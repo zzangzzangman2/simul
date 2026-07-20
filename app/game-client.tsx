@@ -286,6 +286,7 @@ export function GameClient() {
   const [selectedId, setSelectedId] = useState("samsung");
   const [orderMode, setOrderMode] = useState<OrderMode>("buy");
   const [orderPercent, setOrderPercent] = useState(25);
+  const [orderSheetOpen, setOrderSheetOpen] = useState(false);
   const [activeEvent, setActiveEvent] = useState<TimelineEvent | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
@@ -319,6 +320,15 @@ export function GameClient() {
     const timeout = window.setTimeout(() => setToast(null), 2600);
     return () => window.clearTimeout(timeout);
   }, [toast]);
+
+  useEffect(() => {
+    if (!orderSheetOpen) return;
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") setOrderSheetOpen(false);
+    }
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [orderSheetOpen]);
 
   const selectedAsset = assets.find((asset) => asset.id === selectedId) ?? assets[0];
   const currentMonth = months[game.monthIndex];
@@ -499,6 +509,7 @@ export function GameClient() {
     setCompanyDraft("");
     setTab("market");
     setSelectedId("samsung");
+    setOrderSheetOpen(false);
     setToast("새 회사를 시작했습니다.");
   }
 
@@ -512,6 +523,18 @@ export function GameClient() {
       return next;
     });
     setToast(`${companyName}이 2000년의 첫 거래를 시작합니다.`);
+    window.requestAnimationFrame(() => window.scrollTo({ top: 0 }));
+  }
+
+  function navigateTab(nextTab: Tab) {
+    setTab(nextTab);
+    setOrderSheetOpen(false);
+    window.requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: "smooth" }));
+  }
+
+  function openOrderSheet(assetId: string) {
+    setSelectedId(assetId);
+    setOrderSheetOpen(true);
   }
 
   const aumSeries = game.aumHistory.slice(-18).map((point) => point.value);
@@ -533,6 +556,13 @@ export function GameClient() {
             <p className="onboarding-index">00 / INCORPORATION</p>
             <h1>당신의 투자회사에<br /><em>이름을 붙이세요.</em></h1>
             <p>닷컴 열풍과 아시아의 회복이 교차하는 2000년. 50억원과 세 명의 팀으로 첫 투자위원회를 시작합니다.</p>
+
+            <dl className="founding-chips" aria-label="초기 회사 조건">
+              <div><dt>시작일</dt><dd>2000.01.01</dd></div>
+              <div><dt>초기 자본</dt><dd>50억원</dd></div>
+              <div><dt>창립 팀</dt><dd>3명</dd></div>
+              <div><dt>시장</dt><dd>한국 · 미국 · 일본</dd></div>
+            </dl>
 
             <form className="company-form" onSubmit={createCompany}>
               <label htmlFor="company-name">회사 이름</label>
@@ -557,20 +587,6 @@ export function GameClient() {
             </form>
           </div>
 
-          <aside className="founding-brief" aria-label="초기 회사 조건">
-            <span className="brief-label">FOUNDING TERMS</span>
-            <div className="company-name-preview" aria-live="polite">
-              <small>NEW INVESTMENT COMPANY</small>
-              <strong>{companyDraft.trim() || "회사 이름"}</strong>
-            </div>
-            <dl>
-              <div><dt>START DATE</dt><dd>2000.01.01</dd></div>
-              <div><dt>INITIAL CAPITAL</dt><dd>₩ 50억</dd></div>
-              <div><dt>FOUNDING TEAM</dt><dd>3명</dd></div>
-              <div><dt>MARKETS</dt><dd>KR · US · JP</dd></div>
-            </dl>
-            <p>회사 이름을 정하면 이 기기에 자동 저장되며, 이후 시장·포트폴리오·딜룸이 열립니다.</p>
-          </aside>
         </section>
       </main>
     );
@@ -589,53 +605,33 @@ export function GameClient() {
         </div>
       </header>
 
-      <section className="hero-grid">
-        <div className="hero-copy">
-          <span className="status-pill"><i /> REAL HISTORY MODE</span>
-          <p className="hero-kicker">2000년, {game.companyName}의 첫 투자</p>
-          <h1>시장을 읽고,<br /><em>회사를 소유하라.</em></h1>
-          <p className="hero-description">실제 월별 주가 흐름 위에서 투자하고, 팀을 키우고, 시대를 바꾼 인수 기회를 선점하세요.</p>
+      <section className="capital-overview" aria-label="회사 자산 요약">
+        <div className="capital-topline">
+          <span>총 운용자산</span>
+          <span className={aumChange >= 0 ? "positive" : "negative"}>{formatPercent(aumChange)} 이번 달</span>
         </div>
-        <div className="hero-ledger">
-          <div className="ledger-topline">
-            <span>운용자산 AUM</span>
-            <span className={aumChange >= 0 ? "positive" : "negative"}>{formatPercent(aumChange)} M/M</span>
-          </div>
-          <strong className="aum-value" data-testid="aum-value">₩ {formatWon(currentAum).replace("억", " 억")}</strong>
-          <Sparkline values={aumSeries.length > 1 ? aumSeries : [currentAum, currentAum]} color="#d8ff65" />
-          <div className="ledger-breakdown">
-            <span><small>현금</small>{formatWon(game.cash)}</span>
-            <span><small>상장주식</small>{formatWon(invested)}</span>
-            <span><small>인수기업</small>{formatWon(ownedCompanies)}</span>
+        <strong className="capital-value" data-testid="aum-value">₩ {formatWon(currentAum).replace("억", " 억")}</strong>
+        <Sparkline values={aumSeries.length > 1 ? aumSeries : [currentAum, currentAum]} color="#d8ff65" />
+        <div className="capital-breakdown">
+          <span><small>현금</small><b>{formatWon(game.cash)}</b></span>
+          <span><small>주식</small><b>{formatWon(invested)}</b></span>
+          <span><small>인수</small><b>{formatWon(ownedCompanies)}</b></span>
+        </div>
+        <div className="company-status-row">
+          <span><small>팀</small><b>{game.team}명</b></span>
+          <span><small>평판</small><b>{game.reputation}</b></span>
+          <span><small>월수익</small><b>{formatWon(monthlyIncome)}</b></span>
+          <div className="management-actions">
+            <button type="button" onClick={hire}>+ 채용</button>
+            <button type="button" onClick={raiseFund}>펀드</button>
           </div>
         </div>
       </section>
-
-      <section className="command-strip" aria-label="회사 현황">
-        <div><span>TEAM</span><strong>{game.team}명</strong></div>
-        <div><span>REPUTATION</span><strong>{game.reputation}</strong></div>
-        <div><span>MONTHLY DEAL INCOME</span><strong>{formatWon(monthlyIncome)}</strong></div>
-        <div className="command-actions">
-          <button type="button" className="text-button" onClick={hire}>인재 채용 · 3억</button>
-          <button type="button" className="text-button" onClick={raiseFund}>2호 펀드</button>
-        </div>
-      </section>
-
-      <div className="ticker-tape" aria-label="주요 시장 월간 등락">
-        <div className="ticker-track">
-          {assets.concat(assets).map((asset, index) => {
-            const now = priceAt(asset, game.monthIndex);
-            const prev = game.monthIndex ? priceAt(asset, game.monthIndex - 1) : now;
-            const change = ((now - prev) / prev) * 100;
-            return <span key={`${asset.id}-${index}`}><b>{asset.symbol}</b><i className={change >= 0 ? "positive" : "negative"}>{formatPercent(change)}</i></span>;
-          })}
-        </div>
-      </div>
 
       <nav className="game-tabs" aria-label="게임 메뉴">
-        <button type="button" className={tab === "market" ? "active" : ""} onClick={() => setTab("market")}>시장</button>
-        <button type="button" className={tab === "portfolio" ? "active" : ""} onClick={() => setTab("portfolio")}>포트폴리오</button>
-        <button type="button" className={tab === "deals" ? "active" : ""} onClick={() => setTab("deals")}>딜룸 <span>{deals.filter((deal) => deal.month <= currentMonth && !game.acquisitions.some((item) => item.dealId === deal.id)).length}</span></button>
+        <button type="button" className={tab === "market" ? "active" : ""} onClick={() => navigateTab("market")}><i aria-hidden="true">↗</i>시장</button>
+        <button type="button" className={tab === "portfolio" ? "active" : ""} onClick={() => navigateTab("portfolio")}><i aria-hidden="true">▦</i>포트폴리오</button>
+        <button type="button" className={tab === "deals" ? "active" : ""} onClick={() => navigateTab("deals")}><i aria-hidden="true">◇</i>딜룸 <span>{deals.filter((deal) => deal.month <= currentMonth && !game.acquisitions.some((item) => item.dealId === deal.id)).length}</span></button>
       </nav>
 
       {tab === "market" && (
@@ -657,7 +653,7 @@ export function GameClient() {
                 const start = Math.max(0, game.monthIndex - 5);
                 const series = months.slice(start, game.monthIndex + 1).map((_, offset) => priceAt(asset, start + offset));
                 return (
-                  <button type="button" className={`asset-card ${selectedId === asset.id ? "selected" : ""}`} key={asset.id} onClick={() => setSelectedId(asset.id)} aria-pressed={selectedId === asset.id}>
+                  <button type="button" className={`asset-card ${selectedId === asset.id ? "selected" : ""}`} key={asset.id} onClick={() => openOrderSheet(asset.id)} aria-pressed={selectedId === asset.id}>
                     <span className="asset-card-top"><i>{countryFlag[asset.country]}</i><b>{asset.name}</b><small>{asset.symbol}</small></span>
                     <span className="asset-index">{price.toFixed(1)}</span>
                     <span className={change >= 0 ? "asset-change positive" : "asset-change negative"}>{formatPercent(change)}</span>
@@ -669,30 +665,6 @@ export function GameClient() {
             </div>
           </div>
 
-          <aside className="order-ticket" data-testid="order-ticket">
-            <div className="ticket-heading">
-              <div><span>{selectedAsset.market} / {selectedAsset.symbol}</span><h3>{selectedAsset.name}</h3></div>
-              <span className="price-index">IDX {selectedPrice.toFixed(2)}</span>
-            </div>
-            <div className="ticket-chart"><Sparkline values={selectedSeries} color={selectedAsset.color} /></div>
-            <div className="ticket-performance">
-              <span><small>이번 달</small><b className={selectedReturn >= 0 ? "positive" : "negative"}>{formatPercent(selectedReturn)}</b></span>
-              <span><small>보유 가치</small><b>{formatWon(selectedPositionValue)}</b></span>
-            </div>
-            <div className="segmented" role="group" aria-label="주문 유형">
-              <button type="button" className={orderMode === "buy" ? "active" : ""} onClick={() => setOrderMode("buy")}>매수</button>
-              <button type="button" className={orderMode === "sell" ? "active" : ""} onClick={() => setOrderMode("sell")}>매도</button>
-            </div>
-            <div className="percent-grid" role="group" aria-label="주문 비율">
-              {[10, 25, 50, 100].map((percent) => <button type="button" key={percent} className={orderPercent === percent ? "active" : ""} onClick={() => setOrderPercent(percent)}>{percent === 100 ? "MAX" : `${percent}%`}</button>)}
-            </div>
-            <div className="order-summary">
-              <span>{orderMode === "buy" ? "예상 사용 현금" : "예상 매도 가치"}</span>
-              <strong>{formatWon(orderMode === "buy" ? game.cash * orderPercent / 100 : selectedPositionValue * orderPercent / 100)}</strong>
-              <small>거래비용 0.25% 반영 · 수정주가 지수 기준</small>
-            </div>
-            <button type="button" className="primary-button" onClick={placeOrder} data-testid="place-order">{selectedAsset.name} {orderMode === "buy" ? "투자하기" : "매도하기"}</button>
-          </aside>
         </section>
       )}
 
@@ -717,7 +689,7 @@ export function GameClient() {
                 const position = game.positions[asset.id];
                 const value = position.units * priceAt(asset, game.monthIndex);
                 const gain = ((value - position.cost) / position.cost) * 100;
-                return <button type="button" className="holding-row" key={asset.id} onClick={() => { setSelectedId(asset.id); setTab("market"); }}><i style={{ background: asset.color }} /><span><b>{asset.name}</b><small>{asset.market} · {asset.symbol}</small></span><span><b>{formatWon(value)}</b><small className={gain >= 0 ? "positive" : "negative"}>{formatPercent(gain)}</small></span></button>;
+                return <button type="button" className="holding-row" key={asset.id} onClick={() => { setSelectedId(asset.id); setTab("market"); setOrderSheetOpen(true); }}><i style={{ background: asset.color }} /><span><b>{asset.name}</b><small>{asset.market} · {asset.symbol}</small></span><span><b>{formatWon(value)}</b><small className={gain >= 0 ? "positive" : "negative"}>{formatPercent(gain)}</small></span></button>;
               })}
             </div>
           </div>
@@ -759,8 +731,39 @@ export function GameClient() {
         <button type="button" onClick={advanceMonth} data-testid="advance-month">{campaignComplete ? "완주 기록 보기" : "한 달 진행"}<i>→</i></button>
       </div>
 
+      {orderSheetOpen && (
+        <div className="order-sheet-backdrop" role="presentation" onClick={() => setOrderSheetOpen(false)}>
+          <aside className="order-ticket" role="dialog" aria-modal="true" aria-labelledby="order-title" data-testid="order-ticket" onClick={(event) => event.stopPropagation()}>
+            <div className="sheet-handle" aria-hidden="true" />
+            <button type="button" className="sheet-close" onClick={() => setOrderSheetOpen(false)} aria-label="거래창 닫기">×</button>
+            <div className="ticket-heading">
+              <div><span>{selectedAsset.market} / {selectedAsset.symbol}</span><h3 id="order-title">{selectedAsset.name}</h3></div>
+              <span className="price-index">IDX {selectedPrice.toFixed(2)}</span>
+            </div>
+            <div className="ticket-chart"><Sparkline values={selectedSeries} color={selectedAsset.color} /></div>
+            <div className="ticket-performance">
+              <span><small>이번 달</small><b className={selectedReturn >= 0 ? "positive" : "negative"}>{formatPercent(selectedReturn)}</b></span>
+              <span><small>보유 가치</small><b>{formatWon(selectedPositionValue)}</b></span>
+            </div>
+            <div className="segmented" role="group" aria-label="주문 유형">
+              <button type="button" className={orderMode === "buy" ? "active" : ""} onClick={() => setOrderMode("buy")}>매수</button>
+              <button type="button" className={orderMode === "sell" ? "active" : ""} onClick={() => setOrderMode("sell")}>매도</button>
+            </div>
+            <div className="percent-grid" role="group" aria-label="주문 비율">
+              {[10, 25, 50, 100].map((percent) => <button type="button" key={percent} className={orderPercent === percent ? "active" : ""} onClick={() => setOrderPercent(percent)}>{percent === 100 ? "MAX" : `${percent}%`}</button>)}
+            </div>
+            <div className="order-summary">
+              <span>{orderMode === "buy" ? "예상 사용 현금" : "예상 매도 가치"}</span>
+              <strong>{formatWon(orderMode === "buy" ? game.cash * orderPercent / 100 : selectedPositionValue * orderPercent / 100)}</strong>
+              <small>거래비용 0.25% 반영 · 수정주가 지수 기준</small>
+            </div>
+            <button type="button" className="primary-button" onClick={placeOrder} data-testid="place-order">{selectedAsset.name} {orderMode === "buy" ? "투자하기" : "매도하기"}</button>
+          </aside>
+        </div>
+      )}
+
       <footer>
-        <span>{game.companyName} · BUILD 0.2</span>
+        <span>{game.companyName} · BUILD 0.3</span>
         <button type="button" onClick={resetGame}>게임 초기화</button>
       </footer>
 

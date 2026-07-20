@@ -56,7 +56,12 @@ test("documents and preserves the portrait-mobile product contract", async () =>
   assert.match(rules, /최소 360px/);
   assert.match(guide, /첫 방문 시 회사 이름 입력 화면/);
   assert.match(css, /env\(safe-area-inset-bottom\)/);
+  assert.match(css, /width: min\(100%, 430px\)/);
+  assert.match(css, /\.asset-grid \{[\s\S]*?grid-template-columns: 1fr;/);
   assert.match(game, /companyName: string/);
   assert.match(game, /maxLength=\{24\}/);
   assert.match(game, /simul-millennium-capital-v1/);
+  assert.match(game, /orderSheetOpen/);
+  assert.match(game, /order-sheet-backdrop/);
+  assert.match(game, /navigateTab/);
 });
