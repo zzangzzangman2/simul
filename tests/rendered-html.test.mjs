@@ -14,7 +14,7 @@ async function render() {
   );
 }
 
-test("server-renders the investment simulation shell", async () => {
+test("server-renders the required company-name onboarding", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
@@ -22,9 +22,11 @@ test("server-renders the investment simulation shell", async () => {
   const html = await response.text();
   assert.match(html, /<title>MILLENNIUM CAPITAL/);
   assert.match(html, /2000\.01\.01/);
-  assert.match(html, /시장을 읽고/);
-  assert.match(html, /한 달 진행/);
-  assert.match(html, /삼성전자/);
+  assert.match(html, /당신의 투자회사에/);
+  assert.match(html, /id="company-name"/);
+  assert.match(html, /회사 설립하기/);
+  assert.match(html, /disabled/);
+  assert.doesNotMatch(html, /투자할 회사를 고르세요/);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton|Your site is taking shape/);
 });
 
@@ -40,4 +42,21 @@ test("ships a complete 2000-2010 market snapshot", async () => {
     assert.ok(Number.isFinite(asset.prices["2000-01"]));
     assert.ok(Number.isFinite(asset.prices["2010-12"]));
   }
+});
+
+test("documents and preserves the portrait-mobile product contract", async () => {
+  const [rules, guide, css, game] = await Promise.all([
+    readFile(new URL("../AGENTS.md", import.meta.url), "utf8"),
+    readFile(new URL("../PROJECT_GUIDE.md", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+    readFile(new URL("../app/game-client.tsx", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(rules, /390×844px/);
+  assert.match(rules, /최소 360px/);
+  assert.match(guide, /첫 방문 시 회사 이름 입력 화면/);
+  assert.match(css, /env\(safe-area-inset-bottom\)/);
+  assert.match(game, /companyName: string/);
+  assert.match(game, /maxLength=\{24\}/);
+  assert.match(game, /simul-millennium-capital-v1/);
 });

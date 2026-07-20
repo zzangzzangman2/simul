@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 import marketHistory from "./data/market-history.json";
 
 type Market = "ALL" | "KRX" | "NASDAQ" | "TSE";
@@ -25,7 +25,8 @@ type Acquisition = { dealId: string; acquiredIndex: number; purchasePrice: numbe
 type AumPoint = { month: string; value: number };
 
 type GameState = {
-  version: 1;
+  version: 2;
+  companyName: string;
   monthIndex: number;
   cash: number;
   positions: Record<string, Position>;
@@ -35,6 +36,8 @@ type GameState = {
   aumHistory: AumPoint[];
   fundRaised: boolean;
 };
+
+type LegacyGameState = Omit<GameState, "version" | "companyName"> & { version: 1 };
 
 type TimelineEvent = {
   id: string;
@@ -182,7 +185,8 @@ const tradingFee = 0.0025;
 
 function initialState(): GameState {
   return {
-    version: 1,
+    version: 2,
+    companyName: "",
     monthIndex: 0,
     cash: 5_000_000_000,
     positions: {},
@@ -276,6 +280,7 @@ function Sparkline({ values, color }: { values: number[]; color: string }) {
 export function GameClient() {
   const [game, setGame] = useState<GameState>(initialState);
   const [hydrated, setHydrated] = useState(false);
+  const [companyDraft, setCompanyDraft] = useState("");
   const [tab, setTab] = useState<Tab>("market");
   const [marketFilter, setMarketFilter] = useState<Market>("ALL");
   const [selectedId, setSelectedId] = useState("samsung");
@@ -288,8 +293,15 @@ export function GameClient() {
     try {
       const saved = window.localStorage.getItem(storageKey);
       if (saved) {
-        const parsed = JSON.parse(saved) as GameState;
-        if (parsed.version === 1 && parsed.monthIndex < months.length) setGame(parsed);
+        const parsed = JSON.parse(saved) as GameState | LegacyGameState;
+        if (parsed.monthIndex < months.length) {
+          if (parsed.version === 2) {
+            setGame(parsed);
+            setCompanyDraft(parsed.companyName);
+          } else if (parsed.version === 1) {
+            setGame({ ...parsed, version: 2, companyName: "" });
+          }
+        }
       }
     } catch {
       window.localStorage.removeItem(storageKey);
@@ -481,22 +493,95 @@ export function GameClient() {
   }
 
   function resetGame() {
-    if (!window.confirm("현재 회사를 지우고 2000년 1월 1일로 돌아갈까요?")) return;
+    if (!window.confirm(`${game.companyName}의 기록을 지우고 2000년 1월 1일로 돌아갈까요?`)) return;
     window.localStorage.removeItem(storageKey);
     setGame(initialState());
+    setCompanyDraft("");
     setTab("market");
     setSelectedId("samsung");
     setToast("새 회사를 시작했습니다.");
   }
 
+  function createCompany(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const companyName = companyDraft.trim().replace(/\s+/g, " ");
+    if (!companyName) return;
+    setGame((current) => {
+      const next = { ...current, companyName };
+      window.localStorage.setItem(storageKey, JSON.stringify(next));
+      return next;
+    });
+    setToast(`${companyName}이 2000년의 첫 거래를 시작합니다.`);
+  }
+
   const aumSeries = game.aumHistory.slice(-18).map((point) => point.value);
+
+  if (!game.companyName) {
+    return (
+      <main className="onboarding-shell">
+        <header className="onboarding-topbar">
+          <div className="brand-lockup">
+            <span className="brand-mark" aria-hidden="true">M/00</span>
+            <span className="brand-copy"><b>MILLENNIUM CAPITAL</b><small>SIMULATION</small></span>
+          </div>
+          <span>PORTRAIT EDITION · 2000.01.01</span>
+        </header>
+
+        <section className="onboarding-stage">
+          <div className="onboarding-copy">
+            <span className="status-pill"><i /> REAL HISTORY MODE</span>
+            <p className="onboarding-index">00 / INCORPORATION</p>
+            <h1>당신의 투자회사에<br /><em>이름을 붙이세요.</em></h1>
+            <p>닷컴 열풍과 아시아의 회복이 교차하는 2000년. 50억원과 세 명의 팀으로 첫 투자위원회를 시작합니다.</p>
+
+            <form className="company-form" onSubmit={createCompany}>
+              <label htmlFor="company-name">회사 이름</label>
+              <div className="company-input-wrap">
+                <input
+                  id="company-name"
+                  data-testid="company-name-input"
+                  value={companyDraft}
+                  onChange={(event) => setCompanyDraft(event.target.value.slice(0, 24))}
+                  maxLength={24}
+                  placeholder="예: 새벽투자파트너스"
+                  autoComplete="organization"
+                  enterKeyHint="done"
+                  aria-describedby="company-name-help"
+                />
+                <span>{companyDraft.length}/24</span>
+              </div>
+              <small id="company-name-help">이 이름은 상단 간판과 자동 저장 데이터에 사용됩니다.</small>
+              <button type="submit" data-testid="create-company" disabled={!companyDraft.trim()}>
+                회사 설립하기 <i>→</i>
+              </button>
+            </form>
+          </div>
+
+          <aside className="founding-brief" aria-label="초기 회사 조건">
+            <span className="brief-label">FOUNDING TERMS</span>
+            <div className="company-name-preview" aria-live="polite">
+              <small>NEW INVESTMENT COMPANY</small>
+              <strong>{companyDraft.trim() || "회사 이름"}</strong>
+            </div>
+            <dl>
+              <div><dt>START DATE</dt><dd>2000.01.01</dd></div>
+              <div><dt>INITIAL CAPITAL</dt><dd>₩ 50억</dd></div>
+              <div><dt>FOUNDING TEAM</dt><dd>3명</dd></div>
+              <div><dt>MARKETS</dt><dd>KR · US · JP</dd></div>
+            </dl>
+            <p>회사 이름을 정하면 이 기기에 자동 저장되며, 이후 시장·포트폴리오·딜룸이 열립니다.</p>
+          </aside>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="game-shell">
       <header className="topbar">
         <div className="brand-lockup">
           <span className="brand-mark" aria-hidden="true">M/00</span>
-          <span className="brand-copy">MILLENNIUM<br />CAPITAL</span>
+          <span className="brand-copy"><b>{game.companyName}</b><small>INVESTMENT COMPANY</small></span>
         </div>
         <div className="date-block">
           <span>SIMULATION DATE</span>
@@ -507,7 +592,7 @@ export function GameClient() {
       <section className="hero-grid">
         <div className="hero-copy">
           <span className="status-pill"><i /> REAL HISTORY MODE</span>
-          <p className="hero-kicker">2000년, 당신의 첫 투자회사</p>
+          <p className="hero-kicker">2000년, {game.companyName}의 첫 투자</p>
           <h1>시장을 읽고,<br /><em>회사를 소유하라.</em></h1>
           <p className="hero-description">실제 월별 주가 흐름 위에서 투자하고, 팀을 키우고, 시대를 바꾼 인수 기회를 선점하세요.</p>
         </div>
@@ -675,7 +760,7 @@ export function GameClient() {
       </div>
 
       <footer>
-        <span>MILLENNIUM CAPITAL · BUILD 0.1</span>
+        <span>{game.companyName} · BUILD 0.2</span>
         <button type="button" onClick={resetGame}>게임 초기화</button>
       </footer>
 
