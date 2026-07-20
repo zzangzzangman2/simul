@@ -23,6 +23,8 @@ test("server-renders the required company-name onboarding", async () => {
   assert.match(html, /<title>MILLENNIUM CAPITAL/);
   assert.match(html, /2000\.01\.01/);
   assert.match(html, /당신의 투자회사에/);
+  assert.match(html, /100만원/);
+  assert.match(html, /창립 팀<\/dt><dd>1명/);
   assert.match(html, /id="company-name"/);
   assert.match(html, /회사 설립하기/);
   assert.match(html, /disabled/);
@@ -30,26 +32,31 @@ test("server-renders the required company-name onboarding", async () => {
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton|Your site is taking shape/);
 });
 
-test("ships a complete 2000-2010 market snapshot", async () => {
+test("ships a complete daily 2000-2010 market snapshot", async () => {
   const data = JSON.parse(await readFile(new URL("../app/data/market-history.json", import.meta.url), "utf8"));
-  assert.equal(data.period.start, "2000-01");
-  assert.equal(data.period.end, "2010-12");
+  assert.equal(data.schemaVersion, 2);
+  assert.equal(data.period.start, "2000-01-01");
+  assert.equal(data.period.end, "2010-12-31");
   assert.equal(data.assets.length, 9);
 
   for (const asset of data.assets) {
-    const gameMonths = Object.keys(asset.prices).filter((month) => month >= "2000-01" && month <= "2010-12");
-    assert.equal(gameMonths.length, 132, `${asset.symbol} should have 132 monthly observations`);
-    assert.ok(Number.isFinite(asset.prices["2000-01"]));
-    assert.ok(Number.isFinite(asset.prices["2010-12"]));
+    const dates = Object.keys(asset.prices).sort();
+    assert.ok(dates.length >= 2700, `${asset.symbol} should have at least 2700 daily observations`);
+    assert.equal(new Set(dates).size, dates.length, `${asset.symbol} should not contain duplicate dates`);
+    assert.ok(dates[0] >= "1999-12-01" && dates[0] <= "2000-01-04");
+    assert.ok(dates.at(-1) >= "2010-12-30");
+    assert.ok(dates.every((date) => /^\d{4}-\d{2}-\d{2}$/.test(date)));
+    assert.ok(Object.values(asset.prices).every(Number.isFinite));
   }
 });
 
 test("documents and preserves the portrait-mobile product contract", async () => {
-  const [rules, guide, css, game] = await Promise.all([
+  const [rules, guide, css, game, roomImage] = await Promise.all([
     readFile(new URL("../AGENTS.md", import.meta.url), "utf8"),
     readFile(new URL("../PROJECT_GUIDE.md", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     readFile(new URL("../app/game-client.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../public/office-room.png", import.meta.url)),
   ]);
 
   assert.match(rules, /390×844px/);
@@ -59,9 +66,18 @@ test("documents and preserves the portrait-mobile product contract", async () =>
   assert.match(css, /width: min\(100%, 430px\)/);
   assert.match(css, /\.asset-grid \{[\s\S]*?grid-template-columns: 1fr;/);
   assert.match(game, /companyName: string/);
+  assert.match(game, /version: 3/);
+  assert.match(game, /currentDate: string/);
+  assert.match(game, /INITIAL_CAPITAL = 1_000_000/);
+  assert.match(game, /INITIAL_TEAM = 1/);
   assert.match(game, /maxLength=\{24\}/);
   assert.match(game, /simul-millennium-capital-v1/);
+  assert.match(game, /data-testid="office-screen"/);
+  assert.match(game, /data-testid="room-computer"/);
+  assert.match(game, /data-testid="advance-day"/);
   assert.match(game, /orderSheetOpen/);
   assert.match(game, /order-sheet-backdrop/);
   assert.match(game, /navigateTab/);
+  assert.match(css, /url\("\/office-room\.png"\)/);
+  assert.ok(roomImage.byteLength > 100_000);
 });

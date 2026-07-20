@@ -89,15 +89,17 @@ const assets = [
 const start = Math.floor(Date.parse("1999-11-01T00:00:00Z") / 1000);
 const end = Math.floor(Date.parse("2011-02-01T00:00:00Z") / 1000);
 
-function monthKey(timestamp, timeZone) {
+function dayKey(timestamp, timeZone) {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone,
     year: "numeric",
     month: "2-digit",
+    day: "2-digit",
   }).formatToParts(new Date(timestamp * 1000));
   const year = parts.find((part) => part.type === "year")?.value;
   const month = parts.find((part) => part.type === "month")?.value;
-  return `${year}-${month}`;
+  const day = parts.find((part) => part.type === "day")?.value;
+  return `${year}-${month}-${day}`;
 }
 
 async function fetchAsset(asset) {
@@ -106,7 +108,7 @@ async function fetchAsset(asset) {
   );
   url.searchParams.set("period1", String(start));
   url.searchParams.set("period2", String(end));
-  url.searchParams.set("interval", "1mo");
+  url.searchParams.set("interval", "1d");
   url.searchParams.set("events", "history");
   url.searchParams.set("includeAdjustedClose", "true");
 
@@ -132,22 +134,23 @@ async function fetchAsset(asset) {
   chart.timestamp.forEach((timestamp, index) => {
     const value = adjusted[index];
     if (Number.isFinite(value)) {
-      raw[monthKey(timestamp, chart.meta.exchangeTimezoneName)] = value;
+      raw[dayKey(timestamp, chart.meta.exchangeTimezoneName)] = value;
     }
   });
 
-  const baselineKey = raw["1999-12"] ? "1999-12" : Object.keys(raw).sort()[0];
+  const sortedDates = Object.keys(raw).sort();
+  const baselineKey = sortedDates.filter((date) => date <= "1999-12-31").at(-1) ?? sortedDates[0];
   const baseline = raw[baselineKey];
   const prices = Object.fromEntries(
     Object.entries(raw)
-      .filter(([month]) => month >= "1999-12" && month <= "2010-12")
-      .map(([month, value]) => [month, Number(((value / baseline) * 100).toFixed(4))]),
+      .filter(([date]) => date >= "1999-12-01" && date <= "2010-12-31")
+      .map(([date, value]) => [date, Number(((value / baseline) * 100).toFixed(4))]),
   );
 
   return {
     ...asset,
     currency: chart.meta.currency,
-    baselineMonth: baselineKey,
+    baselineDate: baselineKey,
     baselineAdjustedClose: Number(baseline.toFixed(6)),
     prices,
   };
@@ -160,11 +163,11 @@ for (const asset of assets) {
 }
 
 const output = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   generatedAt: new Date().toISOString(),
-  period: { start: "2000-01", end: "2010-12", baseline: "1999-12" },
+  period: { start: "2000-01-01", end: "2010-12-31", baseline: "1999-12" },
   methodology:
-    "월별 수정주가를 1999년 12월=100으로 정규화했습니다. 분할·배당을 반영한 수익률 흐름 비교용이며 당시 화면상 실제 호가가 아닙니다.",
+    "일별 수정주가를 1999년 12월 마지막 가용 거래일=100으로 정규화하고, 해당 기간 응답이 없는 종목은 2000년 1월 첫 가용일=100을 사용했습니다. 분할·배당을 반영한 수익률 흐름 비교용이며 당시 화면상 실제 호가가 아닙니다. 주말·휴장일은 게임에서 직전 거래일 값을 유지합니다.",
   source: {
     name: "Yahoo Finance chart endpoint",
     url: "https://finance.yahoo.com/",

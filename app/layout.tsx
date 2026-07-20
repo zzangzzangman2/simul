@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { headers } from "next/headers";
 import "./globals.css";
@@ -13,13 +13,20 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#0b1117",
+};
+
 export async function generateMetadata(): Promise<Metadata> {
   const requestHeaders = await headers();
   const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") ?? "localhost:3000";
   const protocol = requestHeaders.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
   const origin = `${protocol}://${host}`;
-  const title = "MILLENNIUM CAPITAL — 2000 투자회사 시뮬레이션";
-  const description = "2000년 1월 1일부터 실제 시장 흐름을 따라 투자하고 회사를 인수하는 모바일 경영 시뮬레이션";
+  const title = "MILLENNIUM CAPITAL — 100만원으로 시작하는 2000년 투자회사";
+  const description = "2000년 원룸 사무실에서 100만원과 창립자 1명으로 시작해 하루씩 투자회사를 키우는 모바일 경영 게임";
 
   return {
     title,
@@ -28,13 +35,13 @@ export async function generateMetadata(): Promise<Metadata> {
       title,
       description,
       type: "website",
-      images: [{ url: `${origin}/og.png`, width: 1200, height: 630, alt: title }],
+      images: [{ url: `${origin}/og-room.png`, width: 1200, height: 630, alt: title }],
     },
     twitter: {
       card: "summary_large_image",
       title,
       description,
-      images: [`${origin}/og.png`],
+      images: [`${origin}/og-room.png`],
     },
   };
 }
