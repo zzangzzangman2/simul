@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'game/dynamic_news.dart';
 import 'game/game_engine.dart';
 import 'game/game_persistence.dart';
 import 'game/game_state.dart';
@@ -962,9 +963,33 @@ class OfficeScreen extends StatelessWidget {
   }
 
   Future<void> _handleAdvanceDay(BuildContext context) async {
-    final newspaper = await buildDailyMarketNewspaper(state);
+    final navigator = Navigator.of(context);
+    final loadingRoute = _gameSceneRoute<void>(
+      NewsGeneratingScene(date: state.currentDate),
+    );
+    navigator.push<void>(loadingRoute);
+    final stopwatch = Stopwatch()..start();
+    final client = DynamicNewsClient();
+    DailyMarketNewspaper newspaper;
+    try {
+      final brief = buildDailyBrief(state);
+      final article = await client.generate(
+        dynamicNewsRequestForState(state, brief),
+      );
+      newspaper = await buildDailyMarketNewspaper(
+        state,
+        dynamicArticle: article,
+      );
+      final remaining = 650 - stopwatch.elapsedMilliseconds;
+      if (remaining > 0) {
+        await Future<void>.delayed(Duration(milliseconds: remaining));
+      }
+    } finally {
+      client.close();
+      if (loadingRoute.isActive) navigator.removeRoute(loadingRoute);
+    }
     if (!context.mounted) return;
-    final proceed = await Navigator.of(context).push<bool>(
+    final proceed = await navigator.push<bool>(
       _gameSceneRoute<bool>(KoreaEconomicNewspaperScene(newspaper: newspaper)),
     );
     if (proceed != true || !context.mounted) return;
@@ -1206,6 +1231,122 @@ class FamilyDecisionScene extends StatelessWidget {
           ),
         ),
       ],
+    ),
+  );
+}
+
+class NewsGeneratingScene extends StatelessWidget {
+  const NewsGeneratingScene({super.key, required this.date});
+  final DateTime date;
+
+  @override
+  Widget build(BuildContext context) => PopScope(
+    canPop: false,
+    child: Scaffold(
+      backgroundColor: const Color(0xFF24212B),
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: Image.asset(
+              'assets/images/bg_living_room_1999.png',
+              fit: BoxFit.cover,
+            ),
+          ),
+          const Positioned.fill(child: ColoredBox(color: Color(0xA3181620))),
+          SafeArea(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 520),
+                child: Column(
+                  children: [
+                    const _SceneClockStrip(
+                      location: '우리 집 거실 · 편집 마감',
+                      caption: '오늘의 선택과 시장 기록을 기사로 엮고 있다.',
+                      minute: marketDayEndMinute,
+                      costLabel: 'AI 특별판',
+                    ),
+                    Expanded(
+                      child: Center(
+                        child: Container(
+                          key: const Key('news-generating-scene'),
+                          margin: const EdgeInsets.all(24),
+                          padding: const EdgeInsets.fromLTRB(28, 30, 28, 28),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF5F0E4),
+                            borderRadius: BorderRadius.circular(22),
+                            border: Border.all(
+                              color: const Color(0xFF24211C),
+                              width: 3,
+                            ),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color(0x66000000),
+                                blurRadius: 24,
+                                offset: Offset(0, 10),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.newspaper_rounded,
+                                color: Color(0xFF24211C),
+                                size: 52,
+                              ),
+                              const SizedBox(height: 18),
+                              const Text(
+                                '뉴스를 생성 중입니다',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Color(0xFF171512),
+                                  fontSize: 23,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: -0.8,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                '${date.year}년의 시대 흐름과\n오늘의 행동을 취재하고 있어요.',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: Color(0xFF615B52),
+                                  fontSize: 12,
+                                  height: 1.55,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 22),
+                              const SizedBox(
+                                width: 34,
+                                height: 34,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 4,
+                                  color: Color(0xFFD45D52),
+                                ),
+                              ),
+                              const SizedBox(height: 14),
+                              const Text(
+                                '연결이 늦어지면 기존 시장 기록으로 신문을 완성합니다.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Color(0xFF777168),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     ),
   );
 }
@@ -2076,7 +2217,7 @@ class KoreaEconomicNewspaperSheet extends StatelessWidget {
             ),
             const SizedBox(height: 9),
             Text(
-              newspaper.brief.body,
+              newspaper.dynamicArticle?.content ?? newspaper.brief.body,
               style: const TextStyle(
                 color: Color(0xFF444039),
                 fontSize: 13,
@@ -2084,6 +2225,10 @@ class KoreaEconomicNewspaperSheet extends StatelessWidget {
                 fontWeight: FontWeight.w700,
               ),
             ),
+            if (newspaper.dynamicArticle != null) ...[
+              const SizedBox(height: 12),
+              _DynamicNewsImpact(article: newspaper.dynamicArticle!),
+            ],
             const SizedBox(height: 15),
             Container(
               padding: const EdgeInsets.all(14),
@@ -2190,6 +2335,56 @@ class KoreaEconomicNewspaperSheet extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _DynamicNewsImpact extends StatelessWidget {
+  const _DynamicNewsImpact({required this.article});
+  final DynamicNewsArticle article;
+
+  @override
+  Widget build(BuildContext context) {
+    final positive = article.marketSentiment == 'POSITIVE';
+    final negative = article.marketSentiment == 'NEGATIVE';
+    final label = positive
+        ? '긍정'
+        : negative
+        ? '부정'
+        : '중립';
+    final color = positive
+        ? const Color(0xFFD83B45)
+        : negative
+        ? const Color(0xFF2D6FD2)
+        : const Color(0xFF6B6861);
+    final score = article.stockImpactScore;
+    return Container(
+      key: const Key('dynamic-news-impact'),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFECE4D4),
+        border: Border.all(color: const Color(0xFFBDB29F)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.auto_awesome_rounded, size: 17, color: color),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'AI 기자 · 시장 심리 $label',
+              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900),
+            ),
+          ),
+          Text(
+            '영향 ${score >= 0 ? '+' : ''}${score.toStringAsFixed(1)}',
+            style: TextStyle(
+              color: color,
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
       ),
     );
   }
