@@ -88,11 +88,13 @@ class StockMarketScreen extends StatefulWidget {
     required this.state,
     this.onExecuteTrade,
     this.onSetMarketMinute,
+    this.universe,
   });
 
   final GameState state;
   final Future<GameState> Function(int)? onSetMarketMinute;
   final Future<TradeExecutionResult> Function(TradeOrder)? onExecuteTrade;
+  final HistoricalMarketUniverse? universe;
 
   @override
   State<StockMarketScreen> createState() => _StockMarketScreenState();
@@ -124,7 +126,7 @@ class _StockMarketScreenState extends State<StockMarketScreen> {
 
   Future<void> _loadHistoricalMarket() async {
     try {
-      final universe = await HistoricalMarketUniverse.load();
+      final universe = widget.universe ?? await HistoricalMarketUniverse.load();
       final loaded = <_StockDefinition>[];
       for (final asset in universe.assets) {
         final quote = asset.quoteAtOrBefore(_state.currentDate);
@@ -1422,15 +1424,20 @@ class _MarketBalanceCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Text(
-                '가족 투자계좌',
-                style: TextStyle(
-                  color: Color(0xFF5C6B7A),
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
+              Expanded(
+                child: Text(
+                  '${state.companyName} · 가족 투자계좌',
+                  key: const Key('market-company-name'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF5C6B7A),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ),
-              const Spacer(),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
                 decoration: BoxDecoration(

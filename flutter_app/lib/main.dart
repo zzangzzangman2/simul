@@ -17,6 +17,7 @@ import 'game/seed_money_content.dart';
 import 'game/story_state.dart';
 
 part 'organization_screen.dart';
+part 'room_screens.dart';
 part 'seed_money_screen.dart';
 part 'stock_market_screen.dart';
 part 'visual_novel_onboarding.dart';
@@ -104,8 +105,9 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
         decisionActionMinutes,
       ),
     );
-    setState(() => _state = next);
     await _persistence.save(next);
+    if (!mounted) return;
+    setState(() => _state = next);
   }
 
   Future<GameState> _completeWork(WorkSessionResult result) async {
@@ -814,139 +816,44 @@ class OfficeScreen extends StatelessWidget {
       body: SafeArea(
         child: Column(
           children: [
-            _BrandHeader(trailing: 'DAY ${state.day} · $dateLabel'),
+            _BrandHeader(
+              trailing: 'DAY ${state.day} · $dateLabel',
+              title: state.companyName,
+            ),
             _OfficeMarketClock(
               minute: state.marketMinute,
               tradingDay: isMarketTradingDay(state.currentDate),
             ),
             Expanded(
-              child: Stack(
-                children: [
-                  const Positioned.fill(child: _CartoonRoomBackground()),
-                  Positioned.fill(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.fromLTRB(12, 12, 12, 28),
-                      child: Column(
-                        children: [
-                          _OfficeStatusCard(state: state),
-                          const SizedBox(height: 10),
-                          _TodayNewsCard(state: state),
-                          const SizedBox(height: 16),
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              SizedBox(
-                                width: 118,
-                                child: Image.asset(
-                                  'assets/images/hero-boy.png',
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Column(
-                                  children: [
-                                    _RoomButton(
-                                      key: const Key('open-decisions-button'),
-                                      icon: pending.isEmpty
-                                          ? Icons.mark_email_read_rounded
-                                          : Icons.mark_email_unread_rounded,
-                                      title:
-                                          '안건함 ${pending.isEmpty ? '' : '(${pending.length})'}',
-                                      subtitle: pending.isEmpty
-                                          ? '새 안건 없음'
-                                          : '결정이 기다려요',
-                                      color: pending.isEmpty
-                                          ? const Color(0xFFDFF7EF)
-                                          : _yellow,
-                                      onTap: () => _openDecision(context),
-                                    ),
-                                    const SizedBox(height: 10),
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: _RoomButton(
-                                            key: const Key(
-                                              'open-market-button',
-                                            ),
-                                            icon: Icons.computer_rounded,
-                                            title: 'CRT',
-                                            subtitle: '실시간 시장',
-                                            color: const Color(0xFFDDF3FF),
-                                            compact: true,
-                                            onTap: () =>
-                                                Navigator.of(context).push(
-                                                  _gameSceneRoute<void>(
-                                                    StockMarketScreen(
-                                                      state: state,
-                                                      onSetMarketMinute:
-                                                          onSetMarketMinute,
-                                                      onExecuteTrade:
-                                                          onExecuteTrade,
-                                                    ),
-                                                  ),
-                                                ),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: _RoomButton(
-                                            icon: Icons.folder_rounded,
-                                            title: '서류함',
-                                            subtitle: '장부',
-                                            color: const Color(0xFFFFDCD7),
-                                            compact: true,
-                                            onTap: () => _showLedger(context),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 10),
-                                    _RoomButton(
-                                      key: const Key(
-                                        'open-organization-button',
-                                      ),
-                                      icon: Icons.groups_2_rounded,
-                                      title: '사람들',
-                                      subtitle: '가족 도움 · 직원 배치',
-                                      color: const Color(0xFFFFE9C7),
-                                      onTap: () => Navigator.of(context).push(
-                                        _gameSceneRoute<void>(
-                                          OrganizationScreen(
-                                            state: state,
-                                            onRequestFamilyHelp:
-                                                onRequestFamilyHelp,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 10),
-                                    _RoomButton(
-                                      key: const Key('open-work-button'),
-                                      icon: Icons.savings_rounded,
-                                      title: '일거리',
-                                      subtitle: state.cash >= 10000
-                                          ? '계속할지는 내 선택'
-                                          : '종잣돈 ${_money(state.cash)}원',
-                                      color: const Color(0xFFDDF5E8),
-                                      onTap: () => Navigator.of(context).push(
-                                        _gameSceneRoute<void>(
-                                          SeedMoneyHubScreen(
-                                            state: state,
-                                            onComplete: onCompleteWork,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
+              child: _InteractiveBedroom(
+                state: state,
+                onOpenDecisions: () => _openDecision(context),
+                onOpenMarket: () => Navigator.of(context).push(
+                  _gameSceneRoute<void>(
+                    StockMarketScreen(
+                      state: state,
+                      onSetMarketMinute: onSetMarketMinute,
+                      onExecuteTrade: onExecuteTrade,
                     ),
                   ),
-                ],
+                ),
+                onOpenLedger: () => _openLedger(context),
+                onOpenOrganization: () => Navigator.of(context).push(
+                  _gameSceneRoute<void>(
+                    OrganizationScreen(
+                      state: state,
+                      onRequestFamilyHelp: onRequestFamilyHelp,
+                    ),
+                  ),
+                ),
+                onOpenWork: () => Navigator.of(context).push(
+                  _gameSceneRoute<void>(
+                    SeedMoneyHubScreen(
+                      state: state,
+                      onComplete: onCompleteWork,
+                    ),
+                  ),
+                ),
               ),
             ),
             _AdvanceBar(
@@ -955,7 +862,6 @@ class OfficeScreen extends StatelessWidget {
               tradingDay: isMarketTradingDay(state.currentDate),
               onAdvanceHour: () => _handleAdvanceHour(context),
               onReadNewspaper: () => _handleAdvanceDay(context),
-              onOpenDecision: () => _openDecision(context),
             ),
           ],
         ),
@@ -1011,167 +917,17 @@ class OfficeScreen extends StatelessWidget {
   }
 
   void _openDecision(BuildContext context) {
-    final pending = state.pendingDecisions;
-    if (pending.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('지금은 기다리는 안건이 없어요. 하루를 보내보세요!')),
-      );
-      return;
-    }
     Navigator.of(context).push<void>(
       _gameSceneRoute<void>(
-        FamilyDecisionScene(
-          state: state,
-          decision: pending.first,
-          onSelect: (sceneContext, optionId) async {
-            Navigator.of(sceneContext).pop();
-            await onResolveDecision(pending.first.id, optionId);
-          },
-        ),
+        DecisionInboxScreen(state: state, onResolveDecision: onResolveDecision),
       ),
     );
   }
 
-  void _showLedger(BuildContext context) {
-    showModalBottomSheet<void>(
-      context: context,
-      useSafeArea: true,
-      isScrollControlled: true,
-      builder: (context) => FractionallySizedBox(
-        heightFactor: 0.86,
-        child: FutureBuilder<HistoricalMarketUniverse>(
-          future: HistoricalMarketUniverse.load(),
-          builder: (context, snapshot) {
-            final assets = {
-              for (final asset
-                  in snapshot.data?.assets ?? const <HistoricalMarketAsset>[])
-                asset.id: asset,
-            };
-            final prices = <String, double>{};
-            for (final position in state.positions) {
-              final asset = assets[position.assetId];
-              if (asset == null || asset.currency != 'KRW') continue;
-              final price = _portfolioPriceAtCurrentTime(asset, state);
-              if (price != null) prices[position.assetId] = price;
-            }
-            final portfolioValue = state.portfolioValue(prices);
-            final aum = state.totalAum(prices);
-            return ListView(
-              padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
-              children: [
-                const Text(
-                  '서류함 · 포트폴리오',
-                  style: TextStyle(
-                    color: _ink,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                _OutlinedCard(
-                  color: const Color(0xFFEFF6FF),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: _StatusValue(
-                          label: '현금',
-                          value: '${_money(state.cash)}원',
-                        ),
-                      ),
-                      Expanded(
-                        child: _StatusValue(
-                          label: '원화 주식',
-                          value: snapshot.hasData
-                              ? '${_money(portfolioValue)}원'
-                              : '계산 중',
-                        ),
-                      ),
-                      Expanded(
-                        child: _StatusValue(
-                          label: '원화 AUM',
-                          value: snapshot.hasData ? '${_money(aum)}원' : '계산 중',
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  '보유 종목',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900),
-                ),
-                if (state.positions.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 14),
-                    child: Text('아직 보유한 주식이 없어요.'),
-                  )
-                else
-                  ...state.positions.map((position) {
-                    final asset = assets[position.assetId];
-                    final price = prices[position.assetId];
-                    final isForeign = position.currency != 'KRW';
-                    final value = price == null
-                        ? null
-                        : (price * position.units).round();
-                    final returnRate = value == null || position.totalCost <= 0
-                        ? null
-                        : (value - position.totalCost) /
-                              position.totalCost *
-                              100;
-                    final units =
-                        position.units == position.units.roundToDouble()
-                        ? position.units.toInt().toString()
-                        : position.units.toStringAsFixed(4);
-                    return ListTile(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(asset?.name ?? position.name),
-                      subtitle: Text(
-                        '$units주 · 평균 ${_money(position.averageCost.round())}원'
-                        '${returnRate == null ? '' : ' · ${returnRate >= 0 ? '+' : ''}${returnRate.toStringAsFixed(2)}%'}',
-                      ),
-                      trailing: Text(
-                        isForeign
-                            ? '환율 연결 대기'
-                            : value == null
-                            ? '시세 없음'
-                            : '${_money(value)}원',
-                        style: const TextStyle(fontWeight: FontWeight.w900),
-                      ),
-                    );
-                  }),
-                const Divider(height: 28),
-                const Text(
-                  '현금 원장',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900),
-                ),
-                if (state.ledger.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 14),
-                    child: Text('아직 기록된 거래가 없어요.'),
-                  )
-                else
-                  ...state.ledger.reversed
-                      .take(20)
-                      .map(
-                        (entry) => ListTile(
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
-                          title: Text(entry.description),
-                          subtitle: Text(
-                            'DAY ${entry.day} · ${entry.sourceId}',
-                          ),
-                          trailing: Text(
-                            '${entry.amount > 0 ? '+' : ''}${_money(entry.amount)}원',
-                          ),
-                        ),
-                      ),
-              ],
-            );
-          },
-        ),
-      ),
-    );
+  void _openLedger(BuildContext context) {
+    Navigator.of(
+      context,
+    ).push<void>(_gameSceneRoute<void>(PortfolioLedgerScreen(state: state)));
   }
 }
 
@@ -1297,7 +1053,7 @@ class _SceneClockStrip extends StatelessWidget {
   }
 }
 
-class FamilyDecisionScene extends StatelessWidget {
+class FamilyDecisionScene extends StatefulWidget {
   const FamilyDecisionScene({
     super.key,
     required this.state,
@@ -1306,45 +1062,116 @@ class FamilyDecisionScene extends StatelessWidget {
   });
   final GameState state;
   final DecisionCardData decision;
-  final void Function(BuildContext context, String optionId) onSelect;
+  final Future<void> Function(BuildContext context, String optionId) onSelect;
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: const Color(0xFF22253A),
-    body: Stack(
-      children: [
-        Positioned.fill(
-          child: Image.asset(
-            'assets/images/bg_living_room_1999.png',
-            fit: BoxFit.cover,
+  State<FamilyDecisionScene> createState() => _FamilyDecisionSceneState();
+}
+
+class _FamilyDecisionSceneState extends State<FamilyDecisionScene> {
+  bool _isSubmitting = false;
+
+  Future<void> _handleSelect(String optionId) async {
+    if (_isSubmitting) return;
+    setState(() => _isSubmitting = true);
+    try {
+      await widget.onSelect(context, optionId);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('안건 저장에 실패했어요. 다시 선택해 주세요.')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => PopScope(
+    canPop: !_isSubmitting,
+    child: Scaffold(
+      backgroundColor: const Color(0xFF22253A),
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: Image.asset(
+              'assets/images/bg_living_room_1999.png',
+              fit: BoxFit.cover,
+            ),
           ),
-        ),
-        const Positioned.fill(child: ColoredBox(color: Color(0x8A171926))),
-        SafeArea(
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 520),
-              child: Column(
-                children: [
-                  _SceneClockStrip(
-                    location: '우리 집 거실 · 가족회의',
-                    caption: '엄마가 새 안건을 식탁 위에 올려두었다.',
-                    minute: state.marketMinute,
-                    costLabel: '결정 +30분',
-                    onBack: () => Navigator.of(context).pop(),
-                  ),
-                  Expanded(
-                    child: DecisionSheet(
-                      state: state,
-                      decision: decision,
-                      onSelect: (optionId) => onSelect(context, optionId),
+          const Positioned.fill(child: ColoredBox(color: Color(0x8A171926))),
+          SafeArea(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 520),
+                child: Column(
+                  children: [
+                    _SceneClockStrip(
+                      location: '우리 집 거실 · 가족회의',
+                      caption: _isSubmitting
+                          ? '선택을 투자노트에 저장하고 있다.'
+                          : '엄마가 새 안건을 식탁 위에 올려두었다.',
+                      minute: widget.state.marketMinute,
+                      costLabel: _isSubmitting ? '저장 중' : '결정 +30분',
+                      onBack: _isSubmitting
+                          ? null
+                          : () => Navigator.of(context).pop(),
                     ),
-                  ),
-                ],
+                    Expanded(
+                      child: Stack(
+                        children: [
+                          Positioned.fill(
+                            child: AbsorbPointer(
+                              absorbing: _isSubmitting,
+                              child: DecisionSheet(
+                                state: widget.state,
+                                decision: widget.decision,
+                                onSelect: _handleSelect,
+                              ),
+                            ),
+                          ),
+                          if (_isSubmitting)
+                            const Positioned(
+                              left: 20,
+                              right: 20,
+                              bottom: 20,
+                              child: _DecisionSavingIndicator(),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _DecisionSavingIndicator extends StatelessWidget {
+  const _DecisionSavingIndicator();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    key: const Key('decision-saving-indicator'),
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+    decoration: BoxDecoration(
+      color: const Color(0xF2FFF8E7),
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: _ink, width: 2),
+    ),
+    child: const Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        SizedBox(
+          width: 18,
+          height: 18,
+          child: CircularProgressIndicator(strokeWidth: 2.5),
         ),
+        SizedBox(width: 10),
+        Text('투자노트에 저장 중…', style: TextStyle(fontWeight: FontWeight.w900)),
       ],
     ),
   );
@@ -1732,7 +1559,7 @@ class _OfficeStatusCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  'DAY ${state.day} · ${state.companyName} 투자연구소',
+                  'DAY ${state.day} · ${state.companyName}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
@@ -2571,14 +2398,12 @@ class _AdvanceBar extends StatelessWidget {
     required this.tradingDay,
     required this.onAdvanceHour,
     required this.onReadNewspaper,
-    required this.onOpenDecision,
   });
   final bool hasPendingDecision;
   final int marketMinute;
   final bool tradingDay;
   final VoidCallback onAdvanceHour;
   final VoidCallback onReadNewspaper;
-  final VoidCallback onOpenDecision;
 
   @override
   Widget build(BuildContext context) {
@@ -2595,7 +2420,7 @@ class _AdvanceBar extends StatelessWidget {
           Expanded(
             child: Text(
               hasPendingDecision
-                  ? '결정할 안건이 있어요!'
+                  ? '책상 위 편지를 확인해야 시간이 흘러요.'
                   : ended
                   ? '오늘 장이 끝났어요. 신문을 펼쳐볼까요?'
                   : '${marketTimeLabel(marketMinute)} · ${info.label}',
@@ -2611,21 +2436,21 @@ class _AdvanceBar extends StatelessWidget {
             child: ElevatedButton.icon(
               key: const Key('advance-day-button'),
               onPressed: hasPendingDecision
-                  ? onOpenDecision
+                  ? null
                   : ended
                   ? onReadNewspaper
                   : onAdvanceHour,
               iconAlignment: IconAlignment.end,
               icon: Icon(
                 hasPendingDecision
-                    ? Icons.mark_email_unread_rounded
+                    ? Icons.lock_clock_rounded
                     : ended
                     ? Icons.newspaper_rounded
                     : Icons.schedule_rounded,
               ),
               label: Text(
                 hasPendingDecision
-                    ? '안건 열기'
+                    ? '진행 잠김'
                     : ended
                     ? '오늘 신문'
                     : '1시간 뒤',
@@ -2652,12 +2477,19 @@ class _AdvanceBar extends StatelessWidget {
 }
 
 class _BrandHeader extends StatelessWidget {
-  const _BrandHeader({required this.trailing});
+  const _BrandHeader({required this.trailing, this.title});
 
   final String trailing;
+  final String? title;
 
   @override
   Widget build(BuildContext context) {
+    final displayTitle = title?.trim().isNotEmpty == true
+        ? title!.trim()
+        : '밀레니엄 캐피탈';
+    final mark = title?.trim().isNotEmpty == true
+        ? String.fromCharCode(displayTitle.runes.first)
+        : 'MC';
     return Container(
       height: 62,
       padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -2677,19 +2509,22 @@ class _BrandHeader extends StatelessWidget {
               borderRadius: BorderRadius.circular(14),
               boxShadow: const [BoxShadow(color: _ink, offset: Offset(3, 3))],
             ),
-            child: const Text(
-              'MC',
-              style: TextStyle(color: _ink, fontWeight: FontWeight.w900),
+            child: Text(
+              mark,
+              style: const TextStyle(color: _ink, fontWeight: FontWeight.w900),
             ),
           ),
           const SizedBox(width: 12),
-          const Expanded(
+          Expanded(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '밀레니엄 캐피탈',
+                  displayTitle,
+                  key: const Key('company-header-title'),
+                  maxLines: 1,
+                  softWrap: false,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: _ink,

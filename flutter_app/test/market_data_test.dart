@@ -3,6 +3,14 @@ import 'package:millennium_capital/game/market_data.dart';
 import 'package:millennium_capital/game/market_tick.dart';
 
 void main() {
+  test('default market universe reuses the same cached load', () async {
+    final first = HistoricalMarketUniverse.load();
+    final second = HistoricalMarketUniverse.load();
+
+    expect(identical(first, second), isTrue);
+    expect((await first).assets, isNotEmpty);
+  });
+
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test(

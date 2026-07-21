@@ -103,7 +103,10 @@ class _VisualNovelOnboardingScreenState
     _ => '',
   };
 
-  void _next() => setState(() => _beat += 1);
+  void _next() {
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() => _beat += 1);
+  }
 
   void _finish() {
     final playerName = _playerController.text.trim();
@@ -118,6 +121,7 @@ class _VisualNovelOnboardingScreenState
         _familyRule == null) {
       return;
     }
+    FocusManager.instance.primaryFocus?.unfocus();
     widget.onCreate(
       NewGameSetup(
         playerName: playerName,
@@ -132,9 +136,11 @@ class _VisualNovelOnboardingScreenState
   @override
   Widget build(BuildContext context) {
     final viewInsets = MediaQuery.viewInsetsOf(context);
+    final isKeyboardOpen = viewInsets.bottom > 0;
+    final isNameEntry = _beat == 11 || _beat == 15;
     return Scaffold(
       backgroundColor: const Color(0xFF171B2A),
-      resizeToAvoidBottomInset: true,
+      resizeToAvoidBottomInset: false,
       body: Stack(
         fit: StackFit.expand,
         children: [
@@ -171,28 +177,32 @@ class _VisualNovelOnboardingScreenState
           ),
           if (_character != null)
             Positioned.fill(
-              bottom: viewInsets.bottom > 0 ? 210 : 122,
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 420),
-                transitionBuilder: (child, animation) => FadeTransition(
-                  opacity: animation,
-                  child: SlideTransition(
-                    position: Tween<Offset>(
-                      begin: const Offset(0, 0.06),
-                      end: Offset.zero,
-                    ).animate(animation),
-                    child: child,
+              bottom: 122,
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 180),
+                opacity: isKeyboardOpen && isNameEntry ? 0 : 1,
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 420),
+                  transitionBuilder: (child, animation) => FadeTransition(
+                    opacity: animation,
+                    child: SlideTransition(
+                      position: Tween<Offset>(
+                        begin: const Offset(0, 0.06),
+                        end: Offset.zero,
+                      ).animate(animation),
+                      child: child,
+                    ),
                   ),
-                ),
-                child: Align(
-                  key: ValueKey('$_character-$_beat'),
-                  alignment: _characterAlignment,
-                  child: FractionallySizedBox(
-                    heightFactor: 0.78,
-                    child: Image.asset(
-                      _character!,
-                      fit: BoxFit.contain,
-                      filterQuality: FilterQuality.high,
+                  child: Align(
+                    key: ValueKey('$_character-$_beat'),
+                    alignment: _characterAlignment,
+                    child: FractionallySizedBox(
+                      heightFactor: 0.78,
+                      child: Image.asset(
+                        _character!,
+                        fit: BoxFit.contain,
+                        filterQuality: FilterQuality.high,
+                      ),
                     ),
                   ),
                 ),
@@ -202,13 +212,23 @@ class _VisualNovelOnboardingScreenState
             child: AnimatedPadding(
               duration: const Duration(milliseconds: 180),
               padding: EdgeInsets.fromLTRB(12, 76, 12, viewInsets.bottom + 10),
-              child: Align(
-                alignment: Alignment.bottomCenter,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 560),
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 260),
-                    child: _buildDialogue(context),
+              child: LayoutBuilder(
+                builder: (context, constraints) => Align(
+                  alignment: Alignment.bottomCenter,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: 560,
+                      maxHeight: constraints.maxHeight,
+                    ),
+                    child: SingleChildScrollView(
+                      reverse: isKeyboardOpen && isNameEntry,
+                      keyboardDismissBehavior:
+                          ScrollViewKeyboardDismissBehavior.onDrag,
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 260),
+                        child: _buildDialogue(context),
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -278,7 +298,12 @@ class _VisualNovelOnboardingScreenState
           controller: _playerController,
           maxLength: 12,
           autofocus: false,
+          textInputAction: TextInputAction.done,
           onChanged: (_) => setState(() {}),
+          onSubmitted: (_) {
+            if (_playerController.text.trim().isNotEmpty) _next();
+          },
+          onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
           decoration: _fieldDecoration('예: 민준'),
         ),
         _NovelNextButton(
@@ -361,8 +386,11 @@ class _VisualNovelOnboardingScreenState
         TextField(
           key: const Key('company-name-input'),
           controller: _companyController,
-          maxLength: 18,
+          maxLength: 24,
+          textInputAction: TextInputAction.done,
           onChanged: (_) => setState(() {}),
+          onSubmitted: (_) => _finish(),
+          onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
           decoration: _fieldDecoration('예: 별빛 투자'),
         ),
         _NovelNextButton(

@@ -107,6 +107,9 @@ class HistoricalMarketAsset {
 }
 
 class HistoricalMarketUniverse {
+  static const _defaultAssetPath = 'assets/market/market-history.json';
+  static Future<HistoricalMarketUniverse>? _cachedDefaultLoad;
+
   const HistoricalMarketUniverse({
     required this.schemaVersion,
     required this.sourceName,
@@ -133,8 +136,26 @@ class HistoricalMarketUniverse {
   final List<HistoricalMarketAsset> assets;
 
   static Future<HistoricalMarketUniverse> load({
-    String assetPath = 'assets/market/market-history.json',
-  }) async {
+    String assetPath = _defaultAssetPath,
+    bool forceRefresh = false,
+  }) {
+    if (assetPath != _defaultAssetPath) return _loadFromAsset(assetPath);
+    if (forceRefresh) _cachedDefaultLoad = null;
+    return _cachedDefaultLoad ??= _loadFromAsset(assetPath).onError((
+      error,
+      stackTrace,
+    ) {
+      _cachedDefaultLoad = null;
+      Error.throwWithStackTrace(
+        error ?? StateError('시장 데이터 로드 실패'),
+        stackTrace,
+      );
+    });
+  }
+
+  static Future<HistoricalMarketUniverse> _loadFromAsset(
+    String assetPath,
+  ) async {
     final raw = await rootBundle.loadString(assetPath);
     return HistoricalMarketUniverse.fromJson(
       jsonDecode(raw) as Map<String, dynamic>,
