@@ -206,10 +206,13 @@ class _OrganizationSummary extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Text(
-                  '가족 투자연구소',
-                  style: TextStyle(
+                  state.companyName,
+                  key: const Key('organization-company-name'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 18,
                     fontWeight: FontWeight.w900,

@@ -2,9 +2,13 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:millennium_capital/game/game_engine.dart';
 import 'package:millennium_capital/game/game_persistence.dart';
+import 'package:millennium_capital/game/game_state.dart';
 import 'package:millennium_capital/main.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'support/market_fixture.dart';
 
 void main() {
   setUp(() {
@@ -75,10 +79,15 @@ void main() {
 
     await completeStoryOnboarding(tester);
 
-    expect(find.textContaining('별빛 투자 투자연구소'), findsOneWidget);
+    final companyHeader = tester.widget<Text>(
+      find.byKey(const Key('company-header-title')),
+    );
+    expect(companyHeader.data, '별빛 투자');
+    expect(companyHeader.maxLines, 1);
+    expect(companyHeader.softWrap, isFalse);
     expect(find.text('FAMILY RESEARCH DESK'), findsOneWidget);
-    expect(find.text('가족 신뢰'), findsOneWidget);
-    expect(find.text('안건 열기'), findsOneWidget);
+    expect(find.byKey(const Key('room-company-sign')), findsOneWidget);
+    expect(find.text('진행 잠김'), findsOneWidget);
   });
 
   testWidgets('existing v1 save is restored with safe story defaults', (
@@ -97,9 +106,12 @@ void main() {
     await tester.pumpWidget(const MillenniumCapitalApp());
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('이어하기 연구소'), findsOneWidget);
+    final companyHeader = tester.widget<Text>(
+      find.byKey(const Key('company-header-title')),
+    );
+    expect(companyHeader.data, '이어하기 연구소');
     expect(find.textContaining('DAY 8'), findsWidgets);
-    expect(find.text('가족 신뢰'), findsOneWidget);
+    expect(find.byKey(const Key('room-company-name')), findsOneWidget);
   });
 
   testWidgets('first research sheet is one-hand operable', (tester) async {
@@ -121,18 +133,24 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('첫 기업 조사노트'), findsWidgets);
+    expect(find.byKey(const Key('decision-inbox-screen')), findsOneWidget);
+    await tester.tap(
+      find.byKey(const Key('decision-inbox-item-first-research-note')),
+    );
+    await tester.pumpAndSettle();
     final option = find.byKey(const Key('decision-option-research_products'));
     expect(option, findsOneWidget);
     expect(tester.getSize(option).height, greaterThanOrEqualTo(44));
 
     await tester.tap(option);
     await tester.pumpAndSettle();
-    expect(find.text('시간을 보내도 좋아요'), findsOneWidget);
+    expect(find.byKey(const Key('decision-inbox-screen')), findsNothing);
+    expect(find.text('안건 편지'), findsOneWidget);
     expect(find.text('08:30'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('market ticks and opens a stock detail', (tester) async {
+  testWidgets('desk drawer opens the ledger as its own scene', (tester) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     SharedPreferences.setMockInitialValues({
@@ -147,12 +165,117 @@ void main() {
 
     await tester.pumpWidget(const MillenniumCapitalApp());
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('open-market-button')));
-    await tester.pump();
+    await tester.tap(find.byKey(const Key('open-ledger-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('portfolio-ledger-screen')), findsOneWidget);
+    expect(find.text('서류함 · 포트폴리오'), findsOneWidget);
+    expect(
+      tester.widget<Text>(find.byKey(const Key('ledger-company-name'))).data,
+      '별빛 투자',
+    );
     await tester.runAsync(() async {
-      await Future<void>.delayed(const Duration(milliseconds: 500));
+      await Future<void>.delayed(const Duration(seconds: 2));
     });
-    for (var attempt = 0; attempt < 50; attempt++) {
+    for (var attempt = 0; attempt < 40; attempt++) {
+      await tester.pump(const Duration(milliseconds: 100));
+      if (find.text('계산 중').evaluate().isEmpty) break;
+    }
+    expect(find.text('계산 중'), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('ledger shows valued local and pending foreign positions', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final state = const GameEngine()
+        .createNewGame('별빛 투자', initialCash: 1000000)
+        .copyWith(
+          day: 4,
+          positions: const [
+            PortfolioPosition(
+              assetId: 'kr-005930',
+              symbol: '005930.KS',
+              name: '삼성전자',
+              market: 'KOSPI',
+              currency: 'KRW',
+              units: 10,
+              totalCost: 60000,
+            ),
+            PortfolioPosition(
+              assetId: 'us-aapl',
+              symbol: 'AAPL',
+              name: '애플',
+              market: 'NASDAQ',
+              currency: 'USD',
+              units: 2,
+              totalCost: 30000,
+            ),
+          ],
+        );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PortfolioLedgerScreen(
+          state: state,
+          universe: testMarketUniverse(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('삼성전자'), findsOneWidget);
+    final samsungDetails = tester.widget<Text>(
+      find.textContaining('10주 · 평균 6,000원'),
+    );
+    expect(samsungDetails.data, contains('%'));
+    final samsungTile = tester.widget<ListTile>(
+      find.ancestor(of: find.text('삼성전자'), matching: find.byType(ListTile)),
+    );
+    final samsungValue = (samsungTile.trailing! as Text).data!;
+    expect(samsungValue, endsWith('원'));
+    expect(samsungValue, isNot('시세 없음'));
+    expect(find.text('애플'), findsOneWidget);
+    expect(find.text('환율 연결 대기'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('market ticks and opens a stock detail', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final state = const GameEngine()
+        .createNewGame('별빛 투자', initialCash: 1000000)
+        .copyWith(day: 4);
+    const engine = GameEngine();
+    final persistence = GamePersistence();
+    var current = state;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StockMarketScreen(
+          state: state,
+          universe: testMarketUniverse(),
+          onSetMarketMinute: (minute) async {
+            current = current.copyWith(marketMinute: minute);
+            await persistence.save(current);
+            return current;
+          },
+          onExecuteTrade: (order) async {
+            final result = engine.executeTrade(current, order);
+            if (result.success) {
+              current = result.state;
+              await persistence.save(current);
+            }
+            return result;
+          },
+        ),
+      ),
+    );
+    await tester.pump();
+    for (var attempt = 0; attempt < 20; attempt++) {
       await tester.pump(const Duration(milliseconds: 100));
       if (find.byKey(const Key('stock-row-005930')).evaluate().isNotEmpty) {
         break;
@@ -160,6 +283,10 @@ void main() {
     }
 
     expect(find.text('2000년 국내 종목'), findsOneWidget);
+    expect(
+      tester.widget<Text>(find.byKey(const Key('market-company-name'))).data,
+      '별빛 투자 · 가족 투자계좌',
+    );
     await tester.tap(find.byKey(const Key('market-sort-name')));
     await tester.pump();
     if (find.byKey(const Key('stock-row-005930')).evaluate().isEmpty) {
@@ -260,6 +387,12 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('employee-count-badge')), findsOneWidget);
+      expect(
+        tester
+            .widget<Text>(find.byKey(const Key('organization-company-name')))
+            .data,
+        '가족 배치 연구소',
+      );
       expect(find.text('정식 직원 0명'), findsOneWidget);
       expect(
         find.byKey(const Key('assignment-portrait-mother')),
