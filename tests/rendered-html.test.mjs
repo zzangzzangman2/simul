@@ -123,3 +123,32 @@ test("keeps Gemini credentials server-side and forces the news JSON schema", asy
   assert.match(generator, /maximum: 50/);
   assert.doesNotMatch(generator, /NEXT_PUBLIC_[A-Z_]*(?:KEY|SECRET)/);
 });
+test("allows local Flutter Web preflight and rejects unknown origins", async () => {
+  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
+  workerUrl.searchParams.set("cors-test", `${process.pid}-${Date.now()}`);
+  const { default: worker } = await import(workerUrl.href);
+  const env = { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } };
+  const ctx = { waitUntil() {}, passThroughOnException() {} };
+
+  const preflight = await worker.fetch(
+    new Request("http://localhost/api/news", {
+      method: "OPTIONS",
+      headers: { origin: "http://localhost:3001" },
+    }),
+    env,
+    ctx,
+  );
+  assert.equal(preflight.status, 204);
+  assert.equal(preflight.headers.get("access-control-allow-origin"), "http://localhost:3001");
+
+  const rejected = await worker.fetch(
+    new Request("http://localhost/api/news", {
+      method: "POST",
+      headers: { origin: "https://attacker.example", "content-type": "application/json" },
+      body: "{}",
+    }),
+    env,
+    ctx,
+  );
+  assert.equal(rejected.status, 403);
+});
