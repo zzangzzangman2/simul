@@ -198,6 +198,30 @@ void main() {
     expect(find.byKey(const Key('minute-interval-selector')), findsOneWidget);
     expect(find.byKey(const Key('minute-candle-chart')), findsOneWidget);
     expect(find.byKey(const Key('write-research-note-button')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('write-research-note-button')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('현재 게임 체결가'), findsOneWidget);
+    expect(find.byKey(const Key('order-quantity-value')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.byKey(const Key('request-parent-order-approval')));
+    for (var attempt = 0; attempt < 20; attempt++) {
+      await tester.pump(const Duration(milliseconds: 50));
+      if (find.byKey(const Key('order-result')).evaluate().isNotEmpty) break;
+    }
+    expect(find.textContaining('1주 매수 완료'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    final saved =
+        jsonDecode(
+              (await SharedPreferences.getInstance()).getString(
+                GamePersistence.saveKey,
+              )!,
+            )
+            as Map<String, dynamic>;
+    expect((saved['positions'] as List<dynamic>), hasLength(1));
+    expect(saved['cash'] as int, lessThan(1000000));
+    await tester.tap(find.byKey(const Key('request-parent-order-approval')));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
     await tester.scrollUntilVisible(
       find.byKey(const Key('historical-executive-section')),
       220,

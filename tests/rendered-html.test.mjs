@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import vm from "node:vm";
 
 async function render() {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
@@ -19,10 +20,12 @@ test("opens the Flutter family-story prologue from the default route", async () 
   assert.ok([307, 308].includes(response.status));
   assert.equal(new URL(response.headers.get("location"), "http://localhost").pathname, "/play/index.html");
 
-  const [page, flutterIndex, onboarding] = await Promise.all([
+  const [page, flutterIndex, onboarding, layout, socialCard] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../public/play/index.html", import.meta.url), "utf8"),
     readFile(new URL("../flutter_app/lib/visual_novel_onboarding.dart", import.meta.url), "utf8"),
+    readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../public/og.png", import.meta.url)),
   ]);
   assert.match(page, /redirect\("\/play\/index\.html"\)/);
   assert.doesNotMatch(page, /GameClient/);
@@ -32,6 +35,66 @@ test("opens the Flutter family-story prologue from the default route", async () 
   assert.match(onboarding, /1999\.12\.31\s+·\s+23:57/);
   assert.match(onboarding, /가족 투자연구소/);
   assert.doesNotMatch(onboarding, /100만원/);
+  assert.match(layout, /0원에서 시작하는 가족 투자연구소/);
+  assert.match(layout, /images: \[\{ url: `\$\{origin\}\/og\.png`, width: 1731, height: 909/);
+  assert.match(layout, /themeColor: "#BDEBFA"/);
+  assert.doesNotMatch(layout, /og-room|100만원/);
+  assert.ok(socialCard.byteLength > 1_000_000);
+});
+
+test("bridges a legacy React save before Flutter starts without overwriting Flutter progress", async () => {
+  const flutterTemplate = await readFile(
+    new URL("../flutter_app/web/index.html", import.meta.url),
+    "utf8",
+  );
+  const script = flutterTemplate.match(
+    /<script id="legacy-save-bridge">([\s\S]*?)<\/script>/,
+  )?.[1];
+  assert.ok(script, "legacy save bridge should be present");
+  assert.ok(
+    flutterTemplate.indexOf('id="legacy-save-bridge"') <
+      flutterTemplate.indexOf('src="flutter_bootstrap.js"'),
+    "legacy save bridge must run before Flutter bootstrap",
+  );
+
+  function runBridge(entries) {
+    const storage = new Map(Object.entries(entries));
+    const writes = [];
+    const localStorage = {
+      getItem(key) {
+        return storage.has(key) ? storage.get(key) : null;
+      },
+      setItem(key, value) {
+        writes.push([key, value]);
+        storage.set(key, String(value));
+      },
+    };
+    vm.runInNewContext(script, { localStorage });
+    return { storage, writes };
+  }
+
+  const legacyKey = "simul-millennium-capital-v1";
+  const flutterKey = `flutter.${legacyKey}`;
+  const legacySave = JSON.stringify({ version: 3, companyName: "가족 투자연구소" });
+  const migrated = runBridge({ [legacyKey]: legacySave });
+  const encodedLegacySave = JSON.stringify(legacySave);
+  assert.equal(migrated.storage.get(flutterKey), encodedLegacySave);
+  assert.equal(JSON.parse(migrated.storage.get(flutterKey)), legacySave);
+  assert.deepEqual(migrated.writes, [[flutterKey, encodedLegacySave]]);
+
+  const flutterSave = JSON.stringify({ version: 8, companyName: "새 연구소" });
+  const preserved = runBridge({
+    [legacyKey]: legacySave,
+    [flutterKey]: flutterSave,
+  });
+  assert.equal(preserved.storage.get(flutterKey), flutterSave);
+  assert.deepEqual(preserved.writes, []);
+  assert.deepEqual(runBridge({}).writes, []);
+  assert.deepEqual(runBridge({ [legacyKey]: "not-json" }).writes, []);
+  assert.deepEqual(
+    runBridge({ [legacyKey]: JSON.stringify({ version: 3, companyName: "   " }) }).writes,
+    [],
+  );
 });
 
 test("ships a complete daily 2000-2010 market snapshot", async () => {
@@ -67,7 +130,7 @@ test("documents and preserves the portrait-mobile product contract", async () =>
   assert.match(rules, /390×844px/);
   assert.match(rules, /최소 360px/);
   assert.match(guide, /첫 방문 시 가족 스토리 프롤로그/);
-  assert.match(guide, /현재 스키마는 버전 `7`/);
+  assert.match(guide, /현재 스키마는 버전 `8`/);
   assert.doesNotMatch(rules, /게임 화면보다 먼저 회사 이름/);
   assert.doesNotMatch(guide, /첫 방문 시 회사 이름 입력 화면/);
   assert.doesNotMatch(guide, /작은 원룸 사무실에서 시작/);

@@ -15,6 +15,31 @@
   <link rel="manifest" href="manifest.json">
 </head>
 <body>
+  <script id="legacy-save-bridge">
+    (() => {
+      const legacyKey = 'simul-millennium-capital-v1';
+      const flutterKey = `flutter.${legacyKey}`;
+
+      try {
+        if (localStorage.getItem(flutterKey) !== null) return;
+        const legacySave = localStorage.getItem(legacyKey);
+        if (legacySave !== null) {
+          const parsed = JSON.parse(legacySave);
+          if (
+            !parsed ||
+            Array.isArray(parsed) ||
+            typeof parsed !== 'object' ||
+            typeof parsed.companyName !== 'string' ||
+            parsed.companyName.trim() === ''
+          ) return;
+          // shared_preferences_web JSON-encodes string values in localStorage.
+          localStorage.setItem(flutterKey, JSON.stringify(legacySave));
+        }
+      } catch (_) {
+        // Storage can be unavailable in private or restricted browser contexts.
+      }
+    })();
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

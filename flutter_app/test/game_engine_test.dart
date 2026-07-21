@@ -200,4 +200,239 @@ void main() {
     expect(state.story.playerName, '소년');
     expect(state.story.storyFlags['guardianConsent'], isTrue);
   });
+
+  TradeOrder samsungOrder({
+    required TradeSide side,
+    required double quantity,
+    double unitPrice = 10000,
+  }) => TradeOrder(
+    side: side,
+    assetId: 'samsung',
+    symbol: '005930',
+    name: '삼성전자',
+    market: 'KOSPI',
+    currency: 'KRW',
+    quantity: quantity,
+    unitPrice: unitPrice,
+    marketMinute: 9 * 60,
+    isTradingDay: true,
+  );
+
+  test(
+    'buy debits the quoted current price plus fee and persists a position',
+    () {
+      final state = engine
+          .createNewGame('거래 연구소', initialCash: 200000)
+          .copyWith(day: 4, marketMinute: 9 * 60);
+      final result = engine.executeTrade(
+        state,
+        samsungOrder(side: TradeSide.buy, quantity: 10),
+      );
+
+      expect(result.success, isTrue);
+      expect(result.notional, 100000);
+      expect(result.fee, 250);
+      expect(result.state.cash, 99750);
+      expect(result.state.positions.single.units, 10);
+      expect(result.state.positions.single.totalCost, 100250);
+      expect(result.state.ledger.last.amount, -100250);
+      expect(result.state.ledger.last.counterAccount, 'market_security');
+      expect(result.state.portfolioValue(const {'samsung': 11000}), 110000);
+      expect(result.state.totalAum(const {'samsung': 11000}), 209750);
+      final restored = GameState.fromJson(result.state.toJson());
+      expect(restored.positions.single.units, 10);
+      expect(restored.positions.single.totalCost, 100250);
+    },
+  );
+
+  test('sell credits proceeds after fee and reduces units and cost basis', () {
+    var state = engine
+        .createNewGame('매도 연구소', initialCash: 200000)
+        .copyWith(day: 4, marketMinute: 9 * 60);
+    state = engine
+        .executeTrade(state, samsungOrder(side: TradeSide.buy, quantity: 10))
+        .state;
+    final result = engine.executeTrade(
+      state,
+      samsungOrder(side: TradeSide.sell, quantity: 4, unitPrice: 11000),
+    );
+
+    expect(result.success, isTrue);
+    expect(result.fee, 110);
+    expect(result.state.cash, 143640);
+    expect(result.state.positions.single.units, 6);
+    expect(result.state.positions.single.totalCost, 60150);
+    expect(result.state.ledger.last.amount, 43890);
+  });
+
+  test('insufficient cash rejects a buy without mutating state', () {
+    final state = engine
+        .createNewGame('현금 부족 연구소', initialCash: 10000)
+        .copyWith(day: 4, marketMinute: 9 * 60);
+    final result = engine.executeTrade(
+      state,
+      samsungOrder(side: TradeSide.buy, quantity: 2),
+    );
+
+    expect(result.success, isFalse);
+    expect(result.message, contains('현금'));
+    expect(result.state.toJson(), state.toJson());
+  });
+
+  test('invalid quantity, closed session, and excess sell are rejected', () {
+    final state = engine
+        .createNewGame('검증 연구소', initialCash: 200000)
+        .copyWith(day: 4, marketMinute: 9 * 60);
+    final invalidQuantity = engine.executeTrade(
+      state,
+      samsungOrder(side: TradeSide.buy, quantity: 0),
+    );
+    final closed = engine.executeTrade(
+      state.copyWith(marketMinute: 20 * 60),
+      TradeOrder(
+        side: TradeSide.buy,
+        assetId: 'samsung',
+        symbol: '005930',
+        name: '삼성전자',
+        market: 'KOSPI',
+        currency: 'KRW',
+        quantity: 1,
+        unitPrice: 10000,
+        marketMinute: 20 * 60,
+        isTradingDay: true,
+      ),
+    );
+    final excessSell = engine.executeTrade(
+      state,
+      samsungOrder(side: TradeSide.sell, quantity: 1),
+    );
+
+    expect(invalidQuantity.success, isFalse);
+    expect(closed.success, isFalse);
+    expect(excessSell.success, isFalse);
+    expect(excessSell.message, contains('보유'));
+    expect(state.positions, isEmpty);
+  });
+
+  test('React v3 date, fractional positions, cash, and team migrate to v8', () {
+    final state = engine.migrate({
+      'version': 3,
+      'companyName': '웹 저장 연구소',
+      'currentDate': '2000-01-05',
+      'cash': 765432,
+      'team': 3,
+      'positions': {
+        'samsung': {'units': 2.5, 'cost': 15000},
+      },
+    });
+
+    expect(state.version, GameState.schemaVersion);
+    expect(GameState.schemaVersion, 8);
+    expect(state.day, 5);
+    expect(state.cash, 765432);
+    expect(state.team, 3);
+    expect(state.positions.single.assetId, 'samsung');
+    expect(state.positions.single.units, 2.5);
+    expect(state.positions.single.totalCost, 15000);
+  });
+
+  test(
+    'React v3 foreign positions retain their original currency metadata',
+    () {
+      final state = engine.migrate({
+        'version': 3,
+        'companyName': '해외 보존 연구소',
+        'currentDate': '2000-01-05',
+        'cash': 1000,
+        'team': 1,
+        'positions': {
+          'apple': {'units': 3.25, 'cost': 90000},
+        },
+      });
+
+      expect(state.positions.single.symbol, 'AAPL');
+      expect(state.positions.single.market, 'NASDAQ');
+      expect(state.positions.single.currency, 'USD');
+    },
+  );
+
+  test('a migrated fractional position can be sold completely', () {
+    final migrated = engine
+        .migrate({
+          'version': 3,
+          'companyName': '소수점 보유 연구소',
+          'currentDate': '2000-01-05',
+          'cash': 1000,
+          'team': 1,
+          'positions': {
+            'samsung': {'units': 2.5, 'cost': 15000},
+          },
+        })
+        .copyWith(marketMinute: 9 * 60);
+
+    final result = engine.executeTrade(
+      migrated,
+      samsungOrder(side: TradeSide.sell, quantity: 2.5, unitPrice: 8000),
+    );
+
+    expect(result.success, isTrue);
+    expect(result.notional, 20000);
+    expect(result.fee, 50);
+    expect(result.state.cash, 20950);
+    expect(result.state.positions, isEmpty);
+    expect(result.state.ledger.last.description, contains('2.5주 매도'));
+  });
+
+  test('fractional buy orders are rejected without mutating state', () {
+    final state = engine
+        .createNewGame('수량 검증 연구소', initialCash: 200000)
+        .copyWith(day: 4, marketMinute: 9 * 60);
+    final result = engine.executeTrade(
+      state,
+      samsungOrder(side: TradeSide.buy, quantity: 1.5),
+    );
+
+    expect(result.success, isFalse);
+    expect(result.message, contains('1주 단위'));
+    expect(result.state.toJson(), state.toJson());
+  });
+
+  test('an order with a stale market minute is rejected', () {
+    final state = engine
+        .createNewGame('시세 검증 연구소', initialCash: 200000)
+        .copyWith(day: 4, marketMinute: 10 * 60);
+    final result = engine.executeTrade(
+      state,
+      samsungOrder(side: TradeSide.buy, quantity: 1),
+    );
+
+    expect(result.success, isFalse);
+    expect(result.message, contains('시세 시간'));
+    expect(result.state.toJson(), state.toJson());
+  });
+
+  test('foreign-currency orders stay read-only until FX accounting exists', () {
+    final state = engine
+        .createNewGame('환율 검증 연구소', initialCash: 200000)
+        .copyWith(day: 4, marketMinute: 9 * 60);
+    final result = engine.executeTrade(
+      state,
+      const TradeOrder(
+        side: TradeSide.buy,
+        assetId: 'apple',
+        symbol: 'AAPL',
+        name: 'Apple',
+        market: 'NASDAQ',
+        currency: 'USD',
+        quantity: 1,
+        unitPrice: 1,
+        marketMinute: 9 * 60,
+        isTradingDay: true,
+      ),
+    );
+
+    expect(result.success, isFalse);
+    expect(result.message, contains('환율'));
+    expect(result.state.toJson(), state.toJson());
+  });
 }

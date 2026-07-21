@@ -22,6 +22,7 @@ class GameState {
     required this.marketMinute,
     required this.simulationSeed,
     required this.cash,
+    required this.positions,
     required this.organization,
     required this.story,
     required this.company,
@@ -32,7 +33,7 @@ class GameState {
     required this.processedEventIds,
   });
 
-  static const schemaVersion = 7;
+  static const schemaVersion = 8;
 
   final int version;
   final String companyName;
@@ -40,6 +41,7 @@ class GameState {
   final int marketMinute;
   final String simulationSeed;
   final int cash;
+  final List<PortfolioPosition> positions;
   final OrganizationState organization;
   final StoryState story;
   final CompanyState company;
@@ -51,6 +53,17 @@ class GameState {
 
   /// Legacy-facing team size. The founder is counted as one person.
   int get team => 1 + organization.employees.length;
+
+  int get portfolioCost =>
+      positions.fold<int>(0, (sum, position) => sum + position.totalCost);
+
+  int portfolioValue(Map<String, double> prices) => positions.fold<int>(
+    0,
+    (sum, position) =>
+        sum + ((prices[position.assetId] ?? 0) * position.units).round(),
+  );
+
+  int totalAum(Map<String, double> prices) => cash + portfolioValue(prices);
 
   DateTime get currentDate => DateTime(2000, 1, 1).add(Duration(days: day - 1));
 
@@ -65,6 +78,7 @@ class GameState {
     int? marketMinute,
     String? simulationSeed,
     int? cash,
+    List<PortfolioPosition>? positions,
     OrganizationState? organization,
     StoryState? story,
     CompanyState? company,
@@ -82,6 +96,7 @@ class GameState {
       marketMinute: marketMinute ?? this.marketMinute,
       simulationSeed: simulationSeed ?? this.simulationSeed,
       cash: cash ?? this.cash,
+      positions: positions ?? this.positions,
       organization: organization ?? this.organization,
       story: story ?? this.story,
       company: company ?? this.company,
@@ -101,6 +116,7 @@ class GameState {
     'currentDate': currentDate.toIso8601String().split('T').first,
     'simulationSeed': simulationSeed,
     'cash': cash,
+    'positions': positions.map((position) => position.toJson()).toList(),
     'organization': organization.toJson(),
     'story': story.toJson(),
     'company': company.toJson(),
@@ -122,6 +138,7 @@ class GameState {
       ),
       simulationSeed: json['simulationSeed'] as String? ?? 'simul-default',
       cash: (json['cash'] as num?)?.toInt() ?? 1000000,
+      positions: PortfolioPosition.listFromJson(json['positions']),
       organization: OrganizationState.fromJson(
         (json['organization'] as Map?)?.cast<String, dynamic>() ?? const {},
         legacyTeamCount: (json['team'] as num?)?.toInt() ?? 1,
@@ -168,6 +185,154 @@ class GameState {
     );
   }
 }
+
+class PortfolioPosition {
+  const PortfolioPosition({
+    required this.assetId,
+    required this.symbol,
+    required this.name,
+    required this.market,
+    required this.currency,
+    required this.units,
+    required this.totalCost,
+  });
+
+  final String assetId;
+  final String symbol;
+  final String name;
+  final String market;
+  final String currency;
+  final double units;
+  final int totalCost;
+
+  double get averageCost => units <= 0 ? 0 : totalCost / units;
+
+  PortfolioPosition copyWith({double? units, int? totalCost}) =>
+      PortfolioPosition(
+        assetId: assetId,
+        symbol: symbol,
+        name: name,
+        market: market,
+        currency: currency,
+        units: units ?? this.units,
+        totalCost: totalCost ?? this.totalCost,
+      );
+
+  Map<String, dynamic> toJson() => {
+    'assetId': assetId,
+    'symbol': symbol,
+    'name': name,
+    'market': market,
+    'currency': currency,
+    'units': units,
+    'totalCost': totalCost,
+  };
+
+  factory PortfolioPosition.fromJson(
+    Map<String, dynamic> json, {
+    String? legacyAssetId,
+  }) {
+    final assetId = (json['assetId'] as String? ?? legacyAssetId ?? '').trim();
+    final legacyAsset = _legacyPortfolioAssets[assetId];
+    final units = (json['units'] as num?)?.toDouble() ?? 0;
+    return PortfolioPosition(
+      assetId: assetId,
+      symbol: (json['symbol'] as String? ?? legacyAsset?.symbol ?? assetId)
+          .trim(),
+      name: (json['name'] as String? ?? legacyAsset?.name ?? assetId).trim(),
+      market: (json['market'] as String? ?? legacyAsset?.market ?? 'UNKNOWN')
+          .trim(),
+      currency: (json['currency'] as String? ?? legacyAsset?.currency ?? 'KRW')
+          .trim(),
+      units: units.isFinite && units > 0 ? units : 0,
+      totalCost: ((json['totalCost'] ?? json['cost']) as num?)?.toInt() ?? 0,
+    );
+  }
+
+  static List<PortfolioPosition> listFromJson(Object? raw) {
+    final positions = <PortfolioPosition>[];
+    if (raw is List) {
+      for (final item in raw) {
+        if (item is! Map) continue;
+        final position = PortfolioPosition.fromJson(
+          item.cast<String, dynamic>(),
+        );
+        if (position.assetId.isNotEmpty &&
+            position.units > 0 &&
+            position.totalCost >= 0) {
+          positions.add(position);
+        }
+      }
+    } else if (raw is Map) {
+      for (final entry in raw.entries) {
+        if (entry.value is! Map) continue;
+        final position = PortfolioPosition.fromJson(
+          (entry.value as Map).cast<String, dynamic>(),
+          legacyAssetId: entry.key.toString(),
+        );
+        if (position.assetId.isNotEmpty &&
+            position.units > 0 &&
+            position.totalCost >= 0) {
+          positions.add(position);
+        }
+      }
+    }
+    return positions;
+  }
+}
+
+class _LegacyPortfolioAsset {
+  const _LegacyPortfolioAsset({
+    required this.symbol,
+    required this.name,
+    required this.market,
+    required this.currency,
+  });
+
+  final String symbol;
+  final String name;
+  final String market;
+  final String currency;
+}
+
+const _legacyPortfolioAssets = <String, _LegacyPortfolioAsset>{
+  'apple': _LegacyPortfolioAsset(
+    symbol: 'AAPL',
+    name: 'Apple',
+    market: 'NASDAQ',
+    currency: 'USD',
+  ),
+  'microsoft': _LegacyPortfolioAsset(
+    symbol: 'MSFT',
+    name: 'Microsoft',
+    market: 'NASDAQ',
+    currency: 'USD',
+  ),
+  'cisco': _LegacyPortfolioAsset(
+    symbol: 'CSCO',
+    name: 'Cisco',
+    market: 'NASDAQ',
+    currency: 'USD',
+  ),
+  'toyota': _LegacyPortfolioAsset(
+    symbol: '7203',
+    name: 'Toyota',
+    market: 'TSE',
+    currency: 'JPY',
+  ),
+  'sony': _LegacyPortfolioAsset(
+    symbol: '6758',
+    name: 'Sony',
+    market: 'TSE',
+    currency: 'JPY',
+  ),
+  'softbank': _LegacyPortfolioAsset(
+    symbol: '9984',
+    name: 'SoftBank',
+    market: 'TSE',
+    currency: 'JPY',
+  ),
+};
 
 class CompanyState {
   const CompanyState({
