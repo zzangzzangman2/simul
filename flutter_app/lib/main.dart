@@ -151,6 +151,15 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     return next;
   }
 
+  Future<TradeExecutionResult> _executeTrade(TradeOrder order) async {
+    final current = _state!;
+    final result = _engine.executeTrade(current, order);
+    if (!result.success) return result;
+    setState(() => _state = result.state);
+    await _persistence.save(result.state);
+    return result;
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -197,6 +206,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
                 onResolveDecision: _resolveDecision,
                 onRequestFamilyHelp: _requestFamilyHelp,
                 onCompleteWork: _completeWork,
+                onExecuteTrade: _executeTrade,
               ),
             ),
     );
@@ -780,6 +790,7 @@ class OfficeScreen extends StatelessWidget {
     required this.onResolveDecision,
     required this.onRequestFamilyHelp,
     required this.onCompleteWork,
+    required this.onExecuteTrade,
   });
 
   final GameState state;
@@ -789,6 +800,7 @@ class OfficeScreen extends StatelessWidget {
   final Future<void> Function(String, String) onResolveDecision;
   final Future<GameState> Function(String) onRequestFamilyHelp;
   final Future<GameState> Function(WorkSessionResult) onCompleteWork;
+  final Future<TradeExecutionResult> Function(TradeOrder) onExecuteTrade;
 
   @override
   Widget build(BuildContext context) {
@@ -868,6 +880,8 @@ class OfficeScreen extends StatelessWidget {
                                                       state: state,
                                                       onSetMarketMinute:
                                                           onSetMarketMinute,
+                                                      onExecuteTrade:
+                                                          onExecuteTrade,
                                                     ),
                                                   ),
                                                 ),
@@ -1022,38 +1036,139 @@ class OfficeScreen extends StatelessWidget {
     showModalBottomSheet<void>(
       context: context,
       useSafeArea: true,
-      builder: (context) => Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              '현금 원장',
-              style: TextStyle(
-                color: _ink,
-                fontSize: 20,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: 12),
-            if (state.ledger.isEmpty)
-              const Text('아직 기록된 거래가 없어요.')
-            else
-              ...state.ledger.reversed
-                  .take(5)
-                  .map(
-                    (entry) => ListTile(
+      isScrollControlled: true,
+      builder: (context) => FractionallySizedBox(
+        heightFactor: 0.86,
+        child: FutureBuilder<HistoricalMarketUniverse>(
+          future: HistoricalMarketUniverse.load(),
+          builder: (context, snapshot) {
+            final assets = {
+              for (final asset
+                  in snapshot.data?.assets ?? const <HistoricalMarketAsset>[])
+                asset.id: asset,
+            };
+            final prices = <String, double>{};
+            for (final position in state.positions) {
+              final asset = assets[position.assetId];
+              if (asset == null || asset.currency != 'KRW') continue;
+              final price = _portfolioPriceAtCurrentTime(asset, state);
+              if (price != null) prices[position.assetId] = price;
+            }
+            final portfolioValue = state.portfolioValue(prices);
+            final aum = state.totalAum(prices);
+            return ListView(
+              padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
+              children: [
+                const Text(
+                  '서류함 · 포트폴리오',
+                  style: TextStyle(
+                    color: _ink,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _OutlinedCard(
+                  color: const Color(0xFFEFF6FF),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _StatusValue(
+                          label: '현금',
+                          value: '${_money(state.cash)}원',
+                        ),
+                      ),
+                      Expanded(
+                        child: _StatusValue(
+                          label: '원화 주식',
+                          value: snapshot.hasData
+                              ? '${_money(portfolioValue)}원'
+                              : '계산 중',
+                        ),
+                      ),
+                      Expanded(
+                        child: _StatusValue(
+                          label: '원화 AUM',
+                          value: snapshot.hasData ? '${_money(aum)}원' : '계산 중',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  '보유 종목',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900),
+                ),
+                if (state.positions.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 14),
+                    child: Text('아직 보유한 주식이 없어요.'),
+                  )
+                else
+                  ...state.positions.map((position) {
+                    final asset = assets[position.assetId];
+                    final price = prices[position.assetId];
+                    final isForeign = position.currency != 'KRW';
+                    final value = price == null
+                        ? null
+                        : (price * position.units).round();
+                    final returnRate = value == null || position.totalCost <= 0
+                        ? null
+                        : (value - position.totalCost) /
+                              position.totalCost *
+                              100;
+                    final units =
+                        position.units == position.units.roundToDouble()
+                        ? position.units.toInt().toString()
+                        : position.units.toStringAsFixed(4);
+                    return ListTile(
                       dense: true,
                       contentPadding: EdgeInsets.zero,
-                      title: Text(entry.description),
-                      subtitle: Text('DAY ${entry.day} · ${entry.sourceId}'),
-                      trailing: Text(
-                        '${entry.amount > 0 ? '+' : ''}${_money(entry.amount)}원',
+                      title: Text(asset?.name ?? position.name),
+                      subtitle: Text(
+                        '$units주 · 평균 ${_money(position.averageCost.round())}원'
+                        '${returnRate == null ? '' : ' · ${returnRate >= 0 ? '+' : ''}${returnRate.toStringAsFixed(2)}%'}',
                       ),
-                    ),
-                  ),
-          ],
+                      trailing: Text(
+                        isForeign
+                            ? '환율 연결 대기'
+                            : value == null
+                            ? '시세 없음'
+                            : '${_money(value)}원',
+                        style: const TextStyle(fontWeight: FontWeight.w900),
+                      ),
+                    );
+                  }),
+                const Divider(height: 28),
+                const Text(
+                  '현금 원장',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900),
+                ),
+                if (state.ledger.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 14),
+                    child: Text('아직 기록된 거래가 없어요.'),
+                  )
+                else
+                  ...state.ledger.reversed
+                      .take(20)
+                      .map(
+                        (entry) => ListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(entry.description),
+                          subtitle: Text(
+                            'DAY ${entry.day} · ${entry.sourceId}',
+                          ),
+                          trailing: Text(
+                            '${entry.amount > 0 ? '+' : ''}${_money(entry.amount)}원',
+                          ),
+                        ),
+                      ),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -1849,7 +1964,7 @@ class _TodayNewsCard extends StatelessWidget {
                         pending.isNotEmpty
                             ? pending.first.title
                             : project == null
-                            ? '‘하루 보내기’를 누르면 다음 소식이 와요.'
+                            ? '1시간씩 진행하고 오늘 신문에서 하루를 마쳐요.'
                             : 'Project Atlas · ${_projectLabel(project.status)} · 다음 변화 대기 중',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -3010,6 +3125,24 @@ String _money(int value) {
     result.write(digits[i]);
   }
   return '${negative ? '-' : ''}$result';
+}
+
+double? _portfolioPriceAtCurrentTime(
+  HistoricalMarketAsset asset,
+  GameState state,
+) {
+  final quote = asset.quoteAtOrBefore(state.currentDate);
+  if (quote == null) return null;
+  if (!quote.isExactDate) return quote.close;
+  final previousClose = asset.previousCloseBefore(quote.date) ?? quote.close;
+  final path = generatedFullMarketDayPath(
+    previousClose: previousClose,
+    officialClose: quote.close,
+    seed: _stockSeed(asset.code, state.currentDate),
+  );
+  return path[marketTickForMinute(
+    state.marketMinute,
+  ).clamp(0, path.length - 1)];
 }
 
 String _projectLabel(ProjectStatus status) => switch (status) {

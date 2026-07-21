@@ -63,6 +63,10 @@ void main() {
       findsOneWidget,
     );
     expect(tester.takeException(), isNull);
+    await tester.tap(find.byKey(const Key('write-research-note-button')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('order-quantity-value')), findsOneWidget);
+    expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });
 

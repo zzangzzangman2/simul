@@ -4,6 +4,50 @@ import 'organization_state.dart';
 import 'seed_money_content.dart';
 import 'story_state.dart';
 
+enum TradeSide { buy, sell }
+
+class TradeOrder {
+  const TradeOrder({
+    required this.side,
+    required this.assetId,
+    required this.symbol,
+    required this.name,
+    required this.market,
+    required this.currency,
+    required this.quantity,
+    required this.unitPrice,
+    required this.marketMinute,
+    required this.isTradingDay,
+  });
+
+  final TradeSide side;
+  final String assetId;
+  final String symbol;
+  final String name;
+  final String market;
+  final String currency;
+  final double quantity;
+  final double unitPrice;
+  final int marketMinute;
+  final bool isTradingDay;
+}
+
+class TradeExecutionResult {
+  const TradeExecutionResult({
+    required this.state,
+    required this.success,
+    required this.message,
+    this.notional = 0,
+    this.fee = 0,
+  });
+
+  final GameState state;
+  final bool success;
+  final String message;
+  final int notional;
+  final int fee;
+}
+
 class GameEngine {
   const GameEngine();
 
@@ -36,6 +80,7 @@ class GameEngine {
       marketMinute: marketDayStartMinute,
       simulationSeed: seed,
       cash: initialCash,
+      positions: const [],
       organization: OrganizationState.initial(storyState.familyRule),
       story: storyState,
       company: company,
@@ -53,14 +98,140 @@ class GameEngine {
     }
     final companyName = (json['companyName'] as String? ?? '').trim();
     final fresh = createNewGame(companyName);
+    final currentDate = DateTime.tryParse(
+      (json['currentDate'] as String? ?? '').trim(),
+    );
+    final migratedDay = currentDate == null
+        ? ((json['day'] as num?)?.toInt() ?? 1)
+        : currentDate.difference(DateTime(2000, 1, 1)).inDays + 1;
     return fresh.copyWith(
-      day: ((json['day'] as num?)?.toInt() ?? 1).clamp(1, 4018),
+      day: migratedDay.clamp(1, 4018),
       cash: (json['cash'] as num?)?.toInt() ?? 1000000,
+      positions: PortfolioPosition.listFromJson(json['positions']),
       organization: OrganizationState.fromJson(
         const {},
         legacyTeamCount: (json['team'] as num?)?.toInt() ?? 1,
         familyRule: fresh.story.familyRule,
       ),
+    );
+  }
+
+  TradeExecutionResult executeTrade(GameState state, TradeOrder order) {
+    TradeExecutionResult reject(String message) =>
+        TradeExecutionResult(state: state, success: false, message: message);
+
+    if (order.assetId.trim().isEmpty ||
+        !order.quantity.isFinite ||
+        order.quantity <= 0) {
+      return reject('수량은 0보다 커야 합니다.');
+    }
+    if (order.side == TradeSide.buy &&
+        order.quantity != order.quantity.roundToDouble()) {
+      return reject('매수 수량은 1주 단위로 입력해 주세요.');
+    }
+    if (!order.unitPrice.isFinite || order.unitPrice <= 0) {
+      return reject('유효한 현재가가 없습니다.');
+    }
+    if (order.currency != 'KRW') {
+      return reject('해외 종목은 실제 환율 원장을 연결한 뒤 거래할 수 있습니다.');
+    }
+    if (order.marketMinute != state.marketMinute) {
+      return reject('시세 시간이 바뀌었습니다. 주문창을 다시 확인해 주세요.');
+    }
+    final clock = marketClockAt(
+      order.marketMinute,
+      tradingDay: order.isTradingDay && isMarketTradingDay(state.currentDate),
+    );
+    if (!clock.tradable) {
+      return reject('현재는 주문 가능한 거래 시간이 아닙니다.');
+    }
+
+    final notional = (order.unitPrice * order.quantity).round();
+    if (notional <= 0) return reject('주문 금액이 올바르지 않습니다.');
+    final fee = (notional * 0.0025).round();
+    final index = state.positions.indexWhere(
+      (position) => position.assetId == order.assetId,
+    );
+    final existing = index < 0 ? null : state.positions[index];
+    final positions = [...state.positions];
+    late int cashDelta;
+    late String description;
+
+    if (order.side == TradeSide.buy) {
+      final debit = notional + fee;
+      if (debit > state.cash) return reject('주문 가능 현금이 부족합니다.');
+      final nextPosition = existing == null
+          ? PortfolioPosition(
+              assetId: order.assetId,
+              symbol: order.symbol,
+              name: order.name,
+              market: order.market,
+              currency: order.currency,
+              units: order.quantity.toDouble(),
+              totalCost: debit,
+            )
+          : existing.copyWith(
+              units: existing.units + order.quantity,
+              totalCost: existing.totalCost + debit,
+            );
+      if (index < 0) {
+        positions.add(nextPosition);
+      } else {
+        positions[index] = nextPosition;
+      }
+      cashDelta = -debit;
+      description =
+          '${order.name} ${_tradeUnits(order.quantity)}주 매수 · 수수료 $fee원';
+    } else {
+      if (existing == null || existing.units + 0.000001 < order.quantity) {
+        return reject('보유 수량이 부족합니다.');
+      }
+      final proceeds = notional - fee;
+      final soldCost = order.quantity >= existing.units
+          ? existing.totalCost
+          : (existing.totalCost * order.quantity / existing.units).round();
+      final remainingUnits = existing.units - order.quantity;
+      if (remainingUnits <= 0.000001) {
+        positions.removeAt(index);
+      } else {
+        positions[index] = existing.copyWith(
+          units: remainingUnits,
+          totalCost: existing.totalCost - soldCost,
+        );
+      }
+      cashDelta = proceeds;
+      description =
+          '${order.name} ${_tradeUnits(order.quantity)}주 매도 · 수수료 $fee원';
+    }
+
+    final sideLabel = order.side == TradeSide.buy ? '매수' : '매도';
+    final sourceId =
+        'trade-${order.side.name}-${state.day}-${order.marketMinute}-'
+        '${order.assetId}-${state.ledger.length + 1}';
+    final next = state.copyWith(
+      marketMinute: order.marketMinute,
+      cash: state.cash + cashDelta,
+      positions: positions,
+      ledger: [
+        ...state.ledger,
+        LedgerEntry(
+          id: sourceId,
+          day: state.day,
+          amount: cashDelta,
+          account: 'cash',
+          counterAccount: 'market_security',
+          description: description,
+          sourceId: sourceId,
+        ),
+      ],
+    );
+    return TradeExecutionResult(
+      state: next,
+      success: true,
+      message:
+          '${order.name} ${_tradeUnits(order.quantity)}주 $sideLabel 완료 · 수수료 $fee원',
+      notional: notional,
+      fee: fee,
     );
   }
 
@@ -944,3 +1115,7 @@ class GameEngine {
     return min + (max - min) * normalized;
   }
 }
+
+String _tradeUnits(double units) => units == units.roundToDouble()
+    ? units.toInt().toString()
+    : units.toStringAsFixed(4).replaceFirst(RegExp(r'0+$'), '');
