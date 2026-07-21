@@ -24,6 +24,7 @@
 - 기존 React 앱은 회귀 비교용으로 보존하며 React 웹 스키마 v3 진행은 Flutter v8로 가져옵니다.
 - 로컬 환경마다 Flutter 안정 버전을 설치하고 `flutter --version`으로 3.44.7 이상인지 확인
 - 웹 기본 주소 `/`는 `/play/index.html`의 Flutter 가족 프롤로그로 이동하며, 구 React 투자회사 온보딩은 사용자에게 노출하지 않음
+- 실제 휴대폰 로컬 검증은 `npm run dev:lan`으로 `0.0.0.0:8000`을 열고 같은 Wi-Fi에서 `http://<PC 내부 IP>:8000`으로 접속
 
 ## Flutter에 구현된 이야기 시작
 
