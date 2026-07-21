@@ -1,0 +1,35 @@
+{
+  "name": "밀레니엄 캐피탈",
+  "short_name": "밀레니엄",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#BDEBFA",
+  "theme_color": "#BDEBFA",
+  "description": "1999년 마지막 밤, 열 살 소년이 가족과 현금 0원에서 시작하는 밝은 2D 투자 모험",
+  "orientation": "portrait-primary",
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "icons/Icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/Icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/Icon-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icons/Icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

@@ -16,13 +16,14 @@
 ## 현재 상태
 
 - 브랜치: `main`
-- 기준 커밋: `0a46a09 docs: refresh GitHub project overview` + 국내시장 미커밋 변경
+- 기준 커밋: `main` 최신 HEAD와 이 문서를 함께 갱신
 - 새 주 구현: `flutter_app/`
 - Flutter 3.44.7, Dart 3.12.2, Android·Web 대상
 - 논리 저장 키: `simul-millennium-capital-v1`
-- Flutter 상태 스키마: 버전 6
+- Flutter 상태 스키마: 버전 7
 - 기존 React 앱과 스키마 v3은 시장·거래 이관 기준으로 보존
 - 로컬 SDK 확인 경로: `C:\Users\godho\Downloads\flutter-sdk`
+- 웹 기본 주소 `/`는 `/play/index.html`의 Flutter 가족 프롤로그로 이동하며, 구 React 투자회사 온보딩은 사용자에게 노출하지 않음
 
 ## Flutter에 구현된 이야기 시작
 
