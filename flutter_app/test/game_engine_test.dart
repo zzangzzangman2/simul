@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:millennium_capital/game/game_engine.dart';
 import 'package:millennium_capital/game/game_state.dart';
+import 'package:millennium_capital/game/seed_money_content.dart';
 import 'package:millennium_capital/game/story_state.dart';
 
 void main() {
@@ -16,7 +17,7 @@ void main() {
 
   GameState unlockApple(GameState state) {
     state = resolveFirst(state, 'research_products');
-    state = state.copyWith(day: 2557);
+    state = state.copyWith(day: 2557, cash: 1000000);
     return engine.advanceOneDay(state);
   }
 
@@ -37,8 +38,9 @@ void main() {
     );
     final state = engine.createNewGame('별빛', story: story);
 
-    expect(state.version, 5);
+    expect(state.version, GameState.schemaVersion);
     expect(state.story.playerName, '민준');
+    expect(state.cash, 0);
     expect(state.story.guardianAccountHolder, 'mother');
     expect(state.story.storyFlags['guardianConsent'], isTrue);
     expect(state.story.storyFlags['isLegalCompany'], isFalse);
@@ -63,7 +65,7 @@ void main() {
     state = resolveFirst(state, 'research_products');
     expect(state.pendingDecisions, isEmpty);
 
-    state = state.copyWith(day: 2557);
+    state = state.copyWith(day: 2557, cash: 1000000);
     state = engine.advanceOneDay(state);
     expect(state.pendingDecisions.first.title, contains('Apple'));
     final historical = engine.visiblePrice(state);
@@ -114,6 +116,73 @@ void main() {
     expect(rejected.project?.status, ProjectStatus.cancelled);
   });
 
+  test('family helper fatigue, daily limit, and recovery are persisted', () {
+    var state = engine.createNewGame('가족 연구소');
+    state = resolveFirst(state, 'research_products');
+    final motherBefore = state.organization.familyHelpers.first;
+
+    state = engine.requestFamilyHelp(state, 'mother');
+    final afterHelp = state.organization.familyHelpers.first;
+    expect(afterHelp.fatigue, motherBefore.fatigue + 12);
+    expect(afterHelp.helpCount, 1);
+    expect(state.organization.helpLog, hasLength(1));
+
+    final duplicate = engine.requestFamilyHelp(state, 'mother');
+    expect(duplicate.toJson(), state.toJson());
+
+    state = engine.advanceOneDay(state);
+    final afterRest = state.organization.familyHelpers.first;
+    expect(afterRest.fatigue, afterHelp.fatigue - 3);
+  });
+  test(
+    'work sessions earn period-scale cash, write ledger, and stop at three per day',
+    () {
+      var state = engine.createNewGame('0원 연구소', initialCash: 0);
+      expect(state.cash, 0);
+
+      state = engine.completeWorkSession(
+        state,
+        const WorkSessionResult(
+          activityId: 'dishes',
+          score: 100,
+          maxScore: 100,
+        ),
+      );
+      expect(state.cash, 800);
+      expect(state.ledger.last.counterAccount, 'work_income');
+      expect(state.story.storyFlags['earnedSeedMoney'], 800);
+
+      state = engine.completeWorkSession(
+        state,
+        const WorkSessionResult(
+          activityId: 'stationery',
+          score: 100,
+          maxScore: 100,
+        ),
+      );
+      state = engine.completeWorkSession(
+        state,
+        const WorkSessionResult(
+          activityId: 'flea_market',
+          score: 100,
+          maxScore: 100,
+        ),
+      );
+      final afterThree = state;
+      state = engine.completeWorkSession(
+        state,
+        const WorkSessionResult(
+          activityId: 'dishes',
+          score: 100,
+          maxScore: 100,
+        ),
+      );
+
+      expect(state.toJson(), afterThree.toJson());
+      expect(state.story.storyFlags['workSessionsToday'], 3);
+      expect(state.cash, 3400);
+    },
+  );
   test('v1 save migrates without deleting company, cash, day, or story', () {
     final state = engine.migrate({
       'version': 1,

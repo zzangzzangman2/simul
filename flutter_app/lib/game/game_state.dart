@@ -1,3 +1,4 @@
+import 'organization_state.dart';
 import 'story_state.dart';
 
 enum WorldMode { historical, diverged }
@@ -20,7 +21,7 @@ class GameState {
     required this.day,
     required this.simulationSeed,
     required this.cash,
-    required this.team,
+    required this.organization,
     required this.story,
     required this.company,
     required this.project,
@@ -30,14 +31,14 @@ class GameState {
     required this.processedEventIds,
   });
 
-  static const schemaVersion = 5;
+  static const schemaVersion = 6;
 
   final int version;
   final String companyName;
   final int day;
   final String simulationSeed;
   final int cash;
-  final int team;
+  final OrganizationState organization;
   final StoryState story;
   final CompanyState company;
   final ProjectState? project;
@@ -45,6 +46,9 @@ class GameState {
   final List<ScheduledGameEvent> scheduledEvents;
   final List<LedgerEntry> ledger;
   final List<String> processedEventIds;
+
+  /// Legacy-facing team size. The founder is counted as one person.
+  int get team => 1 + organization.employees.length;
 
   DateTime get currentDate => DateTime(2000, 1, 1).add(Duration(days: day - 1));
 
@@ -58,7 +62,7 @@ class GameState {
     int? day,
     String? simulationSeed,
     int? cash,
-    int? team,
+    OrganizationState? organization,
     StoryState? story,
     CompanyState? company,
     ProjectState? project,
@@ -74,7 +78,7 @@ class GameState {
       day: day ?? this.day,
       simulationSeed: simulationSeed ?? this.simulationSeed,
       cash: cash ?? this.cash,
-      team: team ?? this.team,
+      organization: organization ?? this.organization,
       story: story ?? this.story,
       company: company ?? this.company,
       project: clearProject ? null : project ?? this.project,
@@ -92,7 +96,7 @@ class GameState {
     'currentDate': currentDate.toIso8601String().split('T').first,
     'simulationSeed': simulationSeed,
     'cash': cash,
-    'team': team,
+    'organization': organization.toJson(),
     'story': story.toJson(),
     'company': company.toJson(),
     'project': project?.toJson(),
@@ -109,7 +113,15 @@ class GameState {
       day: ((json['day'] as num?)?.toInt() ?? 1).clamp(1, 4018),
       simulationSeed: json['simulationSeed'] as String? ?? 'simul-default',
       cash: (json['cash'] as num?)?.toInt() ?? 1000000,
-      team: (json['team'] as num?)?.toInt() ?? 1,
+      organization: OrganizationState.fromJson(
+        (json['organization'] as Map?)?.cast<String, dynamic>() ?? const {},
+        legacyTeamCount: (json['team'] as num?)?.toInt() ?? 1,
+        familyRule: FamilyRule.values.firstWhere(
+          (value) =>
+              value.name == ((json['story'] as Map?)?['familyRule'] as String?),
+          orElse: () => FamilyRule.reportLosses,
+        ),
+      ),
       story: StoryState.fromJson(
         (json['story'] as Map?)?.cast<String, dynamic>() ?? const {},
         companyName: json['companyName'] as String? ?? '',

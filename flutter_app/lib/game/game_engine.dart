@@ -1,10 +1,16 @@
 import 'game_state.dart';
+import 'organization_state.dart';
+import 'seed_money_content.dart';
 import 'story_state.dart';
 
 class GameEngine {
   const GameEngine();
 
-  GameState createNewGame(String companyName, {StoryState? story}) {
+  GameState createNewGame(
+    String companyName, {
+    StoryState? story,
+    int initialCash = 0,
+  }) {
     final seed = 'simul-${_stableHash(companyName.trim())}';
     final storyState = story ?? StoryState.migratedDefault(companyName);
     final company = const CompanyState(
@@ -27,8 +33,8 @@ class GameEngine {
       companyName: companyName.trim(),
       day: 1,
       simulationSeed: seed,
-      cash: 1000000,
-      team: 1,
+      cash: initialCash,
+      organization: OrganizationState.initial(storyState.familyRule),
       story: storyState,
       company: company,
       project: null,
@@ -48,8 +54,82 @@ class GameEngine {
     return fresh.copyWith(
       day: ((json['day'] as num?)?.toInt() ?? 1).clamp(1, 4018),
       cash: (json['cash'] as num?)?.toInt() ?? 1000000,
-      team: (json['team'] as num?)?.toInt() ?? 1,
+      organization: OrganizationState.fromJson(
+        const {},
+        legacyTeamCount: (json['team'] as num?)?.toInt() ?? 1,
+        familyRule: fresh.story.familyRule,
+      ),
     );
+  }
+
+  GameState completeWorkSession(GameState state, WorkSessionResult result) {
+    final flags = Map<String, dynamic>.from(state.story.storyFlags);
+    final recordedDay = (flags['workDay'] as num?)?.toInt();
+    final sessionsToday = recordedDay == state.day
+        ? (flags['workSessionsToday'] as num?)?.toInt() ?? 0
+        : 0;
+    if (sessionsToday >= 3) return state;
+
+    final score = result.score.clamp(0, result.maxScore);
+    final normalized = result.maxScore <= 0
+        ? 0
+        : (score * 100 ~/ result.maxScore);
+    final reward = switch (result.activityId) {
+      'dishes' => 300 + normalized * 5,
+      'stationery' => 600 + normalized * 4,
+      'flea_market' => 400 + normalized * 12,
+      _ => 0,
+    };
+    if (reward <= 0) return state;
+
+    final activityLabel = switch (result.activityId) {
+      'dishes' => '저녁 설거지',
+      'stationery' => '문방구 재고 정리',
+      'flea_market' => '가족 벼룩장터',
+      _ => '일거리',
+    };
+    final sessionNumber = (flags['workSessions'] as num?)?.toInt() ?? 0;
+    final sourceId =
+        'work-${state.day}-${sessionNumber + 1}-${result.activityId}';
+    if (state.processedEventIds.contains(sourceId)) return state;
+
+    final earned = (flags['earnedSeedMoney'] as num?)?.toInt() ?? 0;
+    flags['earnedSeedMoney'] = earned + reward;
+    flags['workSessions'] = sessionNumber + 1;
+    flags['workDay'] = state.day;
+    flags['workSessionsToday'] = sessionsToday + 1;
+    flags['lastWorkActivity'] = result.activityId;
+    flags['lastWorkScore'] = normalized;
+    if (state.cash + reward >= 10000) {
+      flags['firstSeedGoalReached'] = true;
+    }
+
+    return state.copyWith(
+      cash: state.cash + reward,
+      story: state.story.copyWith(storyFlags: flags),
+      ledger: [
+        ...state.ledger,
+        LedgerEntry(
+          id: sourceId,
+          day: state.day,
+          amount: reward,
+          account: 'cash',
+          counterAccount: 'work_income',
+          description: '$activityLabel · 정확도 $normalized점',
+          sourceId: sourceId,
+        ),
+      ],
+      processedEventIds: [...state.processedEventIds, sourceId],
+    );
+  }
+
+  GameState requestFamilyHelp(GameState state, String helperId) {
+    final organization = state.organization.requestFamilyHelp(
+      helperId,
+      state.day,
+    );
+    if (identical(organization, state.organization)) return state;
+    return state.copyWith(organization: organization);
   }
 
   double historicalPriceForDay(int day) => 1000 + ((day - 1) * 2.0);
@@ -310,7 +390,10 @@ class GameEngine {
 
   GameState advanceOneDay(GameState state) {
     if (state.pendingDecisions.isNotEmpty) return state;
-    var next = state.copyWith(day: state.day + 1);
+    var next = state.copyWith(
+      day: state.day + 1,
+      organization: state.organization.recoverOneDay(),
+    );
     if (next.company.worldMode == WorldMode.diverged) {
       final noise = _noise(
         next.simulationSeed,
