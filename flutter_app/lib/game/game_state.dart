@@ -33,7 +33,7 @@ class GameState {
     required this.processedEventIds,
   });
 
-  static const schemaVersion = 8;
+  static const schemaVersion = 9;
 
   final int version;
   final String companyName;

@@ -25,20 +25,25 @@ test("opens the Flutter family-story prologue from the default route", async () 
     readFile(new URL("../public/play/index.html", import.meta.url), "utf8"),
     readFile(new URL("../flutter_app/lib/visual_novel_onboarding.dart", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../public/og.png", import.meta.url)),
+    readFile(new URL("../public/og-apartment-v2.png", import.meta.url)),
   ]);
   assert.match(page, /redirect\("\/play\/index\.html"\)/);
   assert.doesNotMatch(page, /GameClient/);
   assert.match(flutterIndex, /<base href="\/play\/">/);
   assert.match(flutterIndex, /flutter_bootstrap\.js/);
-  assert.doesNotMatch(flutterIndex, /100만원|투자회사 설립/);
+  assert.doesNotMatch(flutterIndex, /투자회사 설립/);
+  assert.match(flutterIndex, /창립자 1명이 초기자본 100만원/);
+  assert.match(flutterIndex, /₩1,000,000/);
+  assert.match(flutterIndex, /property="og:image" content="\/og-apartment-v2\.png"/);
+  assert.match(flutterIndex, /name="twitter:card" content="summary_large_image"/);
+  assert.doesNotMatch(flutterIndex, /현금 0원/);
   assert.match(onboarding, /1999\.12\.31\s+·\s+23:57/);
-  assert.match(onboarding, /가족 투자연구소/);
-  assert.doesNotMatch(onboarding, /100만원/);
-  assert.match(layout, /0원에서 시작하는 가족 투자연구소/);
-  assert.match(layout, /images: \[\{ url: `\$\{origin\}\/og\.png`, width: 1731, height: 909/);
-  assert.match(layout, /themeColor: "#BDEBFA"/);
-  assert.doesNotMatch(layout, /og-room|100만원/);
+  assert.match(onboarding, /우리 투자회사의 이름/);
+  assert.match(onboarding, /100만원/);
+  assert.match(layout, /100만원으로 시작하는 투자회사/);
+  assert.match(layout, /images: \[\{ url: `\$\{origin\}\/og-apartment-v2\.png`, width: 1672, height: 941/);
+  assert.match(layout, /themeColor: "#151B29"/);
+  assert.doesNotMatch(layout, /0원에서 시작/);
   assert.ok(socialCard.byteLength > 1_000_000);
 });
 
@@ -97,6 +102,25 @@ test("bridges a legacy React save before Flutter starts without overwriting Flut
   );
 });
 
+test("keeps Flutter launch metadata aligned with the current starting conditions", async () => {
+  const [flutterTemplate, manifest] = await Promise.all([
+    readFile(new URL("../flutter_app/web/index.html", import.meta.url), "utf8"),
+    readFile(new URL("../flutter_app/web/manifest.json", import.meta.url), "utf8"),
+  ]);
+  const parsedManifest = JSON.parse(manifest);
+
+  assert.match(flutterTemplate, /2000년 1월 1일/);
+  assert.match(flutterTemplate, /창립자 1명이 초기자본 100만원/);
+  assert.match(flutterTemplate, /₩1,000,000/);
+  assert.match(flutterTemplate, /property="og:image" content="\/og-apartment-v2\.png"/);
+  assert.match(flutterTemplate, /name="twitter:image" content="\/og-apartment-v2\.png"/);
+  assert.doesNotMatch(flutterTemplate, /현금 0원/);
+  assert.match(parsedManifest.description, /2000년 1월 1일/);
+  assert.match(parsedManifest.description, /창립자 1명이 초기자본 100만원/);
+  assert.match(parsedManifest.description, /₩1,000,000/);
+  assert.doesNotMatch(parsedManifest.description, /현금 0원/);
+});
+
 test("ships a complete daily 2000-2010 market snapshot", async () => {
   const data = JSON.parse(await readFile(new URL("../app/data/market-history.json", import.meta.url), "utf8"));
   assert.equal(data.schemaVersion, 3);
@@ -130,7 +154,7 @@ test("documents and preserves the portrait-mobile product contract", async () =>
   assert.match(rules, /390×844px/);
   assert.match(rules, /최소 360px/);
   assert.match(guide, /첫 방문 시 가족 스토리 프롤로그/);
-  assert.match(guide, /현재 스키마는 버전 `8`/);
+  assert.match(guide, /현재 스키마는 버전 `9`/);
   assert.doesNotMatch(rules, /게임 화면보다 먼저 회사 이름/);
   assert.doesNotMatch(guide, /첫 방문 시 회사 이름 입력 화면/);
   assert.doesNotMatch(guide, /작은 원룸 사무실에서 시작/);

@@ -24,7 +24,15 @@ class _OrganizationScreenState extends State<OrganizationScreen> {
   Future<void> _requestHelp(FamilyHelperStatus helper) async {
     if (_busyHelperId != null || !helper.canHelpOn(_state.day)) return;
     setState(() => _busyHelperId = helper.id);
-    final next = await widget.onRequestFamilyHelp(helper.id);
+    late GameState next;
+    try {
+      next = await widget.onRequestFamilyHelp(helper.id);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _busyHelperId = null);
+      _showSaveFailure(context);
+      return;
+    }
     if (!mounted) return;
     setState(() {
       _state = next;

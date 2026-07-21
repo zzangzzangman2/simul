@@ -125,7 +125,7 @@ void main() {
     }
   });
 
-  testWidgets('360px room hotspots stay on-screen and remain touchable', (
+  testWidgets('360px apartment rooms keep logical hotspots separate', (
     tester,
   ) async {
     await usePhoneSurface(tester);
@@ -150,54 +150,106 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final hotspotRects = <String, Rect>{};
-    for (final key in [
-      'open-market-button',
-      'open-decisions-button',
-      'open-ledger-button',
-      'open-organization-button',
-      'open-work-button',
-    ]) {
-      final object = find.byKey(Key(key));
-      expect(object, findsOneWidget);
-      final size = tester.getSize(object);
-      final rect = tester.getRect(object);
-      hotspotRects[key] = rect;
-      expect(size.width, greaterThanOrEqualTo(48));
-      expect(size.height, greaterThanOrEqualTo(48));
-      expect(rect.left, greaterThanOrEqualTo(0));
-      expect(rect.right, lessThanOrEqualTo(phoneSize.width));
-      expect(rect.top, greaterThanOrEqualTo(0));
-      expect(rect.bottom, lessThanOrEqualTo(phoneSize.height));
-    }
-    final entries = hotspotRects.entries.toList();
-    for (var first = 0; first < entries.length; first++) {
-      for (var second = first + 1; second < entries.length; second++) {
-        expect(
-          entries[first].value.overlaps(entries[second].value),
-          isFalse,
-          reason: '${entries[first].key} overlaps ${entries[second].key}',
-        );
+    void expectRoomHotspots(List<String> keys) {
+      final rects = <Rect>[];
+      for (final key in keys) {
+        final object = find.byKey(Key(key));
+        expect(object, findsOneWidget);
+        expect(object.hitTestable(), findsOneWidget);
+        final size = tester.getSize(object);
+        final rect = tester.getRect(object);
+        rects.add(rect);
+        expect(size.width, greaterThanOrEqualTo(48));
+        expect(size.height, greaterThanOrEqualTo(48));
+        expect(rect.left, greaterThanOrEqualTo(0));
+        expect(rect.right, lessThanOrEqualTo(phoneSize.width));
+        expect(rect.top, greaterThanOrEqualTo(0));
+        expect(rect.bottom, lessThanOrEqualTo(phoneSize.height));
+      }
+      for (var first = 0; first < rects.length; first++) {
+        for (var second = first + 1; second < rects.length; second++) {
+          expect(rects[first].overlaps(rects[second]), isFalse);
+        }
       }
     }
-    expect(
-      hotspotRects['open-market-button']!.center.dx,
-      lessThan(hotspotRects['open-work-button']!.center.dx),
-    );
-    expect(
-      hotspotRects['open-decisions-button']!.center.dy,
-      greaterThan(hotspotRects['open-market-button']!.center.dy),
-    );
-    expect(
-      hotspotRects['open-ledger-button']!.center.dx,
-      greaterThan(hotspotRects['open-decisions-button']!.center.dx),
-    );
+
+    expect(find.byKey(const Key('apartment-place-bedroom')), findsOneWidget);
+    expectRoomHotspots(['open-market-button', 'open-ledger-button']);
+    expect(find.byKey(const Key('open-decisions-button')), findsNothing);
+    expect(find.byKey(const Key('open-organization-button')), findsNothing);
+    expect(find.byKey(const Key('open-work-button')), findsNothing);
     expect(tester.takeException(), isNull);
 
     await tester.tap(find.byKey(const Key('open-market-button')));
     await tester.pump();
-    expect(find.byType(StockMarketScreen, skipOffstage: false), findsOneWidget);
-    await tester.pumpWidget(const SizedBox.shrink());
+    final marketRoute = find.byType(StockMarketScreen, skipOffstage: false);
+    expect(marketRoute, findsOneWidget);
+    Navigator.of(tester.element(marketRoute)).pop();
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('apartment-go-living-room')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('apartment-place-living-room')),
+      findsOneWidget,
+    );
+    expectRoomHotspots(['open-decisions-button', 'open-organization-button']);
+    expect(find.byKey(const Key('open-market-button')), findsNothing);
+    expect(find.byKey(const Key('open-ledger-button')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('apartment-go-kitchen')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('apartment-place-kitchen')), findsOneWidget);
+    expectRoomHotspots(['open-work-button']);
+    expect(find.byKey(const Key('open-decisions-button')), findsNothing);
+    expect(find.byKey(const Key('open-organization-button')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('360px premium ledger scrolls through the daily appendix', (
+    tester,
+  ) async {
+    await usePhoneSurface(tester);
+    final state = newState().copyWith(
+      day: 4,
+      cash: -50000,
+      positions: const [
+        PortfolioPosition(
+          assetId: 'kr-005930',
+          symbol: '005930.KS',
+          name: '삼성전자',
+          market: 'KOSPI',
+          currency: 'KRW',
+          units: 10,
+          totalCost: 60000,
+        ),
+      ],
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PortfolioLedgerScreen(
+          state: state,
+          universe: testMarketUniverse(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('portfolio-ledger-screen')), findsOneWidget);
+    expect(find.byKey(const Key('ledger-aum-hero')), findsOneWidget);
+    expect(find.byKey(const Key('ledger-operating-debt')), findsOneWidget);
+
+    final appendix = find.byKey(const Key('ledger-daily-appendix'));
+    final ledgerScroll = find.descendant(
+      of: find.byKey(const Key('portfolio-ledger-scroll')),
+      matching: find.byType(Scrollable),
+    );
+    await tester.scrollUntilVisible(appendix, 260, scrollable: ledgerScroll);
+    await tester.tap(appendix);
+    await tester.pumpAndSettle();
+
+    expect(find.text('가족 계좌 상태와 오늘의 신문 스크랩'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('decision scene stays locked in front until its save completes', (
@@ -224,6 +276,8 @@ void main() {
         ),
       ),
     );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('apartment-go-living-room')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('open-decisions-button')));
     await tester.pumpAndSettle();

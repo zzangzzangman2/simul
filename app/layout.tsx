@@ -17,7 +17,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#BDEBFA",
+  themeColor: "#151B29",
 };
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -25,8 +25,8 @@ export async function generateMetadata(): Promise<Metadata> {
   const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") ?? "localhost:3000";
   const protocol = requestHeaders.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
   const origin = `${protocol}://${host}`;
-  const title = "MILLENNIUM CAPITAL — 0원에서 시작하는 가족 투자연구소";
-  const description = "1999년 마지막 밤, 열 살 소년이 빈 저금장부와 가족의 신뢰로 투자회사를 키워 가는 모바일 세로형 경영 게임";
+  const title = "밀레니엄 캐피탈 — 100만원으로 시작하는 투자회사";
+  const description = "2000년 1월 1일, 작은 아파트의 CRT 컴퓨터와 100만원으로 회사를 키워 가는 모바일 세로형 투자 경영 게임";
 
   return {
     title,
@@ -35,13 +35,13 @@ export async function generateMetadata(): Promise<Metadata> {
       title,
       description,
       type: "website",
-      images: [{ url: `${origin}/og.png`, width: 1731, height: 909, alt: title }],
+      images: [{ url: `${origin}/og-apartment-v2.png`, width: 1672, height: 941, alt: title }],
     },
     twitter: {
       card: "summary_large_image",
       title,
       description,
-      images: [`${origin}/og.png`],
+      images: [`${origin}/og-apartment-v2.png`],
     },
   };
 }

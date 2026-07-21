@@ -40,7 +40,7 @@ void main() {
 
     expect(state.version, GameState.schemaVersion);
     expect(state.story.playerName, '민준');
-    expect(state.cash, 0);
+    expect(state.cash, initialCompanyCash);
     expect(state.story.guardianAccountHolder, 'mother');
     expect(state.story.storyFlags['guardianConsent'], isTrue);
     expect(state.story.storyFlags['isLegalCompany'], isFalse);
@@ -314,7 +314,7 @@ void main() {
     expect(state.positions, isEmpty);
   });
 
-  test('React v3 date, fractional positions, cash, and team migrate to v8', () {
+  test('React v3 date, fractional positions, cash, and team migrate to v9', () {
     final state = engine.migrate({
       'version': 3,
       'companyName': '웹 저장 연구소',
@@ -327,7 +327,7 @@ void main() {
     });
 
     expect(state.version, GameState.schemaVersion);
-    expect(GameState.schemaVersion, 8);
+    expect(GameState.schemaVersion, 9);
     expect(state.day, 5);
     expect(state.cash, 765432);
     expect(state.team, 3);

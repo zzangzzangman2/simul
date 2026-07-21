@@ -4,6 +4,8 @@ import 'organization_state.dart';
 import 'seed_money_content.dart';
 import 'story_state.dart';
 
+const initialCompanyCash = 1000000;
+
 enum TradeSide { buy, sell }
 
 class TradeOrder {
@@ -54,7 +56,7 @@ class GameEngine {
   GameState createNewGame(
     String companyName, {
     StoryState? story,
-    int initialCash = 0,
+    int initialCash = initialCompanyCash,
   }) {
     final seed = 'simul-${_stableHash(companyName.trim())}';
     final storyState = story ?? StoryState.migratedDefault(companyName);
@@ -94,7 +96,14 @@ class GameEngine {
 
   GameState migrate(Map<String, dynamic> json) {
     if (json['company'] != null) {
-      return GameState.fromJson({...json, 'version': GameState.schemaVersion});
+      final state = GameState.fromJson({
+        ...json,
+        'version': GameState.schemaVersion,
+      });
+      if (_needsInitialCapitalUpgrade(json, state)) {
+        return state.copyWith(cash: initialCompanyCash);
+      }
+      return state;
     }
     final companyName = (json['companyName'] as String? ?? '').trim();
     final fresh = createNewGame(companyName);
@@ -114,6 +123,22 @@ class GameEngine {
         familyRule: fresh.story.familyRule,
       ),
     );
+  }
+
+  bool _needsInitialCapitalUpgrade(
+    Map<String, dynamic> source,
+    GameState state,
+  ) {
+    if ((source['version'] as num?)?.toInt() != 8 ||
+        state.cash != 0 ||
+        state.positions.isNotEmpty ||
+        state.ledger.isNotEmpty) {
+      return false;
+    }
+    final flags = state.story.storyFlags;
+    return ((flags['earnedSeedMoney'] as num?)?.toInt() ?? 0) == 0 &&
+        ((flags['workSessions'] as num?)?.toInt() ?? 0) == 0 &&
+        ((flags['workSessionsToday'] as num?)?.toInt() ?? 0) == 0;
   }
 
   TradeExecutionResult executeTrade(GameState state, TradeOrder order) {

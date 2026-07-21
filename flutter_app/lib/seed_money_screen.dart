@@ -34,7 +34,15 @@ class _SeedMoneyHubScreenState extends State<SeedMoneyHubScreen> {
     );
     if (result == null || !mounted) return;
     setState(() => _saving = true);
-    final next = await widget.onComplete(result);
+    late GameState next;
+    try {
+      next = await widget.onComplete(result);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      _showSaveFailure(context);
+      return;
+    }
     if (!mounted) return;
     setState(() {
       _state = next;
