@@ -111,6 +111,17 @@ npm test
 
 Flutter Web과 Vinext를 함께 배포용으로 빌드할 때는 저장 브리지와 `/play/` 경로까지 검증하는 `npm run build:release`를 사용합니다.
 
+### 같은 Wi-Fi의 실제 휴대폰에서 테스트
+
+먼저 최신 Flutter Web 번들을 만든 뒤 LAN 개발 서버를 엽니다.
+
+```bash
+npm run build:flutter-web
+npm run dev:lan
+```
+
+PC와 휴대폰을 같은 Wi-Fi에 연결하고 휴대폰 브라우저에서 `http://<PC 내부 IP>:8000`으로 접속합니다. 예를 들어 PC의 내부 IP가 `10.0.0.251`이면 `http://10.0.0.251:8000`입니다. Windows 방화벽 메시지가 나오면 공용 네트워크가 아니라 현재 사용 중인 개인 네트워크에서 Node.js의 8000 포트 접근을 허용합니다. 내부 IP는 네트워크가 바뀌면 달라질 수 있으므로 실행할 때 다시 확인합니다.
+
 ## 시장 데이터 갱신
 
 ```bash
