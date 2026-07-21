@@ -113,6 +113,10 @@ class _StockMarketScreenState extends State<StockMarketScreen> {
   _MarketSort _sort = _MarketSort.turnover;
   bool _loading = true;
   String? _loadError;
+  bool _isClosing = false;
+  bool _allowPop = false;
+  bool _isAdvancingHour = false;
+  bool _closeAfterHourAdvance = false;
 
   @override
   void initState() {
@@ -171,7 +175,8 @@ class _StockMarketScreenState extends State<StockMarketScreen> {
         _stocks = loaded;
         _loading = false;
       });
-      if (_live.values.any((notifier) => notifier.value.isTradingDay)) {
+      if (!_isClosing &&
+          _live.values.any((notifier) => notifier.value.isTradingDay)) {
         _timer = Timer.periodic(
           const Duration(milliseconds: 900),
           (_) => _update(),
@@ -219,39 +224,116 @@ class _StockMarketScreenState extends State<StockMarketScreen> {
   }
 
   Future<void> _closeMarket() async {
-    final next = await widget.onSetMarketMinute?.call(_marketMinute);
-    if (next != null) _state = next;
-    if (mounted) Navigator.of(context).pop();
+    if (_isClosing || _allowPop) return;
+    if (_isAdvancingHour) {
+      _closeAfterHourAdvance = true;
+      return;
+    }
+    _isClosing = true;
+    _timer?.cancel();
+    _timer = null;
+    final minuteToSave = _marketMinute;
+    try {
+      final next = await widget.onSetMarketMinute?.call(minuteToSave);
+      if (next != null) _state = next;
+      _popMarketAfterSave();
+    } catch (_) {
+      _isClosing = false;
+      if (!mounted) return;
+      if (!_loading &&
+          _tick < generatedSessionTicks &&
+          _live.values.any((value) => value.value.isTradingDay)) {
+        _timer = Timer.periodic(
+          const Duration(milliseconds: 900),
+          (_) => _update(),
+        );
+      }
+      setState(() {});
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('시장 시간을 저장하지 못했어요. 다시 시도해 주세요.')),
+      );
+    }
+  }
+
+  void _popMarketAfterSave() {
+    if (!mounted) return;
+    setState(() => _allowPop = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) Navigator.of(context).pop();
+    });
+  }
+
+  Widget _withMarketExitGuard(Widget child) {
+    return PopScope<void>(
+      canPop: _allowPop,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop || _isClosing) return;
+        unawaited(_closeMarket());
+      },
+      child: child,
+    );
   }
 
   Future<void> _advanceOneHour() async {
+    if (_isAdvancingHour || _isClosing) return;
     final targetMinute = math.min(_marketMinute + 60, marketDayEndMinute);
     final targetTick = marketTickForMinute(targetMinute);
+    _isAdvancingHour = true;
     _timer?.cancel();
-    _tick = targetTick;
-    _marketMinute = targetMinute;
-    _minute.value = _marketMinute;
-    for (final stock in _stocks) {
-      final notifier = _live[stock.code]!;
-      final current = notifier.value;
-      if (!current.isTradingDay) continue;
-      final sessionHistory = current.sessionPath.take(_tick + 1).toList();
-      notifier.value = current.copyWith(
-        price: sessionHistory.last,
-        high: sessionHistory.reduce(math.max),
-        low: sessionHistory.reduce(math.min),
-        sessionHistory: sessionHistory,
-      );
-    }
-    final next = await widget.onSetMarketMinute?.call(_marketMinute);
-    if (next != null) _state = next;
-    if (!mounted) return;
-    setState(() {});
-    if (_tick < generatedSessionTicks &&
-        _live.values.any((value) => value.value.isTradingDay)) {
-      _timer = Timer.periodic(
-        const Duration(milliseconds: 900),
-        (_) => _update(),
+    _timer = null;
+    if (mounted) setState(() {});
+    try {
+      final next = await widget.onSetMarketMinute?.call(targetMinute);
+      if (next != null) _state = next;
+      if (!mounted) return;
+      _tick = targetTick;
+      _marketMinute = targetMinute;
+      _minute.value = _marketMinute;
+      for (final stock in _stocks) {
+        final notifier = _live[stock.code]!;
+        final current = notifier.value;
+        if (!current.isTradingDay) continue;
+        final sessionHistory = current.sessionPath.take(_tick + 1).toList();
+        notifier.value = current.copyWith(
+          price: sessionHistory.last,
+          high: sessionHistory.reduce(math.max),
+          low: sessionHistory.reduce(math.min),
+          sessionHistory: sessionHistory,
+        );
+      }
+      _isAdvancingHour = false;
+      if (_closeAfterHourAdvance) {
+        _closeAfterHourAdvance = false;
+        _isClosing = true;
+        _popMarketAfterSave();
+        return;
+      }
+      setState(() {});
+      if (_tick < generatedSessionTicks &&
+          _live.values.any((value) => value.value.isTradingDay)) {
+        _timer = Timer.periodic(
+          const Duration(milliseconds: 900),
+          (_) => _update(),
+        );
+      }
+    } catch (_) {
+      _isAdvancingHour = false;
+      if (!mounted) return;
+      if (_closeAfterHourAdvance) {
+        _closeAfterHourAdvance = false;
+        await _closeMarket();
+        return;
+      }
+      if (_tick < generatedSessionTicks &&
+          _live.values.any((value) => value.value.isTradingDay)) {
+        _timer = Timer.periodic(
+          const Duration(milliseconds: 900),
+          (_) => _update(),
+        );
+      }
+      setState(() {});
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('시장 시간을 저장하지 못했어요. 다시 시도해 주세요.')),
       );
     }
   }
@@ -315,28 +397,32 @@ class _StockMarketScreenState extends State<StockMarketScreen> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Scaffold(
-        backgroundColor: Color(0xFFF7F8FA),
-        body: Center(child: CircularProgressIndicator()),
+      return _withMarketExitGuard(
+        const Scaffold(
+          backgroundColor: Color(0xFFF7F8FA),
+          body: Center(child: CircularProgressIndicator()),
+        ),
       );
     }
     if (_loadError != null) {
-      return Scaffold(
-        backgroundColor: const Color(0xFFF7F8FA),
-        body: SafeArea(
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Text(
-                '시장 데이터를 불러오지 못했어요.\n$_loadError',
-                textAlign: TextAlign.center,
+      return _withMarketExitGuard(
+        Scaffold(
+          backgroundColor: const Color(0xFFF7F8FA),
+          body: SafeArea(
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(
+                  '시장 데이터를 불러오지 못했어요.\n$_loadError',
+                  textAlign: TextAlign.center,
+                ),
               ),
             ),
           ),
         ),
       );
     }
-    return _CrtTradingRoomScene(
+    final scene = _CrtTradingRoomScene(
       minute: _marketMinute,
       onBack: _closeMarket,
       child: Scaffold(
@@ -352,7 +438,9 @@ class _StockMarketScreenState extends State<StockMarketScreen> {
                     tradingDay: _live.values.any(
                       (value) => value.value.isTradingDay,
                     ),
-                    onAdvanceHour: _advanceOneHour,
+                    onAdvanceHour: _isAdvancingHour || _isClosing
+                        ? null
+                        : _advanceOneHour,
                   ),
                   Expanded(
                     child: ListView(
@@ -488,6 +576,7 @@ class _StockMarketScreenState extends State<StockMarketScreen> {
         ),
       ),
     );
+    return _withMarketExitGuard(scene);
   }
 }
 
@@ -858,6 +947,9 @@ class _OrderSheet extends StatefulWidget {
 }
 
 class _OrderSheetState extends State<_OrderSheet> {
+  static const _tradeSaveFailureMessage =
+      '주문을 저장하지 못했어요. 저장 공간을 확인하고 다시 시도해 주세요.';
+
   double _quantity = 1;
   bool _submitting = false;
   TradeExecutionResult? _result;
@@ -914,20 +1006,37 @@ class _OrderSheetState extends State<_OrderSheet> {
       _submitting = true;
       _result = null;
     });
-    final result = await widget.onExecuteTrade(
-      TradeOrder(
-        side: widget.isBuy ? TradeSide.buy : TradeSide.sell,
-        assetId: widget.definition.id,
-        symbol: widget.definition.code,
-        name: widget.definition.name,
-        market: widget.definition.market,
-        currency: widget.definition.currency,
-        quantity: _quantity,
-        unitPrice: _executionPrice,
-        marketMinute: _marketMinute,
-        isTradingDay: _quote.isTradingDay,
-      ),
-    );
+    late TradeExecutionResult result;
+    try {
+      result = await widget.onExecuteTrade(
+        TradeOrder(
+          side: widget.isBuy ? TradeSide.buy : TradeSide.sell,
+          assetId: widget.definition.id,
+          symbol: widget.definition.code,
+          name: widget.definition.name,
+          market: widget.definition.market,
+          currency: widget.definition.currency,
+          quantity: _quantity,
+          unitPrice: _executionPrice,
+          marketMinute: _marketMinute,
+          isTradingDay: _quote.isTradingDay,
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _submitting = false;
+        _result = TradeExecutionResult(
+          state: widget.state,
+          success: false,
+          message: _tradeSaveFailureMessage,
+        );
+      });
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(content: Text(_tradeSaveFailureMessage)));
+      return;
+    }
     if (!mounted) return;
     setState(() {
       _submitting = false;
@@ -1330,7 +1439,7 @@ class _MarketClockBar extends StatelessWidget {
   });
   final int minute;
   final bool tradingDay;
-  final VoidCallback onAdvanceHour;
+  final VoidCallback? onAdvanceHour;
 
   @override
   Widget build(BuildContext context) {

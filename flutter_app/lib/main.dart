@@ -17,6 +17,7 @@ import 'game/seed_money_content.dart';
 import 'game/story_state.dart';
 
 part 'organization_screen.dart';
+part 'apartment_hub_screens.dart';
 part 'room_screens.dart';
 part 'seed_money_screen.dart';
 part 'stock_market_screen.dart';
@@ -59,9 +60,12 @@ class MillenniumCapitalApp extends StatefulWidget {
 
 class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
   static const _engine = GameEngine();
+  final _scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
   late final GamePersistence _persistence;
   GameState? _state;
   bool _isReady = false;
+  bool _isRestoring = false;
+  Object? _restoreError;
 
   @override
   void initState() {
@@ -70,13 +74,33 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     _restoreGame();
   }
 
-  Future<void> _restoreGame() async {
-    final restored = await _persistence.load();
-    if (!mounted) return;
-    setState(() {
-      _state = restored;
-      _isReady = true;
-    });
+  Future<void> _restoreGame({bool retry = false}) async {
+    if (_isRestoring) return;
+    _isRestoring = true;
+    if (retry && mounted) {
+      setState(() {
+        _isReady = false;
+        _restoreError = null;
+      });
+    }
+    try {
+      final restored = await _persistence.load();
+      if (!mounted) return;
+      setState(() {
+        _state = restored;
+        _restoreError = null;
+        _isReady = true;
+      });
+    } catch (error, stackTrace) {
+      debugPrint('Failed to restore game: $error\n$stackTrace');
+      if (!mounted) return;
+      setState(() {
+        _restoreError = error;
+        _isReady = true;
+      });
+    } finally {
+      _isRestoring = false;
+    }
   }
 
   Future<void> _createCompany(NewGameSetup setup) async {
@@ -89,10 +113,19 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     final state = _engine.createNewGame(
       setup.companyName,
       story: story,
-      initialCash: 0,
+      initialCash: initialCompanyCash,
     );
+    try {
+      await _persistence.save(state);
+    } catch (error) {
+      debugPrint('Failed to create company save: $error');
+      _scaffoldMessengerKey.currentState
+        ?..hideCurrentSnackBar()
+        ..showSnackBar(_saveFailureSnackBar());
+      return;
+    }
+    if (!mounted) return;
     setState(() => _state = state);
-    await _persistence.save(state);
   }
 
   Future<void> _resolveDecision(String decisionId, String optionId) async {
@@ -116,8 +149,8 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     final next = completed.copyWith(
       marketMinute: advanceGameTime(current.marketMinute, workActionMinutes),
     );
-    setState(() => _state = next);
     await _persistence.save(next);
+    if (mounted) setState(() => _state = next);
     return next;
   }
 
@@ -130,16 +163,16 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
         familyHelpActionMinutes,
       ),
     );
-    setState(() => _state = next);
     await _persistence.save(next);
+    if (mounted) setState(() => _state = next);
     return next;
   }
 
   Future<GameState> _advanceDay() async {
     final current = _state!;
     final next = _engine.advanceOneDay(current);
-    setState(() => _state = next);
     await _persistence.save(next);
+    if (mounted) setState(() => _state = next);
     return next;
   }
 
@@ -148,8 +181,8 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     final next = current.copyWith(
       marketMinute: minute.clamp(marketDayStartMinute, marketDayEndMinute),
     );
-    setState(() => _state = next);
     await _persistence.save(next);
+    if (mounted) setState(() => _state = next);
     return next;
   }
 
@@ -157,14 +190,15 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     final current = _state!;
     final result = _engine.executeTrade(current, order);
     if (!result.success) return result;
-    setState(() => _state = result.state);
     await _persistence.save(result.state);
+    if (mounted) setState(() => _state = result.state);
     return result;
   }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      scaffoldMessengerKey: _scaffoldMessengerKey,
       debugShowCheckedModeBanner: false,
       title: '밀레니엄 캐피탈',
       theme: ThemeData(
@@ -195,6 +229,12 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
       ),
       home: !_isReady
           ? const _GameFrame(child: _LoadingScreen())
+          : _restoreError != null
+          ? _GameFrame(
+              child: _RestoreFailureScreen(
+                onRetry: () => unawaited(_restoreGame(retry: true)),
+              ),
+            )
           : _state == null
           ? _GameFrame(
               child: VisualNovelOnboardingScreen(onCreate: _createCompany),
@@ -253,6 +293,88 @@ class _LoadingScreen extends StatelessWidget {
   Widget build(BuildContext context) => const Scaffold(
     backgroundColor: _sky,
     body: Center(child: CircularProgressIndicator(color: _coral)),
+  );
+}
+
+class _RestoreFailureScreen extends StatelessWidget {
+  const _RestoreFailureScreen({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    key: const Key('restore-failure-screen'),
+    backgroundColor: const Color(0xFF171B2A),
+    body: SafeArea(
+      child: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
+            decoration: BoxDecoration(
+              color: _cream,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: _ink, width: 2),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x55000000),
+                  blurRadius: 24,
+                  offset: Offset(0, 12),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.save_as_rounded, color: _coral, size: 52),
+                const SizedBox(height: 16),
+                Text(
+                  '저장 데이터를\n불러오지 못했어요',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  '기존 저장은 지우거나 덮어쓰지 않았습니다.\n잠시 후 같은 저장으로 다시 시도해 주세요.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Color(0xFF5C6884),
+                    fontSize: 12,
+                    height: 1.55,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 22),
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: ElevatedButton.icon(
+                    key: const Key('restore-retry-button'),
+                    onPressed: onRetry,
+                    icon: const Icon(Icons.refresh_rounded),
+                    label: const Text('다시 불러오기'),
+                    style: ElevatedButton.styleFrom(
+                      foregroundColor: _ink,
+                      backgroundColor: _yellow,
+                      elevation: 0,
+                      side: const BorderSide(color: _ink, width: 2),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      textStyle: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ),
   );
 }
 
@@ -458,10 +580,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         _playerController.text.trim().isNotEmpty && _trait != null;
     return [
       _BackStoryButton(onTap: () => setState(() => _step = 0)),
-      const _Sticker(icon: Icons.mail_rounded, label: '첫 저금장부'),
+      const _Sticker(icon: Icons.mail_rounded, label: '첫 투자 장부'),
       const SizedBox(height: 14),
       Text(
-        '첫 장은 0원\n직접 모으기로 했다',
+        '초기자본 100만원\n창립 인원은 나 한 명',
         style: Theme.of(context).textTheme.headlineLarge,
       ),
       const SizedBox(height: 10),
@@ -806,26 +928,15 @@ class OfficeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final date = state.currentDate;
-    final dateLabel =
-        '${date.year}.${date.month.toString().padLeft(2, '0')}.${date.day.toString().padLeft(2, '0')}';
     final pending = state.pendingDecisions;
 
     return Scaffold(
-      backgroundColor: _cream,
+      backgroundColor: const Color(0xFF17130F),
       body: SafeArea(
         child: Column(
           children: [
-            _BrandHeader(
-              trailing: 'DAY ${state.day} · $dateLabel',
-              title: state.companyName,
-            ),
-            _OfficeMarketClock(
-              minute: state.marketMinute,
-              tradingDay: isMarketTradingDay(state.currentDate),
-            ),
             Expanded(
-              child: _InteractiveBedroom(
+              child: ApartmentHubScreen(
                 state: state,
                 onOpenDecisions: () => _openDecision(context),
                 onOpenMarket: () => Navigator.of(context).push(
@@ -861,7 +972,7 @@ class OfficeScreen extends StatelessWidget {
               marketMinute: state.marketMinute,
               tradingDay: isMarketTradingDay(state.currentDate),
               onAdvanceHour: () => _handleAdvanceHour(context),
-              onReadNewspaper: () => _handleAdvanceDay(context),
+              onAdvanceDay: () => _handleAdvanceDay(context),
             ),
           ],
         ),
@@ -871,7 +982,13 @@ class OfficeScreen extends StatelessWidget {
 
   Future<void> _handleAdvanceHour(BuildContext context) async {
     final target = math.min(state.marketMinute + 60, marketDayEndMinute);
-    await onSetMarketMinute(target);
+    try {
+      final saved = await onSetMarketMinute(target);
+      if (saved.marketMinute != target) return;
+    } catch (_) {
+      if (context.mounted) _showSaveFailure(context);
+      return;
+    }
     if (!context.mounted) return;
     final phase = marketClockAt(
       target,
@@ -883,6 +1000,14 @@ class OfficeScreen extends StatelessWidget {
   }
 
   Future<void> _handleAdvanceDay(BuildContext context) async {
+    try {
+      await _advanceDayWithNewspaper(context);
+    } catch (_) {
+      if (context.mounted) _showSaveFailure(context);
+    }
+  }
+
+  Future<void> _advanceDayWithNewspaper(BuildContext context) async {
     final navigator = Navigator.of(context);
     final loadingRoute = _gameSceneRoute<void>(
       NewsGeneratingScene(date: state.currentDate),
@@ -892,12 +1017,17 @@ class OfficeScreen extends StatelessWidget {
     final client = DynamicNewsClient();
     DailyMarketNewspaper newspaper;
     try {
-      final brief = buildDailyBrief(state);
+      var closingState = state;
+      if (closingState.marketMinute < marketDayEndMinute) {
+        closingState = await onSetMarketMinute(marketDayEndMinute);
+      }
+      if (!context.mounted) return;
+      final brief = buildDailyBrief(closingState);
       final article = await client.generate(
-        dynamicNewsRequestForState(state, brief),
+        dynamicNewsRequestForState(closingState, brief),
       );
       newspaper = await buildDailyMarketNewspaper(
-        state,
+        closingState,
         dynamicArticle: article,
       );
       final remaining = 650 - stopwatch.elapsedMilliseconds;
@@ -929,6 +1059,19 @@ class OfficeScreen extends StatelessWidget {
       context,
     ).push<void>(_gameSceneRoute<void>(PortfolioLedgerScreen(state: state)));
   }
+}
+
+SnackBar _saveFailureSnackBar() => const SnackBar(
+  content: Text(
+    '저장하지 못했어요. 이전 진행 상태를 그대로 유지했습니다.',
+    key: Key('save-failure-message'),
+  ),
+);
+
+void _showSaveFailure(BuildContext context) {
+  ScaffoldMessenger.of(context)
+    ..hideCurrentSnackBar()
+    ..showSnackBar(_saveFailureSnackBar());
 }
 
 class _SceneClockStrip extends StatelessWidget {
@@ -1856,65 +1999,6 @@ class _MarketStatusPill extends StatelessWidget {
   }
 }
 
-class _OfficeMarketClock extends StatelessWidget {
-  const _OfficeMarketClock({required this.minute, required this.tradingDay});
-  final int minute;
-  final bool tradingDay;
-
-  @override
-  Widget build(BuildContext context) {
-    final info = marketClockAt(minute, tradingDay: tradingDay);
-    return Container(
-      key: const Key('office-market-clock'),
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-      color: const Color(0xFF27334D),
-      child: Row(
-        children: [
-          const Icon(Icons.schedule_rounded, color: Colors.white, size: 19),
-          const SizedBox(width: 8),
-          Text(
-            marketTimeLabel(minute),
-            key: const Key('scene-clock-time'),
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 21,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 0.3,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  info.label,
-                  style: const TextStyle(
-                    color: Color(0xFFFFDF68),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                Text(
-                  info.description,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFFCFD6E5),
-                    fontSize: 9,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class NewsBulletinSheet extends StatelessWidget {
   const NewsBulletinSheet({super.key, required this.event, required this.date});
 
@@ -2397,99 +2481,113 @@ class _AdvanceBar extends StatelessWidget {
     required this.marketMinute,
     required this.tradingDay,
     required this.onAdvanceHour,
-    required this.onReadNewspaper,
+    required this.onAdvanceDay,
   });
   final bool hasPendingDecision;
   final int marketMinute;
   final bool tradingDay;
   final VoidCallback onAdvanceHour;
-  final VoidCallback onReadNewspaper;
+  final VoidCallback onAdvanceDay;
 
   @override
   Widget build(BuildContext context) {
     final ended = marketMinute >= marketDayEndMinute;
     final info = marketClockAt(marketMinute, tradingDay: tradingDay);
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 9, 10, 10),
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
       decoration: const BoxDecoration(
         color: Color(0xFF8FDAF2),
         border: Border(top: BorderSide(color: _ink, width: 2)),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Expanded(
-            child: Text(
-              hasPendingDecision
-                  ? '책상 위 편지를 확인해야 시간이 흘러요.'
-                  : ended
-                  ? '오늘 장이 끝났어요. 신문을 펼쳐볼까요?'
-                  : '${marketTimeLabel(marketMinute)} · ${info.label}',
-              style: const TextStyle(
-                color: _ink,
-                fontSize: 11,
-                fontWeight: FontWeight.w900,
-              ),
+          Text(
+            hasPendingDecision
+                ? '거실 탁자 위 안건 편지를 확인해야 진행할 수 있어요.'
+                : ended
+                ? '오늘 장이 끝났어요. 신문으로 하루를 마쳐요.'
+                : '${marketTimeLabel(marketMinute)} · ${info.label}',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: _ink,
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
             ),
           ),
-          SizedBox(
-            height: 50,
-            child: ElevatedButton.icon(
-              key: const Key('advance-day-button'),
-              onPressed: hasPendingDecision
-                  ? null
-                  : ended
-                  ? onReadNewspaper
-                  : onAdvanceHour,
-              iconAlignment: IconAlignment.end,
-              icon: Icon(
-                hasPendingDecision
-                    ? Icons.lock_clock_rounded
-                    : ended
-                    ? Icons.newspaper_rounded
-                    : Icons.schedule_rounded,
-              ),
-              label: Text(
-                hasPendingDecision
-                    ? '진행 잠김'
-                    : ended
-                    ? '오늘 신문'
-                    : '1시간 뒤',
-              ),
-              style: ElevatedButton.styleFrom(
-                foregroundColor: _ink,
-                backgroundColor: _yellow,
-                elevation: 0,
-                side: const BorderSide(color: _ink, width: 2),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                textStyle: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w900,
+          const SizedBox(height: 7),
+          Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 50,
+                  child: ElevatedButton.icon(
+                    key: const Key('advance-hour-button'),
+                    onPressed: hasPendingDecision || ended
+                        ? null
+                        : onAdvanceHour,
+                    icon: Icon(
+                      hasPendingDecision || ended
+                          ? Icons.lock_clock_rounded
+                          : Icons.schedule_rounded,
+                      size: 19,
+                    ),
+                    label: const Text('1시간 보내기'),
+                    style: _advanceButtonStyle(_yellow),
+                  ),
                 ),
               ),
-            ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: SizedBox(
+                  height: 50,
+                  child: ElevatedButton.icon(
+                    key: const Key('advance-day-button'),
+                    onPressed: hasPendingDecision ? null : onAdvanceDay,
+                    icon: Icon(
+                      hasPendingDecision
+                          ? Icons.lock_clock_rounded
+                          : Icons.newspaper_rounded,
+                      size: 19,
+                    ),
+                    label: const Text('하루 보내기'),
+                    style: _advanceButtonStyle(_coral),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
+
+  ButtonStyle _advanceButtonStyle(Color backgroundColor) {
+    return ElevatedButton.styleFrom(
+      foregroundColor: _ink,
+      backgroundColor: backgroundColor,
+      disabledForegroundColor: _ink.withValues(alpha: 0.55),
+      disabledBackgroundColor: const Color(0xFFD6E0E4),
+      elevation: 0,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      side: const BorderSide(color: _ink, width: 2),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
+    );
+  }
 }
 
 class _BrandHeader extends StatelessWidget {
-  const _BrandHeader({required this.trailing, this.title});
+  const _BrandHeader({required this.trailing});
 
   final String trailing;
-  final String? title;
 
   @override
   Widget build(BuildContext context) {
-    final displayTitle = title?.trim().isNotEmpty == true
-        ? title!.trim()
-        : '밀레니엄 캐피탈';
-    final mark = title?.trim().isNotEmpty == true
-        ? String.fromCharCode(displayTitle.runes.first)
-        : 'MC';
+    const displayTitle = '밀레니엄 캐피탈';
+    const mark = 'MC';
     return Container(
       height: 62,
       padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -2566,8 +2664,8 @@ class _StartingConditions extends StatelessWidget {
   Widget build(BuildContext context) {
     const conditions = [
       ('출발하는 날', '2000.01.01', Color(0xFFFFFEF8)),
-      ('내 돈', '0원부터', Color(0xFFFFF4B8)),
-      ('우리 팀', '연구원 1명', Color(0xFFDFF7EF)),
+      ('초기자본', '100만원', Color(0xFFFFF4B8)),
+      ('창립 인원', '1명', Color(0xFFDFF7EF)),
       ('첫 무대', '한국 · 미국 · 일본', Color(0xFFFFE3DF)),
     ];
     return GridView.builder(

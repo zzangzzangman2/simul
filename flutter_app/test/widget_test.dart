@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -5,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:millennium_capital/game/game_engine.dart';
 import 'package:millennium_capital/game/game_persistence.dart';
 import 'package:millennium_capital/game/game_state.dart';
+import 'package:millennium_capital/game/market_clock.dart';
 import 'package:millennium_capital/main.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -20,6 +22,17 @@ void main() {
       await tester.tap(find.byKey(const Key('story-continue')));
       await tester.pumpAndSettle();
     }
+  }
+
+  Future<void> goToLivingRoom(WidgetTester tester) async {
+    await tester.tap(find.byKey(const Key('apartment-go-living-room')));
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> goToKitchen(WidgetTester tester) async {
+    await goToLivingRoom(tester);
+    await tester.tap(find.byKey(const Key('apartment-go-kitchen')));
+    await tester.pumpAndSettle();
   }
 
   Future<void> completeStoryOnboarding(WidgetTester tester) async {
@@ -85,9 +98,10 @@ void main() {
     expect(companyHeader.data, '별빛 투자');
     expect(companyHeader.maxLines, 1);
     expect(companyHeader.softWrap, isFalse);
-    expect(find.text('FAMILY RESEARCH DESK'), findsOneWidget);
+    expect(find.text('1,000,000원'), findsOneWidget);
+    expect(find.byKey(const Key('apartment-place-bedroom')), findsOneWidget);
     expect(find.byKey(const Key('room-company-sign')), findsOneWidget);
-    expect(find.text('진행 잠김'), findsOneWidget);
+    expect(find.textContaining('거실 탁자 위 안건 편지'), findsOneWidget);
   });
 
   testWidgets('existing v1 save is restored with safe story defaults', (
@@ -129,6 +143,7 @@ void main() {
 
     await tester.pumpWidget(const MillenniumCapitalApp());
     await tester.pumpAndSettle();
+    await goToLivingRoom(tester);
     await tester.tap(find.byKey(const Key('open-decisions-button')));
     await tester.pumpAndSettle();
 
@@ -146,7 +161,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('decision-inbox-screen')), findsNothing);
     expect(find.text('안건 편지'), findsOneWidget);
-    expect(find.text('08:30'), findsOneWidget);
+    expect(find.text('DAY 1 · 08:30'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -363,6 +378,310 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('system back saves market time before leaving', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final state = const GameEngine()
+        .createNewGame('Back Test Capital', initialCash: 1000000)
+        .copyWith(day: 4);
+    final saveGate = Completer<GameState>();
+    var saveCalls = 0;
+    int? savedMinute;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => ElevatedButton(
+              key: const Key('open-market-for-system-back'),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => StockMarketScreen(
+                    state: state,
+                    universe: testMarketUniverse(),
+                    onSetMarketMinute: (minute) {
+                      saveCalls += 1;
+                      savedMinute = minute;
+                      return saveGate.future;
+                    },
+                  ),
+                ),
+              ),
+              child: const Text('Open market'),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('open-market-for-system-back')));
+    await tester.pump();
+    for (var attempt = 0; attempt < 20; attempt++) {
+      await tester.pump(const Duration(milliseconds: 100));
+      if (find.byKey(const Key('stock-row-005930')).evaluate().isNotEmpty) {
+        break;
+      }
+    }
+    await tester.pump(const Duration(milliseconds: 950));
+
+    await tester.binding.handlePopRoute();
+    await tester.pump();
+
+    expect(saveCalls, 1);
+    expect(savedMinute, greaterThan(state.marketMinute));
+    expect(find.byType(StockMarketScreen), findsOneWidget);
+
+    await tester.binding.handlePopRoute();
+    await tester.pump();
+    expect(saveCalls, 1);
+
+    saveGate.complete(state.copyWith(marketMinute: savedMinute!));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(StockMarketScreen), findsNothing);
+    expect(
+      find.byKey(const Key('open-market-for-system-back')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('back waits for a successful hour save before leaving', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final state = const GameEngine()
+        .createNewGame('Queued Exit Success', initialCash: 1000000)
+        .copyWith(day: 4);
+    final hourSave = Completer<GameState>();
+    final requestedMinutes = <int>[];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => ElevatedButton(
+              key: const Key('open-market-for-hour-exit-success'),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => StockMarketScreen(
+                    state: state,
+                    universe: testMarketUniverse(),
+                    onSetMarketMinute: (minute) {
+                      requestedMinutes.add(minute);
+                      return hourSave.future;
+                    },
+                  ),
+                ),
+              ),
+              child: const Text('Open market'),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(
+      find.byKey(const Key('open-market-for-hour-exit-success')),
+    );
+    await tester.pump();
+    for (var attempt = 0; attempt < 20; attempt++) {
+      await tester.pump(const Duration(milliseconds: 100));
+      if (find.byKey(const Key('market-clock-bar')).evaluate().isNotEmpty) {
+        break;
+      }
+    }
+    await tester.tap(find.byKey(const Key('market-advance-hour-button')));
+    await tester.pump();
+    expect(requestedMinutes, hasLength(1));
+
+    await tester.binding.handlePopRoute();
+    await tester.pump();
+    expect(requestedMinutes, hasLength(1));
+    expect(find.byType(StockMarketScreen), findsOneWidget);
+
+    hourSave.complete(state.copyWith(marketMinute: requestedMinutes.single));
+    await tester.pumpAndSettle();
+
+    expect(requestedMinutes, hasLength(1));
+    expect(find.byType(StockMarketScreen), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('back waits for a failed hour save then saves the old time', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final state = const GameEngine()
+        .createNewGame('Queued Exit Failure', initialCash: 1000000)
+        .copyWith(day: 4);
+    final hourSave = Completer<GameState>();
+    final requestedMinutes = <int>[];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => ElevatedButton(
+              key: const Key('open-market-for-hour-exit-failure'),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => StockMarketScreen(
+                    state: state,
+                    universe: testMarketUniverse(),
+                    onSetMarketMinute: (minute) {
+                      requestedMinutes.add(minute);
+                      if (requestedMinutes.length == 1) {
+                        return hourSave.future;
+                      }
+                      return Future.value(state.copyWith(marketMinute: minute));
+                    },
+                  ),
+                ),
+              ),
+              child: const Text('Open market'),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(
+      find.byKey(const Key('open-market-for-hour-exit-failure')),
+    );
+    await tester.pump();
+    for (var attempt = 0; attempt < 20; attempt++) {
+      await tester.pump(const Duration(milliseconds: 100));
+      if (find.byKey(const Key('market-clock-bar')).evaluate().isNotEmpty) {
+        break;
+      }
+    }
+    await tester.tap(find.byKey(const Key('market-advance-hour-button')));
+    await tester.pump();
+    await tester.binding.handlePopRoute();
+    await tester.pump();
+
+    expect(requestedMinutes, hasLength(1));
+    expect(find.byType(StockMarketScreen), findsOneWidget);
+
+    hourSave.completeError(StateError('hour save failed'));
+    await tester.pumpAndSettle();
+
+    expect(requestedMinutes, hasLength(2));
+    expect(requestedMinutes[1], requestedMinutes[0] - 60);
+    expect(find.byType(StockMarketScreen), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('failed hour save does not publish the future market time', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final state = const GameEngine()
+        .createNewGame('Hour Save Test', initialCash: 1000000)
+        .copyWith(day: 4);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StockMarketScreen(
+          state: state,
+          universe: testMarketUniverse(),
+          onSetMarketMinute: (_) async => throw StateError('save failed'),
+        ),
+      ),
+    );
+    await tester.pump();
+    for (var attempt = 0; attempt < 20; attempt++) {
+      await tester.pump(const Duration(milliseconds: 100));
+      if (find.byKey(const Key('market-clock-bar')).evaluate().isNotEmpty) {
+        break;
+      }
+    }
+
+    final clock = find.descendant(
+      of: find.byKey(const Key('market-clock-bar')),
+      matching: find.byType(Text),
+    );
+    final before = tester.widget<Text>(clock.first).data;
+
+    await tester.tap(find.byKey(const Key('market-advance-hour-button')));
+    await tester.pump();
+
+    expect(tester.widget<Text>(clock.first).data, before);
+    expect(find.byType(SnackBar), findsOneWidget);
+    expect(
+      tester
+          .widget<TextButton>(
+            find.byKey(const Key('market-advance-hour-button')),
+          )
+          .onPressed,
+      isNotNull,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('trade save failure unlocks the order sheet for retry', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    var current = const GameEngine()
+        .createNewGame('Trade Failure Test', initialCash: 1000000)
+        .copyWith(day: 4);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StockMarketScreen(
+          state: current,
+          universe: testMarketUniverse(),
+          onSetMarketMinute: (minute) async {
+            current = current.copyWith(marketMinute: minute);
+            return current;
+          },
+          onExecuteTrade: (_) async => throw StateError('trade save failed'),
+        ),
+      ),
+    );
+    await tester.pump();
+    for (var attempt = 0; attempt < 20; attempt++) {
+      await tester.pump(const Duration(milliseconds: 100));
+      if (find.byKey(const Key('stock-row-005930')).evaluate().isNotEmpty) {
+        break;
+      }
+    }
+
+    await tester.ensureVisible(find.byKey(const Key('stock-row-005930')));
+    await tester.tap(find.byKey(const Key('stock-row-005930')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(find.byKey(const Key('write-research-note-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('request-parent-order-approval')));
+    for (var attempt = 0; attempt < 20; attempt++) {
+      await tester.pump(const Duration(milliseconds: 50));
+      if (find.byKey(const Key('order-result')).evaluate().isNotEmpty) break;
+    }
+
+    expect(find.textContaining('주문을 저장하지 못했어요'), findsWidgets);
+    expect(find.byType(SnackBar), findsOneWidget);
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.byKey(const Key('request-parent-order-approval')),
+          )
+          .onPressed,
+      isNotNull,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'organization uses upper-body portrait and cards for assignment',
     (tester) async {
@@ -380,6 +699,7 @@ void main() {
 
       await tester.pumpWidget(const MillenniumCapitalApp());
       await tester.pumpAndSettle();
+      await goToLivingRoom(tester);
       await tester.ensureVisible(
         find.byKey(const Key('open-organization-button')),
       );
@@ -504,6 +824,7 @@ void main() {
 
       await tester.pumpWidget(const MillenniumCapitalApp());
       await tester.pumpAndSettle();
+      await goToKitchen(tester);
       await tester.ensureVisible(find.byKey(const Key('open-work-button')));
       await tester.tap(find.byKey(const Key('open-work-button')));
       await tester.pumpAndSettle();
@@ -533,6 +854,105 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+  testWidgets('hour and day advance controls stay distinct when unlocked', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(360, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    const engine = GameEngine();
+    final state = engine
+        .createNewGame('시간 진행 테스트', initialCash: 1000000)
+        .copyWith(decisions: const []);
+    int? requestedMinute;
+
+    Widget buildOffice(GameState currentState) => MaterialApp(
+      home: OfficeScreen(
+        state: currentState,
+        engine: engine,
+        onAdvanceDay: () async => currentState,
+        onSetMarketMinute: (minute) async {
+          requestedMinute = minute;
+          return currentState.copyWith(marketMinute: minute);
+        },
+        onResolveDecision: (_, _) async {},
+        onRequestFamilyHelp: (_) async => currentState,
+        onCompleteWork: (_) async => currentState,
+        onExecuteTrade: (_) async => TradeExecutionResult(
+          state: currentState,
+          success: false,
+          message: 'test',
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(buildOffice(state));
+    await tester.pumpAndSettle();
+
+    final hourFinder = find.byKey(const Key('advance-hour-button'));
+    final dayFinder = find.byKey(const Key('advance-day-button'));
+    expect(tester.widget<ElevatedButton>(hourFinder).onPressed, isNotNull);
+    expect(tester.widget<ElevatedButton>(dayFinder).onPressed, isNotNull);
+
+    await tester.tap(hourFinder);
+    await tester.pump();
+    expect(requestedMinute, state.marketMinute + 60);
+
+    await tester.pumpWidget(
+      buildOffice(state.copyWith(marketMinute: marketDayEndMinute)),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.widget<ElevatedButton>(hourFinder).onPressed, isNull);
+    expect(tester.widget<ElevatedButton>(dayFinder).onPressed, isNotNull);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('day advance commits market close before showing results', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(360, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    const engine = GameEngine();
+    final state = engine
+        .createNewGame('하루 진행 안전 테스트', initialCash: initialCompanyCash)
+        .copyWith(decisions: const []);
+    final closeCommit = Completer<GameState>();
+    int? requestedMinute;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: OfficeScreen(
+          state: state,
+          engine: engine,
+          onAdvanceDay: () async => state,
+          onSetMarketMinute: (minute) {
+            requestedMinute = minute;
+            return closeCommit.future;
+          },
+          onResolveDecision: (_, _) async {},
+          onRequestFamilyHelp: (_) async => state,
+          onCompleteWork: (_) async => state,
+          onExecuteTrade: (_) async => TradeExecutionResult(
+            state: state,
+            success: false,
+            message: 'test',
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('advance-day-button')));
+    await tester.pump();
+    expect(requestedMinute, marketDayEndMinute);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    closeCommit.complete(state.copyWith(marketMinute: marketDayEndMinute));
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+  });
+
   for (final size in [const Size(390, 844), const Size(360, 800)]) {
     testWidgets(
       'office has no layout exception at ${size.width}x${size.height}',
@@ -552,7 +972,19 @@ void main() {
         await tester.pumpWidget(const MillenniumCapitalApp());
         await tester.pumpAndSettle();
 
-        expect(find.byKey(const Key('advance-day-button')), findsOneWidget);
+        final hourFinder = find.byKey(const Key('advance-hour-button'));
+        final dayFinder = find.byKey(const Key('advance-day-button'));
+        expect(hourFinder, findsOneWidget);
+        expect(dayFinder, findsOneWidget);
+        expect(find.text('1시간 보내기'), findsOneWidget);
+        expect(find.text('하루 보내기'), findsOneWidget);
+
+        final hourButton = tester.widget<ElevatedButton>(hourFinder);
+        final dayButton = tester.widget<ElevatedButton>(dayFinder);
+        expect(hourButton.onPressed, isNull);
+        expect(dayButton.onPressed, isNull);
+        expect(tester.getSize(hourFinder).height, greaterThanOrEqualTo(48));
+        expect(tester.getSize(dayFinder).height, greaterThanOrEqualTo(48));
         expect(tester.takeException(), isNull);
       },
     );
