@@ -14,22 +14,24 @@ async function render() {
   );
 }
 
-test("server-renders the required company-name onboarding", async () => {
+test("opens the Flutter family-story prologue from the default route", async () => {
   const response = await render();
-  assert.equal(response.status, 200);
-  assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
+  assert.ok([307, 308].includes(response.status));
+  assert.equal(new URL(response.headers.get("location"), "http://localhost").pathname, "/play/index.html");
 
-  const html = await response.text();
-  assert.match(html, /<title>MILLENNIUM CAPITAL/);
-  assert.match(html, /2000\.01\.01/);
-  assert.match(html, /당신의 투자회사에/);
-  assert.match(html, /100만원/);
-  assert.match(html, /창립 팀<\/dt><dd>1명/);
-  assert.match(html, /id="company-name"/);
-  assert.match(html, /회사 설립하기/);
-  assert.match(html, /disabled/);
-  assert.doesNotMatch(html, /투자할 회사를 고르세요/);
-  assert.doesNotMatch(html, /codex-preview|react-loading-skeleton|Your site is taking shape/);
+  const [page, flutterIndex, onboarding] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../public/play/index.html", import.meta.url), "utf8"),
+    readFile(new URL("../flutter_app/lib/visual_novel_onboarding.dart", import.meta.url), "utf8"),
+  ]);
+  assert.match(page, /redirect\("\/play\/index\.html"\)/);
+  assert.doesNotMatch(page, /GameClient/);
+  assert.match(flutterIndex, /<base href="\/play\/">/);
+  assert.match(flutterIndex, /flutter_bootstrap\.js/);
+  assert.doesNotMatch(flutterIndex, /100만원|투자회사 설립/);
+  assert.match(onboarding, /1999\.12\.31\s+·\s+23:57/);
+  assert.match(onboarding, /가족 투자연구소/);
+  assert.doesNotMatch(onboarding, /100만원/);
 });
 
 test("ships a complete daily 2000-2010 market snapshot", async () => {
@@ -64,7 +66,11 @@ test("documents and preserves the portrait-mobile product contract", async () =>
 
   assert.match(rules, /390×844px/);
   assert.match(rules, /최소 360px/);
-  assert.match(guide, /첫 방문 시 회사 이름 입력 화면/);
+  assert.match(guide, /첫 방문 시 가족 스토리 프롤로그/);
+  assert.match(guide, /현재 스키마는 버전 `7`/);
+  assert.doesNotMatch(rules, /게임 화면보다 먼저 회사 이름/);
+  assert.doesNotMatch(guide, /첫 방문 시 회사 이름 입력 화면/);
+  assert.doesNotMatch(guide, /작은 원룸 사무실에서 시작/);
   assert.match(css, /env\(safe-area-inset-bottom\)/);
   assert.match(css, /width: min\(100%, 430px\)/);
   assert.match(css, /\.asset-grid \{[\s\S]*?grid-template-columns: 1fr;/);

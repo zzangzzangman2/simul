@@ -10,7 +10,7 @@
     "build": "vinext build",
     "start": "vinext start",
     "test": "vinext build && node --test tests/rendered-html.test.mjs",
-    "lint": "eslint . --ignore-pattern dist --ignore-pattern build --ignore-pattern .next --ignore-pattern .vinext --ignore-pattern .wrangler --ignore-pattern flutter_app/.dart_tool --ignore-pattern flutter_app/build --ignore-pattern flutter_app/.plugin_symlinks",
+    "lint": "eslint . --ignore-pattern dist --ignore-pattern build --ignore-pattern .next --ignore-pattern .vinext --ignore-pattern .wrangler --ignore-pattern public/play --ignore-pattern flutter_app/.dart_tool --ignore-pattern flutter_app/build --ignore-pattern flutter_app/.plugin_symlinks",
     "db:generate": "drizzle-kit generate",
     "data:fetch": "node scripts/fetch-market-data.mjs",
     "data:fetch:krx-full": "python scripts/fetch-krx-full-market.py",

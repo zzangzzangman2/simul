@@ -1,5 +1,5 @@
-import { GameClient } from "./game-client";
+import { redirect } from "next/navigation";
 
 export default function Home() {
-  return <GameClient />;
+  redirect("/play/index.html");
 }

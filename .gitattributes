@@ -1,0 +1,2 @@
+# Flutter Web output is generated and must keep exact bytes across platforms.
+public/play/** binary linguist-generated=true
