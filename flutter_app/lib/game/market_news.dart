@@ -1,3 +1,4 @@
+import 'dynamic_news.dart';
 import 'game_state.dart';
 import 'historical_events.dart';
 import 'market_data.dart';
@@ -206,6 +207,7 @@ class DailyMarketNewspaper {
     required this.topLosers,
     required this.headline,
     required this.summary,
+    this.dynamicArticle,
   });
   final DateTime date;
   final DailyBrief brief;
@@ -217,9 +219,69 @@ class DailyMarketNewspaper {
   final List<DailyMarketMover> topLosers;
   final String headline;
   final String summary;
+  final DynamicNewsArticle? dynamicArticle;
 }
 
-Future<DailyMarketNewspaper> buildDailyMarketNewspaper(GameState state) async {
+String _newsLimit(String value, int maxLength) => value.length <= maxLength
+    ? value
+    : '${value.substring(0, maxLength - 3)}...';
+
+DynamicNewsRequest dynamicNewsRequestForState(
+  GameState state,
+  DailyBrief brief,
+) {
+  DecisionCardData? latestDecision;
+  for (final decision in state.decisions.reversed) {
+    if (decision.status == DecisionStatus.resolved) {
+      latestDecision = decision;
+      break;
+    }
+  }
+
+  DecisionOptionData? selectedOption;
+  if (latestDecision?.selectedOptionId != null) {
+    for (final option in latestDecision!.options) {
+      if (option.id == latestDecision.selectedOptionId) {
+        selectedOption = option;
+        break;
+      }
+    }
+  }
+
+  LedgerEntry? todayLedger;
+  for (final entry in state.ledger.reversed) {
+    if (entry.day == state.day) {
+      todayLedger = entry;
+      break;
+    }
+  }
+
+  final action = todayLedger != null
+      ? todayLedger.description
+      : latestDecision != null && selectedOption != null
+      ? '${latestDecision.title}에서 “${selectedOption.label}”을 선택함. ${selectedOption.description}'
+      : '가족 투자연구소에서 시장 시세와 기업 조사노트를 검토함';
+  final isCompanyDecision =
+      latestDecision != null && latestDecision.id != 'first-research-note';
+  final companyName = isCompanyDecision
+      ? state.company.name
+      : (state.companyName.trim().isEmpty ? '가족 투자연구소' : state.companyName);
+  final megaTrend = brief.headline == null
+      ? '${brief.eyebrow} · ${brief.title}'
+      : '${brief.headline!.title} · ${brief.headline!.body}';
+
+  return DynamicNewsRequest(
+    year: state.currentDate.year,
+    companyName: _newsLimit(companyName, 100),
+    action: _newsLimit(action, 500),
+    megaTrend: _newsLimit(megaTrend, 300),
+  );
+}
+
+Future<DailyMarketNewspaper> buildDailyMarketNewspaper(
+  GameState state, {
+  DynamicNewsArticle? dynamicArticle,
+}) async {
   final brief = buildDailyBrief(state);
   final universe = await HistoricalMarketUniverse.load();
   final movers = <DailyMarketMover>[];
@@ -248,6 +310,7 @@ Future<DailyMarketNewspaper> buildDailyMarketNewspaper(GameState state) async {
       .take(3)
       .toList();
   final headline =
+      dynamicArticle?.headline ??
       brief.headline?.title ??
       (brief.marketClosed
           ? '오늘 증시는 휴장, 가족 투자연구소는 숨 고르기'
@@ -268,5 +331,6 @@ Future<DailyMarketNewspaper> buildDailyMarketNewspaper(GameState state) async {
     topLosers: topLosers,
     headline: headline,
     summary: summary,
+    dynamicArticle: dynamicArticle,
   );
 }

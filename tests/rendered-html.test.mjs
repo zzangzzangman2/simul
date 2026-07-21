@@ -84,3 +84,42 @@ test("documents and preserves the portrait-mobile product contract", async () =>
   assert.match(css, /url\("\/office-room\.png"\)/);
   assert.ok(roomImage.byteLength > 100_000);
 });
+
+test("validates the dynamic news API before invoking Gemini", async () => {
+  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
+  workerUrl.searchParams.set("news-test", `${process.pid}-${Date.now()}`);
+  const { default: worker } = await import(workerUrl.href);
+  const response = await worker.fetch(
+    new Request("http://localhost/api/news", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        year: 1999,
+        companyName: "애플",
+        action: "경영진 교체",
+        megaTrend: "모바일 기기 확산",
+      }),
+    }),
+    { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
+    { waitUntil() {}, passThroughOnException() {} },
+  );
+
+  assert.equal(response.status, 400);
+  assert.match((await response.json()).error, /2000~2010/);
+});
+
+test("keeps Gemini credentials server-side and forces the news JSON schema", async () => {
+  const [route, generator] = await Promise.all([
+    readFile(new URL("../app/api/news/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../lib/dynamic-news.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(route, /export async function POST/);
+  assert.match(generator, /gemini-3\.5-flash/);
+  assert.match(generator, /vertexai: true/);
+  assert.match(generator, /responseMimeType: "application\/json"/);
+  assert.match(generator, /responseJsonSchema: articleSchema/);
+  assert.match(generator, /minimum: -30/);
+  assert.match(generator, /maximum: 50/);
+  assert.doesNotMatch(generator, /NEXT_PUBLIC_[A-Z_]*(?:KEY|SECRET)/);
+});
