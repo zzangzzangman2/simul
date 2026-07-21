@@ -49,6 +49,13 @@ class _OrganizationScreenState extends State<OrganizationScreen> {
             child: Column(
               children: [
                 _OrganizationHeader(onBack: () => Navigator.of(context).pop()),
+                _SceneClockStrip(
+                  location: '우리 집 거실 · 사람들',
+                  caption: '가족에게 조사를 부탁하고 역할을 나눈다.',
+                  minute: _state.marketMinute,
+                  costLabel: '도움 요청 +30분',
+                  dark: false,
+                ),
                 Expanded(
                   child: ListView(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),

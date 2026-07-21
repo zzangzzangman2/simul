@@ -72,4 +72,20 @@ void main() {
       expect(paper.headline, isNotEmpty);
     },
   );
+
+  test('meaningful actions consume rational chunks of the game day', () {
+    expect(
+      advanceGameTime(marketDayStartMinute, decisionActionMinutes),
+      8 * 60 + 30,
+    );
+    expect(
+      advanceGameTime(marketDayStartMinute, familyHelpActionMinutes),
+      8 * 60 + 30,
+    );
+    expect(advanceGameTime(marketDayStartMinute, workActionMinutes), 9 * 60);
+    expect(
+      advanceGameTime(19 * 60 + 30, workActionMinutes),
+      marketDayEndMinute,
+    );
+  });
 }

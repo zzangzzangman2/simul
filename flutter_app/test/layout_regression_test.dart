@@ -46,11 +46,15 @@ void main() {
     expect(find.byKey(const Key('stock-row-005930')), findsOneWidget);
     expect(tester.takeException(), isNull);
 
+    await tester.ensureVisible(find.byKey(const Key('stock-row-005930')));
+    await tester.pump();
     await tester.tap(find.byKey(const Key('stock-row-005930')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
-    await tester.ensureVisible(
+    await tester.scrollUntilVisible(
       find.byKey(const Key('historical-executive-section')),
+      220,
+      scrollable: find.byType(Scrollable).last,
     );
     await tester.pump();
 
@@ -151,9 +155,7 @@ void main() {
       summary: 'A compact market summary for a narrow mobile screen.',
     );
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(body: KoreaEconomicNewspaperSheet(newspaper: newspaper)),
-      ),
+      MaterialApp(home: KoreaEconomicNewspaperScene(newspaper: newspaper)),
     );
     await tester.pumpAndSettle();
     expect(find.text('한국경제신문'), findsOneWidget);

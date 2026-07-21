@@ -26,13 +26,11 @@ class _SeedMoneyHubScreenState extends State<SeedMoneyHubScreen> {
   Future<void> _openGame(WorkActivityInfo activity) async {
     if (_saving || _today >= 3) return;
     final result = await Navigator.of(context).push<WorkSessionResult>(
-      MaterialPageRoute<WorkSessionResult>(
-        builder: (_) => switch (activity.id) {
-          'dishes' => const DishwashingMiniGame(),
-          'stationery' => const StationerySortMiniGame(),
-          _ => const FleaMarketMiniGame(),
-        },
-      ),
+      _gameSceneRoute<WorkSessionResult>(switch (activity.id) {
+        'dishes' => const DishwashingMiniGame(),
+        'stationery' => const StationerySortMiniGame(),
+        _ => const FleaMarketMiniGame(),
+      }),
     );
     if (result == null || !mounted) return;
     setState(() => _saving = true);
@@ -56,6 +54,13 @@ class _SeedMoneyHubScreenState extends State<SeedMoneyHubScreen> {
               title: '종잣돈 일거리',
               subtitle: '2000년 1월 · 보호자와 함께',
               onBack: () => Navigator.of(context).pop(),
+            ),
+            _SceneClockStrip(
+              location: '집과 동네 · 오늘의 일거리',
+              caption: '일을 마치면 수입과 함께 한 시간이 흐른다.',
+              minute: _state.marketMinute,
+              costLabel: '완료 +60분',
+              dark: false,
             ),
             Expanded(
               child: ListView(
