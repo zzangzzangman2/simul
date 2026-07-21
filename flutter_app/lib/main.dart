@@ -1,9 +1,20 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'game/game_engine.dart';
 import 'game/game_persistence.dart';
 import 'game/game_state.dart';
+import 'game/historical_executives.dart';
+import 'game/market_news.dart';
+import 'game/organization_state.dart';
+import 'game/seed_money_content.dart';
 import 'game/story_state.dart';
+
+part 'organization_screen.dart';
+part 'seed_money_screen.dart';
+part 'stock_market_screen.dart';
+part 'visual_novel_onboarding.dart';
 
 const _ink = Color(0xFF33405F);
 const _sky = Color(0xFFBDEBFA);
@@ -55,7 +66,11 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
       startingTrait: setup.startingTrait,
       familyRule: setup.familyRule,
     );
-    final state = _engine.createNewGame(setup.companyName, story: story);
+    final state = _engine.createNewGame(
+      setup.companyName,
+      story: story,
+      initialCash: 0,
+    );
     setState(() => _state = state);
     await _persistence.save(state);
   }
@@ -68,12 +83,28 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     await _persistence.save(next);
   }
 
-  Future<void> _advanceDay() async {
-    final current = _state;
-    if (current == null) return;
+  Future<GameState> _completeWork(WorkSessionResult result) async {
+    final current = _state!;
+    final next = _engine.completeWorkSession(current, result);
+    setState(() => _state = next);
+    await _persistence.save(next);
+    return next;
+  }
+
+  Future<GameState> _requestFamilyHelp(String helperId) async {
+    final current = _state!;
+    final next = _engine.requestFamilyHelp(current, helperId);
+    setState(() => _state = next);
+    await _persistence.save(next);
+    return next;
+  }
+
+  Future<GameState> _advanceDay() async {
+    final current = _state!;
     final next = _engine.advanceOneDay(current);
     setState(() => _state = next);
     await _persistence.save(next);
+    return next;
   }
 
   @override
@@ -110,13 +141,17 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
       home: !_isReady
           ? const _GameFrame(child: _LoadingScreen())
           : _state == null
-          ? _GameFrame(child: OnboardingScreen(onCreate: _createCompany))
+          ? _GameFrame(
+              child: VisualNovelOnboardingScreen(onCreate: _createCompany),
+            )
           : _GameFrame(
               child: OfficeScreen(
                 state: _state!,
                 engine: _engine,
                 onAdvanceDay: _advanceDay,
                 onResolveDecision: _resolveDecision,
+                onRequestFamilyHelp: _requestFamilyHelp,
+                onCompleteWork: _completeWork,
               ),
             ),
     );
@@ -366,10 +401,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         _playerController.text.trim().isNotEmpty && _trait != null;
     return [
       _BackStoryButton(onTap: () => setState(() => _step = 0)),
-      const _Sticker(icon: Icons.mail_rounded, label: '외할아버지의 봉투'),
+      const _Sticker(icon: Icons.mail_rounded, label: '첫 저금장부'),
       const SizedBox(height: 14),
       Text(
-        '100만원은\n용돈이 아니었다',
+        '첫 장은 0원\n직접 모으기로 했다',
         style: Theme.of(context).textTheme.headlineLarge,
       ),
       const SizedBox(height: 10),
@@ -697,12 +732,16 @@ class OfficeScreen extends StatelessWidget {
     required this.engine,
     required this.onAdvanceDay,
     required this.onResolveDecision,
+    required this.onRequestFamilyHelp,
+    required this.onCompleteWork,
   });
 
   final GameState state;
   final GameEngine engine;
-  final VoidCallback onAdvanceDay;
+  final Future<GameState> Function() onAdvanceDay;
   final Future<void> Function(String, String) onResolveDecision;
+  final Future<GameState> Function(String) onRequestFamilyHelp;
+  final Future<GameState> Function(WorkSessionResult) onCompleteWork;
 
   @override
   Widget build(BuildContext context) {
@@ -728,7 +767,7 @@ class OfficeScreen extends StatelessWidget {
                         children: [
                           _OfficeStatusCard(state: state),
                           const SizedBox(height: 10),
-                          _TimelineCard(state: state),
+                          _TodayNewsCard(state: state),
                           const SizedBox(height: 16),
                           Row(
                             crossAxisAlignment: CrossAxisAlignment.end,
@@ -763,15 +802,23 @@ class OfficeScreen extends StatelessWidget {
                                       children: [
                                         Expanded(
                                           child: _RoomButton(
+                                            key: const Key(
+                                              'open-market-button',
+                                            ),
                                             icon: Icons.computer_rounded,
                                             title: 'CRT',
-                                            subtitle: '시장',
+                                            subtitle: '실시간 시장',
                                             color: const Color(0xFFDDF3FF),
                                             compact: true,
-                                            onTap: () => _showComingSoon(
-                                              context,
-                                              '주식시장',
-                                            ),
+                                            onTap: () =>
+                                                Navigator.of(context).push(
+                                                  MaterialPageRoute<void>(
+                                                    builder: (_) =>
+                                                        StockMarketScreen(
+                                                          state: state,
+                                                        ),
+                                                  ),
+                                                ),
                                           ),
                                         ),
                                         const SizedBox(width: 8),
@@ -787,6 +834,43 @@ class OfficeScreen extends StatelessWidget {
                                         ),
                                       ],
                                     ),
+                                    const SizedBox(height: 10),
+                                    _RoomButton(
+                                      key: const Key(
+                                        'open-organization-button',
+                                      ),
+                                      icon: Icons.groups_2_rounded,
+                                      title: '사람들',
+                                      subtitle: '가족 도움 · 직원 배치',
+                                      color: const Color(0xFFFFE9C7),
+                                      onTap: () => Navigator.of(context).push(
+                                        MaterialPageRoute<void>(
+                                          builder: (_) => OrganizationScreen(
+                                            state: state,
+                                            onRequestFamilyHelp:
+                                                onRequestFamilyHelp,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    _RoomButton(
+                                      key: const Key('open-work-button'),
+                                      icon: Icons.savings_rounded,
+                                      title: '일거리',
+                                      subtitle: state.cash >= 10000
+                                          ? '계속할지는 내 선택'
+                                          : '종잣돈 ${_money(state.cash)}원',
+                                      color: const Color(0xFFDDF5E8),
+                                      onTap: () => Navigator.of(context).push(
+                                        MaterialPageRoute<void>(
+                                          builder: (_) => SeedMoneyHubScreen(
+                                            state: state,
+                                            onComplete: onCompleteWork,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ),
@@ -801,12 +885,30 @@ class OfficeScreen extends StatelessWidget {
             ),
             _AdvanceBar(
               hasPendingDecision: pending.isNotEmpty,
-              onAdvanceDay: onAdvanceDay,
+              onAdvanceDay: () => _handleAdvanceDay(context),
               onOpenDecision: () => _openDecision(context),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Future<void> _handleAdvanceDay(BuildContext context) async {
+    final beforeDay = state.day;
+    final next = await onAdvanceDay();
+    if (!context.mounted) return;
+    // 중요 안건에 막혀 하루가 흐르지 않았으면 속보도 없다.
+    if (next.day <= beforeDay) return;
+    final headline = historicalNewsForDate(next.currentDate);
+    if (headline == null) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) =>
+          NewsBulletinSheet(event: headline, date: next.currentDate),
     );
   }
 
@@ -873,12 +975,6 @@ class OfficeScreen extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  static void _showComingSoon(BuildContext context, String title) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('$title 화면은 다음 개발 단계에서 연결할게요!')));
   }
 }
 
@@ -1170,60 +1266,413 @@ class _OfficeStatusCard extends StatelessWidget {
   }
 }
 
-class _TimelineCard extends StatelessWidget {
-  const _TimelineCard({required this.state});
+typedef _NewsToneStyle = ({
+  Color fill,
+  Color accent,
+  IconData icon,
+  String tag,
+});
+
+_NewsToneStyle _newsToneStyle(NewsTone tone) => switch (tone) {
+  NewsTone.breaking => (
+    fill: const Color(0xFFFFF0EC),
+    accent: _coral,
+    icon: Icons.campaign_rounded,
+    tag: '속보',
+  ),
+  NewsTone.shock => (
+    fill: const Color(0xFFFFE6E1),
+    accent: const Color(0xFFE0574B),
+    icon: Icons.warning_amber_rounded,
+    tag: '시장 충격',
+  ),
+  NewsTone.launch => (
+    fill: const Color(0xFFE7F4FF),
+    accent: const Color(0xFF3E8FD0),
+    icon: Icons.rocket_launch_rounded,
+    tag: '새 소식',
+  ),
+  NewsTone.milestone => (
+    fill: const Color(0xFFFFF7DA),
+    accent: const Color(0xFFE0A100),
+    icon: Icons.auto_awesome_rounded,
+    tag: '오늘의 소식',
+  ),
+  NewsTone.weekend => (
+    fill: const Color(0xFFECEEF6),
+    accent: const Color(0xFF7C86A0),
+    icon: Icons.weekend_rounded,
+    tag: '주말',
+  ),
+  NewsTone.holiday => (
+    fill: const Color(0xFFEFEAF7),
+    accent: const Color(0xFF8A6FC0),
+    icon: Icons.celebration_rounded,
+    tag: '휴장',
+  ),
+  NewsTone.calm => (
+    fill: const Color(0xFFE7F5EC),
+    accent: const Color(0xFF3AA982),
+    icon: Icons.wb_sunny_rounded,
+    tag: '오늘의 소식',
+  ),
+};
+
+class _TodayNewsCard extends StatelessWidget {
+  const _TodayNewsCard({required this.state});
 
   final GameState state;
 
   @override
   Widget build(BuildContext context) {
-    final project = state.project;
+    final brief = buildDailyBrief(state);
     final pending = state.pendingDecisions;
+    final project = state.project;
+    final tone = _newsToneStyle(brief.tone);
+
     return _OutlinedCard(
-      color: pending.isEmpty
-          ? const Color(0xFFDFF7EF)
-          : const Color(0xFFFFF4B8),
-      child: Row(
+      color: tone.fill,
+      padding: const EdgeInsets.fromLTRB(13, 11, 13, 11),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            pending.isEmpty
-                ? Icons.schedule_rounded
-                : Icons.notifications_active_rounded,
-            color: pending.isEmpty ? const Color(0xFF3AA982) : _coral,
-            size: 29,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  pending.isEmpty ? '시간을 보내도 좋아요' : '중요 안건에서 시간이 멈췄어요',
-                  style: const TextStyle(
-                    color: _ink,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w900,
-                  ),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: tone.accent,
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  pending.isNotEmpty
-                      ? pending.first.title
-                      : project == null
-                      ? '새 안건이 올 때까지 하루를 진행해보세요.'
-                      : 'Project Atlas · ${_projectLabel(project.status)} · 다음 변화 대기 중',
-                  maxLines: 2,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(tone.icon, color: Colors.white, size: 12),
+                    const SizedBox(width: 4),
+                    Text(
+                      brief.isBreaking ? tone.tag : '오늘의 소식',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  brief.eyebrow,
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    color: Color(0xFF68738B),
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF7B849A),
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              _MarketStatusPill(closed: brief.marketClosed),
+            ],
+          ),
+          const SizedBox(height: 9),
+          Text(
+            brief.title,
+            style: const TextStyle(
+              color: _ink,
+              fontSize: 15,
+              height: 1.25,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.4,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            brief.body,
+            style: const TextStyle(
+              color: Color(0xFF5E6883),
+              fontSize: 11,
+              height: 1.45,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xF2FFFEF8),
+              borderRadius: BorderRadius.circular(11),
+              border: Border.all(color: const Color(0x2233405F), width: 1.5),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  pending.isEmpty
+                      ? Icons.schedule_rounded
+                      : Icons.notifications_active_rounded,
+                  color: pending.isEmpty ? const Color(0xFF3AA982) : _coral,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        pending.isEmpty ? '시간을 보내도 좋아요' : '중요 안건에서 시간이 멈췄어요',
+                        style: const TextStyle(
+                          color: _ink,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 1),
+                      Text(
+                        pending.isNotEmpty
+                            ? pending.first.title
+                            : project == null
+                            ? '‘하루 보내기’를 누르면 다음 소식이 와요.'
+                            : 'Project Atlas · ${_projectLabel(project.status)} · 다음 변화 대기 중',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFF7B849A),
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _MarketStatusPill extends StatelessWidget {
+  const _MarketStatusPill({required this.closed});
+
+  final bool closed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: closed ? const Color(0xFFE7E9F0) : const Color(0xFFDFF7EF),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: closed ? const Color(0x3333405F) : const Color(0x333AA982),
+          width: 1.5,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+              color: closed ? const Color(0xFF9AA2B5) : const Color(0xFF3AA982),
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 5),
+          Text(
+            closed ? '휴장' : '개장',
+            style: TextStyle(
+              color: closed ? const Color(0xFF6B7488) : const Color(0xFF2E8768),
+              fontSize: 9,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class NewsBulletinSheet extends StatelessWidget {
+  const NewsBulletinSheet({super.key, required this.event, required this.date});
+
+  final HistoricalNewsEvent event;
+  final DateTime date;
+
+  @override
+  Widget build(BuildContext context) {
+    final tone = _newsToneStyle(event.tone);
+    final dateLabel =
+        '${date.year}.${date.month.toString().padLeft(2, '0')}.${date.day.toString().padLeft(2, '0')}';
+    return DraggableScrollableSheet(
+      initialChildSize: 0.62,
+      minChildSize: 0.42,
+      maxChildSize: 0.9,
+      builder: (context, controller) => Container(
+        decoration: const BoxDecoration(
+          color: _cream,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+          border: Border(top: BorderSide(color: _ink, width: 3)),
+        ),
+        child: ListView(
+          controller: controller,
+          padding: const EdgeInsets.fromLTRB(18, 10, 18, 24),
+          children: [
+            Center(
+              child: Container(
+                width: 44,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF9BA5B7),
+                  borderRadius: BorderRadius.circular(9),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: tone.accent,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(tone.icon, color: Colors.white, size: 15),
+                      const SizedBox(width: 6),
+                      Text(
+                        '속보 · ${event.eyebrow}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  dateLabel,
+                  style: const TextStyle(
+                    color: Color(0xFF7B849A),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Text(
+              event.title,
+              style: const TextStyle(
+                color: _ink,
+                fontSize: 22,
+                height: 1.2,
+                fontWeight: FontWeight.w900,
+                letterSpacing: -0.8,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              event.body,
+              style: const TextStyle(
+                color: Color(0xFF515C77),
+                fontSize: 13,
+                height: 1.6,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(13),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF7DA),
+                borderRadius: BorderRadius.circular(15),
+                border: Border.all(color: _ink, width: 2),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(
+                    Icons.lightbulb_rounded,
+                    color: Color(0xFFE0A100),
+                    size: 20,
+                  ),
+                  const SizedBox(width: 9),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          '투자 메모',
+                          style: TextStyle(
+                            color: _coral,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          event.signal,
+                          style: const TextStyle(
+                            color: _ink,
+                            fontSize: 12,
+                            height: 1.45,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+            SizedBox(
+              height: 52,
+              child: ElevatedButton.icon(
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.check_rounded),
+                label: const Text('확인했어요'),
+                style: ElevatedButton.styleFrom(
+                  foregroundColor: _ink,
+                  backgroundColor: _yellow,
+                  elevation: 0,
+                  side: const BorderSide(color: _ink, width: 2),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  textStyle: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              '실제 사건에서 착안한 게임용 소식입니다. 내부 수치·결과는 가상입니다.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Color(0xFF9AA2B5),
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1373,7 +1822,7 @@ class _StartingConditions extends StatelessWidget {
   Widget build(BuildContext context) {
     const conditions = [
       ('출발하는 날', '2000.01.01', Color(0xFFFFFEF8)),
-      ('내 돈', '100만원', Color(0xFFFFF4B8)),
+      ('내 돈', '0원부터', Color(0xFFFFF4B8)),
       ('우리 팀', '연구원 1명', Color(0xFFDFF7EF)),
       ('첫 무대', '한국 · 미국 · 일본', Color(0xFFFFE3DF)),
     ];
