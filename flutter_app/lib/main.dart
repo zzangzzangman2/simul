@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
@@ -6,6 +7,9 @@ import 'game/game_engine.dart';
 import 'game/game_persistence.dart';
 import 'game/game_state.dart';
 import 'game/historical_executives.dart';
+import 'game/market_clock.dart';
+import 'game/market_data.dart';
+import 'game/market_tick.dart';
 import 'game/market_news.dart';
 import 'game/organization_state.dart';
 import 'game/seed_money_content.dart';
@@ -107,6 +111,16 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     return next;
   }
 
+  Future<GameState> _setMarketMinute(int minute) async {
+    final current = _state!;
+    final next = current.copyWith(
+      marketMinute: minute.clamp(marketDayStartMinute, marketDayEndMinute),
+    );
+    setState(() => _state = next);
+    await _persistence.save(next);
+    return next;
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -149,6 +163,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
                 state: _state!,
                 engine: _engine,
                 onAdvanceDay: _advanceDay,
+                onSetMarketMinute: _setMarketMinute,
                 onResolveDecision: _resolveDecision,
                 onRequestFamilyHelp: _requestFamilyHelp,
                 onCompleteWork: _completeWork,
@@ -731,6 +746,7 @@ class OfficeScreen extends StatelessWidget {
     required this.state,
     required this.engine,
     required this.onAdvanceDay,
+    required this.onSetMarketMinute,
     required this.onResolveDecision,
     required this.onRequestFamilyHelp,
     required this.onCompleteWork,
@@ -739,6 +755,7 @@ class OfficeScreen extends StatelessWidget {
   final GameState state;
   final GameEngine engine;
   final Future<GameState> Function() onAdvanceDay;
+  final Future<GameState> Function(int) onSetMarketMinute;
   final Future<void> Function(String, String) onResolveDecision;
   final Future<GameState> Function(String) onRequestFamilyHelp;
   final Future<GameState> Function(WorkSessionResult) onCompleteWork;
@@ -756,6 +773,10 @@ class OfficeScreen extends StatelessWidget {
         child: Column(
           children: [
             _BrandHeader(trailing: 'DAY ${state.day} · $dateLabel'),
+            _OfficeMarketClock(
+              minute: state.marketMinute,
+              tradingDay: isMarketTradingDay(state.currentDate),
+            ),
             Expanded(
               child: Stack(
                 children: [
@@ -816,6 +837,8 @@ class OfficeScreen extends StatelessWidget {
                                                     builder: (_) =>
                                                         StockMarketScreen(
                                                           state: state,
+                                                          onSetMarketMinute:
+                                                              onSetMarketMinute,
                                                         ),
                                                   ),
                                                 ),
@@ -885,7 +908,10 @@ class OfficeScreen extends StatelessWidget {
             ),
             _AdvanceBar(
               hasPendingDecision: pending.isNotEmpty,
-              onAdvanceDay: () => _handleAdvanceDay(context),
+              marketMinute: state.marketMinute,
+              tradingDay: isMarketTradingDay(state.currentDate),
+              onAdvanceHour: () => _handleAdvanceHour(context),
+              onReadNewspaper: () => _handleAdvanceDay(context),
               onOpenDecision: () => _openDecision(context),
             ),
           ],
@@ -894,22 +920,33 @@ class OfficeScreen extends StatelessWidget {
     );
   }
 
-  Future<void> _handleAdvanceDay(BuildContext context) async {
-    final beforeDay = state.day;
-    final next = await onAdvanceDay();
+  Future<void> _handleAdvanceHour(BuildContext context) async {
+    final target = math.min(state.marketMinute + 60, marketDayEndMinute);
+    await onSetMarketMinute(target);
     if (!context.mounted) return;
-    // 중요 안건에 막혀 하루가 흐르지 않았으면 속보도 없다.
-    if (next.day <= beforeDay) return;
-    final headline = historicalNewsForDate(next.currentDate);
-    if (headline == null) return;
-    await showModalBottomSheet<void>(
+    final phase = marketClockAt(
+      target,
+      tradingDay: isMarketTradingDay(state.currentDate),
+    );
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${marketTimeLabel(target)} · ${phase.label}')),
+    );
+  }
+
+  Future<void> _handleAdvanceDay(BuildContext context) async {
+    final newspaper = await buildDailyMarketNewspaper(state);
+    if (!context.mounted) return;
+    final proceed = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
+      isDismissible: false,
+      enableDrag: false,
       backgroundColor: Colors.transparent,
-      builder: (_) =>
-          NewsBulletinSheet(event: headline, date: next.currentDate),
+      builder: (_) => KoreaEconomicNewspaperSheet(newspaper: newspaper),
     );
+    if (proceed != true || !context.mounted) return;
+    await onAdvanceDay();
   }
 
   void _openDecision(BuildContext context) {
@@ -1499,6 +1536,64 @@ class _MarketStatusPill extends StatelessWidget {
   }
 }
 
+class _OfficeMarketClock extends StatelessWidget {
+  const _OfficeMarketClock({required this.minute, required this.tradingDay});
+  final int minute;
+  final bool tradingDay;
+
+  @override
+  Widget build(BuildContext context) {
+    final info = marketClockAt(minute, tradingDay: tradingDay);
+    return Container(
+      key: const Key('office-market-clock'),
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+      color: const Color(0xFF27334D),
+      child: Row(
+        children: [
+          const Icon(Icons.schedule_rounded, color: Colors.white, size: 19),
+          const SizedBox(width: 8),
+          Text(
+            marketTimeLabel(minute),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 21,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 0.3,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  info.label,
+                  style: const TextStyle(
+                    color: Color(0xFFFFDF68),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                Text(
+                  info.description,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFFCFD6E5),
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class NewsBulletinSheet extends StatelessWidget {
   const NewsBulletinSheet({super.key, required this.event, required this.date});
 
@@ -1678,19 +1773,269 @@ class NewsBulletinSheet extends StatelessWidget {
   }
 }
 
+class KoreaEconomicNewspaperSheet extends StatelessWidget {
+  const KoreaEconomicNewspaperSheet({super.key, required this.newspaper});
+  final DailyMarketNewspaper newspaper;
+
+  @override
+  Widget build(BuildContext context) {
+    final date = newspaper.date;
+    final dateLabel = '${date.year}년 ${date.month}월 ${date.day}일';
+    return FractionallySizedBox(
+      heightFactor: 0.94,
+      child: Container(
+        decoration: const BoxDecoration(
+          color: Color(0xFFF5F0E4),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+          border: Border(top: BorderSide(color: Color(0xFF24211C), width: 3)),
+        ),
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(18, 14, 18, 24),
+          children: [
+            Row(
+              children: [
+                Text(
+                  dateLabel,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  icon: const Icon(Icons.close_rounded),
+                ),
+              ],
+            ),
+            const Divider(color: Color(0xFF24211C), thickness: 1),
+            const Text(
+              '한국경제신문',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Color(0xFF171512),
+                fontSize: 31,
+                fontWeight: FontWeight.w900,
+                letterSpacing: -2,
+              ),
+            ),
+            const Text(
+              '가족 투자연구소 게임 특별판',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
+            ),
+            const Divider(color: Color(0xFF24211C), thickness: 3),
+            const SizedBox(height: 14),
+            Text(
+              newspaper.headline,
+              style: const TextStyle(
+                color: Color(0xFF171512),
+                fontSize: 25,
+                height: 1.18,
+                fontWeight: FontWeight.w900,
+                letterSpacing: -1.1,
+              ),
+            ),
+            const SizedBox(height: 9),
+            Text(
+              newspaper.brief.body,
+              style: const TextStyle(
+                color: Color(0xFF444039),
+                fontSize: 13,
+                height: 1.55,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 15),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                border: Border.all(color: const Color(0xFF24211C), width: 1.4),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '오늘의 국내 증시',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
+                  ),
+                  const SizedBox(height: 7),
+                  Text(
+                    newspaper.summary,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      height: 1.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      _NewspaperStat(
+                        label: '상승',
+                        value: newspaper.advancers,
+                        color: const Color(0xFFD83B45),
+                      ),
+                      _NewspaperStat(
+                        label: '하락',
+                        value: newspaper.decliners,
+                        color: const Color(0xFF2D6FD2),
+                      ),
+                      _NewspaperStat(
+                        label: '보합',
+                        value: newspaper.unchanged,
+                        color: const Color(0xFF6B6861),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 15),
+            if (newspaper.topGainers.isNotEmpty) ...[
+              const Text(
+                '오늘 많이 오른 종목',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900),
+              ),
+              ...newspaper.topGainers.map(
+                (mover) => _NewspaperMoverRow(mover: mover),
+              ),
+              const SizedBox(height: 10),
+            ],
+            if (newspaper.topLosers.isNotEmpty) ...[
+              const Text(
+                '오늘 많이 내린 종목',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900),
+              ),
+              ...newspaper.topLosers.map(
+                (mover) => _NewspaperMoverRow(mover: mover),
+              ),
+              const SizedBox(height: 10),
+            ],
+            Container(
+              padding: const EdgeInsets.all(12),
+              color: const Color(0xFFE7E0D0),
+              child: Text(
+                '오늘의 메모 · ${newspaper.brief.title}\n${newspaper.brief.body}',
+                style: const TextStyle(
+                  fontSize: 11,
+                  height: 1.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            SizedBox(
+              height: 54,
+              child: ElevatedButton.icon(
+                key: const Key('newspaper-next-day-button'),
+                onPressed: () => Navigator.of(context).pop(true),
+                icon: const Icon(Icons.wb_sunny_rounded),
+                label: const Text('신문 읽고 다음 날 08:00'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFFDF68),
+                  foregroundColor: const Color(0xFF24211C),
+                  side: const BorderSide(color: Color(0xFF24211C), width: 2),
+                  textStyle: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              '게임 내 비공식 재현판이며 실제 한국경제신문과 무관합니다.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Color(0xFF777168),
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NewspaperStat extends StatelessWidget {
+  const _NewspaperStat({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+  final String label;
+  final int value;
+  final Color color;
+  @override
+  Widget build(BuildContext context) => Expanded(
+    child: Column(
+      children: [
+        Text(
+          '$value',
+          style: TextStyle(
+            color: color,
+            fontSize: 20,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800),
+        ),
+      ],
+    ),
+  );
+}
+
+class _NewspaperMoverRow extends StatelessWidget {
+  const _NewspaperMoverRow({required this.mover});
+  final DailyMarketMover mover;
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 5),
+    child: Row(
+      children: [
+        Expanded(
+          child: Text(
+            mover.name,
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+          ),
+        ),
+        Text(
+          '${mover.changeRate >= 0 ? '+' : ''}${mover.changeRate.toStringAsFixed(2)}%',
+          style: TextStyle(
+            color: mover.changeRate >= 0
+                ? const Color(0xFFD83B45)
+                : const Color(0xFF2D6FD2),
+            fontSize: 12,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 class _AdvanceBar extends StatelessWidget {
   const _AdvanceBar({
     required this.hasPendingDecision,
-    required this.onAdvanceDay,
+    required this.marketMinute,
+    required this.tradingDay,
+    required this.onAdvanceHour,
+    required this.onReadNewspaper,
     required this.onOpenDecision,
   });
-
   final bool hasPendingDecision;
-  final VoidCallback onAdvanceDay;
+  final int marketMinute;
+  final bool tradingDay;
+  final VoidCallback onAdvanceHour;
+  final VoidCallback onReadNewspaper;
   final VoidCallback onOpenDecision;
 
   @override
   Widget build(BuildContext context) {
+    final ended = marketMinute >= marketDayEndMinute;
+    final info = marketClockAt(marketMinute, tradingDay: tradingDay);
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 9, 10, 10),
       decoration: const BoxDecoration(
@@ -1701,7 +2046,11 @@ class _AdvanceBar extends StatelessWidget {
         children: [
           Expanded(
             child: Text(
-              hasPendingDecision ? '결정할 안건이 있어요!' : '다음 날 새로운 소식이 와요!',
+              hasPendingDecision
+                  ? '결정할 안건이 있어요!'
+                  : ended
+                  ? '오늘 장이 끝났어요. 신문을 펼쳐볼까요?'
+                  : '${marketTimeLabel(marketMinute)} · ${info.label}',
               style: const TextStyle(
                 color: _ink,
                 fontSize: 11,
@@ -1713,14 +2062,26 @@ class _AdvanceBar extends StatelessWidget {
             height: 50,
             child: ElevatedButton.icon(
               key: const Key('advance-day-button'),
-              onPressed: hasPendingDecision ? onOpenDecision : onAdvanceDay,
+              onPressed: hasPendingDecision
+                  ? onOpenDecision
+                  : ended
+                  ? onReadNewspaper
+                  : onAdvanceHour,
               iconAlignment: IconAlignment.end,
               icon: Icon(
                 hasPendingDecision
                     ? Icons.mark_email_unread_rounded
-                    : Icons.arrow_forward_rounded,
+                    : ended
+                    ? Icons.newspaper_rounded
+                    : Icons.schedule_rounded,
               ),
-              label: Text(hasPendingDecision ? '안건 열기' : '하루 보내기'),
+              label: Text(
+                hasPendingDecision
+                    ? '안건 열기'
+                    : ended
+                    ? '오늘 신문'
+                    : '1시간 뒤',
+              ),
               style: ElevatedButton.styleFrom(
                 foregroundColor: _ink,
                 backgroundColor: _yellow,

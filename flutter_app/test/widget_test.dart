@@ -138,7 +138,7 @@ void main() {
       GamePersistence.saveKey: jsonEncode({
         'version': 1,
         'companyName': '별빛 투자',
-        'day': 1,
+        'day': 4,
         'cash': 1000000,
         'team': 1,
       }),
@@ -148,14 +148,40 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('open-market-button')));
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+    });
+    for (var attempt = 0; attempt < 50; attempt++) {
+      await tester.pump(const Duration(milliseconds: 100));
+      if (find.byKey(const Key('stock-row-005930')).evaluate().isNotEmpty) {
+        break;
+      }
+    }
 
-    expect(find.text('실시간 인기 종목'), findsOneWidget);
+    expect(find.text('2000년 국내 종목'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('market-sort-name')));
+    await tester.pump();
+    if (find.byKey(const Key('stock-row-005930')).evaluate().isEmpty) {
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('stock-row-005930')),
+        220,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pump();
+    }
     expect(find.byKey(const Key('stock-row-005930')), findsOneWidget);
     final before = tester
         .widget<Text>(find.byKey(const Key('stock-rate-005930')))
         .data;
     await tester.pump(const Duration(milliseconds: 950));
+    if (find.byKey(const Key('stock-rate-005930')).evaluate().isEmpty) {
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('stock-row-005930')),
+        180,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pump();
+    }
     final after = tester
         .widget<Text>(find.byKey(const Key('stock-rate-005930')))
         .data;
@@ -166,6 +192,8 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
     expect(find.text('삼성전자'), findsWidgets);
     expect(find.byKey(const Key('stock-detail-price')), findsOneWidget);
+    expect(find.byKey(const Key('minute-interval-selector')), findsOneWidget);
+    expect(find.byKey(const Key('minute-candle-chart')), findsOneWidget);
     expect(find.byKey(const Key('write-research-note-button')), findsOneWidget);
     await tester.ensureVisible(
       find.byKey(const Key('historical-executive-section')),

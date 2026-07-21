@@ -1,5 +1,6 @@
 import 'game_state.dart';
 import 'historical_events.dart';
+import 'market_data.dart';
 
 export 'historical_events.dart';
 
@@ -75,7 +76,8 @@ String _seasonTag(int month) {
   return '가을 바람';
 }
 
-int _daySince2000(DateTime date) => date.difference(DateTime(2000, 1, 1)).inDays;
+int _daySince2000(DateTime date) =>
+    date.difference(DateTime(2000, 1, 1)).inDays;
 
 /// 사건이 없는 평범한 날의 짧은 소식. (제목, 부연) 순서.
 const List<(String, String)> _weekdayWinter = [
@@ -183,5 +185,88 @@ DailyBrief buildDailyBrief(GameState state) {
     body: body,
     marketClosed: closed,
     tone: weekend ? NewsTone.weekend : NewsTone.calm,
+  );
+}
+
+class DailyMarketMover {
+  const DailyMarketMover({required this.name, required this.changeRate});
+  final String name;
+  final double changeRate;
+}
+
+class DailyMarketNewspaper {
+  const DailyMarketNewspaper({
+    required this.date,
+    required this.brief,
+    required this.total,
+    required this.advancers,
+    required this.decliners,
+    required this.unchanged,
+    required this.topGainers,
+    required this.topLosers,
+    required this.headline,
+    required this.summary,
+  });
+  final DateTime date;
+  final DailyBrief brief;
+  final int total;
+  final int advancers;
+  final int decliners;
+  final int unchanged;
+  final List<DailyMarketMover> topGainers;
+  final List<DailyMarketMover> topLosers;
+  final String headline;
+  final String summary;
+}
+
+Future<DailyMarketNewspaper> buildDailyMarketNewspaper(GameState state) async {
+  final brief = buildDailyBrief(state);
+  final universe = await HistoricalMarketUniverse.load();
+  final movers = <DailyMarketMover>[];
+  for (final asset in universe.assets.where((asset) => asset.isDomestic)) {
+    final quote = asset.quoteAtOrBefore(state.currentDate);
+    if (quote == null || !quote.isExactDate) continue;
+    final previous = asset.previousCloseBefore(quote.date);
+    if (previous == null || previous <= 0) continue;
+    movers.add(
+      DailyMarketMover(
+        name: asset.name,
+        changeRate: (quote.close - previous) / previous * 100,
+      ),
+    );
+  }
+  movers.sort((left, right) => right.changeRate.compareTo(left.changeRate));
+  final advancers = movers.where((mover) => mover.changeRate > 0.005).length;
+  final decliners = movers.where((mover) => mover.changeRate < -0.005).length;
+  final unchanged = movers.length - advancers - decliners;
+  final topGainers = movers
+      .where((mover) => mover.changeRate > 0)
+      .take(3)
+      .toList();
+  final topLosers = movers.reversed
+      .where((mover) => mover.changeRate < 0)
+      .take(3)
+      .toList();
+  final headline =
+      brief.headline?.title ??
+      (brief.marketClosed
+          ? '오늘 증시는 휴장, 가족 투자연구소는 숨 고르기'
+          : advancers >= decliners
+          ? '국내 증시, 상승 종목이 더 많았다'
+          : '국내 증시, 하락 종목 우세로 마감');
+  final summary = movers.isEmpty
+      ? '오늘 확인 가능한 국내 종가가 없습니다. 시장은 쉬고, 조사노트만 차분히 정리했습니다.'
+      : '국내 ${movers.length}개 종목 중 상승 $advancers개, 하락 $decliners개, 보합 $unchanged개로 하루를 마쳤습니다.';
+  return DailyMarketNewspaper(
+    date: state.currentDate,
+    brief: brief,
+    total: movers.length,
+    advancers: advancers,
+    decliners: decliners,
+    unchanged: unchanged,
+    topGainers: topGainers,
+    topLosers: topLosers,
+    headline: headline,
+    summary: summary,
   );
 }

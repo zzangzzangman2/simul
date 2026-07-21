@@ -19,6 +19,7 @@ class GameState {
     required this.version,
     required this.companyName,
     required this.day,
+    required this.marketMinute,
     required this.simulationSeed,
     required this.cash,
     required this.organization,
@@ -31,11 +32,12 @@ class GameState {
     required this.processedEventIds,
   });
 
-  static const schemaVersion = 6;
+  static const schemaVersion = 7;
 
   final int version;
   final String companyName;
   final int day;
+  final int marketMinute;
   final String simulationSeed;
   final int cash;
   final OrganizationState organization;
@@ -60,6 +62,7 @@ class GameState {
     int? version,
     String? companyName,
     int? day,
+    int? marketMinute,
     String? simulationSeed,
     int? cash,
     OrganizationState? organization,
@@ -76,6 +79,7 @@ class GameState {
       version: version ?? this.version,
       companyName: companyName ?? this.companyName,
       day: day ?? this.day,
+      marketMinute: marketMinute ?? this.marketMinute,
       simulationSeed: simulationSeed ?? this.simulationSeed,
       cash: cash ?? this.cash,
       organization: organization ?? this.organization,
@@ -93,6 +97,7 @@ class GameState {
     'version': schemaVersion,
     'companyName': companyName,
     'day': day,
+    'marketMinute': marketMinute,
     'currentDate': currentDate.toIso8601String().split('T').first,
     'simulationSeed': simulationSeed,
     'cash': cash,
@@ -111,6 +116,10 @@ class GameState {
       version: (json['version'] as num?)?.toInt() ?? schemaVersion,
       companyName: json['companyName'] as String? ?? '',
       day: ((json['day'] as num?)?.toInt() ?? 1).clamp(1, 4018),
+      marketMinute: ((json['marketMinute'] as num?)?.toInt() ?? 480).clamp(
+        480,
+        1200,
+      ),
       simulationSeed: json['simulationSeed'] as String? ?? 'simul-default',
       cash: (json['cash'] as num?)?.toInt() ?? 1000000,
       organization: OrganizationState.fromJson(
