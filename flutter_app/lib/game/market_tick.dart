@@ -1,0 +1,184 @@
+import 'dart:math' as math;
+
+/// 한 거래일을 0.9초 간격으로 압축 재현하는 전체 틱 수.
+const generatedSessionTicks = 240;
+const generatedRegularSessionTicks = 150;
+
+class MarketCandle {
+  const MarketCandle({
+    required this.open,
+    required this.high,
+    required this.low,
+    required this.close,
+    required this.startMinute,
+  });
+
+  final double open;
+  final double high;
+  final double low;
+  final double close;
+  final int startMinute;
+}
+
+/// 실제 이전 종가에서 실제 당일 종가로 이어지는 비주기적 게임용 장중 경로.
+///
+/// 중간 값은 실제 체결가가 아니다. 종목·날짜별 시드로 난수 충격, 단기 모멘텀,
+/// 변동성 군집, 드문 급변을 만들고 Brownian bridge 보정으로 마지막 값만 실제
+/// 종가에 고정한다. 같은 시드는 재현 가능하지만 사인파 같은 반복 주기는 없다.
+List<double> generatedMarketPath({
+  required double previousClose,
+  required double officialClose,
+  int totalTicks = generatedSessionTicks,
+  int seed = 0,
+}) {
+  if (totalTicks <= 0 || previousClose <= 0) {
+    return <double>[officialClose];
+  }
+
+  final raw = <double>[0];
+  var velocity = 0.0;
+  var cumulative = 0.0;
+  var volatility = 0.85;
+  for (var step = 1; step <= totalTicks; step++) {
+    final regime = 0.55 + _unit(seed, step ~/ 11 + 701) * 1.25;
+    volatility = volatility * 0.84 + regime * 0.16;
+    final shock =
+        (_unit(seed, step * 7 + 11) +
+            _unit(seed, step * 13 + 29) +
+            _unit(seed, step * 19 + 47) -
+            1.5) *
+        1.2;
+    velocity = velocity * 0.56 + shock * volatility;
+
+    if (_unit(seed, step * 31 + 97) < 0.035) {
+      final sign = _unit(seed, step * 37 + 131) < 0.5 ? -1.0 : 1.0;
+      velocity += sign * (1.25 + _unit(seed, step * 41 + 173) * 2.35);
+    }
+
+    cumulative += velocity;
+    raw.add(cumulative);
+  }
+
+  final dayMoveRate = ((officialClose - previousClose) / previousClose).abs();
+  final rangeRate = (0.018 + dayMoveRate * 0.38).clamp(0.018, 0.075);
+  final corridor = math.max(
+    (officialClose - previousClose).abs() * 1.45,
+    previousClose * rangeRate * 2.25,
+  );
+  final lower = math.min(previousClose, officialClose) - corridor;
+  final upper = math.max(previousClose, officialClose) + corridor;
+  final rawClose = raw.last;
+  final scale = previousClose * rangeRate * 2.4 / math.sqrt(totalTicks);
+  final result = <double>[previousClose];
+
+  for (var step = 1; step < totalTicks; step++) {
+    final progress = step / totalTicks;
+    final trend = previousClose + (officialClose - previousClose) * progress;
+    final bridge = raw[step] - rawClose * progress;
+    final candidate = (trend + bridge * scale).clamp(lower, upper).toDouble();
+    final tickSize = _tickSize(candidate);
+    var rounded = (candidate / tickSize).roundToDouble() * tickSize;
+
+    if (rounded == result.last && _unit(seed, step * 53 + 211) > 0.32) {
+      final direction = velocityFor(raw, step) >= 0 ? 1.0 : -1.0;
+      rounded = (rounded + tickSize * direction).clamp(lower, upper).toDouble();
+    }
+    result.add(rounded);
+  }
+
+  result.add(officialClose);
+  return result;
+}
+
+/// 08:00~20:00??寃뚯엫 ?섎（ 寃쎈줈. 15:30(tick 150)???ㅼ젣 醫낃?瑜?怨좎젙?섍퀬,
+/// ?댄썑 NXT???뺤옣?μ? 醫낃? 二쇰??먯꽌 ?吏곸씤 ??20:00???ㅼ떆 醫낃?濡??ル뒗??
+List<double> generatedFullMarketDayPath({
+  required double previousClose,
+  required double officialClose,
+  int seed = 0,
+}) {
+  final regular = generatedMarketPath(
+    previousClose: previousClose,
+    officialClose: officialClose,
+    totalTicks: generatedRegularSessionTicks,
+    seed: seed,
+  );
+  final after = generatedMarketPath(
+    previousClose: officialClose,
+    officialClose: officialClose,
+    totalTicks: generatedSessionTicks - generatedRegularSessionTicks,
+    seed: seed ^ 0x5A17,
+  );
+  return <double>[...regular, ...after.skip(1)];
+}
+
+double generatedMarketTick({
+  required double previousClose,
+  required double officialClose,
+  required int tickIndex,
+  int totalTicks = generatedSessionTicks,
+  int seed = 0,
+}) {
+  final path = generatedMarketPath(
+    previousClose: previousClose,
+    officialClose: officialClose,
+    totalTicks: totalTicks,
+    seed: seed,
+  );
+  return path[tickIndex.clamp(0, path.length - 1)];
+}
+
+List<MarketCandle> aggregateMarketCandles(
+  List<double> prices,
+  int intervalMinutes,
+) {
+  if (prices.isEmpty) return const <MarketCandle>[];
+  final interval = math.max(1, intervalMinutes);
+  if (prices.length == 1) {
+    return <MarketCandle>[
+      MarketCandle(
+        open: prices.first,
+        high: prices.first,
+        low: prices.first,
+        close: prices.first,
+        startMinute: 0,
+      ),
+    ];
+  }
+
+  final candles = <MarketCandle>[];
+  for (var start = 0; start < prices.length - 1; start += interval) {
+    final end = math.min(start + interval, prices.length - 1);
+    final slice = prices.sublist(start, end + 1);
+    candles.add(
+      MarketCandle(
+        open: slice.first,
+        high: slice.reduce(math.max),
+        low: slice.reduce(math.min),
+        close: slice.last,
+        startMinute: start,
+      ),
+    );
+  }
+  return candles;
+}
+
+double velocityFor(List<double> raw, int step) {
+  if (step <= 0 || step >= raw.length) return 0;
+  return raw[step] - raw[step - 1];
+}
+
+double _tickSize(double price) {
+  if (price >= 100000) return 100;
+  if (price >= 50000) return 50;
+  if (price >= 5000) return 10;
+  return 1;
+}
+
+double _unit(int seed, int index) {
+  var value = (seed ^ (index * 0x45d9f3b)) & 0x7fffffff;
+  value = ((value ^ (value >> 16)) * 0x45d9f3b) & 0x7fffffff;
+  value = ((value ^ (value >> 16)) * 0x45d9f3b) & 0x7fffffff;
+  value = (value ^ (value >> 16)) & 0x7fffffff;
+  return value / 0x7fffffff;
+}

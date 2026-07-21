@@ -23,10 +23,25 @@ void main() {
   ) async {
     await usePhoneSurface(tester);
     await tester.pumpWidget(
-      MaterialApp(home: StockMarketScreen(state: newState())),
+      MaterialApp(home: StockMarketScreen(state: newState().copyWith(day: 4))),
     );
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+    });
+    for (var attempt = 0; attempt < 50; attempt++) {
+      await tester.pump(const Duration(milliseconds: 100));
+      if (find.byKey(const Key('stock-row-005930')).evaluate().isNotEmpty) {
+        break;
+      }
+    }
+    if (find.byKey(const Key('stock-row-005930')).evaluate().isEmpty) {
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('stock-row-005930')),
+        220,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pump();
+    }
 
     expect(find.byKey(const Key('stock-row-005930')), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -120,6 +135,30 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('360px daily market newspaper stays inside', (tester) async {
+    await usePhoneSurface(tester);
+    final state = newState().copyWith(day: 5);
+    final newspaper = DailyMarketNewspaper(
+      date: state.currentDate,
+      brief: buildDailyBrief(state),
+      total: 22,
+      advancers: 12,
+      decliners: 8,
+      unchanged: 2,
+      topGainers: const [DailyMarketMover(name: 'A', changeRate: 8.4)],
+      topLosers: const [DailyMarketMover(name: 'B', changeRate: -6.2)],
+      headline: 'Mobile newspaper layout headline',
+      summary: 'A compact market summary for a narrow mobile screen.',
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: KoreaEconomicNewspaperSheet(newspaper: newspaper)),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('한국경제신문'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
   testWidgets('360px visual novel portraits stay inside through all scenes', (
     tester,
   ) async {

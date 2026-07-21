@@ -3,7 +3,8 @@
 import { type FormEvent, useEffect, useState } from "react";
 import marketHistory from "./data/market-history.json";
 
-type Market = "ALL" | "KRX" | "NASDAQ" | "TSE";
+type Market = "DOMESTIC" | "KOSPI" | "KOSDAQ" | "OVERSEAS";
+type Exchange = "KOSPI" | "KOSDAQ" | "NASDAQ" | "TSE";
 type Tab = "office" | "market" | "portfolio" | "deals";
 type OrderMode = "buy" | "sell";
 
@@ -11,7 +12,7 @@ type Asset = {
   id: string;
   symbol: string;
   name: string;
-  market: Exclude<Market, "ALL">;
+  market: Exchange;
   country: "KR" | "US" | "JP";
   sector: string;
   color: string;
@@ -417,7 +418,7 @@ export function GameClient() {
   const [hydrated, setHydrated] = useState(false);
   const [companyDraft, setCompanyDraft] = useState("");
   const [tab, setTab] = useState<Tab>("office");
-  const [marketFilter, setMarketFilter] = useState<Market>("ALL");
+  const [marketFilter, setMarketFilter] = useState<Market>("DOMESTIC");
   const [selectedId, setSelectedId] = useState("apple");
   const [orderMode, setOrderMode] = useState<OrderMode>("buy");
   const [orderPercent, setOrderPercent] = useState(25);
@@ -483,7 +484,11 @@ export function GameClient() {
     { length: 30 },
     (_, index) => priceAtDate(selectedAsset, addDays(currentDate, index - 29)),
   ).filter((value): value is number => value !== null);
-  const visibleAssets = marketFilter === "ALL" ? assets : assets.filter((asset) => asset.market === marketFilter);
+  const visibleAssets = marketFilter === "DOMESTIC"
+    ? assets.filter((asset) => asset.country === "KR")
+    : marketFilter === "OVERSEAS"
+      ? assets.filter((asset) => asset.country !== "KR")
+      : assets.filter((asset) => asset.market === marketFilter);
   const campaignComplete = currentDate >= END_DATE;
   const dayNumber = daysBetween(START_DATE, currentDate) + 1;
   const anyMarketOpenToday = assets.some((asset) => hasQuoteOnDate(asset, currentDate));
@@ -824,8 +829,8 @@ export function GameClient() {
                     <div className="section-heading">
                       <div><span>DAILY MARKET TERMINAL</span><h2>어디에 투자할까요?</h2></div>
                       <div className="market-filters" role="group" aria-label="시장 필터">
-                        {(["ALL", "KRX", "NASDAQ", "TSE"] as Market[]).map((market) => (
-                          <button type="button" key={market} className={marketFilter === market ? "active" : ""} onClick={() => setMarketFilter(market)}>{market}</button>
+                        {(["DOMESTIC", "KOSPI", "KOSDAQ", "OVERSEAS"] as Market[]).map((market) => (
+                          <button type="button" key={market} className={marketFilter === market ? "active" : ""} onClick={() => setMarketFilter(market)}>{{ DOMESTIC: "국내", KOSPI: "코스피", KOSDAQ: "코스닥", OVERSEAS: "해외" }[market]}</button>
                         ))}
                       </div>
                     </div>
@@ -849,7 +854,7 @@ export function GameClient() {
                         );
                       })}
                     </div>
-                    <p className="terminal-data-note">실제 일별 수정주가를 기준일=100으로 정규화한 개발용 지수입니다. 주말·휴장일은 직전 거래일 값을 유지합니다.</p>
+                    <p className="terminal-data-note">장중 움직임은 게임용으로 생성하고 거래일 마감값은 실제 일별 종가를 사용합니다. 주말·휴장일은 직전 종가를 유지합니다.</p>
                   </div>
                 </section>
               )}
@@ -922,7 +927,7 @@ export function GameClient() {
             <button type="button" className="sheet-close" onClick={() => setOrderSheetOpen(false)} aria-label="거래창 닫기">×</button>
             <div className="ticket-heading">
               <div><span>{selectedAsset.market} / {selectedAsset.symbol}</span><h3 id="order-title">{selectedAsset.name}</h3></div>
-              <span className="price-index">IDX {selectedPrice?.toFixed(2) ?? "—"}</span>
+              <span className="price-index">{selectedAsset.currency} {selectedPrice?.toFixed(2) ?? "—"}</span>
             </div>
             <div className="ticket-chart"><Sparkline values={selectedSeries} color={selectedAsset.color} /></div>
             <div className="ticket-performance">
@@ -939,7 +944,7 @@ export function GameClient() {
             <div className="order-summary">
               <span>{orderMode === "buy" ? "예상 사용 현금" : "예상 매도 가치"}</span>
               <strong>{formatWon(orderMode === "buy" ? game.cash * orderPercent / 100 : selectedPositionValue * orderPercent / 100)}</strong>
-              <small>거래비용 0.25% 반영 · 수정주가 지수 기준</small>
+              <small>거래비용 0.25% 반영 · 실제 종가 기준</small>
             </div>
             <button type="button" className="primary-button" onClick={placeOrder} data-testid="place-order" disabled={!selectedPrice || !hasQuoteOnDate(selectedAsset, currentDate)}>{!selectedPrice ? "아직 거래 기록 없음" : !hasQuoteOnDate(selectedAsset, currentDate) ? "오늘은 휴장입니다" : `${selectedAsset.name} ${orderMode === "buy" ? "투자하기" : "매도하기"}`}</button>
           </aside>

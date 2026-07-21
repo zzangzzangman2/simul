@@ -1,4 +1,5 @@
 import 'game_state.dart';
+import 'market_clock.dart';
 import 'organization_state.dart';
 import 'seed_money_content.dart';
 import 'story_state.dart';
@@ -32,6 +33,7 @@ class GameEngine {
       version: GameState.schemaVersion,
       companyName: companyName.trim(),
       day: 1,
+      marketMinute: marketDayStartMinute,
       simulationSeed: seed,
       cash: initialCash,
       organization: OrganizationState.initial(storyState.familyRule),
@@ -392,6 +394,7 @@ class GameEngine {
     if (state.pendingDecisions.isNotEmpty) return state;
     var next = state.copyWith(
       day: state.day + 1,
+      marketMinute: marketDayStartMinute,
       organization: state.organization.recoverOneDay(),
     );
     if (next.company.worldMode == WorldMode.diverged) {

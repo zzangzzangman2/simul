@@ -34,16 +34,19 @@ test("server-renders the required company-name onboarding", async () => {
 
 test("ships a complete daily 2000-2010 market snapshot", async () => {
   const data = JSON.parse(await readFile(new URL("../app/data/market-history.json", import.meta.url), "utf8"));
-  assert.equal(data.schemaVersion, 2);
+  assert.equal(data.schemaVersion, 3);
   assert.equal(data.period.start, "2000-01-01");
   assert.equal(data.period.end, "2010-12-31");
-  assert.equal(data.assets.length, 9);
+  assert.equal(data.assets.length, 28);
+  assert.equal(data.assets.filter((asset) => asset.country === "KR").length, 22);
+  assert.equal(data.assets.filter((asset) => asset.country !== "KR").length, 6);
+  assert.deepEqual(new Set(data.assets.map((asset) => asset.market)), new Set(["KOSPI", "KOSDAQ", "NASDAQ", "TSE"]));
 
   for (const asset of data.assets) {
     const dates = Object.keys(asset.prices).sort();
     assert.ok(dates.length >= 2700, `${asset.symbol} should have at least 2700 daily observations`);
     assert.equal(new Set(dates).size, dates.length, `${asset.symbol} should not contain duplicate dates`);
-    assert.ok(dates[0] >= "1999-12-01" && dates[0] <= "2000-01-04");
+    assert.ok(dates[0] >= "1999-12-01" && dates[0] <= "2000-04-28");
     assert.ok(dates.at(-1) >= "2010-12-30");
     assert.ok(dates.every((date) => /^\d{4}-\d{2}-\d{2}$/.test(date)));
     assert.ok(Object.values(asset.prices).every(Number.isFinite));

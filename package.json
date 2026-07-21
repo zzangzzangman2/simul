@@ -12,7 +12,8 @@
     "test": "vinext build && node --test tests/rendered-html.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
-    "data:fetch": "node scripts/fetch-market-data.mjs"
+    "data:fetch": "node scripts/fetch-market-data.mjs",
+    "data:fetch:krx-full": "python scripts/fetch-krx-full-market.py"
   },
   "dependencies": {
     "drizzle-orm": "0.45.2",
