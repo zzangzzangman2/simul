@@ -27,6 +27,20 @@ const _yellow = Color(0xFFFFDF68);
 const _coral = Color(0xFFFF7D72);
 const _blue = Color(0xFF67C7EC);
 
+Route<T> _gameSceneRoute<T>(Widget page) => PageRouteBuilder<T>(
+  transitionDuration: const Duration(milliseconds: 300),
+  reverseTransitionDuration: const Duration(milliseconds: 280),
+  pageBuilder: (_, animation, secondaryAnimation) => page,
+  transitionsBuilder: (_, animation, secondaryAnimation, child) {
+    final fade = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
+    final scale = Tween<double>(begin: 0.985, end: 1).animate(fade);
+    return FadeTransition(
+      opacity: fade,
+      child: ScaleTransition(scale: scale, child: child),
+    );
+  },
+);
+
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(const MillenniumCapitalApp());
@@ -82,14 +96,23 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
   Future<void> _resolveDecision(String decisionId, String optionId) async {
     final current = _state;
     if (current == null) return;
-    final next = _engine.resolveDecision(current, decisionId, optionId);
+    final resolved = _engine.resolveDecision(current, decisionId, optionId);
+    final next = resolved.copyWith(
+      marketMinute: advanceGameTime(
+        current.marketMinute,
+        decisionActionMinutes,
+      ),
+    );
     setState(() => _state = next);
     await _persistence.save(next);
   }
 
   Future<GameState> _completeWork(WorkSessionResult result) async {
     final current = _state!;
-    final next = _engine.completeWorkSession(current, result);
+    final completed = _engine.completeWorkSession(current, result);
+    final next = completed.copyWith(
+      marketMinute: advanceGameTime(current.marketMinute, workActionMinutes),
+    );
     setState(() => _state = next);
     await _persistence.save(next);
     return next;
@@ -97,7 +120,13 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
 
   Future<GameState> _requestFamilyHelp(String helperId) async {
     final current = _state!;
-    final next = _engine.requestFamilyHelp(current, helperId);
+    final helped = _engine.requestFamilyHelp(current, helperId);
+    final next = helped.copyWith(
+      marketMinute: advanceGameTime(
+        current.marketMinute,
+        familyHelpActionMinutes,
+      ),
+    );
     setState(() => _state = next);
     await _persistence.save(next);
     return next;
@@ -833,13 +862,12 @@ class OfficeScreen extends StatelessWidget {
                                             compact: true,
                                             onTap: () =>
                                                 Navigator.of(context).push(
-                                                  MaterialPageRoute<void>(
-                                                    builder: (_) =>
-                                                        StockMarketScreen(
-                                                          state: state,
-                                                          onSetMarketMinute:
-                                                              onSetMarketMinute,
-                                                        ),
+                                                  _gameSceneRoute<void>(
+                                                    StockMarketScreen(
+                                                      state: state,
+                                                      onSetMarketMinute:
+                                                          onSetMarketMinute,
+                                                    ),
                                                   ),
                                                 ),
                                           ),
@@ -867,8 +895,8 @@ class OfficeScreen extends StatelessWidget {
                                       subtitle: '가족 도움 · 직원 배치',
                                       color: const Color(0xFFFFE9C7),
                                       onTap: () => Navigator.of(context).push(
-                                        MaterialPageRoute<void>(
-                                          builder: (_) => OrganizationScreen(
+                                        _gameSceneRoute<void>(
+                                          OrganizationScreen(
                                             state: state,
                                             onRequestFamilyHelp:
                                                 onRequestFamilyHelp,
@@ -886,8 +914,8 @@ class OfficeScreen extends StatelessWidget {
                                           : '종잣돈 ${_money(state.cash)}원',
                                       color: const Color(0xFFDDF5E8),
                                       onTap: () => Navigator.of(context).push(
-                                        MaterialPageRoute<void>(
-                                          builder: (_) => SeedMoneyHubScreen(
+                                        _gameSceneRoute<void>(
+                                          SeedMoneyHubScreen(
                                             state: state,
                                             onComplete: onCompleteWork,
                                           ),
@@ -936,14 +964,8 @@ class OfficeScreen extends StatelessWidget {
   Future<void> _handleAdvanceDay(BuildContext context) async {
     final newspaper = await buildDailyMarketNewspaper(state);
     if (!context.mounted) return;
-    final proceed = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      isDismissible: false,
-      enableDrag: false,
-      backgroundColor: Colors.transparent,
-      builder: (_) => KoreaEconomicNewspaperSheet(newspaper: newspaper),
+    final proceed = await Navigator.of(context).push<bool>(
+      _gameSceneRoute<bool>(KoreaEconomicNewspaperScene(newspaper: newspaper)),
     );
     if (proceed != true || !context.mounted) return;
     await onAdvanceDay();
@@ -957,18 +979,16 @@ class OfficeScreen extends StatelessWidget {
       );
       return;
     }
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) => DecisionSheet(
-        state: state,
-        decision: pending.first,
-        onSelect: (optionId) async {
-          Navigator.of(sheetContext).pop();
-          await onResolveDecision(pending.first.id, optionId);
-        },
+    Navigator.of(context).push<void>(
+      _gameSceneRoute<void>(
+        FamilyDecisionScene(
+          state: state,
+          decision: pending.first,
+          onSelect: (sceneContext, optionId) async {
+            Navigator.of(sceneContext).pop();
+            await onResolveDecision(pending.first.id, optionId);
+          },
+        ),
       ),
     );
   }
@@ -1013,6 +1033,223 @@ class OfficeScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+class _SceneClockStrip extends StatelessWidget {
+  const _SceneClockStrip({
+    required this.location,
+    required this.caption,
+    required this.minute,
+    this.costLabel,
+    this.onBack,
+    this.dark = true,
+  });
+
+  final String location;
+  final String caption;
+  final int minute;
+  final String? costLabel;
+  final VoidCallback? onBack;
+  final bool dark;
+
+  @override
+  Widget build(BuildContext context) {
+    final compact = MediaQuery.sizeOf(context).width < 390;
+    final foreground = dark ? Colors.white : _ink;
+    final secondary = dark ? const Color(0xFFCBD2E0) : const Color(0xFF6B7488);
+    return Container(
+      key: Key('scene-location-${location.hashCode}'),
+      margin: const EdgeInsets.fromLTRB(10, 8, 10, 7),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+      decoration: BoxDecoration(
+        color: dark ? const Color(0xE6263148) : const Color(0xF5FFFDF5),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: dark ? const Color(0x556DD2FF) : const Color(0x3333405F),
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x33000000),
+            blurRadius: 14,
+            offset: Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          if (onBack != null) ...[
+            InkWell(
+              onTap: onBack,
+              borderRadius: BorderRadius.circular(20),
+              child: Padding(
+                padding: const EdgeInsets.all(5),
+                child: Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  color: foreground,
+                  size: 17,
+                ),
+              ),
+            ),
+            const SizedBox(width: 5),
+          ],
+          Icon(
+            Icons.location_on_rounded,
+            color: dark ? _yellow : _coral,
+            size: 19,
+          ),
+          const SizedBox(width: 7),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  location,
+                  style: TextStyle(
+                    color: foreground,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                Text(
+                  caption,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: secondary,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (costLabel != null && !compact) ...[
+            Container(
+              margin: const EdgeInsets.only(right: 7),
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+              decoration: BoxDecoration(
+                color: dark ? const Color(0x334DB8E8) : const Color(0xFFFFEDB2),
+                borderRadius: BorderRadius.circular(9),
+              ),
+              child: Text(
+                costLabel!,
+                style: TextStyle(
+                  color: foreground,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ],
+          Text(
+            marketTimeLabel(minute),
+            key: const Key('scene-clock-time'),
+            style: TextStyle(
+              color: foreground,
+              fontSize: compact ? 16 : 18,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 0.2,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class FamilyDecisionScene extends StatelessWidget {
+  const FamilyDecisionScene({
+    super.key,
+    required this.state,
+    required this.decision,
+    required this.onSelect,
+  });
+  final GameState state;
+  final DecisionCardData decision;
+  final void Function(BuildContext context, String optionId) onSelect;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: const Color(0xFF22253A),
+    body: Stack(
+      children: [
+        Positioned.fill(
+          child: Image.asset(
+            'assets/images/bg_living_room_1999.png',
+            fit: BoxFit.cover,
+          ),
+        ),
+        const Positioned.fill(child: ColoredBox(color: Color(0x8A171926))),
+        SafeArea(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 520),
+              child: Column(
+                children: [
+                  _SceneClockStrip(
+                    location: '우리 집 거실 · 가족회의',
+                    caption: '엄마가 새 안건을 식탁 위에 올려두었다.',
+                    minute: state.marketMinute,
+                    costLabel: '결정 +30분',
+                    onBack: () => Navigator.of(context).pop(),
+                  ),
+                  Expanded(
+                    child: DecisionSheet(
+                      state: state,
+                      decision: decision,
+                      onSelect: (optionId) => onSelect(context, optionId),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class KoreaEconomicNewspaperScene extends StatelessWidget {
+  const KoreaEconomicNewspaperScene({super.key, required this.newspaper});
+  final DailyMarketNewspaper newspaper;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: const Color(0xFF24212B),
+    body: Stack(
+      children: [
+        Positioned.fill(
+          child: Image.asset(
+            'assets/images/bg_living_room_1999.png',
+            fit: BoxFit.cover,
+          ),
+        ),
+        const Positioned.fill(child: ColoredBox(color: Color(0x83181620))),
+        SafeArea(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 520),
+              child: Column(
+                children: [
+                  _SceneClockStrip(
+                    location: '우리 집 거실 · 저녁 신문',
+                    caption: '가족이 식탁에 둘러앉아 오늘의 시장을 정리한다.',
+                    minute: marketDayEndMinute,
+                    costLabel: '하루 결산',
+                    onBack: () => Navigator.of(context).pop(false),
+                  ),
+                  Expanded(
+                    child: KoreaEconomicNewspaperSheet(newspaper: newspaper),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class DecisionSheet extends StatelessWidget {
@@ -1555,6 +1792,7 @@ class _OfficeMarketClock extends StatelessWidget {
           const SizedBox(width: 8),
           Text(
             marketTimeLabel(minute),
+            key: const Key('scene-clock-time'),
             style: const TextStyle(
               color: Colors.white,
               fontSize: 21,

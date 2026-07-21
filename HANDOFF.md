@@ -65,7 +65,7 @@
 
 - Flutter 상태 v7에 `StoryState`와 `OrganizationState`를 포함합니다.
 - 기존 Flutter v1·v4·v5 저장은 회사명·날짜·현금·숫자형 팀을 보존하고 가족 스토리와 조직 기본값을 추가합니다.
-- 자동 검증: 엔진·경영진·시장소식·위젯·모바일 레이아웃 총 46개
+- 자동 검증: 엔진·경영진·시장소식·위젯·모바일 레이아웃 총 47개
 - 화면 검증: `390×844`, `360×800`, 선택 버튼 44px 이상
 - 360×800 회귀 검증: 프롤로그 16장면 인물, 종목·경영진 초상, 조직 카드, 일거리 3종, 뉴스 팝업의 경계 이탈 없음
 
@@ -120,3 +120,13 @@ flutter build web --release
 - 경계값·경로·신문 테스트: `test/market_clock_test.dart`
 
 NXT는 2000년 역사 사실이 아니라 게임 규칙이라는 라벨을 유지한다. 다음 단계는 음력 공휴일/임시휴장일 캘린더 데이터와 신문 지면의 업종별 요약 확장이다.
+
+## 장소형 장면/행동 시간 이어서 작업할 때
+
+- 공통 장소 전환과 거실 안건·신문 장면: `flutter_app/lib/main.dart`
+- CRT 방 장면과 시장·종목 상세 프레임: `flutter_app/lib/stock_market_screen.dart`
+- 행동 시간 상수와 20:00 clamp: `flutter_app/lib/game/market_clock.dart`
+- 가족 도움 장소 시계: `flutter_app/lib/organization_screen.dart`
+- 일거리 완료 60분 및 장소 시계: `flutter_app/lib/seed_money_screen.dart`
+
+현재 규칙은 안건 30분, 가족 도움 30분, 일거리 완료 60분이다. 다음 장소를 추가할 때는 먼저 `단순 열람인지 결과 행동인지`를 결정하고, 결과 행동일 때만 합리적인 시간 비용을 붙인다.

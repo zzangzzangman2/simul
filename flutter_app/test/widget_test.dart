@@ -128,6 +128,7 @@ void main() {
     await tester.tap(option);
     await tester.pumpAndSettle();
     expect(find.text('시간을 보내도 좋아요'), findsOneWidget);
+    expect(find.text('08:30'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -187,6 +188,8 @@ void main() {
         .data;
     expect(after, isNot(before));
 
+    await tester.ensureVisible(find.byKey(const Key('stock-row-005930')));
+    await tester.pump();
     await tester.tap(find.byKey(const Key('stock-row-005930')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
@@ -195,8 +198,10 @@ void main() {
     expect(find.byKey(const Key('minute-interval-selector')), findsOneWidget);
     expect(find.byKey(const Key('minute-candle-chart')), findsOneWidget);
     expect(find.byKey(const Key('write-research-note-button')), findsOneWidget);
-    await tester.ensureVisible(
+    await tester.scrollUntilVisible(
       find.byKey(const Key('historical-executive-section')),
+      220,
+      scrollable: find.byType(Scrollable).last,
     );
     expect(find.text('그날의 경영진'), findsOneWidget);
     expect(find.text('이건희'), findsOneWidget);
@@ -364,6 +369,10 @@ void main() {
         find.byKey(const Key('seed-money-cash')),
       );
       expect(cash.data, '800원');
+      final clock = tester.widget<Text>(
+        find.byKey(const Key('scene-clock-time')),
+      );
+      expect(clock.data, '09:00');
       expect(tester.takeException(), isNull);
     },
   );

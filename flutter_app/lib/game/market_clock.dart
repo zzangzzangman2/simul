@@ -10,6 +10,16 @@ const marketDayEndMinute = 20 * 60;
 const marketTickMinutes = 3;
 const krxCloseTick = 150;
 
+const decisionActionMinutes = 30;
+const familyHelpActionMinutes = 30;
+const workActionMinutes = 60;
+
+int advanceGameTime(int currentMinute, int elapsedMinutes) =>
+    (currentMinute + elapsedMinutes).clamp(
+      marketDayStartMinute,
+      marketDayEndMinute,
+    );
+
 enum MarketSessionPhase {
   nxtPre,
   openingTransition,

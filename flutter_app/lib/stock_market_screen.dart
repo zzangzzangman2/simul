@@ -2,6 +2,86 @@ part of 'main.dart';
 
 enum _MarketSort { turnover, gainers, losers, name }
 
+class _CrtTradingRoomScene extends StatelessWidget {
+  const _CrtTradingRoomScene({
+    required this.minute,
+    required this.child,
+    this.onBack,
+  });
+  final int minute;
+  final Widget child;
+  final VoidCallback? onBack;
+
+  @override
+  Widget build(BuildContext context) {
+    final compact = MediaQuery.sizeOf(context).width < 400;
+    return Scaffold(
+      backgroundColor: const Color(0xFF151A26),
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: Image.asset(
+              'assets/images/bg_boy_room_1999.png',
+              fit: BoxFit.cover,
+            ),
+          ),
+          const Positioned.fill(child: ColoredBox(color: Color(0xA20E1420))),
+          SafeArea(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 540),
+                child: Column(
+                  children: [
+                    _SceneClockStrip(
+                      location: '내 방 · CRT 투자 단말',
+                      caption: '모뎀 소리와 함께 2000년 시장 화면이 켜졌다.',
+                      minute: minute,
+                      costLabel: '장중 시간 연동',
+                      onBack: onBack ?? () => Navigator.of(context).maybePop(),
+                    ),
+                    Expanded(
+                      child: Container(
+                        margin: EdgeInsets.fromLTRB(
+                          compact ? 0 : 8,
+                          0,
+                          compact ? 0 : 8,
+                          8,
+                        ),
+                        padding: EdgeInsets.all(compact ? 3 : 7),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2A2F3A),
+                          borderRadius: BorderRadius.circular(
+                            compact ? 18 : 25,
+                          ),
+                          border: Border.all(
+                            color: const Color(0xFF656E7D),
+                            width: 2,
+                          ),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Color(0x99000000),
+                              blurRadius: 28,
+                              offset: Offset(0, 14),
+                            ),
+                          ],
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(17),
+                          child: child,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class StockMarketScreen extends StatefulWidget {
   const StockMarketScreen({
     super.key,
@@ -225,137 +305,144 @@ class _StockMarketScreenState extends State<StockMarketScreen> {
         ),
       );
     }
-    return Scaffold(
-      backgroundColor: const Color(0xFFF7F8FA),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 520),
-          child: SafeArea(
-            child: Column(
-              children: [
-                _MarketHeader(onBack: _closeMarket),
-                _MarketClockBar(
-                  minute: _marketMinute,
-                  tradingDay: _live.values.any(
-                    (value) => value.value.isTradingDay,
+    return _CrtTradingRoomScene(
+      minute: _marketMinute,
+      onBack: _closeMarket,
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF7F8FA),
+        body: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: SafeArea(
+              child: Column(
+                children: [
+                  _MarketClockBar(
+                    minute: _marketMinute,
+                    tradingDay: _live.values.any(
+                      (value) => value.value.isTradingDay,
+                    ),
+                    onAdvanceHour: _advanceOneHour,
                   ),
-                  onAdvanceHour: _advanceOneHour,
-                ),
-                Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.fromLTRB(18, 4, 18, 30),
-                    children: [
-                      _MarketBalanceCard(state: widget.state),
-                      const SizedBox(height: 18),
-                      TextField(
-                        key: const Key('market-search-input'),
-                        controller: _searchController,
-                        onChanged: (_) => setState(() {}),
-                        decoration: InputDecoration(
-                          hintText: '회사명이나 종목코드 검색',
-                          prefixIcon: const Icon(Icons.search_rounded),
-                          filled: true,
-                          fillColor: Colors.white,
-                          contentPadding: const EdgeInsets.symmetric(
-                            vertical: 12,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(15),
-                            borderSide: BorderSide.none,
+                  Expanded(
+                    child: ListView(
+                      padding: const EdgeInsets.fromLTRB(18, 4, 18, 30),
+                      children: [
+                        _MarketBalanceCard(state: widget.state),
+                        const SizedBox(height: 18),
+                        TextField(
+                          key: const Key('market-search-input'),
+                          controller: _searchController,
+                          onChanged: (_) => setState(() {}),
+                          decoration: InputDecoration(
+                            hintText: '회사명이나 종목코드 검색',
+                            prefixIcon: const Icon(Icons.search_rounded),
+                            filled: true,
+                            fillColor: Colors.white,
+                            contentPadding: const EdgeInsets.symmetric(
+                              vertical: 12,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(15),
+                              borderSide: BorderSide.none,
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 14),
-                      _MarketTabs(
-                        selected: _tab,
-                        onChanged: (value) => setState(() => _tab = value),
-                      ),
-                      const SizedBox(height: 18),
-                      Row(
-                        children: [
-                          Text(
-                            _tab == 3 ? '해외 참고 종목' : '2000년 국내 종목',
-                            style: const TextStyle(
-                              color: Color(0xFF202632),
-                              fontSize: 19,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: -0.6,
-                            ),
-                          ),
-                          const Spacer(),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 5,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFE8F8F0),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Row(
-                              children: [
-                                _LiveDot(),
-                                SizedBox(width: 5),
-                                Text(
-                                  '실제 종가 연동',
-                                  style: TextStyle(
-                                    color: Color(0xFF26845B),
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w800,
-                                  ),
+                        const SizedBox(height: 14),
+                        _MarketTabs(
+                          selected: _tab,
+                          onChanged: (value) => setState(() => _tab = value),
+                        ),
+                        const SizedBox(height: 18),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                _tab == 3 ? '해외 참고 종목' : '2000년 국내 종목',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Color(0xFF202632),
+                                  fontSize: 19,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: -0.6,
                                 ),
-                              ],
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 7),
-                      const Text(
-                        '장중 틱은 자동 생성되며 마지막 값은 실제 일별 종가와 일치합니다.',
-                        style: TextStyle(
-                          color: Color(0xFF8A919E),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE8F8F0),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Row(
+                                children: [
+                                  _LiveDot(),
+                                  SizedBox(width: 5),
+                                  Text(
+                                    '실제 종가 연동',
+                                    style: TextStyle(
+                                      color: Color(0xFF26845B),
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                      const SizedBox(height: 12),
-                      _MarketSortBar(
-                        selected: _sort,
-                        onChanged: (value) => setState(() => _sort = value),
-                      ),
-                      const SizedBox(height: 10),
-                      ..._visibleStocks.map(
-                        (stock) => _StockRow(
-                          key: Key('stock-row-${stock.code}'),
-                          definition: stock,
-                          live: _live[stock.code]!,
-                          onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => _StockDetailScreen(
-                                definition: stock,
-                                live: _live[stock.code]!,
-                                state: widget.state,
+                        const SizedBox(height: 7),
+                        const Text(
+                          '장중 틱은 자동 생성되며 마지막 값은 실제 일별 종가와 일치합니다.',
+                          style: TextStyle(
+                            color: Color(0xFF8A919E),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        _MarketSortBar(
+                          selected: _sort,
+                          onChanged: (value) => setState(() => _sort = value),
+                        ),
+                        const SizedBox(height: 10),
+                        ..._visibleStocks.map(
+                          (stock) => _StockRow(
+                            key: Key('stock-row-${stock.code}'),
+                            definition: stock,
+                            live: _live[stock.code]!,
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => _StockDetailScreen(
+                                  definition: stock,
+                                  live: _live[stock.code]!,
+                                  state: widget.state,
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                      if (_visibleStocks.isEmpty)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 50),
-                          child: Center(
-                            child: Text(
-                              _searchController.text.trim().isNotEmpty
-                                  ? '검색 결과가 없어요.'
-                                  : '아직 공개된 종가가 없어요.\n첫 거래일을 기다려 주세요.',
-                              textAlign: TextAlign.center,
+                        if (_visibleStocks.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 50),
+                            child: Center(
+                              child: Text(
+                                _searchController.text.trim().isNotEmpty
+                                    ? '검색 결과가 없어요.'
+                                    : '아직 공개된 종가가 없어요.\n첫 거래일을 기다려 주세요.',
+                                textAlign: TextAlign.center,
+                              ),
                             ),
                           ),
-                        ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -377,234 +464,243 @@ class _StockDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 520),
-          child: SafeArea(
-            child: ValueListenableBuilder<_LiveStock>(
-              valueListenable: live,
-              builder: (context, quote, _) {
-                final change = quote.price - quote.previousClose;
-                final rate = change / quote.previousClose * 100;
-                final color = _priceColor(change);
-                return Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(8, 4, 14, 4),
-                      child: Row(
-                        children: [
-                          IconButton(
-                            key: const Key('close-stock-detail'),
-                            onPressed: () => Navigator.of(context).pop(),
-                            icon: const Icon(Icons.arrow_back_ios_new_rounded),
-                          ),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  definition.name,
+    return _CrtTradingRoomScene(
+      minute: state.marketMinute,
+      onBack: () => Navigator.of(context).pop(),
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: SafeArea(
+              child: ValueListenableBuilder<_LiveStock>(
+                valueListenable: live,
+                builder: (context, quote, _) {
+                  final change = quote.price - quote.previousClose;
+                  final rate = change / quote.previousClose * 100;
+                  final color = _priceColor(change);
+                  return Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(8, 4, 14, 4),
+                        child: Row(
+                          children: [
+                            IconButton(
+                              key: const Key('close-stock-detail'),
+                              onPressed: () => Navigator.of(context).pop(),
+                              icon: const Icon(
+                                Icons.arrow_back_ios_new_rounded,
+                              ),
+                            ),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    definition.name,
+                                    style: const TextStyle(
+                                      color: Color(0xFF202632),
+                                      fontSize: 17,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                  Text(
+                                    '${definition.market} · ${definition.code}',
+                                    style: const TextStyle(
+                                      color: Color(0xFF8A919E),
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: '관심 종목',
+                              onPressed: () =>
+                                  _showResearchMessage(context, '관심 종목에 담았어요.'),
+                              icon: const Icon(Icons.star_border_rounded),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: ListView(
+                          padding: const EdgeInsets.fromLTRB(20, 16, 20, 120),
+                          children: [
+                            Hero(
+                              tag: 'stock-${definition.code}',
+                              child: Material(
+                                color: Colors.transparent,
+                                child: Text(
+                                  _displayPrice(
+                                    quote.price,
+                                    definition.currency,
+                                  ),
+                                  key: const Key('stock-detail-price'),
                                   style: const TextStyle(
-                                    color: Color(0xFF202632),
-                                    fontSize: 17,
+                                    color: Color(0xFF171B24),
+                                    fontSize: 34,
                                     fontWeight: FontWeight.w900,
+                                    letterSpacing: -1.4,
                                   ),
                                 ),
-                                Text(
-                                  '${definition.market} · ${definition.code}',
-                                  style: const TextStyle(
-                                    color: Color(0xFF8A919E),
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              '어제보다 ${change >= 0 ? '+' : '-'}${_displayPrice(change.abs(), definition.currency)}  ${rate >= 0 ? '+' : ''}${rate.toStringAsFixed(2)}%',
+                              style: TextStyle(
+                                color: color,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                            _TradingStatusRow(quote: quote),
+                            const SizedBox(height: 14),
+                            _MinuteChartPanel(quote: quote),
+                            const SizedBox(height: 24),
+                            _QuoteGrid(quote: quote),
+                            const SizedBox(height: 28),
+                            const Divider(color: Color(0xFFF0F1F3)),
+                            const SizedBox(height: 20),
+                            const Text(
+                              '이 회사를 한 문장으로',
+                              style: TextStyle(
+                                color: Color(0xFF202632),
+                                fontSize: 18,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                            const SizedBox(height: 9),
+                            Text(
+                              definition.summary,
+                              style: const TextStyle(
+                                color: Color(0xFF5D6572),
+                                fontSize: 14,
+                                height: 1.55,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 18),
+                            _HistoricalLeadershipSection(
+                              companyCode: definition.code,
+                              currentDate: state.currentDate,
+                            ),
+                            const SizedBox(height: 18),
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFFF7D8),
+                                borderRadius: BorderRadius.circular(18),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    '오늘의 조사 질문',
+                                    style: TextStyle(
+                                      color: Color(0xFF8A6815),
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    definition.question,
+                                    style: const TextStyle(
+                                      color: Color(0xFF403617),
+                                      fontSize: 14,
+                                      height: 1.45,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              '일별 종가는 실제 기록이며, 0.9초 장중 틱과 조사 설명은 DAY ${state.day}의 게임용 재현입니다.',
+                              style: const TextStyle(
+                                color: Color(0xFF9A9FA8),
+                                fontSize: 10,
+                                height: 1.4,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Color(0x16000000),
+                              blurRadius: 18,
+                              offset: Offset(0, -5),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                key: const Key('ask-family-button'),
+                                onPressed: () => _showOrderSheet(
+                                  context,
+                                  definition: definition,
+                                  quote: quote,
+                                  isBuy: false,
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  minimumSize: const Size.fromHeight(52),
+                                  foregroundColor: const Color(0xFF38404D),
+                                  side: const BorderSide(
+                                    color: Color(0xFFD8DCE2),
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(15),
                                   ),
                                 ),
-                              ],
-                            ),
-                          ),
-                          IconButton(
-                            tooltip: '관심 종목',
-                            onPressed: () =>
-                                _showResearchMessage(context, '관심 종목에 담았어요.'),
-                            icon: const Icon(Icons.star_border_rounded),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Expanded(
-                      child: ListView(
-                        padding: const EdgeInsets.fromLTRB(20, 16, 20, 120),
-                        children: [
-                          Hero(
-                            tag: 'stock-${definition.code}',
-                            child: Material(
-                              color: Colors.transparent,
-                              child: Text(
-                                _displayPrice(quote.price, definition.currency),
-                                key: const Key('stock-detail-price'),
-                                style: const TextStyle(
-                                  color: Color(0xFF171B24),
-                                  fontSize: 34,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: -1.4,
+                                child: const Text(
+                                  '팔기',
+                                  style: TextStyle(fontWeight: FontWeight.w800),
                                 ),
                               ),
                             ),
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            '어제보다 ${change >= 0 ? '+' : '-'}${_displayPrice(change.abs(), definition.currency)}  ${rate >= 0 ? '+' : ''}${rate.toStringAsFixed(2)}%',
-                            style: TextStyle(
-                              color: color,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          _TradingStatusRow(quote: quote),
-                          const SizedBox(height: 14),
-                          _MinuteChartPanel(quote: quote),
-                          const SizedBox(height: 24),
-                          _QuoteGrid(quote: quote),
-                          const SizedBox(height: 28),
-                          const Divider(color: Color(0xFFF0F1F3)),
-                          const SizedBox(height: 20),
-                          const Text(
-                            '이 회사를 한 문장으로',
-                            style: TextStyle(
-                              color: Color(0xFF202632),
-                              fontSize: 18,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                          const SizedBox(height: 9),
-                          Text(
-                            definition.summary,
-                            style: const TextStyle(
-                              color: Color(0xFF5D6572),
-                              fontSize: 14,
-                              height: 1.55,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 18),
-                          _HistoricalLeadershipSection(
-                            companyCode: definition.code,
-                            currentDate: state.currentDate,
-                          ),
-                          const SizedBox(height: 18),
-                          Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFFF7D8),
-                              borderRadius: BorderRadius.circular(18),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  '오늘의 조사 질문',
-                                  style: TextStyle(
-                                    color: Color(0xFF8A6815),
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w900,
+                            const SizedBox(width: 10),
+                            Expanded(
+                              flex: 2,
+                              child: FilledButton(
+                                key: const Key('write-research-note-button'),
+                                onPressed: () => _showOrderSheet(
+                                  context,
+                                  definition: definition,
+                                  quote: quote,
+                                  isBuy: true,
+                                ),
+                                style: FilledButton.styleFrom(
+                                  minimumSize: const Size.fromHeight(52),
+                                  backgroundColor: const Color(0xFF3182F6),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(15),
                                   ),
                                 ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  definition.question,
-                                  style: const TextStyle(
-                                    color: Color(0xFF403617),
-                                    fontSize: 14,
-                                    height: 1.45,
-                                    fontWeight: FontWeight.w800,
-                                  ),
+                                child: const Text(
+                                  '사기',
+                                  style: TextStyle(fontWeight: FontWeight.w900),
                                 ),
-                              ],
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            '일별 종가는 실제 기록이며, 0.9초 장중 틱과 조사 설명은 DAY ${state.day}의 게임용 재현입니다.',
-                            style: const TextStyle(
-                              color: Color(0xFF9A9FA8),
-                              fontSize: 10,
-                              height: 1.4,
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Color(0x16000000),
-                            blurRadius: 18,
-                            offset: Offset(0, -5),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton(
-                              key: const Key('ask-family-button'),
-                              onPressed: () => _showOrderSheet(
-                                context,
-                                definition: definition,
-                                quote: quote,
-                                isBuy: false,
-                              ),
-                              style: OutlinedButton.styleFrom(
-                                minimumSize: const Size.fromHeight(52),
-                                foregroundColor: const Color(0xFF38404D),
-                                side: const BorderSide(
-                                  color: Color(0xFFD8DCE2),
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(15),
-                                ),
-                              ),
-                              child: const Text(
-                                '팔기',
-                                style: TextStyle(fontWeight: FontWeight.w800),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            flex: 2,
-                            child: FilledButton(
-                              key: const Key('write-research-note-button'),
-                              onPressed: () => _showOrderSheet(
-                                context,
-                                definition: definition,
-                                quote: quote,
-                                isBuy: true,
-                              ),
-                              style: FilledButton.styleFrom(
-                                minimumSize: const Size.fromHeight(52),
-                                backgroundColor: const Color(0xFF3182F6),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(15),
-                                ),
-                              ),
-                              child: const Text(
-                                '사기',
-                                style: TextStyle(fontWeight: FontWeight.w900),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                );
-              },
+                    ],
+                  );
+                },
+              ),
             ),
           ),
         ),
@@ -934,37 +1030,6 @@ class _MarketClockBar extends StatelessWidget {
       ),
     );
   }
-}
-
-class _MarketHeader extends StatelessWidget {
-  const _MarketHeader({required this.onBack});
-
-  final VoidCallback onBack;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(8, 5, 15, 6),
-    child: Row(
-      children: [
-        IconButton(
-          key: const Key('close-market-button'),
-          onPressed: onBack,
-          icon: const Icon(Icons.arrow_back_ios_new_rounded),
-        ),
-        const Expanded(
-          child: Text(
-            '주식',
-            style: TextStyle(
-              color: Color(0xFF202632),
-              fontSize: 20,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ),
-        const Icon(Icons.notifications_none_rounded, color: Color(0xFF666D78)),
-      ],
-    ),
-  );
 }
 
 class _MarketBalanceCard extends StatelessWidget {
