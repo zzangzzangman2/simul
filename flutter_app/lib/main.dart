@@ -502,7 +502,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
       scaffoldMessengerKey: _scaffoldMessengerKey,
       navigatorKey: _navigatorKey,
       debugShowCheckedModeBanner: false,
-      title: '밀레니엄 캐피탈',
+      title: '부자되기 시뮬레이션',
       theme: ThemeData(
         useMaterial3: true,
         scaffoldBackgroundColor: _sky,

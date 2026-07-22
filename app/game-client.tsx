@@ -703,7 +703,7 @@ export function GameClient() {
         <header className="onboarding-topbar">
           <div className="brand-lockup">
             <span className="brand-mark" aria-hidden="true">M/00</span>
-            <span className="brand-copy"><b>MILLENNIUM CAPITAL</b><small>SIMULATION</small></span>
+            <span className="brand-copy"><b>부자되기 시뮬레이션</b><small>SEOUL · 2000</small></span>
           </div>
           <span>PORTRAIT EDITION · 2000.01.01</span>
         </header>

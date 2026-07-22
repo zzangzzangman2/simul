@@ -124,6 +124,7 @@ void main() {
     await tester.pumpWidget(const MillenniumCapitalApp());
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('game-title-screen')), findsOneWidget);
+    expect(find.text('부자되기\n시뮬레이션'), findsOneWidget);
     expect(find.text('처음하기'), findsOneWidget);
     expect(find.text('이어하기'), findsOneWidget);
 
@@ -136,6 +137,19 @@ void main() {
 
     await advanceDialogue(tester, 9);
     expect(find.byKey(const Key('story-intro-computer')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('bright cartoon title fits a compact phone', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(360, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(const MillenniumCapitalApp());
+    await tester.pumpAndSettle();
+
+    expect(find.text('부자되기\n시뮬레이션'), findsOneWidget);
+    expect(find.byKey(const Key('title-cartoon-hero')), findsOneWidget);
+    expect(find.byKey(const Key('new-game-button')), findsOneWidget);
+    expect(find.byKey(const Key('continue-game-button')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
