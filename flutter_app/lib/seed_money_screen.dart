@@ -75,7 +75,7 @@ class _SeedMoneyHubScreenState extends State<SeedMoneyHubScreen> {
     final progress = (_earned / 10000).clamp(0.0, 1.0);
     final age = _state.story.ageOn(_state.currentDate);
     return Scaffold(
-      backgroundColor: const Color(0xFFF4EEDC),
+      backgroundColor: const Color(0xFFF0E1BF),
       body: SafeArea(
         child: Column(
           children: [
@@ -95,142 +95,23 @@ class _SeedMoneyHubScreenState extends State<SeedMoneyHubScreen> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(14, 10, 14, 28),
                 children: [
-                  Container(
-                    key: const Key('seed-money-summary'),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF405478), Color(0xFF6B7FA6)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color(0x33405278),
-                          blurRadius: 18,
-                          offset: Offset(0, 9),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Expanded(
-                              child: Text(
-                                '내 손으로 만드는 첫 투자금',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 9,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0x22FFFFFF),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                '오늘 $_today / 3',
-                                style: const TextStyle(
-                                  color: _yellow,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 7),
-                        Text(
-                          '${_money(_state.cash)}원',
-                          key: const Key('seed-money-cash'),
-                          style: const TextStyle(
-                            color: _yellow,
-                            fontSize: 31,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: -1.4,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          _earned >= 10000
-                              ? '직접 번 종잣돈 목표 달성! 보호자 주문 권한이 열렸어요.'
-                              : '직접 번 누적액 ${_money(_earned)}원 · 10,000원까지 ${_money(10000 - _earned)}원',
-                          style: const TextStyle(
-                            color: Color(0xFFDCE5F6),
-                            fontSize: 11,
-                            height: 1.4,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: LinearProgressIndicator(
-                            minHeight: 9,
-                            value: progress,
-                            backgroundColor: const Color(0x33FFFFFF),
-                            valueColor: const AlwaysStoppedAnimation(_yellow),
-                          ),
-                        ),
-                        const SizedBox(height: 9),
-                        Text(
-                          '누적 일거리 수입 ${_money(_earned)}원 · 원금 증여 없음',
-                          style: const TextStyle(
-                            color: Color(0xFFCED8EB),
-                            fontSize: 9,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
+                  _SeedMoneyIllustratedSummary(
+                    cash: _state.cash,
+                    earned: _earned,
+                    today: _today,
+                    progress: progress,
                   ),
                   const SizedBox(height: 13),
-                  Container(
-                    padding: const EdgeInsets.all(13),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFF8E5),
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: const Color(0xFFE8D5A8)),
-                    ),
-                    child: const Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(
-                          Icons.history_edu_rounded,
-                          color: Color(0xFFB47C2C),
-                        ),
-                        SizedBox(width: 9),
-                        Expanded(
-                          child: Text(
-                            '시대 기준 · 2000년 1~8월 법정 최저임금은 시간당 1,600원입니다. 주인공은 10살이므로 정식 고용 대신 집안일, 보호자 동행 일거리와 가족 벼룩장터로 시작합니다.',
-                            style: TextStyle(
-                              color: Color(0xFF746244),
-                              fontSize: 10,
-                              height: 1.5,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  const _ChorePeriodNotice(),
                   const SizedBox(height: 14),
-                  ...workActivities.map(
-                    (activity) => Padding(
+                  ...workActivities.indexed.map(
+                    (entry) => Padding(
                       padding: const EdgeInsets.only(bottom: 11),
                       child: _WorkActivityCard(
-                        activity: activity,
+                        questNumber: entry.$1 + 1,
+                        activity: entry.$2,
                         disabled: _saving || _today >= 3,
-                        onTap: () => _openGame(activity),
+                        onTap: () => _openGame(entry.$2),
                       ),
                     ),
                   ),
@@ -239,8 +120,18 @@ class _SeedMoneyHubScreenState extends State<SeedMoneyHubScreen> {
                       key: const Key('daily-work-limit'),
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFE4ECF5),
-                        borderRadius: BorderRadius.circular(17),
+                        color: const Color(0xFFF3D9A4),
+                        borderRadius: BorderRadius.circular(13),
+                        border: Border.all(
+                          color: const Color(0xFF8D6036),
+                          width: 1.4,
+                        ),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x443A2614),
+                            offset: Offset(3, 4),
+                          ),
+                        ],
                       ),
                       child: const Text(
                         '오늘 할 수 있는 일은 충분히 했어요. 공부와 가족 시간을 지키려면 하루를 보낸 뒤 다시 선택하세요.',
@@ -262,13 +153,316 @@ class _SeedMoneyHubScreenState extends State<SeedMoneyHubScreen> {
   }
 }
 
+class _SeedMoneyIllustratedSummary extends StatelessWidget {
+  const _SeedMoneyIllustratedSummary({
+    required this.cash,
+    required this.earned,
+    required this.today,
+    required this.progress,
+  });
+
+  final int cash;
+  final int earned;
+  final int today;
+  final double progress;
+
+  @override
+  Widget build(BuildContext context) {
+    final reachedGoal = earned >= 10000;
+    return Container(
+      key: const Key('seed-money-summary'),
+      height: 218,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFF6E482A), width: 2),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x553A2614),
+            blurRadius: 8,
+            offset: Offset(4, 7),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Image.asset(
+              'assets/images/ui_seed_money_quest_header.webp',
+              fit: BoxFit.cover,
+              alignment: Alignment.center,
+              filterQuality: FilterQuality.high,
+            ),
+            const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Color(0x08000000),
+                    Color(0x00000000),
+                    Color(0x8F23170F),
+                  ],
+                  stops: [0, 0.5, 1],
+                ),
+              ),
+            ),
+            Positioned(
+              left: 12,
+              right: 12,
+              top: 12,
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(10, 6, 11, 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xEFFFF2CE),
+                      borderRadius: BorderRadius.circular(9),
+                      border: Border.all(
+                        color: const Color(0xFF795033),
+                        width: 1.3,
+                      ),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.menu_book_rounded,
+                          color: Color(0xFF6F4729),
+                          size: 16,
+                        ),
+                        SizedBox(width: 6),
+                        Text(
+                          '우리 집 심부름 장부',
+                          style: TextStyle(
+                            color: Color(0xFF4B321F),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 9,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xE8B94F45),
+                      borderRadius: BorderRadius.circular(9),
+                      border: Border.all(color: const Color(0xFFFFE5B5)),
+                    ),
+                    child: Text(
+                      '오늘 $today / 3',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Positioned(
+              left: 13,
+              right: 13,
+              bottom: 12,
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(12, 9, 12, 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xEEFFF4D8),
+                  borderRadius: BorderRadius.circular(13),
+                  border: Border.all(
+                    color: const Color(0xFF714727),
+                    width: 1.5,
+                  ),
+                  boxShadow: const [
+                    BoxShadow(color: Color(0x66351F10), offset: Offset(3, 4)),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Expanded(
+                          child: Align(
+                            alignment: Alignment.bottomLeft,
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.bottomLeft,
+                              child: Text(
+                                '${_money(cash)}원',
+                                key: const Key('seed-money-cash'),
+                                style: const TextStyle(
+                                  color: Color(0xFF3F2C20),
+                                  fontSize: 25,
+                                  height: 1,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: -1.1,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 9),
+                        Text(
+                          reachedGoal
+                              ? '주문 권한 해금!'
+                              : '${_money(earned)} / 10,000원',
+                          style: TextStyle(
+                            color: reachedGoal
+                                ? const Color(0xFF2D7865)
+                                : const Color(0xFF72553A),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 7),
+                    _LedgerProgress(progress: progress),
+                    const SizedBox(height: 6),
+                    Text(
+                      reachedGoal
+                          ? '직접 번 돈으로 첫 투자 준비를 마쳤어요.'
+                          : '직접 번 돈만 도장을 채워요 · 남은 돈 ${_money(10000 - earned)}원',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFF68533F),
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LedgerProgress extends StatelessWidget {
+  const _LedgerProgress({required this.progress});
+
+  final double progress;
+
+  @override
+  Widget build(BuildContext context) {
+    final filled = (progress * 10).ceil();
+    return Row(
+      children: [
+        for (var index = 0; index < 10; index++) ...[
+          if (index > 0) const SizedBox(width: 3),
+          Expanded(
+            child: Container(
+              height: 8,
+              decoration: BoxDecoration(
+                color: index < filled
+                    ? const Color(0xFFE4AF3D)
+                    : const Color(0xFFE3D1AC),
+                borderRadius: BorderRadius.circular(3),
+                border: Border.all(color: const Color(0xFF765033), width: 0.7),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _ChorePeriodNotice extends StatelessWidget {
+  const _ChorePeriodNotice();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    decoration: BoxDecoration(
+      color: const Color(0xFFFFF2D2),
+      borderRadius: BorderRadius.circular(13),
+      border: Border.all(color: const Color(0xFF9B7043), width: 1.4),
+      boxShadow: const [
+        BoxShadow(color: Color(0x3D51351D), offset: Offset(3, 4)),
+      ],
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Container(
+          width: 54,
+          padding: const EdgeInsets.symmetric(vertical: 11),
+          decoration: const BoxDecoration(
+            color: Color(0xFFC98A45),
+            borderRadius: BorderRadius.horizontal(left: Radius.circular(11)),
+          ),
+          child: const Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.history_edu_rounded, color: Color(0xFFFFF1CF)),
+              SizedBox(height: 3),
+              Text(
+                '2000',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const Expanded(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(11, 10, 12, 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  '엄마가 적어 둔 시대 메모',
+                  style: TextStyle(
+                    color: Color(0xFF6D4425),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                SizedBox(height: 3),
+                Text(
+                  '1~8월 법정 최저임금은 시간당 1,600원. 10살인 지금은 집안일, 보호자 동행, 가족 벼룩장터로 시작해요.',
+                  style: TextStyle(
+                    color: Color(0xFF725B43),
+                    fontSize: 9.5,
+                    height: 1.4,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 class _WorkActivityCard extends StatelessWidget {
   const _WorkActivityCard({
+    required this.questNumber,
     required this.activity,
     required this.disabled,
     required this.onTap,
   });
 
+  final int questNumber;
   final WorkActivityInfo activity;
   final bool disabled;
   final VoidCallback onTap;
@@ -278,18 +472,18 @@ class _WorkActivityCard extends StatelessWidget {
     final data = switch (activity.id) {
       'dishes' => (
         Icons.soup_kitchen_rounded,
-        const Color(0xFFDDF5F2),
-        const Color(0xFF3E8E85),
+        const Color(0xFFDCEFE3),
+        const Color(0xFF317B69),
       ),
       'stationery' => (
         Icons.inventory_2_rounded,
-        const Color(0xFFFFE8C7),
-        const Color(0xFFB8782F),
+        const Color(0xFFF7D9A7),
+        const Color(0xFFA85E28),
       ),
       _ => (
         Icons.calculate_rounded,
-        const Color(0xFFE7E2FA),
-        const Color(0xFF6E61A6),
+        const Color(0xFFE2D9EC),
+        const Color(0xFF6D548E),
       ),
     };
     return Material(
@@ -297,26 +491,63 @@ class _WorkActivityCard extends StatelessWidget {
       child: InkWell(
         key: Key('work-activity-${activity.id}'),
         onTap: disabled ? null : onTap,
-        borderRadius: BorderRadius.circular(21),
+        borderRadius: BorderRadius.circular(15),
         child: Ink(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.fromLTRB(10, 10, 9, 10),
           decoration: BoxDecoration(
-            color: disabled ? const Color(0xFFE5E3DD) : Colors.white,
-            borderRadius: BorderRadius.circular(21),
-            border: Border.all(color: const Color(0xFFE4DDD0)),
+            color: disabled ? const Color(0xFFE1D8C3) : const Color(0xFFFFF8E5),
+            borderRadius: BorderRadius.circular(15),
+            border: Border.all(
+              color: disabled
+                  ? const Color(0xFFAAA08D)
+                  : const Color(0xFF735037),
+              width: 1.5,
+            ),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x443A2614),
+                blurRadius: 2,
+                offset: Offset(4, 5),
+              ),
+            ],
           ),
           child: Row(
             children: [
               Container(
-                width: 58,
-                height: 72,
+                width: 55,
+                height: 88,
                 decoration: BoxDecoration(
                   color: data.$2,
-                  borderRadius: BorderRadius.circular(17),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: data.$3, width: 1.3),
                 ),
-                child: Icon(data.$1, color: data.$3, size: 30),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      '의뢰 ${questNumber.toString().padLeft(2, '0')}',
+                      style: TextStyle(
+                        color: data.$3,
+                        fontSize: 7.5,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Icon(data.$1, color: data.$3, size: 27),
+                    const SizedBox(height: 4),
+                    Text(
+                      '60분',
+                      style: TextStyle(
+                        color: data.$3,
+                        fontSize: 8,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -324,45 +555,79 @@ class _WorkActivityCard extends StatelessWidget {
                     Text(
                       activity.title,
                       style: const TextStyle(
-                        color: _ink,
-                        fontSize: 15,
+                        color: Color(0xFF403025),
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.25,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      activity.subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: data.$3,
+                        fontSize: 9.5,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
-                    const SizedBox(height: 3),
-                    Text(
-                      activity.subtitle,
-                      style: TextStyle(
-                        color: data.$3,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     Text(
                       activity.description,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        color: Color(0xFF7B7F87),
+                        color: Color(0xFF766553),
                         fontSize: 9,
-                        height: 1.35,
-                        fontWeight: FontWeight.w600,
+                        height: 1.3,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
-                    const SizedBox(height: 7),
-                    Text(
-                      activity.periodPay,
-                      style: const TextStyle(
-                        color: Color(0xFF496A59),
-                        fontSize: 10,
-                        fontWeight: FontWeight.w900,
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 7,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: data.$2.withValues(alpha: 0.82),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: data.$3.withValues(alpha: 0.55),
+                        ),
+                      ),
+                      child: Text(
+                        activity.periodPay,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: data.$3,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right_rounded, color: _coral),
+              const SizedBox(width: 7),
+              Container(
+                width: 29,
+                height: 29,
+                decoration: BoxDecoration(
+                  color: disabled
+                      ? const Color(0xFFB5AC9D)
+                      : const Color(0xFFB95348),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFFFFEAC1)),
+                ),
+                child: const Icon(
+                  Icons.play_arrow_rounded,
+                  color: Colors.white,
+                  size: 19,
+                ),
+              ),
             ],
           ),
         ),
@@ -939,8 +1204,20 @@ class _WorkTopBar extends StatelessWidget {
   final bool dark;
 
   @override
-  Widget build(BuildContext context) => SizedBox(
+  Widget build(BuildContext context) => Container(
     height: 67,
+    decoration: dark
+        ? null
+        : const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xFFFFF3D8), Color(0xFFF0E1BF)],
+            ),
+            border: Border(
+              bottom: BorderSide(color: Color(0x558C6239), width: 1.2),
+            ),
+          ),
     child: Row(
       children: [
         IconButton(

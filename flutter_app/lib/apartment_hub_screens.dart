@@ -318,153 +318,159 @@ class _ApartmentLocationHeader extends StatelessWidget {
   Widget build(BuildContext context) => Semantics(
     container: true,
     label: '${details.title}, ${state.companyName}, $activeSaveSlot번 저장 슬롯',
-    child: Container(
+    child: ClipRRect(
       key: const Key('room-company-sign'),
-      constraints: const BoxConstraints(minHeight: 90),
-      padding: const EdgeInsets.fromLTRB(11, 9, 8, 9),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xF21B263B), Color(0xF20F1727)],
-        ),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0x66FFFFFF), width: 1.1),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x8A000000),
-            blurRadius: 22,
-            offset: Offset(0, 9),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: details.accent.withValues(alpha: 0.18),
-                  borderRadius: BorderRadius.circular(13),
-                  border: Border.all(
-                    color: details.accent.withValues(alpha: 0.72),
-                  ),
-                ),
-                child: Icon(details.icon, color: details.accent, size: 22),
+      borderRadius: BorderRadius.circular(18),
+      child: BackdropFilter(
+        filter: ui.ImageFilter.blur(sigmaX: 11, sigmaY: 11),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 90),
+          padding: const EdgeInsets.fromLTRB(11, 9, 8, 9),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xB52B2927), Color(0xA6141B28)],
+            ),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: const Color(0x70F3DFC1), width: 1.1),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x52000000),
+                blurRadius: 14,
+                offset: Offset(0, 6),
               ),
-              const SizedBox(width: 9),
-              Expanded(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          details.title,
-                          key: const Key('apartment-location-title'),
-                          maxLines: 1,
-                          softWrap: false,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: -0.3,
-                          ),
-                        ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: details.accent.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(13),
+                      border: Border.all(
+                        color: details.accent.withValues(alpha: 0.72),
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Row(
+                    child: Icon(details.icon, color: details.accent, size: 22),
+                  ),
+                  const SizedBox(width: 9),
+                  Expanded(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Flexible(
-                          child: KeyedSubtree(
-                            key: const Key('room-company-name'),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
                             child: Text(
-                              state.companyName,
-                              key: const Key('company-header-title'),
+                              details.title,
+                              key: const Key('apartment-location-title'),
                               maxLines: 1,
                               softWrap: false,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: details.accent,
-                                fontSize: 9,
-                                height: 1.15,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
                                 fontWeight: FontWeight.w900,
+                                letterSpacing: -0.3,
                               ),
                             ),
                           ),
                         ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            state.story.officeTier >= 2
-                                ? '정식 본사 · ${details.hint}'
-                                : state.story.officeTier == 1
-                                ? '작은 사무실 · ${details.hint}'
-                                : details.hint,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Color(0xFFB5C0D3),
-                              fontSize: 9,
-                              fontWeight: FontWeight.w700,
+                        const SizedBox(height: 2),
+                        Row(
+                          children: [
+                            Flexible(
+                              child: KeyedSubtree(
+                                key: const Key('room-company-name'),
+                                child: Text(
+                                  state.companyName,
+                                  key: const Key('company-header-title'),
+                                  maxLines: 1,
+                                  softWrap: false,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: details.accent,
+                                    fontSize: 9,
+                                    height: 1.15,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ),
                             ),
-                          ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                state.story.officeTier >= 2
+                                    ? '정식 본사 · ${details.hint}'
+                                    : state.story.officeTier == 1
+                                    ? '작은 사무실 · ${details.hint}'
+                                    : details.hint,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Color(0xFFB5C0D3),
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                  ],
-                ),
+                  ),
+                  IconButton(
+                    key: const Key('game-menu-button'),
+                    tooltip: '저장 및 게임 메뉴',
+                    onPressed: onOpenGameMenu,
+                    style: IconButton.styleFrom(
+                      backgroundColor: const Color(0x1FFFFFFF),
+                      foregroundColor: lastSavedAt == null
+                          ? const Color(0xFFCBD4E4)
+                          : const Color(0xFF8FE0A9),
+                      minimumSize: const Size(42, 42),
+                    ),
+                    icon: const Icon(Icons.menu_rounded),
+                  ),
+                ],
               ),
-              IconButton(
-                key: const Key('game-menu-button'),
-                tooltip: '저장 및 게임 메뉴',
-                onPressed: onOpenGameMenu,
-                style: IconButton.styleFrom(
-                  backgroundColor: const Color(0x1FFFFFFF),
-                  foregroundColor: lastSavedAt == null
-                      ? const Color(0xFFCBD4E4)
-                      : const Color(0xFF8FE0A9),
-                  minimumSize: const Size(42, 42),
+              const SizedBox(height: 7),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Row(
+                    children: [
+                      _ApartmentHudChip(
+                        icon: Icons.calendar_today_rounded,
+                        label:
+                            'DAY ${state.day} · ${marketTimeLabel(state.marketMinute)}',
+                      ),
+                      const SizedBox(width: 5),
+                      _ApartmentHudChip(
+                        icon: Icons.account_balance_wallet_rounded,
+                        label: '${_money(state.cash)}원',
+                      ),
+                      const SizedBox(width: 5),
+                      _ApartmentHudChip(label: 'LV.${state.progression.level}'),
+                      const SizedBox(width: 5),
+                      _ApartmentHudChip(label: 'S$activeSaveSlot'),
+                    ],
+                  ),
                 ),
-                icon: const Icon(Icons.menu_rounded),
               ),
             ],
           ),
-          const SizedBox(height: 7),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: Row(
-                children: [
-                  _ApartmentHudChip(
-                    icon: Icons.calendar_today_rounded,
-                    label:
-                        'DAY ${state.day} · ${marketTimeLabel(state.marketMinute)}',
-                  ),
-                  const SizedBox(width: 5),
-                  _ApartmentHudChip(
-                    icon: Icons.account_balance_wallet_rounded,
-                    label: '${_money(state.cash)}원',
-                  ),
-                  const SizedBox(width: 5),
-                  _ApartmentHudChip(label: 'LV.${state.progression.level}'),
-                  const SizedBox(width: 5),
-                  _ApartmentHudChip(label: 'S$activeSaveSlot'),
-                ],
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     ),
   );
@@ -481,9 +487,9 @@ class _ApartmentHudChip extends StatelessWidget {
     height: 22,
     padding: EdgeInsets.symmetric(horizontal: icon == null ? 7 : 6),
     decoration: BoxDecoration(
-      color: const Color(0x17FFFFFF),
+      color: const Color(0x2B0B0D11),
       borderRadius: BorderRadius.circular(99),
-      border: Border.all(color: const Color(0x1FFFFFFF)),
+      border: Border.all(color: const Color(0x3DF3DFC1)),
     ),
     child: Row(
       mainAxisSize: MainAxisSize.min,
@@ -546,17 +552,17 @@ class _ApartmentObjectHotspot extends StatelessWidget {
             child: Ink(
               padding: const EdgeInsets.fromLTRB(8, 7, 9, 7),
               decoration: BoxDecoration(
-                color: const Color(0xE61D2638),
+                color: const Color(0xB81D2632),
                 borderRadius: BorderRadius.circular(19),
                 border: Border.all(
-                  color: attention ? _yellow : const Color(0xCCFFFFFF),
-                  width: attention ? 2.2 : 1.4,
+                  color: attention ? _yellow : const Color(0x99F3DFC1),
+                  width: attention ? 2.0 : 1.2,
                 ),
                 boxShadow: [
                   const BoxShadow(
-                    color: Color(0x9C000000),
-                    blurRadius: 15,
-                    offset: Offset(0, 7),
+                    color: Color(0x66000000),
+                    blurRadius: 11,
+                    offset: Offset(0, 5),
                   ),
                   BoxShadow(
                     color: accent.withValues(alpha: attention ? 0.65 : 0.30),
@@ -640,55 +646,69 @@ class _ApartmentTravelDock extends StatelessWidget {
     return Semantics(
       container: true,
       label: '아파트 장소 이동',
-      child: Container(
-        constraints: const BoxConstraints(minHeight: 70),
-        padding: const EdgeInsets.fromLTRB(9, 7, 9, 8),
-        decoration: BoxDecoration(
-          color: const Color(0xEE171D2B),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0x99FFFFFF), width: 1.2),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0xA6000000),
-              blurRadius: 19,
-              offset: Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.near_me_rounded, size: 11, color: _yellow),
-                SizedBox(width: 4),
-                Text(
-                  '집 안에서 이동',
-                  style: TextStyle(
-                    color: Color(0xFFC9D1DF),
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 0.35,
-                  ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 70),
+            padding: const EdgeInsets.fromLTRB(9, 7, 9, 8),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Color(0xAA312820), Color(0xB8141A24)],
+              ),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0x70F3DFC1), width: 1.2),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x66000000),
+                  blurRadius: 13,
+                  offset: Offset(0, 6),
                 ),
               ],
             ),
-            const SizedBox(height: 5),
-            Row(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                for (var index = 0; index < destinations.length; index++) ...[
-                  if (index > 0) const SizedBox(width: 7),
-                  Expanded(
-                    child: _ApartmentTravelButton(
-                      place: destinations[index],
-                      onTap: () => onMove(destinations[index]),
+                const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.near_me_rounded, size: 11, color: _yellow),
+                    SizedBox(width: 4),
+                    Text(
+                      '집 안에서 이동',
+                      style: TextStyle(
+                        color: Color(0xFFC9D1DF),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.35,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
+                const SizedBox(height: 5),
+                Row(
+                  children: [
+                    for (
+                      var index = 0;
+                      index < destinations.length;
+                      index++
+                    ) ...[
+                      if (index > 0) const SizedBox(width: 7),
+                      Expanded(
+                        child: _ApartmentTravelButton(
+                          place: destinations[index],
+                          onTap: () => onMove(destinations[index]),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -718,9 +738,9 @@ class _ApartmentTravelButton extends StatelessWidget {
             height: 48,
             padding: const EdgeInsets.symmetric(horizontal: 10),
             decoration: BoxDecoration(
-              color: details.accent.withValues(alpha: 0.16),
+              color: details.accent.withValues(alpha: 0.13),
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: details.accent.withValues(alpha: 0.78)),
+              border: Border.all(color: details.accent.withValues(alpha: 0.68)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
