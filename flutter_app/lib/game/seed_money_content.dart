@@ -38,8 +38,8 @@ const workActivities = <WorkActivityInfo>[
     id: 'stationery',
     title: '문방구 재고 정리',
     subtitle: '학용품·간식·완구를 제자리에',
-    periodPay: '30분 기준 800원 + 정확도 수당',
-    description: '엄마와 함께 동네 문방구의 새 물건을 분류합니다. 2000년 상반기 최저임금 1,600원 기준입니다.',
+    periodPay: '30분 작업 800원 + 정확도 수당',
+    description: '엄마와 함께 새 물건을 분류합니다. 이동과 정리를 포함해 게임 시간은 60분이 흐릅니다.',
   ),
   WorkActivityInfo(
     id: 'flea_market',

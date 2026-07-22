@@ -496,7 +496,7 @@ class _AdultChanceCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final month =
         '${state.currentDate.year}-${state.currentDate.month.toString().padLeft(2, '0')}';
-    final age = state.currentDate.year - state.story.playerBirthYear;
+    final age = state.story.ageOn(state.currentDate);
     final unlocked = state.currentDate.year >= 2010 && age >= 20;
     final alreadyPlayed = state.personalFinance.lastChanceMonth == month;
     final onePercent = state.cash ~/ 100;

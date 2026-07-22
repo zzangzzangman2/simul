@@ -194,6 +194,7 @@ class _StockMarketScreenState extends State<StockMarketScreen> {
   bool _closeAfterTrade = false;
   bool _isClaimingMission = false;
   bool _isShowingSessionNotice = false;
+  bool _isMarketSheetOpen = false;
   final Set<int> _shownSessionNotices = <int>{};
   bool get _hasDomesticTradingSession =>
       isMarketTradingDay(_state.currentDate) &&
@@ -208,6 +209,7 @@ class _StockMarketScreenState extends State<StockMarketScreen> {
         _isClosing ||
         _isExecutingTrade ||
         _isTransferringCash ||
+        _isMarketSheetOpen ||
         _isShowingSessionNotice ||
         _loading ||
         _tick >= generatedSessionTicks ||
@@ -215,6 +217,17 @@ class _StockMarketScreenState extends State<StockMarketScreen> {
       return;
     }
     _timer = Timer.periodic(marketRealtimeTickDuration, (_) => _update());
+  }
+
+  void _pauseMarketForSheet() {
+    _isMarketSheetOpen = true;
+    _timer?.cancel();
+    _timer = null;
+  }
+
+  void _resumeMarketAfterSheet() {
+    _isMarketSheetOpen = false;
+    if (mounted) _resumeTimerIfNeeded();
   }
 
   @override
@@ -602,18 +615,24 @@ class _StockMarketScreenState extends State<StockMarketScreen> {
 
   Future<void> _openTransferSheet(bool deposit) async {
     if (_isTransferringCash || _isClosing || _isExecutingTrade) return;
-    final result = await showModalBottomSheet<FinanceActionResult>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      showDragHandle: true,
-      backgroundColor: Colors.white,
-      builder: (sheetContext) => _BrokerageTransferSheet(
-        state: _state,
-        deposit: deposit,
-        onSubmit: _transferCash,
-      ),
-    );
+    _pauseMarketForSheet();
+    FinanceActionResult? result;
+    try {
+      result = await showModalBottomSheet<FinanceActionResult>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        showDragHandle: true,
+        backgroundColor: Colors.white,
+        builder: (sheetContext) => _BrokerageTransferSheet(
+          state: _state,
+          deposit: deposit,
+          onSubmit: _transferCash,
+        ),
+      );
+    } finally {
+      _resumeMarketAfterSheet();
+    }
     if (result == null || !mounted) return;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -753,6 +772,8 @@ class _StockMarketScreenState extends State<StockMarketScreen> {
           onExecuteTrade: _executeTrade,
           onToggleFavorite: _toggleFavorite,
           onSaveResearchNote: _saveResearchNote,
+          onMarketSheetOpened: _pauseMarketForSheet,
+          onMarketSheetClosed: _resumeMarketAfterSheet,
         ),
       ),
     );
@@ -1088,6 +1109,9 @@ class _StockMarketScreenState extends State<StockMarketScreen> {
                                     onExecuteTrade: _executeTrade,
                                     onToggleFavorite: _toggleFavorite,
                                     onSaveResearchNote: _saveResearchNote,
+                                    onMarketSheetOpened: _pauseMarketForSheet,
+                                    onMarketSheetClosed:
+                                        _resumeMarketAfterSheet,
                                   ),
                                 ),
                               ),
@@ -1135,6 +1159,8 @@ class _StockDetailScreen extends StatefulWidget {
     required this.onExecuteTrade,
     required this.onToggleFavorite,
     required this.onSaveResearchNote,
+    required this.onMarketSheetOpened,
+    required this.onMarketSheetClosed,
   });
 
   final _StockDefinition definition;
@@ -1144,6 +1170,8 @@ class _StockDetailScreen extends StatefulWidget {
   final Future<TradeExecutionResult> Function(TradeOrder) onExecuteTrade;
   final Future<GameState> Function(String) onToggleFavorite;
   final Future<GameState> Function(String, String) onSaveResearchNote;
+  final VoidCallback onMarketSheetOpened;
+  final VoidCallback onMarketSheetClosed;
 
   @override
   State<_StockDetailScreen> createState() => _StockDetailScreenState();
@@ -1167,6 +1195,23 @@ class _StockDetailScreenState extends State<_StockDetailScreen> {
     final result = await widget.onExecuteTrade(order);
     if (result.success && mounted) setState(() => _state = result.state);
     return result;
+  }
+
+  Future<void> _openOrderSheet(bool isBuy) async {
+    widget.onMarketSheetOpened();
+    try {
+      await _showOrderSheet(
+        context,
+        definition: definition,
+        live: live,
+        isBuy: isBuy,
+        state: state,
+        minute: minute,
+        onExecuteTrade: onExecuteTrade,
+      );
+    } finally {
+      widget.onMarketSheetClosed();
+    }
   }
 
   bool get _isFavorite {
@@ -1463,15 +1508,7 @@ class _StockDetailScreenState extends State<_StockDetailScreen> {
                                 child: OutlinedButton(
                                   key: const Key('sell-stock-button'),
                                   onPressed: definition.currency == 'KRW'
-                                      ? () => _showOrderSheet(
-                                          context,
-                                          definition: definition,
-                                          live: live,
-                                          isBuy: false,
-                                          state: state,
-                                          minute: minute,
-                                          onExecuteTrade: onExecuteTrade,
-                                        )
+                                      ? () => _openOrderSheet(false)
                                       : () => _showResearchMessage(
                                           context,
                                           '해외 종목은 실제 환율 원장을 연결하기 전까지 참고용입니다.',
@@ -1500,15 +1537,7 @@ class _StockDetailScreenState extends State<_StockDetailScreen> {
                                 child: FilledButton(
                                   key: const Key('buy-stock-button'),
                                   onPressed: definition.currency == 'KRW'
-                                      ? () => _showOrderSheet(
-                                          context,
-                                          definition: definition,
-                                          live: live,
-                                          isBuy: true,
-                                          state: state,
-                                          minute: minute,
-                                          onExecuteTrade: onExecuteTrade,
-                                        )
+                                      ? () => _openOrderSheet(true)
                                       : () => _showResearchMessage(
                                           context,
                                           '해외 종목은 실제 환율 원장을 연결하기 전까지 참고용입니다.',
@@ -1543,7 +1572,7 @@ class _StockDetailScreenState extends State<_StockDetailScreen> {
     );
   }
 
-  static void _showOrderSheet(
+  static Future<void> _showOrderSheet(
     BuildContext context, {
     required _StockDefinition definition,
     required ValueNotifier<_LiveStock> live,
@@ -1552,7 +1581,7 @@ class _StockDetailScreenState extends State<_StockDetailScreen> {
     required ValueNotifier<int> minute,
     required Future<TradeExecutionResult> Function(TradeOrder) onExecuteTrade,
   }) {
-    showModalBottomSheet<void>(
+    return showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
@@ -1670,6 +1699,9 @@ class _OrderSheetState extends State<_OrderSheet> {
     return marketClockAt(_marketMinute, tradingDay: tradingDay).tradable;
   }
 
+  bool get _authorityReady =>
+      !widget.isBuy || widget.state.story.accountAuthorityLevel > 0;
+
   Future<void> _submit() async {
     if (_submitting || _result?.success == true) return;
     setState(() {
@@ -1726,6 +1758,7 @@ class _OrderSheetState extends State<_OrderSheet> {
         : const Color(0xFFF04452);
     final maxQuantity = _maxQuantity;
     final canSubmit =
+        _authorityReady &&
         _tradable &&
         _quantity > 0 &&
         _quantity <= maxQuantity &&
@@ -1849,14 +1882,19 @@ class _OrderSheetState extends State<_OrderSheet> {
                   ],
                 ),
               ),
-              if (!_tradable || maxQuantity <= 0) ...[
+              if (!_authorityReady || !_tradable || maxQuantity <= 0) ...[
                 const SizedBox(height: 10),
                 Text(
-                  !_tradable
+                  !_authorityReady
+                      ? '직접 번 종잣돈 10,000원을 먼저 마련해야 보호자 주문 승인을 받을 수 있습니다.'
+                      : !_tradable
                       ? '현재는 주문 가능한 거래 시간이 아닙니다.'
                       : widget.isBuy
                       ? '1주를 살 현금이 부족합니다.'
                       : '보유 수량이 없습니다.',
+                  key: !_authorityReady
+                      ? const Key('order-authority-warning')
+                      : null,
                   style: const TextStyle(
                     color: Color(0xFFF04452),
                     fontWeight: FontWeight.w800,
@@ -1910,7 +1948,11 @@ class _OrderSheetState extends State<_OrderSheet> {
                         ),
                       )
                     : Text(
-                        _result?.success == true ? '완료' : '부모님 승인으로 주문 실행',
+                        _result?.success == true
+                            ? '완료'
+                            : !_authorityReady
+                            ? '종잣돈 10,000원 달성 후 주문 가능'
+                            : '부모님 승인으로 주문 실행',
                         style: const TextStyle(fontWeight: FontWeight.w900),
                       ),
               ),

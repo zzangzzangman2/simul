@@ -20,11 +20,15 @@ class _SeedMoneyHubScreenState extends State<SeedMoneyHubScreen> {
 
   int get _earned =>
       (_state.story.storyFlags['earnedSeedMoney'] as num?)?.toInt() ?? 0;
-  int get _today =>
-      (_state.story.storyFlags['workSessionsToday'] as num?)?.toInt() ?? 0;
+  int get _today {
+    final recordedDay = (_state.story.storyFlags['workDay'] as num?)?.toInt();
+    if (recordedDay != _state.day) return 0;
+    return (_state.story.storyFlags['workSessionsToday'] as num?)?.toInt() ?? 0;
+  }
 
   Future<void> _openGame(WorkActivityInfo activity) async {
     if (_saving || _today >= 3) return;
+    final cashBefore = _state.cash;
     final result = await Navigator.of(context).push<WorkSessionResult>(
       _gameSceneRoute<WorkSessionResult>(switch (activity.id) {
         'dishes' => const DishwashingMiniGame(),
@@ -48,12 +52,28 @@ class _SeedMoneyHubScreenState extends State<SeedMoneyHubScreen> {
       _state = next;
       _saving = false;
     });
+    final paid = next.cash - cashBefore;
+    final traitLabel = switch (next.story.startingTrait) {
+      StoryTrait.stability => '안정형',
+      StoryTrait.innovation => '혁신형',
+      StoryTrait.analysis => '분석형',
+      StoryTrait.control => '통제형',
+    };
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            '실제 지급 ${_money(paid)}원 · $traitLabel 성향과 해금 스킬 보너스 반영',
+          ),
+        ),
+      );
   }
 
   @override
   Widget build(BuildContext context) {
     final progress = (_earned / 10000).clamp(0.0, 1.0);
-    final age = _state.currentDate.year - _state.story.playerBirthYear;
+    final age = _state.story.ageOn(_state.currentDate);
     return Scaffold(
       backgroundColor: const Color(0xFFF4EEDC),
       body: SafeArea(
@@ -359,42 +379,82 @@ class DishwashingMiniGame extends StatefulWidget {
 }
 
 class _DishwashingMiniGameState extends State<DishwashingMiniGame> {
-  static const _steps = ['rinse', 'scrub', 'finish'];
+  static const _dishSteps = <List<String>>[
+    ['rinse', 'scrub', 'finish'],
+    ['scrub', 'rinse', 'finish'],
+    ['rinse', 'rinse', 'finish'],
+    ['scrub', 'scrub', 'finish'],
+    ['rinse', 'scrub', 'finish'],
+  ];
+  static const _actionLabels = <String, String>{
+    'rinse': '헹구기',
+    'scrub': '닦기',
+    'finish': '마무리',
+  };
+  Timer? _previewTimer;
   int _dish = 0;
   int _step = 0;
   int _mistakes = 0;
+  bool _showSequence = true;
 
-  void _tap(String action) {
-    if (_dish >= 5) return;
-    if (action != _steps[_step]) {
-      setState(() => _mistakes++);
-      return;
-    }
-    setState(() {
-      if (_step == _steps.length - 1) {
-        _dish++;
-        _step = 0;
-      } else {
-        _step++;
+  List<String> get _steps => _dishSteps[_dish];
+
+  @override
+  void initState() {
+    super.initState();
+    _schedulePreviewEnd();
+  }
+
+  @override
+  void dispose() {
+    _previewTimer?.cancel();
+    super.dispose();
+  }
+
+  void _schedulePreviewEnd() {
+    _previewTimer?.cancel();
+    _previewTimer = Timer(const Duration(milliseconds: 1400), () {
+      if (mounted && _dish < _dishSteps.length) {
+        setState(() => _showSequence = false);
       }
     });
   }
 
+  void _tap(String action) {
+    if (_dish >= _dishSteps.length || _showSequence) return;
+    if (action != _steps[_step]) {
+      setState(() => _mistakes++);
+      return;
+    }
+    final completedDish = _step == _steps.length - 1;
+    setState(() {
+      if (completedDish) {
+        _dish++;
+        _step = 0;
+        _showSequence = _dish < _dishSteps.length;
+      } else {
+        _step++;
+      }
+    });
+    if (completedDish && _dish < _dishSteps.length) _schedulePreviewEnd();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final done = _dish >= 5;
+    final done = _dish >= _dishSteps.length;
     final score = (100 - _mistakes * 8).clamp(40, 100);
     return _MiniGameShell(
       title: '저녁 설거지',
       subtitle: '순서를 기억해서 다섯 장을 깨끗하게',
       backgroundAsset: 'assets/images/bg_kitchen_1999.png',
-      progress: (_dish + (_step / 3)) / 5,
+      progress: (_dish + (_step / 3)) / _dishSteps.length,
       child: done
           ? _MiniGameResult(
               activityId: 'dishes',
               score: score,
               title: _mistakes == 0 ? '반짝반짝 완벽해!' : '깨끗하게 정리 완료!',
-              detail: '순서 실수 $_mistakes회 · 예상 용돈 ${300 + score * 5}원',
+              detail:
+                  '순서 실수 $_mistakes회 · 기본 용돈 ${300 + score * 5}원 · 성향/스킬 보너스 별도',
             )
           : Column(
               children: [
@@ -420,12 +480,12 @@ class _DishwashingMiniGameState extends State<DishwashingMiniGame> {
                     alignment: Alignment.center,
                     children: [
                       Icon(
-                        _step == 0
-                            ? Icons.bubble_chart_rounded
-                            : _step == 1
-                            ? Icons.cleaning_services_rounded
-                            : Icons.auto_awesome_rounded,
-                        color: _step == 2 ? _yellow : const Color(0xFF5A8D89),
+                        _showSequence
+                            ? Icons.visibility_rounded
+                            : Icons.psychology_alt_rounded,
+                        color: _showSequence
+                            ? const Color(0xFF5A8D89)
+                            : _yellow,
                         size: 74,
                       ),
                       Positioned(
@@ -442,14 +502,42 @@ class _DishwashingMiniGameState extends State<DishwashingMiniGame> {
                   ),
                 ),
                 const SizedBox(height: 18),
-                Text(
-                  '지금 할 일 · ${['물로 헹구기', '수세미로 닦기', '깨끗한 물로 마무리'][_step]}',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w900,
-                    shadows: [Shadow(color: Colors.black54, blurRadius: 6)],
-                  ),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 180),
+                  child: _showSequence
+                      ? Container(
+                          key: const Key('dish-sequence-preview'),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 13,
+                            vertical: 9,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xDD10243A),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Text(
+                            '순서 외우기 · ${_steps.map((step) => _actionLabels[step]).join(' → ')}',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        )
+                      : const Text(
+                          '순서를 숨겼어요 · 기억한 순서대로 눌러 보세요',
+                          key: Key('dish-recall-prompt'),
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w900,
+                            shadows: [
+                              Shadow(color: Colors.black54, blurRadius: 6),
+                            ],
+                          ),
+                        ),
                 ),
                 const SizedBox(height: 12),
                 Row(
@@ -458,21 +546,21 @@ class _DishwashingMiniGameState extends State<DishwashingMiniGame> {
                       key: const Key('dish-rinse'),
                       icon: Icons.water_drop_rounded,
                       label: '헹구기',
-                      onTap: () => _tap('rinse'),
+                      onTap: _showSequence ? null : () => _tap('rinse'),
                     ),
                     const SizedBox(width: 8),
                     _GameAction(
                       key: const Key('dish-scrub'),
                       icon: Icons.cleaning_services_rounded,
                       label: '닦기',
-                      onTap: () => _tap('scrub'),
+                      onTap: _showSequence ? null : () => _tap('scrub'),
                     ),
                     const SizedBox(width: 8),
                     _GameAction(
                       key: const Key('dish-finish'),
                       icon: Icons.shower_rounded,
                       label: '마무리',
-                      onTap: () => _tap('finish'),
+                      onTap: _showSequence ? null : () => _tap('finish'),
                     ),
                   ],
                 ),
@@ -539,7 +627,8 @@ class _StationerySortMiniGameState extends State<StationerySortMiniGame> {
               activityId: 'stationery',
               score: score,
               title: score >= 90 ? '사장님도 놀란 진열 실력!' : '재고 정리 완료!',
-              detail: '정답 $_correct개 · 실수 $_mistakes회 · 30분 기준 수당',
+              detail:
+                  '정답 $_correct개 · 실수 $_mistakes회 · 기본 수당 ${600 + score * 4}원 · 보너스 별도',
             )
           : Column(
               children: [
@@ -670,7 +759,8 @@ class _FleaMarketMiniGameState extends State<FleaMarketMiniGame> {
               activityId: 'flea_market',
               score: score,
               title: score >= 90 ? '오늘 계산대는 완벽했어!' : '벼룩장터 마감!',
-              detail: '정답 $_correct개 · 다시 계산 $_mistakes회 · 판매 몫 정산',
+              detail:
+                  '정답 $_correct개 · 다시 계산 $_mistakes회 · 기본 몫 ${400 + score * 12}원 · 보너스 별도',
             )
           : Container(
               padding: const EdgeInsets.all(17),
@@ -902,7 +992,7 @@ class _GameAction extends StatelessWidget {
   });
   final IconData icon;
   final String label;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) => Expanded(

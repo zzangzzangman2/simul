@@ -946,6 +946,112 @@ void main() {
   });
 
   testWidgets(
+    'market clock pauses while the brokerage transfer sheet is open',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final state = const GameEngine()
+          .createNewGame('이체 시계 정지 테스트', initialCash: 1000000)
+          .copyWith(day: 4, marketMinute: 9 * 60, brokerageCash: 500000);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: StockMarketScreen(
+            state: state,
+            universe: testMarketUniverse(),
+            onTransferCash: (amount, deposit) async => const GameEngine()
+                .transferBrokerageCash(state, amount: amount, deposit: deposit),
+          ),
+        ),
+      );
+      await waitForMarketHome(tester);
+      final clock = find.byKey(const Key('market-phone-status-time'));
+
+      await tester.tap(find.byKey(const Key('market-deposit-button')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('brokerage-transfer-amount')),
+        findsOneWidget,
+      );
+      final pausedAt = tester.widget<Text>(clock.first).data;
+      await tester.pump(const Duration(seconds: 2));
+      expect(tester.widget<Text>(clock.first).data, pausedAt);
+
+      Navigator.of(
+        tester.element(find.byKey(const Key('brokerage-transfer-amount'))),
+      ).pop();
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('market clock pauses while the order sheet is open', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final state = const GameEngine()
+        .createNewGame('주문 시계 정지 테스트', initialCash: 1000000)
+        .copyWith(day: 4, marketMinute: 9 * 60);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StockMarketScreen(state: state, universe: testMarketUniverse()),
+      ),
+    );
+    await openMarketExplore(tester);
+    await tester.tap(find.byKey(const Key('stock-row-005930')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('buy-stock-button')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('order-quantity-value')), findsOneWidget);
+
+    final clock = find.byKey(const Key('market-phone-status-time'));
+    final pausedAt = tester.widget<Text>(clock.first).data;
+    await tester.pump(const Duration(seconds: 2));
+    expect(tester.widget<Text>(clock.first).data, pausedAt);
+
+    Navigator.of(
+      tester.element(find.byKey(const Key('order-quantity-value'))),
+    ).pop();
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('first buy is visibly locked until seed-money authority opens', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final base = const GameEngine().createNewGame('주문 권한 표시 테스트');
+    final state = base.copyWith(
+      day: 4,
+      marketMinute: 9 * 60,
+      cash: 1000000,
+      brokerageCash: 1000000,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StockMarketScreen(state: state, universe: testMarketUniverse()),
+      ),
+    );
+    await openMarketExplore(tester);
+    await tester.tap(find.byKey(const Key('stock-row-005930')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('buy-stock-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('order-authority-warning')), findsOneWidget);
+    expect(find.textContaining('10,000원 달성 후'), findsOneWidget);
+    final button = tester.widget<FilledButton>(
+      find.byKey(const Key('request-parent-order-approval')),
+    );
+    expect(button.onPressed, isNull);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
     'market quick jumps are only enabled in their allowed time windows',
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(390, 844));
@@ -1186,15 +1292,23 @@ void main() {
       await tester.binding.setSurfaceSize(const Size(390, 844));
       addTearDown(() => tester.binding.setSurfaceSize(null));
       await tester.pumpWidget(const MaterialApp(home: DishwashingMiniGame()));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      expect(find.byKey(const Key('dish-sequence-preview')), findsOneWidget);
 
-      for (var dish = 0; dish < 5; dish++) {
-        await tester.tap(find.byKey(const Key('dish-rinse')));
-        await tester.pump();
-        await tester.tap(find.byKey(const Key('dish-scrub')));
-        await tester.pump();
-        await tester.tap(find.byKey(const Key('dish-finish')));
-        await tester.pump();
+      const sequences = <List<String>>[
+        ['rinse', 'scrub', 'finish'],
+        ['scrub', 'rinse', 'finish'],
+        ['rinse', 'rinse', 'finish'],
+        ['scrub', 'scrub', 'finish'],
+        ['rinse', 'scrub', 'finish'],
+      ];
+      for (final sequence in sequences) {
+        await tester.pump(const Duration(milliseconds: 1400));
+        expect(find.byKey(const Key('dish-recall-prompt')), findsOneWidget);
+        for (final action in sequence) {
+          await tester.tap(find.byKey(Key('dish-$action')));
+          await tester.pump();
+        }
       }
 
       expect(find.byKey(const Key('work-result-card')), findsOneWidget);
@@ -1202,6 +1316,42 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('daily work limit resets visually on the next game day', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final base = const GameEngine().createNewGame('일거리 날짜 초기화 테스트');
+    final state = base.copyWith(
+      day: 2,
+      story: base.story.copyWith(
+        storyFlags: <String, dynamic>{
+          ...base.story.storyFlags,
+          'workDay': 1,
+          'workSessionsToday': 3,
+        },
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SeedMoneyHubScreen(state: state, onComplete: (_) async => state),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('오늘 0 / 3'), findsOneWidget);
+    expect(find.byKey(const Key('daily-work-limit')), findsNothing);
+    final dishes = tester.widget<InkWell>(
+      find.byKey(const Key('work-activity-dishes')),
+    );
+    expect(dishes.onTap, isNotNull);
+    dishes.onTap!();
+    await tester.pumpAndSettle();
+    expect(find.byType(DishwashingMiniGame), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
     'stationery mini-game sorts every item into its period shop shelf',
@@ -1276,14 +1426,20 @@ void main() {
       expect(find.textContaining('시간당 1,600원'), findsOneWidget);
 
       await tester.tap(find.byKey(const Key('work-activity-dishes')));
-      await tester.pumpAndSettle();
-      for (var dish = 0; dish < 5; dish++) {
-        await tester.tap(find.byKey(const Key('dish-rinse')));
-        await tester.pump();
-        await tester.tap(find.byKey(const Key('dish-scrub')));
-        await tester.pump();
-        await tester.tap(find.byKey(const Key('dish-finish')));
-        await tester.pump();
+      await tester.pump();
+      const sequences = <List<String>>[
+        ['rinse', 'scrub', 'finish'],
+        ['scrub', 'rinse', 'finish'],
+        ['rinse', 'rinse', 'finish'],
+        ['scrub', 'scrub', 'finish'],
+        ['rinse', 'scrub', 'finish'],
+      ];
+      for (final sequence in sequences) {
+        await tester.pump(const Duration(milliseconds: 1400));
+        for (final action in sequence) {
+          await tester.tap(find.byKey(Key('dish-$action')));
+          await tester.pump();
+        }
       }
       await tester.tap(find.byKey(const Key('claim-work-reward')));
       await tester.pumpAndSettle();
