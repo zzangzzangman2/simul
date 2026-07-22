@@ -445,7 +445,7 @@ void main() {
     );
     await tester.pump();
     await waitForMarketHome(tester);
-    expect(find.byKey(const Key('market-snapshot-card')), findsOneWidget);
+    expect(find.byKey(const Key('market-snapshot-card')), findsNothing);
     expect(find.byKey(const Key('market-ranking-table')), findsOneWidget);
     expect(find.byKey(const Key('market-investment-overview')), findsNothing);
     expect(find.byKey(const Key('market-account-summary')), findsNothing);
@@ -1144,7 +1144,10 @@ void main() {
 
       expect(button('market-jump-open-button').onPressed, isNotNull);
       expect(button('market-jump-close-button').onPressed, isNull);
-      expect(find.textContaining('09:00 전에는'), findsOneWidget);
+      expect(
+        tester.widget<Text>(find.byKey(const Key('market-header-status'))).data,
+        contains('개장 준비'),
+      );
 
       await tester.tap(find.byKey(const Key('market-jump-open-button')));
       await tester.pump();
@@ -1154,7 +1157,10 @@ void main() {
       expect(tester.widget<Text>(clock.first).data, contains('09:00'));
       expect(button('market-jump-open-button').onPressed, isNull);
       expect(button('market-jump-close-button').onPressed, isNotNull);
-      expect(find.textContaining('장중에는'), findsOneWidget);
+      expect(
+        tester.widget<Text>(find.byKey(const Key('market-header-status'))).data,
+        contains('KRX 정규장'),
+      );
       expect(
         find.byKey(const Key('market-session-open-dialog')),
         findsOneWidget,
@@ -1174,7 +1180,10 @@ void main() {
       expect(tester.widget<Text>(clock.first).data, contains('15:30'));
       expect(button('market-jump-open-button').onPressed, isNull);
       expect(button('market-jump-close-button').onPressed, isNull);
-      expect(find.textContaining('15:30 이후에는'), findsOneWidget);
+      expect(
+        tester.widget<Text>(find.byKey(const Key('market-header-status'))).data,
+        contains('오늘 장 마감'),
+      );
       expect(
         find.byKey(const Key('market-session-close-dialog')),
         findsOneWidget,
@@ -1187,11 +1196,8 @@ void main() {
       expect(button('market-jump-close-button').onPressed, isNull);
       expect(tester.widget<Text>(clock.first).data, contains('15:30'));
       expect(
-        find.descendant(
-          of: find.byKey(const Key('market-clock-bar')),
-          matching: find.text('오늘 장 마감'),
-        ),
-        findsOneWidget,
+        tester.widget<Text>(find.byKey(const Key('market-header-status'))).data,
+        contains('오늘 장 마감'),
       );
       expect(find.textContaining('NXT'), findsNothing);
       expect(find.byKey(const Key('market-session-open-dialog')), findsNothing);
