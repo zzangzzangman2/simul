@@ -20,9 +20,12 @@ void main() {
       marketClockAt(15 * 60 + 30).phase,
       MarketSessionPhase.closeSettlement,
     );
-    expect(marketClockAt(15 * 60 + 40).phase, MarketSessionPhase.nxtAfter);
+    expect(
+      marketClockAt(15 * 60 + 40).phase,
+      MarketSessionPhase.closeSettlement,
+    );
+    expect(marketClockAt(15 * 60 + 40).tradable, isFalse);
     expect(marketClockAt(20 * 60).phase, MarketSessionPhase.closed);
-    expect(marketClockAt(15 * 60 + 40).isGameExtension, isTrue);
   });
 
   test('weekends and fixed holidays are closed', () {
@@ -59,14 +62,8 @@ void main() {
     );
     expect(path[generatedPreOpenTicks + 1], isNot(10000));
     expect(path[krxCloseTick], 11200);
-    expect(
-      path
-          .sublist(krxCloseTick, krxCloseTick + generatedClosePauseTicks + 1)
-          .toSet(),
-      <double>{11200},
-    );
+    expect(path.sublist(krxCloseTick).toSet(), <double>{11200});
     expect(path.last, 11200);
-    expect(path.sublist(krxCloseTick + 1).toSet().length, greaterThan(2));
 
     final openingCandles = aggregateMarketCandles(
       path.sublist(generatedPreOpenTicks, generatedPreOpenTicks + 3),

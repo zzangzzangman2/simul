@@ -6,11 +6,8 @@ const generatedPreOpenTicks = 60;
 const generatedRegularSessionTicks = 450;
 const generatedRegularTradingTicks =
     generatedRegularSessionTicks - generatedPreOpenTicks;
-const generatedClosePauseTicks = 10;
-const generatedAfterHoursTicks =
-    generatedSessionTicks -
-    generatedRegularSessionTicks -
-    generatedClosePauseTicks;
+const generatedPostCloseTicks =
+    generatedSessionTicks - generatedRegularSessionTicks;
 
 class MarketCandle {
   const MarketCandle({
@@ -117,8 +114,8 @@ List<double> generatedMarketPath({
 /// 08:00~20:00 게임 하루의 1분 가격 경로.
 ///
 /// 08:00~08:59는 개장 전이라 이전 종가로 고정한다. 09:00부터 정규장
-/// 경로를 만들고 15:30(tick 450)에 실제 종가를 고정한다. 15:30~15:39의
-/// 마감 처리 구간도 종가로 유지한 뒤 15:40부터 게임용 확장장 경로를 잇는다.
+/// 경로를 만들고 15:30(tick 450)에 실제 종가를 고정한다. 정규장 마감 뒤에는
+/// 별도 확장장을 만들지 않고 20:00까지 같은 종가를 유지한다.
 List<double> generatedFullMarketDayPath({
   required double previousClose,
   required double officialClose,
@@ -130,17 +127,10 @@ List<double> generatedFullMarketDayPath({
     totalTicks: generatedRegularTradingTicks,
     seed: seed,
   );
-  final after = generatedMarketPath(
-    previousClose: officialClose,
-    officialClose: officialClose,
-    totalTicks: generatedAfterHoursTicks,
-    seed: seed ^ 0x5A17,
-  );
   return <double>[
     ...List<double>.filled(generatedPreOpenTicks, previousClose),
     ...regular,
-    ...List<double>.filled(generatedClosePauseTicks, officialClose),
-    ...after.skip(1),
+    ...List<double>.filled(generatedPostCloseTicks, officialClose),
   ];
 }
 

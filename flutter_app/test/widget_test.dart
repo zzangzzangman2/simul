@@ -1172,6 +1172,9 @@ void main() {
 
       await tester.pump(const Duration(seconds: 1));
       expect(button('market-jump-close-button').onPressed, isNull);
+      expect(tester.widget<Text>(clock.first).data, contains('15:30'));
+      expect(find.text('오늘 장 마감'), findsOneWidget);
+      expect(find.textContaining('NXT'), findsNothing);
       expect(find.byKey(const Key('market-session-open-dialog')), findsNothing);
       expect(
         find.byKey(const Key('market-session-close-dialog')),

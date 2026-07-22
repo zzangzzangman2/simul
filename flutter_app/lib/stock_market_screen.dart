@@ -212,7 +212,8 @@ class _StockMarketScreenState extends State<StockMarketScreen> {
         _isMarketSheetOpen ||
         _isShowingSessionNotice ||
         _loading ||
-        _tick >= generatedSessionTicks ||
+        _marketMinute >= krxCloseMinute ||
+        _tick >= krxCloseTick ||
         !_hasDomesticTradingSession) {
       return;
     }
@@ -309,7 +310,8 @@ class _StockMarketScreenState extends State<StockMarketScreen> {
     if (_isExecutingTrade ||
         _isTransferringCash ||
         _isClosing ||
-        _tick >= generatedSessionTicks) {
+        _marketMinute >= krxCloseMinute ||
+        _tick >= krxCloseTick) {
       return;
     }
     final previousMinute = _marketMinute;
@@ -442,7 +444,7 @@ class _StockMarketScreenState extends State<StockMarketScreen> {
   }
 
   Future<void> _advanceOneHour() =>
-      _advanceMarketTo(math.min(_marketMinute + 60, marketDayEndMinute));
+      _advanceMarketTo(math.min(_marketMinute + 60, krxCloseMinute));
 
   Future<void> _jumpToMarketOpen() => _advanceMarketTo(krxOpenMinute);
 
@@ -457,7 +459,7 @@ class _StockMarketScreenState extends State<StockMarketScreen> {
     }
     if (requestedMinute <= _marketMinute) return;
     final previousMinute = _marketMinute;
-    final targetMinute = math.min(requestedMinute, marketDayEndMinute);
+    final targetMinute = math.min(requestedMinute, krxCloseMinute);
     final targetTick = marketTickForMinute(targetMinute);
     _isAdvancingHour = true;
     _timer?.cancel();
@@ -966,7 +968,10 @@ class _StockMarketScreenState extends State<StockMarketScreen> {
                     minute: _marketMinute,
                     tradingDay: _hasDomesticTradingSession,
                     onAdvanceHour:
-                        _isAdvancingHour || _isClosing || _isExecutingTrade
+                        _isAdvancingHour ||
+                            _isClosing ||
+                            _isExecutingTrade ||
+                            _marketMinute >= krxCloseMinute
                         ? null
                         : _advanceOneHour,
                     onJumpToOpen:
@@ -2320,7 +2325,7 @@ class _MarketClockBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final info = marketClockAt(minute, tradingDay: tradingDay);
-    final ended = minute >= marketDayEndMinute;
+    final ended = minute >= krxCloseMinute;
     final isOpen = info.tradable && !ended;
     final quickJumpHint = !tradingDay
         ? '휴장일에는 장 시간 이동을 사용할 수 없어요.'
@@ -3887,7 +3892,11 @@ class _MinuteChartPanelState extends State<_MinuteChartPanel> {
         sessionHistory.length <= generatedPreOpenTicks) {
       return <double>[sessionHistory.last];
     }
-    final prices = sessionHistory.sublist(generatedPreOpenTicks);
+    final visibleEnd = math.min(
+      sessionHistory.length,
+      generatedRegularSessionTicks + 1,
+    );
+    final prices = sessionHistory.sublist(generatedPreOpenTicks, visibleEnd);
     if (prices.length <= targetPoints) return prices;
     return prices.sublist(prices.length - targetPoints);
   }
@@ -3931,7 +3940,7 @@ class _MinuteChartPanelState extends State<_MinuteChartPanel> {
     if (widget.minute < krxOpenMinute) {
       return <String>['', '', '개장 전 ${marketTimeLabel(widget.minute)}'];
     }
-    final endMinute = widget.minute.clamp(krxOpenMinute, marketDayEndMinute);
+    final endMinute = widget.minute.clamp(krxOpenMinute, krxCloseMinute);
     final elapsed = math.max(0, visiblePointCount - 1);
     final startMinute = math.max(krxOpenMinute, endMinute - elapsed);
     final middleMinute = startMinute + (endMinute - startMinute) ~/ 2;
@@ -4362,6 +4371,8 @@ class _TradingStatusRow extends StatelessWidget {
               ? '장 마감'
               : minute < krxOpenMinute
               ? '개장 전 · 09:00부터 1분봉 생성'
+              : minute >= krxCloseMinute
+              ? '정규장 마감 · 15:30 종가 고정'
               : '재현 장중 · 현실 1초마다 게임 1분 진행',
           style: const TextStyle(
             color: Color(0xFF596270),
