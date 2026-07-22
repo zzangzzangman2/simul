@@ -270,3 +270,82 @@ test("allows local Flutter Web preflight and rejects unknown origins", async () 
   );
   assert.equal(rejected.status, 403);
 });
+test("keeps the Flutter host fixed while the mobile keyboard shrinks the visual viewport", async () => {
+  const [flutterTemplate, flutterBootstrap] = await Promise.all([
+    readFile(new URL("../flutter_app/web/index.html", import.meta.url), "utf8"),
+    readFile(new URL("../flutter_app/web/flutter_bootstrap.js", import.meta.url), "utf8"),
+  ]);
+  const script = flutterTemplate.match(
+    /<script id="mobile-viewport-lock">([\s\S]*?)<\/script>/,
+  )?.[1];
+
+  assert.ok(script, "mobile viewport lock should be present");
+  assert.match(flutterTemplate, /id="flutter_host"/);
+  assert.match(flutterTemplate, /position:\s*fixed/);
+  assert.match(
+    flutterBootstrap,
+    /hostElement:\s*document\.getElementById\('flutter_host'\)/,
+  );
+
+  const cssProperties = new Map();
+  const viewportListeners = new Map();
+  const windowListeners = new Map();
+  const host = { style: {} };
+  const body = { scrollTop: 24 };
+  const root = {
+    clientHeight: 800,
+    style: {
+      setProperty(name, value) {
+        cssProperties.set(name, value);
+      },
+    },
+  };
+  const viewport = {
+    height: 800,
+    addEventListener(type, listener) {
+      viewportListeners.set(type, listener);
+    },
+  };
+  const fakeWindow = {
+    innerHeight: 800,
+    visualViewport: viewport,
+    scrollX: 0,
+    scrollY: 24,
+    addEventListener(type, listener) {
+      windowListeners.set(type, listener);
+    },
+    requestAnimationFrame(callback) {
+      callback();
+    },
+    setTimeout(callback) {
+      callback();
+    },
+    scrollTo(x, y) {
+      this.scrollX = x;
+      this.scrollY = y;
+    },
+  };
+  const document = {
+    documentElement: root,
+    body,
+    getElementById(id) {
+      return id === "flutter_host" ? host : null;
+    },
+  };
+
+  vm.runInNewContext(script, { document, window: fakeWindow });
+  assert.equal(cssProperties.get("--app-height"), "800px");
+  assert.equal(host.style.height, "800px");
+
+  fakeWindow.innerHeight = 480;
+  viewport.height = 480;
+  viewportListeners.get("resize")();
+  assert.equal(cssProperties.get("--app-height"), "800px");
+  assert.equal(host.style.height, "800px");
+
+  fakeWindow.scrollY = 160;
+  body.scrollTop = 160;
+  viewportListeners.get("scroll")();
+  assert.equal(fakeWindow.scrollY, 0);
+  assert.equal(body.scrollTop, 0);
+});

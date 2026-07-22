@@ -335,6 +335,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
         next,
         universe.corporateActionsOn(next.currentDate),
       );
+      next = next.copyWith(marketMinute: marketDayStartMinute);
       await _persistence.save(next);
       if (mounted) {
         setState(() {
@@ -1261,6 +1262,7 @@ class OfficeScreen extends StatelessWidget {
     this.onPlayChanceGame,
     this.onCompleteHubTutorial,
     this.onArchiveNews,
+    this.onBuildDailyNewspaper,
     required this.onCompleteWork,
     required this.onExecuteTrade,
     this.onTransferBrokerageCash,
@@ -1289,6 +1291,7 @@ class OfficeScreen extends StatelessWidget {
   final Future<void> Function()? onCompleteHubTutorial;
   final Future<void> Function(String headline, List<String> eventIds)?
   onArchiveNews;
+  final Future<DailyMarketNewspaper> Function(GameState)? onBuildDailyNewspaper;
   final Future<GameState> Function(WorkSessionResult) onCompleteWork;
   final Future<TradeExecutionResult> Function(TradeOrder) onExecuteTrade;
   final Future<FinanceActionResult> Function(int amount, bool deposit)?
@@ -1600,13 +1603,16 @@ class OfficeScreen extends StatelessWidget {
     final stopwatch = Stopwatch()..start();
     final client = DynamicNewsClient();
     DailyMarketNewspaper newspaper;
+    final closingDay = state.day;
     try {
       var closingState = state;
       if (closingState.marketMinute < marketDayEndMinute) {
         closingState = await onSetMarketMinute(marketDayEndMinute);
       }
       if (!context.mounted) return;
-      final baseNewspaper = await buildDailyMarketNewspaper(closingState);
+      final baseNewspaper = onBuildDailyNewspaper == null
+          ? await buildDailyMarketNewspaper(closingState)
+          : await onBuildDailyNewspaper!(closingState);
       final article = await client.generate(
         dynamicNewsRequestForState(
           closingState,
@@ -1633,15 +1639,19 @@ class OfficeScreen extends StatelessWidget {
       if (loadingRoute.isActive) navigator.removeRoute(loadingRoute);
     }
     if (!context.mounted) return;
-    final proceed = await navigator.push<bool>(
+    await navigator.push<bool>(
       _gameSceneRoute<bool>(KoreaEconomicNewspaperScene(newspaper: newspaper)),
     );
-    if (proceed != true || !context.mounted) return;
-    final previousDay = state.day;
-    final advancedState = await onAdvanceDay();
-    if (advancedState.day > previousDay &&
-        advancedState.marketMinute != marketDayStartMinute) {
-      await onSetMarketMinute(marketDayStartMinute);
+    if (!context.mounted) return;
+    var advancedState = await onAdvanceDay();
+    if (advancedState.day <= closingDay) {
+      throw StateError('신문을 닫은 뒤 다음 날짜로 진행하지 못했습니다.');
+    }
+    if (advancedState.marketMinute != marketDayStartMinute) {
+      advancedState = await onSetMarketMinute(marketDayStartMinute);
+    }
+    if (advancedState.marketMinute != marketDayStartMinute) {
+      throw StateError('다음 날 시작 시각을 08:00으로 저장하지 못했습니다.');
     }
   }
 
@@ -2100,7 +2110,7 @@ class KoreaEconomicNewspaperScene extends StatelessWidget {
                     caption: '가족이 식탁에 둘러앉아 오늘의 시장을 정리한다.',
                     minute: marketDayEndMinute,
                     costLabel: '하루 결산',
-                    onBack: () => Navigator.of(context).pop(false),
+                    onBack: () => Navigator.of(context).pop(true),
                   ),
                   Expanded(
                     child: KoreaEconomicNewspaperSheet(newspaper: newspaper),
@@ -2884,7 +2894,7 @@ class KoreaEconomicNewspaperSheet extends StatelessWidget {
                 ),
                 const Spacer(),
                 IconButton(
-                  onPressed: () => Navigator.of(context).pop(false),
+                  onPressed: () => Navigator.of(context).pop(true),
                   icon: const Icon(Icons.close_rounded),
                 ),
               ],
