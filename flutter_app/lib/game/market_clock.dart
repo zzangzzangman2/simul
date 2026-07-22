@@ -4,7 +4,6 @@ const marketDayStartMinute = 8 * 60;
 const krxOpenMinute = 9 * 60;
 const krxContinuousEndMinute = 15 * 60 + 20;
 const krxCloseMinute = 15 * 60 + 30;
-const nxtAfterStartMinute = 15 * 60 + 40;
 const marketDayEndMinute = 20 * 60;
 const marketTickMinutes = 1;
 const krxCloseTick = 450;
@@ -23,12 +22,10 @@ int advanceGameTime(int currentMinute, int elapsedMinutes) =>
     );
 
 enum MarketSessionPhase {
-  nxtPre,
   openingTransition,
   regular,
   closingAuction,
   closeSettlement,
-  nxtAfter,
   closed,
   holiday,
 }
@@ -39,13 +36,11 @@ class MarketClockInfo {
     required this.label,
     required this.description,
     required this.tradable,
-    this.isGameExtension = false,
   });
   final MarketSessionPhase phase;
   final String label;
   final String description;
   final bool tradable;
-  final bool isGameExtension;
 }
 
 const _krxClosedWeekdays = <String>{
@@ -159,21 +154,12 @@ MarketClockInfo marketClockAt(int minute, {bool tradingDay = true}) {
       tradable: true,
     );
   }
-  if (value < nxtAfterStartMinute) {
-    return const MarketClockInfo(
-      phase: MarketSessionPhase.closeSettlement,
-      label: '정규장 마감',
-      description: '15:30 종가 확정 · 확장장 준비',
-      tradable: false,
-    );
-  }
   if (value < marketDayEndMinute) {
     return const MarketClockInfo(
-      phase: MarketSessionPhase.nxtAfter,
-      label: 'NXT형 애프터마켓',
-      description: '15:40~20:00 · 게임용 확장 거래',
-      tradable: true,
-      isGameExtension: true,
+      phase: MarketSessionPhase.closeSettlement,
+      label: '오늘 장 마감',
+      description: '15:30 종가 확정 · 추가 거래 없음',
+      tradable: false,
     );
   }
   return const MarketClockInfo(
