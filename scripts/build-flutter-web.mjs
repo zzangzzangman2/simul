@@ -53,11 +53,21 @@ async function validateBuild() {
     await access(resolve(buildOutput, name));
   }
   const index = await readFile(resolve(buildOutput, "index.html"), "utf8");
+  const bootstrap = await readFile(resolve(buildOutput, "flutter_bootstrap.js"), "utf8");
   if (!index.includes('<base href="/play/">')) {
     throw new Error("Flutter build does not use the required /play/ base href.");
   }
   if (!index.includes('id="legacy-save-bridge"')) {
     throw new Error("Flutter build is missing the legacy localStorage bridge.");
+  }
+  if (!index.includes('id="flutter_host"') || !index.includes('id="mobile-viewport-lock"')) {
+    throw new Error("Flutter build is missing the fixed mobile viewport host.");
+  }
+  if (
+    !bootstrap.includes("hostElement:") ||
+    !bootstrap.includes("document.getElementById('flutter_host')")
+  ) {
+    throw new Error("Flutter bootstrap is not attached to the fixed host element.");
   }
 }
 
