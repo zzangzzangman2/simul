@@ -3998,7 +3998,7 @@ class _MinuteChartPanelState extends State<_MinuteChartPanel> {
   int interval = 1;
 
   static const minuteWindows = <int, int>{
-    1: 60,
+    1: 180,
     3: 240,
     5: 360,
     10: 480,
@@ -4010,22 +4010,25 @@ class _MinuteChartPanelState extends State<_MinuteChartPanel> {
   };
   _ChartPeriod period = _ChartPeriod.minute;
 
-  List<double> _visibleMinutePrices() {
+  ({List<double> prices, int startMinute}) _visibleMinuteSeries() {
     final targetMinutes = minuteWindows[interval] ?? 60;
     final targetPoints = targetMinutes + 1;
     final sessionHistory = widget.quote.sessionHistory;
     if (!widget.quote.isTradingDay ||
         widget.minute < krxOpenMinute ||
         sessionHistory.length <= generatedPreOpenTicks) {
-      return <double>[sessionHistory.last];
+      return (prices: <double>[sessionHistory.last], startMinute: 0);
     }
     final visibleEnd = math.min(
       sessionHistory.length,
       generatedRegularSessionTicks + 1,
     );
     final prices = sessionHistory.sublist(generatedPreOpenTicks, visibleEnd);
-    if (prices.length <= targetPoints) return prices;
-    return prices.sublist(prices.length - targetPoints);
+    if (prices.length <= targetPoints) {
+      return (prices: prices, startMinute: 0);
+    }
+    final startMinute = prices.length - targetPoints;
+    return (prices: prices.sublist(startMinute), startMinute: startMinute);
   }
 
   List<double> _historicalCloses() {
@@ -4132,6 +4135,7 @@ class _MinuteChartPanelState extends State<_MinuteChartPanel> {
     final window = minuteWindows[interval] ?? 60;
     final windowText = switch (window) {
       60 => '최대 최근 1시간',
+      180 => '최대 최근 3시간',
       240 => '최대 최근 4시간',
       360 => '최대 최근 6시간',
       480 => '최대 최근 8시간',
@@ -4147,12 +4151,18 @@ class _MinuteChartPanelState extends State<_MinuteChartPanel> {
 
   @override
   Widget build(BuildContext context) {
-    final minutePrices = _visibleMinutePrices();
+    final minuteSeries = _visibleMinuteSeries();
+    final minutePrices = minuteSeries.prices;
+    final candleSeed = widget.quote.history.isEmpty
+        ? widget.code.codeUnits.fold<int>(17, (sum, unit) => sum * 31 + unit)
+        : marketStockSeed(widget.code, widget.quote.history.last.parsedDate);
     final candles = period == _ChartPeriod.minute
         ? aggregateMarketCandles(
             minutePrices,
             interval,
             tickMinutes: marketTickMinutes,
+            seed: candleSeed,
+            startMinuteOffset: minuteSeries.startMinute,
           )
         : const <MarketCandle>[];
     final historicalCloses = period == _ChartPeriod.minute
@@ -4164,7 +4174,7 @@ class _MinuteChartPanelState extends State<_MinuteChartPanel> {
     return Column(
       children: [
         SizedBox(
-          height: 205,
+          height: 268,
           child: CustomPaint(
             key: Key(
               period == _ChartPeriod.minute
@@ -4334,6 +4344,13 @@ class _CandleChartPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     if (candles.isEmpty || size.isEmpty) return;
+    const axisWidth = 48.0;
+    const priceTop = 22.0;
+    final chartRight = math.max(1.0, size.width - axisWidth);
+    final volumeTop = size.height * 0.79;
+    final volumeBottom = size.height - 4;
+    final priceBottom = volumeTop - 16;
+    final priceHeight = math.max(1.0, priceBottom - priceTop);
     final values = candles
         .expand((candle) => <double>[candle.high, candle.low])
         .toList(growable: false);
@@ -4343,38 +4360,71 @@ class _CandleChartPainter extends CustomPainter {
       minValue *= 0.995;
       maxValue *= 1.005;
     }
-    final padding = (maxValue - minValue) * 0.08;
+    final padding = (maxValue - minValue) * 0.07;
     minValue -= padding;
     maxValue += padding;
     final range = maxValue - minValue;
     double yFor(double value) =>
-        size.height - ((value - minValue) / range * size.height);
+        priceBottom - ((value - minValue) / range * priceHeight);
+
+    void drawText(
+      String text,
+      Offset offset, {
+      Color color = const Color(0xFF8A919E),
+      double fontSize = 8,
+      FontWeight fontWeight = FontWeight.w700,
+    }) {
+      final painter = TextPainter(
+        text: TextSpan(
+          text: text,
+          style: TextStyle(
+            color: color,
+            fontSize: fontSize,
+            fontWeight: fontWeight,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout(maxWidth: axisWidth);
+      painter.paint(canvas, offset);
+    }
 
     final gridPaint = Paint()
       ..color = const Color(0xFFEFF1F4)
       ..strokeWidth = 1;
-    for (var line = 1; line < 4; line++) {
-      final y = size.height * line / 4;
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
+    for (var line = 0; line <= 4; line++) {
+      final y = priceTop + priceHeight * line / 4;
+      canvas.drawLine(Offset(0, y), Offset(chartRight, y), gridPaint);
+      final value = maxValue - range * line / 4;
+      drawText(
+        _money(value.round()),
+        Offset(chartRight + 5, y - 5),
+        fontSize: 8,
+      );
+    }
+    for (var line = 1; line < 5; line++) {
+      final x = chartRight * line / 5;
+      canvas.drawLine(Offset(x, priceTop), Offset(x, volumeBottom), gridPaint);
     }
 
     if (previousClose >= minValue && previousClose <= maxValue) {
       final baselineY = yFor(previousClose);
       final baselinePaint = Paint()
-        ..color = const Color(0xFFB8BEC7)
+        ..color = const Color(0xFFC2C8D0)
         ..strokeWidth = 1;
-      for (var x = 0.0; x < size.width; x += 7) {
+      for (var x = 0.0; x < chartRight; x += 7) {
         canvas.drawLine(
           Offset(x, baselineY),
-          Offset(math.min(x + 3, size.width), baselineY),
+          Offset(math.min(x + 3, chartRight), baselineY),
           baselinePaint,
         );
       }
     }
 
     final visible = candles;
-    final slot = size.width / math.max(visible.length, 1);
-    final bodyWidth = math.max(2.0, math.min(8.0, slot * 0.58));
+    final slot = chartRight / math.max(visible.length, 1);
+    final bodyWidth = math.max(1.6, math.min(6.0, slot * 0.62));
+    canvas.save();
+    canvas.clipRect(Rect.fromLTRB(0, priceTop, chartRight, priceBottom));
     for (var index = 0; index < visible.length; index++) {
       final candle = visible[index];
       final x = slot * index + slot / 2;
@@ -4395,6 +4445,138 @@ class _CandleChartPainter extends CustomPainter {
       canvas.drawRect(
         Rect.fromLTWH(x - bodyWidth / 2, top, bodyWidth, height),
         paint,
+      );
+    }
+
+    List<double?> movingAverage(int count) {
+      final values = List<double?>.filled(visible.length, null);
+      var sum = 0.0;
+      for (var index = 0; index < visible.length; index++) {
+        sum += visible[index].close;
+        if (index >= count) sum -= visible[index - count].close;
+        if (index >= count - 1) values[index] = sum / count;
+      }
+      return values;
+    }
+
+    void drawMovingAverage(int count, Color color, double width) {
+      final average = movingAverage(count);
+      final path = Path();
+      var started = false;
+      for (var index = 0; index < average.length; index++) {
+        final value = average[index];
+        if (value == null) continue;
+        final point = Offset(slot * index + slot / 2, yFor(value));
+        if (!started) {
+          path.moveTo(point.dx, point.dy);
+          started = true;
+        } else {
+          path.lineTo(point.dx, point.dy);
+        }
+      }
+      if (!started) return;
+      canvas.drawPath(
+        path,
+        Paint()
+          ..color = color
+          ..strokeWidth = width
+          ..style = PaintingStyle.stroke
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round,
+      );
+    }
+
+    drawMovingAverage(5, const Color(0xFF00A99D), 1.25);
+    drawMovingAverage(20, const Color(0xFFF04452), 1.15);
+    drawMovingAverage(60, const Color(0xFFFF8A00), 1.1);
+    drawMovingAverage(120, const Color(0xFF8B3FD1), 1.05);
+    canvas.restore();
+
+    drawText('이동평균', const Offset(2, 2), fontSize: 8);
+    drawText(
+      '5',
+      const Offset(39, 2),
+      color: const Color(0xFF00A99D),
+      fontSize: 8,
+      fontWeight: FontWeight.w900,
+    );
+    drawText(
+      '20',
+      const Offset(50, 2),
+      color: const Color(0xFFF04452),
+      fontSize: 8,
+      fontWeight: FontWeight.w900,
+    );
+    drawText(
+      '60',
+      const Offset(67, 2),
+      color: const Color(0xFFFF8A00),
+      fontSize: 8,
+      fontWeight: FontWeight.w900,
+    );
+    drawText(
+      '120',
+      const Offset(85, 2),
+      color: const Color(0xFF8B3FD1),
+      fontSize: 8,
+      fontWeight: FontWeight.w900,
+    );
+
+    final current = visible.last.close;
+    final currentY = yFor(current).clamp(priceTop, priceBottom);
+    final currentPaint = Paint()
+      ..color = const Color(0xFF3182F6)
+      ..strokeWidth = 1;
+    for (var x = 0.0; x < chartRight; x += 5) {
+      canvas.drawLine(
+        Offset(x, currentY),
+        Offset(math.min(x + 2, chartRight), currentY),
+        currentPaint,
+      );
+    }
+    final priceLabelRect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(chartRight, currentY - 9, axisWidth, 18),
+      const Radius.circular(3),
+    );
+    canvas.drawRRect(priceLabelRect, Paint()..color = const Color(0xFF3182F6));
+    drawText(
+      _money(current.round()),
+      Offset(chartRight + 4, currentY - 5.5),
+      color: Colors.white,
+      fontSize: 8,
+      fontWeight: FontWeight.w900,
+    );
+
+    final volumeDividerY = volumeTop - 8;
+    canvas.drawLine(
+      Offset(0, volumeDividerY),
+      Offset(size.width, volumeDividerY),
+      Paint()
+        ..color = const Color(0xFFD8DDE4)
+        ..strokeWidth = 1,
+    );
+    drawText('거래량', Offset(2, volumeTop - 5), fontSize: 8);
+    final maxVolume = visible
+        .map((candle) => candle.volume)
+        .fold<double>(1, math.max);
+    final volumeChartTop = volumeTop + 9;
+    final volumeHeight = math.max(1.0, volumeBottom - volumeChartTop);
+    for (var index = 0; index < visible.length; index++) {
+      final candle = visible[index];
+      final x = slot * index + slot / 2;
+      final barHeight = candle.volume <= 0
+          ? 0.8
+          : math.max(1.0, candle.volume / maxVolume * volumeHeight);
+      final rising = candle.close >= candle.open;
+      canvas.drawRect(
+        Rect.fromLTWH(
+          x - bodyWidth / 2,
+          volumeBottom - barHeight,
+          bodyWidth,
+          barHeight,
+        ),
+        Paint()
+          ..color = rising ? const Color(0xCCF04452) : const Color(0xCC3182F6),
       );
     }
   }

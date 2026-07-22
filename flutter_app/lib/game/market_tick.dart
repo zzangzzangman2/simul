@@ -16,6 +16,7 @@ class MarketCandle {
     required this.low,
     required this.close,
     required this.startMinute,
+    this.volume = 0,
   });
 
   final double open;
@@ -23,6 +24,7 @@ class MarketCandle {
   final double low;
   final double close;
   final int startMinute;
+  final double volume;
 }
 
 /// 실제 이전 종가에서 실제 당일 종가로 이어지는 비주기적 게임용 장중 경로.
@@ -154,6 +156,8 @@ List<MarketCandle> aggregateMarketCandles(
   List<double> prices,
   int intervalMinutes, {
   int tickMinutes = 1,
+  int? seed,
+  int startMinuteOffset = 0,
 }) {
   if (prices.isEmpty) return const <MarketCandle>[];
   if (intervalMinutes <= 0 || tickMinutes <= 0) {
@@ -172,13 +176,45 @@ List<MarketCandle> aggregateMarketCandles(
   for (var start = 0; start < prices.length - 1; start += interval) {
     final end = math.min(start + interval, prices.length - 1);
     final slice = prices.sublist(start, end + 1);
+    var high = slice.reduce(math.max);
+    var low = slice.reduce(math.min);
+    var volume = 0.0;
+    if (seed != null) {
+      for (var index = start; index < end; index++) {
+        final open = prices[index];
+        final close = prices[index + 1];
+        final absoluteMinute = startMinuteOffset + index * tickMinutes;
+        final reference = math.max((open + close) / 2, 1).toDouble();
+        final tickSize = _tickSize(reference);
+        final body = (close - open).abs();
+        final wickRange = math.max(body * 0.42, tickSize * 2.0);
+        final upperWick = math.max(
+          tickSize,
+          wickRange * (0.18 + _unit(seed, absoluteMinute * 17 + 1009) * 0.62),
+        );
+        final lowerWick = math.max(
+          tickSize,
+          wickRange * (0.18 + _unit(seed, absoluteMinute * 23 + 2027) * 0.62),
+        );
+        final minuteHigh = math.max(open, close) + upperWick;
+        final minuteLow = math.max(tickSize, math.min(open, close) - lowerWick);
+        high = math.max(high, minuteHigh);
+        low = math.min(low, minuteLow);
+
+        final changeRate = body / reference;
+        final activity = 0.65 + changeRate * 180;
+        final noise = 0.6 + _unit(seed, absoluteMinute * 31 + 3037) * 1.25;
+        volume += (120 + (seed.abs() % 880)) * activity * noise;
+      }
+    }
     candles.add(
       MarketCandle(
         open: slice.first,
-        high: slice.reduce(math.max),
-        low: slice.reduce(math.min),
+        high: high,
+        low: low,
         close: slice.last,
-        startMinute: start,
+        startMinute: startMinuteOffset + start * tickMinutes,
+        volume: volume,
       ),
     );
   }

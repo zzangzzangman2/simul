@@ -153,6 +153,30 @@ void main() {
     expect(candles.last.close, 102);
   });
 
+  test('seeded one-minute candles include wicks and reproducible volume', () {
+    final candles = aggregateMarketCandles(
+      <double>[10000, 10020, 9990, 10040],
+      1,
+      seed: 77,
+      startMinuteOffset: 45,
+    );
+    final repeated = aggregateMarketCandles(
+      <double>[10000, 10020, 9990, 10040],
+      1,
+      seed: 77,
+      startMinuteOffset: 45,
+    );
+
+    expect(candles, hasLength(3));
+    expect(candles.first.startMinute, 45);
+    expect(candles.first.high, greaterThan(10020));
+    expect(candles.first.low, lessThan(10000));
+    expect(candles.first.volume, greaterThan(0));
+    expect(repeated.first.high, candles.first.high);
+    expect(repeated.first.low, candles.first.low);
+    expect(repeated.first.volume, candles.first.volume);
+  });
+
   test('candle labels respect the duration of each generated tick', () {
     final candles = aggregateMarketCandles(
       <double>[100, 101, 102, 103, 104],
