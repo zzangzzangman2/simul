@@ -2,7 +2,15 @@ import 'dart:math' as math;
 
 /// 08:00~20:00을 실제 게임 시각 1분 단위로 재현하는 전체 틱 수.
 const generatedSessionTicks = 720;
+const generatedPreOpenTicks = 60;
 const generatedRegularSessionTicks = 450;
+const generatedRegularTradingTicks =
+    generatedRegularSessionTicks - generatedPreOpenTicks;
+const generatedClosePauseTicks = 10;
+const generatedAfterHoursTicks =
+    generatedSessionTicks -
+    generatedRegularSessionTicks -
+    generatedClosePauseTicks;
 
 class MarketCandle {
   const MarketCandle({
@@ -106,8 +114,11 @@ List<double> generatedMarketPath({
   return result;
 }
 
-/// 08:00~20:00??寃뚯엫 ?섎（ 寃쎈줈. 15:30(tick 150)???ㅼ젣 醫낃?瑜?怨좎젙?섍퀬,
-/// ?댄썑 NXT???뺤옣?μ? 醫낃? 二쇰??먯꽌 ?吏곸씤 ??20:00???ㅼ떆 醫낃?濡??ル뒗??
+/// 08:00~20:00 게임 하루의 1분 가격 경로.
+///
+/// 08:00~08:59는 개장 전이라 이전 종가로 고정한다. 09:00부터 정규장
+/// 경로를 만들고 15:30(tick 450)에 실제 종가를 고정한다. 15:30~15:39의
+/// 마감 처리 구간도 종가로 유지한 뒤 15:40부터 게임용 확장장 경로를 잇는다.
 List<double> generatedFullMarketDayPath({
   required double previousClose,
   required double officialClose,
@@ -116,16 +127,21 @@ List<double> generatedFullMarketDayPath({
   final regular = generatedMarketPath(
     previousClose: previousClose,
     officialClose: officialClose,
-    totalTicks: generatedRegularSessionTicks,
+    totalTicks: generatedRegularTradingTicks,
     seed: seed,
   );
   final after = generatedMarketPath(
     previousClose: officialClose,
     officialClose: officialClose,
-    totalTicks: generatedSessionTicks - generatedRegularSessionTicks,
+    totalTicks: generatedAfterHoursTicks,
     seed: seed ^ 0x5A17,
   );
-  return <double>[...regular, ...after.skip(1)];
+  return <double>[
+    ...List<double>.filled(generatedPreOpenTicks, previousClose),
+    ...regular,
+    ...List<double>.filled(generatedClosePauseTicks, officialClose),
+    ...after.skip(1),
+  ];
 }
 
 double generatedMarketTick({
@@ -160,17 +176,7 @@ List<MarketCandle> aggregateMarketCandles(
     );
   }
   final interval = math.max(1, intervalMinutes ~/ tickMinutes);
-  if (prices.length == 1) {
-    return <MarketCandle>[
-      MarketCandle(
-        open: prices.first,
-        high: prices.first,
-        low: prices.first,
-        close: prices.first,
-        startMinute: 0,
-      ),
-    ];
-  }
+  if (prices.length == 1) return const <MarketCandle>[];
 
   final candles = <MarketCandle>[];
   for (var start = 0; start < prices.length - 1; start += interval) {

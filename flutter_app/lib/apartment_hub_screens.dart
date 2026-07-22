@@ -2,6 +2,11 @@ part of 'main.dart';
 
 enum _ApartmentPlace { bedroom, livingRoom, kitchen }
 
+String _apartmentDateLabel(DateTime date) {
+  const weekdays = <String>['월요일', '화요일', '수요일', '목요일', '금요일', '토요일', '일요일'];
+  return '${date.month}월 ${date.day}일 ${weekdays[date.weekday - 1]}';
+}
+
 class ApartmentHubScreen extends StatefulWidget {
   const ApartmentHubScreen({
     super.key,
@@ -453,7 +458,7 @@ class _ApartmentLocationHeader extends StatelessWidget {
                       _ApartmentHudChip(
                         icon: Icons.calendar_today_rounded,
                         label:
-                            'DAY ${state.day} · ${marketTimeLabel(state.marketMinute)}',
+                            '${_apartmentDateLabel(state.currentDate)} · ${marketTimeLabel(state.marketMinute)}',
                       ),
                       const SizedBox(width: 5),
                       _ApartmentHudChip(

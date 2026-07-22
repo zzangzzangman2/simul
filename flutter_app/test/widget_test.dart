@@ -183,7 +183,7 @@ void main() {
       find.byKey(const Key('company-header-title')),
     );
     expect(companyHeader.data, '이어하기 연구소');
-    expect(find.textContaining('DAY 8'), findsWidgets);
+    expect(find.textContaining('1월 8일 토요일'), findsWidgets);
     expect(find.byKey(const Key('room-company-name')), findsOneWidget);
   });
 
@@ -221,7 +221,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('decision-inbox-screen')), findsNothing);
     expect(find.text('안건 편지'), findsOneWidget);
-    expect(find.text('DAY 1 · 08:30'), findsOneWidget);
+    expect(find.text('1월 1일 토요일 · 08:30'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -404,7 +404,7 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final state = const GameEngine()
         .createNewGame('별빛 투자', initialCash: 1000000)
-        .copyWith(day: 4);
+        .copyWith(day: 4, marketMinute: krxOpenMinute);
     const engine = GameEngine();
     final persistence = GamePersistence();
     var current = state;
@@ -486,7 +486,7 @@ void main() {
     }
     final after = tester.widget<Text>(clock.first).data;
     expect(after, isNot(before));
-    expect(after, contains('08:01'));
+    expect(after, contains('09:01'));
 
     await tester.ensureVisible(find.byKey(const Key('stock-row-005930')));
     await tester.pump();
@@ -499,7 +499,7 @@ void main() {
     expect(find.byKey(const Key('minute-interval-selector')), findsOneWidget);
     expect(find.byKey(const Key('minute-candle-chart')), findsOneWidget);
     expect(find.byKey(const Key('chart-time-axis')), findsOneWidget);
-    expect(find.textContaining('전일 '), findsWidgets);
+    expect(find.text('재현 장중 · 현실 1초마다 게임 1분 진행'), findsOneWidget);
     expect(
       tester.widget<Text>(find.byKey(const Key('chart-window-label'))).data,
       contains('최대 최근 1시간'),
@@ -542,7 +542,10 @@ void main() {
       220,
       scrollable: find.byType(Scrollable).last,
     );
+    await tester.drag(find.byType(Scrollable).last, const Offset(0, -140));
+    await tester.pump();
     await tester.tap(find.byKey(const Key('open-market-research-note')));
+    await tester.pump();
     await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const Key('market-research-note-input')),
@@ -945,6 +948,48 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('pre-open clock advances but price and one-minute candles wait', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final state = const GameEngine()
+        .createNewGame('Pre-open Market Test', initialCash: 1000000)
+        .copyWith(day: 4, marketMinute: marketDayStartMinute);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StockMarketScreen(state: state, universe: testMarketUniverse()),
+      ),
+    );
+    await openMarketExplore(tester);
+    await tester.ensureVisible(find.byKey(const Key('stock-row-005930')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('stock-row-005930')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.byKey(const Key('stock-detail-price')), findsOneWidget);
+    expect(find.text('개장 전 · 09:00부터 1분봉 생성'), findsOneWidget);
+    expect(
+      tester.widget<Text>(find.byKey(const Key('chart-window-label'))).data,
+      contains('0개 캔들'),
+    );
+    final detailPrice = find.byKey(const Key('stock-detail-price'));
+    final priceBeforeOpen = tester.widget<Text>(detailPrice).data;
+
+    await tester.pump(const Duration(seconds: 2));
+
+    expect(tester.widget<Text>(detailPrice).data, priceBeforeOpen);
+    expect(
+      tester
+          .widget<Text>(find.byKey(const Key('market-phone-status-time')))
+          .data,
+      contains('08:'),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'market clock pauses while the brokerage transfer sheet is open',
     (tester) async {
@@ -1189,7 +1234,7 @@ void main() {
 
     var current = const GameEngine()
         .createNewGame('Trade Failure Test', initialCash: 1000000)
-        .copyWith(day: 4);
+        .copyWith(day: 4, marketMinute: krxOpenMinute);
     await tester.pumpWidget(
       MaterialApp(
         home: StockMarketScreen(
