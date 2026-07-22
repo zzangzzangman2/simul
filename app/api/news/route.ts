@@ -9,6 +9,32 @@ import {
   parseDynamicNewsRequest,
 } from "@/lib/dynamic-news";
 
+const rateBuckets = new Map<string, { startedAt: number; count: number }>();
+const RATE_WINDOW_MS = 60_000;
+const RATE_LIMIT = 10;
+
+function requestKey(request: Request) {
+  const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  return forwarded || request.headers.get("x-real-ip") || request.headers.get("origin") || "local";
+}
+
+function isRateLimited(request: Request) {
+  const now = Date.now();
+  const key = requestKey(request);
+  const bucket = rateBuckets.get(key);
+  if (!bucket || now - bucket.startedAt >= RATE_WINDOW_MS) {
+    rateBuckets.set(key, { startedAt: now, count: 1 });
+    return false;
+  }
+  bucket.count += 1;
+  if (rateBuckets.size > 1000) {
+    for (const [entryKey, entry] of rateBuckets) {
+      if (now - entry.startedAt >= RATE_WINDOW_MS) rateBuckets.delete(entryKey);
+    }
+  }
+  return bucket.count > RATE_LIMIT;
+}
+
 function allowedOrigin(request: Request) {
   const origin = request.headers.get("origin");
   if (!origin) return null;
@@ -58,6 +84,13 @@ export function OPTIONS(request: Request) {
 export async function POST(request: Request) {
   if (request.headers.has("origin") && !allowedOrigin(request)) {
     return jsonResponse(request, { error: "허용되지 않은 요청 출처입니다." }, 403);
+  }
+  if (isRateLimited(request)) {
+    return jsonResponse(request, { error: "뉴스 요청이 너무 많습니다. 잠시 뒤 다시 시도해 주세요." }, 429);
+  }
+  const length = Number(request.headers.get("content-length") || 0);
+  if (length > 4096) {
+    return jsonResponse(request, { error: "요청 본문이 너무 큽니다." }, 413);
   }
 
   let body: unknown;

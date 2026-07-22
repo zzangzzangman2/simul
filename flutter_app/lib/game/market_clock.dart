@@ -7,8 +7,11 @@ const krxContinuousEndMinute = 15 * 60 + 20;
 const krxCloseMinute = 15 * 60 + 30;
 const nxtAfterStartMinute = 15 * 60 + 40;
 const marketDayEndMinute = 20 * 60;
-const marketTickMinutes = 3;
-const krxCloseTick = 150;
+const marketTickMinutes = 1;
+const krxCloseTick = 450;
+
+/// 주식시장 화면이 열려 있을 때 현실 1초마다 게임 시각 1분을 진행한다.
+const marketRealtimeTickDuration = Duration(seconds: 1);
 
 const decisionActionMinutes = 30;
 const familyHelpActionMinutes = 30;
@@ -46,18 +49,81 @@ class MarketClockInfo {
   final bool isGameExtension;
 }
 
+const _krxClosedWeekdays = <String>{
+  '2000-01-03',
+  '2005-12-30',
+  '2006-01-30',
+  '2006-03-01',
+  '2006-05-01',
+  '2006-05-05',
+  '2006-06-06',
+  '2006-07-17',
+  '2006-08-15',
+  '2006-10-03',
+  '2006-10-05',
+  '2006-10-06',
+  '2006-12-25',
+  '2006-12-29',
+  '2007-01-01',
+  '2007-02-19',
+  '2007-03-02',
+  '2007-05-01',
+  '2007-05-24',
+  '2007-06-06',
+  '2007-07-17',
+  '2007-08-15',
+  '2007-09-24',
+  '2007-09-25',
+  '2007-09-26',
+  '2007-10-03',
+  '2007-12-19',
+  '2007-12-25',
+  '2007-12-31',
+  '2008-01-01',
+  '2008-02-06',
+  '2008-02-07',
+  '2008-02-08',
+  '2008-04-09',
+  '2009-01-01',
+  '2009-01-26',
+  '2009-01-27',
+  '2009-05-01',
+  '2009-05-05',
+  '2009-10-02',
+  '2009-12-25',
+  '2009-12-31',
+  '2010-01-01',
+  '2010-02-15',
+  '2010-03-01',
+  '2010-05-05',
+  '2010-05-21',
+  '2010-06-02',
+  '2010-09-21',
+  '2010-09-22',
+  '2010-09-23',
+  '2010-12-31',
+};
+
+String marketDateKey(DateTime date) =>
+    '${date.year.toString().padLeft(4, '0')}-'
+    '${date.month.toString().padLeft(2, '0')}-'
+    '${date.day.toString().padLeft(2, '0')}';
+
 bool isMarketTradingDay(DateTime date) {
   if (date.weekday >= DateTime.saturday) return false;
-  return switch ((date.month, date.day)) {
+  final fixedHoliday = switch ((date.month, date.day)) {
     (1, 1) ||
     (3, 1) ||
+    (5, 1) ||
     (5, 5) ||
     (6, 6) ||
+    (7, 17) ||
     (8, 15) ||
     (10, 3) ||
-    (12, 25) => false,
-    _ => true,
+    (12, 25) => true,
+    _ => false,
   };
+  return !fixedHoliday && !_krxClosedWeekdays.contains(marketDateKey(date));
 }
 
 MarketClockInfo marketClockAt(int minute, {bool tradingDay = true}) {

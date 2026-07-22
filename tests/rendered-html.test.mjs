@@ -32,18 +32,18 @@ test("opens the Flutter family-story prologue from the default route", async () 
   assert.match(flutterIndex, /<base href="\/play\/">/);
   assert.match(flutterIndex, /flutter_bootstrap\.js/);
   assert.doesNotMatch(flutterIndex, /투자회사 설립/);
-  assert.match(flutterIndex, /창립자 1명이 초기자본 100만원/);
-  assert.match(flutterIndex, /₩1,000,000/);
+  assert.match(flutterIndex, /창립자 1명이 현금 0원/);
+  assert.match(flutterIndex, /종잣돈 1만원을 직접/);
   assert.match(flutterIndex, /property="og:image" content="\/og-apartment-v2\.png"/);
   assert.match(flutterIndex, /name="twitter:card" content="summary_large_image"/);
-  assert.doesNotMatch(flutterIndex, /현금 0원/);
+  assert.doesNotMatch(flutterIndex, /초기자본 100만원/);
   assert.match(onboarding, /1999\.12\.31\s+·\s+23:57/);
-  assert.match(onboarding, /우리 투자회사의 이름/);
-  assert.match(onboarding, /100만원/);
-  assert.match(layout, /100만원으로 시작하는 투자회사/);
+  assert.match(onboarding, /우리 투자연구소 이름/);
+  assert.match(onboarding, /0원부터 첫날 시작하기/);
+  assert.match(layout, /0원에서 시작하는 투자회사/);
   assert.match(layout, /images: \[\{ url: `\$\{origin\}\/og-apartment-v2\.png`, width: 1672, height: 941/);
   assert.match(layout, /themeColor: "#151B29"/);
-  assert.doesNotMatch(layout, /0원에서 시작/);
+  assert.doesNotMatch(layout, /100만원으로 시작/);
   assert.ok(socialCard.byteLength > 1_000_000);
 });
 
@@ -80,12 +80,16 @@ test("bridges a legacy React save before Flutter starts without overwriting Flut
 
   const legacyKey = "simul-millennium-capital-v1";
   const flutterKey = `flutter.${legacyKey}`;
+  const bridgeMarkerKey = `${legacyKey}-flutter-bridge-v1`;
   const legacySave = JSON.stringify({ version: 3, companyName: "가족 투자연구소" });
   const migrated = runBridge({ [legacyKey]: legacySave });
   const encodedLegacySave = JSON.stringify(legacySave);
   assert.equal(migrated.storage.get(flutterKey), encodedLegacySave);
   assert.equal(JSON.parse(migrated.storage.get(flutterKey)), legacySave);
-  assert.deepEqual(migrated.writes, [[flutterKey, encodedLegacySave]]);
+  assert.deepEqual(migrated.writes, [
+    [flutterKey, encodedLegacySave],
+    [bridgeMarkerKey, "1"],
+  ]);
 
   const flutterSave = JSON.stringify({ version: 8, companyName: "새 연구소" });
   const preserved = runBridge({
@@ -93,7 +97,14 @@ test("bridges a legacy React save before Flutter starts without overwriting Flut
     [flutterKey]: flutterSave,
   });
   assert.equal(preserved.storage.get(flutterKey), flutterSave);
-  assert.deepEqual(preserved.writes, []);
+  assert.deepEqual(preserved.writes, [[bridgeMarkerKey, "1"]]);
+
+  const deletedAfterMigration = runBridge({
+    [legacyKey]: legacySave,
+    [bridgeMarkerKey]: "1",
+  });
+  assert.equal(deletedAfterMigration.storage.get(flutterKey), undefined);
+  assert.deepEqual(deletedAfterMigration.writes, []);
   assert.deepEqual(runBridge({}).writes, []);
   assert.deepEqual(runBridge({ [legacyKey]: "not-json" }).writes, []);
   assert.deepEqual(
@@ -110,20 +121,20 @@ test("keeps Flutter launch metadata aligned with the current starting conditions
   const parsedManifest = JSON.parse(manifest);
 
   assert.match(flutterTemplate, /2000년 1월 1일/);
-  assert.match(flutterTemplate, /창립자 1명이 초기자본 100만원/);
-  assert.match(flutterTemplate, /₩1,000,000/);
+  assert.match(flutterTemplate, /창립자 1명이 현금 0원/);
+  assert.match(flutterTemplate, /종잣돈 1만원을 직접/);
   assert.match(flutterTemplate, /property="og:image" content="\/og-apartment-v2\.png"/);
   assert.match(flutterTemplate, /name="twitter:image" content="\/og-apartment-v2\.png"/);
-  assert.doesNotMatch(flutterTemplate, /현금 0원/);
+  assert.doesNotMatch(flutterTemplate, /초기자본 100만원/);
   assert.match(parsedManifest.description, /2000년 1월 1일/);
-  assert.match(parsedManifest.description, /창립자 1명이 초기자본 100만원/);
-  assert.match(parsedManifest.description, /₩1,000,000/);
-  assert.doesNotMatch(parsedManifest.description, /현금 0원/);
+  assert.match(parsedManifest.description, /창립자 1명이 현금 0원/);
+  assert.match(parsedManifest.description, /종잣돈 1만원을 직접/);
+  assert.doesNotMatch(parsedManifest.description, /초기자본 100만원/);
 });
 
 test("ships a complete daily 2000-2010 market snapshot", async () => {
   const data = JSON.parse(await readFile(new URL("../app/data/market-history.json", import.meta.url), "utf8"));
-  assert.equal(data.schemaVersion, 3);
+  assert.equal(data.schemaVersion, 4);
   assert.equal(data.period.start, "2000-01-01");
   assert.equal(data.period.end, "2010-12-31");
   assert.equal(data.assets.length, 28);
@@ -138,8 +149,16 @@ test("ships a complete daily 2000-2010 market snapshot", async () => {
     assert.ok(dates[0] >= "1999-12-01" && dates[0] <= "2000-04-28");
     assert.ok(dates.at(-1) >= "2010-12-30");
     assert.ok(dates.every((date) => /^\d{4}-\d{2}-\d{2}$/.test(date)));
-    assert.ok(Object.values(asset.prices).every(Number.isFinite));
+    assert.ok(Object.values(asset.prices).every((price) => Number.isFinite(price) && price > 0));
+    assert.ok(Array.isArray(asset.corporateActions));
   }
+
+  const actions = data.assets.flatMap((asset) => asset.corporateActions);
+  assert.equal(actions.length, 299);
+  assert.equal(new Set(actions.map((action) => action.id)).size, actions.length);
+  assert.ok(actions.some((action) => action.type === "split"));
+  assert.ok(actions.some((action) => action.type === "dividend"));
+  assert.ok(actions.every((action) => /^\d{4}-\d{2}-\d{2}$/.test(action.date)));
 });
 
 test("documents and preserves the portrait-mobile product contract", async () => {
@@ -153,8 +172,9 @@ test("documents and preserves the portrait-mobile product contract", async () =>
 
   assert.match(rules, /390×844px/);
   assert.match(rules, /최소 360px/);
-  assert.match(guide, /첫 방문 시 가족 스토리 프롤로그/);
-  assert.match(guide, /현재 스키마는 버전 `9`/);
+  assert.match(guide, /처음하기.*이어하기/);
+  assert.match(guide, /현재 상태 스키마는 `v13`/);
+  assert.match(guide, /최대 5슬롯/);
   assert.doesNotMatch(rules, /게임 화면보다 먼저 회사 이름/);
   assert.doesNotMatch(guide, /첫 방문 시 회사 이름 입력 화면/);
   assert.doesNotMatch(guide, /작은 원룸 사무실에서 시작/);
@@ -164,7 +184,7 @@ test("documents and preserves the portrait-mobile product contract", async () =>
   assert.match(game, /companyName: string/);
   assert.match(game, /version: 3/);
   assert.match(game, /currentDate: string/);
-  assert.match(game, /INITIAL_CAPITAL = 1_000_000/);
+  assert.match(game, /INITIAL_CAPITAL = 0/);
   assert.match(game, /INITIAL_TEAM = 1/);
   assert.match(game, /maxLength=\{24\}/);
   assert.match(game, /simul-millennium-capital-v1/);
@@ -208,7 +228,10 @@ test("keeps Gemini credentials server-side and forces the news JSON schema", asy
   ]);
 
   assert.match(route, /export async function POST/);
-  assert.match(generator, /gemini-3\.5-flash/);
+  assert.match(generator, /gemini-3\.6-flash/);
+  assert.match(generator, /ThinkingLevel\.MEDIUM/);
+  assert.doesNotMatch(generator, /temperature:/);
+  assert.match(generator, /maxOutputTokens: 2048/);
   assert.match(generator, /vertexai: true/);
   assert.match(generator, /responseMimeType: "application\/json"/);
   assert.match(generator, /responseJsonSchema: articleSchema/);

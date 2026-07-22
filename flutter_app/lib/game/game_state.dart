@@ -1,4 +1,8 @@
+import 'dart:math' as math;
+
+import 'mission_progression.dart';
 import 'organization_state.dart';
+import 'personal_finance_state.dart';
 import 'story_state.dart';
 
 enum WorldMode { historical, diverged }
@@ -22,8 +26,11 @@ class GameState {
     required this.marketMinute,
     required this.simulationSeed,
     required this.cash,
+    required this.brokerageCash,
     required this.positions,
     required this.organization,
+    required this.personalFinance,
+    required this.progression,
     required this.story,
     required this.company,
     required this.project,
@@ -33,7 +40,8 @@ class GameState {
     required this.processedEventIds,
   });
 
-  static const schemaVersion = 9;
+  static const schemaVersion = 13;
+  static const maxCampaignDay = 4018;
 
   final int version;
   final String companyName;
@@ -41,8 +49,11 @@ class GameState {
   final int marketMinute;
   final String simulationSeed;
   final int cash;
+  final int brokerageCash;
   final List<PortfolioPosition> positions;
   final OrganizationState organization;
+  final PersonalFinanceState personalFinance;
+  final MissionProgressionState progression;
   final StoryState story;
   final CompanyState company;
   final ProjectState? project;
@@ -57,6 +68,8 @@ class GameState {
   int get portfolioCost =>
       positions.fold<int>(0, (sum, position) => sum + position.totalCost);
 
+  int get bankCash => math.max(0, cash - brokerageCash);
+
   int portfolioValue(Map<String, double> prices) => positions.fold<int>(
     0,
     (sum, position) =>
@@ -65,7 +78,16 @@ class GameState {
 
   int totalAum(Map<String, double> prices) => cash + portfolioValue(prices);
 
-  DateTime get currentDate => DateTime(2000, 1, 1).add(Duration(days: day - 1));
+  DateTime get campaignStartDate =>
+      story.storyFlags['campaignStartDate'] == '2000-01-02'
+      ? DateTime(2000, 1, 2)
+      : DateTime(2000, 1, 1);
+
+  DateTime dateForDay(int value) =>
+      campaignStartDate.add(Duration(days: value - 1));
+
+  DateTime get currentDate => dateForDay(day);
+  bool get campaignComplete => !currentDate.isBefore(DateTime(2010, 12, 31));
 
   List<DecisionCardData> get pendingDecisions => decisions
       .where((decision) => decision.status == DecisionStatus.pending)
@@ -76,10 +98,13 @@ class GameState {
     String? companyName,
     int? day,
     int? marketMinute,
+    int? brokerageCash,
     String? simulationSeed,
     int? cash,
     List<PortfolioPosition>? positions,
     OrganizationState? organization,
+    PersonalFinanceState? personalFinance,
+    MissionProgressionState? progression,
     StoryState? story,
     CompanyState? company,
     ProjectState? project,
@@ -94,10 +119,16 @@ class GameState {
       companyName: companyName ?? this.companyName,
       day: day ?? this.day,
       marketMinute: marketMinute ?? this.marketMinute,
+      brokerageCash: (brokerageCash ?? this.brokerageCash).clamp(
+        0,
+        math.max(0, cash ?? this.cash),
+      ),
       simulationSeed: simulationSeed ?? this.simulationSeed,
       cash: cash ?? this.cash,
       positions: positions ?? this.positions,
       organization: organization ?? this.organization,
+      personalFinance: personalFinance ?? this.personalFinance,
+      progression: progression ?? this.progression,
       story: story ?? this.story,
       company: company ?? this.company,
       project: clearProject ? null : project ?? this.project,
@@ -114,10 +145,13 @@ class GameState {
     'day': day,
     'marketMinute': marketMinute,
     'currentDate': currentDate.toIso8601String().split('T').first,
+    'brokerageCash': brokerageCash,
     'simulationSeed': simulationSeed,
     'cash': cash,
     'positions': positions.map((position) => position.toJson()).toList(),
     'organization': organization.toJson(),
+    'personalFinance': personalFinance.toJson(),
+    'progression': progression.toJson(),
     'story': story.toJson(),
     'company': company.toJson(),
     'project': project?.toJson(),
@@ -128,16 +162,21 @@ class GameState {
   };
 
   factory GameState.fromJson(Map<String, dynamic> json) {
+    final cash = (json['cash'] as num?)?.toInt() ?? 0;
+    final brokerageCash = ((json['brokerageCash'] as num?)?.toInt() ?? cash)
+        .clamp(0, math.max(0, cash))
+        .toInt();
     return GameState(
       version: (json['version'] as num?)?.toInt() ?? schemaVersion,
       companyName: json['companyName'] as String? ?? '',
-      day: ((json['day'] as num?)?.toInt() ?? 1).clamp(1, 4018),
+      day: ((json['day'] as num?)?.toInt() ?? 1).clamp(1, maxCampaignDay),
       marketMinute: ((json['marketMinute'] as num?)?.toInt() ?? 480).clamp(
         480,
         1200,
       ),
       simulationSeed: json['simulationSeed'] as String? ?? 'simul-default',
-      cash: (json['cash'] as num?)?.toInt() ?? 1000000,
+      cash: cash,
+      brokerageCash: brokerageCash,
       positions: PortfolioPosition.listFromJson(json['positions']),
       organization: OrganizationState.fromJson(
         (json['organization'] as Map?)?.cast<String, dynamic>() ?? const {},
@@ -147,6 +186,17 @@ class GameState {
               value.name == ((json['story'] as Map?)?['familyRule'] as String?),
           orElse: () => FamilyRule.reportLosses,
         ),
+      ),
+      personalFinance: PersonalFinanceState.fromJson(
+        (json['personalFinance'] as Map?)?.cast<String, dynamic>() ?? const {},
+      ),
+      progression: MissionProgressionState.fromJson(
+        (json['progression'] as Map?)?.cast<String, dynamic>() ?? const {},
+        fallbackDay: ((json['day'] as num?)?.toInt() ?? 1).clamp(
+          1,
+          maxCampaignDay,
+        ),
+        fallbackCash: (json['cash'] as num?)?.toInt() ?? 0,
       ),
       story: StoryState.fromJson(
         (json['story'] as Map?)?.cast<String, dynamic>() ?? const {},
@@ -659,6 +709,10 @@ class LedgerEntry {
     required this.counterAccount,
     required this.description,
     required this.sourceId,
+    this.notional = 0,
+    this.tradingFee = 0,
+    this.disposedCost = 0,
+    this.realizedPnl = 0,
   });
 
   final String id;
@@ -668,6 +722,10 @@ class LedgerEntry {
   final String counterAccount;
   final String description;
   final String sourceId;
+  final int notional;
+  final int tradingFee;
+  final int disposedCost;
+  final int realizedPnl;
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -677,6 +735,10 @@ class LedgerEntry {
     'counterAccount': counterAccount,
     'description': description,
     'sourceId': sourceId,
+    'notional': notional,
+    'tradingFee': tradingFee,
+    'disposedCost': disposedCost,
+    'realizedPnl': realizedPnl,
   };
 
   factory LedgerEntry.fromJson(Map<String, dynamic> json) => LedgerEntry(
@@ -687,5 +749,9 @@ class LedgerEntry {
     counterAccount: json['counterAccount'] as String? ?? 'expense',
     description: json['description'] as String? ?? '',
     sourceId: json['sourceId'] as String? ?? '',
+    notional: (json['notional'] as num?)?.toInt() ?? 0,
+    tradingFee: (json['tradingFee'] as num?)?.toInt() ?? 0,
+    disposedCost: (json['disposedCost'] as num?)?.toInt() ?? 0,
+    realizedPnl: (json['realizedPnl'] as num?)?.toInt() ?? 0,
   );
 }

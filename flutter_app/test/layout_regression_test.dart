@@ -22,6 +22,23 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
   }
 
+  Future<void> openMarketExplore(WidgetTester tester) async {
+    for (var attempt = 0; attempt < 40; attempt++) {
+      await tester.pump(const Duration(milliseconds: 100));
+      if (find.byKey(const Key('market-nav-explore')).evaluate().isNotEmpty) {
+        break;
+      }
+    }
+    await tester.tap(find.byKey(const Key('market-nav-explore')));
+    await tester.pump();
+    for (var attempt = 0; attempt < 40; attempt++) {
+      await tester.pump(const Duration(milliseconds: 100));
+      if (find.byKey(const Key('stock-row-005930')).evaluate().isNotEmpty) {
+        return;
+      }
+    }
+  }
+
   testWidgets('360px stock list, detail, and executive portraits stay inside', (
     tester,
   ) async {
@@ -34,12 +51,7 @@ void main() {
         ),
       ),
     );
-    for (var attempt = 0; attempt < 50; attempt++) {
-      await tester.pump(const Duration(milliseconds: 100));
-      if (find.byKey(const Key('stock-row-005930')).evaluate().isNotEmpty) {
-        break;
-      }
-    }
+    await openMarketExplore(tester);
     if (find.byKey(const Key('stock-row-005930')).evaluate().isEmpty) {
       await tester.scrollUntilVisible(
         find.byKey(const Key('stock-row-005930')),
@@ -69,7 +81,7 @@ void main() {
       findsOneWidget,
     );
     expect(tester.takeException(), isNull);
-    await tester.tap(find.byKey(const Key('write-research-note-button')));
+    await tester.tap(find.byKey(const Key('buy-stock-button')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('order-quantity-value')), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -135,8 +147,13 @@ void main() {
         home: OfficeScreen(
           state: state,
           engine: engine,
+          activeSaveSlot: 1,
+          lastSavedAt: null,
+          onManualSave: () async {},
+          onReturnToTitle: () {},
           onAdvanceDay: () async => state,
           onSetMarketMinute: (_) async => state,
+          onSaveMarketNotebook: (_, _) async => state,
           onResolveDecision: (_, _) async {},
           onRequestFamilyHelp: (_) async => state,
           onCompleteWork: (_) async => state,
@@ -263,8 +280,13 @@ void main() {
         home: OfficeScreen(
           state: state,
           engine: engine,
+          activeSaveSlot: 1,
+          lastSavedAt: null,
+          onManualSave: () async {},
+          onReturnToTitle: () {},
           onAdvanceDay: () async => state,
           onSetMarketMinute: (_) async => state,
+          onSaveMarketNotebook: (_, _) async => state,
           onResolveDecision: (_, _) => save.future,
           onRequestFamilyHelp: (_) async => state,
           onCompleteWork: (_) async => state,
@@ -382,7 +404,7 @@ void main() {
       expect(tester.takeException(), isNull);
     }
 
-    for (var index = 0; index < 6; index++) {
+    for (var index = 0; index < 9; index++) {
       await tester.tap(find.byKey(const Key('story-continue')));
       await tester.pumpAndSettle();
       expectPortraitInside();
@@ -391,7 +413,7 @@ void main() {
     await tester.pumpAndSettle();
     expectPortraitInside();
 
-    for (var index = 0; index < 4; index++) {
+    for (var index = 0; index < 7; index++) {
       await tester.tap(find.byKey(const Key('story-continue')));
       await tester.pumpAndSettle();
       expectPortraitInside();
@@ -402,9 +424,15 @@ void main() {
     await tester.tap(find.byKey(const Key('story-next-name')));
     await tester.pumpAndSettle();
     expectPortraitInside();
+    await tester.tap(find.byKey(const Key('story-continue')));
+    await tester.pumpAndSettle();
+    expectPortraitInside();
 
     await tester.tap(find.byKey(const Key('story-trait-analysis')));
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('story-continue')));
+    await tester.pumpAndSettle();
+    expectPortraitInside();
     await tester.tap(find.byKey(const Key('story-continue')));
     await tester.pumpAndSettle();
     expectPortraitInside();
@@ -432,13 +460,13 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    for (var index = 0; index < 6; index++) {
+    for (var index = 0; index < 9; index++) {
       await tester.tap(find.byKey(const Key('story-continue')));
       await tester.pumpAndSettle();
     }
     await tester.tap(find.byKey(const Key('story-intro-computer')));
     await tester.pumpAndSettle();
-    for (var index = 0; index < 4; index++) {
+    for (var index = 0; index < 7; index++) {
       await tester.tap(find.byKey(const Key('story-continue')));
       await tester.pumpAndSettle();
     }
@@ -450,6 +478,13 @@ void main() {
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('player-name-input')), '민준');
     await tester.pump();
+    final stageRect = tester.getRect(find.byKey(const Key('onboarding-stage')));
+    expect(stageRect.top, 0);
+    expect(stageRect.height, phoneSize.height);
+    final playerPanelRect = tester.getRect(
+      find.byKey(const Key('keyboard-name-panel')),
+    );
+    expect(playerPanelRect.bottom, lessThanOrEqualTo(phoneSize.height - 320));
     final playerInput = find.byKey(const Key('player-name-input'));
     final playerButton = find.byKey(const Key('story-next-name'));
     final playerInputRect = tester.getRect(playerInput);
@@ -465,14 +500,22 @@ void main() {
 
     await tester.tap(playerButton);
     await tester.pump();
+    tester.view.resetViewInsets();
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('story-continue')).hitTestable(),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const Key('story-continue')));
+    await tester.pumpAndSettle();
     expect(
       find.byKey(const Key('story-trait-analysis')).hitTestable(),
       findsOneWidget,
     );
     expect(tester.takeException(), isNull);
-    tester.view.resetViewInsets();
-    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('story-trait-analysis')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('story-continue')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('story-continue')));
     await tester.pumpAndSettle();
@@ -489,6 +532,15 @@ void main() {
       '별빛 투자',
     );
     await tester.pump();
+    final companyStageRect = tester.getRect(
+      find.byKey(const Key('onboarding-stage')),
+    );
+    expect(companyStageRect.top, 0);
+    expect(companyStageRect.height, phoneSize.height);
+    final companyPanelRect = tester.getRect(
+      find.byKey(const Key('keyboard-name-panel')),
+    );
+    expect(companyPanelRect.bottom, lessThanOrEqualTo(phoneSize.height - 320));
     final companyInput = find.byKey(const Key('company-name-input'));
     final companyButton = find.byKey(const Key('create-company-button'));
     final companyInputRect = tester.getRect(companyInput);

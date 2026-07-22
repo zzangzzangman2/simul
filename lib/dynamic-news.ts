@@ -1,6 +1,6 @@
 import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 
-export const DYNAMIC_NEWS_MODEL = "gemini-3.5-flash" as const;
+export const DYNAMIC_NEWS_MODEL = "gemini-3.6-flash" as const;
 
 export type DynamicNewsRequest = {
   year: number;
@@ -137,9 +137,8 @@ export async function generateDynamicNews(
         systemInstruction: `너는 ${input.year}년 당시의 정보만 아는 한국 경제 전문 기자다. 플레이어의 선택으로 달라진 대체역사를 경제 기사처럼 자연스럽게 보도한다. 미래에 공개될 실제 사건이나 결과를 미리 언급하지 않는다. 실제 역사와 게임 속 가상 결과를 섞어 단정하지 않고, 주어진 회사·행동·시대 흐름만 근거로 쓴다. 제목은 간결하게, 본문은 한국어 2~3문장으로 작성한다. 주가 영향 점수는 단기 심리 영향만 나타내며 -30부터 +50 사이로 판단한다. 반드시 지정된 JSON 구조만 반환한다.`,
         responseMimeType: "application/json",
         responseJsonSchema: articleSchema,
-        thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
-        temperature: 0.65,
-        maxOutputTokens: 500,
+        thinkingConfig: { thinkingLevel: ThinkingLevel.MEDIUM },
+        maxOutputTokens: 2048,
       },
     });
     const article = parseGeneratedArticle(response.text ?? "");

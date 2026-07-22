@@ -316,11 +316,13 @@ class DecisionInboxScreen extends StatelessWidget {
     super.key,
     required this.state,
     required this.onResolveDecision,
+    required this.onClaimMission,
   });
 
   final GameState state;
   final Future<void> Function(String decisionId, String optionId)
   onResolveDecision;
+  final Future<MissionClaimResult> Function() onClaimMission;
 
   void _openDecision(BuildContext context, DecisionCardData decision) {
     final inboxNavigator = Navigator.of(context);
@@ -344,6 +346,7 @@ class DecisionInboxScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pending = state.pendingDecisions;
+    final missionProgress = const GameEngine().missionProgress(state);
     return Scaffold(
       key: const Key('decision-inbox-screen'),
       backgroundColor: const Color(0xFF272331),
@@ -361,12 +364,13 @@ class DecisionInboxScreen extends StatelessWidget {
             child: Column(
               children: [
                 _SceneClockStrip(
-                  location: '내 방 · 책상 위 편지',
-                  caption: pending.isEmpty
-                      ? '지금 도착한 안건은 없다.'
-                      : '가족에게 설명할 안건을 하나씩 검토한다.',
+                  location: '내 방 · 미션 보드',
+                  caption: missionProgress == null
+                      ? '모든 장기 미션을 완주했다.'
+                      : '행동으로 목표를 채우고 보상과 스킬을 얻는다.',
                   minute: state.marketMinute,
-                  costLabel: '${pending.length}건 대기',
+                  costLabel:
+                      'LV.${state.progression.level} · ${pending.length}건',
                   onBack: () => Navigator.of(context).pop(),
                 ),
                 Expanded(
@@ -388,7 +392,7 @@ class DecisionInboxScreen extends StatelessWidget {
                         ),
                       ],
                     ),
-                    child: pending.isEmpty
+                    child: missionProgress == null && pending.isEmpty
                         ? _EmptyDecisionInbox(
                             onBack: () => Navigator.of(context).pop(),
                           )
@@ -407,7 +411,7 @@ class DecisionInboxScreen extends StatelessWidget {
                               ),
                               const SizedBox(height: 3),
                               const Text(
-                                '안건 편지함',
+                                '미션 · 안건 보드',
                                 style: TextStyle(
                                   color: _ink,
                                   fontSize: 25,
@@ -415,7 +419,38 @@ class DecisionInboxScreen extends StatelessWidget {
                                   letterSpacing: -1,
                                 ),
                               ),
-                              const SizedBox(height: 14),
+                              const SizedBox(height: 6),
+                              Text(
+                                'LV.${state.progression.level} · ${state.progression.experience} XP · 완수 ${state.progression.claimedMissionIds.length}/${missionCatalog.length}',
+                                style: const TextStyle(
+                                  color: Color(0xFF777D8B),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              if (missionProgress != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 14),
+                                  child: _MissionProgressCard(
+                                    state: state,
+                                    progress: missionProgress,
+                                    onClaim: onClaimMission,
+                                  ),
+                                ),
+                              if (pending.isEmpty)
+                                const Padding(
+                                  padding: EdgeInsets.only(bottom: 12),
+                                  child: Text(
+                                    '지금 결정할 편지는 없어요. 미션 목표는 시장·일거리·사람들·자산 화면에서 계속 진행됩니다.',
+                                    style: TextStyle(
+                                      color: Color(0xFF6F7480),
+                                      fontSize: 11,
+                                      height: 1.45,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
                               ...pending.map(
                                 (decision) => Padding(
                                   padding: const EdgeInsets.only(bottom: 11),
@@ -437,6 +472,279 @@ class DecisionInboxScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+class _MissionProgressCard extends StatefulWidget {
+  const _MissionProgressCard({
+    required this.state,
+    required this.progress,
+    required this.onClaim,
+  });
+
+  final GameState state;
+  final MissionProgressView progress;
+  final Future<MissionClaimResult> Function() onClaim;
+
+  @override
+  State<_MissionProgressCard> createState() => _MissionProgressCardState();
+}
+
+class _MissionProgressCardState extends State<_MissionProgressCard> {
+  bool _claiming = false;
+
+  Future<void> _claim() async {
+    if (_claiming || !widget.progress.complete) return;
+    setState(() => _claiming = true);
+    try {
+      final result = await widget.onClaim();
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(result.message)));
+      if (result.success) Navigator.of(context).pop();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _claiming = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('미션 보상 저장에 실패했습니다. 다시 시도해 주세요.')),
+      );
+    }
+  }
+
+  String _progressLabel() {
+    const moneyMetrics = <String>{
+      'cash',
+      'cash_gain',
+      'realized_profit',
+      'research_income',
+      'external_aum',
+      'trade_volume',
+      'net_worth',
+      'property_income',
+    };
+    final current = widget.progress.current.clamp(
+      0,
+      widget.progress.mission.target,
+    );
+    if (moneyMetrics.contains(widget.progress.mission.metric)) {
+      return '${_money(current)} / ${_money(widget.progress.mission.target)}원';
+    }
+    return '$current / ${widget.progress.mission.target}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final mission = widget.progress.mission;
+    final level = widget.state.progression.level;
+    final unlockedSkills = skillCatalog
+        .where((skill) => skill.level <= level)
+        .toList(growable: false);
+    final nextSkill = skillCatalog
+        .where((skill) => skill.level > level)
+        .firstOrNull;
+    return Container(
+      key: const Key('active-mission-card'),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFBEC),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: widget.progress.complete ? const Color(0xFF56A879) : _coral,
+          width: 2,
+        ),
+        boxShadow: const [
+          BoxShadow(color: Color(0x2233405F), offset: Offset(0, 4)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _yellow,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  mission.chapter,
+                  style: const TextStyle(
+                    color: _ink,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              const Spacer(),
+              if (widget.progress.remainingDays != null)
+                Text(
+                  '남은 ${widget.progress.remainingDays}일',
+                  style: const TextStyle(
+                    color: _coral,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 9),
+          Text(
+            mission.title,
+            style: const TextStyle(
+              color: _ink,
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.5,
+            ),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            mission.story,
+            style: const TextStyle(
+              color: Color(0xFF60697E),
+              fontSize: 11,
+              height: 1.45,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            mission.objective,
+            style: const TextStyle(
+              color: _ink,
+              fontSize: 12,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 7),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: LinearProgressIndicator(
+              key: const Key('active-mission-progress'),
+              value: widget.progress.ratio,
+              minHeight: 10,
+              backgroundColor: const Color(0xFFE6DFC9),
+              color: widget.progress.complete ? const Color(0xFF56A879) : _blue,
+            ),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            widget.progress.unlocked
+                ? _progressLabel()
+                : '${mission.requiredYear}년 해금',
+            style: const TextStyle(
+              color: Color(0xFF6F7480),
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              _MissionRewardChip(
+                label: '+${mission.experienceReward} XP',
+                color: _blue,
+              ),
+              if (mission.cashReward > 0)
+                _MissionRewardChip(
+                  label: '+${_money(mission.cashReward)}원',
+                  color: _yellow,
+                ),
+              if (mission.reputationReward > 0)
+                _MissionRewardChip(
+                  label: '평판 +${mission.reputationReward}',
+                  color: const Color(0xFFD7F0DE),
+                ),
+              if (mission.trustReward > 0)
+                _MissionRewardChip(
+                  label: '신뢰 +${mission.trustReward}',
+                  color: const Color(0xFFFFD9D3),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: FilledButton.icon(
+              key: const Key('claim-mission-reward'),
+              onPressed: widget.progress.complete && !_claiming ? _claim : null,
+              icon: _claiming
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.workspace_premium_rounded),
+              label: Text(widget.progress.complete ? '보상 받고 다음 미션' : '목표 진행 중'),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF33405F),
+                foregroundColor: Colors.white,
+                textStyle: const TextStyle(fontWeight: FontWeight.w900),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            '해금 스킬',
+            style: TextStyle(
+              color: _ink,
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            unlockedSkills
+                .map((skill) => '${skill.name} · ${skill.effect}')
+                .join('\n'),
+            style: const TextStyle(
+              color: Color(0xFF677086),
+              fontSize: 9,
+              height: 1.45,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          if (nextSkill != null) ...[
+            const SizedBox(height: 5),
+            Text(
+              '다음: LV.${nextSkill.level} ${nextSkill.name} — ${nextSkill.effect}',
+              style: const TextStyle(
+                color: _coral,
+                fontSize: 9,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _MissionRewardChip extends StatelessWidget {
+  const _MissionRewardChip({required this.label, required this.color});
+  final String label;
+  final Color color;
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+    decoration: BoxDecoration(
+      color: color,
+      borderRadius: BorderRadius.circular(10),
+    ),
+    child: Text(
+      label,
+      style: const TextStyle(
+        color: _ink,
+        fontSize: 9,
+        fontWeight: FontWeight.w900,
+      ),
+    ),
+  );
 }
 
 class _EmptyDecisionInbox extends StatelessWidget {
@@ -559,9 +867,20 @@ class _DecisionEnvelopeCard extends StatelessWidget {
 }
 
 class PortfolioLedgerScreen extends StatefulWidget {
-  const PortfolioLedgerScreen({super.key, required this.state, this.universe});
+  const PortfolioLedgerScreen({
+    super.key,
+    required this.state,
+    this.onPurchaseSpendingOption,
+    this.onSellRealEstate,
+    this.onPlayChanceGame,
+    this.universe,
+  });
 
   final GameState state;
+  final Future<FinanceActionResult> Function(String optionId)?
+  onPurchaseSpendingOption;
+  final Future<FinanceActionResult> Function(String assetId)? onSellRealEstate;
+  final Future<FinanceActionResult> Function(int stake)? onPlayChanceGame;
   final HistoricalMarketUniverse? universe;
 
   @override
@@ -570,12 +889,57 @@ class PortfolioLedgerScreen extends StatefulWidget {
 
 class _PortfolioLedgerScreenState extends State<PortfolioLedgerScreen> {
   late Future<HistoricalMarketUniverse> _universeFuture;
+  late GameState _state;
 
-  GameState get state => widget.state;
+  GameState get state => _state;
+
+  Future<FinanceActionResult> _purchase(String optionId) async {
+    final handler = widget.onPurchaseSpendingOption;
+    if (handler == null) return _disabledFinanceResult();
+    final result = await handler(optionId);
+    if (mounted && result.success) setState(() => _state = result.state);
+    return result;
+  }
+
+  Future<FinanceActionResult> _sell(String assetId) async {
+    final handler = widget.onSellRealEstate;
+    if (handler == null) return _disabledFinanceResult();
+    final result = await handler(assetId);
+    if (mounted && result.success) setState(() => _state = result.state);
+    return result;
+  }
+
+  Future<FinanceActionResult> _playChance(int stake) async {
+    final handler = widget.onPlayChanceGame;
+    if (handler == null) return _disabledFinanceResult();
+    final result = await handler(stake);
+    if (mounted && result.success) setState(() => _state = result.state);
+    return result;
+  }
+
+  FinanceActionResult _disabledFinanceResult() => FinanceActionResult(
+    state: state,
+    success: false,
+    message: 'Saving is unavailable in this test screen.',
+  );
+
+  void _openAssetSpending() {
+    Navigator.of(context).push<void>(
+      _gameSceneRoute<void>(
+        AssetSpendingScreen(
+          state: state,
+          onPurchase: _purchase,
+          onSellRealEstate: _sell,
+          onPlayChanceGame: _playChance,
+        ),
+      ),
+    );
+  }
 
   @override
   void initState() {
     super.initState();
+    _state = widget.state;
     _universeFuture = widget.universe == null
         ? HistoricalMarketUniverse.load()
         : Future.value(widget.universe!);
@@ -673,6 +1037,9 @@ class _PortfolioLedgerScreenState extends State<PortfolioLedgerScreen> {
                           (sum, entry) =>
                               entry.amount < 0 ? sum + entry.amount.abs() : sum,
                         );
+                        final recentNews = state.story.newsArchive.reversed
+                            .take(10)
+                            .toList(growable: false);
                         return ListView(
                           key: const Key('portfolio-ledger-scroll'),
                           padding: const EdgeInsets.fromLTRB(10, 10, 10, 28),
@@ -681,6 +1048,11 @@ class _PortfolioLedgerScreenState extends State<PortfolioLedgerScreen> {
                               companyName: state.companyName,
                               day: state.day,
                               grade: grade,
+                            ),
+                            const SizedBox(height: 10),
+                            _AssetSpendingEntry(
+                              state: state,
+                              onTap: _openAssetSpending,
                             ),
                             const SizedBox(height: 10),
                             if (snapshot.hasError) ...[
@@ -779,6 +1151,26 @@ class _PortfolioLedgerScreenState extends State<PortfolioLedgerScreen> {
                                   ),
                             const SizedBox(height: 12),
                             _LedgerAppendix(state: state),
+                            const SizedBox(height: 20),
+                            _LedgerSectionTitle(
+                              icon: Icons.newspaper_rounded,
+                              title: '최근 신문',
+                              badge: '${state.story.newsArchive.length}일',
+                            ),
+                            if (recentNews.isEmpty)
+                              const _LedgerEmptyPage(
+                                icon: Icons.article_outlined,
+                                title: '아직 보관한 신문이 없어요',
+                                body: '하루를 마치고 신문을 확인하면 여기에 남습니다.',
+                              )
+                            else
+                              ...recentNews.map(
+                                (item) => Padding(
+                                  padding: const EdgeInsets.only(top: 8),
+                                  child: _NewsArchiveEntry(item: item),
+                                ),
+                              ),
+                            const SizedBox(height: 12),
                             const SizedBox(height: 10),
                             const _LedgerFooterNote(),
                           ],
@@ -1699,7 +2091,7 @@ class _CashLedgerEntry extends StatelessWidget {
                   'DAY',
                   style: TextStyle(
                     color: Color(0xFF9B8261),
-                    fontSize: 7,
+                    fontSize: 10,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
@@ -1737,7 +2129,7 @@ class _CashLedgerEntry extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: Color(0xFF9A856D),
-                    fontSize: 8,
+                    fontSize: 10,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -1818,6 +2210,93 @@ class _LedgerEmptyPage extends StatelessWidget {
       ],
     ),
   );
+}
+
+class _NewsArchiveEntry extends StatelessWidget {
+  const _NewsArchiveEntry({required this.item});
+
+  final Map<String, dynamic> item;
+
+  @override
+  Widget build(BuildContext context) {
+    final day = (item['day'] as num?)?.toInt() ?? 1;
+    final archivedDate = DateTime.tryParse(item['date'] as String? ?? '');
+    final date =
+        archivedDate ?? DateTime(2000, 1, 1).add(Duration(days: day - 1));
+    final headline = item['headline'] as String? ?? '제목 없는 신문';
+    final eventCount = (item['eventIds'] as List?)?.length ?? 0;
+    final dateLabel =
+        '${date.year}.${date.month.toString().padLeft(2, '0')}.${date.day.toString().padLeft(2, '0')}';
+    return Container(
+      key: Key('news-archive-day-$day'),
+      padding: const EdgeInsets.fromLTRB(11, 10, 12, 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF8E8),
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(color: const Color(0xFFCDB17A)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 48,
+            padding: const EdgeInsets.symmetric(vertical: 7),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: const Color(0xFFEEE0C1),
+              borderRadius: BorderRadius.circular(9),
+            ),
+            child: Column(
+              children: [
+                Text(
+                  '${date.month}월',
+                  style: const TextStyle(
+                    color: Color(0xFF9B8261),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                Text(
+                  '${date.day}일',
+                  style: const TextStyle(
+                    color: Color(0xFF49372A),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  headline,
+                  style: const TextStyle(
+                    color: Color(0xFF3E3026),
+                    fontSize: 11,
+                    height: 1.3,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '$dateLabel · 역사 사건 $eventCount건',
+                  style: const TextStyle(
+                    color: Color(0xFF8C765F),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _LedgerFooterNote extends StatelessWidget {

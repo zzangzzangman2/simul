@@ -35,6 +35,14 @@ void main() {
     expect(isMarketTradingDay(DateTime(2000, 1, 4)), isTrue);
   });
 
+  test('market tick advances one game minute per real second', () {
+    expect(marketTickMinutes, 1);
+    expect(marketRealtimeTickDuration, const Duration(seconds: 1));
+    expect(marketTickForMinute(8 * 60), 0);
+    expect(marketTickForMinute(8 * 60 + 1), 1);
+    expect(marketMinuteForTick(1), 8 * 60 + 1);
+  });
+
   test('market tick anchors actual close at 15:30 and finishes at 20:00', () {
     expect(marketTickForMinute(8 * 60), 0);
     expect(marketTickForMinute(15 * 60 + 30), krxCloseTick);

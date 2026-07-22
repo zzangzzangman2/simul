@@ -1,11 +1,12 @@
 {
   "name": "밀레니엄 캐피탈",
   "short_name": "밀레니엄",
-  "start_url": ".",
-  "display": "standalone",
-  "background_color": "#151B29",
-  "theme_color": "#151B29",
-  "description": "2000년 1월 1일, 창립자 1명이 초기자본 100만원(₩1,000,000)으로 회사를 키워 가는 모바일 세로형 투자 경영 게임",
+  "start_url": "./",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
+  "background_color": "#F7F8FA",
+  "theme_color": "#FFFFFF",
+  "description": "2000년 1월 1일, 창립자 1명이 현금 0원에서 종잣돈 1만원을 직접 벌어 회사를 키워 가는 모바일 세로형 투자 경영 게임",
   "orientation": "portrait-primary",
   "prefer_related_applications": false,
   "icons": [

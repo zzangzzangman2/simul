@@ -1,8 +1,8 @@
 import 'dart:math' as math;
 
-/// 한 거래일을 0.9초 간격으로 압축 재현하는 전체 틱 수.
-const generatedSessionTicks = 240;
-const generatedRegularSessionTicks = 150;
+/// 08:00~20:00을 실제 게임 시각 1분 단위로 재현하는 전체 틱 수.
+const generatedSessionTicks = 720;
+const generatedRegularSessionTicks = 450;
 
 class MarketCandle {
   const MarketCandle({
@@ -79,9 +79,25 @@ List<double> generatedMarketPath({
     final tickSize = _tickSize(candidate);
     var rounded = (candidate / tickSize).roundToDouble() * tickSize;
 
-    if (rounded == result.last && _unit(seed, step * 53 + 211) > 0.32) {
-      final direction = velocityFor(raw, step) >= 0 ? 1.0 : -1.0;
-      rounded = (rounded + tickSize * direction).clamp(lower, upper).toDouble();
+    final delta = rounded - result.last;
+    final moveTickSize = _tickSize(result.last);
+    final minimumTicks = 2 + (_unit(seed, step * 43 + 211) * 5).floor();
+    final minimumMove = moveTickSize * minimumTicks;
+    if (delta.abs() < minimumMove) {
+      final direction = delta != 0
+          ? delta.sign
+          : velocityFor(raw, step) +
+                    (_unit(seed, step * 47 + 251) - 0.5) * 1.8 >=
+                0
+          ? 1.0
+          : -1.0;
+      final preferred = result.last + minimumMove * direction;
+      final fallback = result.last - minimumMove * direction;
+      if (preferred >= lower && preferred <= upper) {
+        rounded = preferred;
+      } else if (fallback >= lower && fallback <= upper) {
+        rounded = fallback;
+      }
     }
     result.add(rounded);
   }
@@ -130,10 +146,20 @@ double generatedMarketTick({
 
 List<MarketCandle> aggregateMarketCandles(
   List<double> prices,
-  int intervalMinutes,
-) {
+  int intervalMinutes, {
+  int tickMinutes = 1,
+}) {
   if (prices.isEmpty) return const <MarketCandle>[];
-  final interval = math.max(1, intervalMinutes);
+  if (intervalMinutes <= 0 || tickMinutes <= 0) {
+    throw ArgumentError('Candle and tick intervals must be positive.');
+  }
+  if (intervalMinutes % tickMinutes != 0) {
+    throw ArgumentError(
+      '$intervalMinutes-minute candles cannot be built from '
+      '$tickMinutes-minute ticks.',
+    );
+  }
+  final interval = math.max(1, intervalMinutes ~/ tickMinutes);
   if (prices.length == 1) {
     return <MarketCandle>[
       MarketCandle(
@@ -161,6 +187,14 @@ List<MarketCandle> aggregateMarketCandles(
     );
   }
   return candles;
+}
+
+int marketStockSeed(String code, DateTime date) {
+  var value = date.year * 10000 + date.month * 100 + date.day;
+  for (final unit in code.codeUnits) {
+    value = ((value * 31) ^ unit) & 0x7fffffff;
+  }
+  return value;
 }
 
 double velocityFor(List<double> raw, int step) {

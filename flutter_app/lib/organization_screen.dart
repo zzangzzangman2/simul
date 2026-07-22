@@ -5,10 +5,14 @@ class OrganizationScreen extends StatefulWidget {
     super.key,
     required this.state,
     required this.onRequestFamilyHelp,
+    this.onHireEmployee,
+    this.onLaunchFund,
   });
 
   final GameState state;
   final Future<GameState> Function(String helperId) onRequestFamilyHelp;
+  final Future<GameState> Function(String candidateId)? onHireEmployee;
+  final Future<GameState> Function()? onLaunchFund;
 
   @override
   State<OrganizationScreen> createState() => _OrganizationScreenState();
@@ -17,6 +21,8 @@ class OrganizationScreen extends StatefulWidget {
 class _OrganizationScreenState extends State<OrganizationScreen> {
   late GameState _state = widget.state;
   String? _busyHelperId;
+  String? _busyCandidateId;
+  bool _fundBusy = false;
   String _selectedHelperId = 'mother';
 
   bool get _hiringUnlocked => _state.currentDate.year >= 2003;
@@ -43,6 +49,65 @@ class _OrganizationScreenState extends State<OrganizationScreen> {
       ..showSnackBar(
         SnackBar(content: Text('${helper.name}의 조언을 오늘 조사노트에 추가했어요.')),
       );
+  }
+
+  Future<void> _hire(EmployeeProfile candidate) async {
+    if (_busyCandidateId != null) return;
+    setState(() => _busyCandidateId = candidate.id);
+    try {
+      final next = await widget.onHireEmployee?.call(candidate.id) ?? _state;
+      if (!mounted) return;
+      final hired = next.organization.employees.any(
+        (item) => item.id == candidate.id,
+      );
+      setState(() {
+        _state = next;
+        _busyCandidateId = null;
+      });
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              hired
+                  ? '${candidate.name}님이 합류했습니다.'
+                  : '채용 계약금 ${_money(candidate.salaryMonthly ~/ 2)}원이 필요합니다.',
+            ),
+          ),
+        );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _busyCandidateId = null);
+      _showSaveFailure(context);
+    }
+  }
+
+  Future<void> _launchFund() async {
+    if (_fundBusy) return;
+    setState(() => _fundBusy = true);
+    try {
+      final next = await widget.onLaunchFund?.call() ?? _state;
+      if (!mounted) return;
+      setState(() {
+        _state = next;
+        _fundBusy = false;
+      });
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              next.story.fundLaunched
+                  ? '첫 외부자금 펀드가 출범했습니다.'
+                  : '2004년 이후 · 직원 1명 · 평판 12가 필요합니다.',
+            ),
+          ),
+        );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _fundBusy = false);
+      _showSaveFailure(context);
+    }
   }
 
   @override
@@ -100,7 +165,14 @@ class _OrganizationScreenState extends State<OrganizationScreen> {
                         onRequest: _requestHelp,
                       ),
                       const SizedBox(height: 16),
-                      _HiringSection(state: _state, unlocked: _hiringUnlocked),
+                      _HiringSection(
+                        state: _state,
+                        unlocked: _hiringUnlocked,
+                        busyCandidateId: _busyCandidateId,
+                        fundBusy: _fundBusy,
+                        onHire: _hire,
+                        onLaunchFund: _launchFund,
+                      ),
                       if (organization.helpLog.isNotEmpty) ...[
                         const SizedBox(height: 22),
                         const Text(
@@ -257,8 +329,9 @@ class _OrganizationSummary extends StatelessWidget {
                 value: '${organization.researchHelpCount}회',
               ),
               _OrganizationMetric(
-                label: '채용 해금',
-                value: state.currentDate.year >= 2003 ? '가능' : '2003년',
+                label: '평판 / 월급',
+                value:
+                    '${state.story.reputation} / ${_money(organization.monthlyPayroll)}',
               ),
             ],
           ),
@@ -626,14 +699,36 @@ class _FamilyAssignmentBoard extends StatelessWidget {
 }
 
 class _HiringSection extends StatelessWidget {
-  const _HiringSection({required this.state, required this.unlocked});
+  const _HiringSection({
+    required this.state,
+    required this.unlocked,
+    required this.busyCandidateId,
+    required this.fundBusy,
+    required this.onHire,
+    required this.onLaunchFund,
+  });
 
   final GameState state;
   final bool unlocked;
+  final String? busyCandidateId;
+  final bool fundBusy;
+  final ValueChanged<EmployeeProfile> onHire;
+  final VoidCallback onLaunchFund;
 
   @override
   Widget build(BuildContext context) {
     final employees = state.organization.employees;
+    final available = kHiringCandidates
+        .where(
+          (candidate) =>
+              !employees.any((employee) => employee.id == candidate.id),
+        )
+        .toList();
+    final canLaunchFund =
+        state.currentDate.year >= 2004 &&
+        employees.isNotEmpty &&
+        state.story.reputation >= 12 &&
+        !state.story.fundLaunched;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -654,7 +749,7 @@ class _HiringSection extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  unlocked ? '첫 조사원 채용' : '정식 채용은 아직 일러요',
+                  unlocked ? '채용 · 급여 · 펀드 성장' : '정식 채용은 2003년에 열려요',
                   style: const TextStyle(
                     color: _ink,
                     fontSize: 15,
@@ -667,10 +762,8 @@ class _HiringSection extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             unlocked
-                ? employees.isEmpty
-                      ? '대학 게시판과 지인 소개를 통해 첫 아르바이트 조사원 후보를 만날 수 있습니다.'
-                      : '현재 ${employees.length}명의 직원이 있습니다. 능력과 윤리성은 별도로 평가합니다.'
-                : '2000~2002년에는 가족 도움으로 조사 습관을 익힙니다. 2003년에 첫 아르바이트 조사원 이야기가 열립니다.',
+                ? '후보의 능력·윤리·월 급여를 비교하세요. 계약금은 월 급여의 절반이며 급여와 사무실 임대료는 매월 원장에 반영됩니다.'
+                : '그전에는 가족 조사팀과 함께 종잣돈과 평판을 쌓습니다.',
             style: const TextStyle(
               color: Color(0xFF626A76),
               fontSize: 11,
@@ -678,18 +771,66 @@ class _HiringSection extends StatelessWidget {
               fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 12),
-          const Wrap(
-            spacing: 7,
-            runSpacing: 7,
-            children: [
-              _UnlockChip(label: '2003 · 조사원'),
-              _UnlockChip(label: '2004 · 작은 사무실'),
-              _UnlockChip(label: '2006 · 정식 회사'),
-            ],
-          ),
+          if (unlocked && available.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            ...available.map(
+              (candidate) => Card(
+                margin: const EdgeInsets.only(bottom: 9),
+                child: Padding(
+                  padding: const EdgeInsets.all(11),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          CircleAvatar(
+                            child: Text(candidate.displayedGrade.label),
+                          ),
+                          const SizedBox(width: 9),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '${candidate.name} · ${candidate.role.label}',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                                Text(
+                                  '월 ${_money(candidate.salaryMonthly)}원 · 윤리 ${candidate.ethics} · ${candidate.specialties.join(' · ')}',
+                                  style: const TextStyle(fontSize: 10),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 9),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 44,
+                        child: FilledButton(
+                          key: Key('hire-${candidate.id}'),
+                          onPressed: busyCandidateId == null
+                              ? () => onHire(candidate)
+                              : null,
+                          child: Text(
+                            busyCandidateId == candidate.id
+                                ? '계약 확인 중…'
+                                : '계약금 ${_money(candidate.salaryMonthly ~/ 2)}원으로 채용',
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
           if (employees.isNotEmpty) ...[
-            const SizedBox(height: 13),
+            const SizedBox(height: 10),
+            const Text('현재 직원', style: TextStyle(fontWeight: FontWeight.w900)),
             ...employees.map(
               (employee) => ListTile(
                 contentPadding: EdgeInsets.zero,
@@ -699,11 +840,54 @@ class _HiringSection extends StatelessWidget {
                 ),
                 title: Text(employee.name),
                 subtitle: Text(
-                  '${employee.role.label} · ${employee.specialties.join(', ')}',
+                  '${employee.role.label} · 월 ${_money(employee.salaryMonthly)}원',
                 ),
               ),
             ),
           ],
+          const Divider(height: 24),
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  '외부자금 펀드',
+                  style: TextStyle(fontWeight: FontWeight.w900),
+                ),
+              ),
+              Text(
+                '평판 ${state.story.reputation}/12',
+                style: const TextStyle(fontSize: 10),
+              ),
+            ],
+          ),
+          const SizedBox(height: 5),
+          Text(
+            state.story.fundLaunched
+                ? '운용 중 · 외부 AUM ${_money(state.story.externalAum)}원 · 월 운용보수 자동 수입'
+                : '2004년 이후 직원과 평판을 갖추면 외부 AUM과 반복 운용보수가 열립니다.',
+            style: const TextStyle(fontSize: 10, height: 1.4),
+          ),
+          const SizedBox(height: 9),
+          SizedBox(
+            width: double.infinity,
+            height: 44,
+            child: OutlinedButton.icon(
+              key: const Key('launch-fund-button'),
+              onPressed: canLaunchFund && !fundBusy ? onLaunchFund : null,
+              icon: const Icon(Icons.account_balance_rounded),
+              label: Text(state.story.fundLaunched ? '첫 펀드 운용 중' : '첫 펀드 출범'),
+            ),
+          ),
+          const SizedBox(height: 10),
+          const Wrap(
+            spacing: 7,
+            runSpacing: 7,
+            children: [
+              _UnlockChip(label: '2003 · 조사원'),
+              _UnlockChip(label: '2004 · 작은 사무실'),
+              _UnlockChip(label: '2006 · 정식 회사'),
+            ],
+          ),
         ],
       ),
     );

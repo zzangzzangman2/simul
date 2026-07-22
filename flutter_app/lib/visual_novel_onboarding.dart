@@ -1,9 +1,14 @@
 part of 'main.dart';
 
 class VisualNovelOnboardingScreen extends StatefulWidget {
-  const VisualNovelOnboardingScreen({super.key, required this.onCreate});
+  const VisualNovelOnboardingScreen({
+    super.key,
+    required this.onCreate,
+    this.onExit,
+  });
 
   final ValueChanged<NewGameSetup> onCreate;
+  final VoidCallback? onExit;
 
   @override
   State<VisualNovelOnboardingScreen> createState() =>
@@ -28,81 +33,94 @@ class _VisualNovelOnboardingScreenState
 
   String get _background => switch (_beat) {
     <= 2 => 'assets/images/bg_boy_room_1999.png',
-    <= 8 => 'assets/images/bg_living_room_1999.png',
-    <= 14 => 'assets/images/bg_kitchen_1999.png',
+    <= 13 => 'assets/images/bg_living_room_1999.png',
+    <= 22 => 'assets/images/bg_kitchen_1999.png',
     _ => 'assets/images/bg_boy_room_1999.png',
   };
 
   String get _location => switch (_beat) {
     <= 2 => '작은방',
-    <= 8 => '거실',
-    <= 14 => '부엌 식탁',
+    <= 13 => '거실',
+    <= 22 => '부엌 식탁',
     _ => '작은방 책상',
   };
 
   String get _dateLabel =>
-      _beat <= 8 ? '1999.12.31  ·  23:57' : '2000.01.01  ·  아침';
+      _beat <= 13 ? '1999.12.31  ·  23:57' : '2000.01.02  ·  일요일';
 
   String? get _character => switch (_beat) {
-    2 || 6 || 7 || 12 || 15 => 'assets/images/character_hero.png',
-    4 || 14 => 'assets/images/character_father.png',
-    5 => 'assets/images/character_sister.png',
-    9 || 10 || 11 => 'assets/images/character_grandfather.png',
-    13 => 'assets/images/character_mother.png',
+    2 || 5 || 9 || 10 || 18 || 19 || 20 => 'assets/images/character_hero.png',
+    4 || 11 || 21 || 22 => 'assets/images/character_father.png',
+    3 || 7 => 'assets/images/character_sister.png',
+    14 || 15 || 17 => 'assets/images/character_grandfather.png',
+    1 || 6 || 12 || 16 => 'assets/images/character_mother.png',
     _ => null,
   };
 
   Alignment get _characterAlignment => switch (_beat) {
-    4 || 9 || 10 || 11 || 14 => Alignment.bottomLeft,
-    5 || 13 => Alignment.bottomRight,
+    4 || 11 || 14 || 15 || 17 || 21 || 22 => Alignment.bottomLeft,
+    1 || 3 || 6 || 7 || 12 || 16 => Alignment.bottomRight,
     _ => Alignment.bottomCenter,
   };
 
-  bool get _isNarration => _beat == 0 || _beat == 3 || _beat == 8;
+  bool get _isNarration =>
+      _beat == 0 || _beat == 8 || _beat == 13 || _beat == 23;
 
   String get _speaker => switch (_beat) {
-    0 || 3 || 8 || 15 => '이야기',
-    1 || 13 => '엄마',
-    2 || 6 || 7 || 12 =>
+    0 || 8 || 13 || 23 => '이야기',
+    1 || 6 || 12 || 16 => '엄마',
+    2 || 5 || 9 || 10 || 18 || 19 || 20 =>
       _playerController.text.trim().isEmpty
           ? '나'
           : _playerController.text.trim(),
-    4 || 14 => '아빠',
-    5 => '누나',
-    9 || 10 || 11 => '외할아버지',
+    3 || 7 => '누나',
+    4 || 11 || 21 || 22 => '아빠',
+    14 || 15 || 17 => '외할아버지',
     _ => '이야기',
   };
 
   String get _line => switch (_beat) {
-    0 => '새 천년을 세 분 앞둔 밤. 서울의 오래된 아파트에는 귤 냄새와 난방 열기, 거실 TV의 카운트다운 소리가 섞여 있었다.',
-    1 => '컴퓨터 그만 보고 거실로 나와. 곧 열두 시야!',
-    2 => '화면 속 숫자는 계속 바뀌었다. 컴퓨터가 세상을 멈춘다는 말보다, 이 작은 상자로 어디까지 갈 수 있는지가 더 궁금했다.',
-    3 => '나는 의자에서 뛰어내려 거실로 향했다. 양말이 마룻바닥을 미끄러지고, 누나가 웃음을 터뜨렸다.',
-    4 => '천천히 뛰어. 컴퓨터 날짜가 잘 넘어가는지 같이 확인해 보자꾸나.',
-    5 => '아빠, 얘는 벌써 컴퓨터를 자기 거라고 생각하는 것 같은데?',
-    6 => '가족들의 시선이 내게 모였다. 나는 CRT 화면에서 본 숫자를 떠올리며 입을 열었다.',
-    7 => _introResponse,
-    8 =>
-      '셋, 둘, 하나. TV 속 사람들이 환호했고 오래된 컴퓨터의 시계도 조용히 2000년으로 넘어갔다. 하지만 진짜 시작은 다음 날 아침이었다.',
-    9 => '새해 선물이다. 네가 직접 관리할 종잣돈 100만원과 투자 장부를 맡기마.',
-    10 =>
-      '첫 장에는 초기자본 1,000,000원이라고 적혀 있었다. 이 돈은 생활비와 섞지 말고, 투자와 일거리로 늘거나 줄 때마다 이유를 모두 기록해야 한다.',
-    11 => '그 전에 네 이름부터 똑바로 적어야겠지. 이 투자노트의 첫 번째 주인은 누구냐?',
-    12 => '내가 가장 먼저 배우고 싶은 것은…',
-    13 =>
-      '이 100만원은 엄마 이름의 교육용 계좌에서 시작하자. 비밀번호와 도장은 내가 보관하고, 너는 회사를 조사해 가족 앞에서 설명하는 거야.',
-    14 => '좋아. 생활비와 투자금은 섞지 않고, 빚도 내지 않는다. 마지막 약속 한 줄은 네가 골라라.',
-    _ =>
-      '큰 사무실은 없지만, 내 방 책상과 투자 장부, 초기자본 100만원이면 시작할 수 있다. 창립자는 나 한 명. 우리 투자회사의 이름은…',
+    0 => '새 천년을 세 분 앞둔 밤. 방 안에는 컴퓨터 팬 소리와 거실에서 흘러오는 카운트다운 음악이 뒤섞여 있었다.',
+    1 => '이제 컴퓨터도 잠깐 쉬게 해 줘. 귤 까 놨으니까 얼른 거실로 와!',
+    2 => '잠깐만요. 화면에 있는 숫자 하나만 보고 갈게요. 자꾸 바뀌니까 신기해요.',
+    3 => '또 숫자 구경이야? 그러다 새해도 컴퓨터랑 둘이 맞겠다.',
+    4 => '놀리지는 말고. 궁금한 게 많은 건 좋은 일이야. 대신 직접 확인하는 습관을 들여야지.',
+    5 => '그럼 오늘은 제가 날짜가 제대로 바뀌는지 확인할래요.',
+    6 => '좋아. 확인이 끝나면 우리한테도 쉽게 설명해 줘. 어려운 말은 금지야.',
+    7 => '맞아. 나도 알아들을 수 있게 말하면 인정해 줄게.',
+    8 => '가족이 거실에 둘러앉았다. TV에서는 새 천년 이야기가 쏟아졌고, 모두의 시선이 자연스럽게 내게 모였다.',
+    9 => '나는 조금 긴장했지만, 가장 궁금했던 말을 먼저 꺼냈다.',
+    10 => _introResponse,
+    11 => '좋은 질문이네. 답을 외우는 것보다 왜 그런지 하나씩 찾아보는 게 더 중요해.',
+    12 => '모르면 가족에게 물어봐도 돼. 혼자 끙끙대다가 큰돈을 쓰는 건 안 되고.',
+    13 => '셋, 둘, 하나. 모두가 환호했다. 그리고 주말 아침, 외할아버지가 낡은 장부 한 권을 들고 찾아왔다.',
+    14 => '이건 네 첫 투자노트다. 주식은 회사의 아주 작은 조각을 사는 일이라고 생각하면 돼.',
+    15 => '다만 시작 돈은 0원이다. 먼저 일해서 만 원을 벌고, 사고 싶은 회사가 생기면 가족에게 이유를 말해 보렴.',
+    16 => '처음부터 잘할 필요 없어. 회사 하나를 보고, 좋은 점 하나와 걱정되는 점 하나만 찾으면 충분해.',
+    17 => '좋아, 그럼 첫 장부터 채워 보자. 이 투자노트에 어떤 이름을 적을까?',
+    18 => '내 이름을 적고 나니 진짜 내 장부가 된 것 같았다. 이제 무엇부터 배울지 정할 차례다.',
+    19 => '나는 먼저 이것부터 알아보고 싶다.',
+    20 => _traitResponse,
+    21 => '좋아. 우리 집 규칙은 간단하다. 생활비와 투자금을 섞지 않고, 빚내서 투자하지 않는다.',
+    22 => '마지막 약속 하나는 네가 직접 골라 보렴. 나중에 흔들릴 때 이 문장을 다시 읽는 거야.',
+    _ => '큰 사무실은 없지만 작은방 책상과 0원에서 시작하는 투자노트가 있다. 이제 우리 투자연구소 이름을 붙여 보자.',
   };
 
   String get _introResponse => switch (_introChoice) {
-    'computer' => '“제가 먼저 켜 봐도 돼요?” 아빠가 웃으며 컴퓨터 옆자리를 내주었다.',
-    'y2k' => '“정말 컴퓨터가 다 멈출 수도 있어요?” 엄마는 걱정보다 확인하는 습관이 중요하다고 답했다.',
-    'stocks' => '“이걸로 주식도 살 수 있어요?” 순간 거실이 조용해졌다. 외할아버지만 재미있다는 듯 웃었다.',
+    'computer' => '“제가 먼저 확인해 봐도 돼요?” 아빠가 웃으며 고개를 끄덕였다. “좋아. 확인하고 우리한테도 알려 줘.”',
+    'y2k' => '“정말 컴퓨터가 다 멈출 수도 있어요?” 엄마가 말했다. “그래서 겁먹기보다 하나씩 확인하는 거야.”',
+    'stocks' =>
+      '“컴퓨터로 주식도 살 수 있어요?” 누나가 눈을 동그랗게 떴고 아빠는 “그 전에 주식이 뭔지부터 알아야지”라며 웃었다.',
     _ => '',
   };
 
+  String get _traitResponse => switch (_trait) {
+    StoryTrait.stability => '먼저 돈을 잃지 않는 방법을 배우고 싶다. 그래야 오래 계속할 수 있을 것 같다.',
+    StoryTrait.innovation => '사람들의 생활을 바꾸는 제품을 찾아보고 싶다. 새 기술 이야기는 언제나 두근거린다.',
+    StoryTrait.analysis => '숫자가 왜 오르고 내리는지 직접 적어 보고 싶다. 하나씩 비교하면 길이 보일 것 같다.',
+    StoryTrait.control => '회사가 어떤 선택을 하는지 알아보고 싶다. 주주가 회사에 어떤 목소리를 내는지도 궁금하다.',
+    null => '',
+  };
   void _next() {
     FocusManager.instance.primaryFocus?.unfocus();
     setState(() => _beat += 1);
@@ -137,11 +155,15 @@ class _VisualNovelOnboardingScreenState
   Widget build(BuildContext context) {
     final viewInsets = MediaQuery.viewInsetsOf(context);
     final isKeyboardOpen = viewInsets.bottom > 0;
-    final isNameEntry = _beat == 11 || _beat == 15;
+    final isNameEntry = _beat == 17 || _beat == 23;
+    final keyboardLift = isKeyboardOpen && isNameEntry
+        ? viewInsets.bottom
+        : 0.0;
     return Scaffold(
       backgroundColor: const Color(0xFF171B2A),
       resizeToAvoidBottomInset: false,
       body: Stack(
+        key: const Key('onboarding-stage'),
         fit: StackFit.expand,
         children: [
           AnimatedSwitcher(
@@ -171,16 +193,35 @@ class _VisualNovelOnboardingScreenState
               child: _SceneLabel(
                 date: _dateLabel,
                 location: _location,
-                progress: (_beat + 1) / 16,
+                progress: (_beat + 1) / 24,
               ),
             ),
           ),
+          if (widget.onExit != null)
+            SafeArea(
+              child: Align(
+                alignment: Alignment.topLeft,
+                child: Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: IconButton.filledTonal(
+                    key: const Key('onboarding-exit-button'),
+                    tooltip: '타이틀로',
+                    onPressed: widget.onExit,
+                    style: IconButton.styleFrom(
+                      backgroundColor: const Color(0xB3151B28),
+                      foregroundColor: Colors.white,
+                    ),
+                    icon: const Icon(Icons.arrow_back_rounded),
+                  ),
+                ),
+              ),
+            ),
           if (_character != null)
             Positioned.fill(
               bottom: 122,
               child: AnimatedOpacity(
                 duration: const Duration(milliseconds: 180),
-                opacity: isKeyboardOpen && isNameEntry ? 0 : 1,
+                opacity: 1,
                 child: AnimatedSwitcher(
                   duration: const Duration(milliseconds: 420),
                   transitionBuilder: (child, animation) => FadeTransition(
@@ -208,27 +249,22 @@ class _VisualNovelOnboardingScreenState
                 ),
               ),
             ),
-          SafeArea(
-            child: AnimatedPadding(
-              duration: const Duration(milliseconds: 180),
-              padding: EdgeInsets.fromLTRB(12, 76, 12, viewInsets.bottom + 10),
-              child: LayoutBuilder(
-                builder: (context, constraints) => Align(
-                  alignment: Alignment.bottomCenter,
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxWidth: 560,
-                      maxHeight: constraints.maxHeight,
-                    ),
-                    child: SingleChildScrollView(
-                      reverse: isKeyboardOpen && isNameEntry,
-                      keyboardDismissBehavior:
-                          ScrollViewKeyboardDismissBehavior.onDrag,
-                      child: AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 260),
-                        child: _buildDialogue(context),
-                      ),
-                    ),
+          AnimatedPositioned(
+            key: const Key('keyboard-name-panel'),
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOutCubic,
+            left: 12,
+            right: 12,
+            bottom: keyboardLift + 10,
+            child: SafeArea(
+              top: false,
+              child: Align(
+                alignment: Alignment.bottomCenter,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 560),
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 260),
+                    child: _buildDialogue(context),
                   ),
                 ),
               ),
@@ -240,11 +276,11 @@ class _VisualNovelOnboardingScreenState
   }
 
   Widget _buildDialogue(BuildContext context) {
-    if (_beat == 6) return _introChoices();
-    if (_beat == 11) return _nameEntry();
-    if (_beat == 12) return _traitChoices();
-    if (_beat == 14) return _familyChoices();
-    if (_beat == 15) return _researchDeskName();
+    if (_beat == 9) return _introChoices();
+    if (_beat == 17) return _nameEntry();
+    if (_beat == 19) return _traitChoices();
+    if (_beat == 22) return _familyChoices();
+    if (_beat == 23) return _researchDeskName();
 
     return _NovelDialogue(
       key: ValueKey(_beat),
@@ -265,7 +301,7 @@ class _VisualNovelOnboardingScreenState
         label: '“제가 먼저 켜 봐도 돼요?”',
         onTap: () => setState(() {
           _introChoice = 'computer';
-          _beat = 7;
+          _beat = 10;
         }),
       ),
       _NovelChoice(
@@ -273,7 +309,7 @@ class _VisualNovelOnboardingScreenState
         label: '“정말 다 멈출 수도 있어요?”',
         onTap: () => setState(() {
           _introChoice = 'y2k';
-          _beat = 7;
+          _beat = 10;
         }),
       ),
       _NovelChoice(
@@ -281,7 +317,7 @@ class _VisualNovelOnboardingScreenState
         label: '“이걸로 주식도 살 수 있어요?”',
         onTap: () => setState(() {
           _introChoice = 'stocks';
-          _beat = 7;
+          _beat = 10;
         }),
       ),
     ],
@@ -308,7 +344,7 @@ class _VisualNovelOnboardingScreenState
         ),
         _NovelNextButton(
           key: const Key('story-next-name'),
-          label: '투자노트에 이름 쓰기',
+          label: '이 이름으로 시작하기',
           enabled: _playerController.text.trim().isNotEmpty,
           onTap: _next,
         ),
@@ -346,7 +382,7 @@ class _VisualNovelOnboardingScreenState
 
   void _chooseTrait(StoryTrait trait) => setState(() {
     _trait = trait;
-    _beat = 13;
+    _beat = 20;
   });
 
   Widget _familyChoices() => _NovelDialogue(
@@ -374,7 +410,7 @@ class _VisualNovelOnboardingScreenState
 
   void _chooseFamilyRule(FamilyRule rule) => setState(() {
     _familyRule = rule;
-    _beat = 15;
+    _beat = 23;
   });
 
   Widget _researchDeskName() => _NovelDialogue(
@@ -395,7 +431,7 @@ class _VisualNovelOnboardingScreenState
         ),
         _NovelNextButton(
           key: const Key('create-company-button'),
-          label: '100만원으로 시작하기',
+          label: '0원부터 첫날 시작하기',
           enabled: _companyController.text.trim().isNotEmpty,
           onTap: _finish,
         ),

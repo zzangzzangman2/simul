@@ -2,6 +2,7 @@ import 'dynamic_news.dart';
 import 'game_state.dart';
 import 'historical_events.dart';
 import 'market_data.dart';
+import 'market_clock.dart';
 
 export 'historical_events.dart';
 
@@ -18,11 +19,14 @@ export 'historical_events.dart';
 
 /// 오늘 날짜에 걸린 역사 사건을 돌려준다. 같은 날 여러 건이면 목록 순서(날짜→제목)의
 /// 첫 사건을 준다.
+List<HistoricalNewsEvent> historicalNewsEventsForDate(DateTime date) =>
+    kHistoricalNews
+        .where((event) => event.matches(date))
+        .toList(growable: false);
+
 HistoricalNewsEvent? historicalNewsForDate(DateTime date) {
-  for (final event in kHistoricalNews) {
-    if (event.matches(date)) return event;
-  }
-  return null;
+  final events = historicalNewsEventsForDate(date);
+  return events.isEmpty ? null : events.first;
 }
 
 /// 오늘 화면에 항상 채워 넣을 한 조각 소식.
@@ -34,10 +38,12 @@ class DailyBrief {
     required this.marketClosed,
     required this.tone,
     this.headline,
+    this.otherHeadlines = const [],
   });
 
   /// 굵직한 역사 사건이 걸린 날에만 채워진다.
   final HistoricalNewsEvent? headline;
+  final List<HistoricalNewsEvent> otherHeadlines;
   final String eyebrow;
   final String title;
   final String body;
@@ -146,12 +152,14 @@ DailyBrief buildDailyBrief(GameState state) {
   final date = state.currentDate;
   final weekend = date.weekday >= DateTime.saturday;
   final holiday = _fixedHoliday(date);
-  final closed = weekend || holiday != null;
+  final closed = !isMarketTradingDay(date);
 
-  final event = historicalNewsForDate(date);
+  final events = historicalNewsEventsForDate(date);
+  final event = events.isEmpty ? null : events.first;
   if (event != null) {
     return DailyBrief(
       headline: event,
+      otherHeadlines: events.skip(1).toList(growable: false),
       eyebrow: event.eyebrow,
       title: event.title,
       body: event.signal,
@@ -169,13 +177,26 @@ DailyBrief buildDailyBrief(GameState state) {
       tone: NewsTone.holiday,
     );
   }
+  if (closed) {
+    return DailyBrief(
+      eyebrow: weekend ? '주말' : 'KRX 휴장',
+      title: weekend ? '주말, 증시는 문을 닫았다' : '거래소가 쉬어가는 날',
+      body: weekend
+          ? '쉬는 날엔 숫자 대신 가족과 시간을 보내고 이번 주 판단을 되짚어 봅니다.'
+          : '실제 국내 종가 달력에 거래가 없는 날입니다. 다음 거래일까지 조사노트를 정리합니다.',
+      marketClosed: true,
+      tone: weekend ? NewsTone.weekend : NewsTone.holiday,
+    );
+  }
 
   final flavor = _flavorFor(date, weekend: weekend);
   var title = flavor.$1;
   var body = flavor.$2;
 
   // 시드머니 단계(첫 조사예산 이전)에는 일거리 쪽으로 살짝 안내한다.
-  if (!weekend && state.cash < 10000 && _daySince2000(date).isEven) {
+  if (!closed &&
+      state.story.earnedSeedMoney < 10000 &&
+      _daySince2000(date).isEven) {
     title = '아직 조사 예산이 부족하다';
     body = '방의 ‘일거리’로 설거지·문방구·벼룩장터를 하면 오늘도 종잣돈을 모을 수 있다.';
   }
@@ -266,9 +287,13 @@ DynamicNewsRequest dynamicNewsRequestForState(
   final companyName = isCompanyDecision
       ? state.company.name
       : (state.companyName.trim().isEmpty ? '가족 투자연구소' : state.companyName);
+  final extraEvents = brief.otherHeadlines
+      .map((event) => event.title)
+      .join(' · ');
   final megaTrend = brief.headline == null
       ? '${brief.eyebrow} · ${brief.title}'
-      : '${brief.headline!.title} · ${brief.headline!.body}';
+      : '${brief.headline!.title} · ${brief.headline!.body}'
+            '${extraEvents.isEmpty ? '' : ' · 그 외 소식: $extraEvents'}';
 
   return DynamicNewsRequest(
     year: state.currentDate.year,

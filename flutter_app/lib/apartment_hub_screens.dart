@@ -11,6 +11,10 @@ class ApartmentHubScreen extends StatefulWidget {
     required this.onOpenLedger,
     required this.onOpenOrganization,
     required this.onOpenWork,
+    required this.activeSaveSlot,
+    required this.lastSavedAt,
+    required this.onOpenGameMenu,
+    this.onTutorialComplete,
   });
 
   final GameState state;
@@ -19,6 +23,10 @@ class ApartmentHubScreen extends StatefulWidget {
   final VoidCallback onOpenLedger;
   final VoidCallback onOpenOrganization;
   final VoidCallback onOpenWork;
+  final int activeSaveSlot;
+  final DateTime? lastSavedAt;
+  final VoidCallback onOpenGameMenu;
+  final Future<void> Function()? onTutorialComplete;
 
   @override
   State<ApartmentHubScreen> createState() => _ApartmentHubScreenState();
@@ -26,6 +34,14 @@ class ApartmentHubScreen extends StatefulWidget {
 
 class _ApartmentHubScreenState extends State<ApartmentHubScreen> {
   _ApartmentPlace _place = _ApartmentPlace.bedroom;
+  late bool _tutorialVisible =
+      widget.onTutorialComplete != null && !widget.state.story.tutorialSeen;
+
+  Future<void> _dismissTutorial() async {
+    if (!_tutorialVisible) return;
+    setState(() => _tutorialVisible = false);
+    await widget.onTutorialComplete?.call();
+  }
 
   void _moveTo(_ApartmentPlace place) {
     if (place == _place) return;
@@ -74,6 +90,9 @@ class _ApartmentHubScreenState extends State<ApartmentHubScreen> {
             child: _ApartmentLocationHeader(
               details: details,
               state: widget.state,
+              activeSaveSlot: widget.activeSaveSlot,
+              lastSavedAt: widget.lastSavedAt,
+              onOpenGameMenu: widget.onOpenGameMenu,
             ),
           ),
           Positioned(
@@ -82,10 +101,88 @@ class _ApartmentHubScreenState extends State<ApartmentHubScreen> {
             bottom: 9,
             child: _ApartmentTravelDock(place: _place, onMove: _moveTo),
           ),
+          Positioned(
+            right: 12,
+            top: 108,
+            child: Semantics(
+              button: true,
+              label: '허브 도움말 열기',
+              child: IconButton.filled(
+                key: const Key('hub-help-button'),
+                tooltip: '허브 사용법',
+                onPressed: () => setState(() => _tutorialVisible = true),
+                icon: const Icon(Icons.help_outline_rounded),
+              ),
+            ),
+          ),
+          if (_tutorialVisible)
+            Positioned.fill(
+              child: _HubTutorialOverlay(onDone: _dismissTutorial),
+            ),
         ],
       ),
     );
   }
+}
+
+class _HubTutorialOverlay extends StatelessWidget {
+  const _HubTutorialOverlay({required this.onDone});
+
+  final Future<void> Function() onDone;
+
+  @override
+  Widget build(BuildContext context) => ColoredBox(
+    color: const Color(0xB8000000),
+    child: SafeArea(
+      child: Center(
+        child: Container(
+          key: const Key('hub-tutorial-overlay'),
+          width: 330,
+          margin: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFFEF8),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: const Color(0xFF27334B), width: 2),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '우리 집 투자연구소 사용법',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                '• 침실 CRT: 주식시장과 1분봉\n• 침실 서류함: 장부·성과\n• 거실 편지: 필수 결정\n• 거실 소파: 가족·채용·펀드\n• 부엌 전화: 직접 번 종잣돈',
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.65,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                '아래 이동 독에서는 어느 방으로든 바로 이동할 수 있어요. 노란 테두리는 확인할 안건이 있다는 뜻입니다.',
+                style: TextStyle(fontSize: 12, height: 1.5),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: FilledButton(
+                  key: const Key('hub-tutorial-done'),
+                  onPressed: () => onDone(),
+                  child: const Text('알겠어요'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 class _ApartmentPlaceScene extends StatelessWidget {
@@ -203,123 +300,208 @@ class _ApartmentSceneVignette extends StatelessWidget {
 }
 
 class _ApartmentLocationHeader extends StatelessWidget {
-  const _ApartmentLocationHeader({required this.details, required this.state});
+  const _ApartmentLocationHeader({
+    required this.details,
+    required this.state,
+    required this.activeSaveSlot,
+    required this.lastSavedAt,
+    required this.onOpenGameMenu,
+  });
 
   final _ApartmentPlaceDetails details;
   final GameState state;
+  final int activeSaveSlot;
+  final DateTime? lastSavedAt;
+  final VoidCallback onOpenGameMenu;
 
   @override
   Widget build(BuildContext context) => Semantics(
     container: true,
-    label: '${details.title}, ${state.companyName}',
+    label: '${details.title}, ${state.companyName}, $activeSaveSlot번 저장 슬롯',
     child: Container(
       key: const Key('room-company-sign'),
-      constraints: const BoxConstraints(minHeight: 62),
-      padding: const EdgeInsets.fromLTRB(12, 9, 11, 9),
+      constraints: const BoxConstraints(minHeight: 90),
+      padding: const EdgeInsets.fromLTRB(11, 9, 8, 9),
       decoration: BoxDecoration(
-        color: const Color(0xE61B2232),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xF21B263B), Color(0xF20F1727)],
+        ),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0x99FFFFFF), width: 1.2),
+        border: Border.all(color: const Color(0x66FFFFFF), width: 1.1),
         boxShadow: const [
           BoxShadow(
-            color: Color(0x73000000),
-            blurRadius: 18,
-            offset: Offset(0, 7),
+            color: Color(0x8A000000),
+            blurRadius: 22,
+            offset: Offset(0, 9),
           ),
         ],
       ),
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: details.accent.withValues(alpha: 0.18),
-              borderRadius: BorderRadius.circular(13),
-              border: Border.all(color: details.accent.withValues(alpha: 0.72)),
-            ),
-            child: Icon(details.icon, color: details.accent, size: 22),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  details.title,
-                  key: const Key('apartment-location-title'),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -0.3,
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: details.accent.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(13),
+                  border: Border.all(
+                    color: details.accent.withValues(alpha: 0.72),
                   ),
                 ),
-                const SizedBox(height: 1),
-                Text(
-                  details.hint,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFFC8D0DE),
-                    fontSize: 9,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 112),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                KeyedSubtree(
-                  key: const Key('room-company-name'),
-                  child: Text(
-                    state.companyName,
-                    key: const Key('company-header-title'),
-                    maxLines: 1,
-                    softWrap: false,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.right,
-                    style: TextStyle(
-                      color: details.accent,
-                      fontSize: 10,
-                      height: 1.15,
-                      fontWeight: FontWeight.w900,
+                child: Icon(details.icon, color: details.accent, size: 22),
+              ),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          details.title,
+                          key: const Key('apartment-location-title'),
+                          maxLines: 1,
+                          softWrap: false,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -0.3,
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: KeyedSubtree(
+                            key: const Key('room-company-name'),
+                            child: Text(
+                              state.companyName,
+                              key: const Key('company-header-title'),
+                              maxLines: 1,
+                              softWrap: false,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: details.accent,
+                                fontSize: 9,
+                                height: 1.15,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            state.story.officeTier >= 2
+                                ? '정식 본사 · ${details.hint}'
+                                : state.story.officeTier == 1
+                                ? '작은 사무실 · ${details.hint}'
+                                : details.hint,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Color(0xFFB5C0D3),
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 3),
-                Text(
-                  'DAY ${state.day} · ${marketTimeLabel(state.marketMinute)}',
-                  maxLines: 1,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 8,
-                    fontWeight: FontWeight.w800,
-                  ),
+              ),
+              IconButton(
+                key: const Key('game-menu-button'),
+                tooltip: '저장 및 게임 메뉴',
+                onPressed: onOpenGameMenu,
+                style: IconButton.styleFrom(
+                  backgroundColor: const Color(0x1FFFFFFF),
+                  foregroundColor: lastSavedAt == null
+                      ? const Color(0xFFCBD4E4)
+                      : const Color(0xFF8FE0A9),
+                  minimumSize: const Size(42, 42),
                 ),
-                Text(
-                  '${_money(state.cash)}원',
-                  maxLines: 1,
-                  style: const TextStyle(
-                    color: Color(0xFFCFD6E5),
-                    fontSize: 8,
-                    fontWeight: FontWeight.w700,
+                icon: const Icon(Icons.menu_rounded),
+              ),
+            ],
+          ),
+          const SizedBox(height: 7),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Row(
+                children: [
+                  _ApartmentHudChip(
+                    icon: Icons.calendar_today_rounded,
+                    label:
+                        'DAY ${state.day} · ${marketTimeLabel(state.marketMinute)}',
                   ),
-                ),
-              ],
+                  const SizedBox(width: 5),
+                  _ApartmentHudChip(
+                    icon: Icons.account_balance_wallet_rounded,
+                    label: '${_money(state.cash)}원',
+                  ),
+                  const SizedBox(width: 5),
+                  _ApartmentHudChip(label: 'LV.${state.progression.level}'),
+                  const SizedBox(width: 5),
+                  _ApartmentHudChip(label: 'S$activeSaveSlot'),
+                ],
+              ),
             ),
           ),
         ],
       ),
+    ),
+  );
+}
+
+class _ApartmentHudChip extends StatelessWidget {
+  const _ApartmentHudChip({this.icon, required this.label});
+
+  final IconData? icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    height: 22,
+    padding: EdgeInsets.symmetric(horizontal: icon == null ? 7 : 6),
+    decoration: BoxDecoration(
+      color: const Color(0x17FFFFFF),
+      borderRadius: BorderRadius.circular(99),
+      border: Border.all(color: const Color(0x1FFFFFFF)),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (icon != null) ...[
+          Icon(icon, color: const Color(0xFF93A4BD), size: 10),
+          const SizedBox(width: 4),
+        ],
+        Text(
+          label,
+          maxLines: 1,
+          style: const TextStyle(
+            color: Color(0xFFDDE4EF),
+            fontSize: 9,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ],
     ),
   );
 }
@@ -451,14 +633,9 @@ class _ApartmentTravelDock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final destinations = switch (place) {
-      _ApartmentPlace.bedroom => const [_ApartmentPlace.livingRoom],
-      _ApartmentPlace.livingRoom => const [
-        _ApartmentPlace.bedroom,
-        _ApartmentPlace.kitchen,
-      ],
-      _ApartmentPlace.kitchen => const [_ApartmentPlace.livingRoom],
-    };
+    final destinations = _ApartmentPlace.values
+        .where((destination) => destination != place)
+        .toList(growable: false);
 
     return Semantics(
       container: true,
@@ -490,7 +667,7 @@ class _ApartmentTravelDock extends StatelessWidget {
                   '집 안에서 이동',
                   style: TextStyle(
                     color: Color(0xFFC9D1DF),
-                    fontSize: 8,
+                    fontSize: 10,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 0.35,
                   ),
@@ -630,7 +807,7 @@ class _ApartmentPlaceDetails {
           id: 'bedroom',
           title: '가족 아파트 · 작은방',
           shortTitle: '작은방',
-          hint: 'CRT와 서류 캐비닛에서 투자 업무를 본다',
+          hint: '주식 보기 · 장부 정리',
           assetPath: 'assets/images/bg_bedroom_premium_2000.png',
           icon: Icons.bedroom_parent_rounded,
           accent: Color(0xFF82D7FF),
@@ -639,7 +816,7 @@ class _ApartmentPlaceDetails {
           id: 'living-room',
           title: '가족 아파트 · 거실',
           shortTitle: '거실',
-          hint: '안건을 검토하고 가족과 사람 이야기를 나눈다',
+          hint: '안건 확인 · 가족 이야기',
           assetPath: 'assets/images/bg_living_room_premium_2000.png',
           icon: Icons.weekend_rounded,
           accent: Color(0xFFFFCB78),
@@ -648,7 +825,7 @@ class _ApartmentPlaceDetails {
           id: 'kitchen',
           title: '가족 아파트 · 부엌',
           shortTitle: '부엌',
-          hint: '유선전화로 오늘 할 수 있는 일거리를 찾는다',
+          hint: '일거리 찾기 · 종잣돈 벌기',
           assetPath: 'assets/images/bg_kitchen_premium_2000.png',
           icon: Icons.kitchen_rounded,
           accent: Color(0xFF8CE3BE),

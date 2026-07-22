@@ -25,7 +25,10 @@ void main() {
     });
 
     test('정확한 날짜에 굵직한 사건이 걸려 있다', () {
-      expect(historicalNewsForDate(DateTime(2001, 9, 11))?.tone, NewsTone.shock);
+      expect(
+        historicalNewsForDate(DateTime(2001, 9, 11))?.tone,
+        NewsTone.shock,
+      );
       expect(historicalNewsForDate(DateTime(2008, 9, 15))?.eyebrow, '금융위기');
       expect(
         historicalNewsForDate(DateTime(2000, 1, 1))?.tone,
@@ -35,6 +38,23 @@ void main() {
       expect(historicalNewsForDate(DateTime(2004, 8, 19)), isNotNull);
     });
 
+    test('같은 날의 여러 역사 사건을 모두 보존한다', () {
+      final groups = <String, List<HistoricalNewsEvent>>{};
+      for (final event in kHistoricalNews) {
+        final key = '${event.year}-${event.month}-${event.day}';
+        groups.putIfAbsent(key, () => []).add(event);
+      }
+      final events = groups.values.firstWhere((items) => items.length > 1);
+      final date = DateTime(
+        events.first.year,
+        events.first.month,
+        events.first.day,
+      );
+      final brief = buildDailyBrief(at(date));
+      expect(historicalNewsEventsForDate(date), hasLength(events.length));
+      expect(brief.headline, isNotNull);
+      expect(brief.otherHeadlines, hasLength(events.length - 1));
+    });
     test('사건이 없는 날은 null 이다', () {
       // 411건이 있어도 대부분의 날은 비어 있다. 빈 날 하나를 찾아 검증한다.
       DateTime? empty;

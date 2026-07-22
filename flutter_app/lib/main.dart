@@ -12,12 +12,17 @@ import 'game/market_clock.dart';
 import 'game/market_data.dart';
 import 'game/market_tick.dart';
 import 'game/market_news.dart';
+import 'game/market_quote.dart';
+import 'game/mission_progression.dart';
 import 'game/organization_state.dart';
+import 'game/personal_finance_state.dart';
 import 'game/seed_money_content.dart';
 import 'game/story_state.dart';
 
 part 'organization_screen.dart';
 part 'apartment_hub_screens.dart';
+part 'save_menu_screens.dart';
+part 'asset_spending_screen.dart';
 part 'room_screens.dart';
 part 'seed_money_screen.dart';
 part 'stock_market_screen.dart';
@@ -61,8 +66,14 @@ class MillenniumCapitalApp extends StatefulWidget {
 class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
   static const _engine = GameEngine();
   final _scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
+  final _navigatorKey = GlobalKey<NavigatorState>();
   late final GamePersistence _persistence;
   GameState? _state;
+  List<GameSaveSlot> _slots = const [];
+  _AppView _view = _AppView.title;
+  int _activeSlot = 1;
+  int? _newGameSlot;
+  DateTime? _lastSavedAt;
   bool _isReady = false;
   bool _isRestoring = false;
   Object? _restoreError;
@@ -84,10 +95,18 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
       });
     }
     try {
-      final restored = await _persistence.load();
+      final slots = await _persistence.listSlots();
+      final activeSlot = await _persistence.getActiveSlot();
       if (!mounted) return;
       setState(() {
-        _state = restored;
+        _state = null;
+        _slots = slots;
+        _activeSlot = activeSlot;
+        _lastSavedAt = slots
+            .where((slot) => slot.slot == activeSlot)
+            .firstOrNull
+            ?.savedAt;
+        _view = _AppView.title;
         _restoreError = null;
         _isReady = true;
       });
@@ -103,6 +122,111 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     }
   }
 
+  void _startNewGame() {
+    GameSaveSlot? freeSlot;
+    for (final slot in _slots) {
+      if (slot.isEmpty) {
+        freeSlot = slot;
+        break;
+      }
+    }
+    if (freeSlot == null) {
+      setState(() => _view = _AppView.continueGame);
+      _scaffoldMessengerKey.currentState
+        ?..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('저장 슬롯 5개가 모두 찼어요. 하나를 삭제해 주세요.')),
+        );
+      return;
+    }
+    setState(() {
+      _newGameSlot = freeSlot!.slot;
+      _view = _AppView.onboarding;
+    });
+  }
+
+  void _showContinue() => setState(() => _view = _AppView.continueGame);
+
+  void _showTitle() => setState(() {
+    _state = null;
+    _newGameSlot = null;
+    _view = _AppView.title;
+  });
+
+  Future<void> _continueSlot(int slot) async {
+    setState(() => _isReady = false);
+    try {
+      final state = await _persistence.loadSlot(slot);
+      if (state == null) throw StateError('Save slot $slot is empty');
+      final slots = await _persistence.listSlots();
+      if (!mounted) return;
+      setState(() {
+        _state = state;
+        _slots = slots;
+        _activeSlot = slot;
+        _lastSavedAt = slots
+            .where((item) => item.slot == slot)
+            .firstOrNull
+            ?.savedAt;
+        _view = _AppView.game;
+        _isReady = true;
+      });
+    } catch (error) {
+      debugPrint('Failed to load slot $slot: $error');
+      if (!mounted) return;
+      setState(() {
+        _view = _AppView.continueGame;
+        _isReady = true;
+      });
+      _scaffoldMessengerKey.currentState
+        ?..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('저장을 불러오지 못했어요. 삭제하거나 다시 시도해 주세요.')),
+        );
+    }
+  }
+
+  Future<void> _deleteSaveSlot(int slot) async {
+    try {
+      await _persistence.deleteSlot(slot);
+      final slots = await _persistence.listSlots();
+      final activeSlot = await _persistence.getActiveSlot();
+      if (!mounted) return;
+      setState(() {
+        _slots = slots;
+        _activeSlot = activeSlot;
+      });
+      _scaffoldMessengerKey.currentState?.showSnackBar(
+        SnackBar(content: Text('$slot번 저장을 삭제했습니다.')),
+      );
+    } catch (error) {
+      debugPrint('Failed to delete slot $slot: $error');
+      _scaffoldMessengerKey.currentState?.showSnackBar(
+        const SnackBar(content: Text('저장을 삭제하지 못했어요. 다시 시도해 주세요.')),
+      );
+    }
+  }
+
+  Future<void> _manualSave() async {
+    final state = _state;
+    if (state == null) return;
+    await _persistence.saveToSlot(state, _activeSlot);
+    final slots = await _persistence.listSlots();
+    if (!mounted) return;
+    setState(() {
+      _slots = slots;
+      _lastSavedAt = slots
+          .where((slot) => slot.slot == _activeSlot)
+          .firstOrNull
+          ?.savedAt;
+    });
+  }
+
+  void _returnToTitle() {
+    _navigatorKey.currentState?.popUntil((route) => route.isFirst);
+    unawaited(_restoreGame(retry: true));
+  }
+
   Future<void> _createCompany(NewGameSetup setup) async {
     final story = StoryState.newPlayer(
       playerName: setup.playerName,
@@ -115,8 +239,14 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
       story: story,
       initialCash: initialCompanyCash,
     );
+    final slot = _newGameSlot;
+    if (slot == null) {
+      _showTitle();
+      return;
+    }
     try {
-      await _persistence.save(state);
+      await _persistence.saveToSlot(state, slot);
+      await _persistence.setActiveSlot(slot);
     } catch (error) {
       debugPrint('Failed to create company save: $error');
       _scaffoldMessengerKey.currentState
@@ -125,7 +255,18 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
       return;
     }
     if (!mounted) return;
-    setState(() => _state = state);
+    final slots = await _persistence.listSlots();
+    if (!mounted) return;
+    setState(() {
+      _state = state;
+      _slots = slots;
+      _activeSlot = slot;
+      _lastSavedAt = slots
+          .where((item) => item.slot == slot)
+          .firstOrNull
+          ?.savedAt;
+      _view = _AppView.game;
+    });
   }
 
   Future<void> _resolveDecision(String decisionId, String optionId) async {
@@ -141,6 +282,15 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     await _persistence.save(next);
     if (!mounted) return;
     setState(() => _state = next);
+  }
+
+  Future<MissionClaimResult> _claimMission() async {
+    final current = _state!;
+    final result = _engine.claimMission(current);
+    if (!result.success) return result;
+    await _persistence.save(result.state);
+    if (mounted) setState(() => _state = result.state);
+    return result;
   }
 
   Future<GameState> _completeWork(WorkSessionResult result) async {
@@ -168,12 +318,88 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     return next;
   }
 
-  Future<GameState> _advanceDay() async {
+  Future<GameState> _advanceDay() => _advanceDays(1);
+
+  Future<GameState> _advanceDays(int requestedDays) async {
     final current = _state!;
-    final next = _engine.advanceOneDay(current);
+    var next = current;
+    var advanced = false;
+    final universe = await HistoricalMarketUniverse.load();
+    for (var i = 0; i < requestedDays; i++) {
+      if (next.pendingDecisions.isNotEmpty || next.campaignComplete) break;
+      final before = next;
+      next = _engine.advanceOneDay(next);
+      if (next.day == before.day) break;
+      advanced = true;
+      next = _engine.applyCorporateActions(
+        next,
+        universe.corporateActionsOn(next.currentDate),
+      );
+      await _persistence.save(next);
+      if (mounted) {
+        setState(() {
+          _state = next;
+          _lastSavedAt = DateTime.now();
+        });
+      }
+      if (next.pendingDecisions.isNotEmpty) break;
+    }
+    if (!advanced && mounted) setState(() => _state = next);
+    return next;
+  }
+
+  Future<GameState> _hireEmployee(String candidateId) async {
+    final next = _engine.hireEmployee(_state!, candidateId);
     await _persistence.save(next);
     if (mounted) setState(() => _state = next);
     return next;
+  }
+
+  Future<GameState> _launchFund() async {
+    final next = _engine.launchFund(_state!);
+    await _persistence.save(next);
+    if (mounted) setState(() => _state = next);
+    return next;
+  }
+
+  Future<FinanceActionResult> _purchaseSpendingOption(String optionId) async {
+    final result = _engine.purchaseSpendingOption(_state!, optionId);
+    if (!result.success) return result;
+    await _persistence.save(result.state);
+    if (mounted) setState(() => _state = result.state);
+    return result;
+  }
+
+  Future<FinanceActionResult> _sellRealEstate(String assetId) async {
+    final result = _engine.sellRealEstate(_state!, assetId);
+    if (!result.success) return result;
+    await _persistence.save(result.state);
+    if (mounted) setState(() => _state = result.state);
+    return result;
+  }
+
+  Future<FinanceActionResult> _playAdultChanceGame(int stake) async {
+    final result = _engine.playAdultChanceGame(_state!, stake);
+    if (!result.success) return result;
+    await _persistence.save(result.state);
+    if (mounted) setState(() => _state = result.state);
+    return result;
+  }
+
+  Future<void> _completeHubTutorial() async {
+    final next = _engine.markHubTutorialSeen(_state!);
+    await _persistence.save(next);
+    if (mounted) setState(() => _state = next);
+  }
+
+  Future<void> _archiveNews(String headline, List<String> eventIds) async {
+    final next = _engine.archiveNews(
+      _state!,
+      headline: headline,
+      eventIds: eventIds,
+    );
+    await _persistence.save(next);
+    if (mounted) setState(() => _state = next);
   }
 
   Future<GameState> _setMarketMinute(int minute) async {
@@ -186,9 +412,82 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     return next;
   }
 
+  Future<GameState> _saveMarketNotebook(
+    Set<String> favoriteAssetIds,
+    Map<String, String> researchNotes,
+  ) async {
+    final current = _state!;
+    final favorites = favoriteAssetIds.toList()..sort();
+    final notes = <String, String>{
+      for (final entry in researchNotes.entries)
+        if (entry.value.trim().isNotEmpty)
+          entry.key: entry.value.trim().substring(
+            0,
+            math.min(300, entry.value.trim().length),
+          ),
+    };
+    final flags = <String, dynamic>{
+      ...current.story.storyFlags,
+      'marketFavoriteAssetIds': favorites,
+      'marketResearchNotes': notes,
+    };
+    final next = current.copyWith(
+      story: current.story.copyWith(storyFlags: flags),
+    );
+    await _persistence.save(next);
+    if (mounted) setState(() => _state = next);
+    return next;
+  }
+
   Future<TradeExecutionResult> _executeTrade(TradeOrder order) async {
     final current = _state!;
+    HistoricalTradeQuote? quote;
+    try {
+      quote = resolveHistoricalTradeQuote(
+        await HistoricalMarketUniverse.load(),
+        current,
+        order.assetId,
+      );
+    } catch (_) {
+      return TradeExecutionResult(
+        state: current,
+        success: false,
+        message: '기준 시세를 확인하지 못했어요. 잠시 뒤 다시 시도해 주세요.',
+      );
+    }
+    final asset = quote?.asset;
+    if (quote == null ||
+        asset == null ||
+        order.symbol != asset.code ||
+        order.name != asset.name ||
+        order.market != asset.market ||
+        order.currency != asset.currency ||
+        order.quoteDate != quote.quoteDate ||
+        order.marketMinute != quote.marketMinute ||
+        order.unitPrice != quote.unitPrice ||
+        order.isTradingDay != quote.isTradingDay) {
+      return TradeExecutionResult(
+        state: current,
+        success: false,
+        message: '기준 시세가 바뀌었어요. 주문창을 다시 확인해 주세요.',
+      );
+    }
     final result = _engine.executeTrade(current, order);
+    if (!result.success) return result;
+    await _persistence.save(result.state);
+    if (mounted) setState(() => _state = result.state);
+    return result;
+  }
+
+  Future<FinanceActionResult> _transferBrokerageCash(
+    int amount,
+    bool deposit,
+  ) async {
+    final result = _engine.transferBrokerageCash(
+      _state!,
+      amount: amount,
+      deposit: deposit,
+    );
     if (!result.success) return result;
     await _persistence.save(result.state);
     if (mounted) setState(() => _state = result.state);
@@ -199,6 +498,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       scaffoldMessengerKey: _scaffoldMessengerKey,
+      navigatorKey: _navigatorKey,
       debugShowCheckedModeBanner: false,
       title: '밀레니엄 캐피탈',
       theme: ThemeData(
@@ -235,21 +535,55 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
                 onRetry: () => unawaited(_restoreGame(retry: true)),
               ),
             )
-          : _state == null
-          ? _GameFrame(
-              child: VisualNovelOnboardingScreen(onCreate: _createCompany),
-            )
           : _GameFrame(
-              child: OfficeScreen(
-                state: _state!,
-                engine: _engine,
-                onAdvanceDay: _advanceDay,
-                onSetMarketMinute: _setMarketMinute,
-                onResolveDecision: _resolveDecision,
-                onRequestFamilyHelp: _requestFamilyHelp,
-                onCompleteWork: _completeWork,
-                onExecuteTrade: _executeTrade,
-              ),
+              child: switch (_view) {
+                _AppView.title => _GameTitleScreen(
+                  occupiedSlots: _slots.where((slot) => !slot.isEmpty).length,
+                  onNewGame: _startNewGame,
+                  onContinue: _showContinue,
+                ),
+                _AppView.continueGame => _SaveSlotScreen(
+                  slots: _slots,
+                  activeSlot: _activeSlot,
+                  onLoad: _continueSlot,
+                  onDelete: _deleteSaveSlot,
+                  onBack: _showTitle,
+                ),
+                _AppView.onboarding => VisualNovelOnboardingScreen(
+                  onCreate: _createCompany,
+                  onExit: _showTitle,
+                ),
+                _AppView.game when _state != null => OfficeScreen(
+                  state: _state!,
+                  engine: _engine,
+                  activeSaveSlot: _activeSlot,
+                  lastSavedAt: _lastSavedAt,
+                  onManualSave: _manualSave,
+                  onReturnToTitle: _returnToTitle,
+                  onAdvanceDay: _advanceDay,
+                  onAdvanceDays: _advanceDays,
+                  onSetMarketMinute: _setMarketMinute,
+                  onSaveMarketNotebook: _saveMarketNotebook,
+                  onResolveDecision: _resolveDecision,
+                  onClaimMission: _claimMission,
+                  onRequestFamilyHelp: _requestFamilyHelp,
+                  onHireEmployee: _hireEmployee,
+                  onLaunchFund: _launchFund,
+                  onPurchaseSpendingOption: _purchaseSpendingOption,
+                  onSellRealEstate: _sellRealEstate,
+                  onPlayChanceGame: _playAdultChanceGame,
+                  onCompleteHubTutorial: _completeHubTutorial,
+                  onArchiveNews: _archiveNews,
+                  onCompleteWork: _completeWork,
+                  onExecuteTrade: _executeTrade,
+                  onTransferBrokerageCash: _transferBrokerageCash,
+                ),
+                _ => _GameTitleScreen(
+                  occupiedSlots: _slots.where((slot) => !slot.isEmpty).length,
+                  onNewGame: _startNewGame,
+                  onContinue: _showContinue,
+                ),
+              },
             ),
     );
   }
@@ -583,14 +917,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       const _Sticker(icon: Icons.mail_rounded, label: '첫 투자 장부'),
       const SizedBox(height: 14),
       Text(
-        '초기자본 100만원\n창립 인원은 나 한 명',
+        '초기자본 0원\n직접 번 종잣돈으로 시작',
         style: Theme.of(context).textTheme.headlineLarge,
       ),
       const SizedBox(height: 10),
       const _OutlinedCard(
         color: Color(0xFFFFFEF8),
         child: Text(
-          '“어떤 회사를 믿고, 왜 믿었는지 기록해 보아라. 많이 버는 것보다 잃었을 때 이유를 아는 사람이 되어라.”\n\n계좌는 어머니 명의로 만들고 비밀번호와 도장은 부모님이 보관합니다. 나는 기업을 조사하고 투자 제안서를 씁니다.',
+          '“첫 돈은 네가 직접 벌어 보아라. 어떤 회사를 믿고, 왜 믿었는지도 함께 기록해라.”\n\n계좌는 0원으로 열고 어머니 명의로 관리합니다. 나는 일거리로 종잣돈 1만원을 먼저 마련한 뒤, 기업을 조사하고 투자 제안서를 씁니다.',
           style: TextStyle(
             color: _ink,
             fontSize: 12,
@@ -909,22 +1243,56 @@ class OfficeScreen extends StatelessWidget {
     super.key,
     required this.state,
     required this.engine,
+    required this.activeSaveSlot,
+    required this.lastSavedAt,
+    required this.onManualSave,
+    required this.onReturnToTitle,
     required this.onAdvanceDay,
+    this.onAdvanceDays,
     required this.onSetMarketMinute,
+    required this.onSaveMarketNotebook,
     required this.onResolveDecision,
+    this.onClaimMission,
     required this.onRequestFamilyHelp,
+    this.onHireEmployee,
+    this.onLaunchFund,
+    this.onPurchaseSpendingOption,
+    this.onSellRealEstate,
+    this.onPlayChanceGame,
+    this.onCompleteHubTutorial,
+    this.onArchiveNews,
     required this.onCompleteWork,
     required this.onExecuteTrade,
+    this.onTransferBrokerageCash,
   });
 
   final GameState state;
   final GameEngine engine;
+  final int activeSaveSlot;
+  final DateTime? lastSavedAt;
+  final Future<void> Function() onManualSave;
+  final VoidCallback onReturnToTitle;
   final Future<GameState> Function() onAdvanceDay;
+  final Future<GameState> Function(int days)? onAdvanceDays;
   final Future<GameState> Function(int) onSetMarketMinute;
+  final Future<GameState> Function(Set<String>, Map<String, String>)
+  onSaveMarketNotebook;
   final Future<void> Function(String, String) onResolveDecision;
+  final Future<MissionClaimResult> Function()? onClaimMission;
   final Future<GameState> Function(String) onRequestFamilyHelp;
+  final Future<GameState> Function(String)? onHireEmployee;
+  final Future<GameState> Function()? onLaunchFund;
+  final Future<FinanceActionResult> Function(String optionId)?
+  onPurchaseSpendingOption;
+  final Future<FinanceActionResult> Function(String assetId)? onSellRealEstate;
+  final Future<FinanceActionResult> Function(int stake)? onPlayChanceGame;
+  final Future<void> Function()? onCompleteHubTutorial;
+  final Future<void> Function(String headline, List<String> eventIds)?
+  onArchiveNews;
   final Future<GameState> Function(WorkSessionResult) onCompleteWork;
   final Future<TradeExecutionResult> Function(TradeOrder) onExecuteTrade;
+  final Future<FinanceActionResult> Function(int amount, bool deposit)?
+  onTransferBrokerageCash;
 
   @override
   Widget build(BuildContext context) {
@@ -944,7 +1312,10 @@ class OfficeScreen extends StatelessWidget {
                     StockMarketScreen(
                       state: state,
                       onSetMarketMinute: onSetMarketMinute,
+                      onSaveMarketNotebook: onSaveMarketNotebook,
+                      onClaimMission: onClaimMission,
                       onExecuteTrade: onExecuteTrade,
+                      onTransferCash: onTransferBrokerageCash,
                     ),
                   ),
                 ),
@@ -954,6 +1325,8 @@ class OfficeScreen extends StatelessWidget {
                     OrganizationScreen(
                       state: state,
                       onRequestFamilyHelp: onRequestFamilyHelp,
+                      onHireEmployee: onHireEmployee,
+                      onLaunchFund: onLaunchFund,
                     ),
                   ),
                 ),
@@ -965,19 +1338,160 @@ class OfficeScreen extends StatelessWidget {
                     ),
                   ),
                 ),
+                activeSaveSlot: activeSaveSlot,
+                lastSavedAt: lastSavedAt,
+                onOpenGameMenu: () => _showGameMenu(context),
+                onTutorialComplete: onCompleteHubTutorial,
               ),
             ),
             _AdvanceBar(
               hasPendingDecision: pending.isNotEmpty,
+              campaignComplete: state.campaignComplete,
               marketMinute: state.marketMinute,
-              tradingDay: isMarketTradingDay(state.currentDate),
               onAdvanceHour: () => _handleAdvanceHour(context),
               onAdvanceDay: () => _handleAdvanceDay(context),
+              onAdvanceBatch: () => _showAdvanceMenu(context),
+              onOpenEnding: () => Navigator.of(
+                context,
+              ).push(_gameSceneRoute<void>(CampaignEndingScreen(state: state))),
             ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _showGameMenu(BuildContext context) async {
+    final action = await showModalBottomSheet<_GameMenuAction>(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: const Color(0xFFF7F3EA),
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1B263A),
+                      borderRadius: BorderRadius.circular(13),
+                    ),
+                    child: const Icon(
+                      Icons.save_rounded,
+                      color: Color(0xFFFFD76A),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '$activeSaveSlot번 저장 슬롯',
+                          style: const TextStyle(
+                            color: _ink,
+                            fontSize: 19,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        Text(
+                          lastSavedAt == null
+                              ? '아직 저장 시각 정보가 없습니다'
+                              : '최근 저장 ${_savedAtLabel(lastSavedAt)}',
+                          style: const TextStyle(fontSize: 11),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.all(11),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8F2E8),
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(
+                      Icons.autorenew_rounded,
+                      color: Color(0xFF3C7651),
+                      size: 19,
+                    ),
+                    SizedBox(width: 9),
+                    Expanded(
+                      child: Text(
+                        '게임 날짜가 하루 넘어갈 때마다 자동 저장됩니다.',
+                        style: TextStyle(
+                          color: Color(0xFF315F42),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+              FilledButton.icon(
+                key: const Key('manual-save-button'),
+                onPressed: () =>
+                    Navigator.pop(sheetContext, _GameMenuAction.save),
+                icon: const Icon(Icons.save_rounded),
+                label: const Text('지금 수동저장'),
+              ),
+              const SizedBox(height: 4),
+              TextButton.icon(
+                key: const Key('return-title-button'),
+                onPressed: () =>
+                    Navigator.pop(sheetContext, _GameMenuAction.title),
+                icon: const Icon(Icons.home_outlined),
+                label: const Text('타이틀로 돌아가기'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (action == null || !context.mounted) return;
+    if (action == _GameMenuAction.save) {
+      try {
+        await onManualSave();
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$activeSaveSlot번 슬롯에 수동저장했습니다.')),
+        );
+      } catch (_) {
+        if (context.mounted) _showSaveFailure(context);
+      }
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('타이틀로 돌아갈까요?'),
+        content: const Text('현재 진행은 이미 저장되어 있습니다. 필요하면 먼저 수동저장할 수 있어요.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('계속 플레이'),
+          ),
+          FilledButton(
+            key: const Key('confirm-return-title-button'),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('타이틀로'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) onReturnToTitle();
   }
 
   Future<void> _handleAdvanceHour(BuildContext context) async {
@@ -990,13 +1504,83 @@ class OfficeScreen extends StatelessWidget {
       return;
     }
     if (!context.mounted) return;
-    final phase = marketClockAt(
-      target,
-      tradingDay: isMarketTradingDay(state.currentDate),
-    );
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${marketTimeLabel(target)} · ${phase.label}')),
+      SnackBar(content: Text('${marketTimeLabel(target)} · 아파트 시간이 1시간 흘렀어요.')),
     );
+  }
+
+  Future<void> _showAdvanceMenu(BuildContext context) async {
+    if (onAdvanceDays == null) return;
+    final selection = await showModalBottomSheet<int>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  '빠르게 진행',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: 6),
+                const Text('모든 날짜를 하루씩 계산하므로 기업행동·월 비용·결정 이벤트를 건너뛰지 않습니다.'),
+                const SizedBox(height: 12),
+                ListTile(
+                  leading: const Icon(Icons.next_plan_rounded),
+                  title: const Text('다음 거래일까지'),
+                  onTap: () {
+                    var days = 1;
+                    while (days < 14 &&
+                        !isMarketTradingDay(
+                          state.currentDate.add(Duration(days: days)),
+                        )) {
+                      days++;
+                    }
+                    Navigator.pop(sheetContext, days);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.view_week_rounded),
+                  title: const Text('1주 진행'),
+                  onTap: () => Navigator.pop(sheetContext, 7),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.calendar_month_rounded),
+                  title: const Text('1개월 진행'),
+                  onTap: () => Navigator.pop(sheetContext, 30),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.event_available_rounded),
+                  title: const Text('다음 결정까지 (최대 90일)'),
+                  onTap: () => Navigator.pop(sheetContext, 90),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    if (selection == null || !context.mounted) return;
+    try {
+      final next = await onAdvanceDays!(selection);
+      if (!context.mounted) return;
+      final advanced = next.day - state.day;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            next.pendingDecisions.isNotEmpty
+                ? '$advanced일 진행 후 새 안건 앞에서 멈췄습니다.'
+                : '$advanced일 진행했습니다.',
+          ),
+        ),
+      );
+    } catch (_) {
+      if (context.mounted) _showSaveFailure(context);
+    }
   }
 
   Future<void> _handleAdvanceDay(BuildContext context) async {
@@ -1023,14 +1607,36 @@ class OfficeScreen extends StatelessWidget {
       }
       if (!context.mounted) return;
       final brief = buildDailyBrief(closingState);
-      final article = await client.generate(
-        dynamicNewsRequestForState(closingState, brief),
-      );
+      final meaningfulAction =
+          closingState.ledger.any((entry) => entry.day == closingState.day) ||
+          closingState.decisions.any(
+            (decision) =>
+                decision.status == DecisionStatus.resolved &&
+                decision.createdDay == closingState.day,
+          );
+      final shouldGenerate =
+          isMarketTradingDay(closingState.currentDate) &&
+          (brief.isBreaking || meaningfulAction);
+      final article = shouldGenerate
+          ? await client.generate(
+              dynamicNewsRequestForState(closingState, brief),
+            )
+          : null;
       newspaper = await buildDailyMarketNewspaper(
         closingState,
         dynamicArticle: article,
       );
-      final remaining = 650 - stopwatch.elapsedMilliseconds;
+      await onArchiveNews?.call(
+        newspaper.headline,
+        historicalNewsEventsForDate(closingState.currentDate)
+            .map(
+              (event) =>
+                  '${event.year}-${event.month}-${event.day}-${event.title}',
+            )
+            .toList(growable: false),
+      );
+      final remaining =
+          (shouldGenerate ? 350 : 100) - stopwatch.elapsedMilliseconds;
       if (remaining > 0) {
         await Future<void>.delayed(Duration(milliseconds: remaining));
       }
@@ -1043,21 +1649,61 @@ class OfficeScreen extends StatelessWidget {
       _gameSceneRoute<bool>(KoreaEconomicNewspaperScene(newspaper: newspaper)),
     );
     if (proceed != true || !context.mounted) return;
-    await onAdvanceDay();
+    final previousDay = state.day;
+    final advancedState = await onAdvanceDay();
+    if (advancedState.day > previousDay &&
+        advancedState.marketMinute != marketDayStartMinute) {
+      await onSetMarketMinute(marketDayStartMinute);
+    }
   }
 
   void _openDecision(BuildContext context) {
     Navigator.of(context).push<void>(
       _gameSceneRoute<void>(
-        DecisionInboxScreen(state: state, onResolveDecision: onResolveDecision),
+        DecisionInboxScreen(
+          state: state,
+          onResolveDecision: onResolveDecision,
+          onClaimMission:
+              onClaimMission ??
+              () async => MissionClaimResult(
+                state: state,
+                success: false,
+                message: '이 화면에서는 미션 보상을 저장할 수 없습니다.',
+              ),
+        ),
       ),
     );
   }
 
   void _openLedger(BuildContext context) {
-    Navigator.of(
-      context,
-    ).push<void>(_gameSceneRoute<void>(PortfolioLedgerScreen(state: state)));
+    Navigator.of(context).push<void>(
+      _gameSceneRoute<void>(
+        PortfolioLedgerScreen(
+          state: state,
+          onPurchaseSpendingOption:
+              onPurchaseSpendingOption ??
+              (optionId) async => FinanceActionResult(
+                state: state,
+                success: false,
+                message: '이 화면에서는 저장 기능을 사용할 수 없습니다.',
+              ),
+          onSellRealEstate:
+              onSellRealEstate ??
+              (assetId) async => FinanceActionResult(
+                state: state,
+                success: false,
+                message: '이 화면에서는 저장 기능을 사용할 수 없습니다.',
+              ),
+          onPlayChanceGame:
+              onPlayChanceGame ??
+              (stake) async => FinanceActionResult(
+                state: state,
+                success: false,
+                message: '이 화면에서는 저장 기능을 사용할 수 없습니다.',
+              ),
+        ),
+      ),
+    );
   }
 }
 
@@ -1117,15 +1763,18 @@ class _SceneClockStrip extends StatelessWidget {
       child: Row(
         children: [
           if (onBack != null) ...[
-            InkWell(
-              onTap: onBack,
-              borderRadius: BorderRadius.circular(20),
-              child: Padding(
-                padding: const EdgeInsets.all(5),
-                child: Icon(
-                  Icons.arrow_back_ios_new_rounded,
-                  color: foreground,
-                  size: 17,
+            SizedBox(
+              width: 44,
+              height: 44,
+              child: InkWell(
+                onTap: onBack,
+                borderRadius: BorderRadius.circular(22),
+                child: Center(
+                  child: Icon(
+                    Icons.arrow_back_ios_new_rounded,
+                    color: foreground,
+                    size: 20,
+                  ),
                 ),
               ),
             ),
@@ -1252,9 +1901,9 @@ class _FamilyDecisionSceneState extends State<FamilyDecisionScene> {
                       location: '우리 집 거실 · 가족회의',
                       caption: _isSubmitting
                           ? '선택을 투자노트에 저장하고 있다.'
-                          : '엄마가 새 안건을 식탁 위에 올려두었다.',
+                          : '가족이 함께 읽는 중이에요. 어려운 말은 아래에서 풀어드려요.',
                       minute: widget.state.marketMinute,
-                      costLabel: _isSubmitting ? '저장 중' : '결정 +30분',
+                      costLabel: _isSubmitting ? '저장 중' : '함께 고르기 · 30분',
                       onBack: _isSubmitting
                           ? null
                           : () => Navigator.of(context).pop(),
@@ -1493,8 +2142,8 @@ class DecisionSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DraggableScrollableSheet(
-      initialChildSize: 0.88,
-      minChildSize: 0.62,
+      initialChildSize: 0.96,
+      minChildSize: 0.72,
       maxChildSize: 0.96,
       builder: (context, controller) => Container(
         decoration: const BoxDecoration(
@@ -1525,7 +2174,7 @@ class DecisionSheet extends StatelessWidget {
                 ),
                 const Spacer(),
                 Text(
-                  '마감 DAY ${decision.dueDay}',
+                  'DAY ${decision.dueDay}까지 선택',
                   style: const TextStyle(
                     color: _coral,
                     fontSize: 11,
@@ -1538,7 +2187,7 @@ class DecisionSheet extends StatelessWidget {
             Text(decision.title, style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 5),
             Text(
-              '제안자 · ${decision.proposer}',
+              '이야기를 꺼낸 사람 · ${decision.proposer}',
               style: const TextStyle(
                 color: Color(0xFF6E7890),
                 fontSize: 11,
@@ -1547,12 +2196,38 @@ class DecisionSheet extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             Text(decision.body, style: Theme.of(context).textTheme.bodyMedium),
+            const SizedBox(height: 10),
+            Container(
+              key: const Key('decision-reward-preview'),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+              decoration: BoxDecoration(
+                color: const Color(0xFFDDF3FF),
+                borderRadius: BorderRadius.circular(13),
+                border: Border.all(color: _blue, width: 1.5),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.auto_awesome_rounded, size: 18, color: _ink),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '정답은 없어요 · 선택하면 +25 XP · 미션 +1',
+                      style: TextStyle(
+                        color: _ink,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
             const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
                   child: _FactChip(
-                    label: '핵심 장점',
+                    label: '좋아지는 점',
                     value: decision.benefit,
                     color: const Color(0xFFDFF7EF),
                   ),
@@ -1560,40 +2235,16 @@ class DecisionSheet extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: _FactChip(
-                    label: '핵심 위험',
+                    label: '조심할 점',
                     value: decision.risk,
                     color: const Color(0xFFFFE3DF),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 14),
-            const Text(
-              '사람들의 의견',
-              style: TextStyle(
-                color: _ink,
-                fontSize: 13,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: 7),
-            ...decision.advisorOpinions.map(
-              (opinion) => Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Text(
-                  '• $opinion',
-                  style: const TextStyle(
-                    color: Color(0xFF66718A),
-                    fontSize: 11,
-                    height: 1.35,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ),
             const SizedBox(height: 10),
             const Text(
-              '어떻게 할까요?',
+              '내 생각과 가까운 쪽은?',
               style: TextStyle(
                 color: _ink,
                 fontSize: 15,
@@ -1660,8 +2311,44 @@ class DecisionSheet extends StatelessWidget {
                 ),
               );
             }),
+            const SizedBox(height: 4),
+            Material(
+              type: MaterialType.transparency,
+              child: ExpansionTile(
+                key: const Key('decision-advisor-opinions'),
+                tilePadding: EdgeInsets.zero,
+                childrenPadding: const EdgeInsets.only(bottom: 6),
+                title: const Text(
+                  '가족 의견 더 보기',
+                  style: TextStyle(
+                    color: _ink,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                children: decision.advisorOpinions
+                    .map(
+                      (opinion) => Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            '• $opinion',
+                            style: const TextStyle(
+                              color: Color(0xFF66718A),
+                              fontSize: 11,
+                              height: 1.35,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                    .toList(growable: false),
+              ),
+            ),
             const Text(
-              '실제 회사명을 사용하지만 내부 수치·의견·결과는 게임용 가상 시나리오입니다. 성공 확률과 미래 결과는 숨겨집니다.',
+              '실제 회사 이름이 나와도 수치와 결과는 게임용 이야기예요. 선택한 뒤 결과를 보며 천천히 배워 보세요.',
               style: TextStyle(
                 color: Color(0xFF8A92A2),
                 fontSize: 9,
@@ -1690,8 +2377,8 @@ class _OfficeStatusCard extends StatelessWidget {
       1 => '10만원',
       2 => '25만원',
       3 => '자산 25%',
-      4 => '해외 검토',
-      _ => '동등 발언권',
+      4 => '500만원',
+      _ => '제한 없음',
     };
     return _OutlinedCard(
       color: const Color(0xF7FFFEF8),
@@ -1747,6 +2434,7 @@ class _OfficeStatusCard extends StatelessWidget {
                 ),
               ),
               _StatusValue(label: '주문 한도', value: orderLimit),
+              _StatusValue(label: '평판', value: '${state.story.reputation}'),
             ],
           ),
           const SizedBox(height: 8),
@@ -2251,6 +2939,32 @@ class KoreaEconomicNewspaperSheet extends StatelessWidget {
                 fontWeight: FontWeight.w700,
               ),
             ),
+            if (newspaper.brief.otherHeadlines.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                color: const Color(0xFFF1EBDD),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '같은 날의 다른 소식',
+                      style: TextStyle(fontWeight: FontWeight.w900),
+                    ),
+                    const SizedBox(height: 6),
+                    ...newspaper.brief.otherHeadlines.map(
+                      (event) => Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Text(
+                          '• ${event.title}',
+                          style: const TextStyle(fontSize: 11, height: 1.4),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             if (newspaper.dynamicArticle != null) ...[
               const SizedBox(height: 12),
               _DynamicNewsImpact(article: newspaper.dynamicArticle!),
@@ -2475,29 +3189,138 @@ class _NewspaperMoverRow extends StatelessWidget {
   );
 }
 
+class CampaignEndingScreen extends StatelessWidget {
+  const CampaignEndingScreen({super.key, required this.state});
+  final GameState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final realized = state.ledger.fold<int>(
+      0,
+      (sum, entry) => sum + entry.realizedPnl,
+    );
+    final fees = state.ledger.fold<int>(
+      0,
+      (sum, entry) => sum + entry.tradingFee,
+    );
+    final resolved = state.decisions
+        .where((decision) => decision.status == DecisionStatus.resolved)
+        .length;
+    final history =
+        (state.story.storyFlags['performanceHistory'] as List?) ?? const [];
+    final benchmarkStart = history.isEmpty
+        ? 1000
+        : ((history.first as Map)['benchmarkIndex'] as num?)?.toInt() ?? 1000;
+    final benchmarkEnd = history.isEmpty
+        ? 1000
+        : ((history.last as Map)['benchmarkIndex'] as num?)?.toInt() ?? 1000;
+    final benchmarkRate = benchmarkStart <= 0
+        ? 0.0
+        : (benchmarkEnd - benchmarkStart) / benchmarkStart * 100;
+    return Scaffold(
+      backgroundColor: const Color(0xFFF6F1E5),
+      appBar: AppBar(title: const Text('2010 최종 결산')),
+      body: ListView(
+        padding: const EdgeInsets.all(18),
+        children: [
+          const Icon(Icons.emoji_events_rounded, size: 72, color: _coral),
+          const Text(
+            '새천년의 10년을 완주했습니다',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 18),
+          _EndingMetric(label: '최종 현금', value: '${_money(state.cash)}원'),
+          _EndingMetric(
+            label: '보유원가',
+            value: '${_money(state.portfolioCost)}원',
+          ),
+          _EndingMetric(
+            label: '누적 실현손익',
+            value: '${realized >= 0 ? '+' : ''}${_money(realized)}원',
+          ),
+          _EndingMetric(label: '누적 거래비용', value: '${_money(fees)}원'),
+          _EndingMetric(
+            label: '평판 / 가족 신뢰',
+            value: '${state.story.reputation} / ${state.story.familyTrust}',
+          ),
+          _EndingMetric(
+            label: '직원 / 외부 AUM',
+            value:
+                '${state.organization.employees.length}명 / ${_money(state.story.externalAum)}원',
+          ),
+          _EndingMetric(
+            label: '부동산 추정가 / 월 순현금',
+            value:
+                '${_money(state.personalFinance.estimatedPropertyValueAt(state.day))}원 / ${_money(state.personalFinance.monthlyPropertyIncome - state.personalFinance.monthlyPropertyCost)}원',
+          ),
+          _EndingMetric(
+            label: '선택지출 / 확률 오락 손익',
+            value:
+                '${_money(state.personalFinance.totalSpent)}원 / ${state.personalFinance.chanceNet >= 0 ? '+' : ''}${_money(state.personalFinance.chanceNet)}원',
+          ),
+          _EndingMetric(label: '해결한 결정', value: '$resolved건'),
+          _EndingMetric(
+            label: '기준지수 변화',
+            value:
+                '${benchmarkRate >= 0 ? '+' : ''}${benchmarkRate.toStringAsFixed(1)}%',
+          ),
+          const SizedBox(height: 16),
+          Text(
+            state.story.reputation >= 70
+                ? '엔딩: 신뢰받는 장기 투자회사'
+                : state.story.fundLaunched
+                ? '엔딩: 첫 고객과 함께 성장한 운용사'
+                : state.story.familyTrust >= 60
+                ? '엔딩: 원칙을 지킨 가족 투자연구소'
+                : '엔딩: 시장에서 배움을 이어가는 투자자',
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EndingMetric extends StatelessWidget {
+  const _EndingMetric({required this.label, required this.value});
+  final String label;
+  final String value;
+  @override
+  Widget build(BuildContext context) => ListTile(
+    contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+    title: Text(label),
+    trailing: Text(value, style: const TextStyle(fontWeight: FontWeight.w900)),
+  );
+}
+
 class _AdvanceBar extends StatelessWidget {
   const _AdvanceBar({
     required this.hasPendingDecision,
+    required this.campaignComplete,
     required this.marketMinute,
-    required this.tradingDay,
     required this.onAdvanceHour,
     required this.onAdvanceDay,
+    required this.onAdvanceBatch,
+    required this.onOpenEnding,
   });
   final bool hasPendingDecision;
+  final bool campaignComplete;
   final int marketMinute;
-  final bool tradingDay;
   final VoidCallback onAdvanceHour;
   final VoidCallback onAdvanceDay;
+  final VoidCallback onAdvanceBatch;
+  final VoidCallback onOpenEnding;
 
   @override
   Widget build(BuildContext context) {
     final ended = marketMinute >= marketDayEndMinute;
-    final info = marketClockAt(marketMinute, tradingDay: tradingDay);
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
       decoration: const BoxDecoration(
-        color: Color(0xFF8FDAF2),
-        border: Border(top: BorderSide(color: _ink, width: 2)),
+        color: Color(0xFFF7F3EA),
+        border: Border(top: BorderSide(color: Color(0xFFD7CDBC))),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2505,10 +3328,12 @@ class _AdvanceBar extends StatelessWidget {
         children: [
           Text(
             hasPendingDecision
-                ? '거실 탁자 위 안건 편지를 확인해야 진행할 수 있어요.'
+                ? '거실의 안건 편지를 먼저 확인해 주세요.'
+                : campaignComplete
+                ? '2010년 캠페인을 마쳤어요. 마지막 장부를 확인해 보세요.'
                 : ended
                 ? '오늘 장이 끝났어요. 신문으로 하루를 마쳐요.'
-                : '${marketTimeLabel(marketMinute)} · ${info.label}',
+                : '${marketTimeLabel(marketMinute)} · 아파트 생활',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
@@ -2535,7 +3360,7 @@ class _AdvanceBar extends StatelessWidget {
                       size: 19,
                     ),
                     label: const Text('1시간 보내기'),
-                    style: _advanceButtonStyle(_yellow),
+                    style: _advanceButtonStyle(const Color(0xFFFFE7A6)),
                   ),
                 ),
               ),
@@ -2545,16 +3370,37 @@ class _AdvanceBar extends StatelessWidget {
                   height: 50,
                   child: ElevatedButton.icon(
                     key: const Key('advance-day-button'),
-                    onPressed: hasPendingDecision ? null : onAdvanceDay,
+                    onPressed: hasPendingDecision
+                        ? null
+                        : campaignComplete
+                        ? onOpenEnding
+                        : onAdvanceDay,
                     icon: Icon(
-                      hasPendingDecision
-                          ? Icons.lock_clock_rounded
+                      campaignComplete
+                          ? Icons.emoji_events_rounded
                           : Icons.newspaper_rounded,
                       size: 19,
                     ),
-                    label: const Text('하루 보내기'),
-                    style: _advanceButtonStyle(_coral),
+                    label: Text(campaignComplete ? '최종 결산' : '하루 보내기'),
+                    style: _advanceButtonStyle(const Color(0xFFFFC7B8)),
                   ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                width: 52,
+                height: 50,
+                child: IconButton.filled(
+                  key: const Key('advance-batch-button'),
+                  tooltip: '빠르게 진행',
+                  onPressed: hasPendingDecision || campaignComplete
+                      ? null
+                      : onAdvanceBatch,
+                  style: IconButton.styleFrom(
+                    backgroundColor: const Color(0xFFE9E4D8),
+                    foregroundColor: _ink,
+                  ),
+                  icon: const Icon(Icons.fast_forward_rounded),
                 ),
               ),
             ],
@@ -2664,7 +3510,7 @@ class _StartingConditions extends StatelessWidget {
   Widget build(BuildContext context) {
     const conditions = [
       ('출발하는 날', '2000.01.01', Color(0xFFFFFEF8)),
-      ('초기자본', '100만원', Color(0xFFFFF4B8)),
+      ('초기자본', '0원', Color(0xFFFFF4B8)),
       ('창립 인원', '1명', Color(0xFFDFF7EF)),
       ('첫 무대', '한국 · 미국 · 일본', Color(0xFFFFE3DF)),
     ];
@@ -3071,7 +3917,7 @@ double? _portfolioPriceAtCurrentTime(
   final path = generatedFullMarketDayPath(
     previousClose: previousClose,
     officialClose: quote.close,
-    seed: _stockSeed(asset.code, state.currentDate),
+    seed: marketStockSeed(asset.code, state.currentDate),
   );
   return path[marketTickForMinute(
     state.marketMinute,

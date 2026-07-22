@@ -52,7 +52,8 @@ class _SeedMoneyHubScreenState extends State<SeedMoneyHubScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final progress = (_state.cash / 10000).clamp(0.0, 1.0);
+    final progress = (_earned / 10000).clamp(0.0, 1.0);
+    final age = _state.currentDate.year - _state.story.playerBirthYear;
     return Scaffold(
       backgroundColor: const Color(0xFFF4EEDC),
       body: SafeArea(
@@ -60,7 +61,7 @@ class _SeedMoneyHubScreenState extends State<SeedMoneyHubScreen> {
           children: [
             _WorkTopBar(
               title: '종잣돈 일거리',
-              subtitle: '2000년 1월 · 보호자와 함께',
+              subtitle: '${_state.currentDate.year}년 · $age살 · 직접 번 돈만 집계',
               onBack: () => Navigator.of(context).pop(),
             ),
             _SceneClockStrip(
@@ -140,9 +141,9 @@ class _SeedMoneyHubScreenState extends State<SeedMoneyHubScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          _state.cash >= 10000
-                              ? '첫 목표 달성! 이제 일할지 조사할지는 네 선택이야.'
-                              : '첫 조사예산 10,000원까지 ${_money(10000 - _state.cash)}원',
+                          _earned >= 10000
+                              ? '직접 번 종잣돈 목표 달성! 보호자 주문 권한이 열렸어요.'
+                              : '직접 번 누적액 ${_money(_earned)}원 · 10,000원까지 ${_money(10000 - _earned)}원',
                           style: const TextStyle(
                             color: Color(0xFFDCE5F6),
                             fontSize: 11,
