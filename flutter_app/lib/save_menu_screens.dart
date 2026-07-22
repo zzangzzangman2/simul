@@ -18,137 +18,210 @@ class _GameTitleScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Scaffold(
     key: const Key('game-title-screen'),
-    backgroundColor: const Color(0xFF080D19),
+    backgroundColor: _cream,
     body: Stack(
       fit: StackFit.expand,
       children: [
         const DecoratedBox(
           decoration: BoxDecoration(
-            gradient: RadialGradient(
-              center: Alignment(0.75, -0.8),
-              radius: 1.45,
-              colors: [Color(0xFF243B64), Color(0xFF0D172A), Color(0xFF080D19)],
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xFFDDF8F3), Color(0xFFEAF8F0), _cream],
             ),
           ),
         ),
         Positioned(
-          top: -80,
-          right: -100,
+          top: -54,
+          right: -58,
           child: Container(
-            width: 300,
-            height: 300,
-            decoration: BoxDecoration(
+            width: 180,
+            height: 180,
+            decoration: const BoxDecoration(
               shape: BoxShape.circle,
-              gradient: RadialGradient(
-                colors: [
-                  const Color(0xFFFFD76A).withValues(alpha: 0.22),
-                  Colors.transparent,
-                ],
-              ),
+              color: Color(0x66FFDF68),
+            ),
+          ),
+        ),
+        Positioned(
+          top: 170,
+          left: -46,
+          child: Container(
+            width: 116,
+            height: 116,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: Color(0x55FF7D72),
             ),
           ),
         ),
         SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(22, 28, 22, 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxHeight < 740;
+              return Padding(
+                padding: EdgeInsets.fromLTRB(
+                  20,
+                  compact ? 14 : 22,
+                  20,
+                  compact ? 14 : 20,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 11,
-                        vertical: 7,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0x1FFFFFFF),
-                        borderRadius: BorderRadius.circular(99),
-                        border: Border.all(color: const Color(0x33FFFFFF)),
-                      ),
-                      child: const Text(
-                        'SEOUL · 2000',
-                        style: TextStyle(
-                          color: Color(0xFFAEC7EB),
-                          fontSize: 10,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 1.6,
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 7,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.86),
+                            borderRadius: BorderRadius.circular(99),
+                            border: Border.all(color: const Color(0xFFBBDDD7)),
+                          ),
+                          child: const Text(
+                            '서울 · 2000년',
+                            style: TextStyle(
+                              color: Color(0xFF39766D),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          '$occupiedSlots / ${GamePersistence.slotCount} 저장',
+                          style: const TextStyle(
+                            color: Color(0xFF66837E),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: compact ? 10 : 16),
+                    Align(
+                      alignment: Alignment.center,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _yellow,
+                          borderRadius: BorderRadius.circular(99),
+                          border: Border.all(color: const Color(0xFFFFC84F)),
+                        ),
+                        child: const Text(
+                          '0원에서 시작!',
+                          style: TextStyle(
+                            color: _ink,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
                       ),
                     ),
-                    const Spacer(),
+                    SizedBox(height: compact ? 7 : 9),
                     Text(
-                      '$occupiedSlots / ${GamePersistence.slotCount} SAVE',
-                      style: const TextStyle(
-                        color: Color(0xFF7084A4),
-                        fontSize: 10,
+                      '부자되기\n시뮬레이션',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: _ink,
+                        fontSize: compact ? 31 : 35,
+                        height: 0.98,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -1.8,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      '2000년 서울, 우리 가족의 작은 저금통부터 시작해요',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Color(0xFF58736E),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    SizedBox(height: compact ? 8 : 12),
+                    Expanded(
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxHeight: 260),
+                          child: AspectRatio(
+                            aspectRatio: 1.5,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(26),
+                                border: Border.all(
+                                  color: Colors.white,
+                                  width: 4,
+                                ),
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: Color(0x1F496A63),
+                                    blurRadius: 20,
+                                    offset: Offset(0, 8),
+                                  ),
+                                ],
+                              ),
+                              clipBehavior: Clip.antiAlias,
+                              child: Semantics(
+                                key: const Key('title-cartoon-hero'),
+                                image: true,
+                                label: '서울 2000년 부자되기 카툰 일러스트',
+                                child: Image.asset(
+                                  'assets/images/title_wealth_sim_hero.webp',
+                                  fit: BoxFit.cover,
+                                  alignment: const Alignment(0, 0.38),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: compact ? 8 : 12),
+                    _TitleActionButton(
+                      key: const Key('new-game-button'),
+                      icon: Icons.auto_awesome_rounded,
+                      label: '처음하기',
+                      detail: occupiedSlots >= GamePersistence.slotCount
+                          ? '슬롯이 가득 찼어요 · 저장 삭제 후 시작'
+                          : '새로운 부자 이야기를 시작해요',
+                      filled: true,
+                      onPressed: onNewGame,
+                    ),
+                    const SizedBox(height: 9),
+                    _TitleActionButton(
+                      key: const Key('continue-game-button'),
+                      icon: Icons.folder_open_rounded,
+                      label: '이어하기',
+                      detail: occupiedSlots == 0
+                          ? '저장된 게임이 없습니다'
+                          : '저장 슬롯 $occupiedSlots개',
+                      filled: false,
+                      onPressed: onContinue,
+                    ),
+                    SizedBox(height: compact ? 9 : 13),
+                    const Text(
+                      '최대 5개 저장 · 하루 종료 자동저장 · 언제든 수동저장',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Color(0xFF718783),
+                        fontSize: 9,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
                   ],
                 ),
-                const Spacer(flex: 3),
-                const Icon(
-                  Icons.candlestick_chart_rounded,
-                  color: Color(0xFFFFD76A),
-                  size: 52,
-                ),
-                const SizedBox(height: 18),
-                const Text(
-                  'MILLENNIUM\nCAPITAL',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 38,
-                    height: 0.98,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -2.2,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  '0원에서 시작하는 2000년 투자 성장기',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Color(0xFFA9B7CE),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const Spacer(flex: 4),
-                _TitleActionButton(
-                  key: const Key('new-game-button'),
-                  icon: Icons.auto_awesome_rounded,
-                  label: '처음하기',
-                  detail: occupiedSlots >= GamePersistence.slotCount
-                      ? '슬롯이 가득 찼어요 · 저장 삭제 후 시작'
-                      : '새로운 회사를 설립합니다',
-                  filled: true,
-                  onPressed: onNewGame,
-                ),
-                const SizedBox(height: 10),
-                _TitleActionButton(
-                  key: const Key('continue-game-button'),
-                  icon: Icons.folder_open_rounded,
-                  label: '이어하기',
-                  detail: occupiedSlots == 0
-                      ? '저장된 게임이 없습니다'
-                      : '저장 슬롯 $occupiedSlots개',
-                  filled: false,
-                  onPressed: onContinue,
-                ),
-                const SizedBox(height: 18),
-                const Text(
-                  '최대 5개 저장 · 하루 종료 자동저장 · 언제든 수동저장',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Color(0xFF61718B),
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
+              );
+            },
           ),
         ),
       ],
@@ -173,58 +246,87 @@ class _TitleActionButton extends StatelessWidget {
   final VoidCallback onPressed;
 
   @override
-  Widget build(BuildContext context) => Material(
-    color: filled ? const Color(0xFFFFD76A) : const Color(0xFF151F32),
-    borderRadius: BorderRadius.circular(19),
-    clipBehavior: Clip.antiAlias,
-    child: InkWell(
-      onTap: onPressed,
-      child: Container(
-        constraints: const BoxConstraints(minHeight: 70),
-        padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 12),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(19),
-          border: Border.all(
-            color: filled ? const Color(0xFFFFEBAA) : const Color(0xFF30415D),
-          ),
+  Widget build(BuildContext context) => Container(
+    decoration: BoxDecoration(
+      color: filled ? const Color(0xFFFFCC57) : Colors.white,
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(
+        color: filled ? const Color(0xFFFFB936) : const Color(0xFFC9E2DC),
+      ),
+      boxShadow: const [
+        BoxShadow(
+          color: Color(0x1745635E),
+          blurRadius: 12,
+          offset: Offset(0, 5),
         ),
-        child: Row(
-          children: [
-            Icon(icon, color: filled ? const Color(0xFF182238) : Colors.white),
-            const SizedBox(width: 13),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: TextStyle(
-                      color: filled ? const Color(0xFF182238) : Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: -0.6,
-                    ),
-                  ),
-                  Text(
-                    detail,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: filled
-                          ? const Color(0xFF5C5130)
-                          : const Color(0xFF8FA0BB),
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
+      ],
+    ),
+    child: Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(20),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onPressed,
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 66),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: filled
+                      ? Colors.white.withValues(alpha: 0.72)
+                      : const Color(0xFFE5F6F1),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, color: const Color(0xFF39766D), size: 22),
               ),
-            ),
-            Icon(
-              Icons.arrow_forward_rounded,
-              color: filled ? const Color(0xFF182238) : const Color(0xFF8FA0BB),
-            ),
-          ],
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: const TextStyle(
+                        color: _ink,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    Text(
+                      detail,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFF657A76),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: filled
+                      ? const Color(0x22FFFFFF)
+                      : const Color(0xFFEFF8F6),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.arrow_forward_rounded,
+                  color: _ink,
+                  size: 20,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     ),

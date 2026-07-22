@@ -32,17 +32,17 @@ test("opens the Flutter family-story prologue from the default route", async () 
   assert.match(flutterIndex, /<base href="\/play\/">/);
   assert.match(flutterIndex, /flutter_bootstrap\.js/);
   assert.doesNotMatch(flutterIndex, /투자회사 설립/);
-  assert.match(flutterIndex, /창립자 1명이 현금 0원/);
-  assert.match(flutterIndex, /종잣돈 1만원을 직접/);
+  assert.match(flutterIndex, /2000년 서울/);
+  assert.match(flutterIndex, /부자되기 생활 시뮬레이션/);
   assert.match(flutterIndex, /property="og:image" content="\/og-apartment-v2\.png"/);
   assert.match(flutterIndex, /name="twitter:card" content="summary_large_image"/);
   assert.doesNotMatch(flutterIndex, /초기자본 100만원/);
   assert.match(onboarding, /1999\.12\.31\s+·\s+23:57/);
   assert.match(onboarding, /우리 투자연구소 이름/);
   assert.match(onboarding, /0원부터 첫날 시작하기/);
-  assert.match(layout, /0원에서 시작하는 투자회사/);
+  assert.match(layout, /부자되기 시뮬레이션/);
   assert.match(layout, /images: \[\{ url: `\$\{origin\}\/og-apartment-v2\.png`, width: 1672, height: 941/);
-  assert.match(layout, /themeColor: "#151B29"/);
+  assert.match(layout, /themeColor: "#DDF8F3"/);
   assert.doesNotMatch(layout, /100만원으로 시작/);
   assert.ok(socialCard.byteLength > 1_000_000);
 });
@@ -120,15 +120,15 @@ test("keeps Flutter launch metadata aligned with the current starting conditions
   ]);
   const parsedManifest = JSON.parse(manifest);
 
-  assert.match(flutterTemplate, /2000년 1월 1일/);
-  assert.match(flutterTemplate, /창립자 1명이 현금 0원/);
-  assert.match(flutterTemplate, /종잣돈 1만원을 직접/);
+  assert.match(flutterTemplate, /부자되기 시뮬레이션/);
+  assert.match(flutterTemplate, /2000년 서울/);
+  assert.match(flutterTemplate, /0원에서 시작해/);
   assert.match(flutterTemplate, /property="og:image" content="\/og-apartment-v2\.png"/);
   assert.match(flutterTemplate, /name="twitter:image" content="\/og-apartment-v2\.png"/);
   assert.doesNotMatch(flutterTemplate, /초기자본 100만원/);
-  assert.match(parsedManifest.description, /2000년 1월 1일/);
-  assert.match(parsedManifest.description, /창립자 1명이 현금 0원/);
-  assert.match(parsedManifest.description, /종잣돈 1만원을 직접/);
+  assert.equal(parsedManifest.name, "부자되기 시뮬레이션");
+  assert.match(parsedManifest.description, /2000년 서울/);
+  assert.match(parsedManifest.description, /0원에서 시작해/);
   assert.doesNotMatch(parsedManifest.description, /초기자본 100만원/);
 });
 

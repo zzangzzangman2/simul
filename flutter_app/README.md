@@ -1,4 +1,4 @@
-# MILLENNIUM CAPITAL Flutter
+# 부자되기 시뮬레이션 Flutter
 
 밝고 캐주얼한 2D 모바일 투자회사 경영 게임의 주 구현입니다. 세로형 모바일 화면을 우선하며 Web에서도 실행할 수 있습니다.
 
