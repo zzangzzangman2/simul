@@ -1366,7 +1366,10 @@ class _StockDetailScreenState extends State<_StockDetailScreen> {
                                 ),
                               ),
                               const SizedBox(height: 20),
-                              _TradingStatusRow(quote: quote),
+                              _TradingStatusRow(
+                                quote: quote,
+                                minute: currentMinute,
+                              ),
                               const SizedBox(height: 14),
                               _MinuteChartPanel(
                                 quote: quote,
@@ -3878,20 +3881,13 @@ class _MinuteChartPanelState extends State<_MinuteChartPanel> {
   List<double> _visibleMinutePrices() {
     final targetMinutes = minuteWindows[interval] ?? 60;
     final targetPoints = targetMinutes + 1;
-    final prices = <double>[...widget.quote.sessionHistory];
-    final history = widget.quote.history;
-    var historyIndex = history.length - (widget.quote.isTradingDay ? 2 : 1);
-    while (prices.length < targetPoints && historyIndex > 0) {
-      final point = history[historyIndex];
-      final previous = history[historyIndex - 1];
-      final previousSession = generatedFullMarketDayPath(
-        previousClose: previous.close,
-        officialClose: point.close,
-        seed: marketStockSeed(widget.code, point.parsedDate),
-      );
-      prices.insertAll(0, previousSession);
-      historyIndex -= 1;
+    final sessionHistory = widget.quote.sessionHistory;
+    if (!widget.quote.isTradingDay ||
+        widget.minute < krxOpenMinute ||
+        sessionHistory.length <= generatedPreOpenTicks) {
+      return <double>[sessionHistory.last];
     }
+    final prices = sessionHistory.sublist(generatedPreOpenTicks);
     if (prices.length <= targetPoints) return prices;
     return prices.sublist(prices.length - targetPoints);
   }
@@ -3932,38 +3928,18 @@ class _MinuteChartPanelState extends State<_MinuteChartPanel> {
       '${date.day.toString().padLeft(2, '0')}';
 
   List<String> _minuteAxisLabels(int visiblePointCount) {
-    final lastOffset = math.max(0, visiblePointCount - 1);
-    return <String>[
-      _minuteAxisLabel(lastOffset),
-      _minuteAxisLabel(lastOffset ~/ 2),
-      _minuteAxisLabel(0),
-    ];
-  }
-
-  String _minuteAxisLabel(int ticksBack) {
-    var remaining = math.max(0, ticksBack);
-    var minute = widget.minute.clamp(marketDayStartMinute, marketDayEndMinute);
-    var tradingDaysBack = 0;
-    final todayElapsed = minute - marketDayStartMinute;
-    if (remaining <= todayElapsed) {
-      minute -= remaining;
-    } else {
-      remaining -= todayElapsed;
-      tradingDaysBack = 1;
-      minute = marketDayEndMinute;
-      final sessionMinutes = marketDayEndMinute - marketDayStartMinute;
-      while (remaining > sessionMinutes) {
-        remaining -= sessionMinutes;
-        tradingDaysBack += 1;
-      }
-      minute -= remaining;
+    if (widget.minute < krxOpenMinute) {
+      return <String>['', '', '개장 전 ${marketTimeLabel(widget.minute)}'];
     }
-    final prefix = switch (tradingDaysBack) {
-      0 => '',
-      1 => '전일 ',
-      _ => 'D-$tradingDaysBack ',
-    };
-    return '$prefix${marketTimeLabel(minute)}';
+    final endMinute = widget.minute.clamp(krxOpenMinute, marketDayEndMinute);
+    final elapsed = math.max(0, visiblePointCount - 1);
+    final startMinute = math.max(krxOpenMinute, endMinute - elapsed);
+    final middleMinute = startMinute + (endMinute - startMinute) ~/ 2;
+    return <String>[
+      marketTimeLabel(startMinute),
+      marketTimeLabel(middleMinute),
+      marketTimeLabel(endMinute),
+    ];
   }
 
   List<String> _historicalAxisLabels() {
@@ -4367,9 +4343,10 @@ class _HistoricalCloseChartPainter extends CustomPainter {
 }
 
 class _TradingStatusRow extends StatelessWidget {
-  const _TradingStatusRow({required this.quote});
+  const _TradingStatusRow({required this.quote, required this.minute});
 
   final _LiveStock quote;
+  final int minute;
 
   @override
   Widget build(BuildContext context) => FittedBox(
@@ -4381,7 +4358,11 @@ class _TradingStatusRow extends StatelessWidget {
         const _LiveDot(),
         const SizedBox(width: 7),
         Text(
-          quote.isTradingDay ? '재현 장중 · 현실 1초마다 게임 1분 진행' : '장 마감',
+          !quote.isTradingDay
+              ? '장 마감'
+              : minute < krxOpenMinute
+              ? '개장 전 · 09:00부터 1분봉 생성'
+              : '재현 장중 · 현실 1초마다 게임 1분 진행',
           style: const TextStyle(
             color: Color(0xFF596270),
             fontSize: 11,

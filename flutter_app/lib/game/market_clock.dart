@@ -1,7 +1,6 @@
 import 'market_tick.dart';
 
 const marketDayStartMinute = 8 * 60;
-const nxtPreEndMinute = 8 * 60 + 50;
 const krxOpenMinute = 9 * 60;
 const krxContinuousEndMinute = 15 * 60 + 20;
 const krxCloseMinute = 15 * 60 + 30;
@@ -136,20 +135,11 @@ MarketClockInfo marketClockAt(int minute, {bool tradingDay = true}) {
     );
   }
   final value = minute.clamp(marketDayStartMinute, marketDayEndMinute);
-  if (value < nxtPreEndMinute) {
-    return const MarketClockInfo(
-      phase: MarketSessionPhase.nxtPre,
-      label: 'NXT형 프리마켓',
-      description: '08:00~08:50 · 게임용 확장 거래',
-      tradable: true,
-      isGameExtension: true,
-    );
-  }
   if (value < krxOpenMinute) {
     return const MarketClockInfo(
       phase: MarketSessionPhase.openingTransition,
       label: '개장 준비',
-      description: '09:00 정규장 개장을 기다려요.',
+      description: '08:00~08:59 · 가격 고정 · 09:00 정규장 개장',
       tradable: false,
     );
   }

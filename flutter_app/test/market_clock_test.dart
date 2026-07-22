@@ -6,13 +6,12 @@ import 'package:millennium_capital/game/market_tick.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  test('market clock follows KRX boundaries and game extension labels', () {
-    expect(marketClockAt(8 * 60).phase, MarketSessionPhase.nxtPre);
-    expect(
-      marketClockAt(8 * 60 + 50).phase,
-      MarketSessionPhase.openingTransition,
-    );
+  test('market clock stays closed until the 09:00 KRX open', () {
+    expect(marketClockAt(8 * 60).phase, MarketSessionPhase.openingTransition);
+    expect(marketClockAt(8 * 60).tradable, isFalse);
+    expect(marketClockAt(8 * 60 + 59).tradable, isFalse);
     expect(marketClockAt(9 * 60).phase, MarketSessionPhase.regular);
+    expect(marketClockAt(9 * 60).tradable, isTrue);
     expect(
       marketClockAt(15 * 60 + 20).phase,
       MarketSessionPhase.closingAuction,
@@ -53,9 +52,32 @@ void main() {
       seed: 77,
     );
     expect(path, hasLength(generatedSessionTicks + 1));
+    expect(
+      path.take(generatedPreOpenTicks + 1).toSet(),
+      <double>{10000},
+      reason: '08:00~09:00 가격은 이전 종가로 고정되어야 한다.',
+    );
+    expect(path[generatedPreOpenTicks + 1], isNot(10000));
     expect(path[krxCloseTick], 11200);
+    expect(
+      path
+          .sublist(krxCloseTick, krxCloseTick + generatedClosePauseTicks + 1)
+          .toSet(),
+      <double>{11200},
+    );
     expect(path.last, 11200);
     expect(path.sublist(krxCloseTick + 1).toSet().length, greaterThan(2));
+
+    final openingCandles = aggregateMarketCandles(
+      path.sublist(generatedPreOpenTicks, generatedPreOpenTicks + 3),
+      1,
+      tickMinutes: marketTickMinutes,
+    );
+    expect(openingCandles, hasLength(2));
+    expect(openingCandles.first.open, path[generatedPreOpenTicks]);
+    expect(openingCandles.first.close, path[generatedPreOpenTicks + 1]);
+    expect(openingCandles.last.open, openingCandles.first.close);
+    expect(openingCandles.last.close, path[generatedPreOpenTicks + 2]);
   });
 
   test('saved clock resets to 08:00 after the newspaper advances a day', () {
