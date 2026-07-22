@@ -3757,11 +3757,25 @@ class _MinuteChartPanelState extends State<_MinuteChartPanel> {
       '${date.year}-${date.month.toString().padLeft(2, '0')}-'
       '${date.day.toString().padLeft(2, '0')}';
 
-  List<String> _minuteAxisLabels(int visiblePointCount) {
+  List<String> _minuteAxisLabels(
+    int visiblePointCount, {
+    required int startMinuteOffset,
+  }) {
     if (widget.minute < krxOpenMinute) {
       return <String>['', '', '개장 전 ${marketTimeLabel(widget.minute)}'];
     }
     final endMinute = widget.minute.clamp(krxOpenMinute, krxCloseMinute);
+    if (startMinuteOffset < 0) {
+      final previousStart = (krxCloseMinute + startMinuteOffset).clamp(
+        krxOpenMinute,
+        krxCloseMinute,
+      );
+      return <String>[
+        '전일 ${marketTimeLabel(previousStart)}',
+        '오늘 09:00',
+        marketTimeLabel(endMinute),
+      ];
+    }
     final elapsed = math.max(0, visiblePointCount - 1);
     final startMinute = math.max(krxOpenMinute, endMinute - elapsed);
     final middleMinute = startMinute + (endMinute - startMinute) ~/ 2;
@@ -3813,6 +3827,7 @@ class _MinuteChartPanelState extends State<_MinuteChartPanel> {
   String _windowLabel({
     required int candleCount,
     required int historicalCount,
+    required bool hasPreviousSession,
   }) {
     if (period != _ChartPeriod.minute) {
       return switch (period) {
@@ -3837,16 +3852,43 @@ class _MinuteChartPanelState extends State<_MinuteChartPanel> {
       5760 => '최대 최근 96시간',
       _ => '최근 $window분',
     };
-    return '$interval분봉 · $windowText · $candleCount개 캔들';
+    final previousSessionLabel = hasPreviousSession ? ' · 전일 재현 포함' : '';
+    return '$interval분봉 · $windowText · $candleCount개 캔들'
+        '$previousSessionLabel';
   }
 
   @override
   Widget build(BuildContext context) {
-    final minuteSeries = _visibleMinuteSeries();
-    final minutePrices = minuteSeries.prices;
+    var minuteSeries = _visibleMinuteSeries();
     final candleSeed = widget.quote.history.isEmpty
         ? widget.code.codeUnits.fold<int>(17, (sum, unit) => sum * 31 + unit)
         : marketStockSeed(widget.code, widget.quote.history.last.parsedDate);
+    if (period == _ChartPeriod.minute &&
+        widget.quote.isTradingDay &&
+        widget.minute >= krxOpenMinute &&
+        minuteSeries.startMinute == 0) {
+      final targetPoints = (minuteWindows[interval] ?? 60) + 1;
+      final missingPoints = math.min(
+        math.max(0, targetPoints - minuteSeries.prices.length),
+        generatedRegularTradingTicks,
+      );
+      if (missingPoints > 0) {
+        final previousSession = generatedMarketPath(
+          previousClose: widget.quote.previousClose,
+          officialClose: widget.quote.previousClose,
+          totalTicks: missingPoints,
+          seed: candleSeed ^ 0x5F3759DF,
+        );
+        minuteSeries = (
+          prices: <double>[
+            ...previousSession.take(missingPoints),
+            ...minuteSeries.prices,
+          ],
+          startMinute: -missingPoints,
+        );
+      }
+    }
+    final minutePrices = minuteSeries.prices;
     final candles = period == _ChartPeriod.minute
         ? aggregateMarketCandles(
             minutePrices,
@@ -3860,7 +3902,10 @@ class _MinuteChartPanelState extends State<_MinuteChartPanel> {
         ? const <double>[]
         : _historicalCloses();
     final axisLabels = period == _ChartPeriod.minute
-        ? _minuteAxisLabels(minutePrices.length)
+        ? _minuteAxisLabels(
+            minutePrices.length,
+            startMinuteOffset: minuteSeries.startMinute,
+          )
         : _historicalAxisLabels();
     return Column(
       children: [
@@ -3962,6 +4007,7 @@ class _MinuteChartPanelState extends State<_MinuteChartPanel> {
             _windowLabel(
               candleCount: candles.length,
               historicalCount: historicalCloses.length,
+              hasPreviousSession: minuteSeries.startMinute < 0,
             ),
             key: const Key('chart-window-label'),
             style: const TextStyle(
