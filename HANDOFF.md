@@ -164,7 +164,7 @@ npm test
 - 서버 라우트: `app/api/news/route.ts`
 - Vertex AI 초기화·입력 검증·JSON Schema·15초 타임아웃·메모리 캐시: `lib/dynamic-news.ts`
 - Flutter HTTP 클라이언트와 16초 폴백: `flutter_app/lib/game/dynamic_news.dart`
-- 플레이어 행동·대상 회사·시대 흐름 구성: `flutter_app/lib/game/market_news.dart`
+- 날짜·실제 국내 종가 집계·상승/하락 상위 종목·당일 역사 흐름 구성과 개인 투자소 문맥 차단: `flutter_app/lib/game/market_news.dart`
 - 전체 화면 `뉴스를 생성 중입니다` 및 AI 기사 표시: `flutter_app/lib/main.dart`
 - 로컬 인증·추가 Web 출처 예시: `.env.example`
 

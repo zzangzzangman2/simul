@@ -8,8 +8,8 @@ import 'package:millennium_capital/game/dynamic_news.dart';
 void main() {
   const request = DynamicNewsRequest(
     year: 2007,
-    companyName: '애플',
-    action: '경영권을 인수하고 혁신형 CEO를 선임함',
+    date: '2007-06-29',
+    marketSummary: '국내 증시는 상승 12개, 하락 8개, 보합 2개로 마감',
     megaTrend: '스마트폰 시대의 도래',
   );
 

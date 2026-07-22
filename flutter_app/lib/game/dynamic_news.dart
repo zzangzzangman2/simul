@@ -6,20 +6,20 @@ import 'package:http/http.dart' as http;
 class DynamicNewsRequest {
   const DynamicNewsRequest({
     required this.year,
-    required this.companyName,
-    required this.action,
+    required this.date,
+    required this.marketSummary,
     required this.megaTrend,
   });
 
   final int year;
-  final String companyName;
-  final String action;
+  final String date;
+  final String marketSummary;
   final String megaTrend;
 
   Map<String, Object> toJson() => {
     'year': year,
-    'companyName': companyName,
-    'action': action,
+    'date': date,
+    'marketSummary': marketSummary,
     'megaTrend': megaTrend,
   };
 }

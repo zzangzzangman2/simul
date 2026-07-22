@@ -112,10 +112,14 @@ void main() {
       expect(brief.tone, NewsTone.holiday);
     });
 
-    test('종잣돈 단계(현금 부족)에는 일거리로 안내한다', () {
-      // 현금 0원, 사건·휴일이 아닌 평일 짝수 날.
+    test('초기 자본 0원이어도 경제신문은 개인 일거리를 기사화하지 않는다', () {
       final brief = buildDailyBrief(at(DateTime(2000, 2, 2), cash: 0));
-      expect(brief.body, contains('일거리'));
+      final articleText = '${brief.title} ${brief.body}';
+      expect(articleText, isNot(contains('일거리')));
+      expect(articleText, isNot(contains('조사노트')));
+      expect(articleText, isNot(contains('용돈')));
+      expect(articleText, isNot(contains('가족 투자연구소')));
+      expect(articleText, contains('시장'));
     });
   });
 }
