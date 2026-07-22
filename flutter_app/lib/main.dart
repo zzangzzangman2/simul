@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
@@ -38,7 +39,7 @@ const _blue = Color(0xFF67C7EC);
 Route<T> _gameSceneRoute<T>(Widget page) => PageRouteBuilder<T>(
   transitionDuration: const Duration(milliseconds: 300),
   reverseTransitionDuration: const Duration(milliseconds: 280),
-  pageBuilder: (_, animation, secondaryAnimation) => page,
+  pageBuilder: (_, animation, secondaryAnimation) => _GameFrame(child: page),
   transitionsBuilder: (_, animation, secondaryAnimation, child) {
     final fade = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
     final scale = Tween<double>(begin: 0.985, end: 1).animate(fade);
@@ -1745,16 +1746,17 @@ class _SceneClockStrip extends StatelessWidget {
       margin: const EdgeInsets.fromLTRB(10, 8, 10, 7),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
       decoration: BoxDecoration(
-        color: dark ? const Color(0xE6263148) : const Color(0xF5FFFDF5),
+        color: dark ? const Color(0xE6263148) : const Color(0xF7FFF0D0),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: dark ? const Color(0x556DD2FF) : const Color(0x3333405F),
+          color: dark ? const Color(0x556DD2FF) : const Color(0x6692693F),
+          width: dark ? 1 : 1.3,
         ),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
-            color: Color(0x33000000),
-            blurRadius: 14,
-            offset: Offset(0, 6),
+            color: dark ? const Color(0x33000000) : const Color(0x33432C17),
+            blurRadius: dark ? 14 : 5,
+            offset: Offset(0, dark ? 6 : 3),
           ),
         ],
       ),
@@ -1814,8 +1816,11 @@ class _SceneClockStrip extends StatelessWidget {
               margin: const EdgeInsets.only(right: 7),
               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
               decoration: BoxDecoration(
-                color: dark ? const Color(0x334DB8E8) : const Color(0xFFFFEDB2),
+                color: dark ? const Color(0x334DB8E8) : const Color(0xFFF4D582),
                 borderRadius: BorderRadius.circular(9),
+                border: dark
+                    ? null
+                    : Border.all(color: const Color(0xFFB98345), width: 0.8),
               ),
               child: Text(
                 costLabel!,
@@ -3317,8 +3322,19 @@ class _AdvanceBar extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
       decoration: const BoxDecoration(
-        color: Color(0xFFF7F3EA),
-        border: Border(top: BorderSide(color: Color(0xFFD7CDBC))),
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFF342B25), Color(0xFF171B23)],
+        ),
+        border: Border(top: BorderSide(color: Color(0xFFB9925D), width: 1.4)),
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x77000000),
+            blurRadius: 16,
+            offset: Offset(0, -5),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -3335,7 +3351,7 @@ class _AdvanceBar extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              color: _ink,
+              color: Color(0xFFF6E8CA),
               fontSize: 11,
               fontWeight: FontWeight.w900,
             ),
@@ -3395,8 +3411,11 @@ class _AdvanceBar extends StatelessWidget {
                       ? null
                       : onAdvanceBatch,
                   style: IconButton.styleFrom(
-                    backgroundColor: const Color(0xFFE9E4D8),
-                    foregroundColor: _ink,
+                    backgroundColor: const Color(0x33F6E0B5),
+                    foregroundColor: const Color(0xFFF8E7C8),
+                    disabledBackgroundColor: const Color(0x221E2630),
+                    disabledForegroundColor: const Color(0x668F9AA9),
+                    side: const BorderSide(color: Color(0x66E2C18D)),
                   ),
                   icon: const Icon(Icons.fast_forward_rounded),
                 ),
@@ -3410,13 +3429,13 @@ class _AdvanceBar extends StatelessWidget {
 
   ButtonStyle _advanceButtonStyle(Color backgroundColor) {
     return ElevatedButton.styleFrom(
-      foregroundColor: _ink,
+      foregroundColor: const Color(0xFF33271E),
       backgroundColor: backgroundColor,
-      disabledForegroundColor: _ink.withValues(alpha: 0.55),
-      disabledBackgroundColor: const Color(0xFFD6E0E4),
+      disabledForegroundColor: const Color(0xFF9A948B),
+      disabledBackgroundColor: const Color(0xFF3A3A39),
       elevation: 0,
       padding: const EdgeInsets.symmetric(horizontal: 8),
-      side: const BorderSide(color: _ink, width: 2),
+      side: const BorderSide(color: Color(0xFFB9925D), width: 1.3),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
     );
