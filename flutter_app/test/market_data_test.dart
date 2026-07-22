@@ -95,20 +95,25 @@ void main() {
     expect(close, 6110);
     expect(path.last, 6110);
     expect(path.length, generatedSessionTicks + 1);
-    expect(path.toSet().length, greaterThan(45));
+    expect(path.toSet().length, greaterThan(20));
     expect(path, isNot(equals(anotherPath)));
     final deltas = List<double>.generate(
       path.length - 1,
       (index) => path[index + 1] - path[index],
     );
-    expect(deltas, everyElement(isNot(0)));
+    final regularDeltas = deltas.take(deltas.length - 1).toList();
     expect(
-      deltas.take(deltas.length - 1).map((delta) => delta.abs()),
-      everyElement(greaterThanOrEqualTo(20)),
-      reason: 'Every intermediate minute should make a visible market move.',
+      regularDeltas.where((delta) => delta == 0),
+      isNotEmpty,
+      reason: 'A realistic one-minute path should occasionally stay flat.',
+    );
+    expect(
+      regularDeltas.where((delta) => delta.abs() <= 10).length,
+      greaterThan(regularDeltas.length * 0.75),
+      reason: 'Most minutes should move by no more than one price tick.',
     );
 
-    expect(deltas.toSet().length, greaterThan(12));
+    expect(deltas.toSet().length, greaterThan(3));
     expect(
       deltas.map((delta) => delta.abs()).reduce((a, b) => a > b ? a : b),
       lessThan(590),

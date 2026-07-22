@@ -503,6 +503,12 @@ void main() {
       tester.widget<Text>(find.byKey(const Key('chart-window-label'))).data,
       contains('최대 최근 3시간'),
     );
+    expect(
+      tester.widget<Text>(find.byKey(const Key('chart-window-label'))).data,
+      allOf(contains('180개 캔들'), contains('전일 재현 포함')),
+    );
+    expect(find.textContaining('전일 '), findsWidgets);
+    expect(find.text('오늘 09:00'), findsOneWidget);
     await tester.tap(find.byKey(const Key('minute-interval-selector')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('3분').last);

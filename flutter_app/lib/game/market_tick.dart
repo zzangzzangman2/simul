@@ -75,7 +75,7 @@ List<double> generatedMarketPath({
   final lower = math.min(previousClose, officialClose) - corridor;
   final upper = math.max(previousClose, officialClose) + corridor;
   final rawClose = raw.last;
-  final scale = previousClose * rangeRate * 2.4 / math.sqrt(totalTicks);
+  final scale = previousClose * rangeRate * 0.42 / math.sqrt(totalTicks);
   final result = <double>[previousClose];
 
   for (var step = 1; step < totalTicks; step++) {
@@ -88,9 +88,9 @@ List<double> generatedMarketPath({
 
     final delta = rounded - result.last;
     final moveTickSize = _tickSize(result.last);
-    final minimumTicks = 2 + (_unit(seed, step * 43 + 211) * 5).floor();
+    final minimumTicks = _unit(seed, step * 43 + 211) < 0.28 ? 0 : 1;
     final minimumMove = moveTickSize * minimumTicks;
-    if (delta.abs() < minimumMove) {
+    if (minimumTicks > 0 && delta.abs() < minimumMove) {
       final direction = delta != 0
           ? delta.sign
           : velocityFor(raw, step) +
