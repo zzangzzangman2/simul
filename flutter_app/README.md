@@ -92,4 +92,4 @@ Flutter 테스트가 게임 엔진, 이전 Flutter 저장→v13 보존 마이그
 
 ## 동적 뉴스 API 연결
 
-Flutter Web은 같은 호스트의 `/api/news`를 자동으로 사용합니다. 로컬에서 Next와 Flutter Web을 따로 실행할 때는 Flutter에 `--dart-define=NEWS_API_BASE_URL=http://127.0.0.1:3000`을 전달합니다. 동일 출처와 localhost만 기본 허용하며 추가 Web 출처는 서버의 `NEWS_ALLOWED_ORIGINS`에 쉼표로 지정합니다. Android 빌드는 배포된 Node 서버 주소를 같은 방식으로 전달합니다. AI 서버가 없거나 16초 안에 응답하지 않으면 기존 역사·시장 신문으로 자동 폴백하므로 하루 진행은 막히지 않습니다.
+Flutter Web은 같은 호스트의 `/api/news`를 자동으로 사용합니다. 로컬에서 Next와 Flutter Web을 따로 실행할 때는 Flutter에 `--dart-define=NEWS_API_BASE_URL=http://127.0.0.1:3000`을 전달합니다. 동일 출처와 localhost만 기본 허용하며 추가 Web 출처는 서버의 `NEWS_ALLOWED_ORIGINS`에 쉼표로 지정합니다. Android 빌드는 배포된 Node 서버 주소를 같은 방식으로 전달합니다. 앱은 매일 날짜·실제 국내 종가 집계·상승/하락 상위 종목·당일 역사 흐름만 보내며 플레이어 투자소와 개인 행동은 보내지 않습니다. AI 서버가 없거나 16초 안에 응답하지 않으면 같은 시장 문맥의 결정론적 경제신문으로 자동 폴백하므로 하루 진행은 막히지 않습니다.

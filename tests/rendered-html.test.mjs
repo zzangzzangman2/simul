@@ -208,8 +208,8 @@ test("validates the dynamic news API before invoking Gemini", async () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         year: 1999,
-        companyName: "애플",
-        action: "경영진 교체",
+        date: "1999-12-31",
+        marketSummary: "국내 증시는 정규 거래일을 마쳤다.",
         megaTrend: "모바일 기기 확산",
       }),
     }),
@@ -237,6 +237,8 @@ test("keeps Gemini credentials server-side and forces the news JSON schema", asy
   assert.match(generator, /responseJsonSchema: articleSchema/);
   assert.match(generator, /minimum: -30/);
   assert.match(generator, /maximum: 50/);
+  assert.doesNotMatch(generator, /body\.companyName/);
+  assert.doesNotMatch(generator, /body\.action/);
   assert.doesNotMatch(generator, /NEXT_PUBLIC_[A-Z_]*(?:KEY|SECRET)/);
 });
 test("allows local Flutter Web preflight and rejects unknown origins", async () => {

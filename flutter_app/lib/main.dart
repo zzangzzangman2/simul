@@ -1606,26 +1606,15 @@ class OfficeScreen extends StatelessWidget {
         closingState = await onSetMarketMinute(marketDayEndMinute);
       }
       if (!context.mounted) return;
-      final brief = buildDailyBrief(closingState);
-      final meaningfulAction =
-          closingState.ledger.any((entry) => entry.day == closingState.day) ||
-          closingState.decisions.any(
-            (decision) =>
-                decision.status == DecisionStatus.resolved &&
-                decision.createdDay == closingState.day,
-          );
-      final shouldGenerate =
-          isMarketTradingDay(closingState.currentDate) &&
-          (brief.isBreaking || meaningfulAction);
-      final article = shouldGenerate
-          ? await client.generate(
-              dynamicNewsRequestForState(closingState, brief),
-            )
-          : null;
-      newspaper = await buildDailyMarketNewspaper(
-        closingState,
-        dynamicArticle: article,
+      final baseNewspaper = await buildDailyMarketNewspaper(closingState);
+      final article = await client.generate(
+        dynamicNewsRequestForState(
+          closingState,
+          baseNewspaper.brief,
+          newspaper: baseNewspaper,
+        ),
       );
+      newspaper = baseNewspaper.withDynamicArticle(article);
       await onArchiveNews?.call(
         newspaper.headline,
         historicalNewsEventsForDate(closingState.currentDate)
@@ -1635,8 +1624,7 @@ class OfficeScreen extends StatelessWidget {
             )
             .toList(growable: false),
       );
-      final remaining =
-          (shouldGenerate ? 350 : 100) - stopwatch.elapsedMilliseconds;
+      final remaining = 350 - stopwatch.elapsedMilliseconds;
       if (remaining > 0) {
         await Future<void>.delayed(Duration(milliseconds: remaining));
       }
@@ -2913,7 +2901,7 @@ class KoreaEconomicNewspaperSheet extends StatelessWidget {
               ),
             ),
             const Text(
-              '가족 투자연구소 게임 특별판',
+              '2000~2010 시장 시뮬레이션 특별판',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
             ),
@@ -3039,7 +3027,7 @@ class KoreaEconomicNewspaperSheet extends StatelessWidget {
               padding: const EdgeInsets.all(12),
               color: const Color(0xFFE7E0D0),
               child: Text(
-                '오늘의 메모 · ${newspaper.brief.title}\n${newspaper.brief.body}',
+                '시장 해설 · ${newspaper.brief.title}\n${newspaper.brief.body}',
                 style: const TextStyle(
                   fontSize: 11,
                   height: 1.5,

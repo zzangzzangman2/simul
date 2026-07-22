@@ -77,10 +77,10 @@ String? _fixedHoliday(DateTime date) {
 }
 
 String _seasonTag(int month) {
-  if (month == 12 || month <= 2) return '겨울 아침';
-  if (month <= 5) return '봄 볕';
-  if (month <= 8) return '여름 한낮';
-  return '가을 바람';
+  if (month == 12 || month <= 2) return '연초 시장';
+  if (month <= 5) return '봄철 경제';
+  if (month <= 8) return '여름 시장';
+  return '연말 경제';
 }
 
 int _daySince2000(DateTime date) =>
@@ -88,43 +88,43 @@ int _daySince2000(DateTime date) =>
 
 /// 사건이 없는 평범한 날의 짧은 소식. (제목, 부연) 순서.
 const List<(String, String)> _weekdayWinter = [
-  ('창문에 성에가 낀 아침', '따뜻한 물 한 잔을 두고 어제 적어둔 조사노트를 다시 펼쳤다.'),
-  ('라디오에서 증시 소식이 흘러나왔다', '아직은 낯선 이름들이지만 하나씩 귀에 익어간다.'),
-  ('저금장부의 잔액을 확인했다', '숫자는 작지만, 어디서 왔는지 전부 적혀 있어 든든하다.'),
-  ('학교 갔다 온 뒤 책상에 앉았다', '오늘 시장이 왜 움직였는지 이유를 한 줄로 적어보기로 했다.'),
-  ('가족 투자연구소의 하루가 시작됐다', '조급해하지 말자던 첫날의 약속을 떠올린다.'),
+  ('연초 자금 흐름에 쏠린 시장의 눈', '증권가는 새해 자금이 어느 업종으로 향할지 차분히 살피고 있다.'),
+  ('수출주와 내수주, 엇갈리는 기대', '환율과 소비 흐름에 따라 업종별 전망이 달라질 수 있다는 분석이다.'),
+  ('금리 흐름 점검하는 채권·주식시장', '시장 참가자들은 기업의 자금조달 여건과 실적 전망을 함께 확인하고 있다.'),
+  ('기업 실적 전망, 종목별 차별화 예고', '매출 성장뿐 아니라 부채와 현금흐름을 함께 봐야 한다는 목소리가 나온다.'),
+  ('새해 투자계획 발표 앞둔 주요 기업', '설비투자와 연구개발 방향이 중장기 경쟁력을 가를 변수로 꼽힌다.'),
 ];
 
 const List<(String, String)> _weekdaySpring = [
-  ('창밖으로 봄볕이 들어왔다', '따뜻해진 날씨만큼 시장에도 기대가 감돈다.'),
-  ('오늘도 관심 종목을 살펴봤다', '가격보다 회사가 무엇을 파는지를 먼저 보기로 했다.'),
-  ('조사노트에 질문 하나를 더 적었다', '‘이 회사는 5년 뒤에도 필요할까?’'),
-  ('점심시간에도 신문 경제면을 넘겼다', '모르는 단어는 동그라미를 쳐두고 나중에 물어보기로.'),
-  ('연구소 책상을 정리했다', '어제의 판단과 오늘의 판단을 나란히 붙여 두었다.'),
+  ('연초 실적 윤곽에 관심 집중', '기업별 매출과 수익성의 차이가 주가 흐름을 가를 전망이다.'),
+  ('소비 회복 여부에 유통업계 촉각', '가계 지출과 재고 흐름이 내수기업 실적의 주요 변수로 꼽힌다.'),
+  ('수출기업, 환율과 해외수요 동시 점검', '업종마다 가격 경쟁력과 원재료 부담이 다르게 나타날 수 있다.'),
+  ('주총철 맞은 기업들, 경영계획 공개', '시장에서는 배당보다 지속 가능한 이익과 투자계획을 함께 살피고 있다.'),
+  ('고용과 물가 지표 기다리는 시장', '거시 지표가 금리 기대와 투자심리에 어떤 변화를 줄지 관심이 모인다.'),
 ];
 
 const List<(String, String)> _weekdaySummer = [
-  ('매미 소리 속에 시장이 열렸다', '더위에도 숫자는 쉬지 않고 오르내린다.'),
-  ('선풍기 앞에서 차트를 들여다봤다', '짧은 출렁임에 흔들리지 않는 연습을 한다.'),
-  ('오늘의 등락 이유를 적어봤다', '이유를 모르겠으면 ‘모름’이라고 정직하게 적는다.'),
-  ('방학 숙제 옆에 조사노트를 폈다', '공부와 투자, 둘 다 조금씩 밀리지 않게.'),
-  ('가족이 저녁에 뭘 샀는지 물어봤다', '우리 집 소비가 곧 어떤 회사의 매출이라는 걸 배운다.'),
+  ('반기 실적 앞두고 관망세', '매출 증가가 실제 이익과 현금흐름으로 이어졌는지가 관심사다.'),
+  ('원자재 가격 변화에 업종별 희비', '비용을 제품 가격에 반영할 수 있는 기업의 대응력이 주목된다.'),
+  ('수출 경기와 운송 수요에 관심', '세계 경기 변화가 제조업과 물류기업에 미칠 영향을 시장이 점검하고 있다.'),
+  ('기술주, 성장성과 수익성 사이 줄다리기', '신사업 기대만큼 실제 사업 성과를 확인해야 한다는 분석이 나온다.'),
+  ('내수업계, 여름 소비 흐름 점검', '일시적 성수기 효과와 지속 가능한 수요를 구분해야 한다는 평가다.'),
 ];
 
 const List<(String, String)> _weekdayFall = [
-  ('선선한 바람에 마음이 차분해졌다', '급하게 사고팔지 않아도 괜찮다고 스스로 다독인다.'),
-  ('반년 치 조사노트를 다시 읽었다', '맞은 판단보다 틀린 판단에서 배울 게 많았다.'),
-  ('시장은 오늘도 조용히 흘러갔다', '큰 사건이 없는 날일수록 원칙을 지키기 쉽다.'),
-  ('용돈과 일거리 수입을 나눠 적었다', '쓸 돈과 조사 예산을 섞지 않기로 했다.'),
-  ('창가에 앉아 국내·해외 종목을 비교했다', '같은 산업이라도 나라마다 분위기가 다르다.'),
+  ('연말 실적 전망 조정하는 증권가', '기업별 수주와 비용 변화가 연간 이익 눈높이를 바꾸고 있다.'),
+  ('내년 투자계획 세우는 산업계', '설비 확대가 수요 전망과 재무 여력에 맞는지 검토가 이어진다.'),
+  ('배당 기대보다 현금창출력에 주목', '일회성 이익을 제외한 본업의 경쟁력이 중요하다는 분석이다.'),
+  ('세계 경기 변화에 수출주 변동성', '국가와 업종에 따라 수요 회복 속도가 다를 수 있다는 전망이 나온다.'),
+  ('기관·외국인 수급에 시장 촉각', '단기 매매 흐름과 기업의 장기 가치를 구분할 필요가 있다는 평가다.'),
 ];
 
 const List<(String, String)> _weekend = [
-  ('주말, 증시는 문을 닫았다', '쉬는 날엔 숫자 대신 가족과 시간을 보낸다.'),
-  ('시장이 쉬는 날', '이번 주에 내가 왜 그렇게 판단했는지 되짚어 본다.'),
-  ('느긋한 주말 아침', '급할 것 없다. 좋은 회사는 월요일에도 그 자리에 있다.'),
-  ('가족과 함께한 하루', '외할아버지에게 조사노트를 보여드리고 이야기를 나눴다.'),
-  ('주말엔 조사노트를 덮어두었다', '충분히 쉬어야 다음 주 판단이 흐려지지 않는다.'),
+  ('주말, 국내 증시 휴장', '거래는 쉬지만 국내외 경제 일정과 다음 주 기업 발표에 관심이 이어지고 있다.'),
+  ('시장 휴장, 다음 거래일 준비', '증권가는 주말 사이 나온 경제·산업 소식이 개장 후 미칠 영향을 점검한다.'),
+  ('주말 경제 일정에 시선', '다음 주 금리·물가·기업 실적 일정이 투자심리의 변수가 될 전망이다.'),
+  ('거래 멈춘 주말, 기업 뉴스는 계속', '시장 참가자들은 공시와 산업 동향을 확인하며 다음 장을 준비하고 있다.'),
+  ('한 주 마감한 증권시장', '이번 주 업종별 흐름과 거래량을 돌아보며 다음 주 변수를 정리할 시점이다.'),
 ];
 
 /// 계절/요일에 맞는 결정론적 소식 하나를 고른다.
@@ -147,7 +147,7 @@ const List<(String, String)> _weekend = [
 }
 
 /// 오늘 날짜와 게임 상태로 소식 한 조각을 만든다. 우선순위:
-/// 역사 사건 > 고정 휴장일 > 주말 > 계절 소식. 시드머니 단계에는 살짝 다른 넛지를 준다.
+/// 역사 사건 > 고정 휴장일 > 주말 > 계절별 경제·시장 소식.
 DailyBrief buildDailyBrief(GameState state) {
   final date = state.currentDate;
   final weekend = date.weekday >= DateTime.saturday;
@@ -182,29 +182,19 @@ DailyBrief buildDailyBrief(GameState state) {
       eyebrow: weekend ? '주말' : 'KRX 휴장',
       title: weekend ? '주말, 증시는 문을 닫았다' : '거래소가 쉬어가는 날',
       body: weekend
-          ? '쉬는 날엔 숫자 대신 가족과 시간을 보내고 이번 주 판단을 되짚어 봅니다.'
-          : '실제 국내 종가 달력에 거래가 없는 날입니다. 다음 거래일까지 조사노트를 정리합니다.',
+          ? '국내 증시는 쉬지만 국내외 경제 일정과 기업 발표는 계속됩니다.'
+          : '실제 국내 종가 달력에 거래가 없는 날입니다. 다음 거래일 일정을 확인합니다.',
       marketClosed: true,
       tone: weekend ? NewsTone.weekend : NewsTone.holiday,
     );
   }
 
   final flavor = _flavorFor(date, weekend: weekend);
-  var title = flavor.$1;
-  var body = flavor.$2;
-
-  // 시드머니 단계(첫 조사예산 이전)에는 일거리 쪽으로 살짝 안내한다.
-  if (!closed &&
-      state.story.earnedSeedMoney < 10000 &&
-      _daySince2000(date).isEven) {
-    title = '아직 조사 예산이 부족하다';
-    body = '방의 ‘일거리’로 설거지·문방구·벼룩장터를 하면 오늘도 종잣돈을 모을 수 있다.';
-  }
 
   return DailyBrief(
     eyebrow: weekend ? '주말' : _seasonTag(date.month),
-    title: title,
-    body: body,
+    title: flavor.$1,
+    body: flavor.$2,
     marketClosed: closed,
     tone: weekend ? NewsTone.weekend : NewsTone.calm,
   );
@@ -241,6 +231,23 @@ class DailyMarketNewspaper {
   final String headline;
   final String summary;
   final DynamicNewsArticle? dynamicArticle;
+
+  DailyMarketNewspaper withDynamicArticle(DynamicNewsArticle? article) {
+    if (article == null) return this;
+    return DailyMarketNewspaper(
+      date: date,
+      brief: brief,
+      total: total,
+      advancers: advancers,
+      decliners: decliners,
+      unchanged: unchanged,
+      topGainers: topGainers,
+      topLosers: topLosers,
+      headline: article.headline,
+      summary: summary,
+      dynamicArticle: article,
+    );
+  }
 }
 
 String _newsLimit(String value, int maxLength) => value.length <= maxLength
@@ -249,56 +256,39 @@ String _newsLimit(String value, int maxLength) => value.length <= maxLength
 
 DynamicNewsRequest dynamicNewsRequestForState(
   GameState state,
-  DailyBrief brief,
-) {
-  DecisionCardData? latestDecision;
-  for (final decision in state.decisions.reversed) {
-    if (decision.status == DecisionStatus.resolved) {
-      latestDecision = decision;
-      break;
-    }
-  }
-
-  DecisionOptionData? selectedOption;
-  if (latestDecision?.selectedOptionId != null) {
-    for (final option in latestDecision!.options) {
-      if (option.id == latestDecision.selectedOptionId) {
-        selectedOption = option;
-        break;
-      }
-    }
-  }
-
-  LedgerEntry? todayLedger;
-  for (final entry in state.ledger.reversed) {
-    if (entry.day == state.day) {
-      todayLedger = entry;
-      break;
-    }
-  }
-
-  final action = todayLedger != null
-      ? todayLedger.description
-      : latestDecision != null && selectedOption != null
-      ? '${latestDecision.title}에서 “${selectedOption.label}”을 선택함. ${selectedOption.description}'
-      : '가족 투자연구소에서 시장 시세와 기업 조사노트를 검토함';
-  final isCompanyDecision =
-      latestDecision != null && latestDecision.id != 'first-research-note';
-  final companyName = isCompanyDecision
-      ? state.company.name
-      : (state.companyName.trim().isEmpty ? '가족 투자연구소' : state.companyName);
+  DailyBrief brief, {
+  DailyMarketNewspaper? newspaper,
+}) {
+  final date = state.currentDate;
+  final dateKey =
+      '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   final extraEvents = brief.otherHeadlines
       .map((event) => event.title)
       .join(' · ');
   final megaTrend = brief.headline == null
-      ? '${brief.eyebrow} · ${brief.title}'
+      ? '${brief.eyebrow} · ${brief.title} · ${brief.body}'
       : '${brief.headline!.title} · ${brief.headline!.body}'
             '${extraEvents.isEmpty ? '' : ' · 그 외 소식: $extraEvents'}';
 
+  String moverText(String label, List<DailyMarketMover> movers) {
+    if (movers.isEmpty) return '';
+    return '$label: ${movers.map((mover) => '${mover.name} ${mover.changeRate >= 0 ? '+' : ''}${mover.changeRate.toStringAsFixed(2)}%').join(', ')}.';
+  }
+
+  final marketSummary = newspaper == null
+      ? brief.marketClosed
+            ? '국내 증시는 휴장했다.'
+            : '국내 증시는 정규 거래일을 마쳤다.'
+      : [
+          newspaper.summary,
+          moverText('상승 상위', newspaper.topGainers),
+          moverText('하락 상위', newspaper.topLosers),
+        ].where((text) => text.isNotEmpty).join(' ');
+
   return DynamicNewsRequest(
-    year: state.currentDate.year,
-    companyName: _newsLimit(companyName, 100),
-    action: _newsLimit(action, 500),
+    year: date.year,
+    date: dateKey,
+    marketSummary: _newsLimit(marketSummary, 700),
     megaTrend: _newsLimit(megaTrend, 300),
   );
 }
@@ -338,12 +328,12 @@ Future<DailyMarketNewspaper> buildDailyMarketNewspaper(
       dynamicArticle?.headline ??
       brief.headline?.title ??
       (brief.marketClosed
-          ? '오늘 증시는 휴장, 가족 투자연구소는 숨 고르기'
+          ? '국내 증시 휴장, 다음 거래일 변수 점검'
           : advancers >= decliners
           ? '국내 증시, 상승 종목이 더 많았다'
           : '국내 증시, 하락 종목 우세로 마감');
   final summary = movers.isEmpty
-      ? '오늘 확인 가능한 국내 종가가 없습니다. 시장은 쉬고, 조사노트만 차분히 정리했습니다.'
+      ? '오늘 확인 가능한 국내 종가가 없습니다. 휴장 여부와 다음 거래일 일정을 확인했습니다.'
       : '국내 ${movers.length}개 종목 중 상승 $advancers개, 하락 $decliners개, 보합 $unchanged개로 하루를 마쳤습니다.';
   return DailyMarketNewspaper(
     date: state.currentDate,
