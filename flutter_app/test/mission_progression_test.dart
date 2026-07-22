@@ -46,6 +46,40 @@ void main() {
     },
   );
 
+  test(
+    'work completed before claiming the first mission is still recognized',
+    () {
+      final base = engine.createNewGame('선행 일거리 미션 테스트');
+      final resolved = engine.resolveDecision(
+        base,
+        'first-research-note',
+        'research_products',
+      );
+      final worked = engine.completeWorkSession(
+        resolved,
+        const WorkSessionResult(
+          activityId: 'dishes',
+          score: 100,
+          maxScore: 100,
+        ),
+      );
+      final claim = engine.claimMission(worked);
+      final nextProgress = engine.missionProgress(claim.state)!;
+
+      expect(claim.success, isTrue);
+      expect(nextProgress.mission.id, 'first_work');
+      expect(nextProgress.current, greaterThanOrEqualTo(1));
+      expect(nextProgress.complete, isTrue);
+    },
+  );
+
+  test('campaign age stays ten in 2000 and twenty in 2010', () {
+    final story = engine.createNewGame('나이 기준 테스트').story;
+
+    expect(story.ageOn(DateTime(2000, 1, 2)), 10);
+    expect(story.ageOn(DateTime(2010, 12, 31)), 20);
+  });
+
   test('level skills change work rewards and trading fees', () {
     final base = engine
         .createNewGame('스킬 효과 테스트', initialCash: 200000)

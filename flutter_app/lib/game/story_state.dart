@@ -43,6 +43,12 @@ class StoryState {
   final List<String> seenStoryEventIds;
   final List<String> companyCultureTags;
 
+  /// The campaign treats the protagonist as ten in 2000 and twenty in 2010.
+  /// Only a birth year is stored, so use the same pre-birthday convention
+  /// throughout the game instead of showing an inconsistent Korean age.
+  int ageOn(DateTime date) =>
+      (date.year - playerBirthYear - 1).clamp(0, 200).toInt();
+
   int flagInt(String key, [int fallback = 0]) =>
       (storyFlags[key] as num?)?.toInt() ?? fallback;
   bool flagBool(String key, [bool fallback = false]) =>

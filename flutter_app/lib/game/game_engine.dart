@@ -1158,7 +1158,7 @@ class GameEngine {
   }
 
   FinanceActionResult playAdultChanceGame(GameState state, int stake) {
-    final age = state.currentDate.year - state.story.playerBirthYear;
+    final age = state.story.ageOn(state.currentDate);
     if (state.currentDate.isBefore(DateTime(2010, 1, 1)) || age < 20) {
       return FinanceActionResult(
         state: state,
