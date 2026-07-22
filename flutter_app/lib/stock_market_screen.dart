@@ -3689,7 +3689,7 @@ class _MinuteChartPanelState extends State<_MinuteChartPanel> {
   int interval = 1;
 
   static const minuteWindows = <int, int>{
-    1: 180,
+    1: 90,
     3: 240,
     5: 360,
     10: 480,
@@ -3841,6 +3841,7 @@ class _MinuteChartPanelState extends State<_MinuteChartPanel> {
     final window = minuteWindows[interval] ?? 60;
     final windowText = switch (window) {
       60 => '최대 최근 1시간',
+      90 => '최대 최근 90분',
       180 => '최대 최근 3시간',
       240 => '최대 최근 4시간',
       360 => '최대 최근 6시간',
@@ -4159,7 +4160,7 @@ class _CandleChartPainter extends CustomPainter {
 
     final visible = candles;
     final slot = chartRight / math.max(visible.length, 1);
-    final bodyWidth = math.max(1.6, math.min(6.0, slot * 0.62));
+    final bodyWidth = math.max(2.0, math.min(6.0, slot * 0.72));
     canvas.save();
     canvas.clipRect(Rect.fromLTRB(0, priceTop, chartRight, priceBottom));
     for (var index = 0; index < visible.length; index++) {
@@ -4169,7 +4170,7 @@ class _CandleChartPainter extends CustomPainter {
       final color = rising ? const Color(0xFFF04452) : const Color(0xFF3182F6);
       final paint = Paint()
         ..color = color
-        ..strokeWidth = 1.2;
+        ..strokeWidth = 1;
       canvas.drawLine(
         Offset(x, yFor(candle.high)),
         Offset(x, yFor(candle.low)),
@@ -4191,7 +4192,10 @@ class _CandleChartPainter extends CustomPainter {
       for (var index = 0; index < visible.length; index++) {
         sum += visible[index].close;
         if (index >= count) sum -= visible[index - count].close;
-        if (index >= count - 1) values[index] = sum / count;
+        final missingHistory = math.max(0, count - index - 1);
+        values[index] =
+            (sum + previousClose * missingHistory) /
+            math.min(count, index + 1 + missingHistory);
       }
       return values;
     }

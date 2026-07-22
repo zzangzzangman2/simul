@@ -184,27 +184,36 @@ List<MarketCandle> aggregateMarketCandles(
         final open = prices[index];
         final close = prices[index + 1];
         final absoluteMinute = startMinuteOffset + index * tickMinutes;
-        final reference = math.max((open + close) / 2, 1).toDouble();
-        final tickSize = _tickSize(reference);
+        final tickSize = _tickSize(math.max((open + close) / 2, 1).toDouble());
         final body = (close - open).abs();
-        final wickRange = math.max(body * 0.42, tickSize * 2.0);
-        final upperWick = math.max(
-          tickSize,
-          wickRange * (0.18 + _unit(seed, absoluteMinute * 17 + 1009) * 0.62),
-        );
-        final lowerWick = math.max(
-          tickSize,
-          wickRange * (0.18 + _unit(seed, absoluteMinute * 23 + 2027) * 0.62),
-        );
+        final bodyTicks = body / tickSize;
+        final wickChance = (0.18 + bodyTicks * 0.07).clamp(0.18, 0.48);
+        final upperWick = _unit(seed, absoluteMinute * 17 + 1009) < wickChance
+            ? tickSize
+            : 0.0;
+        final lowerWick = _unit(seed, absoluteMinute * 23 + 2027) < wickChance
+            ? tickSize
+            : 0.0;
         final minuteHigh = math.max(open, close) + upperWick;
         final minuteLow = math.max(tickSize, math.min(open, close) - lowerWick);
         high = math.max(high, minuteHigh);
         low = math.min(low, minuteLow);
 
-        final changeRate = body / reference;
-        final activity = 0.65 + changeRate * 180;
-        final noise = 0.6 + _unit(seed, absoluteMinute * 31 + 3037) * 1.25;
-        volume += (120 + (seed.abs() % 880)) * activity * noise;
+        final activity = 0.16 + math.min(bodyTicks, 8) * 0.18;
+        final noise = 0.55 + _unit(seed, absoluteMinute * 31 + 3037) * 0.7;
+        final burstRoll = _unit(seed, absoluteMinute * 37 + 4051);
+        final burst = burstRoll < 0.045
+            ? 3.8 + _unit(seed, absoluteMinute * 41 + 5011) * 3.2
+            : 1.0;
+        final openingActivity = absoluteMinute >= 0 && absoluteMinute < 15
+            ? 1.35
+            : 1.0;
+        volume +=
+            (120 + (seed.abs() % 880)) *
+            activity *
+            noise *
+            burst *
+            openingActivity;
       }
     }
     candles.add(
