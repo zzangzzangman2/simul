@@ -3701,8 +3701,9 @@ class _MinuteChartPanelState extends State<_MinuteChartPanel> {
   };
   _ChartPeriod period = _ChartPeriod.minute;
 
-  ({List<double> prices, int startMinute}) _visibleMinuteSeries() {
-    final targetMinutes = minuteWindows[interval] ?? 60;
+  ({List<double> prices, int startMinute}) _visibleMinuteSeries({
+    required int targetMinutes,
+  }) {
     final targetPoints = targetMinutes + 1;
     final sessionHistory = widget.quote.sessionHistory;
     if (!widget.quote.isTradingDay ||
@@ -3860,7 +3861,10 @@ class _MinuteChartPanelState extends State<_MinuteChartPanel> {
 
   @override
   Widget build(BuildContext context) {
-    var minuteSeries = _visibleMinuteSeries();
+    final displayMinutes = minuteWindows[interval] ?? 60;
+    final displayCandleCount = math.max(1, displayMinutes ~/ interval);
+    final contextMinutes = displayMinutes + interval * 120;
+    var minuteSeries = _visibleMinuteSeries(targetMinutes: contextMinutes);
     final candleSeed = widget.quote.history.isEmpty
         ? widget.code.codeUnits.fold<int>(17, (sum, unit) => sum * 31 + unit)
         : marketStockSeed(widget.code, widget.quote.history.last.parsedDate);
@@ -3868,23 +3872,19 @@ class _MinuteChartPanelState extends State<_MinuteChartPanel> {
         widget.quote.isTradingDay &&
         widget.minute >= krxOpenMinute &&
         minuteSeries.startMinute == 0) {
-      final targetPoints = (minuteWindows[interval] ?? 60) + 1;
+      final targetPoints = contextMinutes + 1;
       final missingPoints = math.min(
         math.max(0, targetPoints - minuteSeries.prices.length),
         generatedRegularTradingTicks,
       );
       if (missingPoints > 0) {
-        final previousSession = generatedMarketPath(
+        final previousSession = generatedPreviousSessionLeadIn(
           previousClose: widget.quote.previousClose,
-          officialClose: widget.quote.previousClose,
-          totalTicks: missingPoints,
+          pointCount: missingPoints,
           seed: candleSeed ^ 0x5F3759DF,
         );
         minuteSeries = (
-          prices: <double>[
-            ...previousSession.take(missingPoints),
-            ...minuteSeries.prices,
-          ],
+          prices: <double>[...previousSession, ...minuteSeries.prices],
           startMinute: -missingPoints,
         );
       }
@@ -3902,10 +3902,14 @@ class _MinuteChartPanelState extends State<_MinuteChartPanel> {
     final historicalCloses = period == _ChartPeriod.minute
         ? const <double>[]
         : _historicalCloses();
+    final visibleCandleCount = math.min(candles.length, displayCandleCount);
+    final visibleStartMinute = candles.isEmpty
+        ? minuteSeries.startMinute
+        : candles[candles.length - visibleCandleCount].startMinute;
     final axisLabels = period == _ChartPeriod.minute
         ? _minuteAxisLabels(
-            minutePrices.length,
-            startMinuteOffset: minuteSeries.startMinute,
+            visibleCandleCount + 1,
+            startMinuteOffset: visibleStartMinute,
           )
         : _historicalAxisLabels();
     return Column(
@@ -3922,6 +3926,7 @@ class _MinuteChartPanelState extends State<_MinuteChartPanel> {
                 ? _CandleChartPainter(
                     candles: candles,
                     previousClose: widget.quote.previousClose,
+                    maxVisibleCandles: displayCandleCount,
                   )
                 : _HistoricalCloseChartPainter(values: historicalCloses),
             size: Size.infinite,
@@ -4006,7 +4011,7 @@ class _MinuteChartPanelState extends State<_MinuteChartPanel> {
           alignment: Alignment.centerLeft,
           child: Text(
             _windowLabel(
-              candleCount: candles.length,
+              candleCount: visibleCandleCount,
               historicalCount: historicalCloses.length,
               hasPreviousSession: minuteSeries.startMinute < 0,
             ),
@@ -4074,10 +4079,12 @@ class _CandleChartPainter extends CustomPainter {
   const _CandleChartPainter({
     required this.candles,
     required this.previousClose,
+    required this.maxVisibleCandles,
   });
 
   final List<MarketCandle> candles;
   final double previousClose;
+  final int maxVisibleCandles;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -4089,7 +4096,9 @@ class _CandleChartPainter extends CustomPainter {
     final volumeBottom = size.height - 4;
     final priceBottom = volumeTop - 16;
     final priceHeight = math.max(1.0, priceBottom - priceTop);
-    final values = candles
+    final visibleStartIndex = math.max(0, candles.length - maxVisibleCandles);
+    final visible = candles.sublist(visibleStartIndex);
+    final values = visible
         .expand((candle) => <double>[candle.high, candle.low])
         .toList(growable: false);
     var minValue = values.reduce(math.min);
@@ -4158,7 +4167,6 @@ class _CandleChartPainter extends CustomPainter {
       }
     }
 
-    final visible = candles;
     final slot = chartRight / math.max(visible.length, 1);
     final bodyWidth = math.max(2.0, math.min(6.0, slot * 0.72));
     canvas.save();
@@ -4187,17 +4195,17 @@ class _CandleChartPainter extends CustomPainter {
     }
 
     List<double?> movingAverage(int count) {
-      final values = List<double?>.filled(visible.length, null);
+      final allValues = List<double?>.filled(candles.length, null);
       var sum = 0.0;
-      for (var index = 0; index < visible.length; index++) {
-        sum += visible[index].close;
-        if (index >= count) sum -= visible[index - count].close;
+      for (var index = 0; index < candles.length; index++) {
+        sum += candles[index].close;
+        if (index >= count) sum -= candles[index - count].close;
         final missingHistory = math.max(0, count - index - 1);
-        values[index] =
+        allValues[index] =
             (sum + previousClose * missingHistory) /
             math.min(count, index + 1 + missingHistory);
       }
-      return values;
+      return allValues.sublist(visibleStartIndex);
     }
 
     void drawMovingAverage(int count, Color color, double width) {
@@ -4325,7 +4333,8 @@ class _CandleChartPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _CandleChartPainter oldDelegate) =>
       oldDelegate.candles != candles ||
-      oldDelegate.previousClose != previousClose;
+      oldDelegate.previousClose != previousClose ||
+      oldDelegate.maxVisibleCandles != maxVisibleCandles;
 }
 
 class _HistoricalCloseChartPainter extends CustomPainter {

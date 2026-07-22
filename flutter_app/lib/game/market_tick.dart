@@ -113,6 +113,31 @@ List<double> generatedMarketPath({
   return result;
 }
 
+/// 고정된 전일 정규장 경로의 끝부분만 잘라 장 초반 차트 앞에 붙인다.
+///
+/// [pointCount]가 매분 하나씩 줄어도 남아 있는 값은 그대로 유지되므로,
+/// 새 현재 봉이 들어올 때 과거 봉 전체가 다시 그려지는 현상을 막는다.
+List<double> generatedPreviousSessionLeadIn({
+  required double previousClose,
+  required int pointCount,
+  int seed = 0,
+}) {
+  if (pointCount <= 0 || previousClose <= 0) return const <double>[];
+  final previousSession = generatedMarketPath(
+    previousClose: previousClose,
+    officialClose: previousClose,
+    totalTicks: generatedRegularTradingTicks,
+    seed: seed,
+  );
+  final completedTicks = previousSession.take(generatedRegularTradingTicks);
+  final visibleCount = pointCount
+      .clamp(0, generatedRegularTradingTicks)
+      .toInt();
+  return completedTicks
+      .skip(generatedRegularTradingTicks - visibleCount)
+      .toList();
+}
+
 /// 08:00~20:00 게임 하루의 1분 가격 경로.
 ///
 /// 08:00~08:59는 개장 전이라 이전 종가로 고정한다. 09:00부터 정규장
