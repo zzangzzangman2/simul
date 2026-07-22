@@ -501,7 +501,7 @@ void main() {
     expect(find.text('재현 장중 · 현실 1초마다 게임 1분 진행'), findsOneWidget);
     expect(
       tester.widget<Text>(find.byKey(const Key('chart-window-label'))).data,
-      contains('최대 최근 1시간'),
+      contains('최대 최근 3시간'),
     );
     await tester.tap(find.byKey(const Key('minute-interval-selector')));
     await tester.pumpAndSettle();
