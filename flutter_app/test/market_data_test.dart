@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:millennium_capital/game/market_clock.dart';
 import 'package:millennium_capital/game/market_data.dart';
@@ -158,29 +160,63 @@ void main() {
     expect(candles.last.close, 102);
   });
 
-  test('seeded one-minute candles include wicks and reproducible volume', () {
-    final candles = aggregateMarketCandles(
-      <double>[10000, 10020, 9990, 10040],
-      1,
-      seed: 77,
-      startMinuteOffset: 45,
-    );
-    final repeated = aggregateMarketCandles(
-      <double>[10000, 10020, 9990, 10040],
-      1,
-      seed: 77,
-      startMinuteOffset: 45,
-    );
+  test(
+    'seeded one-minute candles use sparse wicks and reproducible volume',
+    () {
+      final prices = List<double>.generate(
+        31,
+        (index) => 10000 + <double>[0, 10, -10, 20][index % 4],
+      );
+      final candles = aggregateMarketCandles(
+        prices,
+        1,
+        seed: 77,
+        startMinuteOffset: 45,
+      );
+      final repeated = aggregateMarketCandles(
+        prices,
+        1,
+        seed: 77,
+        startMinuteOffset: 45,
+      );
 
-    expect(candles, hasLength(3));
-    expect(candles.first.startMinute, 45);
-    expect(candles.first.high, greaterThan(10020));
-    expect(candles.first.low, lessThan(10000));
-    expect(candles.first.volume, greaterThan(0));
-    expect(repeated.first.high, candles.first.high);
-    expect(repeated.first.low, candles.first.low);
-    expect(repeated.first.volume, candles.first.volume);
-  });
+      expect(candles, hasLength(30));
+      expect(candles.first.startMinute, 45);
+      final wickCount = candles.where((candle) {
+        return candle.high > math.max(candle.open, candle.close) ||
+            candle.low < math.min(candle.open, candle.close);
+      }).length;
+      expect(wickCount, inInclusiveRange(1, 24));
+      expect(
+        candles,
+        everyElement(predicate<MarketCandle>((c) => c.volume > 0)),
+      );
+      expect(
+        candles.map((candle) => candle.volume).toSet().length,
+        greaterThan(5),
+      );
+      expect(
+        List<Object>.generate(
+          candles.length,
+          (index) => <double>[
+            repeated[index].high,
+            repeated[index].low,
+            repeated[index].volume,
+          ],
+        ),
+        equals(
+          List<Object>.generate(
+            candles.length,
+            (index) => <double>[
+              candles[index].high,
+              candles[index].low,
+              candles[index].volume,
+            ],
+          ),
+        ),
+      );
+    },
+  );
 
   test('candle labels respect the duration of each generated tick', () {
     final candles = aggregateMarketCandles(
