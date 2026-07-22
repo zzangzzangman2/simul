@@ -712,25 +712,8 @@ class _StockMarketScreenState extends State<StockMarketScreen> {
     }
   }
 
-  List<_StockDefinition> get _visibleStocks {
-    final query = _searchController.text.trim().toLowerCase();
-    final source = switch (_tab) {
-      0 => _stocks.where((stock) => stock.country == 'KR'),
-      1 => _stocks.where((stock) => stock.market == 'KOSPI'),
-      2 => _stocks.where((stock) => stock.market == 'KOSDAQ'),
-      3 => _stocks.where((stock) => stock.country != 'KR'),
-      _ => _stocks.where((stock) => _favoriteAssetIds.contains(stock.id)),
-    };
-    final visible = source
-        .where(
-          (stock) =>
-              query.isEmpty ||
-              stock.name.toLowerCase().contains(query) ||
-              stock.code.contains(query) ||
-              stock.sector.toLowerCase().contains(query) ||
-              stock.market.toLowerCase().contains(query),
-        )
-        .toList();
+  List<_StockDefinition> _sortedStocks(Iterable<_StockDefinition> source) {
+    final visible = source.toList();
     visible.sort((left, right) {
       final leftQuote = _live[left.code]!.value;
       final rightQuote = _live[right.code]!.value;
@@ -749,6 +732,27 @@ class _StockMarketScreenState extends State<StockMarketScreen> {
       };
     });
     return visible;
+  }
+
+  List<_StockDefinition> get _visibleStocks {
+    final query = _searchController.text.trim().toLowerCase();
+    final source = switch (_tab) {
+      0 => _stocks.where((stock) => stock.country == 'KR'),
+      1 => _stocks.where((stock) => stock.market == 'KOSPI'),
+      2 => _stocks.where((stock) => stock.market == 'KOSDAQ'),
+      3 => _stocks.where((stock) => stock.country != 'KR'),
+      _ => _stocks.where((stock) => _favoriteAssetIds.contains(stock.id)),
+    };
+    return _sortedStocks(
+      source.where(
+        (stock) =>
+            query.isEmpty ||
+            stock.name.toLowerCase().contains(query) ||
+            stock.code.contains(query) ||
+            stock.sector.toLowerCase().contains(query) ||
+            stock.market.toLowerCase().contains(query),
+      ),
+    );
   }
 
   Map<String, double> get _currentPrices => {
@@ -801,80 +805,44 @@ class _StockMarketScreenState extends State<StockMarketScreen> {
   }
 
   Widget _buildHomeSection() {
-    final rows = _holdingRows(limit: 3);
-    final movers =
-        _stocks
-            .where((stock) => stock.country == 'KR' && stock.currency == 'KRW')
-            .toList()
-          ..sort(
-            (left, right) => _changeRate(
-              _live[right.code]!.value,
-            ).abs().compareTo(_changeRate(_live[left.code]!.value).abs()),
-          );
+    final domestic = _stocks
+        .where((stock) => stock.country == 'KR' && stock.currency == 'KRW')
+        .toList();
+    final ranked = _sortedStocks(domestic).take(8).toList();
     return ListView(
       key: const Key('market-home-section'),
-      padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 28),
       children: [
-        const Text(
-          '내 투자',
-          style: TextStyle(
-            color: Color(0xFF191F28),
-            fontSize: 24,
-            fontWeight: FontWeight.w900,
-            letterSpacing: -0.8,
-          ),
-        ),
-        const SizedBox(height: 12),
-        _InvestmentOverviewCard(
-          state: _state,
-          prices: _currentPrices,
-          onDeposit: widget.onTransferCash == null
-              ? null
-              : () => _openTransferSheet(true),
-          onWithdraw: widget.onTransferCash == null
-              ? null
-              : () => _openTransferSheet(false),
-        ),
-        const SizedBox(height: 13),
-        _MarketMissionCard(
-          state: _state,
-          onClaim: widget.onClaimMission == null || _isClaimingMission
-              ? null
-              : _claimActiveMission,
-        ),
-        const SizedBox(height: 22),
-        _MarketSectionTitle(
-          title: '보유 주식',
-          action: rows.isEmpty ? null : '전체보기',
-          onAction: rows.isEmpty
-              ? null
-              : () => setState(() => _section = _MarketSection.account),
-        ),
+        const _MarketSectionTitle(title: '시장 한눈에'),
         const SizedBox(height: 8),
-        if (rows.isEmpty)
-          _EmptyPortfolioCard(
-            onExplore: () => setState(() => _section = _MarketSection.explore),
-          )
-        else
-          ...rows,
-        const SizedBox(height: 22),
+        _MarketSnapshotCard(
+          stocks: domestic,
+          live: _live,
+          minute: _marketMinute,
+          tradingDay: _hasDomesticTradingSession,
+        ),
+        const SizedBox(height: 18),
         _MarketSectionTitle(
-          title: '오늘 많이 움직인 주식',
-          action: '더보기',
+          title: '오늘의 종목 순위',
+          action: '전체 종목',
           onAction: () => setState(() => _section = _MarketSection.explore),
         ),
-        const SizedBox(height: 8),
-        ...movers
-            .take(3)
-            .map(
-              (stock) => _StockRow(
-                key: Key('home-stock-row-${stock.code}'),
-                definition: stock,
-                live: _live[stock.code]!,
-                favorite: _favoriteAssetIds.contains(stock.id),
-                onTap: () => _openStock(stock),
-              ),
-            ),
+        const Text(
+          '현재가·등락률·게임 거래대금을 한 줄에서 비교해요.',
+          style: TextStyle(
+            color: Color(0xFF8A919E),
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 9),
+        _MarketSortBar(
+          selected: _sort,
+          compact: true,
+          onChanged: (value) => setState(() => _sort = value),
+        ),
+        const SizedBox(height: 9),
+        _MarketRankingTable(stocks: ranked, live: _live, onOpen: _openStock),
       ],
     );
   }
@@ -886,7 +854,7 @@ class _StockMarketScreenState extends State<StockMarketScreen> {
       padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
       children: [
         const Text(
-          '내 계좌',
+          '내 투자',
           style: TextStyle(
             color: Color(0xFF191F28),
             fontSize: 24,
@@ -904,6 +872,13 @@ class _StockMarketScreenState extends State<StockMarketScreen> {
           onWithdraw: widget.onTransferCash == null
               ? null
               : () => _openTransferSheet(false),
+        ),
+        const SizedBox(height: 13),
+        _MarketMissionCard(
+          state: _state,
+          onClaim: widget.onClaimMission == null || _isClaimingMission
+              ? null
+              : _claimActiveMission,
         ),
         const SizedBox(height: 22),
         _MarketSectionTitle(title: '보유 종목 ${rows.length}'),
@@ -999,24 +974,6 @@ class _StockMarketScreenState extends State<StockMarketScreen> {
                       _MarketSection.explore => ListView(
                         padding: const EdgeInsets.fromLTRB(18, 4, 18, 30),
                         children: [
-                          _MarketBalanceCard(
-                            state: _state,
-                            prices: {
-                              for (final stock in _stocks)
-                                if (stock.currency == 'KRW')
-                                  stock.id: _live[stock.code]!.value.price,
-                            },
-                          ),
-                          const SizedBox(height: 12),
-                          _MarketMissionCard(
-                            state: _state,
-                            onClaim:
-                                widget.onClaimMission == null ||
-                                    _isClaimingMission
-                                ? null
-                                : _claimActiveMission,
-                          ),
-                          const SizedBox(height: 18),
                           TextField(
                             key: const Key('market-search-input'),
                             controller: _searchController,
@@ -2511,7 +2468,7 @@ class _MarketBottomNavigation extends StatelessWidget {
           _item(
             _MarketSection.account,
             Icons.account_balance_wallet_rounded,
-            '내 계좌',
+            '내 투자',
           ),
         ],
       ),
@@ -2589,127 +2546,171 @@ class _MarketSectionTitle extends StatelessWidget {
   );
 }
 
-class _InvestmentOverviewCard extends StatelessWidget {
-  const _InvestmentOverviewCard({
-    required this.state,
-    required this.prices,
-    this.onDeposit,
-    this.onWithdraw,
+class _MarketSnapshotCard extends StatelessWidget {
+  const _MarketSnapshotCard({
+    required this.stocks,
+    required this.live,
+    required this.minute,
+    required this.tradingDay,
   });
 
-  final GameState state;
-  final Map<String, double> prices;
-  final VoidCallback? onDeposit;
-  final VoidCallback? onWithdraw;
+  final List<_StockDefinition> stocks;
+  final Map<String, ValueNotifier<_LiveStock>> live;
+  final int minute;
+  final bool tradingDay;
 
   @override
   Widget build(BuildContext context) {
-    final evaluation = state.portfolioValue(prices);
-    final pnl = evaluation - state.portfolioCost;
-    final rate = state.portfolioCost <= 0
+    final rates = stocks
+        .map((stock) => _changeRate(live[stock.code]!.value))
+        .toList();
+    final rising = rates.where((rate) => rate > 0.05).length;
+    final falling = rates.where((rate) => rate < -0.05).length;
+    final steady = rates.length - rising - falling;
+    final average = rates.isEmpty
         ? 0.0
-        : pnl / state.portfolioCost * 100;
-    final total = state.brokerageCash + evaluation;
-    final pnlColor = _priceColor(pnl.toDouble());
+        : rates.reduce((left, right) => left + right) / rates.length;
+    final turnover = stocks.fold<double>(
+      0,
+      (sum, stock) => sum + _simulatedTurnover(stock, live[stock.code]!.value),
+    );
+    final info = marketClockAt(minute, tradingDay: tradingDay);
+    final averageColor = average.abs() < 0.005
+        ? const Color(0xFF6B7684)
+        : _priceColor(average);
+    final mood = rising > falling
+        ? '상승 우세'
+        : falling > rising
+        ? '하락 우세'
+        : '혼조';
+
     return Container(
-      key: const Key('market-investment-overview'),
-      padding: const EdgeInsets.all(18),
+      key: const Key('market-snapshot-card'),
+      padding: const EdgeInsets.fromLTRB(16, 15, 16, 14),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFEDF5FF), Color(0xFFF7FAFF)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(24),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE7EBF0)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0A101828),
+            blurRadius: 14,
+            offset: Offset(0, 5),
+          ),
+        ],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '${state.companyName} · 가족 투자계좌',
-            key: const Key('market-company-name'),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Color(0xFF6B7684),
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            '${_money(total)}원',
-            key: const Key('market-investment-total'),
-            style: const TextStyle(
-              color: Color(0xFF191F28),
-              fontSize: 29,
-              fontWeight: FontWeight.w900,
-              letterSpacing: -1,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '보유 주식 ${_money(evaluation)}원  ·  ${pnl >= 0 ? '+' : ''}${_money(pnl)}원 (${rate >= 0 ? '+' : ''}${rate.toStringAsFixed(2)}%)',
-            key: const Key('market-investment-pnl'),
-            style: TextStyle(
-              color: pnlColor,
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 14),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.82),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    '주문 가능 예수금',
-                    style: TextStyle(
-                      color: Color(0xFF6B7684),
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEAF2FF),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                Text(
-                  '${_money(state.brokerageCash)}원',
-                  key: const Key('market-brokerage-cash'),
+                child: Text(
+                  info.label,
                   style: const TextStyle(
-                    color: Color(0xFF191F28),
+                    color: Color(0xFF2272D8),
+                    fontSize: 10,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: FilledButton(
-                  key: const Key('market-deposit-button'),
-                  onPressed: onDeposit,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF3182F6),
-                    minimumSize: const Size.fromHeight(44),
-                  ),
-                  child: const Text('입금'),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                mood,
+                key: const Key('market-snapshot-mood'),
+                style: const TextStyle(
+                  color: Color(0xFF4D5968),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
-              const SizedBox(width: 9),
-              Expanded(
-                child: FilledButton.tonal(
-                  key: const Key('market-withdraw-button'),
-                  onPressed: onWithdraw,
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size.fromHeight(44),
-                  ),
-                  child: const Text('출금'),
+              const Spacer(),
+              Text(
+                marketTimeLabel(minute),
+                style: const TextStyle(
+                  color: Color(0xFF8A919E),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
                 ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 13),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '국내 종목 평균',
+                      style: TextStyle(
+                        color: Color(0xFF7B8491),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${average >= 0 ? '+' : ''}${average.toStringAsFixed(2)}%',
+                      key: const Key('market-snapshot-average'),
+                      style: TextStyle(
+                        color: averageColor,
+                        fontSize: 25,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.8,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  const Text(
+                    '게임 거래대금',
+                    style: TextStyle(
+                      color: Color(0xFF7B8491),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    _compactEok(turnover),
+                    key: const Key('market-snapshot-turnover'),
+                    style: const TextStyle(
+                      color: Color(0xFF202632),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const Divider(height: 24, color: Color(0xFFEEF0F3)),
+          Row(
+            children: [
+              _MarketSnapshotMetric(
+                label: '상승',
+                value: rising,
+                color: const Color(0xFFF04452),
+              ),
+              _MarketSnapshotMetric(
+                label: '보합',
+                value: steady,
+                color: const Color(0xFF7B8491),
+              ),
+              _MarketSnapshotMetric(
+                label: '하락',
+                value: falling,
+                color: const Color(0xFF3182F6),
               ),
             ],
           ),
@@ -2717,6 +2718,222 @@ class _InvestmentOverviewCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _MarketSnapshotMetric extends StatelessWidget {
+  const _MarketSnapshotMetric({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final String label;
+  final int value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Container(
+          width: 6,
+          height: 6,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 5),
+        Text(
+          '$label $value',
+          style: const TextStyle(
+            color: Color(0xFF4D5968),
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _MarketRankingTable extends StatelessWidget {
+  const _MarketRankingTable({
+    required this.stocks,
+    required this.live,
+    required this.onOpen,
+  });
+
+  final List<_StockDefinition> stocks;
+  final Map<String, ValueNotifier<_LiveStock>> live;
+  final ValueChanged<_StockDefinition> onOpen;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    key: const Key('market-ranking-table'),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: const Color(0xFFE7EBF0)),
+    ),
+    clipBehavior: Clip.antiAlias,
+    child: Column(
+      children: [
+        const _MarketRankingHeader(),
+        for (var index = 0; index < stocks.length; index++)
+          _MarketRankingRow(
+            key: Key('market-ranking-row-${stocks[index].code}'),
+            rank: index + 1,
+            definition: stocks[index],
+            live: live[stocks[index].code]!,
+            onTap: () => onOpen(stocks[index]),
+          ),
+      ],
+    ),
+  );
+}
+
+class _MarketRankingHeader extends StatelessWidget {
+  const _MarketRankingHeader();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    height: 34,
+    padding: const EdgeInsets.symmetric(horizontal: 10),
+    color: const Color(0xFFF7F8FA),
+    child: const Row(
+      children: [
+        SizedBox(width: 26, child: Text('순위')),
+        Expanded(flex: 5, child: Text('종목')),
+        Expanded(flex: 4, child: Text('현재가', textAlign: TextAlign.right)),
+        Expanded(flex: 3, child: Text('등락', textAlign: TextAlign.right)),
+        Expanded(flex: 4, child: Text('거래대금', textAlign: TextAlign.right)),
+      ],
+    ),
+  );
+}
+
+class _MarketRankingRow extends StatelessWidget {
+  const _MarketRankingRow({
+    super.key,
+    required this.rank,
+    required this.definition,
+    required this.live,
+    required this.onTap,
+  });
+
+  final int rank;
+  final _StockDefinition definition;
+  final ValueNotifier<_LiveStock> live;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => ValueListenableBuilder<_LiveStock>(
+    valueListenable: live,
+    builder: (context, quote, _) {
+      final rate = _changeRate(quote);
+      final change = quote.price - quote.previousClose;
+      return Material(
+        color: Colors.white,
+        child: InkWell(
+          onTap: onTap,
+          child: Container(
+            height: 56,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            decoration: const BoxDecoration(
+              border: Border(
+                top: BorderSide(color: Color(0xFFEEF0F3), width: 1),
+              ),
+            ),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 26,
+                  child: Text(
+                    '$rank',
+                    style: const TextStyle(
+                      color: Color(0xFF7B8491),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  flex: 5,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        definition.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFF252B35),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        definition.code,
+                        style: const TextStyle(
+                          color: Color(0xFF9AA1AB),
+                          fontSize: 8,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  flex: 4,
+                  child: Text(
+                    _displayPrice(quote.price, definition.currency),
+                    maxLines: 1,
+                    textAlign: TextAlign.right,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFF252B35),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  flex: 3,
+                  child: Text(
+                    '${rate >= 0 ? '+' : ''}${rate.toStringAsFixed(2)}%',
+                    maxLines: 1,
+                    textAlign: TextAlign.right,
+                    style: TextStyle(
+                      color: change.abs() < 0.005
+                          ? const Color(0xFF7B8491)
+                          : _priceColor(change),
+                      fontSize: 9,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  flex: 4,
+                  child: Text(
+                    _compactEok(_simulatedTurnover(definition, quote)),
+                    maxLines: 1,
+                    textAlign: TextAlign.right,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFF4D5968),
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    },
+  );
 }
 
 class _BrokerageAccountCard extends StatelessWidget {
@@ -3215,108 +3432,6 @@ class _BrokerageTransferSheetState extends State<_BrokerageTransferSheet> {
   );
 }
 
-class _MarketBalanceCard extends StatelessWidget {
-  const _MarketBalanceCard({required this.state, required this.prices});
-
-  final GameState state;
-  final Map<String, double> prices;
-
-  @override
-  Widget build(BuildContext context) {
-    final date = state.currentDate;
-    final dateLabel =
-        '${date.year}.${date.month.toString().padLeft(2, '0')}.${date.day.toString().padLeft(2, '0')}';
-    final portfolioValue = state.portfolioValue(prices);
-    final aum = state.totalAum(prices);
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(18, 16, 18, 17),
-      decoration: BoxDecoration(
-        color: const Color(0xFFEFF6FF),
-        borderRadius: BorderRadius.circular(22),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  '${state.companyName} · 가족 투자계좌',
-                  key: const Key('market-company-name'),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFF5C6B7A),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    const _LiveDot(),
-                    const SizedBox(width: 6),
-                    Text(
-                      dateLabel,
-                      style: const TextStyle(
-                        color: Color(0xFF536170),
-                        fontSize: 10,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 7),
-          Text(
-            '${_money(state.cash)}원',
-            style: const TextStyle(
-              color: Color(0xFF171B24),
-              fontSize: 27,
-              fontWeight: FontWeight.w900,
-              letterSpacing: -1,
-            ),
-          ),
-          const SizedBox(height: 7),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  '주식 ${_money(portfolioValue)}원',
-                  style: const TextStyle(
-                    color: Color(0xFF718092),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              Text(
-                '원화 AUM ${_money(aum)}원',
-                key: const Key('market-total-aum'),
-                style: const TextStyle(
-                  color: Color(0xFF405269),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _MarketMissionCard extends StatelessWidget {
   const _MarketMissionCard({required this.state, required this.onClaim});
 
@@ -3553,19 +3668,31 @@ class _MarketTabs extends StatelessWidget {
 }
 
 class _MarketSortBar extends StatelessWidget {
-  const _MarketSortBar({required this.selected, required this.onChanged});
+  const _MarketSortBar({
+    required this.selected,
+    required this.onChanged,
+    this.compact = false,
+  });
 
   final _MarketSort selected;
   final ValueChanged<_MarketSort> onChanged;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
-    const labels = <_MarketSort, String>{
-      _MarketSort.turnover: '게임 거래대금순',
-      _MarketSort.gainers: '급상승',
-      _MarketSort.losers: '급하락',
-      _MarketSort.name: '이름순',
-    };
+    final labels = compact
+        ? const <_MarketSort, String>{
+            _MarketSort.turnover: '거래대금',
+            _MarketSort.gainers: '상승',
+            _MarketSort.losers: '하락',
+            _MarketSort.name: '이름',
+          }
+        : const <_MarketSort, String>{
+            _MarketSort.turnover: '게임 거래대금순',
+            _MarketSort.gainers: '급상승',
+            _MarketSort.losers: '급하락',
+            _MarketSort.name: '이름순',
+          };
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
