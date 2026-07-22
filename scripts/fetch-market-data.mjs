@@ -76,7 +76,7 @@ async function fetchAsset(asset) {
   url.searchParams.set("period1", String(start));
   url.searchParams.set("period2", String(end));
   url.searchParams.set("interval", "1d");
-  url.searchParams.set("events", "history");
+  url.searchParams.set("events", "div,splits");
   url.searchParams.set("includeAdjustedClose", "true");
 
   const response = await fetch(url, {
@@ -117,6 +117,26 @@ async function fetchAsset(asset) {
       .map(([date, value]) => [date, Number(((value / baselineAdjusted) * 100).toFixed(4))]),
   );
   const tradeDates = Object.keys(prices);
+  const corporateActions = [
+    ...Object.values(chart.events?.splits ?? {}).map((event) => ({
+      id: `${asset.id}-split-${dayKey(event.date, chart.meta.exchangeTimezoneName)}`,
+      type: "split",
+      date: dayKey(event.date, chart.meta.exchangeTimezoneName),
+      numerator: Number(event.numerator),
+      denominator: Number(event.denominator),
+      source: "Yahoo Finance chart event",
+    })),
+    ...Object.values(chart.events?.dividends ?? {}).map((event) => ({
+      id: `${asset.id}-dividend-${dayKey(event.date, chart.meta.exchangeTimezoneName)}`,
+      type: "dividend",
+      date: dayKey(event.date, chart.meta.exchangeTimezoneName),
+      amount: Number(event.amount),
+      currency: chart.meta.currency,
+      source: "Yahoo Finance chart event",
+    })),
+  ]
+    .filter((event) => event.date >= "2000-01-01" && event.date <= "2010-12-31")
+    .sort((left, right) => left.date.localeCompare(right.date) || left.id.localeCompare(right.id));
 
   return {
     ...asset,
@@ -128,6 +148,7 @@ async function fetchAsset(asset) {
     lastTradeDate: tradeDates.at(-1),
     prices,
     adjustedIndex,
+    corporateActions,
   };
 }
 
@@ -138,7 +159,7 @@ for (const asset of assets) {
 }
 
 const output = {
-  schemaVersion: 3,
+  schemaVersion: 4,
   generatedAt: new Date().toISOString(),
   period: { start: "2000-01-01", end: "2010-12-31", baseline: "1999-12" },
   methodology:

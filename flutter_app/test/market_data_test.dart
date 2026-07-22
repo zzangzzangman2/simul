@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:millennium_capital/game/market_clock.dart';
 import 'package:millennium_capital/game/market_data.dart';
 import 'package:millennium_capital/game/market_tick.dart';
 
@@ -18,7 +19,7 @@ void main() {
     () async {
       final universe = await HistoricalMarketUniverse.load();
 
-      expect(universe.schemaVersion, 3);
+      expect(universe.schemaVersion, 4);
       expect(universe.assets.length, 28);
       expect(universe.assets.where((asset) => asset.isDomestic).length, 22);
       expect(universe.assets.where((asset) => !asset.isDomestic).length, 6);
@@ -28,6 +29,39 @@ void main() {
       );
     },
   );
+
+  test('market parser rejects duplicate assets and invalid prices', () {
+    Map<String, dynamic> asset(String id, String symbol, Object price) => {
+      'id': id,
+      'symbol': symbol,
+      'name': id,
+      'market': 'KOSPI',
+      'country': 'KR',
+      'currency': 'KRW',
+      'prices': {'2000-01-04': price},
+    };
+    Map<String, dynamic> universe(List<Map<String, dynamic>> assets) => {
+      'schemaVersion': 4,
+      'source': {'name': 'test'},
+      'assets': assets,
+    };
+
+    expect(
+      () => HistoricalMarketUniverse.fromJson(
+        universe([
+          asset('same', '000001.KS', 100),
+          asset('same', '000002.KS', 200),
+        ]),
+      ),
+      throwsA(isA<FormatException>()),
+    );
+    expect(
+      () => HistoricalMarketUniverse.fromJson(
+        universe([asset('bad', '000003.KS', -1)]),
+      ),
+      throwsA(isA<FormatException>()),
+    );
+  });
 
   test('Samsung does not leak its first quote before 2000-01-04', () async {
     final universe = await HistoricalMarketUniverse.load();
@@ -67,6 +101,13 @@ void main() {
       path.length - 1,
       (index) => path[index + 1] - path[index],
     );
+    expect(deltas, everyElement(isNot(0)));
+    expect(
+      deltas.take(deltas.length - 1).map((delta) => delta.abs()),
+      everyElement(greaterThanOrEqualTo(20)),
+      reason: 'Every intermediate minute should make a visible market move.',
+    );
+
     expect(deltas.toSet().length, greaterThan(12));
     expect(
       deltas.map((delta) => delta.abs()).reduce((a, b) => a > b ? a : b),
@@ -96,4 +137,34 @@ void main() {
       expect(candles.last.close, 108);
     },
   );
+
+  test('one-minute market ticks produce a true one-minute candle', () {
+    expect(marketTickMinutes, 1);
+    final candles = aggregateMarketCandles(
+      <double>[100, 101, 99, 102],
+      1,
+      tickMinutes: marketTickMinutes,
+    );
+    expect(candles, hasLength(3));
+    expect(candles.first.startMinute, 0);
+    expect(candles.first.open, 100);
+    expect(candles.first.close, 101);
+    expect(candles.last.startMinute, 2);
+    expect(candles.last.close, 102);
+  });
+
+  test('candle labels respect the duration of each generated tick', () {
+    final candles = aggregateMarketCandles(
+      <double>[100, 101, 102, 103, 104],
+      6,
+      tickMinutes: 3,
+    );
+    expect(candles, hasLength(2));
+    expect(candles.first.open, 100);
+    expect(candles.first.close, 102);
+    expect(
+      () => aggregateMarketCandles(<double>[100, 101], 5, tickMinutes: 3),
+      throwsArgumentError,
+    );
+  });
 }

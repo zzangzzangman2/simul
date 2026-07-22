@@ -117,7 +117,7 @@ class EmployeeProfile {
     trueGrade: EmployeeGrade.c,
     potentialGrade: EmployeeGrade.b,
     gradeConfidence: 40,
-    salaryMonthly: 0,
+    salaryMonthly: 70000,
     morale: 60,
     workload: 0,
     loyalty: 50,
@@ -184,7 +184,7 @@ class EmployeeProfile {
         EmployeeGrade.b,
       ),
       gradeConfidence: (json['gradeConfidence'] as num?)?.toInt() ?? 40,
-      salaryMonthly: (json['salaryMonthly'] as num?)?.toInt() ?? 0,
+      salaryMonthly: (json['salaryMonthly'] as num?)?.toInt() ?? 70000,
       morale: (json['morale'] as num?)?.toInt() ?? 60,
       workload: (json['workload'] as num?)?.toInt() ?? 0,
       loyalty: (json['loyalty'] as num?)?.toInt() ?? 50,
@@ -197,6 +197,113 @@ class EmployeeProfile {
     );
   }
 }
+
+const kHiringCandidates = <EmployeeProfile>[
+  EmployeeProfile(
+    id: 'candidate-hana',
+    name: '김하나',
+    role: EmployeeRole.researcher,
+    displayedGrade: EmployeeGrade.b,
+    trueGrade: EmployeeGrade.a,
+    potentialGrade: EmployeeGrade.s,
+    gradeConfidence: 55,
+    salaryMonthly: 80000,
+    morale: 72,
+    workload: 0,
+    loyalty: 64,
+    ethics: 88,
+    specialties: ['소비재', '현장조사'],
+    traits: ['꼼꼼함', '정직함'],
+    stats: EmployeeStats(
+      analysis: 72,
+      valuation: 60,
+      accounting: 55,
+      negotiation: 62,
+      operations: 68,
+      risk: 70,
+      communication: 76,
+      leadership: 52,
+    ),
+  ),
+  EmployeeProfile(
+    id: 'candidate-junho',
+    name: '박준호',
+    role: EmployeeRole.analyst,
+    displayedGrade: EmployeeGrade.b,
+    trueGrade: EmployeeGrade.b,
+    potentialGrade: EmployeeGrade.a,
+    gradeConfidence: 70,
+    salaryMonthly: 95000,
+    morale: 68,
+    workload: 0,
+    loyalty: 58,
+    ethics: 76,
+    specialties: ['재무제표', '가치평가'],
+    traits: ['수치 중심', '신중함'],
+    stats: EmployeeStats(
+      analysis: 78,
+      valuation: 82,
+      accounting: 75,
+      negotiation: 48,
+      operations: 55,
+      risk: 74,
+      communication: 57,
+      leadership: 51,
+    ),
+  ),
+  EmployeeProfile(
+    id: 'candidate-minseo',
+    name: '이민서',
+    role: EmployeeRole.officeAccounting,
+    displayedGrade: EmployeeGrade.c,
+    trueGrade: EmployeeGrade.b,
+    potentialGrade: EmployeeGrade.a,
+    gradeConfidence: 62,
+    salaryMonthly: 70000,
+    morale: 75,
+    workload: 0,
+    loyalty: 72,
+    ethics: 93,
+    specialties: ['회계', '운영'],
+    traits: ['원칙주의', '꾸준함'],
+    stats: EmployeeStats(
+      analysis: 61,
+      valuation: 58,
+      accounting: 88,
+      negotiation: 52,
+      operations: 80,
+      risk: 81,
+      communication: 65,
+      leadership: 55,
+    ),
+  ),
+  EmployeeProfile(
+    id: 'candidate-doyun',
+    name: '최도윤',
+    role: EmployeeRole.legalCompliance,
+    displayedGrade: EmployeeGrade.a,
+    trueGrade: EmployeeGrade.a,
+    potentialGrade: EmployeeGrade.s,
+    gradeConfidence: 78,
+    salaryMonthly: 130000,
+    morale: 66,
+    workload: 0,
+    loyalty: 60,
+    ethics: 96,
+    specialties: ['준법', '계약'],
+    traits: ['독립적', '위험 경계'],
+    stats: EmployeeStats(
+      analysis: 73,
+      valuation: 59,
+      accounting: 70,
+      negotiation: 75,
+      operations: 68,
+      risk: 92,
+      communication: 71,
+      leadership: 63,
+    ),
+  ),
+];
 
 class FamilyHelperStatus {
   const FamilyHelperStatus({
@@ -301,6 +408,29 @@ class OrganizationState {
 
   int get researchHelpCount =>
       familyHelpers.fold<int>(0, (sum, item) => sum + item.helpCount);
+
+  int get monthlyPayroll =>
+      employees.fold<int>(0, (sum, employee) => sum + employee.salaryMonthly);
+
+  OrganizationState copyWith({
+    List<EmployeeProfile>? employees,
+    List<FamilyHelperStatus>? familyHelpers,
+    List<String>? cultureTags,
+    List<String>? helpLog,
+  }) => OrganizationState(
+    employees: employees ?? this.employees,
+    familyHelpers: familyHelpers ?? this.familyHelpers,
+    cultureTags: cultureTags ?? this.cultureTags,
+    helpLog: helpLog ?? this.helpLog,
+  );
+
+  OrganizationState hire(EmployeeProfile candidate, int day) {
+    if (employees.any((employee) => employee.id == candidate.id)) return this;
+    return copyWith(
+      employees: [...employees, candidate],
+      helpLog: [...helpLog, 'DAY $day · ${candidate.name} 정식 합류'],
+    );
+  }
 
   factory OrganizationState.initial(FamilyRule rule) => OrganizationState(
     employees: const [],

@@ -17,7 +17,7 @@ void main() {
     final request = dynamicNewsRequestForState(resolved, brief);
     expect(request.year, 2000);
     expect(request.companyName, '새벽투자연구소');
-    expect(request.action, contains('제품부터 본다'));
+    expect(request.action, contains('써 본 제품부터 보기'));
     expect(request.megaTrend, isNotEmpty);
   });
 }

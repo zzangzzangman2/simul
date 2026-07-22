@@ -82,7 +82,7 @@ type Deal = {
 const assets = marketHistory.assets as unknown as Asset[];
 const START_DATE = marketHistory.period.start;
 const END_DATE = marketHistory.period.end;
-const INITIAL_CAPITAL = 1_000_000;
+const INITIAL_CAPITAL = 0;
 const INITIAL_TEAM = 1;
 const MIN_ORDER = 10_000;
 const HIRING_COST = 350_000;
@@ -713,11 +713,11 @@ export function GameClient() {
             <span className="status-pill"><i /> REAL HISTORY MODE</span>
             <p className="onboarding-index">00 / INCORPORATION</p>
             <h1>당신의 투자회사에<br /><em>이름을 붙이세요.</em></h1>
-            <p>2000년 1월 1일, 작은 원룸 사무실과 100만원이 전부입니다. 혼자 시작해 하루씩 회사를 키워보세요.</p>
+            <p>2000년 1월 1일, 작은 원룸 사무실과 0원의 빈 장부가 전부입니다. 혼자 시작해 하루씩 회사를 키워보세요.</p>
 
             <dl className="founding-chips" aria-label="초기 회사 조건">
               <div><dt>시작일</dt><dd>2000.01.01</dd></div>
-              <div><dt>초기 자본</dt><dd>100만원</dd></div>
+              <div><dt>초기 자본</dt><dd>0원</dd></div>
               <div><dt>창립 팀</dt><dd>1명</dd></div>
               <div><dt>시장</dt><dd>한국 · 미국 · 일본</dd></div>
             </dl>

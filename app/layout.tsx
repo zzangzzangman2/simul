@@ -25,8 +25,8 @@ export async function generateMetadata(): Promise<Metadata> {
   const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") ?? "localhost:3000";
   const protocol = requestHeaders.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
   const origin = `${protocol}://${host}`;
-  const title = "밀레니엄 캐피탈 — 100만원으로 시작하는 투자회사";
-  const description = "2000년 1월 1일, 작은 아파트의 CRT 컴퓨터와 100만원으로 회사를 키워 가는 모바일 세로형 투자 경영 게임";
+  const title = "밀레니엄 캐피탈 — 0원에서 시작하는 투자회사";
+  const description = "2000년 1월 1일, 창립자 1명이 0원에서 종잣돈 1만원을 직접 벌어 회사를 키워 가는 모바일 세로형 투자 경영 게임";
 
   return {
     title,

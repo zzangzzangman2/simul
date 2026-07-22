@@ -43,39 +43,90 @@ class StoryState {
   final List<String> seenStoryEventIds;
   final List<String> companyCultureTags;
 
+  int flagInt(String key, [int fallback = 0]) =>
+      (storyFlags[key] as num?)?.toInt() ?? fallback;
+  bool flagBool(String key, [bool fallback = false]) =>
+      storyFlags[key] as bool? ?? fallback;
+  int get earnedSeedMoney => flagInt('earnedSeedMoney');
+  int get reputation => flagInt('reputation');
+  int get externalAum => flagInt('externalAum');
+  int get officeTier => flagInt('officeTier');
+  bool get fundLaunched => flagBool('fundLaunched');
+  bool get tutorialSeen => flagBool('hubTutorialSeen');
+  List<Map<String, dynamic>> get newsArchive {
+    final raw = storyFlags['newsArchive'];
+    if (raw is! List) return const <Map<String, dynamic>>[];
+    return raw
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList(growable: false);
+  }
+
   factory StoryState.newPlayer({
     required String playerName,
     required String introChoice,
     required StoryTrait startingTrait,
     required FamilyRule familyRule,
   }) {
+    final introAffinity = switch (introChoice) {
+      'computer' => (mother: 0, father: 0, sibling: 3, grandfather: 0),
+      'y2k' => (mother: 2, father: 1, sibling: 0, grandfather: 0),
+      'stocks' => (mother: 0, father: 0, sibling: 0, grandfather: 3),
+      _ => (mother: 0, father: 0, sibling: 0, grandfather: 0),
+    };
+    final traitTrust = switch (startingTrait) {
+      StoryTrait.stability => 2,
+      StoryTrait.analysis => 1,
+      StoryTrait.innovation => 0,
+      StoryTrait.control => -1,
+    };
+    final traitSchool = switch (startingTrait) {
+      StoryTrait.analysis => 4,
+      StoryTrait.stability => 2,
+      StoryTrait.innovation => 1,
+      StoryTrait.control => 0,
+    };
     return StoryState(
       playerName: playerName.trim(),
       playerBirthYear: 1989,
       introChoice: introChoice,
       startingTrait: startingTrait,
       familyRule: familyRule,
-      familyTrust: 30,
-      motherAffinity: familyRule == FamilyRule.reportLosses ? 33 : 30,
-      fatherAffinity: familyRule == FamilyRule.noHotTips ? 33 : 30,
-      siblingAffinity: 30,
-      grandfatherAffinity: familyRule == FamilyRule.keepCash ? 33 : 30,
+      familyTrust: 30 + traitTrust,
+      motherAffinity:
+          (familyRule == FamilyRule.reportLosses ? 33 : 30) +
+          introAffinity.mother,
+      fatherAffinity:
+          (familyRule == FamilyRule.noHotTips ? 33 : 30) + introAffinity.father,
+      siblingAffinity: 30 + introAffinity.sibling,
+      grandfatherAffinity:
+          (familyRule == FamilyRule.keepCash ? 33 : 30) +
+          introAffinity.grandfather,
       householdStability: 55,
-      schoolBalance: 60,
+      schoolBalance: 60 + traitSchool,
       roomLevel: 0,
-      accountAuthorityLevel: 1,
+      accountAuthorityLevel: 0,
       guardianAccountHolder: 'mother',
       storyFlags: const {
         'prologueComplete': true,
+        'campaignStartDate': '2000-01-02',
         'guardianConsent': true,
         'isLegalCompany': false,
         'earnedSeedMoney': 0,
         'workSessions': 0,
         'workSessionsToday': 0,
         'firstSeedGoalReached': false,
+        'firstOrderExecuted': false,
+        'reputation': 0,
+        'officeTier': 0,
+        'fundLaunched': false,
+        'externalAum': 0,
+        'hubTutorialSeen': false,
+        'performanceHistory': <Map<String, dynamic>>[],
+        'newsArchive': <Map<String, dynamic>>[],
       },
       seenStoryEventIds: const ['PROLOGUE_MILLENNIUM'],
-      companyCultureTags: [familyRule.name],
+      companyCultureTags: [familyRule.name, startingTrait.name, introChoice],
     );
   }
 
@@ -109,6 +160,7 @@ class StoryState {
     int? schoolBalance,
     int? roomLevel,
     int? accountAuthorityLevel,
+    String? guardianAccountHolder,
     Map<String, dynamic>? storyFlags,
     List<String>? seenStoryEventIds,
     List<String>? companyCultureTags,
@@ -133,7 +185,8 @@ class StoryState {
       roomLevel: (roomLevel ?? this.roomLevel).clamp(0, 4),
       accountAuthorityLevel:
           (accountAuthorityLevel ?? this.accountAuthorityLevel).clamp(0, 5),
-      guardianAccountHolder: guardianAccountHolder,
+      guardianAccountHolder:
+          guardianAccountHolder ?? this.guardianAccountHolder,
       storyFlags: storyFlags ?? this.storyFlags,
       seenStoryEventIds: seenStoryEventIds ?? this.seenStoryEventIds,
       companyCultureTags: companyCultureTags ?? this.companyCultureTags,
@@ -187,7 +240,7 @@ class StoryState {
       schoolBalance: (json['schoolBalance'] as num?)?.toInt() ?? 60,
       roomLevel: (json['roomLevel'] as num?)?.toInt() ?? 0,
       accountAuthorityLevel:
-          (json['accountAuthorityLevel'] as num?)?.toInt() ?? 1,
+          (json['accountAuthorityLevel'] as num?)?.toInt() ?? 0,
       guardianAccountHolder:
           json['guardianAccountHolder'] as String? ?? 'mother',
       storyFlags:

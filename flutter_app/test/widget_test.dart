@@ -24,7 +24,53 @@ void main() {
     }
   }
 
+  Future<void> startNewGame(WidgetTester tester) async {
+    if (find.byKey(const Key('game-title-screen')).evaluate().isEmpty) return;
+    await tester.tap(find.byKey(const Key('new-game-button')));
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> continueFirstSave(WidgetTester tester) async {
+    if (find.byKey(const Key('game-title-screen')).evaluate().isEmpty) return;
+    await tester.tap(find.byKey(const Key('continue-game-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('load-save-slot-1')));
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> dismissHubTutorial(WidgetTester tester) async {
+    final done = find.byKey(const Key('hub-tutorial-done'));
+    if (done.evaluate().isEmpty) return;
+    await tester.tap(done);
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> waitForMarketHome(WidgetTester tester) async {
+    for (var attempt = 0; attempt < 30; attempt++) {
+      await tester.pump(const Duration(milliseconds: 100));
+      if (find.byKey(const Key('market-home-section')).evaluate().isNotEmpty) {
+        return;
+      }
+    }
+  }
+
+  Future<void> openMarketExplore(WidgetTester tester) async {
+    await waitForMarketHome(tester);
+    await tester.tap(find.byKey(const Key('market-nav-explore')));
+    await tester.pump();
+    for (var attempt = 0; attempt < 30; attempt++) {
+      await tester.pump(const Duration(milliseconds: 100));
+      if (find.byKey(const Key('stock-row-005930')).evaluate().isNotEmpty) {
+        await tester.drag(find.byType(Scrollable).first, const Offset(0, -240));
+        await tester.pump();
+        await tester.ensureVisible(find.byKey(const Key('stock-row-005930')));
+        return;
+      }
+    }
+  }
+
   Future<void> goToLivingRoom(WidgetTester tester) async {
+    await dismissHubTutorial(tester);
     await tester.tap(find.byKey(const Key('apartment-go-living-room')));
     await tester.pumpAndSettle();
   }
@@ -36,18 +82,23 @@ void main() {
   }
 
   Future<void> completeStoryOnboarding(WidgetTester tester) async {
-    await advanceDialogue(tester, 6);
+    await startNewGame(tester);
+    await advanceDialogue(tester, 9);
     await tester.tap(find.byKey(const Key('story-intro-computer')));
     await tester.pumpAndSettle();
 
-    await advanceDialogue(tester, 4);
+    await advanceDialogue(tester, 7);
     await tester.enterText(find.byKey(const Key('player-name-input')), '민준');
     await tester.pump();
     await tester.ensureVisible(find.byKey(const Key('story-next-name')));
     await tester.tap(find.byKey(const Key('story-next-name')));
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('story-continue')));
+    await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('story-trait-analysis')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('story-continue')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('story-continue')));
     await tester.pumpAndSettle();
@@ -62,6 +113,7 @@ void main() {
     await tester.ensureVisible(find.byKey(const Key('create-company-button')));
     await tester.tap(find.byKey(const Key('create-company-button')));
     await tester.pumpAndSettle();
+    await dismissHubTutorial(tester);
   }
 
   testWidgets('prologue explains the setting before showing a choice', (
@@ -71,13 +123,18 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(const MillenniumCapitalApp());
     await tester.pumpAndSettle();
+    expect(find.byKey(const Key('game-title-screen')), findsOneWidget);
+    expect(find.text('처음하기'), findsOneWidget);
+    expect(find.text('이어하기'), findsOneWidget);
+
+    await startNewGame(tester);
 
     expect(find.textContaining('새 천년을 세 분 앞둔 밤'), findsOneWidget);
     expect(find.textContaining('작은방'), findsOneWidget);
     expect(find.byKey(const Key('story-intro-computer')), findsNothing);
     expect(find.byKey(const Key('company-name-input')), findsNothing);
 
-    await advanceDialogue(tester, 6);
+    await advanceDialogue(tester, 9);
     expect(find.byKey(const Key('story-intro-computer')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
@@ -98,10 +155,11 @@ void main() {
     expect(companyHeader.data, '별빛 투자');
     expect(companyHeader.maxLines, 1);
     expect(companyHeader.softWrap, isFalse);
-    expect(find.text('1,000,000원'), findsOneWidget);
+    expect(find.text('가족 아파트 · 작은방'), findsOneWidget);
+    expect(find.text('0원'), findsOneWidget);
     expect(find.byKey(const Key('apartment-place-bedroom')), findsOneWidget);
     expect(find.byKey(const Key('room-company-sign')), findsOneWidget);
-    expect(find.textContaining('거실 탁자 위 안건 편지'), findsOneWidget);
+    expect(find.textContaining('거실의 안건 편지를 먼저'), findsOneWidget);
   });
 
   testWidgets('existing v1 save is restored with safe story defaults', (
@@ -119,6 +177,7 @@ void main() {
 
     await tester.pumpWidget(const MillenniumCapitalApp());
     await tester.pumpAndSettle();
+    await continueFirstSave(tester);
 
     final companyHeader = tester.widget<Text>(
       find.byKey(const Key('company-header-title')),
@@ -143,11 +202,12 @@ void main() {
 
     await tester.pumpWidget(const MillenniumCapitalApp());
     await tester.pumpAndSettle();
+    await continueFirstSave(tester);
     await goToLivingRoom(tester);
     await tester.tap(find.byKey(const Key('open-decisions-button')));
     await tester.pumpAndSettle();
 
-    expect(find.text('첫 기업 조사노트'), findsWidgets);
+    expect(find.text('첫 미션: 회사 하나를 구경해 보자'), findsWidgets);
     expect(find.byKey(const Key('decision-inbox-screen')), findsOneWidget);
     await tester.tap(
       find.byKey(const Key('decision-inbox-item-first-research-note')),
@@ -162,6 +222,42 @@ void main() {
     expect(find.byKey(const Key('decision-inbox-screen')), findsNothing);
     expect(find.text('안건 편지'), findsOneWidget);
     expect(find.text('DAY 1 · 08:30'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('mission board shows progress rewards level and skills', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    const engine = GameEngine();
+    final base = engine.createNewGame('미션 연구소');
+    final state = engine.resolveDecision(
+      base,
+      'first-research-note',
+      'research_products',
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: DecisionInboxScreen(
+          state: state,
+          onResolveDecision: (_, _) async {},
+          onClaimMission: () async => engine.claimMission(state),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('미션 · 안건 보드'), findsOneWidget);
+    expect(find.byKey(const Key('active-mission-card')), findsOneWidget);
+    expect(find.text('첫 조사 원칙을 정하자'), findsOneWidget);
+    expect(find.text('+80 XP'), findsOneWidget);
+    expect(find.textContaining('첫 장부'), findsWidgets);
+    final claim = tester.widget<FilledButton>(
+      find.byKey(const Key('claim-mission-reward')),
+    );
+    expect(claim.onPressed, isNotNull);
     expect(tester.takeException(), isNull);
   });
 
@@ -180,6 +276,8 @@ void main() {
 
     await tester.pumpWidget(const MillenniumCapitalApp());
     await tester.pumpAndSettle();
+    await continueFirstSave(tester);
+    await dismissHubTutorial(tester);
     await tester.tap(find.byKey(const Key('open-ledger-button')));
     await tester.pumpAndSettle();
 
@@ -259,6 +357,48 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('ledger replays recent archived newspapers', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final base = const GameEngine().createNewGame('별빛 투자');
+    final state = base.copyWith(
+      day: 4,
+      story: base.story.copyWith(
+        storyFlags: {
+          ...base.story.storyFlags,
+          'newsArchive': <Map<String, dynamic>>[
+            {
+              'day': 4,
+              'headline': '새천년 시장의 첫 기록',
+              'eventIds': <String>['event-1', 'event-2'],
+            },
+          ],
+        },
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PortfolioLedgerScreen(
+          state: state,
+          universe: testMarketUniverse(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final card = find.byKey(const Key('news-archive-day-4'));
+    final ledgerScroll = find.descendant(
+      of: find.byKey(const Key('portfolio-ledger-scroll')),
+      matching: find.byType(Scrollable),
+    );
+    await tester.scrollUntilVisible(card, 300, scrollable: ledgerScroll);
+    expect(card, findsOneWidget);
+    expect(find.text('새천년 시장의 첫 기록'), findsOneWidget);
+    expect(find.textContaining('역사 사건 2건'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('market ticks and opens a stock detail', (tester) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -278,6 +418,20 @@ void main() {
             await persistence.save(current);
             return current;
           },
+          onSaveMarketNotebook: (favorites, notes) async {
+            final favoriteList = favorites.toList()..sort();
+            current = current.copyWith(
+              story: current.story.copyWith(
+                storyFlags: <String, dynamic>{
+                  ...current.story.storyFlags,
+                  'marketFavoriteAssetIds': favoriteList,
+                  'marketResearchNotes': <String, String>{...notes},
+                },
+              ),
+            );
+            await persistence.save(current);
+            return current;
+          },
           onExecuteTrade: (order) async {
             final result = engine.executeTrade(current, order);
             if (result.success) {
@@ -290,18 +444,24 @@ void main() {
       ),
     );
     await tester.pump();
-    for (var attempt = 0; attempt < 20; attempt++) {
-      await tester.pump(const Duration(milliseconds: 100));
-      if (find.byKey(const Key('stock-row-005930')).evaluate().isNotEmpty) {
-        break;
-      }
-    }
-
-    expect(find.text('2000년 국내 종목'), findsOneWidget);
+    await waitForMarketHome(tester);
+    expect(find.byKey(const Key('market-investment-overview')), findsOneWidget);
+    expect(find.byKey(const Key('market-empty-portfolio')), findsOneWidget);
+    expect(find.byKey(const Key('market-nav-home')), findsOneWidget);
+    expect(find.byKey(const Key('market-nav-account')), findsOneWidget);
     expect(
       tester.widget<Text>(find.byKey(const Key('market-company-name'))).data,
       '별빛 투자 · 가족 투자계좌',
     );
+    await openMarketExplore(tester);
+
+    expect(find.text('2000년 국내 종목'), findsOneWidget);
+    expect(find.byKey(const Key('market-phone-status-bar')), findsOneWidget);
+    expect(find.byKey(const Key('market-home-app-bar')), findsOneWidget);
+    expect(find.byKey(const Key('market-phone-status-time')), findsOneWidget);
+    expect(find.text('내 방 · CRT 투자 단말'), findsNothing);
+    expect(find.text('모뎀 소리와 함께 2000년 시장 화면이 켜졌다.'), findsNothing);
+    expect(find.byKey(const Key('market-mission-card')), findsOneWidget);
     await tester.tap(find.byKey(const Key('market-sort-name')));
     await tester.pump();
     if (find.byKey(const Key('stock-row-005930')).evaluate().isEmpty) {
@@ -313,10 +473,9 @@ void main() {
       await tester.pump();
     }
     expect(find.byKey(const Key('stock-row-005930')), findsOneWidget);
-    final before = tester
-        .widget<Text>(find.byKey(const Key('stock-rate-005930')))
-        .data;
-    await tester.pump(const Duration(milliseconds: 950));
+    final clock = find.byKey(const Key('market-phone-status-time'));
+    final before = tester.widget<Text>(clock.first).data;
+    await tester.pump(marketRealtimeTickDuration);
     if (find.byKey(const Key('stock-rate-005930')).evaluate().isEmpty) {
       await tester.scrollUntilVisible(
         find.byKey(const Key('stock-row-005930')),
@@ -325,10 +484,9 @@ void main() {
       );
       await tester.pump();
     }
-    final after = tester
-        .widget<Text>(find.byKey(const Key('stock-rate-005930')))
-        .data;
+    final after = tester.widget<Text>(clock.first).data;
     expect(after, isNot(before));
+    expect(after, contains('08:01'));
 
     await tester.ensureVisible(find.byKey(const Key('stock-row-005930')));
     await tester.pump();
@@ -336,11 +494,77 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     expect(find.text('삼성전자'), findsWidgets);
+    expect(find.byKey(const Key('market-phone-status-bar')), findsWidgets);
     expect(find.byKey(const Key('stock-detail-price')), findsOneWidget);
     expect(find.byKey(const Key('minute-interval-selector')), findsOneWidget);
     expect(find.byKey(const Key('minute-candle-chart')), findsOneWidget);
-    expect(find.byKey(const Key('write-research-note-button')), findsOneWidget);
-    await tester.tap(find.byKey(const Key('write-research-note-button')));
+    expect(find.byKey(const Key('chart-time-axis')), findsOneWidget);
+    expect(find.textContaining('전일 '), findsWidgets);
+    expect(
+      tester.widget<Text>(find.byKey(const Key('chart-window-label'))).data,
+      contains('최대 최근 1시간'),
+    );
+    await tester.tap(find.byKey(const Key('minute-interval-selector')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('3분').last);
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<Text>(find.byKey(const Key('chart-window-label'))).data,
+      contains('최대 최근 4시간'),
+    );
+    await tester.tap(find.byKey(const Key('chart-range-day')));
+    await tester.pump();
+    expect(find.byKey(const Key('historical-close-chart')), findsOneWidget);
+    expect(find.textContaining('일봉'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('chart-range-week')));
+    await tester.pump();
+    expect(find.textContaining('주봉'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('chart-range-month')));
+    await tester.pump();
+    expect(find.textContaining('월봉'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('chart-range-year')));
+    await tester.pump();
+    expect(find.byKey(const Key('historical-close-chart')), findsOneWidget);
+    expect(find.textContaining('년봉'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('toggle-market-favorite')));
+    await tester.pumpAndSettle();
+    final favoriteIcon = tester.widget<Icon>(
+      find.descendant(
+        of: find.byKey(const Key('toggle-market-favorite')),
+        matching: find.byType(Icon),
+      ),
+    );
+    expect(favoriteIcon.icon, Icons.star_rounded);
+
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('open-market-research-note')),
+      220,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.tap(find.byKey(const Key('open-market-research-note')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('market-research-note-input')),
+      '제품 경쟁력과 다음 실적을 확인한다.',
+    );
+    await tester.tap(find.byKey(const Key('save-market-research-note')));
+    await tester.pumpAndSettle();
+    expect(find.text('제품 경쟁력과 다음 실적을 확인한다.'), findsOneWidget);
+    expect(
+      (current.story.storyFlags['marketFavoriteAssetIds'] as List<dynamic>),
+      contains('kr-005930'),
+    );
+    expect(
+      (current.story.storyFlags['marketResearchNotes']
+          as Map<dynamic, dynamic>)['kr-005930'],
+      '제품 경쟁력과 다음 실적을 확인한다.',
+    );
+    await tester.pump(const Duration(seconds: 4));
+    await tester.pump();
+
+    expect(find.byKey(const Key('buy-stock-button')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('buy-stock-button')));
     await tester.pumpAndSettle();
     expect(find.textContaining('현재 게임 체결가'), findsOneWidget);
     expect(find.byKey(const Key('order-quantity-value')), findsOneWidget);
@@ -376,6 +600,104 @@ void main() {
       find.byKey(const Key('executive-portrait-lee_kun_hee')),
       findsOneWidget,
     );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('home deposit and live account holdings stay in sync', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    const engine = GameEngine();
+    var current = engine
+        .createNewGame('계좌 테스트', initialCash: 200000)
+        .copyWith(
+          day: 4,
+          marketMinute: 9 * 60,
+          cash: 179950,
+          brokerageCash: 50000,
+          positions: const [
+            PortfolioPosition(
+              assetId: 'kr-005930',
+              symbol: '005930',
+              name: '삼성전자',
+              market: 'KOSPI',
+              currency: 'KRW',
+              units: 2,
+              totalCost: 20050,
+            ),
+          ],
+          ledger: const [
+            LedgerEntry(
+              id: 'test-buy',
+              day: 4,
+              amount: -20050,
+              account: 'cash',
+              counterAccount: 'market_security',
+              description: '삼성전자 매수 · 증권 수수료 50원',
+              sourceId: 'test-buy',
+              notional: 20000,
+              tradingFee: 50,
+            ),
+          ],
+        );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StockMarketScreen(
+          state: current,
+          universe: testMarketUniverse(),
+          onSetMarketMinute: (minute) async {
+            current = current.copyWith(marketMinute: minute);
+            return current;
+          },
+          onTransferCash: (amount, deposit) async {
+            final result = engine.transferBrokerageCash(
+              current,
+              amount: amount,
+              deposit: deposit,
+            );
+            if (result.success) current = result.state;
+            return result;
+          },
+        ),
+      ),
+    );
+    await waitForMarketHome(tester);
+
+    expect(
+      find.byKey(const Key('market-account-position-kr-005930')),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const Key('market-deposit-button')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('brokerage-transfer-amount')),
+      '10000',
+    );
+    await tester.tap(find.byKey(const Key('brokerage-transfer-submit')));
+    await tester.pumpAndSettle();
+
+    expect(current.brokerageCash, 60000);
+    expect(current.bankCash, 119950);
+    ScaffoldMessenger.of(
+      tester.element(find.byKey(const Key('market-home-section'))),
+    ).hideCurrentSnackBar();
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('market-nav-account')));
+    await tester.pump();
+    expect(find.byKey(const Key('market-account-summary')), findsOneWidget);
+    expect(find.textContaining('누적 증권 수수료 50원'), findsOneWidget);
+    expect(
+      find.byKey(const Key('market-account-position-kr-005930')),
+      findsOneWidget,
+    );
+
+    final value = find.byKey(const Key('position-value-kr-005930'));
+    final before = tester.widget<Text>(value).data;
+    await tester.pump(const Duration(seconds: 1));
+    final after = tester.widget<Text>(value).data;
+    expect(after, isNot(before));
     expect(tester.takeException(), isNull);
   });
 
@@ -418,13 +740,8 @@ void main() {
 
     await tester.tap(find.byKey(const Key('open-market-for-system-back')));
     await tester.pump();
-    for (var attempt = 0; attempt < 20; attempt++) {
-      await tester.pump(const Duration(milliseconds: 100));
-      if (find.byKey(const Key('stock-row-005930')).evaluate().isNotEmpty) {
-        break;
-      }
-    }
-    await tester.pump(const Duration(milliseconds: 950));
+    await waitForMarketHome(tester);
+    await tester.pump(marketRealtimeTickDuration);
 
     await tester.binding.handlePopRoute();
     await tester.pump();
@@ -579,6 +896,140 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('open market advances one game minute after one real second', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final state = const GameEngine()
+        .createNewGame('Minute Market Test', initialCash: 1000000)
+        .copyWith(day: 4, marketMinute: 9 * 60);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StockMarketScreen(state: state, universe: testMarketUniverse()),
+      ),
+    );
+    await tester.pump();
+    for (var attempt = 0; attempt < 20; attempt++) {
+      await tester.pump(const Duration(milliseconds: 100));
+      if (find.byKey(const Key('market-clock-bar')).evaluate().isNotEmpty) {
+        break;
+      }
+    }
+    final clock = find.byKey(const Key('market-phone-status-time'));
+    expect(tester.widget<Text>(clock.first).data, contains('09:00'));
+
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(tester.widget<Text>(clock.first).data, contains('09:00'));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(tester.widget<Text>(clock.first).data, contains('09:01'));
+
+    await openMarketExplore(tester);
+    await tester.tap(find.byKey(const Key('stock-row-005930')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('1분봉'), findsWidgets);
+    expect(find.textContaining('현실 1초마다 게임 1분 진행'), findsOneWidget);
+    final detailPrice = find.byKey(const Key('stock-detail-price'));
+    final priceBeforeTick = tester.widget<Text>(detailPrice).data;
+    await tester.pump(const Duration(seconds: 1));
+    final priceAfterTick = tester.widget<Text>(detailPrice).data;
+    expect(priceAfterTick, isNot(priceBeforeTick));
+    expect(
+      tester
+          .widget<Text>(find.byKey(const Key('market-phone-status-time')))
+          .data,
+      contains('09:'),
+    );
+    expect(find.byKey(const Key('chart-time-axis')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'market quick jumps are only enabled in their allowed time windows',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final requestedMinutes = <int>[];
+      final state = const GameEngine()
+          .createNewGame('Quick Jump Test', initialCash: 1000000)
+          .copyWith(day: 4, marketMinute: marketDayStartMinute);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: StockMarketScreen(
+            state: state,
+            universe: testMarketUniverse(),
+            onSetMarketMinute: (minute) async {
+              requestedMinutes.add(minute);
+              return state.copyWith(marketMinute: minute);
+            },
+          ),
+        ),
+      );
+      await tester.pump();
+      for (var attempt = 0; attempt < 20; attempt++) {
+        await tester.pump(const Duration(milliseconds: 100));
+        if (find.byKey(const Key('market-clock-bar')).evaluate().isNotEmpty) {
+          break;
+        }
+      }
+
+      FilledButton button(String key) =>
+          tester.widget<FilledButton>(find.byKey(Key(key)));
+
+      expect(button('market-jump-open-button').onPressed, isNotNull);
+      expect(button('market-jump-close-button').onPressed, isNull);
+      expect(find.textContaining('09:00 전에는'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('market-jump-open-button')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(requestedMinutes, <int>[krxOpenMinute]);
+      final clock = find.byKey(const Key('market-phone-status-time'));
+      expect(tester.widget<Text>(clock.first).data, contains('09:00'));
+      expect(button('market-jump-open-button').onPressed, isNull);
+      expect(button('market-jump-close-button').onPressed, isNotNull);
+      expect(find.textContaining('장중에는'), findsOneWidget);
+      expect(
+        find.byKey(const Key('market-session-open-dialog')),
+        findsOneWidget,
+      );
+      expect(find.text('장이 시작되었습니다'), findsOneWidget);
+      expect(
+        find.byKey(const Key('market-session-close-dialog')),
+        findsNothing,
+      );
+      await tester.tap(find.byKey(const Key('market-session-notice-confirm')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('market-jump-close-button')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(requestedMinutes, <int>[krxOpenMinute, krxCloseMinute]);
+      expect(tester.widget<Text>(clock.first).data, contains('15:30'));
+      expect(button('market-jump-open-button').onPressed, isNull);
+      expect(button('market-jump-close-button').onPressed, isNull);
+      expect(find.textContaining('15:30 이후에는'), findsOneWidget);
+      expect(
+        find.byKey(const Key('market-session-close-dialog')),
+        findsOneWidget,
+      );
+      expect(find.text('장이 마감되었습니다'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('market-session-notice-confirm')));
+      await tester.pumpAndSettle();
+
+      await tester.pump(const Duration(seconds: 1));
+      expect(button('market-jump-close-button').onPressed, isNull);
+      expect(find.byKey(const Key('market-session-open-dialog')), findsNothing);
+      expect(
+        find.byKey(const Key('market-session-close-dialog')),
+        findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('failed hour save does not publish the future market time', (
     tester,
   ) async {
@@ -605,10 +1056,7 @@ void main() {
       }
     }
 
-    final clock = find.descendant(
-      of: find.byKey(const Key('market-clock-bar')),
-      matching: find.byType(Text),
-    );
+    final clock = find.byKey(const Key('market-phone-status-time'));
     final before = tester.widget<Text>(clock.first).data;
 
     await tester.tap(find.byKey(const Key('market-advance-hour-button')));
@@ -650,18 +1098,13 @@ void main() {
       ),
     );
     await tester.pump();
-    for (var attempt = 0; attempt < 20; attempt++) {
-      await tester.pump(const Duration(milliseconds: 100));
-      if (find.byKey(const Key('stock-row-005930')).evaluate().isNotEmpty) {
-        break;
-      }
-    }
+    await openMarketExplore(tester);
 
     await tester.ensureVisible(find.byKey(const Key('stock-row-005930')));
     await tester.tap(find.byKey(const Key('stock-row-005930')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
-    await tester.tap(find.byKey(const Key('write-research-note-button')));
+    await tester.tap(find.byKey(const Key('buy-stock-button')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('request-parent-order-approval')));
     for (var attempt = 0; attempt < 20; attempt++) {
@@ -699,6 +1142,7 @@ void main() {
 
       await tester.pumpWidget(const MillenniumCapitalApp());
       await tester.pumpAndSettle();
+      await continueFirstSave(tester);
       await goToLivingRoom(tester);
       await tester.ensureVisible(
         find.byKey(const Key('open-organization-button')),
@@ -824,6 +1268,7 @@ void main() {
 
       await tester.pumpWidget(const MillenniumCapitalApp());
       await tester.pumpAndSettle();
+      await continueFirstSave(tester);
       await goToKitchen(tester);
       await tester.ensureVisible(find.byKey(const Key('open-work-button')));
       await tester.tap(find.byKey(const Key('open-work-button')));
@@ -846,7 +1291,7 @@ void main() {
       final cash = tester.widget<Text>(
         find.byKey(const Key('seed-money-cash')),
       );
-      expect(cash.data, '800원');
+      expect(cash.data, '880원');
       final clock = tester.widget<Text>(
         find.byKey(const Key('scene-clock-time')),
       );
@@ -863,18 +1308,23 @@ void main() {
     const engine = GameEngine();
     final state = engine
         .createNewGame('시간 진행 테스트', initialCash: 1000000)
-        .copyWith(decisions: const []);
+        .copyWith(decisions: const [], marketMinute: krxOpenMinute);
     int? requestedMinute;
 
     Widget buildOffice(GameState currentState) => MaterialApp(
       home: OfficeScreen(
         state: currentState,
         engine: engine,
+        activeSaveSlot: 1,
+        lastSavedAt: null,
+        onManualSave: () async {},
+        onReturnToTitle: () {},
         onAdvanceDay: () async => currentState,
         onSetMarketMinute: (minute) async {
           requestedMinute = minute;
           return currentState.copyWith(marketMinute: minute);
         },
+        onSaveMarketNotebook: (_, _) async => currentState,
         onResolveDecision: (_, _) async {},
         onRequestFamilyHelp: (_) async => currentState,
         onCompleteWork: (_) async => currentState,
@@ -888,6 +1338,8 @@ void main() {
 
     await tester.pumpWidget(buildOffice(state));
     await tester.pumpAndSettle();
+    expect(find.text('09:00 · 아파트 생활'), findsOneWidget);
+    expect(find.text('KRX 정규장'), findsNothing);
 
     final hourFinder = find.byKey(const Key('advance-hour-button'));
     final dayFinder = find.byKey(const Key('advance-day-button'));
@@ -925,11 +1377,16 @@ void main() {
         home: OfficeScreen(
           state: state,
           engine: engine,
+          activeSaveSlot: 1,
+          lastSavedAt: null,
+          onManualSave: () async {},
+          onReturnToTitle: () {},
           onAdvanceDay: () async => state,
           onSetMarketMinute: (minute) {
             requestedMinute = minute;
             return closeCommit.future;
           },
+          onSaveMarketNotebook: (_, _) async => state,
           onResolveDecision: (_, _) async {},
           onRequestFamilyHelp: (_) async => state,
           onCompleteWork: (_) async => state,
@@ -971,6 +1428,7 @@ void main() {
 
         await tester.pumpWidget(const MillenniumCapitalApp());
         await tester.pumpAndSettle();
+        await continueFirstSave(tester);
 
         final hourFinder = find.byKey(const Key('advance-hour-button'));
         final dayFinder = find.byKey(const Key('advance-day-button'));
