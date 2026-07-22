@@ -3863,8 +3863,7 @@ class _MinuteChartPanelState extends State<_MinuteChartPanel> {
   Widget build(BuildContext context) {
     final displayMinutes = minuteWindows[interval] ?? 60;
     final displayCandleCount = math.max(1, displayMinutes ~/ interval);
-    final contextMinutes = displayMinutes + interval * 120;
-    var minuteSeries = _visibleMinuteSeries(targetMinutes: contextMinutes);
+    var minuteSeries = _visibleMinuteSeries(targetMinutes: displayMinutes);
     final candleSeed = widget.quote.history.isEmpty
         ? widget.code.codeUnits.fold<int>(17, (sum, unit) => sum * 31 + unit)
         : marketStockSeed(widget.code, widget.quote.history.last.parsedDate);
@@ -3872,7 +3871,7 @@ class _MinuteChartPanelState extends State<_MinuteChartPanel> {
         widget.quote.isTradingDay &&
         widget.minute >= krxOpenMinute &&
         minuteSeries.startMinute == 0) {
-      final targetPoints = contextMinutes + 1;
+      final targetPoints = displayMinutes + 1;
       final missingPoints = math.min(
         math.max(0, targetPoints - minuteSeries.prices.length),
         generatedRegularTradingTicks,
@@ -3925,7 +3924,6 @@ class _MinuteChartPanelState extends State<_MinuteChartPanel> {
             painter: period == _ChartPeriod.minute
                 ? _CandleChartPainter(
                     candles: candles,
-                    previousClose: widget.quote.previousClose,
                     maxVisibleCandles: displayCandleCount,
                   )
                 : _HistoricalCloseChartPainter(values: historicalCloses),
@@ -4078,19 +4076,17 @@ class _ChartAxisText extends StatelessWidget {
 class _CandleChartPainter extends CustomPainter {
   const _CandleChartPainter({
     required this.candles,
-    required this.previousClose,
     required this.maxVisibleCandles,
   });
 
   final List<MarketCandle> candles;
-  final double previousClose;
   final int maxVisibleCandles;
 
   @override
   void paint(Canvas canvas, Size size) {
     if (candles.isEmpty || size.isEmpty) return;
     const axisWidth = 48.0;
-    const priceTop = 22.0;
+    const priceTop = 8.0;
     final chartRight = math.max(1.0, size.width - axisWidth);
     final volumeTop = size.height * 0.79;
     final volumeBottom = size.height - 4;
@@ -4148,25 +4144,6 @@ class _CandleChartPainter extends CustomPainter {
         fontSize: 8,
       );
     }
-    for (var line = 1; line < 5; line++) {
-      final x = chartRight * line / 5;
-      canvas.drawLine(Offset(x, priceTop), Offset(x, volumeBottom), gridPaint);
-    }
-
-    if (previousClose >= minValue && previousClose <= maxValue) {
-      final baselineY = yFor(previousClose);
-      final baselinePaint = Paint()
-        ..color = const Color(0xFFC2C8D0)
-        ..strokeWidth = 1;
-      for (var x = 0.0; x < chartRight; x += 7) {
-        canvas.drawLine(
-          Offset(x, baselineY),
-          Offset(math.min(x + 3, chartRight), baselineY),
-          baselinePaint,
-        );
-      }
-    }
-
     final slot = chartRight / math.max(visible.length, 1);
     final bodyWidth = math.max(2.0, math.min(6.0, slot * 0.72));
     canvas.save();
@@ -4194,82 +4171,7 @@ class _CandleChartPainter extends CustomPainter {
       );
     }
 
-    List<double?> movingAverage(int count) {
-      final allValues = List<double?>.filled(candles.length, null);
-      var sum = 0.0;
-      for (var index = 0; index < candles.length; index++) {
-        sum += candles[index].close;
-        if (index >= count) sum -= candles[index - count].close;
-        final missingHistory = math.max(0, count - index - 1);
-        allValues[index] =
-            (sum + previousClose * missingHistory) /
-            math.min(count, index + 1 + missingHistory);
-      }
-      return allValues.sublist(visibleStartIndex);
-    }
-
-    void drawMovingAverage(int count, Color color, double width) {
-      final average = movingAverage(count);
-      final path = Path();
-      var started = false;
-      for (var index = 0; index < average.length; index++) {
-        final value = average[index];
-        if (value == null) continue;
-        final point = Offset(slot * index + slot / 2, yFor(value));
-        if (!started) {
-          path.moveTo(point.dx, point.dy);
-          started = true;
-        } else {
-          path.lineTo(point.dx, point.dy);
-        }
-      }
-      if (!started) return;
-      canvas.drawPath(
-        path,
-        Paint()
-          ..color = color
-          ..strokeWidth = width
-          ..style = PaintingStyle.stroke
-          ..strokeCap = StrokeCap.round
-          ..strokeJoin = StrokeJoin.round,
-      );
-    }
-
-    drawMovingAverage(5, const Color(0xFF00A99D), 1.25);
-    drawMovingAverage(20, const Color(0xFFF04452), 1.15);
-    drawMovingAverage(60, const Color(0xFFFF8A00), 1.1);
-    drawMovingAverage(120, const Color(0xFF8B3FD1), 1.05);
     canvas.restore();
-
-    drawText('이동평균', const Offset(2, 2), fontSize: 8);
-    drawText(
-      '5',
-      const Offset(39, 2),
-      color: const Color(0xFF00A99D),
-      fontSize: 8,
-      fontWeight: FontWeight.w900,
-    );
-    drawText(
-      '20',
-      const Offset(50, 2),
-      color: const Color(0xFFF04452),
-      fontSize: 8,
-      fontWeight: FontWeight.w900,
-    );
-    drawText(
-      '60',
-      const Offset(67, 2),
-      color: const Color(0xFFFF8A00),
-      fontSize: 8,
-      fontWeight: FontWeight.w900,
-    );
-    drawText(
-      '120',
-      const Offset(85, 2),
-      color: const Color(0xFF8B3FD1),
-      fontSize: 8,
-      fontWeight: FontWeight.w900,
-    );
 
     final current = visible.last.close;
     final currentY = yFor(current).clamp(priceTop, priceBottom);
@@ -4333,7 +4235,6 @@ class _CandleChartPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _CandleChartPainter oldDelegate) =>
       oldDelegate.candles != candles ||
-      oldDelegate.previousClose != previousClose ||
       oldDelegate.maxVisibleCandles != maxVisibleCandles;
 }
 
