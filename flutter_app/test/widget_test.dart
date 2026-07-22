@@ -445,14 +445,13 @@ void main() {
     );
     await tester.pump();
     await waitForMarketHome(tester);
-    expect(find.byKey(const Key('market-investment-overview')), findsOneWidget);
-    expect(find.byKey(const Key('market-empty-portfolio')), findsOneWidget);
+    expect(find.byKey(const Key('market-snapshot-card')), findsOneWidget);
+    expect(find.byKey(const Key('market-ranking-table')), findsOneWidget);
+    expect(find.byKey(const Key('market-investment-overview')), findsNothing);
+    expect(find.byKey(const Key('market-account-summary')), findsNothing);
+    expect(find.byKey(const Key('market-mission-card')), findsNothing);
     expect(find.byKey(const Key('market-nav-home')), findsOneWidget);
     expect(find.byKey(const Key('market-nav-account')), findsOneWidget);
-    expect(
-      tester.widget<Text>(find.byKey(const Key('market-company-name'))).data,
-      '별빛 투자 · 가족 투자계좌',
-    );
     await openMarketExplore(tester);
 
     expect(find.text('2000년 국내 종목'), findsOneWidget);
@@ -461,7 +460,7 @@ void main() {
     expect(find.byKey(const Key('market-phone-status-time')), findsOneWidget);
     expect(find.text('내 방 · CRT 투자 단말'), findsNothing);
     expect(find.text('모뎀 소리와 함께 2000년 시장 화면이 켜졌다.'), findsNothing);
-    expect(find.byKey(const Key('market-mission-card')), findsOneWidget);
+    expect(find.byKey(const Key('market-mission-card')), findsNothing);
     await tester.tap(find.byKey(const Key('market-sort-name')));
     await tester.pump();
     if (find.byKey(const Key('stock-row-005930')).evaluate().isEmpty) {
@@ -606,7 +605,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('home deposit and live account holdings stay in sync', (
+  testWidgets('investment tab deposit and live holdings stay in sync', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
@@ -668,11 +667,16 @@ void main() {
     );
     await waitForMarketHome(tester);
 
+    expect(find.byKey(const Key('market-account-summary')), findsNothing);
     expect(
       find.byKey(const Key('market-account-position-kr-005930')),
-      findsOneWidget,
+      findsNothing,
     );
-    await tester.tap(find.byKey(const Key('market-deposit-button')));
+    await tester.tap(find.byKey(const Key('market-nav-account')));
+    await tester.pump();
+    expect(find.byKey(const Key('market-account-summary')), findsOneWidget);
+    expect(find.byKey(const Key('market-mission-card')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('market-account-deposit')));
     await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const Key('brokerage-transfer-amount')),
@@ -684,13 +688,20 @@ void main() {
     expect(current.brokerageCash, 60000);
     expect(current.bankCash, 119950);
     ScaffoldMessenger.of(
-      tester.element(find.byKey(const Key('market-home-section'))),
+      tester.element(find.byKey(const Key('market-account-section'))),
     ).hideCurrentSnackBar();
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('market-nav-account')));
-    await tester.pump();
     expect(find.byKey(const Key('market-account-summary')), findsOneWidget);
     expect(find.textContaining('누적 증권 수수료 50원'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('market-account-position-kr-005930')),
+      240,
+      scrollable: find.descendant(
+        of: find.byKey(const Key('market-account-section')),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    await tester.pump();
     expect(
       find.byKey(const Key('market-account-position-kr-005930')),
       findsOneWidget,
@@ -1012,7 +1023,9 @@ void main() {
       await waitForMarketHome(tester);
       final clock = find.byKey(const Key('market-phone-status-time'));
 
-      await tester.tap(find.byKey(const Key('market-deposit-button')));
+      await tester.tap(find.byKey(const Key('market-nav-account')));
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('market-account-deposit')));
       await tester.pumpAndSettle();
       expect(
         find.byKey(const Key('brokerage-transfer-amount')),
@@ -1173,7 +1186,13 @@ void main() {
       await tester.pump(const Duration(seconds: 1));
       expect(button('market-jump-close-button').onPressed, isNull);
       expect(tester.widget<Text>(clock.first).data, contains('15:30'));
-      expect(find.text('오늘 장 마감'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('market-clock-bar')),
+          matching: find.text('오늘 장 마감'),
+        ),
+        findsOneWidget,
+      );
       expect(find.textContaining('NXT'), findsNothing);
       expect(find.byKey(const Key('market-session-open-dialog')), findsNothing);
       expect(
