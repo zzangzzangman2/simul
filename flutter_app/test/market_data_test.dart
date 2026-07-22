@@ -122,6 +122,23 @@ void main() {
     );
   });
 
+  test('previous-session lead-in only drops its oldest point each minute', () {
+    final ninetyPoints = generatedPreviousSessionLeadIn(
+      previousClose: 50400,
+      pointCount: 90,
+      seed: 77,
+    );
+    final eightyNinePoints = generatedPreviousSessionLeadIn(
+      previousClose: 50400,
+      pointCount: 89,
+      seed: 77,
+    );
+
+    expect(ninetyPoints, hasLength(90));
+    expect(eightyNinePoints, hasLength(89));
+    expect(ninetyPoints.skip(1), orderedEquals(eightyNinePoints));
+  });
+
   test(
     'minute candles aggregate generated ticks into selectable intervals',
     () {
