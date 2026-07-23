@@ -505,6 +505,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
       title: '부자되기 시뮬레이션',
       theme: ThemeData(
         useMaterial3: true,
+        fontFamily: 'Pretendard',
         scaffoldBackgroundColor: _sky,
         colorScheme: ColorScheme.fromSeed(seedColor: _blue),
         textTheme: const TextTheme(
@@ -3319,20 +3320,25 @@ class _AdvanceBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ended = marketMinute >= marketDayEndMinute;
+    final dayProgress = (marketMinute / marketDayEndMinute).clamp(0.0, 1.0);
+    final message = hasPendingDecision
+        ? '거실의 안건 편지를 먼저 확인해요'
+        : campaignComplete
+        ? '마지막 장부를 펼칠 시간이에요'
+        : ended
+        ? '오늘도 수고했어요 · 신문으로 마감'
+        : '${marketTimeLabel(marketMinute)} · 아파트 생활';
+
     return Container(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+      padding: const EdgeInsets.fromLTRB(12, 9, 12, 11),
       decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color(0xFF342B25), Color(0xFF171B23)],
-        ),
-        border: Border(top: BorderSide(color: Color(0xFFB9925D), width: 1.4)),
+        color: Color(0xFFFFFAF0),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         boxShadow: [
           BoxShadow(
-            color: Color(0x77000000),
-            blurRadius: 16,
-            offset: Offset(0, -5),
+            color: Color(0x300E1726),
+            blurRadius: 20,
+            offset: Offset(0, -7),
           ),
         ],
       ),
@@ -3340,28 +3346,81 @@ class _AdvanceBar extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            hasPendingDecision
-                ? '거실의 안건 편지를 먼저 확인해 주세요.'
-                : campaignComplete
-                ? '2010년 캠페인을 마쳤어요. 마지막 장부를 확인해 보세요.'
-                : ended
-                ? '오늘 장이 끝났어요. 신문으로 하루를 마쳐요.'
-                : '${marketTimeLabel(marketMinute)} · 아파트 생활',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Color(0xFFF6E8CA),
-              fontSize: 11,
-              fontWeight: FontWeight.w900,
-            ),
+          Row(
+            children: [
+              Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: hasPendingDecision
+                      ? const Color(0xFFFFE4DE)
+                      : const Color(0xFFFFEDB8),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  hasPendingDecision
+                      ? Icons.mark_email_unread_rounded
+                      : ended
+                      ? Icons.nights_stay_rounded
+                      : Icons.wb_sunny_rounded,
+                  color: hasPendingDecision ? _coral : const Color(0xFFD39724),
+                  size: 16,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      message,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: _ink,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(99),
+                      child: LinearProgressIndicator(
+                        value: dayProgress,
+                        minHeight: 4,
+                        backgroundColor: const Color(0xFFE4E7EC),
+                        valueColor: AlwaysStoppedAnimation(
+                          hasPendingDecision ? _coral : const Color(0xFF65BE9B),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0F2F6),
+                  borderRadius: BorderRadius.circular(99),
+                ),
+                child: Text(
+                  ended ? '20:00' : marketTimeLabel(marketMinute),
+                  style: const TextStyle(
+                    color: Color(0xFF667189),
+                    fontSize: 9,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 7),
+          const SizedBox(height: 8),
           Row(
             children: [
               Expanded(
                 child: SizedBox(
-                  height: 50,
+                  height: 52,
                   child: ElevatedButton.icon(
                     key: const Key('advance-hour-button'),
                     onPressed: hasPendingDecision || ended
@@ -3370,18 +3429,18 @@ class _AdvanceBar extends StatelessWidget {
                     icon: Icon(
                       hasPendingDecision || ended
                           ? Icons.lock_clock_rounded
-                          : Icons.schedule_rounded,
+                          : Icons.more_time_rounded,
                       size: 19,
                     ),
                     label: const Text('1시간 보내기'),
-                    style: _advanceButtonStyle(const Color(0xFFFFE7A6)),
+                    style: _advanceButtonStyle(const Color(0xFF4B9F87)),
                   ),
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: SizedBox(
-                  height: 50,
+                  height: 52,
                   child: ElevatedButton.icon(
                     key: const Key('advance-day-button'),
                     onPressed: hasPendingDecision
@@ -3392,18 +3451,18 @@ class _AdvanceBar extends StatelessWidget {
                     icon: Icon(
                       campaignComplete
                           ? Icons.emoji_events_rounded
-                          : Icons.newspaper_rounded,
+                          : Icons.bedtime_rounded,
                       size: 19,
                     ),
                     label: Text(campaignComplete ? '최종 결산' : '하루 보내기'),
-                    style: _advanceButtonStyle(const Color(0xFFFFC7B8)),
+                    style: _advanceButtonStyle(_coral),
                   ),
                 ),
               ),
               const SizedBox(width: 8),
               SizedBox(
-                width: 52,
-                height: 50,
+                width: 50,
+                height: 52,
                 child: IconButton.filled(
                   key: const Key('advance-batch-button'),
                   tooltip: '빠르게 진행',
@@ -3411,11 +3470,13 @@ class _AdvanceBar extends StatelessWidget {
                       ? null
                       : onAdvanceBatch,
                   style: IconButton.styleFrom(
-                    backgroundColor: const Color(0x33F6E0B5),
-                    foregroundColor: const Color(0xFFF8E7C8),
-                    disabledBackgroundColor: const Color(0x221E2630),
-                    disabledForegroundColor: const Color(0x668F9AA9),
-                    side: const BorderSide(color: Color(0x66E2C18D)),
+                    backgroundColor: const Color(0xFFFFD96A),
+                    foregroundColor: _ink,
+                    disabledBackgroundColor: const Color(0xFFE0E3E8),
+                    disabledForegroundColor: const Color(0xFF9BA3B1),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(17),
+                    ),
                   ),
                   icon: const Icon(Icons.fast_forward_rounded),
                 ),
@@ -3429,15 +3490,14 @@ class _AdvanceBar extends StatelessWidget {
 
   ButtonStyle _advanceButtonStyle(Color backgroundColor) {
     return ElevatedButton.styleFrom(
-      foregroundColor: const Color(0xFF33271E),
+      foregroundColor: Colors.white,
       backgroundColor: backgroundColor,
-      disabledForegroundColor: const Color(0xFF9A948B),
-      disabledBackgroundColor: const Color(0xFF3A3A39),
+      disabledForegroundColor: const Color(0xFF9AA0AC),
+      disabledBackgroundColor: const Color(0xFFE2E4E8),
       elevation: 0,
       padding: const EdgeInsets.symmetric(horizontal: 8),
-      side: const BorderSide(color: Color(0xFFB9925D), width: 1.3),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(17)),
+      textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
     );
   }
 }

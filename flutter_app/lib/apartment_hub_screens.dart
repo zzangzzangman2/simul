@@ -231,7 +231,7 @@ class _ApartmentPlaceScene extends StatelessWidget {
             interactionKey: const Key('open-market-button'),
             alignment: const Alignment(-0.58, -0.14),
             icon: Icons.desktop_windows_rounded,
-            eyebrow: 'CRT COMPUTER',
+            eyebrow: '컴퓨터 켜기',
             label: '주식시장',
             accent: const Color(0xFF80D8FF),
             onTap: onOpenMarket,
@@ -240,7 +240,7 @@ class _ApartmentPlaceScene extends StatelessWidget {
             interactionKey: const Key('open-ledger-button'),
             alignment: const Alignment(0.72, 0.36),
             icon: Icons.inventory_2_rounded,
-            eyebrow: 'FILE CABINET',
+            eyebrow: '장부 펼치기',
             label: '서류함',
             accent: const Color(0xFFFFC78E),
             onTap: onOpenLedger,
@@ -251,7 +251,7 @@ class _ApartmentPlaceScene extends StatelessWidget {
             interactionKey: const Key('open-organization-button'),
             alignment: const Alignment(-0.52, 0.06),
             icon: Icons.family_restroom_rounded,
-            eyebrow: 'FAMILY SOFA',
+            eyebrow: '함께 이야기',
             label: '가족·조직',
             accent: const Color(0xFFFFD27A),
             onTap: onOpenOrganization,
@@ -262,7 +262,7 @@ class _ApartmentPlaceScene extends StatelessWidget {
             icon: state.pendingDecisions.isEmpty
                 ? Icons.drafts_rounded
                 : Icons.mark_email_unread_rounded,
-            eyebrow: 'DECISION LETTER',
+            eyebrow: '새 편지 확인',
             label: state.pendingDecisions.isEmpty
                 ? '안건 편지'
                 : '안건 ${state.pendingDecisions.length}건',
@@ -278,7 +278,7 @@ class _ApartmentPlaceScene extends StatelessWidget {
             interactionKey: const Key('open-work-button'),
             alignment: const Alignment(-0.68, 0.06),
             icon: Icons.phone_in_talk_rounded,
-            eyebrow: 'CORDED PHONE',
+            eyebrow: '일거리 찾기',
             label: '일거리 전화',
             accent: const Color(0xFF98E5C1),
             onTap: onOpenWork,
@@ -320,196 +320,270 @@ class _ApartmentLocationHeader extends StatelessWidget {
   final VoidCallback onOpenGameMenu;
 
   @override
-  Widget build(BuildContext context) => Semantics(
-    container: true,
-    label: '${details.title}, ${state.companyName}, $activeSaveSlot번 저장 슬롯',
-    child: ClipRRect(
-      key: const Key('room-company-sign'),
-      borderRadius: BorderRadius.circular(18),
-      child: BackdropFilter(
-        filter: ui.ImageFilter.blur(sigmaX: 11, sigmaY: 11),
-        child: Container(
-          constraints: const BoxConstraints(minHeight: 90),
-          padding: const EdgeInsets.fromLTRB(11, 9, 8, 9),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xB52B2927), Color(0xA6141B28)],
+  Widget build(BuildContext context) {
+    final level = state.progression.level;
+    final currentLevelXp = experienceForLevel(level);
+    final nextLevelXp = level >= 10
+        ? currentLevelXp
+        : experienceForLevel(level + 1);
+    final levelProgress = level >= 10
+        ? 1.0
+        : ((state.progression.experience - currentLevelXp) /
+                  (nextLevelXp - currentLevelXp))
+              .clamp(0.0, 1.0);
+
+    return Semantics(
+      container: true,
+      label: '${details.title}, ${state.companyName}, $activeSaveSlot번 저장 슬롯',
+      child: ClipRRect(
+        key: const Key('room-company-sign'),
+        borderRadius: BorderRadius.circular(24),
+        child: BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(10, 9, 8, 9),
+            decoration: BoxDecoration(
+              color: const Color(0xEFFFFAF0),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: const Color(0xF2FFFFFF), width: 1.5),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x330F1724),
+                  blurRadius: 18,
+                  offset: Offset(0, 8),
+                ),
+              ],
             ),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: const Color(0x70F3DFC1), width: 1.1),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x52000000),
-                blurRadius: 14,
-                offset: Offset(0, 6),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: details.accent.withValues(alpha: 0.18),
-                      borderRadius: BorderRadius.circular(13),
-                      border: Border.all(
-                        color: details.accent.withValues(alpha: 0.72),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            details.accent,
+                            details.accent.withValues(alpha: 0.72),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(17),
+                        boxShadow: [
+                          BoxShadow(
+                            color: details.accent.withValues(alpha: 0.34),
+                            blurRadius: 11,
+                            offset: const Offset(0, 5),
+                          ),
+                        ],
                       ),
-                    ),
-                    child: Icon(details.icon, color: details.accent, size: 22),
-                  ),
-                  const SizedBox(width: 9),
-                  Expanded(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              details.title,
-                              key: const Key('apartment-location-title'),
-                              maxLines: 1,
-                              softWrap: false,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: -0.3,
-                              ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            'DAY',
+                            style: TextStyle(
+                              color: _ink.withValues(alpha: 0.66),
+                              fontSize: 7,
+                              height: 1,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.7,
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 2),
-                        Row(
-                          children: [
-                            Flexible(
-                              child: KeyedSubtree(
-                                key: const Key('room-company-name'),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${state.day}',
+                            style: const TextStyle(
+                              color: _ink,
+                              fontSize: 19,
+                              height: 1,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                details.icon,
+                                color: details.accent,
+                                size: 15,
+                              ),
+                              const SizedBox(width: 5),
+                              Expanded(
                                 child: Text(
-                                  state.companyName,
-                                  key: const Key('company-header-title'),
+                                  details.title,
+                                  key: const Key('apartment-location-title'),
                                   maxLines: 1,
-                                  softWrap: false,
                                   overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: details.accent,
-                                    fontSize: 9,
-                                    height: 1.15,
+                                  style: const TextStyle(
+                                    color: _ink,
+                                    fontSize: 15,
+                                    height: 1.1,
                                     fontWeight: FontWeight.w900,
+                                    letterSpacing: -0.45,
                                   ),
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                state.story.officeTier >= 2
-                                    ? '정식 본사 · ${details.hint}'
-                                    : state.story.officeTier == 1
-                                    ? '작은 사무실 · ${details.hint}'
-                                    : details.hint,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: Color(0xFFB5C0D3),
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w700,
-                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 3),
+                          KeyedSubtree(
+                            key: const Key('room-company-name'),
+                            child: Text(
+                              state.companyName,
+                              key: const Key('company-header-title'),
+                              maxLines: 1,
+                              softWrap: false,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: details.accent.computeLuminance() > 0.7
+                                    ? const Color(0xFF8A5F20)
+                                    : details.accent,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w900,
                               ),
                             ),
-                          ],
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Text(
+                                'LV.$level',
+                                style: const TextStyle(
+                                  color: Color(0xFF667189),
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(99),
+                                  child: LinearProgressIndicator(
+                                    value: levelProgress,
+                                    minHeight: 4,
+                                    backgroundColor: const Color(0xFFDDE2EA),
+                                    valueColor: AlwaysStoppedAnimation(
+                                      details.accent,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        IconButton(
+                          key: const Key('game-menu-button'),
+                          tooltip: '저장 및 게임 메뉴',
+                          onPressed: onOpenGameMenu,
+                          style: IconButton.styleFrom(
+                            backgroundColor: _ink,
+                            foregroundColor: Colors.white,
+                            minimumSize: const Size(44, 44),
+                          ),
+                          icon: const Icon(Icons.menu_rounded),
                         ),
+                        if (lastSavedAt != null)
+                          const Positioned(
+                            right: 2,
+                            top: 1,
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: Color(0xFF55C88A),
+                                shape: BoxShape.circle,
+                                border: Border.fromBorderSide(
+                                  BorderSide(color: Colors.white, width: 2),
+                                ),
+                              ),
+                              child: SizedBox(width: 10, height: 10),
+                            ),
+                          ),
                       ],
                     ),
-                  ),
-                  IconButton(
-                    key: const Key('game-menu-button'),
-                    tooltip: '저장 및 게임 메뉴',
-                    onPressed: onOpenGameMenu,
-                    style: IconButton.styleFrom(
-                      backgroundColor: const Color(0x1FFFFFFF),
-                      foregroundColor: lastSavedAt == null
-                          ? const Color(0xFFCBD4E4)
-                          : const Color(0xFF8FE0A9),
-                      minimumSize: const Size(42, 42),
-                    ),
-                    icon: const Icon(Icons.menu_rounded),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 7),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: Row(
-                    children: [
-                      _ApartmentHudChip(
-                        icon: Icons.calendar_today_rounded,
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 5,
+                      child: _ApartmentHudChip(
+                        icon: Icons.schedule_rounded,
                         label:
                             '${_apartmentDateLabel(state.currentDate)} · ${marketTimeLabel(state.marketMinute)}',
                       ),
-                      const SizedBox(width: 5),
-                      _ApartmentHudChip(
-                        icon: Icons.account_balance_wallet_rounded,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      flex: 3,
+                      child: _ApartmentHudChip(
+                        icon: Icons.savings_rounded,
                         label: '${_money(state.cash)}원',
+                        accent: const Color(0xFFFFB84D),
                       ),
-                      const SizedBox(width: 5),
-                      _ApartmentHudChip(label: 'LV.${state.progression.level}'),
-                      const SizedBox(width: 5),
-                      _ApartmentHudChip(label: 'S$activeSaveSlot'),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(width: 6),
+                    _ApartmentHudChip(label: 'S$activeSaveSlot'),
+                  ],
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 class _ApartmentHudChip extends StatelessWidget {
-  const _ApartmentHudChip({this.icon, required this.label});
+  const _ApartmentHudChip({this.icon, required this.label, this.accent});
 
   final IconData? icon;
   final String label;
+  final Color? accent;
 
   @override
   Widget build(BuildContext context) => Container(
-    height: 22,
-    padding: EdgeInsets.symmetric(horizontal: icon == null ? 7 : 6),
+    height: 27,
+    padding: EdgeInsets.symmetric(horizontal: icon == null ? 8 : 7),
     decoration: BoxDecoration(
-      color: const Color(0x2B0B0D11),
+      color: const Color(0xFFF1F3F7),
       borderRadius: BorderRadius.circular(99),
-      border: Border.all(color: const Color(0x3DF3DFC1)),
     ),
     child: Row(
+      mainAxisAlignment: MainAxisAlignment.center,
       mainAxisSize: MainAxisSize.min,
       children: [
         if (icon != null) ...[
-          Icon(icon, color: const Color(0xFF93A4BD), size: 10),
+          Icon(icon, color: accent ?? const Color(0xFF76829A), size: 12),
           const SizedBox(width: 4),
         ],
-        Text(
-          label,
-          maxLines: 1,
-          style: const TextStyle(
-            color: Color(0xFFDDE4EF),
-            fontSize: 9,
-            fontWeight: FontWeight.w800,
+        Flexible(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: _ink,
+              fontSize: 9,
+              fontWeight: FontWeight.w900,
+            ),
           ),
         ),
       ],
@@ -541,91 +615,136 @@ class _ApartmentObjectHotspot extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Align(
     alignment: alignment,
-    child: Semantics(
-      button: true,
-      label: '$label 열기',
-      excludeSemantics: true,
-      child: SizedBox(
-        width: 132,
-        height: 64,
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            key: interactionKey,
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(19),
-            child: Ink(
-              padding: const EdgeInsets.fromLTRB(8, 7, 9, 7),
-              decoration: BoxDecoration(
-                color: const Color(0xB81D2632),
-                borderRadius: BorderRadius.circular(19),
-                border: Border.all(
-                  color: attention ? _yellow : const Color(0x99F3DFC1),
-                  width: attention ? 2.0 : 1.2,
-                ),
-                boxShadow: [
-                  const BoxShadow(
-                    color: Color(0x66000000),
-                    blurRadius: 11,
-                    offset: Offset(0, 5),
-                  ),
-                  BoxShadow(
-                    color: accent.withValues(alpha: attention ? 0.65 : 0.30),
-                    blurRadius: attention ? 20 : 11,
-                    spreadRadius: attention ? 2 : 0,
-                  ),
-                ],
-              ),
-              child: Row(
+    child: TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.92, end: 1),
+      duration: const Duration(milliseconds: 420),
+      curve: Curves.easeOutBack,
+      builder: (context, scale, child) =>
+          Transform.scale(scale: scale, child: child),
+      child: Semantics(
+        button: true,
+        label: '$label 열기',
+        excludeSemantics: true,
+        child: SizedBox(
+          width: 128,
+          height: 62,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              key: interactionKey,
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(22),
+              child: Stack(
+                clipBehavior: Clip.none,
+                alignment: Alignment.centerLeft,
                 children: [
+                  Positioned(
+                    left: 18,
+                    right: 0,
+                    top: 7,
+                    bottom: 7,
+                    child: Ink(
+                      padding: const EdgeInsets.fromLTRB(31, 7, 8, 7),
+                      decoration: BoxDecoration(
+                        color: const Color(0xF2FFF9EE),
+                        borderRadius: BorderRadius.circular(17),
+                        border: Border.all(
+                          color: attention ? _coral : Colors.white,
+                          width: attention ? 2 : 1.4,
+                        ),
+                        boxShadow: [
+                          const BoxShadow(
+                            color: Color(0x400B1423),
+                            blurRadius: 12,
+                            offset: Offset(0, 6),
+                          ),
+                          if (attention)
+                            BoxShadow(
+                              color: _yellow.withValues(alpha: 0.55),
+                              blurRadius: 18,
+                              spreadRadius: 2,
+                            ),
+                        ],
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: _ink,
+                              fontSize: 11.5,
+                              height: 1.05,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: -0.3,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  eyebrow,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Color(0xFF788399),
+                                    fontSize: 7.5,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 2),
+                              const Icon(
+                                Icons.chevron_right_rounded,
+                                color: Color(0xFF788399),
+                                size: 12,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                   Container(
-                    width: 42,
-                    height: 42,
+                    width: 48,
+                    height: 48,
                     decoration: BoxDecoration(
-                      color: accent,
-                      borderRadius: BorderRadius.circular(13),
-                      boxShadow: const [
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [accent, accent.withValues(alpha: 0.76)],
+                      ),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2.2),
+                      boxShadow: [
                         BoxShadow(
-                          color: Color(0x52000000),
-                          blurRadius: 7,
-                          offset: Offset(0, 3),
+                          color: accent.withValues(alpha: 0.45),
+                          blurRadius: 13,
+                          offset: const Offset(0, 5),
                         ),
                       ],
                     ),
-                    child: Icon(icon, color: const Color(0xFF20283A), size: 22),
+                    child: Icon(icon, color: _ink, size: 23),
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          eyebrow,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: accent,
-                            fontSize: 6.5,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 0.45,
+                  if (attention)
+                    const Positioned(
+                      left: 34,
+                      top: 1,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: _coral,
+                          shape: BoxShape.circle,
+                          border: Border.fromBorderSide(
+                            BorderSide(color: Colors.white, width: 2),
                           ),
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          label,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: -0.25,
-                          ),
-                        ),
-                      ],
+                        child: SizedBox(width: 14, height: 14),
+                      ),
                     ),
-                  ),
                 ],
               ),
             ),
@@ -652,65 +771,65 @@ class _ApartmentTravelDock extends StatelessWidget {
       container: true,
       label: '아파트 장소 이동',
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
         child: BackdropFilter(
-          filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          filter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
           child: Container(
-            constraints: const BoxConstraints(minHeight: 70),
-            padding: const EdgeInsets.fromLTRB(9, 7, 9, 8),
+            constraints: const BoxConstraints(minHeight: 72),
+            padding: const EdgeInsets.fromLTRB(8, 7, 8, 8),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Color(0xAA312820), Color(0xB8141A24)],
-              ),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0x70F3DFC1), width: 1.2),
+              color: const Color(0xEFFFFAF0),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: const Color(0xF2FFFFFF), width: 1.5),
               boxShadow: const [
                 BoxShadow(
-                  color: Color(0x66000000),
-                  blurRadius: 13,
-                  offset: Offset(0, 6),
+                  color: Color(0x440B1423),
+                  blurRadius: 17,
+                  offset: Offset(0, 8),
                 ),
               ],
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
+            child: Row(
               children: [
-                const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.near_me_rounded, size: 11, color: _yellow),
-                    SizedBox(width: 4),
-                    Text(
-                      '집 안에서 이동',
-                      style: TextStyle(
-                        color: Color(0xFFC9D1DF),
-                        fontSize: 10,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0.35,
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 7),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 31,
+                        height: 31,
+                        decoration: BoxDecoration(
+                          color: _ink.withValues(alpha: 0.08),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          detailsForPlace(place).icon,
+                          color: _ink,
+                          size: 16,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 5),
-                Row(
-                  children: [
-                    for (
-                      var index = 0;
-                      index < destinations.length;
-                      index++
-                    ) ...[
-                      if (index > 0) const SizedBox(width: 7),
-                      Expanded(
-                        child: _ApartmentTravelButton(
-                          place: destinations[index],
-                          onTap: () => onMove(destinations[index]),
+                      const SizedBox(height: 3),
+                      const Text(
+                        '이동',
+                        style: TextStyle(
+                          color: Color(0xFF747E91),
+                          fontSize: 8,
+                          fontWeight: FontWeight.w900,
                         ),
                       ),
                     ],
-                  ],
+                  ),
                 ),
+                for (var index = 0; index < destinations.length; index++) ...[
+                  if (index > 0) const SizedBox(width: 7),
+                  Expanded(
+                    child: _ApartmentTravelButton(
+                      place: destinations[index],
+                      onTap: () => onMove(destinations[index]),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -718,6 +837,9 @@ class _ApartmentTravelDock extends StatelessWidget {
       ),
     );
   }
+
+  _ApartmentPlaceDetails detailsForPlace(_ApartmentPlace value) =>
+      _ApartmentPlaceDetails.forPlace(value);
 }
 
 class _ApartmentTravelButton extends StatelessWidget {
@@ -738,37 +860,52 @@ class _ApartmentTravelButton extends StatelessWidget {
         child: InkWell(
           key: Key('apartment-go-${details.id}'),
           onTap: onTap,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(17),
           child: Ink(
-            height: 48,
-            padding: const EdgeInsets.symmetric(horizontal: 10),
+            height: 54,
+            padding: const EdgeInsets.symmetric(horizontal: 9),
             decoration: BoxDecoration(
-              color: details.accent.withValues(alpha: 0.13),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: details.accent.withValues(alpha: 0.68)),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  details.accent.withValues(alpha: 0.28),
+                  details.accent.withValues(alpha: 0.12),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(17),
+              border: Border.all(color: details.accent.withValues(alpha: 0.62)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(details.icon, color: details.accent, size: 19),
+                Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    color: details.accent,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(details.icon, color: _ink, size: 16),
+                ),
                 const SizedBox(width: 7),
                 Flexible(
                   child: Text(
-                    '${details.shortTitle}으로',
+                    details.shortTitle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      color: Colors.white,
+                      color: _ink,
                       fontSize: 11,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
                 ),
-                const SizedBox(width: 3),
+                const SizedBox(width: 2),
                 const Icon(
-                  Icons.chevron_right_rounded,
-                  color: Colors.white,
-                  size: 17,
+                  Icons.arrow_forward_ios_rounded,
+                  color: _ink,
+                  size: 11,
                 ),
               ],
             ),
