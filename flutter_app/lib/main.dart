@@ -1300,72 +1300,53 @@ class OfficeScreen extends StatelessWidget {
   onTransferBrokerageCash;
 
   @override
-  Widget build(BuildContext context) {
-    final pending = state.pendingDecisions;
-
-    return Scaffold(
-      backgroundColor: const Color(0xFF17130F),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: ApartmentHubScreen(
-                state: state,
-                onOpenDecisions: () => _openDecision(context),
-                onOpenMarket: () => Navigator.of(context).push(
-                  _gameSceneRoute<void>(
-                    StockMarketScreen(
-                      state: state,
-                      onSetMarketMinute: onSetMarketMinute,
-                      onSaveMarketNotebook: onSaveMarketNotebook,
-                      onClaimMission: onClaimMission,
-                      onExecuteTrade: onExecuteTrade,
-                      onTransferCash: onTransferBrokerageCash,
-                    ),
-                  ),
-                ),
-                onOpenLedger: () => _openLedger(context),
-                onOpenOrganization: () => Navigator.of(context).push(
-                  _gameSceneRoute<void>(
-                    OrganizationScreen(
-                      state: state,
-                      onRequestFamilyHelp: onRequestFamilyHelp,
-                      onHireEmployee: onHireEmployee,
-                      onLaunchFund: onLaunchFund,
-                    ),
-                  ),
-                ),
-                onOpenWork: () => Navigator.of(context).push(
-                  _gameSceneRoute<void>(
-                    SeedMoneyHubScreen(
-                      state: state,
-                      onComplete: onCompleteWork,
-                    ),
-                  ),
-                ),
-                activeSaveSlot: activeSaveSlot,
-                lastSavedAt: lastSavedAt,
-                onOpenGameMenu: () => _showGameMenu(context),
-                onTutorialComplete: onCompleteHubTutorial,
-              ),
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: const Color(0xFF17130F),
+    body: SafeArea(
+      child: ApartmentHubScreen(
+        state: state,
+        onOpenDecisions: () => _openDecision(context),
+        onOpenMarket: () => Navigator.of(context).push(
+          _gameSceneRoute<void>(
+            StockMarketScreen(
+              state: state,
+              onSetMarketMinute: onSetMarketMinute,
+              onSaveMarketNotebook: onSaveMarketNotebook,
+              onClaimMission: onClaimMission,
+              onExecuteTrade: onExecuteTrade,
+              onTransferCash: onTransferBrokerageCash,
             ),
-            _AdvanceBar(
-              hasPendingDecision: pending.isNotEmpty,
-              campaignComplete: state.campaignComplete,
-              marketMinute: state.marketMinute,
-              onAdvanceHour: () => _handleAdvanceHour(context),
-              onAdvanceDay: () => _handleAdvanceDay(context),
-              onAdvanceBatch: () => _showAdvanceMenu(context),
-              onOpenEnding: () => Navigator.of(
-                context,
-              ).push(_gameSceneRoute<void>(CampaignEndingScreen(state: state))),
-            ),
-          ],
+          ),
         ),
+        onOpenLedger: () => _openLedger(context),
+        onOpenOrganization: () => Navigator.of(context).push(
+          _gameSceneRoute<void>(
+            OrganizationScreen(
+              state: state,
+              onRequestFamilyHelp: onRequestFamilyHelp,
+              onHireEmployee: onHireEmployee,
+              onLaunchFund: onLaunchFund,
+            ),
+          ),
+        ),
+        onOpenWork: () => Navigator.of(context).push(
+          _gameSceneRoute<void>(
+            SeedMoneyHubScreen(state: state, onComplete: onCompleteWork),
+          ),
+        ),
+        activeSaveSlot: activeSaveSlot,
+        lastSavedAt: lastSavedAt,
+        onOpenGameMenu: () => _showGameMenu(context),
+        onAdvanceHour: () => _handleAdvanceHour(context),
+        onAdvanceDay: () => _handleAdvanceDay(context),
+        onAdvanceBatch: () => _showAdvanceMenu(context),
+        onOpenEnding: () => Navigator.of(
+          context,
+        ).push(_gameSceneRoute<void>(CampaignEndingScreen(state: state))),
+        onTutorialComplete: onCompleteHubTutorial,
       ),
-    );
-  }
-
+    ),
+  );
   Future<void> _showGameMenu(BuildContext context) async {
     final action = await showModalBottomSheet<_GameMenuAction>(
       context: context,
@@ -3297,209 +3278,6 @@ class _EndingMetric extends StatelessWidget {
     title: Text(label),
     trailing: Text(value, style: const TextStyle(fontWeight: FontWeight.w900)),
   );
-}
-
-class _AdvanceBar extends StatelessWidget {
-  const _AdvanceBar({
-    required this.hasPendingDecision,
-    required this.campaignComplete,
-    required this.marketMinute,
-    required this.onAdvanceHour,
-    required this.onAdvanceDay,
-    required this.onAdvanceBatch,
-    required this.onOpenEnding,
-  });
-  final bool hasPendingDecision;
-  final bool campaignComplete;
-  final int marketMinute;
-  final VoidCallback onAdvanceHour;
-  final VoidCallback onAdvanceDay;
-  final VoidCallback onAdvanceBatch;
-  final VoidCallback onOpenEnding;
-
-  @override
-  Widget build(BuildContext context) {
-    final ended = marketMinute >= marketDayEndMinute;
-    final dayProgress = (marketMinute / marketDayEndMinute).clamp(0.0, 1.0);
-    final message = hasPendingDecision
-        ? '거실의 안건 편지를 먼저 확인해요'
-        : campaignComplete
-        ? '마지막 장부를 펼칠 시간이에요'
-        : ended
-        ? '오늘도 수고했어요 · 신문으로 마감'
-        : '${marketTimeLabel(marketMinute)} · 아파트 생활';
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(12, 9, 12, 11),
-      decoration: const BoxDecoration(
-        color: Color(0xFFFFFAF0),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        boxShadow: [
-          BoxShadow(
-            color: Color(0x300E1726),
-            blurRadius: 20,
-            offset: Offset(0, -7),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 30,
-                height: 30,
-                decoration: BoxDecoration(
-                  color: hasPendingDecision
-                      ? const Color(0xFFFFE4DE)
-                      : const Color(0xFFFFEDB8),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  hasPendingDecision
-                      ? Icons.mark_email_unread_rounded
-                      : ended
-                      ? Icons.nights_stay_rounded
-                      : Icons.wb_sunny_rounded,
-                  color: hasPendingDecision ? _coral : const Color(0xFFD39724),
-                  size: 16,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      message,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: _ink,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(99),
-                      child: LinearProgressIndicator(
-                        value: dayProgress,
-                        minHeight: 4,
-                        backgroundColor: const Color(0xFFE4E7EC),
-                        valueColor: AlwaysStoppedAnimation(
-                          hasPendingDecision ? _coral : const Color(0xFF65BE9B),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF0F2F6),
-                  borderRadius: BorderRadius.circular(99),
-                ),
-                child: Text(
-                  ended ? '20:00' : marketTimeLabel(marketMinute),
-                  style: const TextStyle(
-                    color: Color(0xFF667189),
-                    fontSize: 9,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: SizedBox(
-                  height: 52,
-                  child: ElevatedButton.icon(
-                    key: const Key('advance-hour-button'),
-                    onPressed: hasPendingDecision || ended
-                        ? null
-                        : onAdvanceHour,
-                    icon: Icon(
-                      hasPendingDecision || ended
-                          ? Icons.lock_clock_rounded
-                          : Icons.more_time_rounded,
-                      size: 19,
-                    ),
-                    label: const Text('1시간 보내기'),
-                    style: _advanceButtonStyle(const Color(0xFF4B9F87)),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: SizedBox(
-                  height: 52,
-                  child: ElevatedButton.icon(
-                    key: const Key('advance-day-button'),
-                    onPressed: hasPendingDecision
-                        ? null
-                        : campaignComplete
-                        ? onOpenEnding
-                        : onAdvanceDay,
-                    icon: Icon(
-                      campaignComplete
-                          ? Icons.emoji_events_rounded
-                          : Icons.bedtime_rounded,
-                      size: 19,
-                    ),
-                    label: Text(campaignComplete ? '최종 결산' : '하루 보내기'),
-                    style: _advanceButtonStyle(_coral),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              SizedBox(
-                width: 50,
-                height: 52,
-                child: IconButton.filled(
-                  key: const Key('advance-batch-button'),
-                  tooltip: '빠르게 진행',
-                  onPressed: hasPendingDecision || campaignComplete
-                      ? null
-                      : onAdvanceBatch,
-                  style: IconButton.styleFrom(
-                    backgroundColor: const Color(0xFFFFD96A),
-                    foregroundColor: _ink,
-                    disabledBackgroundColor: const Color(0xFFE0E3E8),
-                    disabledForegroundColor: const Color(0xFF9BA3B1),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(17),
-                    ),
-                  ),
-                  icon: const Icon(Icons.fast_forward_rounded),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  ButtonStyle _advanceButtonStyle(Color backgroundColor) {
-    return ElevatedButton.styleFrom(
-      foregroundColor: Colors.white,
-      backgroundColor: backgroundColor,
-      disabledForegroundColor: const Color(0xFF9AA0AC),
-      disabledBackgroundColor: const Color(0xFFE2E4E8),
-      elevation: 0,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(17)),
-      textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
-    );
-  }
 }
 
 class _BrandHeader extends StatelessWidget {

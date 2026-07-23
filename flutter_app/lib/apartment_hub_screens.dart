@@ -19,6 +19,10 @@ class ApartmentHubScreen extends StatefulWidget {
     required this.activeSaveSlot,
     required this.lastSavedAt,
     required this.onOpenGameMenu,
+    required this.onAdvanceHour,
+    required this.onAdvanceDay,
+    required this.onAdvanceBatch,
+    required this.onOpenEnding,
     this.onTutorialComplete,
   });
 
@@ -31,6 +35,10 @@ class ApartmentHubScreen extends StatefulWidget {
   final int activeSaveSlot;
   final DateTime? lastSavedAt;
   final VoidCallback onOpenGameMenu;
+  final VoidCallback onAdvanceHour;
+  final VoidCallback onAdvanceDay;
+  final VoidCallback onAdvanceBatch;
+  final VoidCallback onOpenEnding;
   final Future<void> Function()? onTutorialComplete;
 
   @override
@@ -107,17 +115,17 @@ class _ApartmentHubScreenState extends State<ApartmentHubScreen> {
             child: _ApartmentTravelDock(place: _place, onMove: _moveTo),
           ),
           Positioned(
-            right: 12,
-            top: 108,
-            child: Semantics(
-              button: true,
-              label: '허브 도움말 열기',
-              child: IconButton.filled(
-                key: const Key('hub-help-button'),
-                tooltip: '허브 사용법',
-                onPressed: () => setState(() => _tutorialVisible = true),
-                icon: const Icon(Icons.help_outline_rounded),
-              ),
+            right: 10,
+            top: 126,
+            child: _ApartmentActionRail(
+              hasPendingDecision: widget.state.pendingDecisions.isNotEmpty,
+              campaignComplete: widget.state.campaignComplete,
+              marketMinute: widget.state.marketMinute,
+              onAdvanceHour: widget.onAdvanceHour,
+              onAdvanceDay: widget.onAdvanceDay,
+              onAdvanceBatch: widget.onAdvanceBatch,
+              onOpenEnding: widget.onOpenEnding,
+              onHelp: () => setState(() => _tutorialVisible = true),
             ),
           ),
           if (_tutorialVisible)
@@ -616,139 +624,236 @@ class _ApartmentObjectHotspot extends StatelessWidget {
   Widget build(BuildContext context) => Align(
     alignment: alignment,
     child: TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0.92, end: 1),
-      duration: const Duration(milliseconds: 420),
+      tween: Tween(begin: 0.9, end: 1),
+      duration: const Duration(milliseconds: 360),
       curve: Curves.easeOutBack,
       builder: (context, scale, child) =>
           Transform.scale(scale: scale, child: child),
-      child: Semantics(
-        button: true,
-        label: '$label 열기',
-        excludeSemantics: true,
-        child: SizedBox(
-          width: 128,
-          height: 62,
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              key: interactionKey,
-              onTap: onTap,
-              borderRadius: BorderRadius.circular(22),
-              child: Stack(
-                clipBehavior: Clip.none,
-                alignment: Alignment.centerLeft,
-                children: [
-                  Positioned(
-                    left: 18,
-                    right: 0,
-                    top: 7,
-                    bottom: 7,
-                    child: Ink(
-                      padding: const EdgeInsets.fromLTRB(31, 7, 8, 7),
+      child: Tooltip(
+        message: '$label · $eyebrow',
+        waitDuration: const Duration(milliseconds: 280),
+        child: Semantics(
+          button: true,
+          label: '$label 열기',
+          child: SizedBox(
+            width: 58,
+            height: 58,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                key: interactionKey,
+                onTap: onTap,
+                customBorder: const CircleBorder(),
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Ink(
                       decoration: BoxDecoration(
-                        color: const Color(0xF2FFF9EE),
-                        borderRadius: BorderRadius.circular(17),
+                        color: const Color(0xEFFFFAF0),
+                        shape: BoxShape.circle,
                         border: Border.all(
                           color: attention ? _coral : Colors.white,
-                          width: attention ? 2 : 1.4,
+                          width: attention ? 2.6 : 2,
                         ),
                         boxShadow: [
                           const BoxShadow(
-                            color: Color(0x400B1423),
+                            color: Color(0x480B1423),
                             blurRadius: 12,
                             offset: Offset(0, 6),
                           ),
-                          if (attention)
-                            BoxShadow(
-                              color: _yellow.withValues(alpha: 0.55),
-                              blurRadius: 18,
-                              spreadRadius: 2,
+                          BoxShadow(
+                            color: accent.withValues(
+                              alpha: attention ? 0.52 : 0.26,
                             ),
-                        ],
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            label,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: _ink,
-                              fontSize: 11.5,
-                              height: 1.05,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: -0.3,
-                            ),
-                          ),
-                          const SizedBox(height: 3),
-                          Row(
-                            children: [
-                              Flexible(
-                                child: Text(
-                                  eyebrow,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: Color(0xFF788399),
-                                    fontSize: 7.5,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 2),
-                              const Icon(
-                                Icons.chevron_right_rounded,
-                                color: Color(0xFF788399),
-                                size: 12,
-                              ),
-                            ],
+                            blurRadius: attention ? 18 : 10,
+                            spreadRadius: attention ? 2 : 0,
                           ),
                         ],
                       ),
-                    ),
-                  ),
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [accent, accent.withValues(alpha: 0.76)],
-                      ),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2.2),
-                      boxShadow: [
-                        BoxShadow(
-                          color: accent.withValues(alpha: 0.45),
-                          blurRadius: 13,
-                          offset: const Offset(0, 5),
-                        ),
-                      ],
-                    ),
-                    child: Icon(icon, color: _ink, size: 23),
-                  ),
-                  if (attention)
-                    const Positioned(
-                      left: 34,
-                      top: 1,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: _coral,
-                          shape: BoxShape.circle,
-                          border: Border.fromBorderSide(
-                            BorderSide(color: Colors.white, width: 2),
+                      child: Center(
+                        child: Container(
+                          width: 42,
+                          height: 42,
+                          decoration: BoxDecoration(
+                            color: accent,
+                            shape: BoxShape.circle,
                           ),
+                          child: Icon(icon, color: _ink, size: 22),
                         ),
-                        child: SizedBox(width: 14, height: 14),
                       ),
                     ),
-                ],
+                    if (attention)
+                      const Positioned(
+                        right: -1,
+                        top: -1,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: _coral,
+                            shape: BoxShape.circle,
+                            border: Border.fromBorderSide(
+                              BorderSide(color: Colors.white, width: 2),
+                            ),
+                          ),
+                          child: SizedBox(width: 15, height: 15),
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
           ),
+        ),
+      ),
+    ),
+  );
+}
+
+class _ApartmentActionRail extends StatelessWidget {
+  const _ApartmentActionRail({
+    required this.hasPendingDecision,
+    required this.campaignComplete,
+    required this.marketMinute,
+    required this.onAdvanceHour,
+    required this.onAdvanceDay,
+    required this.onAdvanceBatch,
+    required this.onOpenEnding,
+    required this.onHelp,
+  });
+
+  final bool hasPendingDecision;
+  final bool campaignComplete;
+  final int marketMinute;
+  final VoidCallback onAdvanceHour;
+  final VoidCallback onAdvanceDay;
+  final VoidCallback onAdvanceBatch;
+  final VoidCallback onOpenEnding;
+  final VoidCallback onHelp;
+
+  @override
+  Widget build(BuildContext context) {
+    final ended = marketMinute >= marketDayEndMinute;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(22),
+      child: BackdropFilter(
+        filter: ui.ImageFilter.blur(sigmaX: 13, sigmaY: 13),
+        child: Container(
+          width: 58,
+          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 6),
+          decoration: BoxDecoration(
+            color: const Color(0xDFFFFAF0),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: const Color(0xEFFFFFFF), width: 1.4),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x380B1423),
+                blurRadius: 14,
+                offset: Offset(0, 7),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _ApartmentRailButton(
+                buttonKey: const Key('advance-hour-button'),
+                tooltip: '1시간 보내기 · 게임 시간 60분 진행',
+                icon: hasPendingDecision || ended
+                    ? Icons.lock_clock_rounded
+                    : Icons.more_time_rounded,
+                color: const Color(0xFF4B9F87),
+                onPressed: hasPendingDecision || ended ? null : onAdvanceHour,
+              ),
+              const SizedBox(height: 6),
+              _ApartmentRailButton(
+                buttonKey: const Key('advance-day-button'),
+                tooltip: campaignComplete
+                    ? '최종 결산 열기'
+                    : '하루 보내기 · 신문 확인 후 다음 날 08:00',
+                icon: campaignComplete
+                    ? Icons.emoji_events_rounded
+                    : Icons.bedtime_rounded,
+                color: _coral,
+                onPressed: hasPendingDecision
+                    ? null
+                    : campaignComplete
+                    ? onOpenEnding
+                    : onAdvanceDay,
+              ),
+              const SizedBox(height: 6),
+              _ApartmentRailButton(
+                buttonKey: const Key('advance-batch-button'),
+                tooltip: '빠르게 진행 · 여러 날을 한 번에',
+                icon: Icons.fast_forward_rounded,
+                color: const Color(0xFFFFD05A),
+                foreground: _ink,
+                onPressed: hasPendingDecision || campaignComplete
+                    ? null
+                    : onAdvanceBatch,
+              ),
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 6),
+                child: SizedBox(
+                  width: 28,
+                  child: Divider(height: 1, color: Color(0xFFD9DDE4)),
+                ),
+              ),
+              _ApartmentRailButton(
+                buttonKey: const Key('hub-help-button'),
+                tooltip: '아이콘 사용법 보기',
+                icon: Icons.help_outline_rounded,
+                color: const Color(0xFF74819A),
+                onPressed: onHelp,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ApartmentRailButton extends StatelessWidget {
+  const _ApartmentRailButton({
+    required this.buttonKey,
+    required this.tooltip,
+    required this.icon,
+    required this.color,
+    required this.onPressed,
+    this.foreground = Colors.white,
+  });
+
+  final Key buttonKey;
+  final String tooltip;
+  final IconData icon;
+  final Color color;
+  final VoidCallback? onPressed;
+  final Color foreground;
+
+  @override
+  Widget build(BuildContext context) => Tooltip(
+    message: tooltip,
+    waitDuration: const Duration(milliseconds: 280),
+    child: Semantics(
+      button: true,
+      label: tooltip,
+      child: SizedBox(
+        width: 46,
+        height: 48,
+        child: ElevatedButton(
+          key: buttonKey,
+          onPressed: onPressed,
+          style: ElevatedButton.styleFrom(
+            padding: EdgeInsets.zero,
+            elevation: 0,
+            backgroundColor: color,
+            foregroundColor: foreground,
+            disabledBackgroundColor: const Color(0xFFE1E4E8),
+            disabledForegroundColor: const Color(0xFF9AA2AF),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
+          child: Icon(icon, size: 21),
         ),
       ),
     ),
@@ -762,72 +867,42 @@ class _ApartmentTravelDock extends StatelessWidget {
   final ValueChanged<_ApartmentPlace> onMove;
 
   @override
-  Widget build(BuildContext context) {
-    final destinations = _ApartmentPlace.values
-        .where((destination) => destination != place)
-        .toList(growable: false);
-
-    return Semantics(
+  Widget build(BuildContext context) => Align(
+    alignment: Alignment.bottomCenter,
+    child: Semantics(
       container: true,
       label: '아파트 장소 이동',
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(22),
         child: BackdropFilter(
-          filter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+          filter: ui.ImageFilter.blur(sigmaX: 13, sigmaY: 13),
           child: Container(
-            constraints: const BoxConstraints(minHeight: 72),
-            padding: const EdgeInsets.fromLTRB(8, 7, 8, 8),
+            padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              color: const Color(0xEFFFFAF0),
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: const Color(0xF2FFFFFF), width: 1.5),
+              color: const Color(0xDFFFFAF0),
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: const Color(0xEFFFFFFF), width: 1.4),
               boxShadow: const [
                 BoxShadow(
-                  color: Color(0x440B1423),
-                  blurRadius: 17,
-                  offset: Offset(0, 8),
+                  color: Color(0x3D0B1423),
+                  blurRadius: 14,
+                  offset: Offset(0, 7),
                 ),
               ],
             ),
             child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 7),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 31,
-                        height: 31,
-                        decoration: BoxDecoration(
-                          color: _ink.withValues(alpha: 0.08),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          detailsForPlace(place).icon,
-                          color: _ink,
-                          size: 16,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      const Text(
-                        '이동',
-                        style: TextStyle(
-                          color: Color(0xFF747E91),
-                          fontSize: 8,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                for (var index = 0; index < destinations.length; index++) ...[
-                  if (index > 0) const SizedBox(width: 7),
-                  Expanded(
-                    child: _ApartmentTravelButton(
-                      place: destinations[index],
-                      onTap: () => onMove(destinations[index]),
-                    ),
+                for (
+                  var index = 0;
+                  index < _ApartmentPlace.values.length;
+                  index++
+                ) ...[
+                  if (index > 0) const SizedBox(width: 6),
+                  _ApartmentTravelButton(
+                    place: _ApartmentPlace.values[index],
+                    selected: _ApartmentPlace.values[index] == place,
+                    onTap: () => onMove(_ApartmentPlace.values[index]),
                   ),
                 ],
               ],
@@ -835,80 +910,53 @@ class _ApartmentTravelDock extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-
-  _ApartmentPlaceDetails detailsForPlace(_ApartmentPlace value) =>
-      _ApartmentPlaceDetails.forPlace(value);
+    ),
+  );
 }
 
 class _ApartmentTravelButton extends StatelessWidget {
-  const _ApartmentTravelButton({required this.place, required this.onTap});
+  const _ApartmentTravelButton({
+    required this.place,
+    required this.selected,
+    required this.onTap,
+  });
 
   final _ApartmentPlace place;
+  final bool selected;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final details = _ApartmentPlaceDetails.forPlace(place);
-    return Semantics(
-      button: true,
-      label: '${details.title}으로 이동',
-      excludeSemantics: true,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          key: Key('apartment-go-${details.id}'),
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(17),
-          child: Ink(
-            height: 54,
-            padding: const EdgeInsets.symmetric(horizontal: 9),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  details.accent.withValues(alpha: 0.28),
-                  details.accent.withValues(alpha: 0.12),
-                ],
+    return Tooltip(
+      message: selected ? '${details.title} · 현재 위치' : '${details.title}으로 이동',
+      waitDuration: const Duration(milliseconds: 280),
+      child: Semantics(
+        button: true,
+        selected: selected,
+        label: '${details.title}으로 이동',
+        child: SizedBox(
+          width: 48,
+          height: 48,
+          child: ElevatedButton(
+            key: Key('apartment-go-${details.id}'),
+            onPressed: selected ? null : onTap,
+            style: ElevatedButton.styleFrom(
+              padding: EdgeInsets.zero,
+              elevation: 0,
+              backgroundColor: details.accent,
+              foregroundColor: _ink,
+              disabledBackgroundColor: details.accent,
+              disabledForegroundColor: _ink,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(
+                  color: selected ? _ink : Colors.transparent,
+                  width: selected ? 2 : 0,
+                ),
               ),
-              borderRadius: BorderRadius.circular(17),
-              border: Border.all(color: details.accent.withValues(alpha: 0.62)),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  width: 30,
-                  height: 30,
-                  decoration: BoxDecoration(
-                    color: details.accent,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(details.icon, color: _ink, size: 16),
-                ),
-                const SizedBox(width: 7),
-                Flexible(
-                  child: Text(
-                    details.shortTitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: _ink,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 2),
-                const Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  color: _ink,
-                  size: 11,
-                ),
-              ],
-            ),
+            child: Icon(details.icon, size: 21),
           ),
         ),
       ),

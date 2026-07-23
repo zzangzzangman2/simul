@@ -173,7 +173,7 @@ void main() {
     expect(find.text('0원'), findsOneWidget);
     expect(find.byKey(const Key('apartment-place-bedroom')), findsOneWidget);
     expect(find.byKey(const Key('room-company-sign')), findsOneWidget);
-    expect(find.textContaining('거실의 안건 편지를 먼저'), findsOneWidget);
+    expect(find.byTooltip('1시간 보내기 · 게임 시간 60분 진행'), findsOneWidget);
   });
 
   testWidgets('existing v1 save is restored with safe story defaults', (
@@ -234,7 +234,7 @@ void main() {
     await tester.tap(option);
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('decision-inbox-screen')), findsNothing);
-    expect(find.text('안건 편지'), findsOneWidget);
+    expect(find.byKey(const Key('open-decisions-button')), findsOneWidget);
     expect(find.text('1월 1일 토요일 · 08:30'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
@@ -1587,7 +1587,7 @@ void main() {
 
     await tester.pumpWidget(buildOffice(state));
     await tester.pumpAndSettle();
-    expect(find.text('09:00 · 아파트 생활'), findsOneWidget);
+    expect(find.textContaining('09:00'), findsOneWidget);
     expect(find.text('KRX 정규장'), findsNothing);
 
     final hourFinder = find.byKey(const Key('advance-hour-button'));
@@ -1683,8 +1683,8 @@ void main() {
         final dayFinder = find.byKey(const Key('advance-day-button'));
         expect(hourFinder, findsOneWidget);
         expect(dayFinder, findsOneWidget);
-        expect(find.text('1시간 보내기'), findsOneWidget);
-        expect(find.text('하루 보내기'), findsOneWidget);
+        expect(find.byTooltip('1시간 보내기 · 게임 시간 60분 진행'), findsOneWidget);
+        expect(find.byTooltip('하루 보내기 · 신문 확인 후 다음 날 08:00'), findsOneWidget);
 
         final hourButton = tester.widget<ElevatedButton>(hourFinder);
         final dayButton = tester.widget<ElevatedButton>(dayFinder);
