@@ -1023,69 +1023,64 @@ class _ApartmentObjectHotspot extends StatelessWidget {
           button: true,
           label: '$label 열기',
           child: SizedBox(
-            width: 66,
+            width: 48,
             height: 48,
             child: Material(
               color: Colors.transparent,
               child: InkWell(
                 key: interactionKey,
                 onTap: onTap,
-                borderRadius: BorderRadius.circular(24),
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    Ink(
-                      decoration: BoxDecoration(
-                        color: const Color(0xF7FFF8E9),
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(
-                          color: attention ? _coral : _ink,
-                          width: attention ? 2.4 : 1.8,
-                        ),
-                        boxShadow: [
-                          const BoxShadow(
-                            color: Color(0x480B1423),
-                            blurRadius: 12,
-                            offset: Offset(0, 6),
-                          ),
-                          BoxShadow(
-                            color: accent.withValues(
-                              alpha: attention ? 0.52 : 0.26,
-                            ),
-                            blurRadius: attention ? 18 : 10,
-                            spreadRadius: attention ? 2 : 0,
-                          ),
-                        ],
+                customBorder: const CircleBorder(),
+                child: Center(
+                  child: AnimatedContainer(
+                    key: ValueKey(attention),
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOutCubic,
+                    width: attention ? 42 : 36,
+                    height: attention ? 42 : 36,
+                    decoration: BoxDecoration(
+                      color: attention
+                          ? const Color(0xBFE24B5B)
+                          : const Color(0x9975D6F4),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: const Color(0xF2FFFFFF),
+                        width: 2,
                       ),
-                      child: const Center(
-                        child: Text(
-                          '누르기',
-                          style: TextStyle(
-                            fontFamily: _hubDisplayFont,
-                            color: _ink,
-                            fontSize: 11,
-                            height: 1,
-                            fontWeight: FontWeight.w700,
-                          ),
+                      boxShadow: [
+                        const BoxShadow(
+                          color: Color(0x3D0B1423),
+                          blurRadius: 8,
+                          offset: Offset(0, 4),
                         ),
-                      ),
+                        BoxShadow(
+                          color: (attention ? _coral : accent).withValues(
+                            alpha: attention ? 0.62 : 0.42,
+                          ),
+                          blurRadius: attention ? 18 : 12,
+                          spreadRadius: attention ? 2 : 0,
+                        ),
+                      ],
                     ),
-                    if (attention)
-                      const Positioned(
-                        right: -1,
-                        top: -1,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            color: _coral,
-                            shape: BoxShape.circle,
-                            border: Border.fromBorderSide(
-                              BorderSide(color: Colors.white, width: 2),
+                    child: Center(
+                      child: attention
+                          ? const Text(
+                              '!',
+                              style: TextStyle(
+                                fontFamily: _hubDisplayFont,
+                                color: Colors.white,
+                                fontSize: 26,
+                                height: 1,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            )
+                          : const Icon(
+                              Icons.auto_awesome_rounded,
+                              color: Colors.white,
+                              size: 19,
                             ),
-                          ),
-                          child: SizedBox(width: 15, height: 15),
-                        ),
-                      ),
-                  ],
+                    ),
+                  ),
                 ),
               ),
             ),
