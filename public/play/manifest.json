@@ -6,7 +6,7 @@
   "display_override": ["fullscreen", "standalone"],
   "background_color": "#DDF8F3",
   "theme_color": "#DDF8F3",
-  "description": "2000년 서울, 외할아버지에게 받은 세뱃돈 1만원으로 투자와 장부를 배우며 가족과 함께 성장하는 모바일 세로형 생활 시뮬레이션",
+  "description": "2000년 서울, 투자학원에서 기초를 배우고 외할아버지의 세뱃돈 1만원으로 가족과 함께 성장하는 모바일 세로형 생활·투자 시뮬레이션",
   "orientation": "portrait-primary",
   "prefer_related_applications": false,
   "icons": [

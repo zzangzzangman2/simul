@@ -319,6 +319,15 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     return next;
   }
 
+  Future<FinanceActionResult> _repayAcademyTuitionDebt() async {
+    final current = _state!;
+    final result = _engine.repayAcademyTuitionDebt(current);
+    if (!result.success) return result;
+    await _persistence.save(result.state);
+    if (mounted) setState(() => _state = result.state);
+    return result;
+  }
+
   Future<GameState> _advanceDay() => _advanceDays(1);
 
   Future<GameState> _advanceDays(int requestedDays) async {
@@ -699,6 +708,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
                   onResolveDecision: _resolveDecision,
                   onClaimMission: _claimMission,
                   onRequestFamilyHelp: _requestFamilyHelp,
+                  onRepayAcademyTuitionDebt: _repayAcademyTuitionDebt,
                   onHireEmployee: _hireEmployee,
                   onLaunchFund: _launchFund,
                   onPurchaseSpendingOption: _purchaseSpendingOption,
@@ -1388,6 +1398,7 @@ class OfficeScreen extends StatelessWidget {
     required this.onResolveDecision,
     this.onClaimMission,
     required this.onRequestFamilyHelp,
+    this.onRepayAcademyTuitionDebt,
     this.onHireEmployee,
     this.onLaunchFund,
     this.onPurchaseSpendingOption,
@@ -1417,6 +1428,7 @@ class OfficeScreen extends StatelessWidget {
   final Future<void> Function(String, String) onResolveDecision;
   final Future<MissionClaimResult> Function()? onClaimMission;
   final Future<GameState> Function(String) onRequestFamilyHelp;
+  final Future<FinanceActionResult> Function()? onRepayAcademyTuitionDebt;
   final Future<GameState> Function(String)? onHireEmployee;
   final Future<GameState> Function()? onLaunchFund;
   final Future<FinanceActionResult> Function(String optionId)?
@@ -1461,6 +1473,7 @@ class OfficeScreen extends StatelessWidget {
             OrganizationScreen(
               state: state,
               onRequestFamilyHelp: onRequestFamilyHelp,
+              onRepayAcademyTuitionDebt: onRepayAcademyTuitionDebt,
               onHireEmployee: onHireEmployee,
               onLaunchFund: onLaunchFund,
             ),

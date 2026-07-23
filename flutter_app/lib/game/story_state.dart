@@ -56,6 +56,10 @@ class StoryState {
   int get startingSeedMoney => flagInt('startingSeedMoney');
   int get earnedSeedMoney => flagInt('earnedSeedMoney');
   int get seedMoneyTotal => startingSeedMoney + earnedSeedMoney;
+  int get academyTuitionDebt => flagInt('academyTuitionDebt');
+  int get academyTuitionOriginal => flagInt('academyTuitionOriginal');
+  bool get academyTuitionRepaid =>
+      academyTuitionOriginal > 0 && academyTuitionDebt <= 0;
   int get reputation => flagInt('reputation');
   int get externalAum => flagInt('externalAum');
   int get officeTier => flagInt('officeTier');
@@ -123,6 +127,9 @@ class StoryState {
         'startingSeedMoney': 0,
         'seedMoneySource': '',
         'earnedSeedMoney': 0,
+        'academyTuitionDebt': 1000000,
+        'academyTuitionOriginal': 1000000,
+        'academyTuitionPaidByFather': true,
         'workSessions': 0,
         'workSessionsToday': 0,
         'firstSeedGoalReached': false,
@@ -154,6 +161,9 @@ class StoryState {
         'startingSeedMoney': 0,
         'seedMoneySource': '',
         'earnedSeedMoney': 0,
+        'academyTuitionDebt': 0,
+        'academyTuitionOriginal': 0,
+        'academyTuitionPaidByFather': false,
         'workSessions': 0,
         'workSessionsToday': 0,
         'firstSeedGoalReached': false,

@@ -32,86 +32,110 @@ class _VisualNovelOnboardingScreenState
   }
 
   String get _background => switch (_beat) {
-    <= 2 => 'assets/images/bg_boy_room_1999.png',
-    <= 13 => 'assets/images/bg_living_room_1999.png',
-    <= 22 => 'assets/images/bg_kitchen_1999.png',
+    <= 7 => 'assets/images/bg_living_room_1999.png',
+    <= 13 => 'assets/images/bg_kitchen_1999.png',
+    <= 23 => 'assets/images/bg_stock_academy_2000_v1.png',
+    <= 27 => 'assets/images/bg_living_room_cartoon_2000.png',
     _ => 'assets/images/bg_boy_room_1999.png',
   };
 
   String get _location => switch (_beat) {
-    <= 2 => '작은방',
-    <= 13 => '거실',
-    <= 22 => '부엌 식탁',
+    <= 7 => '거실 · TV 앞',
+    <= 13 => '부엌 식탁',
+    <= 23 => '새천년 투자학원 · 입문반',
+    <= 27 => '거실 · 가족 장부',
     _ => '작은방 책상',
   };
 
-  String get _dateLabel =>
-      _beat <= 13 ? '1999.12.31  ·  23:57' : '2000.01.02  ·  일요일';
+  String get _dateLabel => switch (_beat) {
+    <= 7 => '1999.12.31  ·  21:40',
+    <= 13 => '2000.01.02  ·  일요일',
+    <= 23 => '2000년 1월  ·  첫 수업',
+    _ => '2000.01.02  ·  일요일',
+  };
 
   String? get _character => switch (_beat) {
-    2 || 5 || 9 || 10 || 18 || 19 || 20 => 'assets/images/character_hero.png',
-    4 || 11 || 21 || 22 => 'assets/images/character_father.png',
-    3 || 7 => 'assets/images/character_sister.png',
-    14 || 15 || 17 => 'assets/images/character_grandfather.png',
-    1 || 6 || 12 || 16 => 'assets/images/character_mother.png',
+    1 || 5 || 7 || 10 || 21 || 23 => 'assets/images/character_hero.png',
+    4 || 6 || 12 || 25 || 26 => 'assets/images/character_father.png',
+    2 => 'assets/images/character_sister.png',
+    9 || 11 || 27 => 'assets/images/character_grandfather.png',
+    3 || 13 => 'assets/images/character_mother.png',
     _ => null,
   };
 
   Alignment get _characterAlignment => switch (_beat) {
-    4 || 11 || 14 || 15 || 17 || 21 || 22 => Alignment.bottomLeft,
-    1 || 3 || 6 || 7 || 12 || 16 => Alignment.bottomRight,
+    4 || 6 || 9 || 11 || 12 || 25 || 26 || 27 => Alignment.bottomLeft,
+    2 || 3 || 13 => Alignment.bottomRight,
+    _ => Alignment.bottomCenter,
+  };
+
+  bool get _isAcademyTeacherBeat => _beat >= 15 && _beat <= 20 || _beat == 22;
+
+  Alignment get _teacherPoseAlignment => switch (_beat) {
+    15 => Alignment.topLeft,
+    16 => Alignment.topCenter,
+    17 => Alignment.topRight,
+    18 => Alignment.bottomLeft,
+    19 => Alignment.bottomRight,
     _ => Alignment.bottomCenter,
   };
 
   bool get _isNarration =>
-      _beat == 0 || _beat == 8 || _beat == 13 || _beat == 23;
+      _beat == 0 || _beat == 8 || _beat == 14 || _beat == 24 || _beat == 28;
 
   String get _speaker => switch (_beat) {
-    0 || 8 || 13 || 23 => '이야기',
-    1 || 6 || 12 || 16 => '엄마',
-    2 || 5 || 9 || 10 || 18 || 19 || 20 =>
+    0 || 8 || 14 || 24 || 28 => '이야기',
+    1 || 5 || 7 || 10 || 21 || 23 =>
       _playerController.text.trim().isEmpty
           ? '나'
           : _playerController.text.trim(),
-    3 || 7 => '누나',
-    4 || 11 || 21 || 22 => '아빠',
-    14 || 15 || 17 => '외할아버지',
+    2 => '누나',
+    3 || 13 => '엄마',
+    4 || 6 || 12 || 25 || 26 => '아빠',
+    9 || 11 || 27 => '외할아버지',
+    15 || 16 || 17 || 18 || 19 || 20 || 22 => '한서윤 선생님',
     _ => '이야기',
   };
 
   String get _line => switch (_beat) {
-    0 => '새 천년을 세 분 앞둔 밤. 방 안에는 컴퓨터 팬 소리와 거실에서 흘러오는 카운트다운 음악이 뒤섞여 있었다.',
-    1 => '이제 컴퓨터도 잠깐 쉬게 해 줘. 귤 까 놨으니까 얼른 거실로 와!',
-    2 => '잠깐만요. 화면에 있는 숫자 하나만 보고 갈게요. 자꾸 바뀌니까 신기해요.',
-    3 => '또 숫자 구경이야? 그러다 새해도 컴퓨터랑 둘이 맞겠다.',
-    4 => '놀리지는 말고. 궁금한 게 많은 건 좋은 일이야. 대신 직접 확인하는 습관을 들여야지.',
-    5 => '그럼 오늘은 제가 날짜가 제대로 바뀌는지 확인할래요.',
-    6 => '좋아. 확인이 끝나면 우리한테도 쉽게 설명해 줘. 어려운 말은 금지야.',
-    7 => '맞아. 나도 알아들을 수 있게 말하면 인정해 줄게.',
-    8 => '가족이 거실에 둘러앉았다. TV에서는 새 천년 이야기가 쏟아졌고, 모두의 시선이 자연스럽게 내게 모였다.',
-    9 => '나는 조금 긴장했지만, 가장 궁금했던 말을 먼저 꺼냈다.',
-    10 => _introResponse,
-    11 => '좋은 질문이네. 답을 외우는 것보다 왜 그런지 하나씩 찾아보는 게 더 중요해.',
-    12 => '모르면 가족에게 물어봐도 돼. 혼자 끙끙대다가 큰돈을 쓰는 건 안 되고.',
-    13 => '셋, 둘, 하나. 모두가 환호했다. 그리고 주말 아침, 외할아버지가 낡은 장부와 세뱃돈 봉투를 들고 찾아왔다.',
-    14 => '이건 네 첫 투자노트다. 그리고 새해니까 세뱃돈 만 원도 함께 주마.',
-    15 => '이 만 원은 네 첫 투자금이다. 생활비와 섞지 말고, 사고 싶은 회사가 생기면 가족에게 이유부터 말해 보렴.',
-    16 => '처음부터 잘할 필요 없어. 회사 하나를 보고, 좋은 점 하나와 걱정되는 점 하나만 찾으면 충분해.',
-    17 => '좋아, 그럼 첫 장부터 채워 보자. 이 투자노트에 어떤 이름을 적을까?',
-    18 => '내 이름을 적고 나니 진짜 내 장부가 된 것 같았다. 이제 무엇부터 배울지 정할 차례다.',
-    19 => '나는 먼저 이것부터 알아보고 싶다.',
-    20 => _traitResponse,
-    21 => '좋아. 우리 집 규칙은 간단하다. 생활비와 투자금을 섞지 않고, 빚내서 투자하지 않는다.',
-    22 => '마지막 약속 하나는 네가 직접 골라 보렴. 나중에 흔들릴 때 이 문장을 다시 읽는 거야.',
+    0 =>
+      'TV 드라마 속 젊은 투자자가 작은 회사의 가능성을 먼저 알아보고 모두를 놀라게 했다. 엔딩 음악이 끝났는데도 내 눈은 화면에서 떨어지지 않았다.',
+    1 => '저도 주식 해 보고 싶어요. 멋진 회사를 남들보다 먼저 찾아내는 거, 진짜 멋있잖아요!',
+    2 => '드라마 한 편 보고 벌써 투자자야? 넥타이부터 사 달라고 하겠네.',
+    3 => '멋있어 보이는 장면 뒤에는 잃을 수도 있는 진짜 돈이 있어. 버튼부터 누르는 건 안 돼.',
+    4 => '그래도 정말 배우고 싶다면 먼저 투자학원 입문반부터 다녀. 회사와 주문이 뭔지는 알고 시작해야지.',
+    5 => '학원이요? 저도 갈래요. 그런데 학원비는 얼마예요?',
+    6 => '100만 원이다. 내가 먼저 내주마. 공짜 용돈은 아니고, 네 장부에 “아빠에게 갚을 학원비”로 적는 거야.',
+    7 => '약속할게요. 제가 돈을 벌면 아빠가 먼저 내준 학원비부터 꼭 갚을게요.',
+    8 => '주말 아침, 소식을 들은 외할아버지가 낡은 투자 장부와 세뱃돈 봉투를 들고 찾아왔다.',
+    9 => '배우겠다고 마음먹은 건 좋구나. 이 장부와 세뱃돈 만 원을 첫 투자금으로 주마. 학원비 빚과 투자금은 절대 섞지 말거라.',
+    10 => '외할아버지가 물었다. “학원에서 가장 먼저 무엇을 배우고 싶니?”',
+    11 => _introResponse,
+    12 => '입문반 수업은 내가 먼저 신청해 뒀다. 배운 뒤에도 모르는 주문은 반드시 우리에게 물어봐.',
+    13 => '세뱃돈은 어머니 명의 교육용 증권계좌에 넣을게. 생활비, 학원비 빚, 투자금은 각각 따로 기록하자.',
+    14 =>
+      '첫 수업 날. 중학생과 고등학생들 사이에서 발이 바닥에 닿지 않는 의자에 앉았지만, 칠판의 차트만큼은 누구보다 크게 보였다.',
+    15 => '반가워요. 입문반을 맡은 한서윤입니다. 오늘은 종목 추천 대신, 주문하기 전에 반드시 알아야 할 것부터 배울 거예요.',
+    16 => '주식 한 주는 회사의 아주 작은 조각이에요. 가격표만 사는 게 아니라 그 회사의 제품, 실적, 위험을 함께 사는 거죠.',
+    17 => '가격이 오른다는 건 사려는 사람이 더 급했다는 뜻일 뿐, 그 회사가 무조건 좋아졌다는 뜻은 아니에요.',
+    18 => '첫 주문표에는 회사, 매수·매도, 수량, 가격 방식이 들어갑니다. 아래 세 칸을 순서대로 기억해 두세요.',
+    19 => '그리고 가장 중요한 한 줄. “왜 사고, 무엇이 틀리면 팔 것인가.” 이걸 쓰지 못하면 아직 주문할 때가 아니에요.',
+    20 => '좋아요. 이제 투자노트 첫 장에 학생 이름을 적어 볼까요?',
+    21 => '이름을 적는 순간, 드라마 흉내가 아니라 내가 책임져야 할 진짜 공부가 시작된 느낌이었다.',
+    22 => '첫 조사 과제입니다. 어떤 기준을 가장 먼저 연습해 보고 싶나요?',
+    23 => _traitResponse,
+    24 => '수업을 마치고 집으로 돌아오자 아빠는 약속대로 가족 장부 첫 줄에 학원비 1,000,000원을 적었다.',
+    25 => '투자금은 빚내지 않는다. 그리고 네가 번 돈의 사용 이유를 적는다. 마지막 가족 규칙은 네가 골라 보렴.',
+    26 => '학원비를 갚을 만큼 회사 통장에 돈이 모이면, 거실에서 나를 선택해 “학원비 갚기”를 누르면 된다.',
+    27 => '세뱃돈 만 원은 작아 보여도 원칙을 시험하기에는 충분하다. 배운 대로 회사 하나부터 천천히 살펴보자꾸나.',
     _ =>
-      '큰 사무실은 없지만 작은방 책상과 외할아버지가 준 세뱃돈 만 원, 첫 투자노트가 있다. 이제 우리 투자연구소 이름을 붙여 보자.',
+      '드라마에서 시작된 호기심, 세뱃돈 만 원, 갚아야 할 학원비 100만 원, 그리고 첫 투자노트가 생겼다. 이제 우리 투자연구소 이름을 붙여 보자.',
   };
 
   String get _introResponse => switch (_introChoice) {
-    'computer' => '“제가 먼저 확인해 봐도 돼요?” 아빠가 웃으며 고개를 끄덕였다. “좋아. 확인하고 우리한테도 알려 줘.”',
-    'y2k' => '“정말 컴퓨터가 다 멈출 수도 있어요?” 엄마가 말했다. “그래서 겁먹기보다 하나씩 확인하는 거야.”',
-    'stocks' =>
-      '“컴퓨터로 주식도 살 수 있어요?” 누나가 눈을 동그랗게 떴고 아빠는 “그 전에 주식이 뭔지부터 알아야지”라며 웃었다.',
+    'computer' => '컴퓨터는 빠르지만 답을 대신 정해 주지는 않는단다. 회사 소식을 찾고 서로 맞는지 확인하는 법부터 배우렴.',
+    'y2k' => '돈을 지키는 질문부터 배우겠다는 건 좋은 시작이다. 모르는 위험은 작게 시작해서 확인하면 돼.',
+    'stocks' => '좋은 회사를 고르는 눈은 하루아침에 생기지 않는다. 제품을 보고 숫자를 읽고, 틀릴 가능성도 함께 적어 보렴.',
     _ => '',
   };
 
@@ -156,7 +180,7 @@ class _VisualNovelOnboardingScreenState
   Widget build(BuildContext context) {
     final viewInsets = MediaQuery.viewInsetsOf(context);
     final isKeyboardOpen = viewInsets.bottom > 0;
-    final isNameEntry = _beat == 17 || _beat == 23;
+    final isNameEntry = _beat == 20 || _beat == 28;
     final keyboardLift = isKeyboardOpen && isNameEntry
         ? viewInsets.bottom
         : 0.0;
@@ -194,7 +218,7 @@ class _VisualNovelOnboardingScreenState
               child: _SceneLabel(
                 date: _dateLabel,
                 location: _location,
-                progress: (_beat + 1) / 24,
+                progress: (_beat + 1) / 29,
               ),
             ),
           ),
@@ -217,7 +241,13 @@ class _VisualNovelOnboardingScreenState
                 ),
               ),
             ),
-          if (_character != null)
+          if (_isAcademyTeacherBeat)
+            Positioned(
+              right: 2,
+              bottom: 118,
+              child: _AcademyTeacherPose(poseAlignment: _teacherPoseAlignment),
+            )
+          else if (_character != null)
             Positioned.fill(
               bottom: 122,
               child: AnimatedOpacity(
@@ -277,11 +307,12 @@ class _VisualNovelOnboardingScreenState
   }
 
   Widget _buildDialogue(BuildContext context) {
-    if (_beat == 9) return _introChoices();
-    if (_beat == 17) return _nameEntry();
-    if (_beat == 19) return _traitChoices();
-    if (_beat == 22) return _familyChoices();
-    if (_beat == 23) return _researchDeskName();
+    if (_beat == 10) return _introChoices();
+    if (_beat == 18) return _academyTutorial();
+    if (_beat == 20) return _nameEntry();
+    if (_beat == 22) return _traitChoices();
+    if (_beat == 25) return _familyChoices();
+    if (_beat == 28) return _researchDeskName();
 
     return _NovelDialogue(
       key: ValueKey(_beat),
@@ -299,29 +330,63 @@ class _VisualNovelOnboardingScreenState
     choices: [
       _NovelChoice(
         key: const Key('story-intro-computer'),
-        label: '“제가 먼저 켜 봐도 돼요?”',
+        label: '컴퓨터로 회사 소식을 찾는 법',
         onTap: () => setState(() {
           _introChoice = 'computer';
-          _beat = 10;
+          _beat = 11;
         }),
       ),
       _NovelChoice(
         key: const Key('story-intro-y2k'),
-        label: '“정말 다 멈출 수도 있어요?”',
+        label: '돈을 잃지 않게 위험을 확인하는 법',
         onTap: () => setState(() {
           _introChoice = 'y2k';
-          _beat = 10;
+          _beat = 11;
         }),
       ),
       _NovelChoice(
         key: const Key('story-intro-stocks'),
-        label: '“이걸로 주식도 살 수 있어요?”',
+        label: '좋은 회사를 골라 주주가 되는 법',
         onTap: () => setState(() {
           _introChoice = 'stocks';
-          _beat = 10;
+          _beat = 11;
         }),
       ),
     ],
+  );
+
+  Widget _academyTutorial() => _NovelDialogue(
+    key: const ValueKey('academy-tutorial'),
+    speaker: _speaker,
+    line: _line,
+    child: Column(
+      children: [
+        const _AcademyLessonRow(
+          number: '1',
+          title: '회사 조각',
+          body: '제품 · 실적 · 위험을 먼저 본다',
+        ),
+        const SizedBox(height: 6),
+        const _AcademyLessonRow(
+          number: '2',
+          title: '매수와 매도',
+          body: '사는 주문과 파는 주문을 구분한다',
+        ),
+        const SizedBox(height: 6),
+        const _AcademyLessonRow(
+          number: '3',
+          title: '시장가와 지정가',
+          body: '빠른 체결과 원하는 가격의 차이, 수수료까지 확인한다',
+        ),
+        const SizedBox(height: 10),
+        _NovelNextButton(
+          key: const Key('academy-tutorial-continue'),
+          label: '주문표 연습 완료',
+          enabled: true,
+          onTap: _next,
+        ),
+      ],
+    ),
   );
 
   Widget _nameEntry() => _NovelDialogue(
@@ -383,7 +448,7 @@ class _VisualNovelOnboardingScreenState
 
   void _chooseTrait(StoryTrait trait) => setState(() {
     _trait = trait;
-    _beat = 20;
+    _beat = 23;
   });
 
   Widget _familyChoices() => _NovelDialogue(
@@ -411,7 +476,7 @@ class _VisualNovelOnboardingScreenState
 
   void _chooseFamilyRule(FamilyRule rule) => setState(() {
     _familyRule = rule;
-    _beat = 23;
+    _beat = 26;
   });
 
   Widget _researchDeskName() => _NovelDialogue(
@@ -432,7 +497,7 @@ class _VisualNovelOnboardingScreenState
         ),
         _NovelNextButton(
           key: const Key('create-company-button'),
-          label: '세뱃돈 1만원으로 첫날 시작하기',
+          label: '학원 수료하고 첫 장부 시작하기',
           enabled: _companyController.text.trim().isNotEmpty,
           onTap: _finish,
         ),
@@ -478,6 +543,104 @@ class _LivingBackground extends StatelessWidget {
   );
 }
 
+class _AcademyTeacherPose extends StatelessWidget {
+  const _AcademyTeacherPose({required this.poseAlignment});
+
+  final Alignment poseAlignment;
+
+  @override
+  Widget build(BuildContext context) {
+    final dimension = (MediaQuery.sizeOf(context).width * 0.72)
+        .clamp(250.0, 340.0)
+        .toDouble();
+    return SizedBox(
+      key: const Key('academy-teacher-character'),
+      width: dimension,
+      height: dimension,
+      child: ClipRect(
+        child: OverflowBox(
+          alignment: poseAlignment,
+          minWidth: dimension * 3,
+          maxWidth: dimension * 3,
+          minHeight: dimension * 2,
+          maxHeight: dimension * 2,
+          child: Image.asset(
+            'assets/images/주식선생님/05_6자세_슬랜더_투명_최종.png',
+            width: dimension * 3,
+            height: dimension * 2,
+            fit: BoxFit.fill,
+            filterQuality: FilterQuality.high,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AcademyLessonRow extends StatelessWidget {
+  const _AcademyLessonRow({
+    required this.number,
+    required this.title,
+    required this.body,
+  });
+
+  final String number;
+  final String title;
+  final String body;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+    decoration: BoxDecoration(
+      color: const Color(0xFFFFF4D8),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: const Color(0xFFE5C98E)),
+    ),
+    child: Row(
+      children: [
+        CircleAvatar(
+          radius: 13,
+          backgroundColor: const Color(0xFF536A96),
+          child: Text(
+            number,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 10,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ),
+        const SizedBox(width: 9),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  color: _ink,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              Text(
+                body,
+                style: const TextStyle(
+                  color: Color(0xFF687183),
+                  fontSize: 9,
+                  height: 1.3,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 class _SceneLabel extends StatelessWidget {
   const _SceneLabel({
     required this.date,
@@ -496,23 +659,30 @@ class _SceneLabel extends StatelessWidget {
       children: [
         Row(
           children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
-              decoration: BoxDecoration(
-                color: const Color(0xD9292B3A),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0x66FFFFFF)),
-              ),
-              child: Text(
-                '⌂  $location',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
+            Flexible(
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 11,
+                  vertical: 7,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xD9292B3A),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: const Color(0x66FFFFFF)),
+                ),
+                child: Text(
+                  '⌂  $location',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ),
             ),
-            const Spacer(),
+            const SizedBox(width: 8),
             Text(
               date,
               style: const TextStyle(

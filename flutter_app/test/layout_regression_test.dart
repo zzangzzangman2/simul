@@ -426,7 +426,7 @@ void main() {
       expect(tester.takeException(), isNull);
     }
 
-    for (var index = 0; index < 9; index++) {
+    for (var index = 0; index < 10; index++) {
       await tester.tap(find.byKey(const Key('story-continue')));
       await tester.pumpAndSettle();
       expectPortraitInside();
@@ -440,6 +440,13 @@ void main() {
       await tester.pumpAndSettle();
       expectPortraitInside();
     }
+    expect(find.byKey(const Key('academy-teacher-character')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('academy-tutorial-continue')));
+    await tester.pumpAndSettle();
+    expectPortraitInside();
+    await tester.tap(find.byKey(const Key('story-continue')));
+    await tester.pumpAndSettle();
+    expectPortraitInside();
     await tester.enterText(find.byKey(const Key('player-name-input')), '민준');
     await tester.pump();
     await tester.ensureVisible(find.byKey(const Key('story-next-name')));
@@ -461,6 +468,10 @@ void main() {
 
     await tester.tap(find.byKey(const Key('family-rule-report-losses')));
     await tester.pumpAndSettle();
+    for (var index = 0; index < 2; index++) {
+      await tester.tap(find.byKey(const Key('story-continue')));
+      await tester.pumpAndSettle();
+    }
     await tester.enterText(
       find.byKey(const Key('company-name-input')),
       '별빛 투자',
@@ -482,7 +493,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    for (var index = 0; index < 9; index++) {
+    for (var index = 0; index < 10; index++) {
       await tester.tap(find.byKey(const Key('story-continue')));
       await tester.pumpAndSettle();
     }
@@ -492,6 +503,10 @@ void main() {
       await tester.tap(find.byKey(const Key('story-continue')));
       await tester.pumpAndSettle();
     }
+    await tester.tap(find.byKey(const Key('academy-tutorial-continue')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('story-continue')));
+    await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('player-name-input')));
     tester.view.viewInsets = FakeViewPadding(
@@ -543,6 +558,10 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('family-rule-report-losses')));
     await tester.pumpAndSettle();
+    for (var index = 0; index < 2; index++) {
+      await tester.tap(find.byKey(const Key('story-continue')));
+      await tester.pumpAndSettle();
+    }
 
     await tester.tap(find.byKey(const Key('company-name-input')));
     tester.view.viewInsets = FakeViewPadding(

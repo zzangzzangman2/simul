@@ -37,6 +37,8 @@ void main() {
     expect(state.story.guardianAccountHolder, 'mother');
     expect(state.story.storyFlags['guardianConsent'], isTrue);
     expect(state.story.storyFlags['isLegalCompany'], isFalse);
+    expect(state.story.academyTuitionDebt, academyTuitionDebtAmount);
+    expect(state.story.academyTuitionRepaid, isFalse);
     expect(
       state.story.storyFlags['seedMoneySource'],
       'grandfather_new_year_gift',
@@ -47,6 +49,59 @@ void main() {
     expect(state.ledger.single.counterAccount, 'family_gift');
     expect(state.ledger.single.description, contains('외할아버지 세뱃돈'));
     expect(state.pendingDecisions.first.id, 'first-research-note');
+  });
+
+  test('academy tuition is repaid from bank cash once and recorded', () {
+    final story = StoryState.newPlayer(
+      playerName: '민준',
+      introChoice: 'computer',
+      startingTrait: StoryTrait.analysis,
+      familyRule: FamilyRule.reportLosses,
+    );
+    final initial = engine
+        .createNewGame('별빛', story: story)
+        .copyWith(cash: academyTuitionDebtAmount + 10000);
+    final fatherBefore = initial.story.fatherAffinity;
+    final trustBefore = initial.story.familyTrust;
+
+    final result = engine.repayAcademyTuitionDebt(initial);
+
+    expect(result.success, isTrue);
+    expect(result.cashDelta, -academyTuitionDebtAmount);
+    expect(result.state.cash, 10000);
+    expect(result.state.brokerageCash, 10000);
+    expect(result.state.story.academyTuitionDebt, 0);
+    expect(result.state.story.academyTuitionRepaid, isTrue);
+    expect(result.state.story.fatherAffinity, fatherBefore + 3);
+    expect(result.state.story.familyTrust, trustBefore + 2);
+    expect(result.state.ledger.last.account, 'company_bank');
+    expect(result.state.ledger.last.counterAccount, 'family_debt_repayment');
+    expect(result.state.ledger.last.amount, -academyTuitionDebtAmount);
+
+    final repeated = engine.repayAcademyTuitionDebt(result.state);
+    expect(repeated.success, isFalse);
+    expect(repeated.state.toJson(), result.state.toJson());
+  });
+
+  test('academy tuition never withdraws from brokerage cash', () {
+    final story = StoryState.newPlayer(
+      playerName: '민준',
+      introChoice: 'stocks',
+      startingTrait: StoryTrait.stability,
+      familyRule: FamilyRule.keepCash,
+    );
+    final initial = engine
+        .createNewGame('별빛', story: story)
+        .copyWith(
+          cash: academyTuitionDebtAmount,
+          brokerageCash: academyTuitionDebtAmount,
+        );
+
+    final result = engine.repayAcademyTuitionDebt(initial);
+
+    expect(result.success, isFalse);
+    expect(result.message, contains('회사 통장'));
+    expect(result.state.toJson(), initial.toJson());
   });
 
   test('first research choice changes trust and is applied only once', () {

@@ -5,12 +5,14 @@ class OrganizationScreen extends StatefulWidget {
     super.key,
     required this.state,
     required this.onRequestFamilyHelp,
+    this.onRepayAcademyTuitionDebt,
     this.onHireEmployee,
     this.onLaunchFund,
   });
 
   final GameState state;
   final Future<GameState> Function(String helperId) onRequestFamilyHelp;
+  final Future<FinanceActionResult> Function()? onRepayAcademyTuitionDebt;
   final Future<GameState> Function(String candidateId)? onHireEmployee;
   final Future<GameState> Function()? onLaunchFund;
 
@@ -23,6 +25,7 @@ class _OrganizationScreenState extends State<OrganizationScreen> {
   String? _busyHelperId;
   String? _busyCandidateId;
   bool _fundBusy = false;
+  bool _repayingTuition = false;
   String _selectedHelperId = 'mother';
 
   bool get _hiringUnlocked => _state.currentDate.year >= 2003;
@@ -110,6 +113,26 @@ class _OrganizationScreenState extends State<OrganizationScreen> {
     }
   }
 
+  Future<void> _repayAcademyTuition() async {
+    if (_repayingTuition || widget.onRepayAcademyTuitionDebt == null) return;
+    setState(() => _repayingTuition = true);
+    try {
+      final result = await widget.onRepayAcademyTuitionDebt!.call();
+      if (!mounted) return;
+      setState(() {
+        _state = result.state;
+        _repayingTuition = false;
+      });
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(result.message)));
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _repayingTuition = false);
+      _showSaveFailure(context);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final organization = _state.organization;
@@ -156,13 +179,16 @@ class _OrganizationScreenState extends State<OrganizationScreen> {
                       ),
                       const SizedBox(height: 13),
                       _FamilyAssignmentBoard(
+                        state: _state,
                         helpers: organization.familyHelpers,
                         selectedId: _selectedHelperId,
                         day: _state.day,
                         busyHelperId: _busyHelperId,
+                        repayingTuition: _repayingTuition,
                         onSelected: (helperId) =>
                             setState(() => _selectedHelperId = helperId),
                         onRequest: _requestHelp,
+                        onRepayTuition: _repayAcademyTuition,
                       ),
                       const SizedBox(height: 16),
                       _HiringSection(
@@ -403,20 +429,26 @@ class _OrganizationMetric extends StatelessWidget {
 
 class _FamilyAssignmentBoard extends StatelessWidget {
   const _FamilyAssignmentBoard({
+    required this.state,
     required this.helpers,
     required this.selectedId,
     required this.day,
     required this.busyHelperId,
+    required this.repayingTuition,
     required this.onSelected,
     required this.onRequest,
+    required this.onRepayTuition,
   });
 
+  final GameState state;
   final List<FamilyHelperStatus> helpers;
   final String selectedId;
   final int day;
   final String? busyHelperId;
+  final bool repayingTuition;
   final ValueChanged<String> onSelected;
   final ValueChanged<FamilyHelperStatus> onRequest;
+  final VoidCallback onRepayTuition;
 
   @override
   Widget build(BuildContext context) {
@@ -618,6 +650,16 @@ class _FamilyAssignmentBoard extends StatelessWidget {
               ),
             ),
           ),
+          if (selected.id == 'father' &&
+              state.story.academyTuitionOriginal > 0) ...[
+            const SizedBox(height: 12),
+            _AcademyTuitionDebtCard(
+              debt: state.story.academyTuitionDebt,
+              bankCash: state.bankCash,
+              repaying: repayingTuition,
+              onRepay: onRepayTuition,
+            ),
+          ],
           const SizedBox(height: 14),
           const Text(
             '아래 카드에서 조언자를 선택하세요',
@@ -690,6 +732,135 @@ class _FamilyAssignmentBoard extends StatelessWidget {
                   ),
                 );
               },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AcademyTuitionDebtCard extends StatelessWidget {
+  const _AcademyTuitionDebtCard({
+    required this.debt,
+    required this.bankCash,
+    required this.repaying,
+    required this.onRepay,
+  });
+
+  final int debt;
+  final int bankCash;
+  final bool repaying;
+  final VoidCallback onRepay;
+
+  @override
+  Widget build(BuildContext context) {
+    final repaid = debt <= 0;
+    final canRepay = !repaid && !repaying && bankCash >= debt;
+    final shortfall = debt > bankCash ? debt - bankCash : 0;
+
+    return Container(
+      key: const Key('academy-tuition-debt-card'),
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: repaid ? const Color(0xFFEAF6EF) : const Color(0xFFFFF5E3),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(
+          color: repaid ? const Color(0xFFB9DBC6) : const Color(0xFFE9C98B),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                repaid ? Icons.task_alt_rounded : Icons.school_outlined,
+                size: 19,
+                color: repaid
+                    ? const Color(0xFF3D8A5F)
+                    : const Color(0xFF9A6820),
+              ),
+              const SizedBox(width: 7),
+              const Expanded(
+                child: Text(
+                  '아빠가 먼저 낸 주식학원비',
+                  style: TextStyle(
+                    color: _ink,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              Text(
+                repaid ? '상환 완료' : '${_money(debt)}원',
+                style: TextStyle(
+                  color: repaid
+                      ? const Color(0xFF3D8A5F)
+                      : const Color(0xFFB05F39),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 7),
+          Text(
+            repaid
+                ? '약속을 지켰습니다. 교육비 채무가 가족 장부에서 정리됐어요.'
+                : shortfall > 0
+                ? '회사 통장에 ${_money(shortfall)} 더 필요해요. 증권 예수금은 자동 출금하지 않습니다.'
+                : '투자금이 아닌 교육비 채무입니다. 회사 통장에서 전액 상환합니다.',
+            style: const TextStyle(
+              color: Color(0xFF6E675D),
+              fontSize: 9,
+              height: 1.45,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 9),
+          SizedBox(
+            width: double.infinity,
+            height: 38,
+            child: FilledButton.icon(
+              key: const Key('repay-academy-tuition-button'),
+              onPressed: canRepay ? onRepay : null,
+              icon: repaying
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Icon(
+                      repaid
+                          ? Icons.check_rounded
+                          : Icons.account_balance_wallet_outlined,
+                      size: 17,
+                    ),
+              label: Text(
+                repaying
+                    ? '상환 기록 중…'
+                    : repaid
+                    ? '학원비 전액 상환 완료'
+                    : '학원비 ${_money(debt)} 갚기',
+              ),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF9A6820),
+                disabledBackgroundColor: repaid
+                    ? const Color(0xFFB9DBC6)
+                    : const Color(0xFFD8D4CC),
+                disabledForegroundColor: repaid
+                    ? const Color(0xFF356D4D)
+                    : const Color(0xFF77736C),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                textStyle: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
             ),
           ),
         ],

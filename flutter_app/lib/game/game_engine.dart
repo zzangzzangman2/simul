@@ -11,6 +11,8 @@ import 'story_state.dart';
 
 const initialCompanyCash = 10000;
 const grandfatherNewYearGiftSourceId = 'grandfather-new-year-gift';
+const academyTuitionDebtAmount = 1000000;
+const academyTuitionRepaymentSourceId = 'academy-tuition-repayment';
 const gameTradingFeeRate = 0.0025;
 const dailyMarketReportPrice = 1200;
 
@@ -667,6 +669,53 @@ class GameEngine {
       state: next,
       success: true,
       message: '$amount원을 증권계좌에 ${deposit ? '입금' : '출금'}했습니다.',
+    );
+  }
+
+  FinanceActionResult repayAcademyTuitionDebt(GameState state) {
+    FinanceActionResult reject(String message) =>
+        FinanceActionResult(state: state, success: false, message: message);
+    final debt = state.story.academyTuitionDebt;
+    if (debt <= 0) return reject('아빠에게 빌린 학원비는 이미 모두 갚았습니다.');
+    if (state.processedEventIds.contains(academyTuitionRepaymentSourceId)) {
+      return reject('학원비 상환 기록이 이미 처리되었습니다.');
+    }
+    if (state.bankCash < debt) {
+      return reject('회사 통장 잔액이 ${debt - state.bankCash}원 부족합니다.');
+    }
+
+    final flags = Map<String, dynamic>.from(state.story.storyFlags)
+      ..['academyTuitionDebt'] = 0
+      ..['academyTuitionRepaidDay'] = state.day;
+    final next = state.copyWith(
+      cash: state.cash - debt,
+      story: state.story.copyWith(
+        fatherAffinity: state.story.fatherAffinity + 3,
+        familyTrust: state.story.familyTrust + 2,
+        storyFlags: flags,
+      ),
+      ledger: [
+        ...state.ledger,
+        LedgerEntry(
+          id: academyTuitionRepaymentSourceId,
+          day: state.day,
+          amount: -debt,
+          account: 'company_bank',
+          counterAccount: 'family_debt_repayment',
+          description: '아빠 선납 주식학원비 상환',
+          sourceId: academyTuitionRepaymentSourceId,
+        ),
+      ],
+      processedEventIds: [
+        ...state.processedEventIds,
+        academyTuitionRepaymentSourceId,
+      ],
+    );
+    return FinanceActionResult(
+      state: next,
+      success: true,
+      message: '아빠에게 학원비 1,000,000원을 모두 갚았습니다.',
+      cashDelta: -debt,
     );
   }
 
