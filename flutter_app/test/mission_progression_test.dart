@@ -38,7 +38,7 @@ void main() {
       expect(resolved.progression.experience, 25);
       expect(claim.success, isTrue);
       expect(claim.cashReward, 500);
-      expect(claim.state.cash, 500);
+      expect(claim.state.cash, initialCompanyCash + 500);
       expect(claim.state.progression.experience, 105);
       expect(claim.state.progression.activeMission?.id, 'first_work');
       expect(claim.state.progression.claimedMissionIds, contains('first_note'));
@@ -145,7 +145,7 @@ void main() {
     final migrated = engine.migrate(legacy);
 
     expect(migrated.version, GameState.schemaVersion);
-    expect(migrated.cash, 0);
+    expect(migrated.cash, initialCompanyCash);
     expect(migrated.progression.experience, 0);
     expect(migrated.progression.activeMission?.id, 'first_note');
   });

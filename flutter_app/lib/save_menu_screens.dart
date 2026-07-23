@@ -116,7 +116,7 @@ class _GameTitleScreen extends StatelessWidget {
                           border: Border.all(color: const Color(0xFFFFC84F)),
                         ),
                         child: const Text(
-                          '0원에서 시작!',
+                          '세뱃돈 1만원 시작!',
                           style: TextStyle(
                             color: _ink,
                             fontSize: 11,

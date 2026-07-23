@@ -35,13 +35,13 @@ void main() {
       final migrated = await persistence.load();
 
       expect(migrated, isNotNull);
-      expect(migrated!.cash, initialCompanyCash);
+      expect(migrated!.cash, 0);
       expect(migrated.version, GameState.schemaVersion);
       final stored =
           jsonDecode(preferences.getString(GamePersistence.saveKey)!)
               as Map<String, dynamic>;
       expect(stored['version'], GameState.schemaVersion);
-      expect(stored['cash'], initialCompanyCash);
+      expect(stored['cash'], 0);
 
       await persistence.save(migrated.copyWith(cash: 0));
       final loadedAgain = await persistence.load();
@@ -68,7 +68,7 @@ void main() {
       final migrated = await persistence.load();
 
       expect(migrated, isNotNull);
-      expect(migrated!.cash, initialCompanyCash);
+      expect(migrated!.cash, 0);
       expect(migrated.day, 4);
       expect(migrated.marketMinute, 9 * 60);
       expect(migrated.decisions, isEmpty);
@@ -243,7 +243,7 @@ void main() {
             as Map<String, dynamic>;
     expect(saveAttempts, 2);
     expect(stored['version'], GameState.schemaVersion);
-    expect(stored['cash'], initialCompanyCash);
+    expect(stored['cash'], 0);
     expect(tester.takeException(), isNull);
   });
 

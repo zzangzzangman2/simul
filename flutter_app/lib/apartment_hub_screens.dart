@@ -209,7 +209,7 @@ class _HubTutorialOverlay extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               const Text(
-                '• 침실 CRT: 주식시장과 1분봉\n• 침실 서류함: 장부·성과\n• 거실 편지: 필수 결정\n• 거실 소파: 가족·채용·펀드\n• 부엌 전화: 직접 번 종잣돈',
+                '• 침실 CRT: 주식시장과 1분봉\n• 침실 서류함: 장부·성과\n• 거실 편지: 필수 결정\n• 거실 소파: 가족·채용·펀드\n• 부엌 전화: 일거리 수입',
                 style: TextStyle(
                   fontSize: 13,
                   height: 1.65,

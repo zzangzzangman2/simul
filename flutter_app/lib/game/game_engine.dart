@@ -9,7 +9,8 @@ import 'personal_finance_state.dart';
 import 'seed_money_content.dart';
 import 'story_state.dart';
 
-const initialCompanyCash = 0;
+const initialCompanyCash = 10000;
+const grandfatherNewYearGiftSourceId = 'grandfather-new-year-gift';
 const gameTradingFeeRate = 0.0025;
 const dailyMarketReportPrice = 1200;
 
@@ -249,7 +250,20 @@ class GameEngine {
         worldSeed ??
         'world-${DateTime.now().microsecondsSinceEpoch}-${_newGameSerial++}-${_worldSeedRandom.nextInt(0x7fffffff)}-${_stableHash(companyName.trim())}';
     final baseStory = story ?? StoryState.migratedDefault(companyName);
-    final storyState = initialCash > 0 && baseStory.accountAuthorityLevel == 0
+    final isGrandfatherGiftStart =
+        initialCompanyCash > 0 && initialCash == initialCompanyCash;
+    final storyState = isGrandfatherGiftStart
+        ? baseStory.copyWith(
+            accountAuthorityLevel: math.max(1, baseStory.accountAuthorityLevel),
+            storyFlags: {
+              ...baseStory.storyFlags,
+              'startingSeedMoney': initialCompanyCash,
+              'seedMoneySource': 'grandfather_new_year_gift',
+              'firstSeedGoalReached': true,
+            },
+          )
+        : initialCash > initialCompanyCash &&
+              baseStory.accountAuthorityLevel == 0
         ? baseStory.copyWith(accountAuthorityLevel: 5)
         : baseStory;
     final company = const CompanyState(
@@ -285,8 +299,22 @@ class GameEngine {
       project: null,
       decisions: [_firstResearchNote(1)],
       scheduledEvents: const [],
-      ledger: const [],
-      processedEventIds: const [],
+      ledger: isGrandfatherGiftStart
+          ? const [
+              LedgerEntry(
+                id: grandfatherNewYearGiftSourceId,
+                day: 1,
+                amount: initialCompanyCash,
+                account: 'brokerage_cash',
+                counterAccount: 'family_gift',
+                description: '외할아버지 세뱃돈 · 첫 투자금',
+                sourceId: grandfatherNewYearGiftSourceId,
+              ),
+            ]
+          : const [],
+      processedEventIds: isGrandfatherGiftStart
+          ? const [grandfatherNewYearGiftSourceId]
+          : const [],
     );
     return prepareHiddenMarketScenario(state);
   }
@@ -300,7 +328,9 @@ class GameEngine {
       return _recoverLegacyMarketState(state);
     }
     final companyName = (json['companyName'] as String? ?? '').trim();
-    final fresh = createNewGame(companyName);
+    // Legacy saves keep their recorded balance and must not receive the new
+    // grandfather gift retroactively.
+    final fresh = createNewGame(companyName, initialCash: 0);
     final currentDate = DateTime.tryParse(
       (json['currentDate'] as String? ?? '').trim(),
     );
@@ -511,7 +541,7 @@ class GameEngine {
     int maxWithCounter(int value) => value > counter ? value : counter;
     return switch (metric) {
       'work_sessions' => maxWithCounter(state.story.flagInt('workSessions', 0)),
-      'earned_seed' => state.story.earnedSeedMoney,
+      'earned_seed' => state.story.seedMoneyTotal,
       'decisions_resolved' => maxWithCounter(
         state.decisions
             .where((decision) => decision.status == DecisionStatus.resolved)
@@ -1021,7 +1051,7 @@ class GameEngine {
       final authority = state.story.accountAuthorityLevel;
       final limit = gameOrderAuthorityLimit(state);
       if (authority == 0) {
-        return reject('직접 번 종잣돈 10,000원을 먼저 마련해 보호자 승인을 받아야 합니다.');
+        return reject('종잣돈 10,000원을 먼저 마련해 보호자 승인을 받아야 합니다.');
       }
       if (rawNotional > limit) {
         return reject('현재 계좌 권한의 1회 주문 한도는 $limit원입니다.');
@@ -1386,13 +1416,14 @@ class GameEngine {
     if (state.processedEventIds.contains(sourceId)) return state;
 
     final earned = (flags['earnedSeedMoney'] as num?)?.toInt() ?? 0;
+    final seedMoneyBefore = state.story.startingSeedMoney + earned;
     flags['earnedSeedMoney'] = earned + reward;
     flags['workSessions'] = sessionNumber + 1;
     flags['workDay'] = state.day;
     flags['workSessionsToday'] = sessionsToday + 1;
     flags['lastWorkActivity'] = result.activityId;
     flags['lastWorkScore'] = normalized;
-    final reachedSeedGoal = earned + reward >= 10000;
+    final reachedSeedGoal = seedMoneyBefore + reward >= 10000;
     final firstCompletion =
         reachedSeedGoal && !state.story.flagBool('firstSeedGoalReached');
     if (reachedSeedGoal) {
