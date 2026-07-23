@@ -137,6 +137,10 @@ void main() {
 
     await advanceDialogue(tester, 9);
     expect(find.byKey(const Key('story-intro-computer')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('story-intro-computer')));
+    await tester.pumpAndSettle();
+    await advanceDialogue(tester, 4);
+    expect(find.textContaining('세뱃돈 만 원도 함께 주마'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -170,7 +174,7 @@ void main() {
     expect(companyHeader.maxLines, 1);
     expect(companyHeader.softWrap, isFalse);
     expect(find.text('가족 아파트 · 작은방'), findsOneWidget);
-    expect(find.text('0원'), findsOneWidget);
+    expect(find.text('10,000원'), findsOneWidget);
     expect(find.byKey(const Key('apartment-place-bedroom')), findsOneWidget);
     expect(find.byKey(const Key('room-company-sign')), findsOneWidget);
     expect(find.byTooltip('1시간 보내기 · 게임 시간 60분 진행'), findsOneWidget);
@@ -1130,7 +1134,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('first buy is visibly locked until seed-money authority opens', (
+  testWidgets('grandfather gift opens the first guardian order authority', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
@@ -1154,12 +1158,12 @@ void main() {
     await tester.tap(find.byKey(const Key('buy-stock-button')));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('order-authority-warning')), findsOneWidget);
-    expect(find.textContaining('10,000원 달성 후'), findsOneWidget);
+    expect(find.byKey(const Key('order-authority-warning')), findsNothing);
+    expect(find.text('부모님 승인으로 주문 실행'), findsOneWidget);
     final button = tester.widget<FilledButton>(
       find.byKey(const Key('request-parent-order-approval')),
     );
-    expect(button.onPressed, isNull);
+    expect(button.onPressed, isNotNull);
     expect(tester.takeException(), isNull);
   });
 

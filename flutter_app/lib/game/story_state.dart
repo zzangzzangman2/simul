@@ -53,7 +53,9 @@ class StoryState {
       (storyFlags[key] as num?)?.toInt() ?? fallback;
   bool flagBool(String key, [bool fallback = false]) =>
       storyFlags[key] as bool? ?? fallback;
+  int get startingSeedMoney => flagInt('startingSeedMoney');
   int get earnedSeedMoney => flagInt('earnedSeedMoney');
+  int get seedMoneyTotal => startingSeedMoney + earnedSeedMoney;
   int get reputation => flagInt('reputation');
   int get externalAum => flagInt('externalAum');
   int get officeTier => flagInt('officeTier');
@@ -118,6 +120,8 @@ class StoryState {
         'campaignStartDate': '2000-01-02',
         'guardianConsent': true,
         'isLegalCompany': false,
+        'startingSeedMoney': 0,
+        'seedMoneySource': '',
         'earnedSeedMoney': 0,
         'workSessions': 0,
         'workSessionsToday': 0,
@@ -147,6 +151,8 @@ class StoryState {
         'prologueComplete': true,
         'guardianConsent': true,
         'isLegalCompany': false,
+        'startingSeedMoney': 0,
+        'seedMoneySource': '',
         'earnedSeedMoney': 0,
         'workSessions': 0,
         'workSessionsToday': 0,

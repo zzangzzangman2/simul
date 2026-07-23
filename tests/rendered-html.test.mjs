@@ -39,7 +39,7 @@ test("opens the Flutter family-story prologue from the default route", async () 
   assert.doesNotMatch(flutterIndex, /초기자본 100만원/);
   assert.match(onboarding, /1999\.12\.31\s+·\s+23:57/);
   assert.match(onboarding, /우리 투자연구소 이름/);
-  assert.match(onboarding, /0원부터 첫날 시작하기/);
+  assert.match(onboarding, /세뱃돈 1만원으로 첫날 시작하기/);
   assert.match(layout, /부자되기 시뮬레이션/);
   assert.match(layout, /images: \[\{ url: `\$\{origin\}\/og-apartment-v2\.png`, width: 1672, height: 941/);
   assert.match(layout, /themeColor: "#DDF8F3"/);
@@ -122,13 +122,13 @@ test("keeps Flutter launch metadata aligned with the current starting conditions
 
   assert.match(flutterTemplate, /부자되기 시뮬레이션/);
   assert.match(flutterTemplate, /2000년 서울/);
-  assert.match(flutterTemplate, /0원에서 시작해/);
+  assert.match(flutterTemplate, /세뱃돈 1만원/);
   assert.match(flutterTemplate, /property="og:image" content="\/og-apartment-v2\.png"/);
   assert.match(flutterTemplate, /name="twitter:image" content="\/og-apartment-v2\.png"/);
   assert.doesNotMatch(flutterTemplate, /초기자본 100만원/);
   assert.equal(parsedManifest.name, "부자되기 시뮬레이션");
   assert.match(parsedManifest.description, /2000년 서울/);
-  assert.match(parsedManifest.description, /0원에서 시작해/);
+  assert.match(parsedManifest.description, /세뱃돈 1만원/);
   assert.doesNotMatch(parsedManifest.description, /초기자본 100만원/);
 });
 

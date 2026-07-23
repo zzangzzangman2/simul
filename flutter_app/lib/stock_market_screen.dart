@@ -2430,7 +2430,7 @@ class _OrderSheetState extends State<_OrderSheet> {
                   !_tradable
                       ? '현재는 주문 가능한 거래 시간이 아닙니다.'
                       : !_authorityReady
-                      ? '직접 번 종잣돈 10,000원을 먼저 마련해야 보호자 주문 승인을 받을 수 있습니다.'
+                      ? '종잣돈 10,000원을 먼저 마련해야 보호자 주문 승인을 받을 수 있습니다.'
                       : widget.isBuy
                       ? '1주를 살 현금이 부족합니다.'
                       : '보유 수량이 없습니다.',

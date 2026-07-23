@@ -28,10 +28,24 @@ void main() {
 
     expect(state.version, GameState.schemaVersion);
     expect(state.story.playerName, '민준');
-    expect(state.cash, initialCompanyCash);
+    expect(state.cash, 10000);
+    expect(state.brokerageCash, 10000);
+    expect(state.story.startingSeedMoney, 10000);
+    expect(state.story.earnedSeedMoney, 0);
+    expect(state.story.seedMoneyTotal, 10000);
+    expect(state.story.accountAuthorityLevel, 1);
     expect(state.story.guardianAccountHolder, 'mother');
     expect(state.story.storyFlags['guardianConsent'], isTrue);
     expect(state.story.storyFlags['isLegalCompany'], isFalse);
+    expect(
+      state.story.storyFlags['seedMoneySource'],
+      'grandfather_new_year_gift',
+    );
+    expect(state.ledger, hasLength(1));
+    expect(state.ledger.single.amount, 10000);
+    expect(state.ledger.single.account, 'brokerage_cash');
+    expect(state.ledger.single.counterAccount, 'family_gift');
+    expect(state.ledger.single.description, contains('외할아버지 세뱃돈'));
     expect(state.pendingDecisions.first.id, 'first-research-note');
   });
 
@@ -759,23 +773,17 @@ void main() {
   });
 
   test('earned seed money unlocks the first guardian order authority', () {
-    final state = engine
-        .createNewGame('종잣돈 권한 테스트')
-        .copyWith(
-          story: engine
-              .createNewGame('종잣돈 권한 테스트')
-              .story
-              .copyWith(
-                storyFlags: {
-                  ...engine.createNewGame('종잣돈 권한 테스트').story.storyFlags,
-                  'earnedSeedMoney': 9500,
-                },
-              ),
-        );
+    final base = engine.createNewGame('종잣돈 권한 테스트', initialCash: 0);
+    final state = base.copyWith(
+      story: base.story.copyWith(
+        storyFlags: {...base.story.storyFlags, 'earnedSeedMoney': 9500},
+      ),
+    );
     final next = engine.completeWorkSession(
       state,
       const WorkSessionResult(activityId: 'dishes', score: 100, maxScore: 100),
     );
+    expect(next.story.startingSeedMoney, 0);
     expect(next.story.earnedSeedMoney, greaterThanOrEqualTo(10000));
     expect(next.story.accountAuthorityLevel, 1);
     expect(next.story.reputation, 3);
@@ -854,7 +862,7 @@ void main() {
     final migrated = engine.migrate(legacy);
 
     expect(migrated.version, GameState.schemaVersion);
-    expect(migrated.cash, 0);
+    expect(migrated.cash, initialCompanyCash);
     expect(migrated.personalFinance.realEstate, isEmpty);
     expect(migrated.personalFinance.totalSpent, 0);
   });
@@ -1004,7 +1012,7 @@ void main() {
       );
       final initial = engine.createNewGame('일요일 시작 연구소', story: story);
 
-      expect(initial.cash, 0);
+      expect(initial.cash, initialCompanyCash);
       expect(initial.currentDate, DateTime(2000, 1, 2));
       expect(initial.currentDate.weekday, DateTime.sunday);
       expect(initial.marketMinute, marketDayStartMinute);

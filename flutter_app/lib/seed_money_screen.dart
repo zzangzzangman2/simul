@@ -20,6 +20,7 @@ class _SeedMoneyHubScreenState extends State<SeedMoneyHubScreen> {
 
   int get _earned =>
       (_state.story.storyFlags['earnedSeedMoney'] as num?)?.toInt() ?? 0;
+  int get _seedMoney => _state.story.seedMoneyTotal;
   int get _today {
     final recordedDay = (_state.story.storyFlags['workDay'] as num?)?.toInt();
     if (recordedDay != _state.day) return 0;
@@ -72,7 +73,7 @@ class _SeedMoneyHubScreenState extends State<SeedMoneyHubScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final progress = (_earned / 10000).clamp(0.0, 1.0);
+    final progress = (_seedMoney / 10000).clamp(0.0, 1.0);
     final age = _state.story.ageOn(_state.currentDate);
     return Scaffold(
       backgroundColor: const Color(0xFFF7F3E9),
@@ -81,7 +82,8 @@ class _SeedMoneyHubScreenState extends State<SeedMoneyHubScreen> {
           children: [
             _WorkTopBar(
               title: '오늘 뭐 하고 벌까?',
-              subtitle: '${_state.currentDate.year}년 · $age살 · 직접 번 돈만 집계',
+              subtitle:
+                  '${_state.currentDate.year}년 · $age살 · 세뱃돈과 일거리 수입을 구분해 기록',
               onBack: () => Navigator.of(context).pop(),
             ),
             _SceneClockStrip(
@@ -97,6 +99,7 @@ class _SeedMoneyHubScreenState extends State<SeedMoneyHubScreen> {
                 children: [
                   _SeedMoneyIllustratedSummary(
                     cash: _state.cash,
+                    seedMoney: _seedMoney,
                     earned: _earned,
                     today: _today,
                     progress: progress,
@@ -156,19 +159,21 @@ class _SeedMoneyHubScreenState extends State<SeedMoneyHubScreen> {
 class _SeedMoneyIllustratedSummary extends StatelessWidget {
   const _SeedMoneyIllustratedSummary({
     required this.cash,
+    required this.seedMoney,
     required this.earned,
     required this.today,
     required this.progress,
   });
 
   final int cash;
+  final int seedMoney;
   final int earned;
   final int today;
   final double progress;
 
   @override
   Widget build(BuildContext context) {
-    final reachedGoal = earned >= 10000;
+    final reachedGoal = seedMoney >= 10000;
     return Container(
       key: const Key('seed-money-summary'),
       height: 202,
@@ -232,7 +237,7 @@ class _SeedMoneyIllustratedSummary extends StatelessWidget {
                     Icon(Icons.savings_rounded, color: _coral, size: 16),
                     SizedBox(width: 6),
                     Text(
-                      '첫 주문 종잣돈 모으기',
+                      '외할아버지 세뱃돈 · 첫 투자금',
                       style: TextStyle(
                         color: _ink,
                         fontSize: 11,
@@ -300,9 +305,9 @@ class _SeedMoneyIllustratedSummary extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
-                                '내 지갑',
-                                style: TextStyle(
+                              Text(
+                                '보유 현금 · 직접 번 ${_money(earned)}원',
+                                style: const TextStyle(
                                   color: Color(0xFF7A8292),
                                   fontSize: 9,
                                   fontWeight: FontWeight.w800,
@@ -349,7 +354,7 @@ class _SeedMoneyIllustratedSummary extends StatelessWidget {
                               Text(
                                 reachedGoal
                                     ? '주문 가능!'
-                                    : '${_money(10000 - earned)}원',
+                                    : '${_money(10000 - seedMoney)}원',
                                 style: TextStyle(
                                   color: reachedGoal
                                       ? const Color(0xFF318367)

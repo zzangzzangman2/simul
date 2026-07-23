@@ -25,8 +25,8 @@ export async function generateMetadata(): Promise<Metadata> {
   const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") ?? "localhost:3000";
   const protocol = requestHeaders.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
   const origin = `${protocol}://${host}`;
-  const title = "부자되기 시뮬레이션 — 0원에서 시작하는 2000년 생활 게임";
-  const description = "2000년 서울, 0원에서 시작해 일하고 저축하고 투자하며 가족과 함께 성장하는 모바일 세로형 부자되기 생활 시뮬레이션";
+  const title = "부자되기 시뮬레이션 — 세뱃돈 1만원으로 시작하는 2000년 생활 게임";
+  const description = "2000년 서울, 외할아버지에게 받은 세뱃돈 1만원으로 투자와 장부를 배우며 가족과 함께 성장하는 모바일 세로형 생활 시뮬레이션";
 
   return {
     title,

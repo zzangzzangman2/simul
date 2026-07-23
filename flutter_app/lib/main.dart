@@ -1051,14 +1051,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       const _Sticker(icon: Icons.mail_rounded, label: '첫 투자 장부'),
       const SizedBox(height: 14),
       Text(
-        '초기자본 0원\n직접 번 종잣돈으로 시작',
+        '초기자본 10,000원\n외할아버지 세뱃돈으로 시작',
         style: Theme.of(context).textTheme.headlineLarge,
       ),
       const SizedBox(height: 10),
       const _OutlinedCard(
         color: Color(0xFFFFFEF8),
         child: Text(
-          '“첫 돈은 네가 직접 벌어 보아라. 어떤 회사를 믿고, 왜 믿었는지도 함께 기록해라.”\n\n계좌는 0원으로 열고 어머니 명의로 관리합니다. 나는 일거리로 종잣돈 1만원을 먼저 마련한 뒤, 기업을 조사하고 투자 제안서를 씁니다.',
+          '“새해 세뱃돈 만 원을 네 첫 투자금으로 주마. 어떤 회사를 믿고, 왜 믿었는지도 함께 기록해라.”\n\n세뱃돈은 어머니 명의의 교육용 증권계좌에 넣고 생활비와 분리합니다. 나는 기업을 조사해 가족에게 투자 이유를 설명하고, 일거리 수입도 따로 장부에 적습니다.',
           style: TextStyle(
             color: _ink,
             fontSize: 12,
@@ -3587,10 +3587,10 @@ class _StartingConditions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const conditions = [
-      ('출발하는 날', '2000.01.01', Color(0xFFFFFEF8)),
-      ('초기자본', '0원', Color(0xFFFFF4B8)),
+      ('출발하는 날', '2000.01.02', Color(0xFFFFFEF8)),
+      ('초기자본', '세뱃돈 1만원', Color(0xFFFFF4B8)),
       ('창립 인원', '1명', Color(0xFFDFF7EF)),
-      ('첫 무대', '한국 · 미국 · 일본', Color(0xFFFFE3DF)),
+      ('첫 무대', '국내 가상시장', Color(0xFFFFE3DF)),
     ];
     return GridView.builder(
       shrinkWrap: true,

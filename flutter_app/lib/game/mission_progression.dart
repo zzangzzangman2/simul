@@ -67,7 +67,7 @@ MissionDefinition _mission(
 final List<MissionDefinition> missionCatalog = <MissionDefinition>[
   _mission(
     'first_note',
-    '1장 · 0원의 장부',
+    '1장 · 세뱃돈 장부',
     '첫 조사 원칙을 정하자',
     '가족 앞에서 어떤 기준으로 회사를 볼지 선언하면 첫 장부가 시작된다.',
     'decisions_resolved',
@@ -79,9 +79,9 @@ final List<MissionDefinition> missionCatalog = <MissionDefinition>[
   ),
   _mission(
     'first_work',
-    '1장 · 0원의 장부',
+    '1장 · 세뱃돈 장부',
     '내 손으로 첫 돈 벌기',
-    '투자금과 생활비를 섞지 않으려면 작은 일거리부터 직접 해내야 한다.',
+    '세뱃돈과 직접 번 돈을 구분해 기록하려면 작은 일거리부터 직접 해내야 한다.',
     'work_sessions',
     1,
     '일거리 1회 완료',
@@ -90,12 +90,12 @@ final List<MissionDefinition> missionCatalog = <MissionDefinition>[
   ),
   _mission(
     'seed_10000',
-    '1장 · 0원의 장부',
-    '종잣돈 1만원 완성',
-    '직접 번 돈이 1만원을 넘으면 보호자에게 첫 주문 승인을 부탁할 수 있다.',
+    '1장 · 세뱃돈 장부',
+    '세뱃돈 1만원 기록',
+    '외할아버지에게 받은 세뱃돈을 생활비와 분리해 첫 투자금으로 기록한다.',
     'earned_seed',
     10000,
-    '누적 종잣돈 10,000원 벌기',
+    '종잣돈 10,000원 확인',
     130,
     cash: 1000,
     reputation: 1,
