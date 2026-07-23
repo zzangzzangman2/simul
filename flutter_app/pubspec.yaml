@@ -24,3 +24,8 @@ flutter:
     - assets/images/
     - assets/images/executives/
     - assets/market/
+    - assets/fonts/LICENSE-Pretendard.txt
+  fonts:
+    - family: Pretendard
+      fonts:
+        - asset: assets/fonts/PretendardVariable.ttf
