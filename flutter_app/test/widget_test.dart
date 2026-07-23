@@ -55,6 +55,43 @@ void main() {
     }
   }
 
+  Future<void> completeGuidedMarketAndReturnHome(WidgetTester tester) async {
+    await waitForMarketHome(tester);
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.tap(find.byKey(const Key('market-tutorial-next')));
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('market-tutorial-target')));
+    await tester.pump(const Duration(milliseconds: 750));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('market-tutorial-target')));
+    await tester.pump(const Duration(milliseconds: 800));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('market-detail-tutorial-target')));
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('market-detail-tutorial-next')));
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('market-detail-tutorial-target')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 700));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('market-order-tutorial-done')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('market-order-tutorial-overlay')),
+      findsNothing,
+    );
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+  }
+
   Future<void> openMarketExplore(WidgetTester tester) async {
     await waitForMarketHome(tester);
     await tester.tap(find.byKey(const Key('market-nav-explore')));
@@ -118,6 +155,12 @@ void main() {
     await tester.ensureVisible(find.byKey(const Key('create-company-button')));
     await tester.tap(find.byKey(const Key('create-company-button')));
     await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('academy-market-tutorial-screen')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('apartment-place-bedroom')), findsNothing);
+    await completeGuidedMarketAndReturnHome(tester);
     await dismissHubTutorial(tester);
   }
 
@@ -485,6 +528,7 @@ void main() {
       addTearDown(() => tester.binding.setSurfaceSize(null));
       const engine = GameEngine();
       final persistence = GamePersistence();
+      final completionGate = Completer<void>();
       final story = StoryState.newPlayer(
         playerName: '민재',
         introChoice: 'stocks',
@@ -503,6 +547,7 @@ void main() {
             onCompleteTutorial: () async {
               current = engine.markMarketTutorialSeen(current);
               await persistence.save(current);
+              await completionGate.future;
               return current;
             },
           ),
@@ -513,6 +558,17 @@ void main() {
 
       expect(find.byKey(const Key('market-tutorial-overlay')), findsOneWidget);
       expect(find.byKey(const Key('market-tutorial-teacher')), findsOneWidget);
+      expect(
+        find.byKey(const Key('market-tutorial-teacher-upper-body')),
+        findsOneWidget,
+      );
+      final tutorialTeacherRect = tester.getRect(
+        find.byKey(const Key('market-tutorial-teacher')),
+      );
+      expect(tutorialTeacherRect.width, 180);
+      expect(tutorialTeacherRect.height, lessThan(190));
+      expect(tutorialTeacherRect.top, greaterThanOrEqualTo(0));
+      expect(tutorialTeacherRect.bottom, lessThanOrEqualTo(800));
       expect(find.byKey(const Key('market-tutorial-next')), findsOneWidget);
 
       await tester.tap(
@@ -576,13 +632,15 @@ void main() {
       );
 
       await tester.tap(find.byKey(const Key('market-order-tutorial-done')));
-      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pump();
       expect(
         find.byKey(const Key('market-order-tutorial-overlay')),
         findsNothing,
       );
       expect(find.byKey(const Key('order-type-selector')), findsOneWidget);
       expect(current.story.marketTutorialSeen, isTrue);
+      completionGate.complete();
+      await tester.pump(const Duration(milliseconds: 300));
       final restored = await persistence.load();
       expect(restored!.story.marketTutorialSeen, isTrue);
       expect(tester.takeException(), isNull);

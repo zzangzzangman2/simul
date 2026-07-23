@@ -1951,6 +1951,8 @@ class _StockDetailScreenState extends State<_StockDetailScreen> {
     bool tutorialEnabled = false,
     Future<void> Function()? onCompleteTutorial,
   }) {
+    var showingTutorial = tutorialEnabled;
+    var completingTutorial = false;
     return showModalBottomSheet<void>(
       context: context,
       showDragHandle: !tutorialEnabled,
@@ -1962,7 +1964,6 @@ class _StockDetailScreenState extends State<_StockDetailScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (sheetContext) {
-        var showingTutorial = tutorialEnabled;
         return StatefulBuilder(
           builder: (context, setSheetState) {
             final orderSheet = _OrderSheet(
@@ -1985,9 +1986,22 @@ class _StockDetailScreenState extends State<_StockDetailScreen> {
                       Positioned.fill(
                         child: _OrderTicketTutorialOverlay(
                           onDone: () async {
-                            await onCompleteTutorial?.call();
-                            if (context.mounted) {
-                              setSheetState(() => showingTutorial = false);
+                            if (completingTutorial) return;
+                            completingTutorial = true;
+                            setSheetState(() => showingTutorial = false);
+                            try {
+                              await onCompleteTutorial?.call();
+                            } catch (_) {
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context)
+                                ..hideCurrentSnackBar()
+                                ..showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      '완료 기록을 저장하지 못했어요. 다음 접속 때 다시 시도할게요.',
+                                    ),
+                                  ),
+                                );
                             }
                           },
                         ),
@@ -3072,95 +3086,122 @@ class _StockTutorialGuideOverlayState
   @override
   Widget build(BuildContext context) {
     final hasTarget = widget.targetKey != null;
-    return KeyedSubtree(
-      key: widget.overlayKey,
-      child: Stack(
-        key: _layoutKey,
-        children: [
-          const Positioned.fill(
-            child: ModalBarrier(dismissible: false, color: Color(0x990C1424)),
-          ),
-          if (_targetRect != null)
-            Positioned.fromRect(
-              rect: _targetRect!,
-              child: GestureDetector(
-                key: widget.targetActionKey,
-                behavior: HitTestBehavior.opaque,
-                onTap: widget.onAction,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.10),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: const Color(0xFFFFD85E),
-                      width: 4,
-                    ),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Color(0xAAFFD85E),
-                        blurRadius: 18,
-                        spreadRadius: 2,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final guideWidth = constraints.maxWidth;
+        final teacherWidth = (guideWidth * 0.5).clamp(180.0, 250.0).toDouble();
+        final speechRight = teacherWidth * 0.78;
+        return KeyedSubtree(
+          key: widget.overlayKey,
+          child: Stack(
+            key: _layoutKey,
+            children: [
+              const Positioned.fill(
+                child: ModalBarrier(
+                  dismissible: false,
+                  color: Color(0x990C1424),
+                ),
+              ),
+              if (_targetRect != null)
+                Positioned.fromRect(
+                  rect: _targetRect!,
+                  child: GestureDetector(
+                    key: widget.targetActionKey,
+                    behavior: HitTestBehavior.opaque,
+                    onTap: widget.onAction,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.10),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: const Color(0xFFFFD85E),
+                          width: 4,
+                        ),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0xAAFFD85E),
+                            blurRadius: 18,
+                            spreadRadius: 2,
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                  child: const Center(
-                    child: Icon(
-                      Icons.touch_app_rounded,
-                      color: Color(0xFFFFE58C),
-                      size: 28,
+                      child: const Center(
+                        child: Icon(
+                          Icons.touch_app_rounded,
+                          color: Color(0xFFFFE58C),
+                          size: 28,
+                        ),
+                      ),
                     ),
                   ),
                 ),
+              Positioned(
+                right: -6,
+                bottom: 54,
+                child: _StockTutorialTeacher(
+                  poseAlignment: widget.poseAlignment,
+                  width: teacherWidth,
+                ),
               ),
-            ),
-          Positioned(
-            right: -9,
-            bottom: 72,
-            child: _StockTutorialTeacher(poseAlignment: widget.poseAlignment),
+              Positioned(
+                left: 12,
+                right: speechRight,
+                bottom: 185,
+                child: _StockTutorialSpeechBubble(
+                  speaker: widget.speaker,
+                  message: widget.message,
+                  actionKey: widget.actionKey,
+                  actionLabel: widget.actionLabel,
+                  showAction: !hasTarget,
+                  waitingForTarget: hasTarget && _targetRect == null,
+                  onAction: widget.onAction,
+                ),
+              ),
+            ],
           ),
-          Positioned(
-            left: 12,
-            right: 88,
-            bottom: 185,
-            child: _StockTutorialSpeechBubble(
-              speaker: widget.speaker,
-              message: widget.message,
-              actionKey: widget.actionKey,
-              actionLabel: widget.actionLabel,
-              showAction: !hasTarget,
-              waitingForTarget: hasTarget && _targetRect == null,
-              onAction: widget.onAction,
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
 
 class _StockTutorialTeacher extends StatelessWidget {
-  const _StockTutorialTeacher({required this.poseAlignment});
+  const _StockTutorialTeacher({
+    required this.poseAlignment,
+    required this.width,
+  });
 
   final Alignment poseAlignment;
+  final double width;
 
   @override
   Widget build(BuildContext context) {
-    const dimension = 158.0;
+    final height = width * 1.03;
+    final cellDimension = width * 1.66;
+    final cropAlignment = Alignment(
+      poseAlignment.x < -0.5
+          ? -0.84
+          : poseAlignment.x > 0.5
+          ? 0.84
+          : 0,
+      poseAlignment.y < 0 ? -1 : 0.52,
+    );
     return SizedBox(
       key: const Key('market-tutorial-teacher'),
-      width: dimension,
-      height: dimension,
+      width: width,
+      height: height,
       child: ClipRect(
         child: OverflowBox(
-          alignment: poseAlignment,
-          minWidth: dimension * 3,
-          maxWidth: dimension * 3,
-          minHeight: dimension * 2,
-          maxHeight: dimension * 2,
+          alignment: cropAlignment,
+          minWidth: cellDimension * 3,
+          maxWidth: cellDimension * 3,
+          minHeight: cellDimension * 2,
+          maxHeight: cellDimension * 2,
           child: Image.asset(
             'assets/images/주식선생님/05_6자세_슬랜더_투명_최종.png',
-            width: dimension * 3,
-            height: dimension * 2,
+            key: const Key('market-tutorial-teacher-upper-body'),
+            width: cellDimension * 3,
+            height: cellDimension * 2,
             fit: BoxFit.fill,
             filterQuality: FilterQuality.high,
           ),

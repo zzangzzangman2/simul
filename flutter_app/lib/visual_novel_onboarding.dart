@@ -34,42 +34,38 @@ class _VisualNovelOnboardingScreenState
   String get _background => switch (_beat) {
     <= 7 => 'assets/images/bg_living_room_1999.png',
     <= 13 => 'assets/images/bg_kitchen_1999.png',
-    <= 23 => 'assets/images/bg_stock_academy_2000_v1.png',
-    <= 27 => 'assets/images/bg_living_room_cartoon_2000.png',
-    _ => 'assets/images/bg_boy_room_1999.png',
+    _ => 'assets/images/bg_stock_academy_2000_v1.png',
   };
 
   String get _location => switch (_beat) {
     <= 7 => '거실 · TV 앞',
     <= 13 => '부엌 식탁',
-    <= 23 => '새천년 투자학원 · 입문반',
-    <= 27 => '거실 · 가족 장부',
-    _ => '작은방 책상',
+    _ => '새천년 투자학원 · 입문반',
   };
 
   String get _dateLabel => switch (_beat) {
     <= 7 => '1999.12.31  ·  21:40',
     <= 13 => '2000.01.02  ·  일요일',
-    <= 23 => '2000년 1월  ·  첫 수업',
-    _ => '2000.01.02  ·  일요일',
+    _ => '2000년 1월  ·  첫 수업',
   };
 
   String? get _character => switch (_beat) {
     1 || 5 || 7 || 10 || 21 || 23 => 'assets/images/character_hero.png',
-    4 || 6 || 12 || 25 || 26 => 'assets/images/character_father.png',
+    4 || 6 || 12 => 'assets/images/character_father.png',
     2 => 'assets/images/character_sister.png',
-    9 || 11 || 27 => 'assets/images/character_grandfather.png',
+    9 || 11 => 'assets/images/character_grandfather.png',
     3 || 13 => 'assets/images/character_mother.png',
     _ => null,
   };
 
   Alignment get _characterAlignment => switch (_beat) {
-    4 || 6 || 9 || 11 || 12 || 25 || 26 || 27 => Alignment.bottomLeft,
+    4 || 6 || 9 || 11 || 12 => Alignment.bottomLeft,
     2 || 3 || 13 => Alignment.bottomRight,
     _ => Alignment.bottomCenter,
   };
 
-  bool get _isAcademyTeacherBeat => _beat >= 15 && _beat <= 20 || _beat == 22;
+  bool get _isAcademyTeacherBeat =>
+      _beat >= 15 && _beat <= 20 || _beat == 22 || _beat >= 25;
 
   Alignment get _teacherPoseAlignment => switch (_beat) {
     15 => Alignment.topLeft,
@@ -77,23 +73,28 @@ class _VisualNovelOnboardingScreenState
     17 => Alignment.topRight,
     18 => Alignment.bottomLeft,
     19 => Alignment.bottomRight,
+    25 => Alignment.topLeft,
+    26 => Alignment.bottomCenter,
+    27 => Alignment.bottomRight,
+    28 => Alignment.topCenter,
     _ => Alignment.bottomCenter,
   };
 
   bool get _isNarration =>
-      _beat == 0 || _beat == 8 || _beat == 14 || _beat == 24 || _beat == 28;
+      _beat == 0 || _beat == 8 || _beat == 14 || _beat == 24;
 
   String get _speaker => switch (_beat) {
-    0 || 8 || 14 || 24 || 28 => '이야기',
+    0 || 8 || 14 || 24 => '이야기',
     1 || 5 || 7 || 10 || 21 || 23 =>
       _playerController.text.trim().isEmpty
           ? '나'
           : _playerController.text.trim(),
     2 => '누나',
     3 || 13 => '엄마',
-    4 || 6 || 12 || 25 || 26 => '아빠',
-    9 || 11 || 27 => '외할아버지',
+    4 || 6 || 12 => '아빠',
+    9 || 11 => '외할아버지',
     15 || 16 || 18 || 20 || 22 => '한서윤 선생님',
+    25 || 26 || 27 || 28 => '한서윤 선생님',
     17 || 19 =>
       _playerController.text.trim().isEmpty
           ? '나'
@@ -131,12 +132,13 @@ class _VisualNovelOnboardingScreenState
       '${_playerController.text.trim()}입니다. 드라마처럼 멋있어 보이는 것보다, 제가 왜 사는지 설명할 수 있는 투자자가 될래요.',
     22 => '첫 조사 과제입니다. 어떤 기준을 가장 먼저 연습해 보고 싶나요?',
     23 => _traitResponse,
-    24 => '수업을 마치고 집으로 돌아오자 아빠는 약속대로 가족 장부 첫 줄에 학원비 1,000,000원을 적었다.',
-    25 => '투자금은 빚내지 않는다. 그리고 네가 번 돈의 사용 이유를 적는다. 마지막 가족 규칙은 네가 골라 보렴.',
-    26 => '학원비를 갚을 만큼 회사 통장에 돈이 모이면, 거실에서 나를 선택해 “학원비 갚기”를 누르면 된다.',
-    27 => '세뱃돈 만 원은 작아 보여도 원칙을 시험하기에는 충분하다. 배운 대로 회사 하나부터 천천히 살펴보자꾸나.',
-    _ =>
-      '드라마에서 시작된 호기심, 세뱃돈 만 원, 갚아야 할 학원비 100만 원, 그리고 첫 투자노트가 생겼다. 이제 우리 투자연구소 이름을 붙여 보자.',
+    24 => '수업 마지막 화면 실습을 앞두고, 선생님은 가족이 적어 보낸 투자 약속 카드와 세뱃돈 장부를 교탁 위에 펼쳤다.',
+    25 => '가족과 약속한 원칙 가운데 첫 주문부터 반드시 지킬 한 가지를 골라 볼까요?',
+    26 =>
+      '아빠가 먼저 낸 학원비 1,000,000원은 투자금이 아니에요. 나중에 회사 통장에 돈이 모이면 거실에서 아빠에게 갚아야 해요.',
+    27 =>
+      '외할아버지의 세뱃돈 10,000원은 교육용 증권계좌에 들어 있어요. 이제 화면 실습에 표시할 투자연구소 이름을 정해 볼까요?',
+    _ => '좋아요. 이름을 적으면 집으로 돌아가기 전에 실제 주식 화면을 열어, 제가 가리키는 곳을 함께 눌러 볼게요.',
   };
 
   String get _introResponse => switch (_introChoice) {
@@ -250,8 +252,8 @@ class _VisualNovelOnboardingScreenState
             ),
           if (_isAcademyTeacherBeat)
             Positioned(
-              right: 2,
-              bottom: 118,
+              right: -18,
+              bottom: 112,
               child: _AcademyTeacherPose(poseAlignment: _teacherPoseAlignment),
             )
           else if (_character != null)
@@ -504,7 +506,7 @@ class _VisualNovelOnboardingScreenState
         ),
         _NovelNextButton(
           key: const Key('create-company-button'),
-          label: '학원 수료하고 첫 장부 시작하기',
+          label: '투자연구소 이름을 적고 시장 실습 시작',
           enabled: _companyController.text.trim().isNotEmpty,
           onTap: _finish,
         ),
@@ -557,8 +559,10 @@ class _AcademyTeacherPose extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dimension = (MediaQuery.sizeOf(context).width * 0.72)
-        .clamp(250.0, 340.0)
+    final size = MediaQuery.sizeOf(context);
+    final dimension = math
+        .min(size.width * 1.28, size.height * 0.68)
+        .clamp(300.0, 520.0)
         .toDouble();
     return SizedBox(
       key: const Key('academy-teacher-character'),
