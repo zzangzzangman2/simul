@@ -82,8 +82,14 @@ void main() {
         }
         await tester.pump();
 
-        expect(currentState.day, initialDay);
-        expect(currentState.marketMinute, marketDayEndMinute);
+        expect(currentState.day, initialDay + 1);
+        expect(currentState.marketMinute, marketDayStartMinute);
+        final hidden = currentState.story.storyFlags['hiddenMarketScenario'];
+        expect(hidden, isA<Map>());
+        expect(
+          (hidden as Map)['date'],
+          marketDateKey(currentState.currentDate),
+        );
         expect(find.byType(KoreaEconomicNewspaperSheet), findsOneWidget);
 
         if (closeMethod == '신문 X') {
@@ -92,13 +98,6 @@ void main() {
           await tester.tap(find.byIcon(Icons.arrow_back_ios_new_rounded).first);
         } else {
           await tester.binding.handlePopRoute();
-        }
-        for (
-          var attempt = 0;
-          attempt < 10 && currentState.day == initialDay;
-          attempt++
-        ) {
-          await tester.pump(const Duration(milliseconds: 100));
         }
         await tester.pumpAndSettle();
 

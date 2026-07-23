@@ -565,7 +565,7 @@ final List<MissionDefinition> missionCatalog = <MissionDefinition>[
     'twenty_decisions',
     '12장 · 투자 명가',
     '스무 번의 선택',
-    '결과가 좋았던 선택과 틀렸던 선택을 모두 회사의 역사로 남긴다.',
+    '결과가 좋았던 선택과 틀렸던 선택을 모두 회사의 기록으로 남긴다.',
     'decisions_resolved',
     20,
     '누적 안건 20건 해결',

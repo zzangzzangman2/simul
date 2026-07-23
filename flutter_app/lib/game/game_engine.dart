@@ -9,6 +9,7 @@ import 'story_state.dart';
 
 const initialCompanyCash = 0;
 const gameTradingFeeRate = 0.0025;
+const dailyMarketReportPrice = 1200;
 
 int gameTradingFee(int notional) => (notional * gameTradingFeeRate).round();
 
@@ -127,32 +128,37 @@ class MissionClaimResult {
 class GameEngine {
   const GameEngine();
 
+  static int _newGameSerial = 0;
+
   GameState createNewGame(
     String companyName, {
     StoryState? story,
     int initialCash = initialCompanyCash,
+    String? worldSeed,
   }) {
-    final seed = 'simul-${_stableHash(companyName.trim())}';
+    final seed =
+        worldSeed ??
+        'world-${DateTime.now().microsecondsSinceEpoch}-${_newGameSerial++}-${_stableHash(companyName.trim())}';
     final baseStory = story ?? StoryState.migratedDefault(companyName);
     final storyState = initialCash > 0 && baseStory.accountAuthorityLevel == 0
         ? baseStory.copyWith(accountAuthorityLevel: 5)
         : baseStory;
     final company = const CompanyState(
-      id: 'apple',
-      name: 'Apple',
-      worldMode: WorldMode.historical,
-      divergedAtDay: null,
-      divergenceReason: null,
+      id: 'hanbit_telecom',
+      name: '한빛통신',
+      worldMode: CompanyWorldMode.fictional,
+      worldStartedAtDay: 1,
+      worldPremise: '처음부터 생성된 가상 세계',
       votingOwnershipPct: 0,
-      historicalPriceAtDivergence: null,
-      simulatedPrice: null,
+      worldReferencePrice: null,
+      simulatedPrice: 28400,
       monthlyRevenue: 120000,
       brand: 42,
       technology: 48,
       morale: 55,
       risk: 20,
     );
-    return GameState(
+    final state = GameState(
       version: GameState.schemaVersion,
       companyName: companyName.trim(),
       day: 1,
@@ -172,6 +178,7 @@ class GameEngine {
       ledger: const [],
       processedEventIds: const [],
     );
+    return prepareHiddenMarketScenario(state);
   }
 
   GameState migrate(Map<String, dynamic> json) {
@@ -180,7 +187,7 @@ class GameEngine {
         ...json,
         'version': GameState.schemaVersion,
       });
-      return _recoverLegacyForeignPositions(state);
+      return _recoverLegacyMarketState(state);
     }
     final companyName = (json['companyName'] as String? ?? '').trim();
     final fresh = createNewGame(companyName);
@@ -190,7 +197,7 @@ class GameEngine {
     final migratedDay = currentDate == null
         ? ((json['day'] as num?)?.toInt() ?? 1)
         : currentDate.difference(DateTime(2000, 1, 1)).inDays + 1;
-    return _recoverLegacyForeignPositions(
+    return _recoverLegacyMarketState(
       fresh.copyWith(
         day: migratedDay.clamp(1, GameState.maxCampaignDay),
         cash: (json['cash'] as num?)?.toInt() ?? 0,
@@ -205,39 +212,62 @@ class GameEngine {
     );
   }
 
-  GameState _recoverLegacyForeignPositions(GameState state) {
-    final foreign = state.positions
-        .where((position) => position.currency != 'KRW')
-        .toList();
-    if (foreign.isEmpty) return state;
-    final recovered = foreign.fold<int>(
+  GameState _recoverLegacyMarketState(GameState state) {
+    final invalid = state.positions
+        .where((position) => !isFictionalMarketAssetId(position.assetId))
+        .toList(growable: false);
+    final recovered = invalid.fold<int>(
       0,
       (sum, position) => sum + position.totalCost,
     );
-    final sourceId = 'legacy-foreign-cost-recovery-v10';
-    return state.copyWith(
+    const sourceId = 'legacy-real-market-recovery-v14';
+    final companyIsFictional = isFictionalMarketAssetId(state.company.id);
+    final migratedCompany = companyIsFictional
+        ? state.company.copyWith(worldMode: CompanyWorldMode.fictional)
+        : const CompanyState(
+            id: 'hanbit_telecom',
+            name: '한빛통신',
+            worldMode: CompanyWorldMode.fictional,
+            worldStartedAtDay: 1,
+            worldPremise: 'v14 가상 시장 전환',
+            votingOwnershipPct: 0,
+            worldReferencePrice: null,
+            simulatedPrice: 28400,
+            monthlyRevenue: 120000,
+            brand: 42,
+            technology: 48,
+            morale: 55,
+            risk: 20,
+          );
+    var migrated = state.copyWith(
+      version: GameState.schemaVersion,
+      company: migratedCompany,
       cash: state.cash + recovered,
+      brokerageCash: state.brokerageCash + recovered,
       positions: state.positions
-          .where((position) => position.currency == 'KRW')
-          .toList(),
-      ledger: [
+          .where((position) => isFictionalMarketAssetId(position.assetId))
+          .toList(growable: false),
+      ledger: <LedgerEntry>[
         ...state.ledger,
-        if (!state.processedEventIds.contains(sourceId))
+        if (invalid.isNotEmpty && !state.processedEventIds.contains(sourceId))
           LedgerEntry(
             id: sourceId,
             day: state.day,
             amount: recovered,
             account: 'cash',
             counterAccount: 'legacy_position_recovery',
-            description: '거래 불가 레거시 해외 포지션 원가 기준 복구',
+            description: '기존 실제 종목을 원가 기준 현금으로 전환',
             sourceId: sourceId,
           ),
       ],
-      processedEventIds: [
+      processedEventIds: <String>[
         ...state.processedEventIds,
-        if (!state.processedEventIds.contains(sourceId)) sourceId,
+        if (invalid.isNotEmpty && !state.processedEventIds.contains(sourceId))
+          sourceId,
       ],
     );
+    migrated = prepareHiddenMarketScenario(migrated);
+    return migrated;
   }
 
   MissionProgressView? missionProgress(GameState state) {
@@ -686,6 +716,7 @@ class GameEngine {
     List<MarketCorporateAction> actions,
   ) {
     var cash = state.cash;
+    var brokerageCash = state.brokerageCash;
     var positions = [...state.positions];
     final ledger = [...state.ledger];
     final processed = {...state.processedEventIds};
@@ -745,6 +776,97 @@ class GameEngine {
           );
           changed = true;
         }
+      } else if (position != null &&
+          action.type == MarketCorporateActionType.spinoff &&
+          action.relatedAssetId != null &&
+          action.relatedSymbol != null &&
+          action.relatedName != null &&
+          action.relatedMarket != null) {
+        final grantedUnits = position.units * action.unitFactor;
+        if (grantedUnits.isFinite && grantedUnits > 0) {
+          final relatedIndex = positions.indexWhere(
+            (item) => item.assetId == action.relatedAssetId,
+          );
+          if (relatedIndex >= 0) {
+            positions[relatedIndex] = positions[relatedIndex].copyWith(
+              units: positions[relatedIndex].units + grantedUnits,
+            );
+          } else {
+            positions.add(
+              PortfolioPosition(
+                assetId: action.relatedAssetId!,
+                symbol: action.relatedSymbol!,
+                name: action.relatedName!,
+                market: action.relatedMarket!,
+                currency: action.currency,
+                units: grantedUnits,
+                totalCost: 0,
+              ),
+            );
+          }
+          ledger.add(
+            LedgerEntry(
+              id: eventId,
+              day: state.day,
+              amount: 0,
+              account: 'market_security',
+              counterAccount: 'corporate_spinoff',
+              description:
+                  '${position.name} 분사 · ${action.relatedName} ${_tradeUnits(grantedUnits)}주 배정',
+              sourceId: eventId,
+            ),
+          );
+          changed = true;
+        }
+      } else if (position != null &&
+          action.type == MarketCorporateActionType.materialSpinoff) {
+        ledger.add(
+          LedgerEntry(
+            id: eventId,
+            day: state.day,
+            amount: 0,
+            account: 'market_security',
+            counterAccount: 'corporate_material_spinoff',
+            description: '${position.name} 물적분할 · 신설법인 지분은 모회사가 보유',
+            sourceId: eventId,
+          ),
+        );
+        changed = true;
+      } else if (position != null &&
+          action.type == MarketCorporateActionType.rightsIssue) {
+        ledger.add(
+          LedgerEntry(
+            id: eventId,
+            day: state.day,
+            amount: 0,
+            account: 'market_security',
+            counterAccount: 'corporate_rights_issue',
+            description: '${position.name} 유상증자 · 보유지분 희석 가능성 발생',
+            sourceId: eventId,
+          ),
+        );
+        changed = true;
+      } else if (position != null &&
+          action.type == MarketCorporateActionType.delisting) {
+        final payout = (position.units * action.amount).round();
+        cash += payout;
+        brokerageCash += payout;
+        positions.removeAt(index);
+        ledger.add(
+          LedgerEntry(
+            id: eventId,
+            day: state.day,
+            amount: payout,
+            account: 'cash',
+            counterAccount: 'delisting_settlement',
+            description: '${position.name} 상장폐지 정리매매·잔여가치 정산',
+            sourceId: eventId,
+            notional: payout,
+            disposedCost: position.totalCost,
+            realizedPnl: payout - position.totalCost,
+          ),
+        );
+        changed = true;
       }
       processed.add(eventId);
     }
@@ -754,6 +876,7 @@ class GameEngine {
     }
     return state.copyWith(
       cash: cash,
+      brokerageCash: brokerageCash,
       positions: positions,
       ledger: ledger,
       processedEventIds: processed.toList(growable: false),
@@ -1260,14 +1383,112 @@ class GameEngine {
     return state.copyWith(story: state.story.copyWith(storyFlags: flags));
   }
 
-  double historicalPriceForDay(int day) => 1000 + ((day - 1) * 2.0);
+  GameState prepareHiddenMarketScenario(GameState state) {
+    final flags = Map<String, dynamic>.from(state.story.storyFlags);
+    final dateKey = marketDateKey(state.currentDate);
+    final current = (flags['hiddenMarketScenario'] as Map?)
+        ?.cast<String, dynamic>();
+    if (current?['date'] == dateKey) return state;
 
-  double visiblePrice(GameState state) {
-    if (state.company.worldMode == WorldMode.historical) {
-      return historicalPriceForDay(state.day);
+    final archive = ((flags['marketScenarioArchive'] as List?) ?? const [])
+        .whereType<Map>()
+        .map((item) => item.cast<String, dynamic>())
+        .toList();
+    if (current != null) archive.add(current);
+    if (archive.length > 32) {
+      archive.removeRange(0, archive.length - 32);
     }
-    return state.company.simulatedPrice ?? historicalPriceForDay(state.day);
+    flags['marketWorldVersion'] = 1;
+    flags['marketScenarioArchive'] = archive;
+    flags['hiddenMarketScenario'] = hiddenFictionalMarketScenario(
+      state.simulationSeed,
+      state.currentDate,
+    );
+    return state.copyWith(story: state.story.copyWith(storyFlags: flags));
   }
+
+  FinanceActionResult purchaseDailyMarketReport(GameState state) {
+    final dateKey = marketDateKey(state.currentDate);
+    final flags = Map<String, dynamic>.from(state.story.storyFlags);
+    final reports = <String, dynamic>{
+      for (final entry
+          in ((flags['dailyMarketReports'] as Map?) ?? const {}).entries)
+        if (entry.key is String) entry.key as String: entry.value,
+    };
+    if (reports.containsKey(dateKey)) {
+      return FinanceActionResult(
+        state: state,
+        success: false,
+        message: '오늘의 시장 조사 보고서는 이미 구매했습니다.',
+      );
+    }
+    if (state.cash < dailyMarketReportPrice) {
+      return FinanceActionResult(
+        state: state,
+        success: false,
+        message: '보고서 구매에 ${dailyMarketReportPrice - state.cash}원이 부족합니다.',
+      );
+    }
+
+    final events = fictionalMarketEventsForDate(
+      state.simulationSeed,
+      state.currentDate,
+    );
+    final signals = events
+        .take(3)
+        .map(
+          (event) => <String, dynamic>{
+            'companyName': event.companyName,
+            'sector': event.sector,
+            'hint': event.reportHint,
+          },
+        )
+        .toList(growable: false);
+    reports[dateKey] = signals.isEmpty
+        ? <Map<String, dynamic>>[
+            <String, dynamic>{
+              'companyName': '시장 전체',
+              'sector': '수급',
+              'hint': '눈에 띄는 기업별 사전 징후가 적다. 거래대금과 업종 순환을 우선 확인할 필요가 있다.',
+            },
+          ]
+        : signals;
+    flags['dailyMarketReports'] = reports;
+    final sourceId = 'market-report-$dateKey';
+    final next = state.copyWith(
+      cash: state.cash - dailyMarketReportPrice,
+      story: state.story.copyWith(storyFlags: flags),
+      ledger: [
+        ...state.ledger,
+        LedgerEntry(
+          id: sourceId,
+          day: state.day,
+          amount: -dailyMarketReportPrice,
+          account: 'cash',
+          counterAccount: 'market_research_expense',
+          description: '오늘의 시장 조사 보고서',
+          sourceId: sourceId,
+        ),
+      ],
+      processedEventIds: [...state.processedEventIds, sourceId],
+    );
+    return FinanceActionResult(
+      state: next,
+      success: true,
+      message: '현장 징후를 정리한 보고서를 받았습니다. 결과와 방향은 보장하지 않습니다.',
+      cashDelta: -dailyMarketReportPrice,
+    );
+  }
+
+  List<FictionalMarketEvent> revealedMarketEvents(GameState state) =>
+      fictionalMarketEventsForDate(
+        state.simulationSeed,
+        state.currentDate,
+      ).where((event) => event.revealMinute <= state.marketMinute).toList();
+  double generatedCompanyPriceForDay(int day) => 28400 + ((day - 1) * 1.5);
+
+  double visiblePrice(GameState state) =>
+      state.company.simulatedPrice ?? generatedCompanyPriceForDay(state.day);
 
   GameState resolveDecision(
     GameState state,
@@ -1314,15 +1535,15 @@ class GameEngine {
         );
       case 'acquire_control':
       case 'acquire_control_followup':
-        next = _spend(next, option.cashCost, decisionId, 'Apple 경영권 시나리오 배정금');
-        final continuityPrice = historicalPriceForDay(next.day);
+        next = _spend(next, option.cashCost, decisionId, '한빛통신 경영권 시나리오 배정금');
+        final continuityPrice = generatedCompanyPriceForDay(next.day);
         next = next.copyWith(
           company: next.company.copyWith(
-            worldMode: WorldMode.diverged,
-            divergedAtDay: next.day,
-            divergenceReason: '의결권 55% 확보',
+            worldMode: CompanyWorldMode.fictional,
+            worldStartedAtDay: next.day,
+            worldPremise: '의결권 55% 확보',
             votingOwnershipPct: 55,
-            historicalPriceAtDivergence: continuityPrice,
+            worldReferencePrice: continuityPrice,
             simulatedPrice: continuityPrice,
           ),
           decisions: [...next.decisions, _productProposal(next.day)],
@@ -1340,7 +1561,7 @@ class GameEngine {
             ...next.decisions,
             _endingCard(
               next.day,
-              '경쟁 세력이 먼저 Apple 이사회를 장악했습니다. 다음 기회를 기다려야 해요.',
+              '경쟁 세력이 먼저 한빛통신 이사회를 장악했습니다. 다음 기회를 기다려야 해요.',
             ),
           ],
         );
@@ -1388,8 +1609,8 @@ class GameEngine {
             brand: next.company.brand - 2,
           ),
           project: const ProjectState(
-            id: 'project-atlas',
-            codename: 'Project Atlas',
+            id: 'project-aurora',
+            codename: 'Project Aurora',
             status: ProjectStatus.cancelled,
             approvedBudget: 0,
             spentBudget: 0,
@@ -1602,11 +1823,11 @@ class GameEngine {
       organization: state.organization.recoverOneDay(),
     );
     next = _refreshExpiredMissionWindow(next);
-    if (next.company.worldMode == WorldMode.diverged) {
+    if (next.company.worldMode == CompanyWorldMode.fictional) {
       final basePrice =
           next.company.simulatedPrice ??
-          next.company.historicalPriceAtDivergence ??
-          historicalPriceForDay(next.day - 1);
+          next.company.worldReferencePrice ??
+          generatedCompanyPriceForDay(next.day - 1);
       final noise = _noise(
         next.simulationSeed,
         'price-${next.day}',
@@ -1632,20 +1853,11 @@ class GameEngine {
         next,
         burn,
         'monthly-burn-${next.day}',
-        'Project Atlas 월간 개발비',
+        'Project Aurora 월간 개발비',
       );
     }
-    if (next.day >= 2558 &&
-        next.company.worldMode == WorldMode.historical &&
-        !next.decisions.any((item) => item.id.startsWith('control-offer'))) {
-      next = next.copyWith(
-        decisions: [
-          ...next.decisions,
-          _controlOffer(next.day, followUp: false),
-        ],
-      );
-    }
-    return _processDueEvents(next);
+    final processed = _processDueEvents(next);
+    return prepareHiddenMarketScenario(processed);
   }
 
   GameState _applyMonthlyEconomy(GameState state) {
@@ -1965,7 +2177,7 @@ class GameEngine {
     late double priceMultiplier;
     if (score >= 235) {
       message =
-          'Project Atlas가 예상 밖의 큰 호응을 얻었습니다. Apple이 새로운 휴대기기 시장의 기준을 만들기 시작했어요.';
+          'Project Aurora가 예상 밖의 큰 호응을 얻었습니다. 한빛통신이 새로운 휴대기기 시장의 기준을 만들기 시작했어요.';
       revenueDelta = 260000;
       cashDelta = 180000;
       brandDelta = 16;
@@ -1986,7 +2198,7 @@ class GameEngine {
       moraleDelta = -2;
       priceMultiplier = 0.98;
     } else {
-      message = '제품은 시장에 닿았지만 결함과 낮은 수요가 겹쳤습니다. 실제 역사와 달리 성공은 보장되지 않아요.';
+      message = '제품은 시장에 닿았지만 결함과 낮은 수요가 겹쳤습니다. 이 세계에서도 성공은 보장되지 않아요.';
       revenueDelta = -30000;
       cashDelta = -50000;
       brandDelta = -8;
@@ -2001,8 +2213,8 @@ class GameEngine {
         morale: state.company.morale + moraleDelta,
         simulatedPrice:
             (state.company.simulatedPrice ??
-                state.company.historicalPriceAtDivergence ??
-                historicalPriceForDay(state.day)) *
+                state.company.worldReferencePrice ??
+                generatedCompanyPriceForDay(state.day)) *
             priceMultiplier,
       ),
       project: project.copyWith(status: ProjectStatus.completed),
@@ -2017,7 +2229,7 @@ class GameEngine {
           amount: cashDelta,
           account: 'cash',
           counterAccount: 'product_result',
-          description: 'Project Atlas 초기 출시 결과',
+          description: 'Project Aurora 초기 출시 결과',
           sourceId: 'launch_result',
         ),
       ],
@@ -2036,7 +2248,7 @@ class GameEngine {
     int riskDelta,
     String sourceId,
   ) {
-    var next = _spend(state, cost, sourceId, 'Project Atlas 1차 개발 승인');
+    var next = _spend(state, cost, sourceId, 'Project Aurora 1차 개발 승인');
     next = next.copyWith(
       company: next.company.copyWith(
         morale: next.company.morale + moraleDelta,
@@ -2044,8 +2256,8 @@ class GameEngine {
         technology: next.company.technology + (path == 'partner' ? 2 : 1),
       ),
       project: ProjectState(
-        id: 'project-atlas',
-        codename: 'Project Atlas',
+        id: 'project-aurora',
+        codename: 'Project Aurora',
         status: ProjectStatus.development,
         approvedBudget: cost,
         spentBudget: cost,
@@ -2154,18 +2366,18 @@ class GameEngine {
   }) => DecisionCardData(
     id: followUp ? 'control-offer-followup-$day' : 'control-offer-$day',
     category: '회사 운영 체험',
-    title: followUp ? 'Apple 운영 체험, 마지막 선택' : 'Apple 회사를 직접 운영해 볼까?',
+    title: followUp ? '한빛통신 운영 체험, 마지막 선택' : '한빛통신 회사를 직접 운영해 볼까?',
     proposer: '시나리오 운영자 윤 실장',
     body: followUp
         ? '검토하는 사이 경쟁 세력이 이사회 표를 모았습니다. 시나리오 비용은 늘었고 오늘 결론이 필요해요.'
-        : '첫 세로 슬라이스에서는 개발용 시나리오 계약으로 Apple 이사회 의결권 55%를 맡습니다. 실제 거래가격이나 내부정보가 아니며, 이후 역사는 우리의 선택으로 움직입니다.',
+        : '첫 세로 슬라이스에서는 개발용 시나리오 계약으로 한빛통신 이사회 의결권 55%를 맡습니다. 실제 거래가격이나 내부정보가 아니며, 이후 세계는 우리의 선택으로 움직입니다.',
     createdDay: day,
     dueDay: day + (followUp ? 1 : 3),
     requestedFunds: followUp ? 350000 : 300000,
-    benefit: 'Apple 경영권과 이사회 과반 체험',
+    benefit: '한빛통신 경영권과 이사회 과반 체험',
     risk: '게임 자금 감소 · 제품 성공 불확실',
     advisorOpinions: const [
-      '운영자: 실제 인수가 아닌 대체역사 체험용 조건입니다.',
+      '운영자: 실제 인수가 아닌 가상 세계 체험용 조건입니다.',
       '기술자: 통합형 휴대기기 아이디어는 있으나 성공은 모릅니다.',
       '친구: 그래도 우리 게임 자금을 거의 3분의 1이나 쓰는 거야!',
     ],
@@ -2174,7 +2386,7 @@ class GameEngine {
             DecisionOptionData(
               id: 'acquire_control_followup',
               label: '35만원으로 시나리오 시작',
-              description: '비용은 올랐지만 지금 Apple 지배 시나리오를 시작합니다.',
+              description: '비용은 올랐지만 지금 한빛통신 지배 시나리오를 시작합니다.',
               cashCost: 350000,
             ),
             DecisionOptionData(
@@ -2187,7 +2399,7 @@ class GameEngine {
             DecisionOptionData(
               id: 'acquire_control',
               label: '30만원으로 시나리오 시작',
-              description: '오늘의 개발용 기준지수에서 Apple 대체역사를 시작합니다.',
+              description: '오늘의 개발용 기준지수에서 한빛통신 가상 세계를 시작합니다.',
               cashCost: 300000,
             ),
             DecisionOptionData(
@@ -2202,9 +2414,9 @@ class GameEngine {
     id: 'product-proposal-$day',
     category: 'CEO 제안',
     title: '전화·음악·인터넷을 하나로 합칠까?',
-    proposer: 'Apple CEO',
+    proposer: '한빛통신 CEO',
     body:
-        '전화, 음악, 인터넷 기능을 하나의 터치 기기에 통합하고 싶습니다. 게임 속 내부 코드명만 표시하며 실제 역사상 결과는 미리 알려주지 않습니다.',
+        '전화, 음악, 인터넷 기능을 하나의 터치 기기에 통합하고 싶습니다. 게임 속 내부 코드명만 표시하며 정답처럼 알려진 결과는 미리 알려주지 않습니다.',
     createdDay: day,
     dueDay: day + 3,
     requestedFunds: 180000,
@@ -2290,7 +2502,7 @@ class GameEngine {
         id: '${finalReview ? 'final-' : ''}launch-review-$day',
         category: '출시 심사',
         title: finalReview ? '완성한 기기를 이제 출시할까?' : '새 휴대기기를 지금 팔기 시작할까?',
-        proposer: 'Apple 이사회',
+        proposer: '한빛통신 이사회',
         body: finalReview
             ? '품질 보강은 끝났지만 경쟁사의 소문이 커졌습니다. 이제 출시하거나 접어야 합니다.'
             : '시제품은 작동하지만 수요는 넓은 범위로만 추정됩니다. 지금 출시하면 빠르지만 품질 위험이 남습니다.',
@@ -2349,14 +2561,12 @@ class GameEngine {
         requestedFunds: 0,
         benefit: '이번 선택의 변화가 저장됩니다.',
         risk: '다음 선택에도 누적 영향을 줍니다.',
-        advisorOpinions: const [
-          '기록: 실제 회사명은 사용하지만 내부 수치·의견·결과는 게임용 가상 시나리오입니다.',
-        ],
+        advisorOpinions: const ['기록: 모든 회사명·수치·의견·결과는 게임용 가상 시나리오입니다.'],
         options: const [
           DecisionOptionData(
             id: 'acknowledge',
             label: '결과 확인',
-            description: '대체역사 기록을 닫고 사무실로 돌아갑니다.',
+            description: '가상 세계 기록을 닫고 사무실로 돌아갑니다.',
           ),
         ],
       );

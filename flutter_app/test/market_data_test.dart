@@ -7,8 +7,8 @@ import 'package:millennium_capital/game/market_tick.dart';
 
 void main() {
   test('default market universe reuses the same cached load', () async {
-    final first = HistoricalMarketUniverse.load();
-    final second = HistoricalMarketUniverse.load();
+    final first = FictionalMarketUniverse.load();
+    final second = FictionalMarketUniverse.load();
 
     expect(identical(first, second), isTrue);
     expect((await first).assets, isNotEmpty);
@@ -17,17 +17,25 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test(
-    'market asset contains domestic main pack and preserved overseas pack',
+    'market universe contains 30 fixed fictional firms and later generations',
     () async {
-      final universe = await HistoricalMarketUniverse.load();
+      final universe = await FictionalMarketUniverse.load(seed: 'roster-test');
 
-      expect(universe.schemaVersion, 4);
-      expect(universe.assets.length, 28);
-      expect(universe.assets.where((asset) => asset.isDomestic).length, 22);
-      expect(universe.assets.where((asset) => !asset.isDomestic).length, 6);
+      expect(universe.schemaVersion, greaterThanOrEqualTo(5));
+      expect(
+        universe.assets.where((asset) => asset.generation == 0),
+        hasLength(30),
+      );
+      expect(universe.assets.length, greaterThan(70));
+      expect(
+        universe.assets,
+        everyElement(
+          predicate<FictionalMarketAsset>((asset) => asset.isDomestic),
+        ),
+      );
       expect(
         universe.assets.map((asset) => asset.market).toSet(),
-        containsAll(<String>{'KOSPI', 'KOSDAQ', 'NASDAQ', 'TSE'}),
+        equals(<String>{fictionalMainMarket, fictionalGrowthMarket}),
       );
     },
   );
@@ -37,7 +45,7 @@ void main() {
       'id': id,
       'symbol': symbol,
       'name': id,
-      'market': 'KOSPI',
+      'market': fictionalMainMarket,
       'country': 'KR',
       'currency': 'KRW',
       'prices': {'2000-01-04': price},
@@ -49,7 +57,7 @@ void main() {
     };
 
     expect(
-      () => HistoricalMarketUniverse.fromJson(
+      () => FictionalMarketUniverse.fromJson(
         universe([
           asset('same', '000001.KS', 100),
           asset('same', '000002.KS', 200),
@@ -58,25 +66,28 @@ void main() {
       throwsA(isA<FormatException>()),
     );
     expect(
-      () => HistoricalMarketUniverse.fromJson(
+      () => FictionalMarketUniverse.fromJson(
         universe([asset('bad', '000003.KS', -1)]),
       ),
       throwsA(isA<FormatException>()),
     );
   });
 
-  test('Samsung does not leak its first quote before 2000-01-04', () async {
-    final universe = await HistoricalMarketUniverse.load();
-    final samsung = universe.assets.singleWhere(
-      (asset) => asset.symbol == '005930.KS',
-    );
+  test(
+    'fixed fictional firms start together without a pre-campaign quote',
+    () async {
+      final universe = await FictionalMarketUniverse.load(seed: 'listing-test');
+      final hanbit = universe.assets.singleWhere(
+        (asset) => asset.id == 'hanbit_telecom',
+      );
 
-    expect(samsung.quoteAtOrBefore(DateTime(2000, 1, 3)), isNull);
-    final first = samsung.quoteAtOrBefore(DateTime(2000, 1, 4));
-    expect(first, isNotNull);
-    expect(first!.isExactDate, isTrue);
-    expect(first.close, 6110);
-  });
+      expect(hanbit.quoteAtOrBefore(DateTime(1999, 12, 29)), isNull);
+      final first = hanbit.quoteAtOrBefore(DateTime(1999, 12, 30));
+      expect(first, isNotNull);
+      expect(first!.isExactDate, isTrue);
+      expect(first.close, greaterThan(0));
+    },
+  );
 
   test('generated ticks finish on the exact official close', () {
     final path = generatedMarketPath(

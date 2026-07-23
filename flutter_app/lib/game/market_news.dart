@@ -1,33 +1,19 @@
 import 'dynamic_news.dart';
 import 'game_state.dart';
-import 'historical_events.dart';
 import 'market_data.dart';
 import 'market_clock.dart';
 
-export 'historical_events.dart';
+export 'market_data.dart' show FictionalMarketEvent, NewsTone;
 
-/// 하루 넘김을 의미 있게 만드는 소식 시스템.
-///
-/// 두 층으로 구성한다.
-///  1. [kHistoricalNews] (historical_events.dart) : 실제 날짜에 걸린 굵직한
-///     역사 사건 400여 건. 랜딩하면 속보로 뜬다.
-///  2. [buildDailyBrief] : 사건이 없는 평범한 날에도 달력·계절·주말/휴장·가족을
-///     기반으로 짧은 소식을 만들어 빈 날이 없게 한다.
-///
-/// 규칙: 여기서는 가짜 시세를 만들지 않는다(DO_NOTS). 숫자 가격 대신 상황·분위기만
-/// 전한다. 사건은 실제 발생일 당일에만 노출하며 미래를 미리 흘리지 않는다.
-
-/// 오늘 날짜에 걸린 역사 사건을 돌려준다. 같은 날 여러 건이면 목록 순서(날짜→제목)의
-/// 첫 사건을 준다.
-List<HistoricalNewsEvent> historicalNewsEventsForDate(DateTime date) =>
-    kHistoricalNews
-        .where((event) => event.matches(date))
-        .toList(growable: false);
-
-HistoricalNewsEvent? historicalNewsForDate(DateTime date) {
-  final events = historicalNewsEventsForDate(date);
-  return events.isEmpty ? null : events.first;
-}
+/// 조간신문은 전달이 끝난 전날 사건과 종가만 정리한다.
+/// 오늘의 비공개 시나리오와 결과 방향은 이 계층에 전달하지 않는다.
+List<FictionalMarketEvent> marketNewsEventsForState(
+  GameState state, {
+  DateTime? date,
+}) => fictionalMarketEventsForDate(
+  state.simulationSeed,
+  date ?? state.currentDate,
+);
 
 /// 오늘 화면에 항상 채워 넣을 한 조각 소식.
 class DailyBrief {
@@ -41,9 +27,9 @@ class DailyBrief {
     this.otherHeadlines = const [],
   });
 
-  /// 굵직한 역사 사건이 걸린 날에만 채워진다.
-  final HistoricalNewsEvent? headline;
-  final List<HistoricalNewsEvent> otherHeadlines;
+  /// 가상 시장의 공개 사건이 걸린 날에만 채워진다.
+  final FictionalMarketEvent? headline;
+  final List<FictionalMarketEvent> otherHeadlines;
   final String eyebrow;
   final String title;
   final String body;
@@ -147,14 +133,14 @@ const List<(String, String)> _weekend = [
 }
 
 /// 오늘 날짜와 게임 상태로 소식 한 조각을 만든다. 우선순위:
-/// 역사 사건 > 고정 휴장일 > 주말 > 계절별 경제·시장 소식.
+/// 공개된 시장 사건 > 고정 휴장일 > 주말 > 계절별 경제·시장 소식.
 DailyBrief buildDailyBrief(GameState state) {
   final date = state.currentDate;
   final weekend = date.weekday >= DateTime.saturday;
   final holiday = _fixedHoliday(date);
   final closed = !isMarketTradingDay(date);
 
-  final events = historicalNewsEventsForDate(date);
+  final events = marketNewsEventsForState(state);
   final event = events.isEmpty ? null : events.first;
   if (event != null) {
     return DailyBrief(
@@ -179,11 +165,11 @@ DailyBrief buildDailyBrief(GameState state) {
   }
   if (closed) {
     return DailyBrief(
-      eyebrow: weekend ? '주말' : 'KRX 휴장',
+      eyebrow: weekend ? '주말' : '미래거래소 휴장',
       title: weekend ? '주말, 증시는 문을 닫았다' : '거래소가 쉬어가는 날',
       body: weekend
           ? '국내 증시는 쉬지만 국내외 경제 일정과 기업 발표는 계속됩니다.'
-          : '실제 국내 종가 달력에 거래가 없는 날입니다. 다음 거래일 일정을 확인합니다.',
+          : '가상 거래소 달력에 거래가 없는 날입니다. 다음 거래일 일정을 확인합니다.',
       marketClosed: true,
       tone: weekend ? NewsTone.weekend : NewsTone.holiday,
     );
@@ -277,8 +263,8 @@ DynamicNewsRequest dynamicNewsRequestForState(
 
   final marketSummary = newspaper == null
       ? brief.marketClosed
-            ? '국내 증시는 휴장했다.'
-            : '국내 증시는 정규 거래일을 마쳤다.'
+            ? '가상 증시는 휴장했다.'
+            : '가상 증시는 정규 거래일을 마쳤다.'
       : [
           newspaper.summary,
           moverText('상승 상위', newspaper.topGainers),
@@ -298,7 +284,9 @@ Future<DailyMarketNewspaper> buildDailyMarketNewspaper(
   DynamicNewsArticle? dynamicArticle,
 }) async {
   final brief = buildDailyBrief(state);
-  final universe = await HistoricalMarketUniverse.load();
+  final universe = await FictionalMarketUniverse.load(
+    seed: state.simulationSeed,
+  );
   final movers = <DailyMarketMover>[];
   for (final asset in universe.assets.where((asset) => asset.isDomestic)) {
     final quote = asset.quoteAtOrBefore(state.currentDate);
@@ -328,12 +316,12 @@ Future<DailyMarketNewspaper> buildDailyMarketNewspaper(
       dynamicArticle?.headline ??
       brief.headline?.title ??
       (brief.marketClosed
-          ? '국내 증시 휴장, 다음 거래일 변수 점검'
+          ? '가상 증시 휴장, 다음 거래일 일정 점검'
           : advancers >= decliners
-          ? '국내 증시, 상승 종목이 더 많았다'
-          : '국내 증시, 하락 종목 우세로 마감');
+          ? '가상 증시, 상승 종목이 더 많았다'
+          : '가상 증시, 하락 종목 우세로 마감');
   final summary = movers.isEmpty
-      ? '오늘 확인 가능한 국내 종가가 없습니다. 휴장 여부와 다음 거래일 일정을 확인했습니다.'
+      ? '오늘 확인 가능한 가상 시장 종가가 없습니다. 휴장 여부와 다음 거래일 일정을 확인했습니다.'
       : '국내 ${movers.length}개 종목 중 상승 $advancers개, 하락 $decliners개, 보합 $unchanged개로 하루를 마쳤습니다.';
   return DailyMarketNewspaper(
     date: state.currentDate,

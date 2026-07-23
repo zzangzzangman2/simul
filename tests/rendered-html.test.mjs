@@ -132,48 +132,38 @@ test("keeps Flutter launch metadata aligned with the current starting conditions
   assert.doesNotMatch(parsedManifest.description, /초기자본 100만원/);
 });
 
-test("ships a complete daily 2000-2010 market snapshot", async () => {
-  const data = JSON.parse(await readFile(new URL("../app/data/market-history.json", import.meta.url), "utf8"));
-  assert.equal(data.schemaVersion, 4);
-  assert.equal(data.period.start, "2000-01-01");
-  assert.equal(data.period.end, "2010-12-31");
-  assert.equal(data.assets.length, 28);
-  assert.equal(data.assets.filter((asset) => asset.country === "KR").length, 22);
-  assert.equal(data.assets.filter((asset) => asset.country !== "KR").length, 6);
-  assert.deepEqual(new Set(data.assets.map((asset) => asset.market)), new Set(["KOSPI", "KOSDAQ", "NASDAQ", "TSE"]));
-
-  for (const asset of data.assets) {
-    const dates = Object.keys(asset.prices).sort();
-    assert.ok(dates.length >= 2700, `${asset.symbol} should have at least 2700 daily observations`);
-    assert.equal(new Set(dates).size, dates.length, `${asset.symbol} should not contain duplicate dates`);
-    assert.ok(dates[0] >= "1999-12-01" && dates[0] <= "2000-04-28");
-    assert.ok(dates.at(-1) >= "2010-12-30");
-    assert.ok(dates.every((date) => /^\d{4}-\d{2}-\d{2}$/.test(date)));
-    assert.ok(Object.values(asset.prices).every((price) => Number.isFinite(price) && price > 0));
-    assert.ok(Array.isArray(asset.corporateActions));
-  }
-
-  const actions = data.assets.flatMap((asset) => asset.corporateActions);
-  assert.equal(actions.length, 299);
-  assert.equal(new Set(actions.map((action) => action.id)).size, actions.length);
-  assert.ok(actions.some((action) => action.type === "split"));
-  assert.ok(actions.some((action) => action.type === "dividend"));
-  assert.ok(actions.every((action) => /^\d{4}-\d{2}-\d{2}$/.test(action.date)));
+test("ships a fixed fictional roster and an expanding market generator", async () => {
+  const source = await readFile(
+    new URL("../flutter_app/lib/game/fictional_market.dart", import.meta.url),
+    "utf8",
+  );
+  const fixedRoster = source.slice(
+    source.indexOf("const fixedFictionalCompanies"),
+    source.indexOf("const _spinoffBlueprints"),
+  );
+  assert.equal((fixedRoster.match(/FictionalCompanyDefinition\(/g) ?? []).length, 30);
+  assert.match(source, /한빛통신/);
+  assert.match(source, /rightsIssue/);
+  assert.match(source, /materialSpinoff/);
+  assert.match(source, /delisting/);
+  assert.match(source, /buildFictionalMarketUniverse/);
+  assert.doesNotMatch(source, /assets\/market\/market-history\.json/);
 });
 
 test("documents and preserves the portrait-mobile product contract", async () => {
-  const [rules, guide, css, game, roomImage] = await Promise.all([
+  const [rules, guide, css, state, market, roomImage] = await Promise.all([
     readFile(new URL("../AGENTS.md", import.meta.url), "utf8"),
     readFile(new URL("../PROJECT_GUIDE.md", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
-    readFile(new URL("../app/game-client.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../flutter_app/lib/game/game_state.dart", import.meta.url), "utf8"),
+    readFile(new URL("../flutter_app/lib/stock_market_screen.dart", import.meta.url), "utf8"),
     readFile(new URL("../public/office-room.png", import.meta.url)),
   ]);
 
   assert.match(rules, /390×844px/);
   assert.match(rules, /최소 360px/);
   assert.match(guide, /처음하기.*이어하기/);
-  assert.match(guide, /현재 상태 스키마는 `v13`/);
+  assert.match(guide, /현재 상태 스키마는 `v14`/);
   assert.match(guide, /최대 5슬롯/);
   assert.doesNotMatch(rules, /게임 화면보다 먼저 회사 이름/);
   assert.doesNotMatch(guide, /첫 방문 시 회사 이름 입력 화면/);
@@ -181,19 +171,12 @@ test("documents and preserves the portrait-mobile product contract", async () =>
   assert.match(css, /env\(safe-area-inset-bottom\)/);
   assert.match(css, /width: min\(100%, 430px\)/);
   assert.match(css, /\.asset-grid \{[\s\S]*?grid-template-columns: 1fr;/);
-  assert.match(game, /companyName: string/);
-  assert.match(game, /version: 3/);
-  assert.match(game, /currentDate: string/);
-  assert.match(game, /INITIAL_CAPITAL = 0/);
-  assert.match(game, /INITIAL_TEAM = 1/);
-  assert.match(game, /maxLength=\{24\}/);
-  assert.match(game, /simul-millennium-capital-v1/);
-  assert.match(game, /data-testid="office-screen"/);
-  assert.match(game, /data-testid="room-computer"/);
-  assert.match(game, /data-testid="advance-day"/);
-  assert.match(game, /orderSheetOpen/);
-  assert.match(game, /order-sheet-backdrop/);
-  assert.match(game, /navigateTab/);
+  assert.match(state, /schemaVersion = 14/);
+  assert.match(state, /simulationSeed/);
+  assert.match(market, /daily-market-report-card/);
+  assert.match(market, /purchase-market-report-button/);
+  assert.match(market, /가상시장 종목/);
+  assert.doesNotMatch(market, /historical-executive-section/);
   assert.match(css, /url\("\/office-room\.png"\)/);
   assert.ok(roomImage.byteLength > 100_000);
 });

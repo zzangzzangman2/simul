@@ -298,7 +298,7 @@ class _FinanceNoticeCard extends StatelessWidget {
       border: Border.all(color: const Color(0xFFDCC38F)),
     ),
     child: const Text(
-      '부동산 가격·임대수입·매각가는 게임 밸런스용 가상 수치이며 실제 역사 데이터가 아닙니다. 부동산은 주식 운용 AUM과 분리해 표시합니다.',
+      '부동산 가격·임대수입·매각가는 게임 밸런스용 가상 수치이며 현실 부동산 데이터가 아닙니다. 부동산은 주식 운용 AUM과 분리해 표시합니다.',
       style: TextStyle(fontSize: 11, height: 1.5, fontWeight: FontWeight.w700),
     ),
   );

@@ -5,7 +5,7 @@ import 'organization_state.dart';
 import 'personal_finance_state.dart';
 import 'story_state.dart';
 
-enum WorldMode { historical, diverged }
+enum CompanyWorldMode { fictional }
 
 enum DecisionStatus { pending, resolved }
 
@@ -40,7 +40,7 @@ class GameState {
     required this.processedEventIds,
   });
 
-  static const schemaVersion = 13;
+  static const schemaVersion = 14;
   static const maxCampaignDay = 4018;
 
   final int version;
@@ -283,17 +283,13 @@ class PortfolioPosition {
     String? legacyAssetId,
   }) {
     final assetId = (json['assetId'] as String? ?? legacyAssetId ?? '').trim();
-    final legacyAsset = _legacyPortfolioAssets[assetId];
     final units = (json['units'] as num?)?.toDouble() ?? 0;
     return PortfolioPosition(
       assetId: assetId,
-      symbol: (json['symbol'] as String? ?? legacyAsset?.symbol ?? assetId)
-          .trim(),
-      name: (json['name'] as String? ?? legacyAsset?.name ?? assetId).trim(),
-      market: (json['market'] as String? ?? legacyAsset?.market ?? 'UNKNOWN')
-          .trim(),
-      currency: (json['currency'] as String? ?? legacyAsset?.currency ?? 'KRW')
-          .trim(),
+      symbol: (json['symbol'] as String? ?? assetId).trim(),
+      name: (json['name'] as String? ?? assetId).trim(),
+      market: (json['market'] as String? ?? 'UNKNOWN').trim(),
+      currency: (json['currency'] as String? ?? 'KRW').trim(),
       units: units.isFinite && units > 0 ? units : 0,
       totalCost: ((json['totalCost'] ?? json['cost']) as num?)?.toInt() ?? 0,
     );
@@ -331,68 +327,15 @@ class PortfolioPosition {
   }
 }
 
-class _LegacyPortfolioAsset {
-  const _LegacyPortfolioAsset({
-    required this.symbol,
-    required this.name,
-    required this.market,
-    required this.currency,
-  });
-
-  final String symbol;
-  final String name;
-  final String market;
-  final String currency;
-}
-
-const _legacyPortfolioAssets = <String, _LegacyPortfolioAsset>{
-  'apple': _LegacyPortfolioAsset(
-    symbol: 'AAPL',
-    name: 'Apple',
-    market: 'NASDAQ',
-    currency: 'USD',
-  ),
-  'microsoft': _LegacyPortfolioAsset(
-    symbol: 'MSFT',
-    name: 'Microsoft',
-    market: 'NASDAQ',
-    currency: 'USD',
-  ),
-  'cisco': _LegacyPortfolioAsset(
-    symbol: 'CSCO',
-    name: 'Cisco',
-    market: 'NASDAQ',
-    currency: 'USD',
-  ),
-  'toyota': _LegacyPortfolioAsset(
-    symbol: '7203',
-    name: 'Toyota',
-    market: 'TSE',
-    currency: 'JPY',
-  ),
-  'sony': _LegacyPortfolioAsset(
-    symbol: '6758',
-    name: 'Sony',
-    market: 'TSE',
-    currency: 'JPY',
-  ),
-  'softbank': _LegacyPortfolioAsset(
-    symbol: '9984',
-    name: 'SoftBank',
-    market: 'TSE',
-    currency: 'JPY',
-  ),
-};
-
 class CompanyState {
   const CompanyState({
     required this.id,
     required this.name,
     required this.worldMode,
-    required this.divergedAtDay,
-    required this.divergenceReason,
+    required this.worldStartedAtDay,
+    required this.worldPremise,
     required this.votingOwnershipPct,
-    required this.historicalPriceAtDivergence,
+    required this.worldReferencePrice,
     required this.simulatedPrice,
     required this.monthlyRevenue,
     required this.brand,
@@ -403,11 +346,11 @@ class CompanyState {
 
   final String id;
   final String name;
-  final WorldMode worldMode;
-  final int? divergedAtDay;
-  final String? divergenceReason;
+  final CompanyWorldMode worldMode;
+  final int? worldStartedAtDay;
+  final String? worldPremise;
   final double votingOwnershipPct;
-  final double? historicalPriceAtDivergence;
+  final double? worldReferencePrice;
   final double? simulatedPrice;
   final int monthlyRevenue;
   final int brand;
@@ -418,11 +361,11 @@ class CompanyState {
   bool get isControlled => votingOwnershipPct >= 50;
 
   CompanyState copyWith({
-    WorldMode? worldMode,
-    int? divergedAtDay,
-    String? divergenceReason,
+    CompanyWorldMode? worldMode,
+    int? worldStartedAtDay,
+    String? worldPremise,
     double? votingOwnershipPct,
-    double? historicalPriceAtDivergence,
+    double? worldReferencePrice,
     double? simulatedPrice,
     int? monthlyRevenue,
     int? brand,
@@ -434,11 +377,10 @@ class CompanyState {
       id: id,
       name: name,
       worldMode: worldMode ?? this.worldMode,
-      divergedAtDay: divergedAtDay ?? this.divergedAtDay,
-      divergenceReason: divergenceReason ?? this.divergenceReason,
+      worldStartedAtDay: worldStartedAtDay ?? this.worldStartedAtDay,
+      worldPremise: worldPremise ?? this.worldPremise,
       votingOwnershipPct: votingOwnershipPct ?? this.votingOwnershipPct,
-      historicalPriceAtDivergence:
-          historicalPriceAtDivergence ?? this.historicalPriceAtDivergence,
+      worldReferencePrice: worldReferencePrice ?? this.worldReferencePrice,
       simulatedPrice: simulatedPrice ?? this.simulatedPrice,
       monthlyRevenue: monthlyRevenue ?? this.monthlyRevenue,
       brand: (brand ?? this.brand).clamp(0, 100),
@@ -452,10 +394,10 @@ class CompanyState {
     'id': id,
     'name': name,
     'worldMode': worldMode.name,
-    'divergedAtDay': divergedAtDay,
-    'divergenceReason': divergenceReason,
+    'worldStartedAtDay': worldStartedAtDay,
+    'worldPremise': worldPremise,
     'votingOwnershipPct': votingOwnershipPct,
-    'historicalPriceAtDivergence': historicalPriceAtDivergence,
+    'worldReferencePrice': worldReferencePrice,
     'simulatedPrice': simulatedPrice,
     'monthlyRevenue': monthlyRevenue,
     'brand': brand,
@@ -465,16 +407,17 @@ class CompanyState {
   };
 
   factory CompanyState.fromJson(Map<String, dynamic> json) => CompanyState(
-    id: json['id'] as String? ?? 'apple',
-    name: json['name'] as String? ?? 'Apple',
-    worldMode: json['worldMode'] == WorldMode.diverged.name
-        ? WorldMode.diverged
-        : WorldMode.historical,
-    divergedAtDay: (json['divergedAtDay'] as num?)?.toInt(),
-    divergenceReason: json['divergenceReason'] as String?,
+    id: json['id'] as String? ?? 'hanbit_telecom',
+    name: json['name'] as String? ?? '한빛통신',
+    worldMode: CompanyWorldMode.fictional,
+    worldStartedAtDay:
+        ((json['worldStartedAtDay'] ?? json['divergedAtDay']) as num?)?.toInt(),
+    worldPremise: (json['worldPremise'] ?? json['divergenceReason']) as String?,
     votingOwnershipPct: (json['votingOwnershipPct'] as num?)?.toDouble() ?? 0,
-    historicalPriceAtDivergence: (json['historicalPriceAtDivergence'] as num?)
-        ?.toDouble(),
+    worldReferencePrice:
+        ((json['worldReferencePrice'] ?? json['historicalPriceAtDivergence'])
+                as num?)
+            ?.toDouble(),
     simulatedPrice: (json['simulatedPrice'] as num?)?.toDouble(),
     monthlyRevenue: (json['monthlyRevenue'] as num?)?.toInt() ?? 120000,
     brand: (json['brand'] as num?)?.toInt() ?? 42,

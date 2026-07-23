@@ -33,13 +33,13 @@ void main() {
     await tester.pump();
     for (var attempt = 0; attempt < 40; attempt++) {
       await tester.pump(const Duration(milliseconds: 100));
-      if (find.byKey(const Key('stock-row-005930')).evaluate().isNotEmpty) {
+      if (find.byKey(const Key('stock-row-1001')).evaluate().isNotEmpty) {
         return;
       }
     }
   }
 
-  testWidgets('360px stock list, detail, and executive portraits stay inside', (
+  testWidgets('360px fictional stock list and research detail stay inside', (
     tester,
   ) async {
     await usePhoneSurface(tester);
@@ -52,34 +52,31 @@ void main() {
       ),
     );
     await openMarketExplore(tester);
-    if (find.byKey(const Key('stock-row-005930')).evaluate().isEmpty) {
+    if (find.byKey(const Key('stock-row-1001')).evaluate().isEmpty) {
       await tester.scrollUntilVisible(
-        find.byKey(const Key('stock-row-005930')),
+        find.byKey(const Key('stock-row-1001')),
         220,
         scrollable: find.byType(Scrollable).first,
       );
       await tester.pump();
     }
 
-    expect(find.byKey(const Key('stock-row-005930')), findsOneWidget);
+    expect(find.byKey(const Key('stock-row-1001')), findsOneWidget);
     expect(tester.takeException(), isNull);
 
-    await tester.ensureVisible(find.byKey(const Key('stock-row-005930')));
+    await tester.ensureVisible(find.byKey(const Key('stock-row-1001')));
     await tester.pump();
-    await tester.tap(find.byKey(const Key('stock-row-005930')));
+    await tester.tap(find.byKey(const Key('stock-row-1001')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     await tester.scrollUntilVisible(
-      find.byKey(const Key('historical-executive-section')),
+      find.text('오늘의 조사 질문'),
       220,
       scrollable: find.byType(Scrollable).last,
     );
     await tester.pump();
 
-    expect(
-      find.byKey(const Key('executive-portrait-lee_kun_hee')),
-      findsOneWidget,
-    );
+    expect(find.text('오늘의 조사 질문'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.tap(find.byKey(const Key('buy-stock-button')));
     await tester.pumpAndSettle();
@@ -232,10 +229,10 @@ void main() {
       cash: -50000,
       positions: const [
         PortfolioPosition(
-          assetId: 'kr-005930',
-          symbol: '005930.KS',
-          name: '삼성전자',
-          market: 'KOSPI',
+          assetId: 'hanbit_telecom',
+          symbol: '1001',
+          name: '한빛통신',
+          market: '미래시장',
           currency: 'KRW',
           units: 10,
           totalCost: 60000,
@@ -331,14 +328,23 @@ void main() {
 
   testWidgets('360px longest news bulletin stays inside', (tester) async {
     await usePhoneSurface(tester);
-    final event = kHistoricalNews.reduce(
-      (current, next) =>
-          next.title.length + next.eyebrow.length >
-              current.title.length + current.eyebrow.length
-          ? next
-          : current,
+    const event = FictionalMarketEvent(
+      id: 'layout-long-event',
+      date: '2006-06-15',
+      companyId: 'cheonghae_heavy',
+      companyName: '청해중공업',
+      sector: '조선·기계',
+      stage: 3,
+      eyebrow: '대형 프로젝트 원가 재검토',
+      title: '청해중공업, 장기간 진행한 친환경 해양설비의 인도 일정과 추가 비용을 다시 검토한다',
+      body: '발주처의 설계 변경과 원자재 가격 상승이 겹쳐 회사가 공정별 원가와 인도 일정을 다시 계산하고 있다.',
+      signal: '수주 금액보다 남은 공사비와 지체상금 조건을 함께 확인해야 합니다.',
+      reportHint: '현장 투입 인력과 외주비가 계획보다 빠르게 늘고 있다.',
+      revealMinute: 14 * 60,
+      impactPct: -0.08,
+      tone: NewsTone.shock,
     );
-    final date = DateTime(event.year, event.month, event.day);
+    final date = DateTime(2006, 6, 15);
 
     await tester.pumpWidget(
       MaterialApp(
@@ -372,7 +378,7 @@ void main() {
       MaterialApp(home: KoreaEconomicNewspaperScene(newspaper: newspaper)),
     );
     await tester.pumpAndSettle();
-    expect(find.text('한국경제신문'), findsOneWidget);
+    expect(find.text('새천년경제'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
   testWidgets('360px visual novel portraits stay inside through all scenes', (

@@ -881,14 +881,14 @@ class PortfolioLedgerScreen extends StatefulWidget {
   onPurchaseSpendingOption;
   final Future<FinanceActionResult> Function(String assetId)? onSellRealEstate;
   final Future<FinanceActionResult> Function(int stake)? onPlayChanceGame;
-  final HistoricalMarketUniverse? universe;
+  final FictionalMarketUniverse? universe;
 
   @override
   State<PortfolioLedgerScreen> createState() => _PortfolioLedgerScreenState();
 }
 
 class _PortfolioLedgerScreenState extends State<PortfolioLedgerScreen> {
-  late Future<HistoricalMarketUniverse> _universeFuture;
+  late Future<FictionalMarketUniverse> _universeFuture;
   late GameState _state;
 
   GameState get state => _state;
@@ -941,13 +941,16 @@ class _PortfolioLedgerScreenState extends State<PortfolioLedgerScreen> {
     super.initState();
     _state = widget.state;
     _universeFuture = widget.universe == null
-        ? HistoricalMarketUniverse.load()
+        ? FictionalMarketUniverse.load(seed: state.simulationSeed)
         : Future.value(widget.universe!);
   }
 
   void _retryMarketData() {
     setState(() {
-      _universeFuture = HistoricalMarketUniverse.load(forceRefresh: true);
+      _universeFuture = FictionalMarketUniverse.load(
+        seed: state.simulationSeed,
+        forceRefresh: true,
+      );
     });
   }
 
@@ -995,13 +998,13 @@ class _PortfolioLedgerScreenState extends State<PortfolioLedgerScreen> {
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(20),
-                    child: FutureBuilder<HistoricalMarketUniverse>(
+                    child: FutureBuilder<FictionalMarketUniverse>(
                       future: _universeFuture,
                       builder: (context, snapshot) {
                         final assets = {
                           for (final asset
                               in snapshot.data?.assets ??
-                                  const <HistoricalMarketAsset>[])
+                                  const <FictionalMarketAsset>[])
                             asset.id: asset,
                         };
                         final prices = <String, double>{};
@@ -2283,7 +2286,7 @@ class _NewsArchiveEntry extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '$dateLabel · 역사 사건 $eventCount건',
+                  '$dateLabel · 시장 사건 $eventCount건',
                   style: const TextStyle(
                     color: Color(0xFF8C765F),
                     fontSize: 10,
