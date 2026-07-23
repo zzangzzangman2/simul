@@ -962,16 +962,16 @@ void main() {
     expect(find.textContaining('1분봉'), findsWidgets);
     expect(find.textContaining('현실 1초마다 게임 1분 진행'), findsOneWidget);
     final detailPrice = find.byKey(const Key('stock-detail-price'));
-    final priceBeforeTick = tester.widget<Text>(detailPrice).data;
+    expect(detailPrice, findsOneWidget);
+    final clockBeforeTick = tester
+        .widget<Text>(find.byKey(const Key('market-phone-status-time')))
+        .data;
     await tester.pump(const Duration(seconds: 1));
-    final priceAfterTick = tester.widget<Text>(detailPrice).data;
-    expect(priceAfterTick, isNot(priceBeforeTick));
-    expect(
-      tester
-          .widget<Text>(find.byKey(const Key('market-phone-status-time')))
-          .data,
-      contains('09:'),
-    );
+    final clockAfterTick = tester
+        .widget<Text>(find.byKey(const Key('market-phone-status-time')))
+        .data;
+    expect(clockAfterTick, isNot(clockBeforeTick));
+    expect(clockAfterTick, contains('09:'));
     expect(find.byKey(const Key('chart-time-axis')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
@@ -1093,6 +1093,43 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('stock detail exposes fundamentals and a limit-order ticket', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final state = const GameEngine()
+        .createNewGame('지정가 화면 테스트', initialCash: 1000000)
+        .copyWith(day: 4, marketMinute: 9 * 60);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StockMarketScreen(state: state, universe: testMarketUniverse()),
+      ),
+    );
+    await openMarketExplore(tester);
+    await tester.tap(find.byKey(const Key('stock-row-1001')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('company-fundamentals-card')), findsOneWidget);
+    expect(find.text('분기 재무와 시장 기대'), findsOneWidget);
+    expect(find.text('사업 관계망'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('buy-stock-button')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('order-type-selector')), findsOneWidget);
+    await tester.tap(find.text('지정가'));
+    await tester.pump();
+    expect(find.byKey(const Key('limit-price-control')), findsOneWidget);
+    expect(find.textContaining('미체결은 장 마감에 자동 취소'), findsOneWidget);
+
+    Navigator.of(
+      tester.element(find.byKey(const Key('limit-price-control'))),
+    ).pop();
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('first buy is visibly locked until seed-money authority opens', (
     tester,
   ) async {
@@ -1194,7 +1231,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
       expect(requestedMinutes, <int>[krxOpenMinute, krxCloseMinute]);
-      expect(tester.widget<Text>(clock.first).data, contains('15:30'));
+      expect(tester.widget<Text>(clock.first).data, contains('15:00'));
       expect(button('market-jump-open-button').onPressed, isNull);
       expect(button('market-jump-close-button').onPressed, isNull);
       expect(
@@ -1211,7 +1248,7 @@ void main() {
 
       await tester.pump(const Duration(seconds: 1));
       expect(button('market-jump-close-button').onPressed, isNull);
-      expect(tester.widget<Text>(clock.first).data, contains('15:30'));
+      expect(tester.widget<Text>(clock.first).data, contains('15:00'));
       expect(
         tester.widget<Text>(find.byKey(const Key('market-header-status'))).data,
         contains('오늘 장 마감'),
@@ -1377,28 +1414,25 @@ void main() {
     },
   );
   testWidgets(
-    'dish mini-game requires the full cleaning sequence before reward',
+    'dish mini-game V2 requires wet scrub rinse and rack for every dish',
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(390, 844));
       addTearDown(() => tester.binding.setSurfaceSize(null));
       await tester.pumpWidget(const MaterialApp(home: DishwashingMiniGame()));
       await tester.pump();
-      expect(find.byKey(const Key('dish-sequence-preview')), findsOneWidget);
 
-      const sequences = <List<String>>[
-        ['rinse', 'scrub', 'finish'],
-        ['scrub', 'rinse', 'finish'],
-        ['rinse', 'rinse', 'finish'],
-        ['scrub', 'scrub', 'finish'],
-        ['rinse', 'scrub', 'finish'],
-      ];
-      for (final sequence in sequences) {
-        await tester.pump(const Duration(milliseconds: 1400));
-        expect(find.byKey(const Key('dish-recall-prompt')), findsOneWidget);
-        for (final action in sequence) {
-          await tester.tap(find.byKey(Key('dish-$action')));
+      const grimeCounts = [3, 3, 5, 4];
+      for (var dish = 0; dish < grimeCounts.length; dish++) {
+        await tester.tap(find.byKey(const Key('dish-wet')));
+        await tester.pump();
+        for (var spot = 0; spot < grimeCounts[dish]; spot++) {
+          await tester.tap(find.byKey(Key('dish-grime-$dish-$spot')));
           await tester.pump();
         }
+        await tester.tap(find.byKey(const Key('dish-rinse')));
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('dish-rack')));
+        await tester.pump();
       }
 
       expect(find.byKey(const Key('work-result-card')), findsOneWidget);
@@ -1443,37 +1477,39 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets(
-    'stationery mini-game sorts every item into its period shop shelf',
-    (tester) async {
-      await tester.binding.setSurfaceSize(const Size(390, 844));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
-      await tester.pumpWidget(
-        const MaterialApp(home: StationerySortMiniGame()),
-      );
-      await tester.pumpAndSettle();
+  testWidgets('stationery mini-game V2 packs every customer order exactly', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(const MaterialApp(home: StationerySortMiniGame()));
+    await tester.pumpAndSettle();
 
-      for (final category in [
-        'school',
-        'school',
-        'snack',
-        'toy',
-        'school',
-        'snack',
-        'toy',
-        'school',
-      ]) {
-        await tester.tap(find.byKey(Key('sort-$category')));
+    const orders = <List<String>>[
+      ['notebook', 'pencil', 'pencil', 'eraser'],
+      ['candy', 'candy', 'snack'],
+      ['marbles', 'marbles', 'marbles', 'candy'],
+      ['notebook', 'pencil', 'snack', 'marbles'],
+    ];
+    for (final order in orders) {
+      for (final item in order) {
+        final stock = find.byKey(Key('stock-$item'));
+        await tester.ensureVisible(stock);
+        await tester.tap(stock);
         await tester.pump();
       }
+      final pack = find.byKey(const Key('pack-order'));
+      await tester.ensureVisible(pack);
+      await tester.tap(pack);
+      await tester.pump();
+    }
 
-      expect(find.byKey(const Key('work-result-card')), findsOneWidget);
-      expect(find.text('100점'), findsOneWidget);
-      expect(tester.takeException(), isNull);
-    },
-  );
+    expect(find.byKey(const Key('work-result-card')), findsOneWidget);
+    expect(find.text('100점'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 
-  testWidgets('flea market mini-game checks real won change calculations', (
+  testWidgets('flea market V2 combines negotiation and cash change', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
@@ -1481,9 +1517,30 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: FleaMarketMiniGame()));
     await tester.pumpAndSettle();
 
-    for (final change in [800, 2500, 3200, 6500, 5800]) {
-      await tester.tap(find.byKey(Key('change-$change')));
-      await tester.pump();
+    const counterCounts = [1, 2, 2, 3];
+    const changes = <List<int>>[
+      [1000, 1000, 1000, 500],
+      [1000, 1000],
+      [1000, 1000, 500],
+      [5000, 500],
+    ];
+    for (var sale = 0; sale < counterCounts.length; sale++) {
+      for (var counter = 0; counter < counterCounts[sale]; counter++) {
+        await tester.tap(find.byKey(const Key('deal-counter')));
+        await tester.pump();
+      }
+      await tester.tap(find.byKey(const Key('deal-accept')));
+      await tester.pumpAndSettle();
+      for (final value in changes[sale]) {
+        final note = find.byKey(Key('change-note-$value'));
+        await tester.ensureVisible(note);
+        await tester.tap(note);
+        await tester.pump();
+      }
+      final submit = find.byKey(const Key('change-submit'));
+      await tester.ensureVisible(submit);
+      await tester.tap(submit);
+      await tester.pumpAndSettle();
     }
 
     expect(find.byKey(const Key('work-result-card')), findsOneWidget);
@@ -1516,20 +1573,20 @@ void main() {
       expect(find.textContaining('시간당 1,600원'), findsOneWidget);
 
       await tester.tap(find.byKey(const Key('work-activity-dishes')));
-      await tester.pump();
-      const sequences = <List<String>>[
-        ['rinse', 'scrub', 'finish'],
-        ['scrub', 'rinse', 'finish'],
-        ['rinse', 'rinse', 'finish'],
-        ['scrub', 'scrub', 'finish'],
-        ['rinse', 'scrub', 'finish'],
-      ];
-      for (final sequence in sequences) {
-        await tester.pump(const Duration(milliseconds: 1400));
-        for (final action in sequence) {
-          await tester.tap(find.byKey(Key('dish-$action')));
+      await tester.pumpAndSettle();
+
+      const grimeCounts = [3, 3, 5, 4];
+      for (var dish = 0; dish < grimeCounts.length; dish++) {
+        await tester.tap(find.byKey(const Key('dish-wet')));
+        await tester.pump();
+        for (var spot = 0; spot < grimeCounts[dish]; spot++) {
+          await tester.tap(find.byKey(Key('dish-grime-$dish-$spot')));
           await tester.pump();
         }
+        await tester.tap(find.byKey(const Key('dish-rinse')));
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('dish-rack')));
+        await tester.pump();
       }
       await tester.tap(find.byKey(const Key('claim-work-reward')));
       await tester.pumpAndSettle();
@@ -1537,7 +1594,7 @@ void main() {
       final cash = tester.widget<Text>(
         find.byKey(const Key('seed-money-cash')),
       );
-      expect(cash.data, '880원');
+      expect(cash.data, '1,430원');
       final clock = tester.widget<Text>(
         find.byKey(const Key('scene-clock-time')),
       );

@@ -1,6 +1,10 @@
+import 'dart:math' as math;
+
 import 'market_clock.dart';
 
 part 'fictional_market.dart';
+part 'market_arc_scenarios.dart';
+part 'market_era_events.dart';
 
 enum MarketCorporateActionType {
   split,
@@ -9,6 +13,119 @@ enum MarketCorporateActionType {
   materialSpinoff,
   spinoff,
   delisting,
+}
+
+enum FictionalCompanyRelationType {
+  supplier,
+  customer,
+  competitor,
+  partner,
+  parent,
+  subsidiary,
+}
+
+class FictionalCompanyRelation {
+  const FictionalCompanyRelation({
+    required this.relatedAssetId,
+    required this.relatedName,
+    required this.type,
+    required this.strength,
+  });
+
+  final String relatedAssetId;
+  final String relatedName;
+  final FictionalCompanyRelationType type;
+  final double strength;
+
+  Map<String, dynamic> toJson() => {
+    'relatedAssetId': relatedAssetId,
+    'relatedName': relatedName,
+    'type': type.name,
+    'strength': strength,
+  };
+
+  factory FictionalCompanyRelation.fromJson(Map<String, dynamic> json) =>
+      FictionalCompanyRelation(
+        relatedAssetId: json['relatedAssetId'] as String? ?? '',
+        relatedName: json['relatedName'] as String? ?? '',
+        type: FictionalCompanyRelationType.values.firstWhere(
+          (value) => value.name == json['type'],
+          orElse: () => FictionalCompanyRelationType.partner,
+        ),
+        strength: ((json['strength'] as num?)?.toDouble() ?? 0.2)
+            .clamp(0.05, 0.8)
+            .toDouble(),
+      );
+}
+
+class FictionalFinancialSnapshot {
+  const FictionalFinancialSnapshot({
+    required this.period,
+    required this.revenue,
+    required this.operatingProfit,
+    required this.consensusOperatingProfit,
+    required this.netIncome,
+    required this.operatingCashFlow,
+    required this.cash,
+    required this.debt,
+    required this.equity,
+    required this.sharesOutstanding,
+    required this.orderBacklog,
+  });
+
+  final String period;
+  final int revenue;
+  final int operatingProfit;
+  final int consensusOperatingProfit;
+  final int netIncome;
+  final int operatingCashFlow;
+  final int cash;
+  final int debt;
+  final int equity;
+  final int sharesOutstanding;
+  final int orderBacklog;
+
+  double get operatingMargin =>
+      revenue <= 0 ? 0 : operatingProfit / revenue * 100;
+  double get roe => equity <= 0 ? 0 : netIncome * 4 / equity * 100;
+  double get eps =>
+      sharesOutstanding <= 0 ? 0 : netIncome * 4 / sharesOutstanding;
+  double get bps => sharesOutstanding <= 0 ? 0 : equity / sharesOutstanding;
+  double get earningsSurprisePct => consensusOperatingProfit == 0
+      ? 0
+      : (operatingProfit - consensusOperatingProfit) /
+            consensusOperatingProfit.abs() *
+            100;
+
+  Map<String, dynamic> toJson() => {
+    'period': period,
+    'revenue': revenue,
+    'operatingProfit': operatingProfit,
+    'consensusOperatingProfit': consensusOperatingProfit,
+    'netIncome': netIncome,
+    'operatingCashFlow': operatingCashFlow,
+    'cash': cash,
+    'debt': debt,
+    'equity': equity,
+    'sharesOutstanding': sharesOutstanding,
+    'orderBacklog': orderBacklog,
+  };
+
+  factory FictionalFinancialSnapshot.fromJson(Map<String, dynamic> json) =>
+      FictionalFinancialSnapshot(
+        period: json['period'] as String? ?? '',
+        revenue: (json['revenue'] as num?)?.toInt() ?? 0,
+        operatingProfit: (json['operatingProfit'] as num?)?.toInt() ?? 0,
+        consensusOperatingProfit:
+            (json['consensusOperatingProfit'] as num?)?.toInt() ?? 0,
+        netIncome: (json['netIncome'] as num?)?.toInt() ?? 0,
+        operatingCashFlow: (json['operatingCashFlow'] as num?)?.toInt() ?? 0,
+        cash: (json['cash'] as num?)?.toInt() ?? 0,
+        debt: (json['debt'] as num?)?.toInt() ?? 0,
+        equity: (json['equity'] as num?)?.toInt() ?? 0,
+        sharesOutstanding: (json['sharesOutstanding'] as num?)?.toInt() ?? 0,
+        orderBacklog: (json['orderBacklog'] as num?)?.toInt() ?? 0,
+      );
 }
 
 class MarketCorporateAction {
@@ -135,6 +252,8 @@ class FictionalMarketAsset {
     this.parentAssetId,
     this.listedOn,
     this.delistedOn,
+    this.financials = const <FictionalFinancialSnapshot>[],
+    this.relations = const <FictionalCompanyRelation>[],
   }) : _dates = prices.keys.toList()..sort(),
        _prices = prices;
 
@@ -195,6 +314,22 @@ class FictionalMarketAsset {
       parentAssetId: json['parentAssetId'] as String?,
       listedOn: json['listedOn'] as String?,
       delistedOn: json['delistedOn'] as String?,
+      financials: ((json['financials'] as List?) ?? const [])
+          .whereType<Map>()
+          .map(
+            (item) => FictionalFinancialSnapshot.fromJson(
+              item.cast<String, dynamic>(),
+            ),
+          )
+          .toList(growable: false),
+      relations: ((json['relations'] as List?) ?? const [])
+          .whereType<Map>()
+          .map(
+            (item) =>
+                FictionalCompanyRelation.fromJson(item.cast<String, dynamic>()),
+          )
+          .where((relation) => relation.relatedAssetId.isNotEmpty)
+          .toList(growable: false),
     );
   }
 
@@ -213,6 +348,8 @@ class FictionalMarketAsset {
   final String? parentAssetId;
   final String? listedOn;
   final String? delistedOn;
+  final List<FictionalFinancialSnapshot> financials;
+  final List<FictionalCompanyRelation> relations;
   final List<String> _dates;
   final Map<String, double> _prices;
 
@@ -220,6 +357,16 @@ class FictionalMarketAsset {
   bool get isDomestic => country == 'KR';
   String? get firstTradeDate => _dates.isEmpty ? null : _dates.first;
   String? get lastTradeDate => _dates.isEmpty ? null : _dates.last;
+
+  FictionalFinancialSnapshot? financialAtOrBefore(DateTime date) {
+    final key = _dateKey(date);
+    FictionalFinancialSnapshot? result;
+    for (final snapshot in financials) {
+      if (snapshot.period.compareTo(key) > 0) break;
+      result = snapshot;
+    }
+    return result;
+  }
 
   FictionalMarketQuote? quoteAtOrBefore(DateTime date) {
     final key = _dateKey(date);

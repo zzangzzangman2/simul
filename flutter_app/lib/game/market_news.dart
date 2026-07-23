@@ -113,10 +113,33 @@ const List<(String, String)> _weekend = [
   ('한 주 마감한 증권시장', '이번 주 업종별 흐름과 거래량을 돌아보며 다음 주 변수를 정리할 시점이다.'),
 ];
 
+const _fallbackAngles = <String>[
+  '현금흐름 재점검',
+  '수주잔고 확인',
+  '재고와 가동률 비교',
+  '환율 민감도 분석',
+  '차입금 만기 점검',
+  '원재료 부담 추적',
+  '신규 투자 효율 검토',
+  '기관·개인 수급 비교',
+];
+
+const _fallbackLenses = <String>[
+  '매출 증가가 실제 영업현금으로 이어지는지 확인할 필요가 있다.',
+  '발표 규모보다 계약 조건과 인도 일정을 함께 살펴야 한다.',
+  '단기 주가보다 재고 회전과 생산 가동률 변화가 먼저 나타날 수 있다.',
+  '원화 가치 변화가 수출 가격과 원재료 비용에 서로 다르게 반영될 전망이다.',
+  '투자 확대가 차입 부담을 넘어설 만큼 수익을 만드는지가 관건이다.',
+  '같은 업종 안에서도 가격 전가력에 따라 이익 흐름이 엇갈릴 수 있다.',
+  '신사업 기대와 기존 사업의 현금창출력을 분리해서 볼 필요가 있다.',
+  '거래량 급증이 장기 자금인지 단기 추격 매수인지 구분해야 한다.',
+];
+
 /// 계절/요일에 맞는 결정론적 소식 하나를 고른다.
 (String, String) _flavorFor(DateTime date, {required bool weekend}) {
+  final day = _daySince2000(date);
   if (weekend) {
-    return _weekend[_daySince2000(date) % _weekend.length];
+    return _weekend[day % _weekend.length];
   }
   final List<(String, String)> pool;
   final month = date.month;
@@ -129,7 +152,12 @@ const List<(String, String)> _weekend = [
   } else {
     pool = _weekdayFall;
   }
-  return pool[_daySince2000(date) % pool.length];
+  final base = pool[day % pool.length];
+  final angle = _fallbackAngles[(day ~/ pool.length) % _fallbackAngles.length];
+  final lens =
+      _fallbackLenses[(day ~/ (pool.length * _fallbackAngles.length)) %
+          _fallbackLenses.length];
+  return ('${base.$1} · $angle', '${base.$2} $lens');
 }
 
 /// 오늘 날짜와 게임 상태로 소식 한 조각을 만든다. 우선순위:
@@ -164,12 +192,11 @@ DailyBrief buildDailyBrief(GameState state) {
     );
   }
   if (closed) {
+    final flavor = _flavorFor(date, weekend: weekend);
     return DailyBrief(
       eyebrow: weekend ? '주말' : '미래거래소 휴장',
-      title: weekend ? '주말, 증시는 문을 닫았다' : '거래소가 쉬어가는 날',
-      body: weekend
-          ? '국내 증시는 쉬지만 국내외 경제 일정과 기업 발표는 계속됩니다.'
-          : '가상 거래소 달력에 거래가 없는 날입니다. 다음 거래일 일정을 확인합니다.',
+      title: weekend ? flavor.$1 : '거래소가 쉬어가는 날',
+      body: weekend ? flavor.$2 : '가상 거래소 달력에 거래가 없는 날입니다. 다음 거래일 일정을 확인합니다.',
       marketClosed: true,
       tone: weekend ? NewsTone.weekend : NewsTone.holiday,
     );

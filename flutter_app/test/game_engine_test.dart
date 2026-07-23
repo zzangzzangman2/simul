@@ -92,11 +92,13 @@ void main() {
   });
 
   test('daily report reveals signals once without exposing outcomes', () {
-    final state = engine.createNewGame(
-      '보고서 연구소',
-      initialCash: 5000,
-      worldSeed: 'report-world-seed',
-    );
+    final state = engine
+        .createNewGame(
+          '보고서 연구소',
+          initialCash: 5000,
+          worldSeed: 'report-world-seed',
+        )
+        .copyWith(brokerageCash: 0);
     final purchased = engine.purchaseDailyMarketReport(state);
     final repeated = engine.purchaseDailyMarketReport(purchased.state);
     final reports =
@@ -144,9 +146,9 @@ void main() {
           maxScore: 100,
         ),
       );
-      expect(state.cash, 880);
+      expect(state.cash, 1430);
       expect(state.ledger.last.counterAccount, 'work_income');
-      expect(state.story.storyFlags['earnedSeedMoney'], 880);
+      expect(state.story.storyFlags['earnedSeedMoney'], 1430);
 
       state = engine.completeWorkSession(
         state,
@@ -176,7 +178,7 @@ void main() {
 
       expect(state.toJson(), afterThree.toJson());
       expect(state.story.storyFlags['workSessionsToday'], 3);
-      expect(state.cash, 3740);
+      expect(state.cash, 5500);
     },
   );
   test('v1 save migrates without deleting company, cash, day, or story', () {
@@ -202,6 +204,9 @@ void main() {
     required double quantity,
     double unitPrice = 10000,
     String quoteDate = '2000-01-04',
+    TradeOrderType type = TradeOrderType.market,
+    double? limitPrice,
+    double previousClose = 10000,
   }) => TradeOrder(
     side: side,
     assetId: 'hanbit_telecom',
@@ -214,6 +219,9 @@ void main() {
     quoteDate: quoteDate,
     marketMinute: 9 * 60,
     isTradingDay: true,
+    type: type,
+    limitPrice: limitPrice,
+    previousClose: previousClose,
   );
 
   test(
@@ -269,6 +277,193 @@ void main() {
     expect(result.realizedPnl, 3790);
     expect(result.state.ledger.last.disposedCost, 40100);
     expect(result.state.ledger.last.realizedPnl, 3790);
+  });
+
+  test(
+    'non-marketable limit order reserves cash, persists, fills, and cancels',
+    () {
+      final state = engine
+          .createNewGame('지정가 연구소', initialCash: 300000)
+          .copyWith(day: 4, marketMinute: 9 * 60);
+      final placed = engine.executeTrade(
+        state,
+        hanbitOrder(
+          side: TradeSide.buy,
+          quantity: 10,
+          type: TradeOrderType.limit,
+          limitPrice: 9000,
+        ),
+      );
+
+      expect(placed.success, isTrue);
+      expect(placed.filledQuantity, 0);
+      expect(placed.pendingQuantity, 10);
+      expect(placed.state.pendingOrders, hasLength(1));
+      expect(
+        placed.state.availableBrokerageCash,
+        lessThan(state.brokerageCash),
+      );
+      final restored = GameState.fromJson(placed.state.toJson());
+      expect(restored.pendingOrders.single.limitPrice, 9000);
+      final legacyPendingJson = placed.state.toJson();
+      final legacyPending =
+          (legacyPendingJson['pendingOrders'] as List).single
+              as Map<String, dynamic>;
+      legacyPending.remove('placedSequence');
+      final legacyPendingState = GameState.fromJson(legacyPendingJson);
+      final collisionSafe = engine.executeTrade(
+        legacyPendingState,
+        hanbitOrder(
+          side: TradeSide.buy,
+          quantity: 1,
+          type: TradeOrderType.limit,
+          limitPrice: 9000,
+        ),
+      );
+      expect(
+        collisionSafe.state.pendingOrders.map((order) => order.id).toSet(),
+        hasLength(2),
+      );
+
+      final filled = engine.processPendingOrdersAtQuote(
+        restored,
+        assetId: 'hanbit_telecom',
+        unitPrice: 8900,
+        marketMinute: 9 * 60 + 1,
+        isTradingDay: true,
+      );
+      expect(filled.pendingOrders, isEmpty);
+      expect(filled.positions.single.units, 10);
+
+      final second = engine.executeTrade(
+        state,
+        hanbitOrder(
+          side: TradeSide.buy,
+          quantity: 3,
+          type: TradeOrderType.limit,
+          limitPrice: 9000,
+        ),
+      );
+      final cancelled = engine.cancelPendingOrder(
+        second.state,
+        second.state.pendingOrders.single.id,
+      );
+      expect(cancelled.success, isTrue);
+      expect(cancelled.state.pendingOrders, isEmpty);
+      expect(cancelled.state.availableBrokerageCash, state.brokerageCash);
+
+      final replacement = engine.executeTrade(
+        cancelled.state,
+        hanbitOrder(
+          side: TradeSide.buy,
+          quantity: 3,
+          type: TradeOrderType.limit,
+          limitPrice: 9000,
+        ),
+      );
+      expect(replacement.orderId, isNot(second.orderId));
+    },
+  );
+
+  test('pending buys use price priority before placement sequence', () {
+    final state = engine
+        .createNewGame('가격 우선 연구소', initialCash: 100000000)
+        .copyWith(day: 4, marketMinute: 9 * 60);
+    final lower = engine.executeTrade(
+      state,
+      hanbitOrder(
+        side: TradeSide.buy,
+        quantity: 5000,
+        type: TradeOrderType.limit,
+        limitPrice: 9000,
+      ),
+    );
+    final higher = engine.executeTrade(
+      lower.state,
+      hanbitOrder(
+        side: TradeSide.buy,
+        quantity: 5000,
+        type: TradeOrderType.limit,
+        limitPrice: 9500,
+      ),
+    );
+
+    final filled = engine.processPendingOrdersAtQuote(
+      higher.state,
+      assetId: 'hanbit_telecom',
+      unitPrice: 9000,
+      marketMinute: 9 * 60 + 1,
+      isTradingDay: true,
+    );
+    final lowOrder = filled.pendingOrders.singleWhere(
+      (order) => order.limitPrice == 9000,
+    );
+    final highOrder = filled.pendingOrders.singleWhere(
+      (order) => order.limitPrice == 9500,
+    );
+
+    expect(lowOrder.remainingQuantity, 5000);
+    expect(highOrder.remainingQuantity, lessThan(5000));
+    expect(highOrder.placedSequence, greaterThan(lowOrder.placedSequence));
+  });
+
+  test('marketable limit order can partially fill and leave a reservation', () {
+    final state = engine
+        .createNewGame('부분 체결 연구소', initialCash: 100000000)
+        .copyWith(day: 4, marketMinute: 9 * 60);
+    final result = engine.executeTrade(
+      state,
+      hanbitOrder(
+        side: TradeSide.buy,
+        quantity: 5000,
+        type: TradeOrderType.limit,
+        limitPrice: 10000,
+      ),
+    );
+
+    expect(result.success, isTrue);
+    expect(result.filledQuantity, greaterThan(0));
+    expect(result.filledQuantity, lessThan(5000));
+    expect(result.pendingQuantity, 5000 - result.filledQuantity);
+    expect(result.state.pendingOrders, hasLength(1));
+    expect(
+      result.state.pendingOrders.single.remainingQuantity,
+      result.pendingQuantity,
+    );
+    expect(result.state.positions.single.units, result.filledQuantity);
+  });
+
+  test('pending day orders expire at the historical 15:00 close', () {
+    final state = engine
+        .createNewGame('종가 주문 연구소', initialCash: 300000)
+        .copyWith(day: 4, marketMinute: 9 * 60);
+    final placed = engine.executeTrade(
+      state,
+      hanbitOrder(
+        side: TradeSide.buy,
+        quantity: 2,
+        type: TradeOrderType.limit,
+        limitPrice: 9000,
+      ),
+    );
+    final expired = engine.expirePendingOrders(
+      placed.state.copyWith(marketMinute: krxCloseMinute),
+    );
+
+    expect(expired.pendingOrders, isEmpty);
+    expect(expired.ledger.last.counterAccount, 'day_order_expiry');
+  });
+
+  test('pre-v15 saves migrate with an empty pending-order book', () {
+    final legacy = engine.createNewGame('주문 마이그레이션').toJson()
+      ..remove('pendingOrders')
+      ..['version'] = 14;
+
+    final migrated = engine.migrate(legacy);
+
+    expect(migrated.version, GameState.schemaVersion);
+    expect(migrated.pendingOrders, isEmpty);
+    expect(migrated.availableBrokerageCash, migrated.brokerageCash);
   });
 
   test('deposit and withdrawal move cash without changing total assets', () {
@@ -366,7 +561,7 @@ void main() {
   });
 
   test(
-    'React v3 date, fractional positions, cash, and team migrate to v14',
+    'React v3 date, fractional positions, cash, and team migrate to v15',
     () {
       final state = engine.migrate({
         'version': 3,
@@ -380,7 +575,7 @@ void main() {
       });
 
       expect(state.version, GameState.schemaVersion);
-      expect(GameState.schemaVersion, 14);
+      expect(GameState.schemaVersion, 15);
       expect(state.day, 5);
       expect(state.cash, 765432);
       expect(state.brokerageCash, 765432);
@@ -606,7 +801,7 @@ void main() {
         DateTime(2003, 1, 31).difference(DateTime(2000, 1, 1)).inDays + 1;
     var state = engine
         .createNewGame('채용 경제 테스트', initialCash: 500000)
-        .copyWith(day: january31, decisions: const []);
+        .copyWith(day: january31, brokerageCash: 0, decisions: const []);
     state = engine.hireEmployee(state, 'candidate-hana');
     expect(state.organization.employees.single.name, '김하나');
     expect(state.cash, 460000);
@@ -625,7 +820,7 @@ void main() {
   test('reputation and staff unlock an external capital fund', () {
     var state = engine
         .createNewGame('펀드 테스트', initialCash: 500000)
-        .copyWith(day: 1500, decisions: const []);
+        .copyWith(day: 1500, brokerageCash: 0, decisions: const []);
     state = engine.hireEmployee(state, 'candidate-hana');
     state = state.copyWith(
       story: state.story.copyWith(
@@ -671,7 +866,7 @@ void main() {
           DateTime(2004, 12, 31).difference(DateTime(2000, 1, 1)).inDays + 1;
       final base = engine
           .createNewGame('자료 소비 테스트', initialCash: 1000000)
-          .copyWith(day: december31, decisions: const []);
+          .copyWith(day: december31, brokerageCash: 0, decisions: const []);
 
       final purchase = engine.purchaseSpendingOption(base, 'data_archive');
       final duplicate = engine.purchaseSpendingOption(
@@ -702,7 +897,7 @@ void main() {
           DateTime(2006, 12, 31).difference(DateTime(2000, 1, 1)).inDays + 1;
       final base = engine
           .createNewGame('자가 사무실 테스트', initialCash: 5000000)
-          .copyWith(day: december31, decisions: const []);
+          .copyWith(day: december31, brokerageCash: 0, decisions: const []);
       final legal = base.copyWith(
         story: base.story.copyWith(
           storyFlags: {
@@ -744,7 +939,7 @@ void main() {
         DateTime(2008, 12, 31).difference(DateTime(2000, 1, 1)).inDays + 1;
     final base = engine
         .createNewGame('임대 자산 테스트', initialCash: 20000000)
-        .copyWith(day: december31, decisions: const []);
+        .copyWith(day: december31, brokerageCash: 0, decisions: const []);
     final legal = base.copyWith(
       story: base.story.copyWith(
         storyFlags: {...base.story.storyFlags, 'isLegalCompany': true},
@@ -778,7 +973,7 @@ void main() {
           DateTime(2010, 1, 1).difference(DateTime(2000, 1, 1)).inDays + 1;
       final adult = engine
           .createNewGame('확률 오락 테스트', initialCash: 10000000)
-          .copyWith(day: january1, decisions: const []);
+          .copyWith(day: january1, brokerageCash: 0, decisions: const []);
       final beforeAdult = adult.copyWith(day: january1 - 366);
 
       final locked = engine.playAdultChanceGame(beforeAdult, 10000);
@@ -825,6 +1020,241 @@ void main() {
       expect(monday.marketMinute, marketDayStartMinute);
     },
   );
+
+  test('market reports use bank cash and never drain brokerage cash', () {
+    final funded = engine.createNewGame(
+      '보고서 계정 분리 테스트',
+      initialCash: 100000,
+      worldSeed: 'report-account-world',
+    );
+
+    final rejected = engine.purchaseDailyMarketReport(funded);
+    expect(rejected.success, isFalse);
+    expect(rejected.message, contains('은행 잔고'));
+    expect(rejected.state.toJson(), funded.toJson());
+
+    final withdrawal = engine.transferBrokerageCash(
+      funded,
+      amount: dailyMarketReportPrice,
+      deposit: false,
+    );
+    final purchased = engine.purchaseDailyMarketReport(withdrawal.state);
+
+    expect(withdrawal.success, isTrue);
+    expect(purchased.success, isTrue);
+    expect(purchased.state.cash, 100000 - dailyMarketReportPrice);
+    expect(purchased.state.brokerageCash, 100000 - dailyMarketReportPrice);
+    expect(purchased.state.bankCash, 0);
+    expect(purchased.state.ledger.last.account, 'company_bank');
+  });
+
+  test('monthly unpaid costs keep cash and ledger amounts reconciled', () {
+    final january31 =
+        DateTime(2000, 1, 31).difference(DateTime(2000, 1, 1)).inDays + 1;
+    final base = engine.createNewGame('미지급금 테스트', initialCash: 100000);
+    final state = base.copyWith(
+      day: january31,
+      brokerageCash: 90000,
+      decisions: const [],
+      story: base.story.copyWith(
+        storyFlags: {...base.story.storyFlags, 'officeTier': 1},
+      ),
+    );
+    final ledgerLength = state.ledger.length;
+
+    final next = engine.advanceOneDay(state);
+    final monthlyEntries = next.ledger.skip(ledgerLength).toList();
+    final bookedCashDelta = monthlyEntries.fold<int>(
+      0,
+      (sum, entry) => sum + entry.amount,
+    );
+    final payable = monthlyEntries.singleWhere(
+      (entry) => entry.counterAccount == 'operating_expense_accrual',
+    );
+
+    expect(next.currentDate, DateTime(2000, 2, 1));
+    expect(next.cash - state.cash, bookedCashDelta);
+    expect(next.brokerageCash, state.brokerageCash);
+    expect(next.bankCash, 0);
+    expect(next.story.flagInt('unpaidOperatingCost'), payable.notional);
+    expect(payable.amount, 0);
+    expect(payable.notional, greaterThan(0));
+  });
+
+  test(
+    'the first control opportunity is reachable after trading and saving',
+    () {
+      final base = engine.createNewGame('경영권 기회 테스트', initialCash: 600000);
+      final state = base.copyWith(
+        day: 29,
+        brokerageCash: 200000,
+        decisions: const [],
+        story: base.story.copyWith(
+          storyFlags: {...base.story.storyFlags, 'firstOrderExecuted': true},
+        ),
+      );
+
+      final next = engine.advanceOneDay(state);
+
+      expect(next.story.flagBool('controlOfferPresented'), isTrue);
+      expect(next.pendingDecisions, hasLength(1));
+      expect(next.pendingDecisions.single.id, startsWith('control-offer-'));
+    },
+  );
+
+  test('semiannual era choices make the 20-decision mission attainable', () {
+    var state = resolveFirst(
+      engine.createNewGame(
+        '시대 결정 테스트',
+        initialCash: 0,
+        worldSeed: 'era-decision-world',
+      ),
+      'research_products',
+    );
+
+    for (var year = 2000; year <= 2010; year++) {
+      for (final triggerDate in [
+        DateTime(year, 3, 31),
+        DateTime(year, 9, 30),
+      ]) {
+        final day = triggerDate.difference(state.campaignStartDate).inDays + 1;
+        state = state.copyWith(day: day, decisions: state.decisions);
+        state = engine.advanceOneDay(state);
+        expect(
+          state.pendingDecisions.single.category,
+          '시대 기술 검토',
+          reason: '$year ${triggerDate.month}',
+        );
+        state = resolveFirst(state, 'era_observe');
+      }
+    }
+
+    final resolved = state.decisions
+        .where((decision) => decision.status == DecisionStatus.resolved)
+        .length;
+    expect(resolved, greaterThanOrEqualTo(20));
+  });
+
+  test(
+    'prudent office milestone does not force rent, while expansion does',
+    () {
+      final initial = resolveFirst(
+        engine.createNewGame('사무실 선택 테스트', initialCash: 1000000),
+        'research_products',
+      );
+      final officeDate = DateTime(2004, 1, 2);
+      final beforeOfficeDay = officeDate
+          .difference(initial.campaignStartDate)
+          .inDays;
+      final offered = engine.advanceOneDay(
+        initial.copyWith(day: beforeOfficeDay, decisions: initial.decisions),
+      );
+
+      final prudent = engine.resolveDecision(
+        offered,
+        offered.pendingDecisions.single.id,
+        'milestone_prudent',
+      );
+      final bold = engine.resolveDecision(
+        offered,
+        offered.pendingDecisions.single.id,
+        'milestone_bold',
+      );
+
+      expect(prudent.story.officeTier, 0);
+      expect(prudent.story.flagBool('officePlanDeferred'), isTrue);
+      expect(bold.story.officeTier, 1);
+      expect(bold.story.flagBool('officeLeaseAccepted'), isTrue);
+
+      final january31 =
+          DateTime(2004, 1, 31).difference(initial.campaignStartDate).inDays +
+          1;
+      final prudentFebruary = engine.advanceOneDay(
+        prudent.copyWith(
+          day: january31,
+          brokerageCash: 0,
+          decisions: prudent.decisions,
+        ),
+      );
+      final boldFebruary = engine.advanceOneDay(
+        bold.copyWith(
+          day: january31,
+          brokerageCash: 0,
+          decisions: bold.decisions,
+        ),
+      );
+      expect(
+        prudentFebruary.ledger.where(
+          (entry) => entry.counterAccount == 'rent_expense',
+        ),
+        isEmpty,
+      );
+      expect(
+        boldFebruary.ledger.any(
+          (entry) => entry.counterAccount == 'rent_expense',
+        ),
+        isTrue,
+      );
+    },
+  );
+
+  test('large orders receive slippage and respect per-stock liquidity', () {
+    final state = engine
+        .createNewGame('대량 주문 테스트', initialCash: 1000000000)
+        .copyWith(day: 4, marketMinute: 9 * 60);
+
+    final filled = engine.executeTrade(
+      state,
+      hanbitOrder(side: TradeSide.buy, quantity: 1000),
+    );
+    final rejected = engine.executeTrade(
+      state,
+      hanbitOrder(side: TradeSide.buy, quantity: 60000),
+    );
+
+    expect(filled.success, isTrue);
+    expect(filled.notional, greaterThan(10000000));
+    expect(rejected.success, isFalse);
+    expect(rejected.message, contains('체결 한도'));
+    expect(gameMaxBuyQuantity(state, 10000), 50000);
+  });
+
+  test('generated IPO positions survive a save migration intact', () async {
+    const worldSeed = 'generated-ipo-save-world';
+    final universe = await FictionalMarketUniverse.load(seed: worldSeed);
+    final ipo = universe.assets.firstWhere(
+      (asset) => asset.listedOn != null && asset.parentAssetId == null,
+    );
+    final original = engine
+        .createNewGame('신규상장 저장 테스트', initialCash: 100000, worldSeed: worldSeed)
+        .copyWith(
+          positions: [
+            PortfolioPosition(
+              assetId: ipo.id,
+              symbol: ipo.symbol,
+              name: ipo.name,
+              market: ipo.market,
+              currency: ipo.currency,
+              units: 7,
+              totalCost: 77000,
+            ),
+          ],
+        );
+
+    final restored = engine.migrate(original.toJson());
+
+    expect(restored.positions, hasLength(1));
+    expect(restored.positions.single.assetId, ipo.id);
+    expect(restored.positions.single.totalCost, 77000);
+    expect(restored.cash, original.cash);
+    expect(
+      restored.ledger.where(
+        (entry) => entry.counterAccount == 'legacy_position_recovery',
+      ),
+      isEmpty,
+    );
+  });
+
   test('the campaign cannot advance beyond 2010-12-31', () {
     final state = engine
         .createNewGame('캠페인 종료 테스트')

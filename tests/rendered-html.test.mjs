@@ -163,7 +163,7 @@ test("documents and preserves the portrait-mobile product contract", async () =>
   assert.match(rules, /390×844px/);
   assert.match(rules, /최소 360px/);
   assert.match(guide, /처음하기.*이어하기/);
-  assert.match(guide, /현재 상태 스키마는 `v14`/);
+  assert.match(guide, /현재 상태 스키마는 `v15`/);
   assert.match(guide, /최대 5슬롯/);
   assert.doesNotMatch(rules, /게임 화면보다 먼저 회사 이름/);
   assert.doesNotMatch(guide, /첫 방문 시 회사 이름 입력 화면/);
@@ -171,7 +171,7 @@ test("documents and preserves the portrait-mobile product contract", async () =>
   assert.match(css, /env\(safe-area-inset-bottom\)/);
   assert.match(css, /width: min\(100%, 430px\)/);
   assert.match(css, /\.asset-grid \{[\s\S]*?grid-template-columns: 1fr;/);
-  assert.match(state, /schemaVersion = 14/);
+  assert.match(state, /schemaVersion = 15/);
   assert.match(state, /simulationSeed/);
   assert.match(market, /daily-market-report-card/);
   assert.match(market, /purchase-market-report-button/);

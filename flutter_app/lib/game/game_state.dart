@@ -9,6 +9,112 @@ enum CompanyWorldMode { fictional }
 
 enum DecisionStatus { pending, resolved }
 
+enum PendingOrderSide { buy, sell }
+
+class PendingTradeOrder {
+  const PendingTradeOrder({
+    required this.id,
+    required this.side,
+    required this.assetId,
+    required this.symbol,
+    required this.name,
+    required this.market,
+    required this.currency,
+    required this.limitPrice,
+    required this.originalQuantity,
+    required this.remainingQuantity,
+    required this.placedDate,
+    required this.placedMinute,
+    required this.placedSequence,
+  });
+
+  final String id;
+  final PendingOrderSide side;
+  final String assetId;
+  final String symbol;
+  final String name;
+  final String market;
+  final String currency;
+  final double limitPrice;
+  final double originalQuantity;
+  final double remainingQuantity;
+  final String placedDate;
+  final int placedMinute;
+  final int placedSequence;
+
+  double get filledQuantity => originalQuantity - remainingQuantity;
+
+  PendingTradeOrder copyWith({double? remainingQuantity}) => PendingTradeOrder(
+    id: id,
+    side: side,
+    assetId: assetId,
+    symbol: symbol,
+    name: name,
+    market: market,
+    currency: currency,
+    limitPrice: limitPrice,
+    originalQuantity: originalQuantity,
+    remainingQuantity: remainingQuantity ?? this.remainingQuantity,
+    placedDate: placedDate,
+    placedMinute: placedMinute,
+    placedSequence: placedSequence,
+  );
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'side': side.name,
+    'assetId': assetId,
+    'symbol': symbol,
+    'name': name,
+    'market': market,
+    'currency': currency,
+    'limitPrice': limitPrice,
+    'originalQuantity': originalQuantity,
+    'remainingQuantity': remainingQuantity,
+    'placedDate': placedDate,
+    'placedMinute': placedMinute,
+    'placedSequence': placedSequence,
+  };
+
+  factory PendingTradeOrder.fromJson(Map<String, dynamic> json) {
+    final original = (json['originalQuantity'] as num?)?.toDouble() ?? 0;
+    final remaining =
+        (json['remainingQuantity'] as num?)?.toDouble() ?? original;
+    return PendingTradeOrder(
+      id: json['id'] as String? ?? '',
+      side: PendingOrderSide.values.firstWhere(
+        (value) => value.name == json['side'],
+        orElse: () => PendingOrderSide.buy,
+      ),
+      assetId: json['assetId'] as String? ?? '',
+      symbol: json['symbol'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+      market: json['market'] as String? ?? '',
+      currency: json['currency'] as String? ?? 'KRW',
+      limitPrice: (json['limitPrice'] as num?)?.toDouble() ?? 0,
+      originalQuantity: original,
+      remainingQuantity: remaining,
+      placedDate: json['placedDate'] as String? ?? '',
+      placedMinute: (json['placedMinute'] as num?)?.toInt() ?? 0,
+      placedSequence: (json['placedSequence'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  bool get isValid =>
+      id.isNotEmpty &&
+      assetId.isNotEmpty &&
+      currency == 'KRW' &&
+      limitPrice.isFinite &&
+      limitPrice > 0 &&
+      originalQuantity.isFinite &&
+      originalQuantity > 0 &&
+      remainingQuantity.isFinite &&
+      remainingQuantity > 0 &&
+      remainingQuantity <= originalQuantity &&
+      placedDate.length == 10 &&
+      placedSequence >= 0;
+}
+
 enum ProjectStatus {
   proposal,
   development,
@@ -28,6 +134,7 @@ class GameState {
     required this.cash,
     required this.brokerageCash,
     required this.positions,
+    required this.pendingOrders,
     required this.organization,
     required this.personalFinance,
     required this.progression,
@@ -40,7 +147,7 @@ class GameState {
     required this.processedEventIds,
   });
 
-  static const schemaVersion = 14;
+  static const schemaVersion = 15;
   static const maxCampaignDay = 4018;
 
   final int version;
@@ -51,6 +158,7 @@ class GameState {
   final int cash;
   final int brokerageCash;
   final List<PortfolioPosition> positions;
+  final List<PendingTradeOrder> pendingOrders;
   final OrganizationState organization;
   final PersonalFinanceState personalFinance;
   final MissionProgressionState progression;
@@ -69,6 +177,24 @@ class GameState {
       positions.fold<int>(0, (sum, position) => sum + position.totalCost);
 
   int get bankCash => math.max(0, cash - brokerageCash);
+
+  int get pendingBuyReservedCash => pendingOrders
+      .where((order) => order.side == PendingOrderSide.buy)
+      .fold<int>(
+        0,
+        (sum, order) =>
+            sum + (order.limitPrice * order.remainingQuantity * 1.003).ceil(),
+      );
+
+  int get availableBrokerageCash =>
+      math.max(0, brokerageCash - pendingBuyReservedCash);
+
+  double pendingSellReservedUnits(String assetId) => pendingOrders
+      .where(
+        (order) =>
+            order.assetId == assetId && order.side == PendingOrderSide.sell,
+      )
+      .fold<double>(0, (sum, order) => sum + order.remainingQuantity);
 
   int portfolioValue(Map<String, double> prices) => positions.fold<int>(
     0,
@@ -102,6 +228,7 @@ class GameState {
     String? simulationSeed,
     int? cash,
     List<PortfolioPosition>? positions,
+    List<PendingTradeOrder>? pendingOrders,
     OrganizationState? organization,
     PersonalFinanceState? personalFinance,
     MissionProgressionState? progression,
@@ -126,6 +253,7 @@ class GameState {
       simulationSeed: simulationSeed ?? this.simulationSeed,
       cash: cash ?? this.cash,
       positions: positions ?? this.positions,
+      pendingOrders: pendingOrders ?? this.pendingOrders,
       organization: organization ?? this.organization,
       personalFinance: personalFinance ?? this.personalFinance,
       progression: progression ?? this.progression,
@@ -149,6 +277,7 @@ class GameState {
     'simulationSeed': simulationSeed,
     'cash': cash,
     'positions': positions.map((position) => position.toJson()).toList(),
+    'pendingOrders': pendingOrders.map((order) => order.toJson()).toList(),
     'organization': organization.toJson(),
     'personalFinance': personalFinance.toJson(),
     'progression': progression.toJson(),
@@ -178,6 +307,13 @@ class GameState {
       cash: cash,
       brokerageCash: brokerageCash,
       positions: PortfolioPosition.listFromJson(json['positions']),
+      pendingOrders: ((json['pendingOrders'] as List?) ?? const [])
+          .whereType<Map>()
+          .map(
+            (item) => PendingTradeOrder.fromJson(item.cast<String, dynamic>()),
+          )
+          .where((order) => order.isValid)
+          .toList(growable: false),
       organization: OrganizationState.fromJson(
         (json['organization'] as Map?)?.cast<String, dynamic>() ?? const {},
         legacyTeamCount: (json['team'] as num?)?.toInt() ?? 1,

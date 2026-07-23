@@ -323,15 +323,54 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
 
   Future<GameState> _advanceDays(int requestedDays) async {
     final current = _state!;
-    var next = current;
+    final initialFlags = Map<String, dynamic>.from(current.story.storyFlags)
+      ..remove('fastForwardStopReason');
+    var next = current.copyWith(
+      story: current.story.copyWith(storyFlags: initialFlags),
+    );
     var advanced = false;
     final universe = await FictionalMarketUniverse.load(
       seed: next.simulationSeed,
     );
     for (var i = 0; i < requestedDays; i++) {
       if (next.pendingDecisions.isNotEmpty || next.campaignComplete) break;
-      final before = next;
-      next = _engine.advanceOneDay(next);
+      var before = next;
+      var stopAfterClosing = false;
+      String? stopReason;
+      if (requestedDays > 1) {
+        final events = marketNewsEventsForState(before);
+        final brief = buildDailyBrief(before);
+        before = _engine.archiveNews(
+          before,
+          headline: brief.title,
+          eventIds: events.map((event) => event.id).toList(growable: false),
+        );
+        final trackedAssets = <String>{
+          ...before.positions.map((position) => position.assetId),
+          ...((before.story.storyFlags['marketFavoriteAssetIds'] as List?) ??
+                  const [])
+              .whereType<String>(),
+        };
+        final important = events
+            .where(
+              (event) =>
+                  event.companyId == fictionalWholeMarketCompanyId ||
+                  trackedAssets.contains(event.companyId),
+            )
+            .where(
+              (event) =>
+                  event.tone == NewsTone.shock ||
+                  event.tone == NewsTone.milestone ||
+                  event.impactPct.abs() >= 0.08 ||
+                  event.eyebrow.contains('상장폐지'),
+            );
+        if (important.isNotEmpty) {
+          stopAfterClosing = true;
+          stopReason =
+              '${marketDateKey(before.currentDate)} 보유·관심 종목 중요 뉴스가 공개되어 멈췄습니다.';
+        }
+      }
+      next = _engine.advanceOneDay(before);
       if (next.day == before.day) break;
       advanced = true;
       next = _engine.applyCorporateActions(
@@ -345,6 +384,19 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
           _state = next;
           _lastSavedAt = DateTime.now();
         });
+      }
+      if (stopAfterClosing) {
+        next = next.copyWith(
+          story: next.story.copyWith(
+            storyFlags: {
+              ...next.story.storyFlags,
+              'fastForwardStopReason': stopReason,
+            },
+          ),
+        );
+        await _persistence.save(next);
+        if (mounted) setState(() => _state = next);
+        break;
       }
       if (next.pendingDecisions.isNotEmpty) break;
     }
@@ -416,9 +468,68 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
 
   Future<GameState> _setMarketMinute(int minute) async {
     final current = _state!;
-    final next = current.copyWith(
-      marketMinute: minute.clamp(marketDayStartMinute, marketDayEndMinute),
-    );
+    final target = minute.clamp(marketDayStartMinute, marketDayEndMinute);
+    var next = current;
+    if (target > current.marketMinute && current.pendingOrders.isNotEmpty) {
+      final universe = await FictionalMarketUniverse.load(
+        seed: current.simulationSeed,
+      );
+      final paths =
+          <String, ({FictionalMarketAsset asset, List<double> path})>{};
+      for (final assetId
+          in current.pendingOrders.map((order) => order.assetId).toSet()) {
+        FictionalMarketAsset? asset;
+        for (final candidate in universe.assets) {
+          if (candidate.id == assetId) {
+            asset = candidate;
+            break;
+          }
+        }
+        if (asset == null) continue;
+        final quote = asset.quoteAtOrBefore(current.currentDate);
+        if (quote == null) continue;
+        final previousClose =
+            asset.previousCloseBefore(quote.date) ?? quote.close;
+        paths[assetId] = (
+          asset: asset,
+          path: quote.isExactDate
+              ? generatedFullMarketDayPath(
+                  previousClose: previousClose,
+                  officialClose: quote.close,
+                  seed: marketStockSeed(
+                    '${current.simulationSeed}:${asset.code}',
+                    current.currentDate,
+                  ),
+                )
+              : <double>[quote.close],
+        );
+      }
+      for (var cursor = current.marketMinute + 1; cursor <= target; cursor++) {
+        next = next.copyWith(marketMinute: cursor);
+        final pendingAssetIds = next.pendingOrders
+            .map((order) => order.assetId)
+            .toSet();
+        for (final assetId in pendingAssetIds) {
+          final entry = paths[assetId];
+          if (entry == null) continue;
+          final pathIndex = marketTickForMinute(
+            cursor,
+          ).clamp(0, entry.path.length - 1);
+          next = _engine.processPendingOrdersAtQuote(
+            next,
+            assetId: assetId,
+            unitPrice: entry.path[pathIndex],
+            marketMinute: cursor,
+            isTradingDay: entry.path.length > 1,
+          );
+        }
+      }
+    } else {
+      next = current.copyWith(marketMinute: target);
+    }
+    if (target >= krxCloseMinute) {
+      next = _engine.expirePendingOrders(next.copyWith(marketMinute: target));
+    }
     await _persistence.save(next);
     if (mounted) setState(() => _state = next);
     return next;
@@ -485,6 +596,14 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
       );
     }
     final result = _engine.executeTrade(current, order);
+    if (!result.success) return result;
+    await _persistence.save(result.state);
+    if (mounted) setState(() => _state = result.state);
+    return result;
+  }
+
+  Future<FinanceActionResult> _cancelPendingOrder(String orderId) async {
+    final result = _engine.cancelPendingOrder(_state!, orderId);
     if (!result.success) return result;
     await _persistence.save(result.state);
     if (mounted) setState(() => _state = result.state);
@@ -590,6 +709,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
                   onArchiveNews: _archiveNews,
                   onCompleteWork: _completeWork,
                   onExecuteTrade: _executeTrade,
+                  onCancelPendingOrder: _cancelPendingOrder,
                   onTransferBrokerageCash: _transferBrokerageCash,
                 ),
                 _ => _GameTitleScreen(
@@ -1279,6 +1399,7 @@ class OfficeScreen extends StatelessWidget {
     this.onBuildDailyNewspaper,
     required this.onCompleteWork,
     required this.onExecuteTrade,
+    this.onCancelPendingOrder,
     this.onTransferBrokerageCash,
   });
 
@@ -1309,6 +1430,8 @@ class OfficeScreen extends StatelessWidget {
   final Future<DailyMarketNewspaper> Function(GameState)? onBuildDailyNewspaper;
   final Future<GameState> Function(WorkSessionResult) onCompleteWork;
   final Future<TradeExecutionResult> Function(TradeOrder) onExecuteTrade;
+  final Future<FinanceActionResult> Function(String orderId)?
+  onCancelPendingOrder;
   final Future<FinanceActionResult> Function(int amount, bool deposit)?
   onTransferBrokerageCash;
 
@@ -1327,6 +1450,7 @@ class OfficeScreen extends StatelessWidget {
               onSaveMarketNotebook: onSaveMarketNotebook,
               onPurchaseReport: onPurchaseMarketReport,
               onExecuteTrade: onExecuteTrade,
+              onCancelPendingOrder: onCancelPendingOrder,
               onTransferCash: onTransferBrokerageCash,
             ),
           ),
@@ -1588,10 +1712,14 @@ class OfficeScreen extends StatelessWidget {
       final next = await onAdvanceDays!(selection);
       if (!context.mounted) return;
       final advanced = next.day - state.day;
+      final stopReason =
+          next.story.storyFlags['fastForwardStopReason'] as String?;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            next.pendingDecisions.isNotEmpty
+            stopReason != null
+                ? '$advanced일 진행 · $stopReason'
+                : next.pendingDecisions.isNotEmpty
                 ? '$advanced일 진행 후 새 안건 앞에서 멈췄습니다.'
                 : '$advanced일 진행했습니다.',
           ),
@@ -3232,17 +3360,6 @@ class CampaignEndingScreen extends StatelessWidget {
     final resolved = state.decisions
         .where((decision) => decision.status == DecisionStatus.resolved)
         .length;
-    final history =
-        (state.story.storyFlags['performanceHistory'] as List?) ?? const [];
-    final benchmarkStart = history.isEmpty
-        ? 1000
-        : ((history.first as Map)['benchmarkIndex'] as num?)?.toInt() ?? 1000;
-    final benchmarkEnd = history.isEmpty
-        ? 1000
-        : ((history.last as Map)['benchmarkIndex'] as num?)?.toInt() ?? 1000;
-    final benchmarkRate = benchmarkStart <= 0
-        ? 0.0
-        : (benchmarkEnd - benchmarkStart) / benchmarkStart * 100;
     return Scaffold(
       backgroundColor: const Color(0xFFF6F1E5),
       appBar: AppBar(title: const Text('2010 최종 결산')),
@@ -3261,6 +3378,7 @@ class CampaignEndingScreen extends StatelessWidget {
             label: '보유원가',
             value: '${_money(state.portfolioCost)}원',
           ),
+          _EndingMarketSummary(state: state),
           _EndingMetric(
             label: '누적 실현손익',
             value: '${realized >= 0 ? '+' : ''}${_money(realized)}원',
@@ -3286,11 +3404,6 @@ class CampaignEndingScreen extends StatelessWidget {
                 '${_money(state.personalFinance.totalSpent)}원 / ${state.personalFinance.chanceNet >= 0 ? '+' : ''}${_money(state.personalFinance.chanceNet)}원',
           ),
           _EndingMetric(label: '해결한 결정', value: '$resolved건'),
-          _EndingMetric(
-            label: '기준지수 변화',
-            value:
-                '${benchmarkRate >= 0 ? '+' : ''}${benchmarkRate.toStringAsFixed(1)}%',
-          ),
           const SizedBox(height: 16),
           Text(
             state.story.reputation >= 70
@@ -3305,6 +3418,75 @@ class CampaignEndingScreen extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _EndingMarketSummary extends StatelessWidget {
+  const _EndingMarketSummary({required this.state});
+
+  final GameState state;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<FictionalMarketUniverse>(
+      future: FictionalMarketUniverse.load(seed: state.simulationSeed),
+      builder: (context, snapshot) {
+        final universe = snapshot.data;
+        if (universe == null) {
+          return const _EndingMetric(label: '시장 평가 계산', value: '불러오는 중');
+        }
+        final prices = <String, double>{};
+        for (final asset in universe.assets) {
+          final quote = asset.quoteAtOrBefore(state.currentDate);
+          if (quote != null) prices[asset.id] = quote.close;
+        }
+        final portfolioValue = state.portfolioValue(prices);
+        final unrealized = portfolioValue - state.portfolioCost;
+        final propertyValue = state.personalFinance.estimatedPropertyValueAt(
+          state.day,
+        );
+        final totalAssets = state.cash + portfolioValue + propertyValue;
+        final benchmarkReturns = <double>[];
+        for (final asset in universe.assets.where(
+          (asset) => asset.isDomestic && asset.listedOn == null,
+        )) {
+          final start = asset.quoteAtOrBefore(state.campaignStartDate);
+          final end = asset.quoteAtOrBefore(state.currentDate);
+          final wasDelisted =
+              asset.delistedOn != null &&
+              marketDateKey(state.currentDate).compareTo(asset.delistedOn!) >=
+                  0;
+          if (start != null && start.close > 0 && wasDelisted) {
+            benchmarkReturns.add(-1);
+          } else if (start != null && end != null && start.close > 0) {
+            benchmarkReturns.add(end.close / start.close - 1);
+          }
+        }
+        final benchmarkRate = benchmarkReturns.isEmpty
+            ? 0.0
+            : benchmarkReturns.reduce((left, right) => left + right) /
+                  benchmarkReturns.length *
+                  100;
+        return Column(
+          children: [
+            _EndingMetric(
+              label: '보유주식 평가액',
+              value: '${_money(portfolioValue)}원',
+            ),
+            _EndingMetric(
+              label: '미실현손익',
+              value: '${unrealized >= 0 ? '+' : ''}${_money(unrealized)}원',
+            ),
+            _EndingMetric(label: '최종 총자산', value: '${_money(totalAssets)}원'),
+            _EndingMetric(
+              label: '가상시장 동일가중 기준',
+              value:
+                  '${benchmarkRate >= 0 ? '+' : ''}${benchmarkRate.toStringAsFixed(1)}%',
+            ),
+          ],
+        );
+      },
     );
   }
 }

@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'game_state.dart';
 import 'market_clock.dart';
 import 'market_data.dart';
@@ -29,6 +31,100 @@ double gameTradingFeeRateForState(GameState state) =>
 
 enum TradeSide { buy, sell }
 
+enum TradeOrderType { market, limit }
+
+const gameMinimumOrderLiquidity = 5000000;
+const gameMaximumOrderLiquidity = 2000000000;
+
+int gameOrderAuthorityLimit(GameState state) =>
+    switch (state.story.accountAuthorityLevel) {
+      0 => 0,
+      1 => 100000,
+      2 => 250000,
+      3 => ((state.cash + state.portfolioCost) * 0.25).round(),
+      4 => 5000000,
+      _ => gameMaximumOrderLiquidity,
+    };
+
+int gameMarketOrderNotionalLimit(double unitPrice) {
+  if (!unitPrice.isFinite || unitPrice <= 0) return 0;
+  return (unitPrice * 50000)
+      .round()
+      .clamp(gameMinimumOrderLiquidity, gameMaximumOrderLiquidity)
+      .toInt();
+}
+
+double gameMarketImpactRate(int rawNotional) {
+  if (rawNotional <= gameMinimumOrderLiquidity) return 0;
+  final pressure = rawNotional / gameMinimumOrderLiquidity;
+  return (math.log(pressure + 1) * 0.004).clamp(0, 0.04).toDouble();
+}
+
+int gameTradeNotional({
+  required TradeSide side,
+  required double unitPrice,
+  required double quantity,
+}) {
+  final raw = (unitPrice * quantity).round();
+  if (raw <= 0) return 0;
+  final impact = gameMarketImpactRate(raw);
+  final multiplier = side == TradeSide.buy ? 1 + impact : 1 - impact;
+  return (raw * multiplier).round();
+}
+
+int gameMaxBuyQuantity(GameState state, double unitPrice) {
+  if (!unitPrice.isFinite ||
+      unitPrice <= 0 ||
+      state.availableBrokerageCash <= 0 ||
+      state.story.accountAuthorityLevel == 0) {
+    return 0;
+  }
+  final rawLimit = math.min(
+    gameOrderAuthorityLimit(state),
+    gameMarketOrderNotionalLimit(unitPrice),
+  );
+  var low = 0;
+  var high = math.min(
+    (state.availableBrokerageCash / unitPrice).floor(),
+    (rawLimit / unitPrice).floor(),
+  );
+  while (low < high) {
+    final middle = (low + high + 1) ~/ 2;
+    final rawNotional = (unitPrice * middle).round();
+    final notional = gameTradeNotional(
+      side: TradeSide.buy,
+      unitPrice: unitPrice,
+      quantity: middle.toDouble(),
+    );
+    final fee = gameTradingFeeForState(state, notional);
+    if (rawNotional <= rawLimit &&
+        notional + fee <= state.availableBrokerageCash) {
+      low = middle;
+    } else {
+      high = middle - 1;
+    }
+  }
+  return low;
+}
+
+int gameAvailableLimitFillUnits({
+  required String assetId,
+  required int day,
+  required int minute,
+  required double unitPrice,
+}) {
+  if (assetId.isEmpty || unitPrice <= 0 || !unitPrice.isFinite) return 0;
+  var hash = day * 1009 + minute * 9176;
+  for (final unit in assetId.codeUnits) {
+    hash = ((hash * 31) ^ unit) & 0x7fffffff;
+  }
+  final base = 120 + hash % 1881;
+  final auctionMultiplier =
+      minute < krxOpenMinute + 5 || minute >= krxContinuousEndMinute ? 2 : 1;
+  final notionalCap = gameMarketOrderNotionalLimit(unitPrice);
+  return math.min(base * auctionMultiplier, notionalCap ~/ unitPrice);
+}
+
 class TradeOrder {
   const TradeOrder({
     required this.side,
@@ -42,6 +138,9 @@ class TradeOrder {
     required this.quoteDate,
     required this.marketMinute,
     required this.isTradingDay,
+    this.type = TradeOrderType.market,
+    this.limitPrice,
+    this.previousClose = 0,
   });
 
   final TradeSide side;
@@ -55,6 +154,9 @@ class TradeOrder {
   final String quoteDate;
   final int marketMinute;
   final bool isTradingDay;
+  final TradeOrderType type;
+  final double? limitPrice;
+  final double previousClose;
 }
 
 class TradeExecutionResult {
@@ -65,6 +167,9 @@ class TradeExecutionResult {
     this.notional = 0,
     this.fee = 0,
     this.realizedPnl = 0,
+    this.orderId,
+    this.filledQuantity = 0,
+    this.pendingQuantity = 0,
   });
 
   final GameState state;
@@ -73,6 +178,9 @@ class TradeExecutionResult {
   final int notional;
   final int fee;
   final int realizedPnl;
+  final String? orderId;
+  final double filledQuantity;
+  final double pendingQuantity;
 }
 
 class FinanceActionResult {
@@ -129,6 +237,7 @@ class GameEngine {
   const GameEngine();
 
   static int _newGameSerial = 0;
+  static final math.Random _worldSeedRandom = math.Random.secure();
 
   GameState createNewGame(
     String companyName, {
@@ -138,7 +247,7 @@ class GameEngine {
   }) {
     final seed =
         worldSeed ??
-        'world-${DateTime.now().microsecondsSinceEpoch}-${_newGameSerial++}-${_stableHash(companyName.trim())}';
+        'world-${DateTime.now().microsecondsSinceEpoch}-${_newGameSerial++}-${_worldSeedRandom.nextInt(0x7fffffff)}-${_stableHash(companyName.trim())}';
     final baseStory = story ?? StoryState.migratedDefault(companyName);
     final storyState = initialCash > 0 && baseStory.accountAuthorityLevel == 0
         ? baseStory.copyWith(accountAuthorityLevel: 5)
@@ -167,6 +276,7 @@ class GameEngine {
       cash: initialCash,
       brokerageCash: initialCash,
       positions: const [],
+      pendingOrders: const [],
       organization: OrganizationState.initial(storyState.familyRule),
       personalFinance: PersonalFinanceState.initial(),
       progression: MissionProgressionState.initial(day: 1, cash: initialCash),
@@ -256,7 +366,7 @@ class GameEngine {
             id: sourceId,
             day: state.day,
             amount: recovered,
-            account: 'cash',
+            account: 'brokerage_cash',
             counterAccount: 'legacy_position_recovery',
             description: '기존 실제 종목을 원가 기준 현금으로 전환',
             sourceId: sourceId,
@@ -346,7 +456,7 @@ class GameEngine {
                 id: 'mission-${progress.mission.id}-${state.day}',
                 day: state.day,
                 amount: cashReward,
-                account: 'cash',
+                account: 'company_bank',
                 counterAccount: 'mission_reward',
                 description: '${progress.mission.title} 완료 보상',
                 sourceId: 'mission-${progress.mission.id}',
@@ -498,7 +608,7 @@ class GameEngine {
     FinanceActionResult reject(String message) =>
         FinanceActionResult(state: state, success: false, message: message);
     if (amount <= 0) return reject('이체 금액은 0원보다 커야 합니다.');
-    final available = deposit ? state.bankCash : state.brokerageCash;
+    final available = deposit ? state.bankCash : state.availableBrokerageCash;
     if (amount > available) {
       return reject(deposit ? '회사 통장 잔액이 부족합니다.' : '출금 가능한 예수금이 부족합니다.');
     }
@@ -530,7 +640,344 @@ class GameEngine {
     );
   }
 
+  TradeExecutionResult _placeLimitOrder(GameState state, TradeOrder order) {
+    TradeExecutionResult reject(String message) =>
+        TradeExecutionResult(state: state, success: false, message: message);
+    final limitPrice = order.limitPrice;
+    if (limitPrice == null ||
+        !limitPrice.isFinite ||
+        limitPrice <= 0 ||
+        !isValidMarketOrderPrice(limitPrice, market: order.market)) {
+      return reject('지정가는 해당 시장의 호가단위에 맞춰 입력해 주세요.');
+    }
+    if (order.assetId.trim().isEmpty ||
+        !order.quantity.isFinite ||
+        order.quantity <= 0 ||
+        order.quantity != order.quantity.roundToDouble()) {
+      return reject('주문 수량은 1주 단위로 입력해 주세요.');
+    }
+    final stateDate = marketDateKey(state.currentDate);
+    if (order.quoteDate != stateDate ||
+        order.marketMinute != state.marketMinute ||
+        order.currency != 'KRW') {
+      return reject('시세가 바뀌었습니다. 주문창을 다시 확인해 주세요.');
+    }
+    final clock = marketClockAt(
+      order.marketMinute,
+      tradingDay: order.isTradingDay && isMarketTradingDay(state.currentDate),
+    );
+    if (!clock.tradable) return reject('현재는 주문 가능한 거래 시간이 아닙니다.');
+
+    final reference = order.previousClose > 0
+        ? order.previousClose
+        : order.unitPrice;
+    final range = marketDailyPriceRange(
+      previousClose: reference,
+      date: state.currentDate,
+      market: order.market,
+    );
+    if (limitPrice < range.lower || limitPrice > range.upper) {
+      return reject(
+        '지정가는 오늘 가격제한폭 '
+        '${range.lower.round()}~${range.upper.round()}원 안에서만 낼 수 있습니다.',
+      );
+    }
+
+    final limitNotional = (limitPrice * order.quantity).round();
+    if (order.side == TradeSide.buy) {
+      final authorityLimit = gameOrderAuthorityLimit(state);
+      if (state.story.accountAuthorityLevel == 0) {
+        return reject('첫 주문 권한을 먼저 열어야 합니다.');
+      }
+      if (limitNotional > authorityLimit) {
+        return reject('현재 계좌 권한의 1회 주문 한도를 넘었습니다.');
+      }
+      final reservation = (limitNotional * 1.003).ceil();
+      if (reservation > state.availableBrokerageCash) {
+        return reject('다른 미체결 주문을 제외한 주문 가능 예수금이 부족합니다.');
+      }
+    } else {
+      PortfolioPosition? position;
+      for (final item in state.positions) {
+        if (item.assetId == order.assetId) {
+          position = item;
+          break;
+        }
+      }
+      final available =
+          (position?.units ?? 0) -
+          state.pendingSellReservedUnits(order.assetId);
+      if (available + 0.000001 < order.quantity) {
+        return reject('다른 미체결 매도 주문을 제외한 보유 수량이 부족합니다.');
+      }
+    }
+
+    final highestPendingSequence = state.pendingOrders.fold<int>(
+      0,
+      (highest, pending) => math.max(highest, pending.placedSequence),
+    );
+    var orderSequence =
+        math.max(highestPendingSequence, state.ledger.length) + 1;
+    late String orderId;
+    do {
+      orderId =
+          'limit-${order.side.name}-${state.day}-${order.marketMinute}-'
+          '${order.assetId}-$orderSequence';
+      if (state.pendingOrders.every((pending) => pending.id != orderId)) break;
+      orderSequence += 1;
+    } while (true);
+    final marketable = order.side == TradeSide.buy
+        ? limitPrice >= order.unitPrice
+        : limitPrice <= order.unitPrice;
+    final capacity = marketable
+        ? gameAvailableLimitFillUnits(
+            assetId: order.assetId,
+            day: state.day,
+            minute: order.marketMinute,
+            unitPrice: order.unitPrice,
+          )
+        : 0;
+    final fillQuantity = math.min(order.quantity, capacity.toDouble());
+    var nextState = state;
+    var filledNotional = 0;
+    var filledFee = 0;
+    var realizedPnl = 0;
+    if (fillQuantity > 0) {
+      final fill = executeTrade(
+        state,
+        TradeOrder(
+          side: order.side,
+          assetId: order.assetId,
+          symbol: order.symbol,
+          name: order.name,
+          market: order.market,
+          currency: order.currency,
+          quantity: fillQuantity,
+          unitPrice: order.unitPrice,
+          quoteDate: order.quoteDate,
+          marketMinute: order.marketMinute,
+          isTradingDay: order.isTradingDay,
+          previousClose: order.previousClose,
+        ),
+      );
+      if (!fill.success) return fill;
+      nextState = fill.state;
+      filledNotional = fill.notional;
+      filledFee = fill.fee;
+      realizedPnl = fill.realizedPnl;
+    }
+
+    final remaining = order.quantity - fillQuantity;
+    if (remaining > 0.000001) {
+      nextState = nextState.copyWith(
+        pendingOrders: [
+          ...nextState.pendingOrders,
+          PendingTradeOrder(
+            id: orderId,
+            side: order.side == TradeSide.buy
+                ? PendingOrderSide.buy
+                : PendingOrderSide.sell,
+            assetId: order.assetId,
+            symbol: order.symbol,
+            name: order.name,
+            market: order.market,
+            currency: order.currency,
+            limitPrice: limitPrice,
+            originalQuantity: order.quantity,
+            remainingQuantity: remaining,
+            placedDate: stateDate,
+            placedMinute: order.marketMinute,
+            placedSequence: orderSequence,
+          ),
+        ],
+      );
+    }
+    final message = remaining <= 0.000001
+        ? '${order.name} 지정가 ${_tradeUnits(fillQuantity)}주 전량 체결'
+        : fillQuantity > 0
+        ? '${order.name} ${_tradeUnits(fillQuantity)}주 체결 · '
+              '${_tradeUnits(remaining)}주 미체결 대기'
+        : '${order.name} ${_tradeUnits(remaining)}주 지정가 주문 접수';
+    return TradeExecutionResult(
+      state: nextState,
+      success: true,
+      message: message,
+      notional: filledNotional,
+      fee: filledFee,
+      realizedPnl: realizedPnl,
+      orderId: remaining > 0.000001 ? orderId : null,
+      filledQuantity: fillQuantity,
+      pendingQuantity: remaining,
+    );
+  }
+
+  FinanceActionResult cancelPendingOrder(GameState state, String orderId) {
+    final index = state.pendingOrders.indexWhere(
+      (order) => order.id == orderId,
+    );
+    if (index < 0) {
+      return FinanceActionResult(
+        state: state,
+        success: false,
+        message: '취소할 미체결 주문을 찾지 못했습니다.',
+      );
+    }
+    final order = state.pendingOrders[index];
+    final pending = [...state.pendingOrders]..removeAt(index);
+    final sourceId = 'cancel-$orderId';
+    final next = state.copyWith(
+      pendingOrders: pending,
+      ledger: [
+        ...state.ledger,
+        LedgerEntry(
+          id: sourceId,
+          day: state.day,
+          amount: 0,
+          account: 'brokerage_order',
+          counterAccount: 'order_cancel',
+          description:
+              '${order.name} ${_tradeUnits(order.remainingQuantity)}주 '
+              '${order.side == PendingOrderSide.buy ? '매수' : '매도'} 주문 취소',
+          sourceId: sourceId,
+        ),
+      ],
+    );
+    return FinanceActionResult(
+      state: next,
+      success: true,
+      message: '${order.name} 미체결 주문을 취소했습니다.',
+    );
+  }
+
+  GameState processPendingOrdersAtQuote(
+    GameState state, {
+    required String assetId,
+    required double unitPrice,
+    required int marketMinute,
+    required bool isTradingDay,
+  }) {
+    if (state.pendingOrders.every((order) => order.assetId != assetId)) {
+      return state;
+    }
+    final clock = marketClockAt(
+      marketMinute,
+      tradingDay: isTradingDay && isMarketTradingDay(state.currentDate),
+    );
+    if (!clock.tradable) return state;
+    var capacity = gameAvailableLimitFillUnits(
+      assetId: assetId,
+      day: state.day,
+      minute: marketMinute,
+      unitPrice: unitPrice,
+    );
+    if (capacity <= 0) return state;
+
+    var next = state;
+    final candidates =
+        state.pendingOrders.where((order) => order.assetId == assetId).toList()
+          ..sort((left, right) {
+            if (left.side != right.side) {
+              return left.side.index.compareTo(right.side.index);
+            }
+            final priceOrder = left.side == PendingOrderSide.buy
+                ? right.limitPrice.compareTo(left.limitPrice)
+                : left.limitPrice.compareTo(right.limitPrice);
+            if (priceOrder != 0) return priceOrder;
+            final minuteOrder = left.placedMinute.compareTo(right.placedMinute);
+            if (minuteOrder != 0) return minuteOrder;
+            final sequenceOrder = left.placedSequence.compareTo(
+              right.placedSequence,
+            );
+            if (sequenceOrder != 0) return sequenceOrder;
+            return left.id.compareTo(right.id);
+          });
+    for (final candidate in candidates) {
+      if (capacity <= 0) break;
+      final marketable = candidate.side == PendingOrderSide.buy
+          ? candidate.limitPrice >= unitPrice
+          : candidate.limitPrice <= unitPrice;
+      if (!marketable) continue;
+      final quantity = math.min(
+        candidate.remainingQuantity,
+        capacity.toDouble(),
+      );
+      final withoutCurrent = next.copyWith(
+        pendingOrders: next.pendingOrders
+            .where((order) => order.id != candidate.id)
+            .toList(growable: false),
+        marketMinute: marketMinute,
+      );
+      final fill = executeTrade(
+        withoutCurrent,
+        TradeOrder(
+          side: candidate.side == PendingOrderSide.buy
+              ? TradeSide.buy
+              : TradeSide.sell,
+          assetId: candidate.assetId,
+          symbol: candidate.symbol,
+          name: candidate.name,
+          market: candidate.market,
+          currency: candidate.currency,
+          quantity: quantity,
+          unitPrice: unitPrice,
+          quoteDate: marketDateKey(state.currentDate),
+          marketMinute: marketMinute,
+          isTradingDay: isTradingDay,
+          previousClose: unitPrice,
+        ),
+      );
+      if (!fill.success) continue;
+      next = fill.state;
+      final remaining = candidate.remainingQuantity - quantity;
+      if (remaining > 0.000001) {
+        next = next.copyWith(
+          pendingOrders: [
+            ...next.pendingOrders,
+            candidate.copyWith(remainingQuantity: remaining),
+          ],
+        );
+      }
+      capacity -= quantity.ceil();
+    }
+    return next;
+  }
+
+  GameState expirePendingOrders(GameState state) {
+    if (state.pendingOrders.isEmpty) return state;
+    final dateKey = marketDateKey(state.currentDate);
+    final expired = state.pendingOrders
+        .where(
+          (order) =>
+              order.placedDate != dateKey ||
+              state.marketMinute >= krxCloseMinute,
+        )
+        .toList(growable: false);
+    if (expired.isEmpty) return state;
+    final ids = expired.map((order) => order.id).toSet();
+    final sourceId = 'expire-orders-${state.day}-${state.marketMinute}';
+    return state.copyWith(
+      pendingOrders: state.pendingOrders
+          .where((order) => !ids.contains(order.id))
+          .toList(growable: false),
+      ledger: [
+        ...state.ledger,
+        LedgerEntry(
+          id: sourceId,
+          day: state.day,
+          amount: 0,
+          account: 'brokerage_order',
+          counterAccount: 'day_order_expiry',
+          description: '장 마감 · 미체결 ${expired.length}건 자동 취소',
+          sourceId: sourceId,
+        ),
+      ],
+    );
+  }
+
   TradeExecutionResult executeTrade(GameState state, TradeOrder order) {
+    if (order.type == TradeOrderType.limit) {
+      return _placeLimitOrder(state, order);
+    }
     TradeExecutionResult reject(String message) =>
         TradeExecutionResult(state: state, success: false, message: message);
 
@@ -564,25 +1011,27 @@ class GameEngine {
       return reject('현재는 주문 가능한 거래 시간이 아닙니다.');
     }
 
-    final notional = (order.unitPrice * order.quantity).round();
-    if (notional <= 0) return reject('주문 금액이 올바르지 않습니다.');
+    final rawNotional = (order.unitPrice * order.quantity).round();
+    if (rawNotional <= 0) return reject('주문 금액이 올바르지 않습니다.');
+    final liquidityLimit = gameMarketOrderNotionalLimit(order.unitPrice);
+    if (rawNotional > liquidityLimit) {
+      return reject('이 종목의 1회 체결 한도는 $liquidityLimit원입니다. 수량을 나눠 주문해 주세요.');
+    }
     if (order.side == TradeSide.buy) {
       final authority = state.story.accountAuthorityLevel;
-      final limit = switch (authority) {
-        0 => 0,
-        1 => 100000,
-        2 => 250000,
-        3 => ((state.cash + state.portfolioCost) * 0.25).round(),
-        4 => 5000000,
-        _ => 9007199254740991,
-      };
+      final limit = gameOrderAuthorityLimit(state);
       if (authority == 0) {
         return reject('직접 번 종잣돈 10,000원을 먼저 마련해 보호자 승인을 받아야 합니다.');
       }
-      if (notional > limit) {
+      if (rawNotional > limit) {
         return reject('현재 계좌 권한의 1회 주문 한도는 $limit원입니다.');
       }
     }
+    final notional = gameTradeNotional(
+      side: order.side,
+      unitPrice: order.unitPrice,
+      quantity: order.quantity,
+    );
     final fee = gameTradingFeeForState(state, notional);
     final index = state.positions.indexWhere(
       (position) => position.assetId == order.assetId,
@@ -596,7 +1045,9 @@ class GameEngine {
 
     if (order.side == TradeSide.buy) {
       final debit = notional + fee;
-      if (debit > state.brokerageCash) return reject('주문 가능 예수금이 부족합니다.');
+      if (debit > state.availableBrokerageCash) {
+        return reject('미체결 주문을 제외한 주문 가능 예수금이 부족합니다.');
+      }
       final nextPosition = existing == null
           ? PortfolioPosition(
               assetId: order.assetId,
@@ -622,7 +1073,10 @@ class GameEngine {
       description =
           '${order.name} ${_tradeUnits(order.quantity)}주 매수 · 증권 수수료 $fee원';
     } else {
-      if (existing == null || existing.units + 0.000001 < order.quantity) {
+      final availableUnits =
+          (existing?.units ?? 0) -
+          state.pendingSellReservedUnits(order.assetId);
+      if (existing == null || availableUnits + 0.000001 < order.quantity) {
         return reject('보유 수량이 부족합니다.');
       }
       final proceeds = notional - fee;
@@ -690,7 +1144,7 @@ class GameEngine {
           id: sourceId,
           day: state.day,
           amount: cashDelta,
-          account: 'cash',
+          account: 'brokerage_cash',
           counterAccount: 'market_security',
           description: description,
           sourceId: sourceId,
@@ -710,6 +1164,7 @@ class GameEngine {
       notional: notional,
       fee: fee,
       realizedPnl: realizedPnl,
+      filledQuantity: order.quantity,
     );
   }
 
@@ -860,7 +1315,7 @@ class GameEngine {
             id: eventId,
             day: state.day,
             amount: payout,
-            account: 'cash',
+            account: 'brokerage_cash',
             counterAccount: 'delisting_settlement',
             description: '${position.name} 상장폐지 정리매매·잔여가치 정산',
             sourceId: eventId,
@@ -899,9 +1354,9 @@ class GameEngine {
         ? 0
         : (score * 100 ~/ result.maxScore);
     final baseReward = switch (result.activityId) {
-      'dishes' => 300 + normalized * 5,
-      'stationery' => 600 + normalized * 4,
-      'flea_market' => 400 + normalized * 12,
+      'dishes' => 500 + normalized * 8,
+      'stationery' => 800 + normalized * 7,
+      'flea_market' => 700 + normalized * 15,
       _ => 0,
     };
     final yearScale = state.currentDate.year >= 2006
@@ -964,7 +1419,7 @@ class GameEngine {
           id: sourceId,
           day: state.day,
           amount: reward,
-          account: 'cash',
+          account: 'company_bank',
           counterAccount: 'work_income',
           description: '$activityLabel · 정확도 $normalized점',
           sourceId: sourceId,
@@ -1041,7 +1496,7 @@ class GameEngine {
     final joiningCost = state.progression.hasSkill('talent_network')
         ? (baseJoiningCost * 0.9).round()
         : baseJoiningCost;
-    if (state.cash < joiningCost) return state;
+    if (state.bankCash < joiningCost) return state;
     final sourceId = 'hire-$candidateId-${state.day}';
     return state.copyWith(
       cash: state.cash - joiningCost,
@@ -1058,7 +1513,7 @@ class GameEngine {
           id: sourceId,
           day: state.day,
           amount: -joiningCost,
-          account: 'cash',
+          account: 'company_bank',
           counterAccount: 'recruiting',
           description: '${candidate.name} 채용 계약금',
           sourceId: sourceId,
@@ -1155,11 +1610,11 @@ class GameEngine {
             : '올해는 이미 선택했습니다.',
       );
     }
-    if (state.cash < option.cost) {
+    if (state.bankCash < option.cost) {
       return FinanceActionResult(
         state: state,
         success: false,
-        message: '현금이 ${option.cost - state.cash}원 부족합니다.',
+        message: '은행 잔고가 ${option.cost - state.bankCash}원 부족합니다.',
       );
     }
 
@@ -1219,7 +1674,7 @@ class GameEngine {
           id: sourceId,
           day: state.day,
           amount: -option.cost,
-          account: 'cash',
+          account: 'company_bank',
           counterAccount: option.isRealEstate
               ? 'real_estate_asset'
               : 'discretionary_expense',
@@ -1267,7 +1722,7 @@ class GameEngine {
           id: sourceId,
           day: state.day,
           amount: proceeds,
-          account: 'cash',
+          account: 'company_bank',
           counterAccount: 'real_estate_sale',
           description: '${asset.name} 매각',
           sourceId: sourceId,
@@ -1301,9 +1756,9 @@ class GameEngine {
         message: '책임 있는 이용을 위해 월 1회로 제한됩니다.',
       );
     }
-    final onePercent = state.cash ~/ 100;
+    final onePercent = state.bankCash ~/ 100;
     final maxStake = onePercent < 100000 ? onePercent : 100000;
-    if (stake < 10000 || stake > maxStake || stake > state.cash) {
+    if (stake < 10000 || stake > maxStake || stake > state.bankCash) {
       return FinanceActionResult(
         state: state,
         success: false,
@@ -1323,7 +1778,7 @@ class GameEngine {
         id: '$sourceId-stake',
         day: state.day,
         amount: -stake,
-        account: 'cash',
+        account: 'company_bank',
         counterAccount: 'chance_entertainment',
         description: '성인 확률 오락 참가금',
         sourceId: sourceId,
@@ -1333,7 +1788,7 @@ class GameEngine {
           id: '$sourceId-payout',
           day: state.day,
           amount: payout,
-          account: 'cash',
+          account: 'company_bank',
           counterAccount: 'chance_payout',
           description: '성인 확률 오락 지급금',
           sourceId: sourceId,
@@ -1425,11 +1880,12 @@ class GameEngine {
         message: '오늘의 시장 조사 보고서는 이미 구매했습니다.',
       );
     }
-    if (state.cash < dailyMarketReportPrice) {
+    if (state.bankCash < dailyMarketReportPrice) {
       return FinanceActionResult(
         state: state,
         success: false,
-        message: '보고서 구매에 ${dailyMarketReportPrice - state.cash}원이 부족합니다.',
+        message:
+            '보고서 구매에 은행 잔고가 ${dailyMarketReportPrice - state.bankCash}원 부족합니다.',
       );
     }
 
@@ -1467,7 +1923,7 @@ class GameEngine {
           id: sourceId,
           day: state.day,
           amount: -dailyMarketReportPrice,
-          account: 'cash',
+          account: 'company_bank',
           counterAccount: 'market_research_expense',
           description: '오늘의 시장 조사 보고서',
           sourceId: sourceId,
@@ -1503,7 +1959,7 @@ class GameEngine {
     );
     if (decision.status != DecisionStatus.pending) return state;
     final option = decision.options.firstWhere((item) => item.id == optionId);
-    if (option.cashCost > state.cash) return state;
+    if (option.cashCost > state.bankCash) return state;
 
     var decisions = state.decisions
         .map((item) => item.id == decisionId ? item.resolve(optionId) : item)
@@ -1739,10 +2195,46 @@ class GameEngine {
           'final_launch_review',
           3,
         );
+      case 'era_partner':
+      case 'era_prototype':
+        next = _spend(next, option.cashCost, decisionId, '시대 기술 실증 투자');
+        final isPartner = optionId == 'era_partner';
+        final resultEventId = 'era-result-$decisionId';
+        next = next.copyWith(
+          company: next.company.copyWith(
+            technology: next.company.technology + (isPartner ? 5 : 3),
+            brand: next.company.brand + (isPartner ? 3 : 1),
+            risk: next.company.risk + (isPartner ? 3 : 1),
+          ),
+          story: next.story.copyWith(
+            storyFlags: {
+              ...next.story.storyFlags,
+              'eraPath:$resultEventId': optionId,
+              'eraTitle:$resultEventId': decision.title,
+            },
+          ),
+        );
+        next = _schedule(
+          next,
+          resultEventId,
+          'era_technology_result',
+          isPartner ? 45 : 30,
+        );
+      case 'era_observe':
+        next = next.copyWith(
+          story: next.story.copyWith(
+            familyTrust: next.story.familyTrust + 1,
+            storyFlags: {
+              ...next.story.storyFlags,
+              'lastObservedEraTechnology': decision.title,
+            },
+          ),
+        );
       case 'milestone_prudent':
         next = _applyMilestoneResolution(
           next,
           decision,
+          optionId: optionId,
           risk: -3,
           reputation: 2,
           trust: 2,
@@ -1751,6 +2243,7 @@ class GameEngine {
         next = _applyMilestoneResolution(
           next,
           decision,
+          optionId: optionId,
           risk: 3,
           reputation: 4,
           trust: 0,
@@ -1759,6 +2252,7 @@ class GameEngine {
         next = _applyMilestoneResolution(
           next,
           decision,
+          optionId: optionId,
           risk: -1,
           reputation: 1,
           trust: 4,
@@ -1777,6 +2271,7 @@ class GameEngine {
   GameState _applyMilestoneResolution(
     GameState state,
     DecisionCardData decision, {
+    required String optionId,
     required int risk,
     required int reputation,
     required int trust,
@@ -1787,13 +2282,22 @@ class GameEngine {
     var roomLevel = state.story.roomLevel;
     var legal = state.story.flagBool('isLegalCompany');
     if (decision.id.contains('office-year')) {
-      officeTier = officeTier < 1 ? 1 : officeTier;
       roomLevel = roomLevel < 2 ? 2 : roomLevel;
+      if (optionId == 'milestone_bold') {
+        officeTier = officeTier < 1 ? 1 : officeTier;
+        flags['officeLeaseAccepted'] = true;
+        flags.remove('officePlanDeferred');
+      } else {
+        flags['officePlanDeferred'] = true;
+      }
     }
     if (decision.id.contains('incorporation-year')) {
-      officeTier = officeTier < 2 ? 2 : officeTier;
       roomLevel = roomLevel < 3 ? 3 : roomLevel;
       legal = true;
+      if (optionId == 'milestone_bold') {
+        officeTier = officeTier < 2 ? 2 : officeTier;
+        flags['officeExpansionAccepted'] = true;
+      }
     }
     flags['officeTier'] = officeTier;
     flags['isLegalCompany'] = legal;
@@ -1819,7 +2323,10 @@ class GameEngine {
     if (state.pendingDecisions.isNotEmpty || state.campaignComplete) {
       return state;
     }
-    var next = state.copyWith(
+    final settled = expirePendingOrders(
+      state.copyWith(marketMinute: krxCloseMinute),
+    );
+    var next = settled.copyWith(
       day: state.day + 1,
       marketMinute: marketDayStartMinute,
       progression: state.progression.record('days_advanced'),
@@ -1849,6 +2356,8 @@ class GameEngine {
     }
     next = _applyMonthlyEconomy(next);
     next = _applyCampaignMilestones(next);
+    next = _applyControlOpportunity(next);
+    next = _applyEraTechnologyDecisions(next);
     if (next.day % 30 == 0 &&
         next.project?.status == ProjectStatus.development) {
       const burn = 10000;
@@ -1894,7 +2403,9 @@ class GameEngine {
     final interestRate = state.progression.hasSkill('cash_management')
         ? 0.0015
         : 0.001;
-    final interest = state.cash > 0 ? (state.cash * interestRate).round() : 0;
+    final interest = state.bankCash > 0
+        ? (state.bankCash * interestRate).round()
+        : 0;
     final controlledIncome = state.company.isControlled
         ? (state.company.monthlyRevenue * 0.05).round()
         : 0;
@@ -1904,28 +2415,46 @@ class GameEngine {
         interest +
         controlledIncome +
         propertyIncome;
-    final net = income - payroll - rent - propertyCost;
     final flags = Map<String, dynamic>.from(state.story.storyFlags);
+    final priorUnpaid = state.story.flagInt('unpaidOperatingCost');
+    final availableBank = state.bankCash + income;
+    final currentExpenses = payroll + rent + propertyCost;
+    final totalDue = priorUnpaid + currentExpenses;
+    final paidTotal = math.min(availableBank, totalDue);
+    var remainingPayment = paidTotal;
+    final paidPrior = math.min(priorUnpaid, remainingPayment);
+    remainingPayment -= paidPrior;
+    final paidPayroll = math.min(payroll, remainingPayment);
+    remainingPayment -= paidPayroll;
+    final paidRent = math.min(rent, remainingPayment);
+    remainingPayment -= paidRent;
+    final paidPropertyCost = math.min(propertyCost, remainingPayment);
+    final paidCurrent = paidPayroll + paidRent + paidPropertyCost;
+    final unpaidCurrent = currentExpenses - paidCurrent;
+    final unpaidOperatingCost = priorUnpaid - paidPrior + unpaidCurrent;
+    final cashDelta = income - paidTotal;
+    final endingCash = state.cash + cashDelta;
+    final economicNet = income - currentExpenses;
     final history = ((flags['performanceHistory'] as List?) ?? const [])
         .map((item) => Map<String, dynamic>.from(item as Map))
         .toList();
     history.add({
       'day': state.day,
-      'cash': (state.cash + net).clamp(0, 1 << 62),
+      'cash': endingCash,
       'portfolioCost': state.portfolioCost,
       'realizedPnl': state.ledger.fold<int>(
         0,
         (sum, entry) => sum + entry.realizedPnl,
       ),
       'reputation': state.story.reputation,
-      'benchmarkIndex': 1000 + state.day * 2,
     });
     if (history.length > 132) history.removeRange(0, history.length - 132);
     flags['performanceHistory'] = history;
-    if (net >= 0) {
+    if (unpaidOperatingCost == 0 && economicNet >= 0) {
+      flags.remove('unpaidOperatingCost');
       flags['reputation'] = (state.story.reputation + 1).clamp(0, 100);
-    } else if (state.cash + net < 0) {
-      flags['unpaidOperatingCost'] = -(state.cash + net);
+    } else if (unpaidOperatingCost > 0) {
+      flags['unpaidOperatingCost'] = unpaidOperatingCost;
       flags['reputation'] = (state.story.reputation - 2).clamp(0, 100);
     }
     final entries = <LedgerEntry>[];
@@ -1936,7 +2465,7 @@ class GameEngine {
           id: '$sourceId-$suffix',
           day: state.day,
           amount: amount,
-          account: 'cash',
+          account: 'company_bank',
           counterAccount: account,
           description: label,
           sourceId: sourceId,
@@ -1954,21 +2483,43 @@ class GameEngine {
       'property_rent_income',
       '부동산 월 임대수입',
     );
-    addEntry('payroll', -payroll, 'salary_expense', '직원 월 급여');
-    addEntry('rent', -rent, 'rent_expense', '사무실 월 임대료');
+    addEntry(
+      'payable-payment',
+      -paidPrior,
+      'accounts_payable',
+      '이전 미지급 운영비 지급',
+    );
+    addEntry('payroll', -paidPayroll, 'salary_expense', '직원 월 급여 지급');
+    addEntry('rent', -paidRent, 'rent_expense', '사무실 월 임대료 지급');
     addEntry(
       'property-cost',
-      -propertyCost,
+      -paidPropertyCost,
       'property_maintenance',
-      '부동산 월 유지비',
+      '부동산 월 유지비 지급',
     );
+    if (unpaidCurrent > 0) {
+      entries.add(
+        LedgerEntry(
+          id: '$sourceId-payable-accrual',
+          day: state.day,
+          amount: 0,
+          account: 'accounts_payable',
+          counterAccount: 'operating_expense_accrual',
+          description: '이번 달 미지급 운영비',
+          sourceId: sourceId,
+          notional: unpaidCurrent,
+        ),
+      );
+    }
     var progression = state.progression.record(
       'research_income',
       researchRevenue,
     );
-    if (net >= 0) progression = progression.record('positive_months');
+    if (unpaidOperatingCost == 0 && economicNet >= 0) {
+      progression = progression.record('positive_months');
+    }
     return state.copyWith(
-      cash: (state.cash + net).clamp(0, 1 << 62),
+      cash: endingCash,
       progression: progression,
       personalFinance: state.personalFinance.copyWith(
         totalPropertyIncome:
@@ -1978,6 +2529,101 @@ class GameEngine {
       ledger: [...state.ledger, ...entries],
       processedEventIds: [...state.processedEventIds, sourceId],
     );
+  }
+
+  GameState _applyControlOpportunity(GameState state) {
+    if (state.pendingDecisions.isNotEmpty ||
+        state.company.isControlled ||
+        state.story.flagBool('controlOfferPresented') ||
+        !state.story.flagBool('firstOrderExecuted') ||
+        state.day < 30 ||
+        state.bankCash < 300000) {
+      return state;
+    }
+    final flags = Map<String, dynamic>.from(state.story.storyFlags)
+      ..['controlOfferPresented'] = true;
+    return state.copyWith(
+      story: state.story.copyWith(storyFlags: flags),
+      decisions: [
+        ...state.decisions,
+        _controlOffer(state.day, followUp: false),
+      ],
+    );
+  }
+
+  GameState _applyEraTechnologyDecisions(GameState state) {
+    if (state.pendingDecisions.isNotEmpty) return state;
+    final date = state.currentDate;
+    final periods = <String>[
+      if (date.month >= 4) 'spring',
+      if (date.month >= 10) 'autumn',
+    ];
+    for (final period in periods) {
+      final decisionId = 'era-technology-${date.year}-$period';
+      if (state.decisions.any((decision) => decision.id == decisionId) ||
+          state.processedEventIds.contains(decisionId)) {
+        continue;
+      }
+      final candidates = fictionalEraTechnologies
+          .where(
+            (technology) =>
+                technology.firstYear <= date.year &&
+                technology.lastYear >= date.year,
+          )
+          .toList(growable: false);
+      if (candidates.isEmpty) return state;
+      final technology =
+          candidates[_stableHash('${state.simulationSeed}:$decisionId') %
+              candidates.length];
+      final yearScale = date.year - 2000;
+      final prototypeCost = 10000 + yearScale * 5000;
+      final partnershipCost = prototypeCost * 2;
+      return state.copyWith(
+        decisions: [
+          ...state.decisions,
+          DecisionCardData(
+            id: decisionId,
+            category: '시대 기술 검토',
+            title: '${technology.name}, 국내 협력 기회를 검토할까?',
+            proposer: '국내 산업기술 협의회',
+            body:
+                '${technology.sectors.join('·')} 업종에서 ${technology.name} 실증 사업이 시작됩니다. '
+                '먼저 뛰어들면 기술과 평판을 얻을 수 있지만 시제품이 실패하면 비용과 신뢰를 잃을 수 있습니다.',
+            createdDay: state.day,
+            dueDay: state.day + 14,
+            requestedFunds: partnershipCost,
+            benefit: '시대에 맞는 기술·브랜드·협력 경험',
+            risk: '시제품 실패·비용 손실·기술 위험 증가',
+            advisorOpinions: const [
+              '기술자: 작은 시제품으로 먼저 검증하면 실패 비용을 줄일 수 있습니다.',
+              '회계사: 협력비는 반드시 은행 잔고 안에서 집행해야 합니다.',
+              '가족: 유행 이름보다 고객과 현금흐름을 함께 확인하자.',
+            ],
+            options: [
+              DecisionOptionData(
+                id: 'era_partner',
+                label: '국내기업과 공동개발',
+                description: '비용과 위험을 나누고 45일 뒤 실증 결과를 확인합니다.',
+                cashCost: partnershipCost,
+              ),
+              DecisionOptionData(
+                id: 'era_prototype',
+                label: '소형 시제품부터 검증',
+                description: '작은 비용으로 30일 동안 핵심 기능을 시험합니다.',
+                cashCost: prototypeCost,
+              ),
+              const DecisionOptionData(
+                id: 'era_observe',
+                label: '자료만 모으며 관찰',
+                description: '현금을 지키고 다음 기술 기회를 준비합니다.',
+              ),
+            ],
+          ),
+        ],
+        processedEventIds: [...state.processedEventIds, decisionId],
+      );
+    }
+    return state;
   }
 
   GameState _applyCampaignMilestones(GameState state) {
@@ -2050,30 +2696,70 @@ class GameEngine {
             body: milestone.body,
             createdDay: next.day,
             dueDay: next.day + 7,
-            requestedFunds: 0,
+            requestedFunds: milestone.id == 'office-year'
+                ? 50000
+                : milestone.id == 'incorporation-year'
+                ? 150000
+                : 0,
             benefit: '평판·가족 신뢰·조직 성장',
             risk: '선택에 따라 위험과 성장 속도가 달라집니다.',
             advisorOpinions: const [
               '엄마: 장부에 설명할 수 있는 선택이어야 해.',
               '외할아버지: 오래 버틸 수 있는 원칙부터 보자.',
             ],
-            options: const [
-              DecisionOptionData(
-                id: 'milestone_prudent',
-                label: '현금과 원칙 우선',
-                description: '위험을 낮추고 가족 신뢰를 높입니다.',
-              ),
-              DecisionOptionData(
-                id: 'milestone_bold',
-                label: '조사 후 과감히 전진',
-                description: '평판과 기술을 얻는 대신 위험이 조금 오릅니다.',
-              ),
-              DecisionOptionData(
-                id: 'milestone_family',
-                label: '가족과 함께 결정',
-                description: '관계와 장기 신뢰를 우선합니다.',
-              ),
-            ],
+            options: milestone.id == 'office-year'
+                ? const [
+                    DecisionOptionData(
+                      id: 'milestone_prudent',
+                      label: '작은방 사무실 유지',
+                      description: '월 임대료 없이 현금과 원칙을 지킵니다.',
+                    ),
+                    DecisionOptionData(
+                      id: 'milestone_bold',
+                      label: '작은 사무실 계약',
+                      description: '신뢰를 얻는 대신 다음 달부터 월 5만원 임대료가 생깁니다.',
+                    ),
+                    DecisionOptionData(
+                      id: 'milestone_family',
+                      label: '가족 공간부터 정비',
+                      description: '재택 공간을 개선하고 가족 신뢰를 우선합니다.',
+                    ),
+                  ]
+                : milestone.id == 'incorporation-year'
+                ? const [
+                    DecisionOptionData(
+                      id: 'milestone_prudent',
+                      label: '현재 공간에서 법인 전환',
+                      description: '사무실을 넓히지 않고 준법·회계 체계부터 갖춥니다.',
+                    ),
+                    DecisionOptionData(
+                      id: 'milestone_bold',
+                      label: '법인 전환과 사무실 확장',
+                      description: '조직 신뢰를 높이지만 다음 달부터 월 15만원 임대료가 생깁니다.',
+                    ),
+                    DecisionOptionData(
+                      id: 'milestone_family',
+                      label: '가족 회계 약속 후 전환',
+                      description: '현재 공간을 유지하며 가족과 법인 원칙을 정합니다.',
+                    ),
+                  ]
+                : const [
+                    DecisionOptionData(
+                      id: 'milestone_prudent',
+                      label: '현금과 원칙 우선',
+                      description: '위험을 낮추고 가족 신뢰를 높입니다.',
+                    ),
+                    DecisionOptionData(
+                      id: 'milestone_bold',
+                      label: '조사 후 과감히 전진',
+                      description: '평판과 기술을 얻는 대신 위험이 조금 오릅니다.',
+                    ),
+                    DecisionOptionData(
+                      id: 'milestone_family',
+                      label: '가족과 함께 결정',
+                      description: '관계와 장기 신뢰를 우선합니다.',
+                    ),
+                  ],
           ),
         ],
         processedEventIds: [...next.processedEventIds, eventId],
@@ -2125,6 +2811,8 @@ class GameEngine {
               _launchReview(next.day, finalReview: true),
             ],
           );
+        case 'era_technology_result':
+          next = _applyEraTechnologyResult(next, event.id);
         case 'launch_result':
           next = _applyLaunchResult(next);
         case 'competitor_result':
@@ -2154,6 +2842,65 @@ class GameEngine {
       }
     }
     return next;
+  }
+
+  GameState _applyEraTechnologyResult(GameState state, String eventId) {
+    final path = state.story.storyFlags['eraPath:$eventId'] as String?;
+    final title =
+        state.story.storyFlags['eraTitle:$eventId'] as String? ?? '시대 기술 실증';
+    if (path == null) return state;
+    final partner = path == 'era_partner';
+    final threshold = partner ? 56 : 48;
+    final roll = _stableHash('${state.simulationSeed}:$eventId:result') % 100;
+    final success = roll < threshold;
+    final cashDelta = success ? (partner ? 90000 : 45000) : 0;
+    final priceMultiplier = success
+        ? (partner ? 1.14 : 1.08)
+        : (partner ? 0.78 : 0.88);
+    final message = success
+        ? '$title 실증이 성공했습니다. 국내 협력사가 양산 검증을 통과해 기술과 브랜드, 후속 수입이 함께 늘었습니다.'
+        : '$title 실증이 실패했습니다. 시제품 목표를 충족하지 못해 투자비를 잃고 기술 위험과 평판 부담이 커졌습니다.';
+    final flags = Map<String, dynamic>.from(state.story.storyFlags)
+      ..remove('eraPath:$eventId')
+      ..remove('eraTitle:$eventId');
+    return state.copyWith(
+      cash: state.cash + cashDelta,
+      company: state.company.copyWith(
+        technology:
+            state.company.technology + (success ? (partner ? 8 : 4) : -4),
+        brand: state.company.brand + (success ? (partner ? 7 : 3) : -6),
+        morale: state.company.morale + (success ? 4 : -5),
+        risk: state.company.risk + (success ? -3 : (partner ? 9 : 5)),
+        simulatedPrice:
+            (state.company.simulatedPrice ??
+                state.company.worldReferencePrice ??
+                generatedCompanyPriceForDay(state.day)) *
+            priceMultiplier,
+      ),
+      story: state.story.copyWith(
+        storyFlags: {
+          ...flags,
+          'reputation': (state.story.reputation + (success ? 3 : -2)).clamp(
+            0,
+            100,
+          ),
+        },
+      ),
+      decisions: [...state.decisions, _endingCard(state.day, message)],
+      ledger: [
+        ...state.ledger,
+        if (cashDelta > 0)
+          LedgerEntry(
+            id: '$eventId-income',
+            day: state.day,
+            amount: cashDelta,
+            account: 'company_bank',
+            counterAccount: 'technology_partnership_income',
+            description: '시대 기술 실증 후속 수입',
+            sourceId: eventId,
+          ),
+      ],
+    );
   }
 
   GameState _applyLaunchResult(GameState state) {
@@ -2230,7 +2977,7 @@ class GameEngine {
           id: 'launch-result-${next.day}',
           day: next.day,
           amount: cashDelta,
-          account: 'cash',
+          account: 'company_bank',
           counterAccount: 'product_result',
           description: 'Project Aurora 초기 출시 결과',
           sourceId: 'launch_result',
@@ -2285,6 +3032,7 @@ class GameEngine {
     String description,
   ) {
     if (cost == 0) return state;
+    if (cost > state.bankCash) return state;
     final ledgerId = '$sourceId-${state.day}-$cost';
     if (state.ledger.any((entry) => entry.id == ledgerId)) return state;
     return state.copyWith(
@@ -2295,7 +3043,7 @@ class GameEngine {
           id: ledgerId,
           day: state.day,
           amount: -cost,
-          account: 'cash',
+          account: 'company_bank',
           counterAccount: 'investment',
           description: description,
           sourceId: sourceId,

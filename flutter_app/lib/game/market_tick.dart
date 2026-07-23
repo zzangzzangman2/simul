@@ -3,7 +3,7 @@ import 'dart:math' as math;
 /// 08:00~20:00을 실제 게임 시각 1분 단위로 재현하는 전체 틱 수.
 const generatedSessionTicks = 720;
 const generatedPreOpenTicks = 60;
-const generatedRegularSessionTicks = 450;
+const generatedRegularSessionTicks = 420;
 const generatedRegularTradingTicks =
     generatedRegularSessionTicks - generatedPreOpenTicks;
 const generatedPostCloseTicks =
@@ -72,8 +72,16 @@ List<double> generatedMarketPath({
     (officialClose - previousClose).abs() * 1.45,
     previousClose * rangeRate * 2.25,
   );
-  final lower = math.min(previousClose, officialClose) - corridor;
-  final upper = math.max(previousClose, officialClose) + corridor;
+  final dailyLower = previousClose * 0.85;
+  final dailyUpper = previousClose * 1.15;
+  final lower = math.max(
+    dailyLower,
+    math.min(previousClose, officialClose) - corridor,
+  );
+  final upper = math.min(
+    dailyUpper,
+    math.max(previousClose, officialClose) + corridor,
+  );
   final rawClose = raw.last;
   final scale = previousClose * rangeRate * 0.42 / math.sqrt(totalTicks);
   final result = <double>[previousClose];
@@ -141,7 +149,7 @@ List<double> generatedPreviousSessionLeadIn({
 /// 08:00~20:00 게임 하루의 1분 가격 경로.
 ///
 /// 08:00~08:59는 개장 전이라 이전 종가로 고정한다. 09:00부터 정규장
-/// 경로를 만들고 15:30(tick 450)에 실제 종가를 고정한다. 정규장 마감 뒤에는
+/// 경로를 만들고 15:00(tick 420)에 실제 종가를 고정한다. 정규장 마감 뒤에는
 /// 별도 확장장을 만들지 않고 20:00까지 같은 종가를 유지한다.
 List<double> generatedFullMarketDayPath({
   required double previousClose,

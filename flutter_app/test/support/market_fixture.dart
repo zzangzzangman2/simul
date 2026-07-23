@@ -18,6 +18,29 @@ FictionalMarketUniverse testMarketUniverse() => FictionalMarketUniverse(
         '2000-01-03': 6040,
         '2000-01-04': 6110,
       },
+      financials: const [
+        FictionalFinancialSnapshot(
+          period: '1999-12-30',
+          revenue: 1200000000,
+          operatingProfit: 150000000,
+          consensusOperatingProfit: 140000000,
+          netIncome: 110000000,
+          operatingCashFlow: 165000000,
+          cash: 800000000,
+          debt: 350000000,
+          equity: 1200000000,
+          sharesOutstanding: 1000000,
+          orderBacklog: 920000000,
+        ),
+      ],
+      relations: const [
+        FictionalCompanyRelation(
+          relatedAssetId: 'widget_partner',
+          relatedName: '테스트 부품',
+          type: FictionalCompanyRelationType.supplier,
+          strength: 0.35,
+        ),
+      ],
     ),
   ],
 );
