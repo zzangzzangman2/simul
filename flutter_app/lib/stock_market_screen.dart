@@ -282,7 +282,6 @@ class StockMarketScreen extends StatefulWidget {
     this.onSetMarketMinute,
     this.onSaveMarketNotebook,
     this.onPurchaseReport,
-    this.onClaimMission,
     this.universe,
   });
 
@@ -291,7 +290,6 @@ class StockMarketScreen extends StatefulWidget {
   final Future<GameState> Function(Set<String>, Map<String, String>)?
   onSaveMarketNotebook;
   final Future<FinanceActionResult> Function()? onPurchaseReport;
-  final Future<MissionClaimResult> Function()? onClaimMission;
   final Future<TradeExecutionResult> Function(TradeOrder)? onExecuteTrade;
   final Future<FinanceActionResult> Function(int amount, bool deposit)?
   onTransferCash;
@@ -323,7 +321,6 @@ class _StockMarketScreenState extends State<StockMarketScreen> {
   bool _isTransferringCash = false;
   bool _closeAfterTrade = false;
   bool _isPurchasingReport = false;
-  bool _isClaimingMission = false;
   bool _isShowingSessionNotice = false;
   bool _isShowingBreakingNews = false;
   final Set<String> _shownBreakingNewsEventIds = <String>{};
@@ -907,24 +904,6 @@ class _StockMarketScreenState extends State<StockMarketScreen> {
     return _persistMarketNotebook(_favoriteAssetIds, notes);
   }
 
-  Future<void> _claimActiveMission() async {
-    final callback = widget.onClaimMission;
-    if (callback == null || _isClaimingMission) return;
-    setState(() => _isClaimingMission = true);
-    try {
-      final result = await callback();
-      if (result.success && mounted) setState(() => _state = result.state);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(result.message)));
-    } catch (_) {
-      if (mounted) _showSaveFailure(context);
-    } finally {
-      if (mounted) setState(() => _isClaimingMission = false);
-    }
-  }
-
   List<_StockDefinition> _sortedStocks(Iterable<_StockDefinition> source) {
     final visible = source.toList();
     visible.sort((left, right) {
@@ -1086,13 +1065,6 @@ class _StockMarketScreenState extends State<StockMarketScreen> {
           onWithdraw: widget.onTransferCash == null
               ? null
               : () => _openTransferSheet(false),
-        ),
-        const SizedBox(height: 13),
-        _MarketMissionCard(
-          state: _state,
-          onClaim: widget.onClaimMission == null || _isClaimingMission
-              ? null
-              : _claimActiveMission,
         ),
         const SizedBox(height: 22),
         _MarketSectionTitle(title: '보유 종목 ${rows.length}'),
@@ -3207,110 +3179,6 @@ class _BrokerageTransferSheetState extends State<_BrokerageTransferSheet> {
       ),
     ),
   );
-}
-
-class _MarketMissionCard extends StatelessWidget {
-  const _MarketMissionCard({required this.state, required this.onClaim});
-
-  final GameState state;
-  final VoidCallback? onClaim;
-
-  @override
-  Widget build(BuildContext context) {
-    final progress = const GameEngine().missionProgress(state);
-    if (progress == null) return const SizedBox.shrink();
-    final mission = progress.mission;
-    final accent = progress.complete ? const Color(0xFF168A5B) : _marketAccent;
-    return Container(
-      key: const Key('market-mission-card'),
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(14, 13, 14, 12),
-      decoration: BoxDecoration(
-        color: _marketSurface,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(
-                '진행 중 미션',
-                style: TextStyle(
-                  color: accent,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const Spacer(),
-              if (progress.remainingDays != null)
-                Text(
-                  '${progress.remainingDays}일 남음',
-                  style: const TextStyle(
-                    color: _marketMuted,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w500,
-                    fontFeatures: _marketNumberFeatures,
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            mission.title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: _marketInk,
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 9),
-          LinearProgressIndicator(
-            value: progress.ratio,
-            minHeight: 4,
-            borderRadius: BorderRadius.circular(99),
-            backgroundColor: const Color(0xFFDDE2E8),
-            color: accent,
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  '${mission.objective} · ${progress.current.clamp(0, mission.target)}/${mission.target}',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: _marketMuted,
-                    fontSize: 10,
-                    height: 1.35,
-                    fontWeight: FontWeight.w500,
-                    fontFeatures: _marketNumberFeatures,
-                  ),
-                ),
-              ),
-              if (progress.complete) ...[
-                const SizedBox(width: 8),
-                FilledButton(
-                  key: const Key('claim-market-mission'),
-                  onPressed: onClaim,
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size(88, 38),
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    elevation: 0,
-                    backgroundColor: accent,
-                  ),
-                  child: Text(onClaim == null ? '저장 중' : '보상 받기'),
-                ),
-              ],
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _ResearchNoteEditor extends StatefulWidget {

@@ -34,7 +34,8 @@ const articleSchema = {
       type: "number",
       minimum: -30,
       maximum: 50,
-      description: "게임의 기본 가격 엔진에 전달할 단기 영향 점수",
+      description:
+        "기사에 표시할 당시 시장 심리 강도. 가격·거래·저장 상태에는 사용하지 않음",
     },
   },
   required: ["headline", "content", "marketSentiment", "stockImpactScore"],

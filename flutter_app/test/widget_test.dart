@@ -197,7 +197,7 @@ void main() {
       find.byKey(const Key('company-header-title')),
     );
     expect(companyHeader.data, '이어하기 연구소');
-    expect(find.textContaining('1월 8일 토요일'), findsWidgets);
+    expect(find.textContaining('1월 8일 토'), findsWidgets);
     expect(find.byKey(const Key('room-company-name')), findsOneWidget);
   });
 
@@ -235,7 +235,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('decision-inbox-screen')), findsNothing);
     expect(find.byKey(const Key('open-decisions-button')), findsOneWidget);
-    expect(find.text('1월 1일 토요일 · 08:30'), findsOneWidget);
+    expect(find.text('1월 1일 토 · 08:30'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -689,7 +689,7 @@ void main() {
     await tester.tap(find.byKey(const Key('market-nav-account')));
     await tester.pump();
     expect(find.byKey(const Key('market-account-summary')), findsOneWidget);
-    expect(find.byKey(const Key('market-mission-card')), findsOneWidget);
+    expect(find.byKey(const Key('market-mission-card')), findsNothing);
     await tester.tap(find.byKey(const Key('market-account-deposit')));
     await tester.pumpAndSettle();
     await tester.enterText(

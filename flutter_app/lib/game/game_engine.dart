@@ -213,15 +213,17 @@ class GameEngine {
   }
 
   GameState _recoverLegacyMarketState(GameState state) {
+    bool isCurrentWorldAsset(String assetId) =>
+        isFictionalMarketAssetId(assetId, seed: state.simulationSeed);
     final invalid = state.positions
-        .where((position) => !isFictionalMarketAssetId(position.assetId))
+        .where((position) => !isCurrentWorldAsset(position.assetId))
         .toList(growable: false);
     final recovered = invalid.fold<int>(
       0,
       (sum, position) => sum + position.totalCost,
     );
     const sourceId = 'legacy-real-market-recovery-v14';
-    final companyIsFictional = isFictionalMarketAssetId(state.company.id);
+    final companyIsFictional = isCurrentWorldAsset(state.company.id);
     final migratedCompany = companyIsFictional
         ? state.company.copyWith(worldMode: CompanyWorldMode.fictional)
         : const CompanyState(
@@ -245,7 +247,7 @@ class GameEngine {
       cash: state.cash + recovered,
       brokerageCash: state.brokerageCash + recovered,
       positions: state.positions
-          .where((position) => isFictionalMarketAssetId(position.assetId))
+          .where((position) => isCurrentWorldAsset(position.assetId))
           .toList(growable: false),
       ledger: <LedgerEntry>[
         ...state.ledger,
@@ -763,12 +765,13 @@ class GameEngine {
         final dividend = (position.units * action.amount).round();
         if (dividend > 0) {
           cash += dividend;
+          brokerageCash += dividend;
           ledger.add(
             LedgerEntry(
               id: eventId,
               day: state.day,
               amount: dividend,
-              account: 'cash',
+              account: 'brokerage_cash',
               counterAccount: 'dividend_income',
               description: '${position.name} 배당금',
               sourceId: eventId,

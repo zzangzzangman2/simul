@@ -770,7 +770,10 @@ FictionalCompanyDefinition? fictionalCompanyById(String id) {
   return null;
 }
 
-bool isFictionalMarketAssetId(String id) => fictionalCompanyById(id) != null;
+bool isFictionalMarketAssetId(String id, {required String seed}) {
+  if (fictionalCompanyById(id) != null) return true;
+  return _generatedListingPlans(seed).any((plan) => plan.definition.id == id);
+}
 
 List<String> _allowedArcKinds(FictionalCompanyDefinition company) =>
     switch (company.sector) {

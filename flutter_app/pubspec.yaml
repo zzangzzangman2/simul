@@ -23,7 +23,14 @@ flutter:
   assets:
     - assets/images/
     - assets/fonts/LICENSE-Pretendard.txt
+    - assets/fonts/LICENSE-Maplestory.txt
   fonts:
     - family: Pretendard
       fonts:
         - asset: assets/fonts/PretendardVariable.ttf
+    - family: Maplestory
+      fonts:
+        - asset: assets/fonts/MaplestoryLight.ttf
+          weight: 400
+        - asset: assets/fonts/MaplestoryBold.ttf
+          weight: 700

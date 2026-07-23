@@ -513,6 +513,7 @@ void main() {
         .createNewGame('기업행동 테스트', initialCash: 100000)
         .copyWith(
           day: 5,
+          brokerageCash: 20000,
           positions: const [
             PortfolioPosition(
               assetId: 'sample',
@@ -551,6 +552,9 @@ void main() {
     expect(state.positions.single.units, 20);
     expect(state.positions.single.totalCost, 50000);
     expect(state.cash, 101000);
+    expect(state.brokerageCash, 21000);
+    expect(state.bankCash, 80000);
+    expect(state.ledger.first.account, 'brokerage_cash');
     expect(state.ledger, hasLength(2));
     expect(state.processedEventIds, hasLength(2));
     expect(

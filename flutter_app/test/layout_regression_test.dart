@@ -188,6 +188,7 @@ void main() {
     }
 
     expect(find.byKey(const Key('apartment-place-bedroom')), findsOneWidget);
+    expect(find.byKey(const Key('hub-mission-card')), findsOneWidget);
     expectRoomHotspots(['open-market-button', 'open-ledger-button']);
     expect(find.byKey(const Key('open-decisions-button')), findsNothing);
     expect(find.byKey(const Key('open-organization-button')), findsNothing);
@@ -195,11 +196,16 @@ void main() {
     expect(tester.takeException(), isNull);
 
     await tester.tap(find.byKey(const Key('open-market-button')));
-    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
     final marketRoute = find.byType(StockMarketScreen, skipOffstage: false);
     expect(marketRoute, findsOneWidget);
+    expect(
+      find.byKey(const Key('hub-mission-card')).hitTestable(),
+      findsNothing,
+    );
     Navigator.of(tester.element(marketRoute)).pop();
     await tester.pumpAndSettle();
+    expect(find.byKey(const Key('hub-mission-card')), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('apartment-go-living-room')));
     await tester.pumpAndSettle();
@@ -208,6 +214,7 @@ void main() {
       findsOneWidget,
     );
     expectRoomHotspots(['open-decisions-button', 'open-organization-button']);
+    expect(find.byKey(const Key('hub-mission-card')), findsOneWidget);
     expect(find.byKey(const Key('open-market-button')), findsNothing);
     expect(find.byKey(const Key('open-ledger-button')), findsNothing);
 
@@ -215,8 +222,17 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('apartment-place-kitchen')), findsOneWidget);
     expectRoomHotspots(['open-work-button']);
+    expect(find.byKey(const Key('hub-mission-card')), findsOneWidget);
     expect(find.byKey(const Key('open-decisions-button')), findsNothing);
     expect(find.byKey(const Key('open-organization-button')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('open-work-button')));
+    await tester.pumpAndSettle();
+    expect(find.byType(SeedMoneyHubScreen), findsOneWidget);
+    expect(
+      find.byKey(const Key('hub-mission-card')).hitTestable(),
+      findsNothing,
+    );
     expect(tester.takeException(), isNull);
   });
 

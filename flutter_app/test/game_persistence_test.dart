@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:millennium_capital/game/game_engine.dart';
 import 'package:millennium_capital/game/game_persistence.dart';
 import 'package:millennium_capital/game/game_state.dart';
+import 'package:millennium_capital/game/market_data.dart';
 import 'package:millennium_capital/main.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -110,6 +111,46 @@ void main() {
       expect(stored['cash'], 0);
     },
   );
+
+  test('a generated IPO holding survives save and reload', () async {
+    const seed = 'generated-ipo-persistence-test';
+    final universe = await FictionalMarketUniverse.load(seed: seed);
+    final ipo = universe.assets.firstWhere(
+      (asset) => asset.generation == 1 && asset.id.startsWith('ipo_'),
+    );
+    final state = engine
+        .createNewGame('생성 IPO 저장 테스트', initialCash: 500000, worldSeed: seed)
+        .copyWith(
+          positions: [
+            PortfolioPosition(
+              assetId: ipo.id,
+              symbol: ipo.symbol,
+              name: ipo.name,
+              market: ipo.market,
+              currency: ipo.currency,
+              units: 7,
+              totalCost: 123400,
+            ),
+          ],
+        );
+    final preferences = await SharedPreferences.getInstance();
+    final persistence = GamePersistence(preferences: preferences);
+
+    await persistence.save(state);
+    final loaded = await persistence.load();
+
+    expect(loaded, isNotNull);
+    expect(loaded!.positions, hasLength(1));
+    expect(loaded.positions.single.assetId, ipo.id);
+    expect(loaded.positions.single.units, 7);
+    expect(loaded.positions.single.totalCost, 123400);
+    expect(loaded.cash, 500000);
+    expect(loaded.brokerageCash, 500000);
+    expect(
+      loaded.processedEventIds,
+      isNot(contains('legacy-real-market-recovery-v14')),
+    );
+  });
 
   test('SharedPreferences false is surfaced as a save failure', () async {
     final preferences = await SharedPreferences.getInstance();
@@ -368,9 +409,13 @@ void main() {
   testWidgets('failed hour save never publishes the new clock to the UI', (
     tester,
   ) async {
-    final state = engine
-        .createNewGame('시계 저장 실패 테스트')
-        .copyWith(decisions: const []);
+    final initialState = engine.createNewGame('시계 저장 실패 테스트');
+    final state = initialState.copyWith(
+      decisions: const [],
+      story: initialState.story.copyWith(
+        storyFlags: {...initialState.story.storyFlags, 'hubTutorialSeen': true},
+      ),
+    );
     SharedPreferences.setMockInitialValues({
       GamePersistence.saveKey: jsonEncode(state.toJson()),
     });
