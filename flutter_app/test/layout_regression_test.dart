@@ -441,6 +441,13 @@ void main() {
       expectPortraitInside();
     }
     expect(find.byKey(const Key('academy-teacher-character')), findsOneWidget);
+    final academyTeacherRect = tester.getRect(
+      find.byKey(const Key('academy-teacher-character')),
+    );
+    expect(
+      academyTeacherRect.height,
+      greaterThanOrEqualTo(phoneSize.height * 0.5),
+    );
     await tester.tap(find.byKey(const Key('academy-tutorial-continue')));
     await tester.pumpAndSettle();
     expectPortraitInside();

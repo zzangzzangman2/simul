@@ -20,10 +20,12 @@ test("opens the Flutter family-story prologue from the default route", async () 
   assert.ok([307, 308].includes(response.status));
   assert.equal(new URL(response.headers.get("location"), "http://localhost").pathname, "/play/index.html");
 
-  const [page, flutterIndex, onboarding, layout, socialCard] = await Promise.all([
+  const [page, flutterIndex, onboarding, main, stockMarket, layout, socialCard] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../public/play/index.html", import.meta.url), "utf8"),
     readFile(new URL("../flutter_app/lib/visual_novel_onboarding.dart", import.meta.url), "utf8"),
+    readFile(new URL("../flutter_app/lib/main.dart", import.meta.url), "utf8"),
+    readFile(new URL("../flutter_app/lib/stock_market_screen.dart", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../public/og-apartment-v2.png", import.meta.url)),
   ]);
@@ -45,8 +47,10 @@ test("opens the Flutter family-story prologue from the default route", async () 
   assert.match(onboarding, /주식선생님\/05_6자세_슬랜더_투명_최종\.png/);
   assert.match(onboarding, /가격이 오르는 회사가 무조건 좋은 회사인 건가요/);
   assert.match(onboarding, /시장가랑 지정가는 언제 골라야 해요/);
-  assert.match(onboarding, /우리 투자연구소 이름/);
-  assert.match(onboarding, /학원 수료하고 첫 장부 시작하기/);
+  assert.match(onboarding, /투자연구소 이름을 정해 볼까요/);
+  assert.match(onboarding, /투자연구소 이름을 적고 시장 실습 시작/);
+  assert.match(main, /academy-market-tutorial-screen/);
+  assert.match(stockMarket, /market-tutorial-teacher-upper-body/);
   assert.match(layout, /부자되기 시뮬레이션/);
   assert.match(layout, /images: \[\{ url: `\$\{origin\}\/og-apartment-v2\.png`, width: 1672, height: 941/);
   assert.match(layout, /themeColor: "#DDF8F3"/);

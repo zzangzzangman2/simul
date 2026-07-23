@@ -77,6 +77,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
   DateTime? _lastSavedAt;
   bool _isReady = false;
   bool _isRestoring = false;
+  bool _marketTutorialLaunchScheduled = false;
   Object? _restoreError;
 
   @override
@@ -172,6 +173,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
         _view = _AppView.game;
         _isReady = true;
       });
+      _scheduleMarketTutorialLaunch();
     } catch (error) {
       debugPrint('Failed to load slot $slot: $error');
       if (!mounted) return;
@@ -267,6 +269,51 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
           .firstOrNull
           ?.savedAt;
       _view = _AppView.game;
+    });
+    _scheduleMarketTutorialLaunch();
+  }
+
+  void _scheduleMarketTutorialLaunch() {
+    final state = _state;
+    if (state == null ||
+        !state.story.marketTutorialEligible ||
+        state.story.marketTutorialSeen ||
+        _marketTutorialLaunchScheduled) {
+      return;
+    }
+    _marketTutorialLaunchScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        _marketTutorialLaunchScheduled = false;
+        return;
+      }
+      final current = _state;
+      final navigator = _navigatorKey.currentState;
+      if (current == null ||
+          current.story.marketTutorialSeen ||
+          navigator == null) {
+        _marketTutorialLaunchScheduled = false;
+        return;
+      }
+      unawaited(
+        navigator
+            .push<void>(
+              _gameSceneRoute<void>(
+                StockMarketScreen(
+                  key: const Key('academy-market-tutorial-screen'),
+                  state: current,
+                  onSetMarketMinute: _setMarketMinute,
+                  onSaveMarketNotebook: _saveMarketNotebook,
+                  onPurchaseReport: _purchaseDailyMarketReport,
+                  onCompleteTutorial: _completeMarketTutorial,
+                  onExecuteTrade: _executeTrade,
+                  onCancelPendingOrder: _cancelPendingOrder,
+                  onTransferCash: _transferBrokerageCash,
+                ),
+              ),
+            )
+            .whenComplete(() => _marketTutorialLaunchScheduled = false),
+      );
     });
   }
 
