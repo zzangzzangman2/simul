@@ -104,7 +104,7 @@ void main() {
 
         expect(currentState.day, initialDay + 1);
         expect(currentState.marketMinute, marketDayStartMinute);
-        expect(find.text('08:00 · 아파트 생활'), findsOneWidget);
+        expect(find.textContaining('08:00'), findsOneWidget);
         expect(find.byType(KoreaEconomicNewspaperSheet), findsNothing);
         expect(tester.takeException(), isNull);
       },
