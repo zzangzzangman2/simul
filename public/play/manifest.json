@@ -6,7 +6,7 @@
   "display_override": ["fullscreen", "standalone"],
   "background_color": "#DDF8F3",
   "theme_color": "#DDF8F3",
-  "description": "2000년 서울, 0원에서 시작해 일하고 저축하고 투자하며 가족과 함께 성장하는 모바일 세로형 부자되기 생활 시뮬레이션",
+  "description": "2000년 서울, 외할아버지에게 받은 세뱃돈 1만원으로 투자와 장부를 배우며 가족과 함께 성장하는 모바일 세로형 생활 시뮬레이션",
   "orientation": "portrait-primary",
   "prefer_related_applications": false,
   "icons": [
