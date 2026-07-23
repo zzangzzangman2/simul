@@ -65,6 +65,8 @@ class StoryState {
   int get officeTier => flagInt('officeTier');
   bool get fundLaunched => flagBool('fundLaunched');
   bool get tutorialSeen => flagBool('hubTutorialSeen');
+  bool get marketTutorialEligible => flagBool('marketTutorialEligible');
+  bool get marketTutorialSeen => flagBool('marketTutorialSeen');
   List<Map<String, dynamic>> get newsArchive {
     final raw = storyFlags['newsArchive'];
     if (raw is! List) return const <Map<String, dynamic>>[];
@@ -139,6 +141,8 @@ class StoryState {
         'fundLaunched': false,
         'externalAum': 0,
         'hubTutorialSeen': false,
+        'marketTutorialEligible': true,
+        'marketTutorialSeen': false,
         'performanceHistory': <Map<String, dynamic>>[],
         'newsArchive': <Map<String, dynamic>>[],
       },
@@ -167,6 +171,8 @@ class StoryState {
         'workSessions': 0,
         'workSessionsToday': 0,
         'firstSeedGoalReached': false,
+        'marketTutorialEligible': false,
+        'marketTutorialSeen': true,
         'migratedCompanyName': companyName,
       },
     );

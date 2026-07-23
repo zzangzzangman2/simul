@@ -1516,6 +1516,16 @@ class GameEngine {
     ),
   );
 
+  GameState markMarketTutorialSeen(GameState state) => state.copyWith(
+    story: state.story.copyWith(
+      storyFlags: {
+        ...state.story.storyFlags,
+        'marketTutorialSeen': true,
+        'marketTutorialCompletedDay': state.day,
+      },
+    ),
+  );
+
   GameState requestFamilyHelp(GameState state, String helperId) {
     final organization = state.organization.requestFamilyHelp(
       helperId,

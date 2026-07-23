@@ -37,6 +37,8 @@ void main() {
     expect(state.story.guardianAccountHolder, 'mother');
     expect(state.story.storyFlags['guardianConsent'], isTrue);
     expect(state.story.storyFlags['isLegalCompany'], isFalse);
+    expect(state.story.marketTutorialEligible, isTrue);
+    expect(state.story.marketTutorialSeen, isFalse);
     expect(state.story.academyTuitionDebt, academyTuitionDebtAmount);
     expect(state.story.academyTuitionRepaid, isFalse);
     expect(
@@ -49,6 +51,25 @@ void main() {
     expect(state.ledger.single.counterAccount, 'family_gift');
     expect(state.ledger.single.description, contains('외할아버지 세뱃돈'));
     expect(state.pendingDecisions.first.id, 'first-research-note');
+  });
+
+  test('market tutorial completion is stored in story state', () {
+    final story = StoryState.newPlayer(
+      playerName: '민재',
+      introChoice: 'stocks',
+      startingTrait: StoryTrait.analysis,
+      familyRule: FamilyRule.reportLosses,
+    );
+    final initial = engine
+        .createNewGame('별빛 투자', story: story)
+        .copyWith(day: 4);
+
+    final completed = engine.markMarketTutorialSeen(initial);
+
+    expect(completed.story.marketTutorialEligible, isTrue);
+    expect(completed.story.marketTutorialSeen, isTrue);
+    expect(completed.story.storyFlags['marketTutorialCompletedDay'], 4);
+    expect(initial.story.marketTutorialSeen, isFalse);
   });
 
   test('academy tuition is repaid from bank cash once and recorded', () {

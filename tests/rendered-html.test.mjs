@@ -43,6 +43,8 @@ test("opens the Flutter family-story prologue from the default route", async () 
   assert.match(onboarding, /bg_stock_academy_2000_v1\.png/);
   assert.match(onboarding, /academy-tutorial-continue/);
   assert.match(onboarding, /주식선생님\/05_6자세_슬랜더_투명_최종\.png/);
+  assert.match(onboarding, /가격이 오르는 회사가 무조건 좋은 회사인 건가요/);
+  assert.match(onboarding, /시장가랑 지정가는 언제 골라야 해요/);
   assert.match(onboarding, /우리 투자연구소 이름/);
   assert.match(onboarding, /학원 수료하고 첫 장부 시작하기/);
   assert.match(layout, /부자되기 시뮬레이션/);
@@ -181,6 +183,10 @@ test("documents and preserves the portrait-mobile product contract", async () =>
   assert.match(market, /daily-market-report-card/);
   assert.match(market, /purchase-market-report-button/);
   assert.match(market, /가상시장 종목/);
+  assert.match(market, /market-tutorial-overlay/);
+  assert.match(market, /market-detail-tutorial-target/);
+  assert.match(market, /market-order-tutorial-done/);
+  assert.match(market, /한서윤 선생님/);
   assert.doesNotMatch(market, /historical-executive-section/);
   assert.match(css, /url\("\/office-room\.png"\)/);
   assert.ok(roomImage.byteLength > 100_000);
