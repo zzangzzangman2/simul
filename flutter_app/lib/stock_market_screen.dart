@@ -6,6 +6,13 @@ enum _MarketSection { home, explore, account }
 
 enum _ChartPeriod { minute, day, week, month, year }
 
+const _marketInk = Color(0xFF191F28);
+const _marketMuted = Color(0xFF6B7684);
+const _marketLine = Color(0xFFE8EBEF);
+const _marketSurface = Color(0xFFF7F8FA);
+const _marketAccent = Color(0xFF356FE5);
+const _marketNumberFeatures = <ui.FontFeature>[ui.FontFeature.tabularFigures()];
+
 class _CrtTradingRoomScene extends StatelessWidget {
   const _CrtTradingRoomScene({required this.minute, required this.child});
 
@@ -13,26 +20,38 @@ class _CrtTradingRoomScene extends StatelessWidget {
   final Widget child;
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: const Color(0xFFF7F8FA),
-    body: SafeArea(
-      bottom: false,
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 540),
-          child: ColoredBox(
-            color: Colors.white,
-            child: Column(
-              children: [
-                _MarketPhoneStatusBar(minute: minute),
-                Expanded(child: child),
-              ],
+  Widget build(BuildContext context) {
+    final baseTheme = Theme.of(context);
+    return Theme(
+      data: baseTheme.copyWith(
+        colorScheme: baseTheme.colorScheme.copyWith(primary: _marketAccent),
+        textTheme: baseTheme.textTheme.apply(fontFamily: 'Pretendard'),
+        primaryTextTheme: baseTheme.primaryTextTheme.apply(
+          fontFamily: 'Pretendard',
+        ),
+      ),
+      child: Scaffold(
+        backgroundColor: _marketSurface,
+        body: SafeArea(
+          bottom: false,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 540),
+              child: ColoredBox(
+                color: Colors.white,
+                child: Column(
+                  children: [
+                    _MarketPhoneStatusBar(minute: minute),
+                    Expanded(child: child),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 class _MarketPhoneStatusBar extends StatelessWidget {
@@ -52,10 +71,11 @@ class _MarketPhoneStatusBar extends StatelessWidget {
           marketTimeLabel(minute),
           key: const Key('market-phone-status-time'),
           style: const TextStyle(
-            color: Color(0xFF171B24),
+            color: _marketInk,
             fontSize: 14,
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.w700,
             letterSpacing: -0.2,
+            fontFeatures: _marketNumberFeatures,
           ),
         ),
         const Spacer(),
@@ -99,8 +119,8 @@ class _MarketHomeAppBar extends StatelessWidget {
     final info = marketClockAt(minute, tradingDay: tradingDay);
     return Container(
       key: const Key('market-home-app-bar'),
-      height: 62,
-      padding: const EdgeInsets.fromLTRB(5, 0, 8, 0),
+      height: 66,
+      padding: const EdgeInsets.fromLTRB(4, 0, 7, 0),
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(bottom: BorderSide(color: Color(0xFFF0F1F3))),
@@ -124,9 +144,9 @@ class _MarketHomeAppBar extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: Color(0xFF171B24),
+                    color: _marketInk,
                     fontSize: 17,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w700,
                     letterSpacing: -0.4,
                   ),
                 ),
@@ -152,8 +172,9 @@ class _MarketHomeAppBar extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           color: Color(0xFF7B8491),
-                          fontSize: 9,
-                          fontWeight: FontWeight.w800,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          fontFeatures: _marketNumberFeatures,
                         ),
                       ),
                     ),
@@ -178,16 +199,23 @@ class _MarketHomeAppBar extends StatelessWidget {
                     key: const Key('market-jump-open-button'),
                     onPressed: onJumpToOpen,
                     style: FilledButton.styleFrom(
-                      minimumSize: const Size(32, 32),
-                      maximumSize: const Size(32, 32),
+                      minimumSize: const Size(43, 38),
+                      maximumSize: const Size(43, 38),
                       padding: EdgeInsets.zero,
                       elevation: 0,
                       backgroundColor: const Color(0xFFE6F0FF),
-                      foregroundColor: const Color(0xFF3182F6),
+                      foregroundColor: _marketAccent,
                       disabledBackgroundColor: Colors.transparent,
                       disabledForegroundColor: const Color(0xFFB3BAC4),
                     ),
-                    child: const Icon(Icons.play_arrow_rounded, size: 18),
+                    child: const Text(
+                      '09:00',
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                        fontFeatures: _marketNumberFeatures,
+                      ),
+                    ),
                   ),
                 ),
                 Tooltip(
@@ -196,13 +224,19 @@ class _MarketHomeAppBar extends StatelessWidget {
                     key: const Key('market-advance-hour-button'),
                     onPressed: onAdvanceHour,
                     style: TextButton.styleFrom(
-                      minimumSize: const Size(32, 32),
-                      maximumSize: const Size(32, 32),
+                      minimumSize: const Size(43, 38),
+                      maximumSize: const Size(43, 38),
                       padding: EdgeInsets.zero,
                       foregroundColor: const Color(0xFF4C596A),
                       disabledForegroundColor: const Color(0xFFB3BAC4),
                     ),
-                    child: const Icon(Icons.more_time_rounded, size: 17),
+                    child: const Text(
+                      '+1시간',
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
                 ),
                 Tooltip(
@@ -211,8 +245,8 @@ class _MarketHomeAppBar extends StatelessWidget {
                     key: const Key('market-jump-close-button'),
                     onPressed: onJumpToClose,
                     style: FilledButton.styleFrom(
-                      minimumSize: const Size(32, 32),
-                      maximumSize: const Size(32, 32),
+                      minimumSize: const Size(43, 38),
+                      maximumSize: const Size(43, 38),
                       padding: EdgeInsets.zero,
                       elevation: 0,
                       backgroundColor: const Color(0xFFEAF8F1),
@@ -220,7 +254,14 @@ class _MarketHomeAppBar extends StatelessWidget {
                       disabledBackgroundColor: Colors.transparent,
                       disabledForegroundColor: const Color(0xFFB3BAC4),
                     ),
-                    child: const Icon(Icons.stop_rounded, size: 17),
+                    child: const Text(
+                      '15:30',
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                        fontFeatures: _marketNumberFeatures,
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -936,7 +977,7 @@ class _StockMarketScreenState extends State<StockMarketScreen> {
           style: TextStyle(
             color: Color(0xFF191F28),
             fontSize: 24,
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.w700,
             letterSpacing: -0.8,
           ),
         ),
@@ -1086,41 +1127,32 @@ class _StockMarketScreenState extends State<StockMarketScreen> {
                                   style: const TextStyle(
                                     color: Color(0xFF202632),
                                     fontSize: 19,
-                                    fontWeight: FontWeight.w900,
+                                    fontWeight: FontWeight.w700,
                                     letterSpacing: -0.6,
                                   ),
                                 ),
                               ),
                               const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 5,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFE8F8F0),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: const Row(
-                                  children: [
-                                    _LiveDot(),
-                                    SizedBox(width: 5),
-                                    Text(
-                                      '실제 종가 연동',
-                                      style: TextStyle(
-                                        color: Color(0xFF26845B),
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w800,
-                                      ),
+                              const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  _LiveDot(),
+                                  SizedBox(width: 5),
+                                  Text(
+                                    '종가 연동',
+                                    style: TextStyle(
+                                      color: Color(0xFF26845B),
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
                           const SizedBox(height: 7),
                           const Text(
-                            '장중 틱은 자동 생성되며 마지막 값은 실제 일별 종가와 일치합니다.',
+                            '장중 1분 틱은 게임용이며 15:30 실제 종가로 마감합니다.',
                             style: TextStyle(
                               color: Color(0xFF8A919E),
                               fontSize: 12,
@@ -1345,7 +1377,7 @@ class _StockDetailScreenState extends State<_StockDetailScreen> {
                                       style: const TextStyle(
                                         color: Color(0xFF202632),
                                         fontSize: 17,
-                                        fontWeight: FontWeight.w900,
+                                        fontWeight: FontWeight.w700,
                                       ),
                                     ),
                                     Text(
@@ -1388,10 +1420,11 @@ class _StockDetailScreenState extends State<_StockDetailScreen> {
                                     ),
                                     key: const Key('stock-detail-price'),
                                     style: const TextStyle(
-                                      color: Color(0xFF171B24),
+                                      color: _marketInk,
                                       fontSize: 34,
-                                      fontWeight: FontWeight.w900,
-                                      letterSpacing: -1.4,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: -1.2,
+                                      fontFeatures: _marketNumberFeatures,
                                     ),
                                   ),
                                 ),
@@ -1402,7 +1435,8 @@ class _StockDetailScreenState extends State<_StockDetailScreen> {
                                 style: TextStyle(
                                   color: color,
                                   fontSize: 14,
-                                  fontWeight: FontWeight.w800,
+                                  fontWeight: FontWeight.w600,
+                                  fontFeatures: _marketNumberFeatures,
                                 ),
                               ),
                               const SizedBox(height: 20),
@@ -1426,7 +1460,7 @@ class _StockDetailScreenState extends State<_StockDetailScreen> {
                                 style: TextStyle(
                                   color: Color(0xFF202632),
                                   fontSize: 18,
-                                  fontWeight: FontWeight.w900,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
                               const SizedBox(height: 9),
@@ -1448,8 +1482,9 @@ class _StockDetailScreenState extends State<_StockDetailScreen> {
                               Container(
                                 padding: const EdgeInsets.all(16),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFFFF7D8),
-                                  borderRadius: BorderRadius.circular(18),
+                                  color: const Color(0xFFF3F6FA),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(color: _marketLine),
                                 ),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1460,9 +1495,9 @@ class _StockDetailScreenState extends State<_StockDetailScreen> {
                                           child: Text(
                                             '오늘의 조사 질문',
                                             style: TextStyle(
-                                              color: Color(0xFF8A6815),
+                                              color: _marketAccent,
                                               fontSize: 11,
-                                              fontWeight: FontWeight.w900,
+                                              fontWeight: FontWeight.w700,
                                             ),
                                           ),
                                         ),
@@ -1487,10 +1522,10 @@ class _StockDetailScreenState extends State<_StockDetailScreen> {
                                     Text(
                                       definition.question,
                                       style: const TextStyle(
-                                        color: Color(0xFF403617),
+                                        color: _marketInk,
                                         fontSize: 14,
                                         height: 1.45,
-                                        fontWeight: FontWeight.w800,
+                                        fontWeight: FontWeight.w600,
                                       ),
                                     ),
                                     if (_researchNote.isNotEmpty) ...[
@@ -1569,7 +1604,7 @@ class _StockDetailScreenState extends State<_StockDetailScreen> {
                                   child: const Text(
                                     '팔기',
                                     style: TextStyle(
-                                      fontWeight: FontWeight.w800,
+                                      fontWeight: FontWeight.w600,
                                     ),
                                   ),
                                 ),
@@ -1587,7 +1622,7 @@ class _StockDetailScreenState extends State<_StockDetailScreen> {
                                         ),
                                   style: FilledButton.styleFrom(
                                     minimumSize: const Size.fromHeight(52),
-                                    backgroundColor: const Color(0xFF3182F6),
+                                    backgroundColor: _marketAccent,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(15),
                                     ),
@@ -1595,7 +1630,7 @@ class _StockDetailScreenState extends State<_StockDetailScreen> {
                                   child: const Text(
                                     '사기',
                                     style: TextStyle(
-                                      fontWeight: FontWeight.w900,
+                                      fontWeight: FontWeight.w700,
                                     ),
                                   ),
                                 ),
@@ -1796,9 +1831,7 @@ class _OrderSheetState extends State<_OrderSheet> {
   @override
   Widget build(BuildContext context) {
     final action = widget.isBuy ? '사기' : '팔기';
-    final actionColor = widget.isBuy
-        ? const Color(0xFF3182F6)
-        : const Color(0xFFF04452);
+    final actionColor = widget.isBuy ? _marketAccent : const Color(0xFFF04452);
     final maxQuantity = _maxQuantity;
     final canSubmit =
         _authorityReady &&
@@ -1825,7 +1858,7 @@ class _OrderSheetState extends State<_OrderSheet> {
                 style: const TextStyle(
                   color: Color(0xFF202632),
                   fontSize: 22,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
               const SizedBox(height: 7),
@@ -1851,7 +1884,7 @@ class _OrderSheetState extends State<_OrderSheet> {
                         const Expanded(
                           child: Text(
                             '주문 수량',
-                            style: TextStyle(fontWeight: FontWeight.w900),
+                            style: TextStyle(fontWeight: FontWeight.w700),
                           ),
                         ),
                         IconButton.filledTonal(
@@ -1871,7 +1904,7 @@ class _OrderSheetState extends State<_OrderSheet> {
                             textAlign: TextAlign.center,
                             style: const TextStyle(
                               fontSize: 18,
-                              fontWeight: FontWeight.w900,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                         ),
@@ -1940,7 +1973,7 @@ class _OrderSheetState extends State<_OrderSheet> {
                       : null,
                   style: const TextStyle(
                     color: Color(0xFFF04452),
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
@@ -1962,7 +1995,7 @@ class _OrderSheetState extends State<_OrderSheet> {
                       color: _result!.success
                           ? const Color(0xFF18794E)
                           : const Color(0xFFB42332),
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
@@ -1996,7 +2029,7 @@ class _OrderSheetState extends State<_OrderSheet> {
                             : !_authorityReady
                             ? '종잣돈 10,000원 달성 후 주문 가능'
                             : '부모님 승인으로 주문 실행',
-                        style: const TextStyle(fontWeight: FontWeight.w900),
+                        style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
               ),
             ],
@@ -2027,7 +2060,7 @@ class _OrderSummaryRow extends StatelessWidget {
         Text(
           '${_money(value)}원',
           style: TextStyle(
-            fontWeight: strong ? FontWeight.w900 : FontWeight.w700,
+            fontWeight: strong ? FontWeight.w700 : FontWeight.w700,
           ),
         ),
       ],
@@ -2062,7 +2095,7 @@ class _HistoricalLeadershipSection extends StatelessWidget {
                 style: TextStyle(
                   color: Color(0xFF202632),
                   fontSize: 18,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ),
@@ -2077,7 +2110,7 @@ class _HistoricalLeadershipSection extends StatelessWidget {
                 style: const TextStyle(
                   color: Color(0xFF3774C7),
                   fontSize: 10,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ),
@@ -2146,7 +2179,7 @@ class _HistoricalExecutiveCard extends StatelessWidget {
                     style: const TextStyle(
                       color: Color(0xFF3774C7),
                       fontSize: 10,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                   const SizedBox(height: 3),
@@ -2155,7 +2188,7 @@ class _HistoricalExecutiveCard extends StatelessWidget {
                     style: const TextStyle(
                       color: Color(0xFF252B35),
                       fontSize: 17,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                   Text(
@@ -2287,7 +2320,7 @@ class _MarketSessionNoticeCard extends StatelessWidget {
                             style: TextStyle(
                               color: accent,
                               fontSize: 14,
-                              fontWeight: FontWeight.w900,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                         ),
@@ -2299,7 +2332,7 @@ class _MarketSessionNoticeCard extends StatelessWidget {
                       style: const TextStyle(
                         color: Color(0xFF171B24),
                         fontSize: 22,
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w700,
                         letterSpacing: -0.7,
                       ),
                     ),
@@ -2328,7 +2361,7 @@ class _MarketSessionNoticeCard extends StatelessWidget {
                         ),
                         child: const Text(
                           '확인',
-                          style: TextStyle(fontWeight: FontWeight.w900),
+                          style: TextStyle(fontWeight: FontWeight.w700),
                         ),
                       ),
                     ),
@@ -2390,19 +2423,15 @@ class _MarketBottomNavigation extends StatelessWidget {
               Icon(
                 icon,
                 size: 22,
-                color: active
-                    ? const Color(0xFF3182F6)
-                    : const Color(0xFFADB5BD),
+                color: active ? _marketAccent : const Color(0xFFADB5BD),
               ),
               const SizedBox(height: 2),
               Text(
                 label,
                 style: TextStyle(
-                  color: active
-                      ? const Color(0xFF3182F6)
-                      : const Color(0xFF8B95A1),
+                  color: active ? _marketAccent : const Color(0xFF8B95A1),
                   fontSize: 10,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],
@@ -2429,7 +2458,7 @@ class _MarketSectionTitle extends StatelessWidget {
           style: const TextStyle(
             color: Color(0xFF202632),
             fontSize: 18,
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.w700,
             letterSpacing: -0.5,
           ),
         ),
@@ -2439,7 +2468,7 @@ class _MarketSectionTitle extends StatelessWidget {
           onPressed: onAction,
           child: Text(
             action!,
-            style: const TextStyle(fontWeight: FontWeight.w800),
+            style: const TextStyle(fontWeight: FontWeight.w600),
           ),
         ),
     ],
@@ -2458,47 +2487,18 @@ class _MarketRankingTable extends StatelessWidget {
   final ValueChanged<_StockDefinition> onOpen;
 
   @override
-  Widget build(BuildContext context) => Container(
+  Widget build(BuildContext context) => Column(
     key: const Key('market-ranking-table'),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: const Color(0xFFE7EBF0)),
-    ),
-    clipBehavior: Clip.antiAlias,
-    child: Column(
-      children: [
-        const _MarketRankingHeader(),
-        for (var index = 0; index < stocks.length; index++)
-          _MarketRankingRow(
-            key: Key('market-ranking-row-${stocks[index].code}'),
-            rank: index + 1,
-            definition: stocks[index],
-            live: live[stocks[index].code]!,
-            onTap: () => onOpen(stocks[index]),
-          ),
-      ],
-    ),
-  );
-}
-
-class _MarketRankingHeader extends StatelessWidget {
-  const _MarketRankingHeader();
-
-  @override
-  Widget build(BuildContext context) => Container(
-    height: 34,
-    padding: const EdgeInsets.symmetric(horizontal: 10),
-    color: const Color(0xFFF7F8FA),
-    child: const Row(
-      children: [
-        SizedBox(width: 26, child: Text('순위')),
-        Expanded(flex: 5, child: Text('종목')),
-        Expanded(flex: 4, child: Text('현재가', textAlign: TextAlign.right)),
-        Expanded(flex: 3, child: Text('등락', textAlign: TextAlign.right)),
-        Expanded(flex: 4, child: Text('거래대금', textAlign: TextAlign.right)),
-      ],
-    ),
+    children: [
+      for (var index = 0; index < stocks.length; index++)
+        _MarketRankingRow(
+          key: Key('market-ranking-row-${stocks[index].code}'),
+          rank: index + 1,
+          definition: stocks[index],
+          live: live[stocks[index].code]!,
+          onTap: () => onOpen(stocks[index]),
+        ),
+    ],
   );
 }
 
@@ -2527,28 +2527,26 @@ class _MarketRankingRow extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
           child: Container(
-            height: 56,
-            padding: const EdgeInsets.symmetric(horizontal: 10),
+            height: 68,
+            padding: const EdgeInsets.symmetric(horizontal: 2),
             decoration: const BoxDecoration(
-              border: Border(
-                top: BorderSide(color: Color(0xFFEEF0F3), width: 1),
-              ),
+              border: Border(bottom: BorderSide(color: _marketLine)),
             ),
             child: Row(
               children: [
                 SizedBox(
-                  width: 26,
+                  width: 30,
                   child: Text(
-                    '$rank',
+                    rank.toString(),
                     style: const TextStyle(
-                      color: Color(0xFF7B8491),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF8B95A1),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      fontFeatures: _marketNumberFeatures,
                     ),
                   ),
                 ),
                 Expanded(
-                  flex: 5,
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -2558,64 +2556,56 @@ class _MarketRankingRow extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          color: Color(0xFF252B35),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w900,
+                          color: _marketInk,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 4),
                       Text(
-                        definition.code,
+                        '${definition.code} · 거래대금 ${_compactEok(_simulatedTurnover(definition, quote))}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          color: Color(0xFF9AA1AB),
-                          fontSize: 8,
-                          fontWeight: FontWeight.w700,
+                          color: _marketMuted,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w500,
+                          fontFeatures: _marketNumberFeatures,
                         ),
                       ),
                     ],
                   ),
                 ),
-                Expanded(
-                  flex: 4,
-                  child: Text(
-                    _displayPrice(quote.price, definition.currency),
-                    maxLines: 1,
-                    textAlign: TextAlign.right,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Color(0xFF252B35),
-                      fontSize: 10,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ),
-                Expanded(
-                  flex: 3,
-                  child: Text(
-                    '${rate >= 0 ? '+' : ''}${rate.toStringAsFixed(2)}%',
-                    maxLines: 1,
-                    textAlign: TextAlign.right,
-                    style: TextStyle(
-                      color: change.abs() < 0.005
-                          ? const Color(0xFF7B8491)
-                          : _priceColor(change),
-                      fontSize: 9,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ),
-                Expanded(
-                  flex: 4,
-                  child: Text(
-                    _compactEok(_simulatedTurnover(definition, quote)),
-                    maxLines: 1,
-                    textAlign: TextAlign.right,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Color(0xFF4D5968),
-                      fontSize: 9,
-                      fontWeight: FontWeight.w800,
-                    ),
+                const SizedBox(width: 10),
+                SizedBox(
+                  width: 104,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        _displayPrice(quote.price, definition.currency),
+                        maxLines: 1,
+                        style: const TextStyle(
+                          color: _marketInk,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          fontFeatures: _marketNumberFeatures,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${rate >= 0 ? '+' : ''}${rate.toStringAsFixed(2)}%',
+                        style: TextStyle(
+                          color: change.abs() < 0.005
+                              ? const Color(0xFF7B8491)
+                              : _priceColor(change),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          fontFeatures: _marketNumberFeatures,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -2658,108 +2648,135 @@ class _BrokerageAccountCard extends StatelessWidget {
     final pnlColor = _priceColor(pnl.toDouble());
     return Container(
       key: const Key('market-account-summary'),
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFFE9EDF2)),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x0D101828),
-            blurRadius: 18,
-            offset: Offset(0, 7),
-          ),
-        ],
-      ),
+      padding: const EdgeInsets.fromLTRB(2, 4, 2, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            '총 투자자산',
-            style: TextStyle(
-              color: Color(0xFF6B7684),
-              fontWeight: FontWeight.w700,
+          Text(
+            '${state.companyName} 증권계좌',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: _marketMuted,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 5),
+          const SizedBox(height: 8),
           Text(
             '${_money(state.brokerageCash + evaluation)}원',
             style: const TextStyle(
-              fontSize: 27,
-              fontWeight: FontWeight.w900,
-              letterSpacing: -0.8,
-            ),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            '평가손익 ${pnl >= 0 ? '+' : ''}${_money(pnl)}원 · ${rate >= 0 ? '+' : ''}${rate.toStringAsFixed(2)}%',
-            key: const Key('market-account-pnl'),
-            style: TextStyle(color: pnlColor, fontWeight: FontWeight.w900),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: _AccountMetric(
-                  label: '총 매입',
-                  value: '${_money(state.portfolioCost)}원',
-                ),
-              ),
-              Expanded(
-                child: _AccountMetric(
-                  label: '총 평가',
-                  value: '${_money(evaluation)}원',
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _AccountMetric(
-                  label: '예수금',
-                  value: '${_money(state.brokerageCash)}원',
-                ),
-              ),
-              Expanded(
-                child: _AccountMetric(
-                  label: '회사 통장',
-                  value: '${_money(state.bankCash)}원',
-                ),
-              ),
-            ],
-          ),
-          const Divider(height: 25),
-          Text(
-            '실현손익 ${realized >= 0 ? '+' : ''}${_money(realized)}원  ·  누적 증권 수수료 ${_money(totalFees)}원',
-            key: const Key('market-account-fees'),
-            style: const TextStyle(
-              color: Color(0xFF6B7684),
-              fontSize: 11,
+              color: _marketInk,
+              fontSize: 31,
               fontWeight: FontWeight.w700,
+              letterSpacing: -1.0,
+              fontFeatures: _marketNumberFeatures,
             ),
           ),
           const SizedBox(height: 5),
-          const Text(
-            '매수·매도 체결 시 기본 증권 수수료 0.250% 적용',
+          Text(
+            '평가손익 ${pnl >= 0 ? '+' : ''}${_money(pnl)}원 · ${rate >= 0 ? '+' : ''}${rate.toStringAsFixed(2)}%',
+            key: const Key('market-account-pnl'),
             style: TextStyle(
-              color: Color(0xFF8B95A1),
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
+              color: pnlColor,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              fontFeatures: _marketNumberFeatures,
             ),
           ),
-          const SizedBox(height: 13),
+          const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.all(15),
+            decoration: BoxDecoration(
+              color: _marketSurface,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: _AccountMetric(
+                        label: '총 매입',
+                        value: '${_money(state.portfolioCost)}원',
+                      ),
+                    ),
+                    Expanded(
+                      child: _AccountMetric(
+                        label: '총 평가',
+                        value: '${_money(evaluation)}원',
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _AccountMetric(
+                        label: '예수금',
+                        value: '${_money(state.brokerageCash)}원',
+                      ),
+                    ),
+                    Expanded(
+                      child: _AccountMetric(
+                        label: '회사 통장',
+                        value: '${_money(state.bankCash)}원',
+                      ),
+                    ),
+                  ],
+                ),
+                const Divider(height: 25, color: _marketLine),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _AccountMetric(
+                        label: '실현손익',
+                        value:
+                            '${realized >= 0 ? '+' : ''}${_money(realized)}원',
+                      ),
+                    ),
+                    Expanded(
+                      child: _AccountMetric(
+                        label: '누적 수수료',
+                        value: '${_money(totalFees)}원',
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '누적 증권 수수료 ${_money(totalFees)}원 · 매매 수수료율 0.250%',
+            key: const Key('market-account-fees'),
+            style: const TextStyle(
+              color: Color(0xFF8B95A1),
+              fontSize: 10,
+              fontWeight: FontWeight.w500,
+              fontFeatures: _marketNumberFeatures,
+            ),
+          ),
+          const SizedBox(height: 15),
           Row(
             children: [
               Expanded(
-                child: OutlinedButton(
+                child: FilledButton(
                   key: const Key('market-account-deposit'),
                   onPressed: onDeposit,
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(44),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(46),
+                    elevation: 0,
+                    backgroundColor: _marketAccent,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
-                  child: const Text('입금'),
+                  child: const Text(
+                    '입금',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
                 ),
               ),
               const SizedBox(width: 9),
@@ -2768,9 +2785,17 @@ class _BrokerageAccountCard extends StatelessWidget {
                   key: const Key('market-account-withdraw'),
                   onPressed: onWithdraw,
                   style: OutlinedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(44),
+                    minimumSize: const Size.fromHeight(46),
+                    foregroundColor: _marketInk,
+                    side: const BorderSide(color: _marketLine),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
-                  child: const Text('출금'),
+                  child: const Text(
+                    '출금',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
                 ),
               ),
             ],
@@ -2807,7 +2832,7 @@ class _AccountMetric extends StatelessWidget {
         style: const TextStyle(
           color: Color(0xFF333D4B),
           fontSize: 14,
-          fontWeight: FontWeight.w900,
+          fontWeight: FontWeight.w700,
         ),
       ),
     ],
@@ -2838,90 +2863,74 @@ class _PortfolioPositionRow extends StatelessWidget {
           ? 0.0
           : pnl / position.totalCost * 100;
       final color = _priceColor(pnl.toDouble());
-      return Container(
-        margin: const EdgeInsets.only(bottom: 9),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: const Color(0xFFEDF0F3)),
-        ),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(18),
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Row(
-                children: [
-                  Container(
-                    width: 42,
-                    height: 42,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: definition.accent.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Text(
-                      definition.name.substring(0, 1),
-                      style: TextStyle(
-                        color: definition.accent,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 11),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          definition.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          '${_displayUnits(position.units)}주 · 평균 ${_money((position.totalCost / position.units).round())}원',
-                          style: const TextStyle(
-                            color: Color(0xFF8B95A1),
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
+      return Material(
+        color: Colors.white,
+        child: InkWell(
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 15),
+            decoration: const BoxDecoration(
+              border: Border(bottom: BorderSide(color: _marketLine)),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '${_money(evaluation)}원',
-                        key: Key('position-value-${position.assetId}'),
+                        definition.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w900,
+                          color: _marketInk,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
-                      const SizedBox(height: 3),
+                      const SizedBox(height: 4),
                       Text(
-                        '${pnl >= 0 ? '+' : ''}${_money(pnl)}원 · ${rate >= 0 ? '+' : ''}${rate.toStringAsFixed(2)}%',
-                        key: Key('position-rate-${position.assetId}'),
-                        style: TextStyle(
-                          color: color,
+                        '${_displayUnits(position.units)}주 · 평균 ${_money(
+                              (position.totalCost / position.units).round(),
+                            )}원',
+                        style: const TextStyle(
+                          color: _marketMuted,
                           fontSize: 10,
-                          fontWeight: FontWeight.w900,
+                          fontWeight: FontWeight.w500,
+                          fontFeatures: _marketNumberFeatures,
                         ),
                       ),
                     ],
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(width: 10),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '${_money(evaluation)}원',
+                      key: Key('position-value-${position.assetId}'),
+                      style: const TextStyle(
+                        color: _marketInk,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        fontFeatures: _marketNumberFeatures,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${pnl >= 0 ? '+' : ''}${_money(pnl)}원 · ${rate >= 0 ? '+' : ''}${rate.toStringAsFixed(2)}%',
+                      key: Key('position-rate-${position.assetId}'),
+                      style: TextStyle(
+                        color: color,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        fontFeatures: _marketNumberFeatures,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
         ),
@@ -2939,17 +2948,14 @@ class _EmptyPortfolioCard extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     key: const Key('market-empty-portfolio'),
     padding: const EdgeInsets.all(18),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(18),
-    ),
+
     child: Column(
       children: [
         const Icon(Icons.savings_outlined, color: Color(0xFF3182F6), size: 30),
         const SizedBox(height: 8),
         const Text(
           '아직 보유한 주식이 없어요',
-          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900),
+          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: 4),
         const Text(
@@ -3040,7 +3046,7 @@ class _BrokerageTransferSheetState extends State<_BrokerageTransferSheet> {
             widget.deposit ? '증권계좌에 입금' : '증권계좌에서 출금',
             style: const TextStyle(
               fontSize: 22,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w700,
               letterSpacing: -0.6,
             ),
           ),
@@ -3103,7 +3109,7 @@ class _BrokerageTransferSheetState extends State<_BrokerageTransferSheet> {
             key: const Key('brokerage-transfer-submit'),
             onPressed: _processing ? null : _submit,
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF3182F6),
+              backgroundColor: _marketAccent,
               minimumSize: const Size.fromHeight(52),
             ),
             child: _processing
@@ -3134,56 +3140,61 @@ class _MarketMissionCard extends StatelessWidget {
     final progress = const GameEngine().missionProgress(state);
     if (progress == null) return const SizedBox.shrink();
     final mission = progress.mission;
+    final accent = progress.complete ? const Color(0xFF168A5B) : _marketAccent;
     return Container(
       key: const Key('market-mission-card'),
       width: double.infinity,
-      padding: const EdgeInsets.all(13),
+      padding: const EdgeInsets.fromLTRB(14, 13, 14, 12),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFFBEC),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: progress.complete ? const Color(0xFF4FA578) : _yellow,
-          width: 1.5,
-        ),
+        color: _marketSurface,
+        borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.flag_rounded, color: _coral, size: 18),
-              const SizedBox(width: 7),
-              Expanded(
-                child: Text(
-                  mission.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: _ink,
-                    fontWeight: FontWeight.w900,
-                  ),
+              Text(
+                '진행 중 미션',
+                style: TextStyle(
+                  color: accent,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
+              const Spacer(),
               if (progress.remainingDays != null)
                 Text(
                   '${progress.remainingDays}일 남음',
                   style: const TextStyle(
-                    color: _coral,
+                    color: _marketMuted,
                     fontSize: 10,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w500,
+                    fontFeatures: _marketNumberFeatures,
                   ),
                 ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
+          Text(
+            mission.title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: _marketInk,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 9),
           LinearProgressIndicator(
             value: progress.ratio,
-            minHeight: 7,
+            minHeight: 4,
             borderRadius: BorderRadius.circular(99),
-            backgroundColor: const Color(0xFFE7E4D7),
-            color: progress.complete ? const Color(0xFF4FA578) : _coral,
+            backgroundColor: const Color(0xFFDDE2E8),
+            color: accent,
           ),
-          const SizedBox(height: 7),
+          const SizedBox(height: 8),
           Row(
             children: [
               Expanded(
@@ -3192,10 +3203,11 @@ class _MarketMissionCard extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    color: Color(0xFF626C79),
+                    color: _marketMuted,
                     fontSize: 10,
                     height: 1.35,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w500,
+                    fontFeatures: _marketNumberFeatures,
                   ),
                 ),
               ),
@@ -3204,6 +3216,12 @@ class _MarketMissionCard extends StatelessWidget {
                 FilledButton(
                   key: const Key('claim-market-mission'),
                   onPressed: onClaim,
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(88, 38),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    elevation: 0,
+                    backgroundColor: accent,
+                  ),
                   child: Text(onClaim == null ? '저장 중' : '보상 받기'),
                 ),
               ],
@@ -3264,7 +3282,7 @@ class _ResearchNoteEditorState extends State<_ResearchNoteEditor> {
           children: [
             const Text(
               '기업 조사노트',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 5),
             Text(
@@ -3333,7 +3351,7 @@ class _MarketTabs extends StatelessWidget {
                             : const Color(0xFF9299A3),
                         fontSize: 13,
                         fontWeight: selected == index
-                            ? FontWeight.w900
+                            ? FontWeight.w700
                             : FontWeight.w700,
                       ),
                     ),
@@ -3343,7 +3361,7 @@ class _MarketTabs extends StatelessWidget {
                       height: 3,
                       width: selected == index ? 28 : 0,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF3182F6),
+                        color: _marketAccent,
                         borderRadius: BorderRadius.circular(3),
                       ),
                     ),
@@ -3379,38 +3397,44 @@ class _MarketSortBar extends StatelessWidget {
             _MarketSort.name: '이름',
           }
         : const <_MarketSort, String>{
-            _MarketSort.turnover: '게임 거래대금순',
-            _MarketSort.gainers: '급상승',
-            _MarketSort.losers: '급하락',
-            _MarketSort.name: '이름순',
+            _MarketSort.turnover: '거래대금',
+            _MarketSort.gainers: '상승률',
+            _MarketSort.losers: '하락률',
+            _MarketSort.name: '이름',
           };
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
-        children: labels.entries
-            .map(
-              (entry) => Padding(
-                padding: const EdgeInsets.only(right: 7),
-                child: ChoiceChip(
-                  key: Key('market-sort-${entry.key.name}'),
-                  selected: selected == entry.key,
-                  onSelected: (_) => onChanged(entry.key),
-                  label: Text(entry.value),
-                  showCheckmark: false,
-                  selectedColor: const Color(0xFFE8F2FF),
-                  backgroundColor: Colors.white,
-                  side: BorderSide.none,
-                  labelStyle: TextStyle(
-                    color: selected == entry.key
-                        ? const Color(0xFF2272D8)
-                        : const Color(0xFF697281),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
+        children: labels.entries.map((entry) {
+          final active = selected == entry.key;
+          return Padding(
+            padding: const EdgeInsets.only(right: 18),
+            child: InkWell(
+              key: Key('market-sort-${entry.key.name}'),
+              onTap: () => onChanged(entry.key),
+              child: Container(
+                height: 36,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(
+                      color: active ? _marketAccent : Colors.transparent,
+                      width: 2,
+                    ),
+                  ),
+                ),
+                child: Text(
+                  entry.value,
+                  style: TextStyle(
+                    color: active ? _marketInk : _marketMuted,
+                    fontSize: 12,
+                    fontWeight: active ? FontWeight.w700 : FontWeight.w500,
                   ),
                 ),
               ),
-            )
-            .toList(),
+            ),
+          );
+        }).toList(),
       ),
     );
   }
@@ -3441,171 +3465,125 @@ class _StockRow extends StatelessWidget {
       final volatility = quote.previousClose <= 0
           ? 0.0
           : (quote.high - quote.low) / quote.previousClose * 100;
-      final signal = _marketSignal(definition, rate, volatility);
-      return Container(
-        margin: const EdgeInsets.only(bottom: 9),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: const Color(0xFFEDF0F3)),
-        ),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(18),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(13, 12, 13, 11),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 40,
-                        height: 40,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: definition.accent.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(13),
-                        ),
-                        child: Text(
-                          definition.name.substring(0, 1),
-                          style: TextStyle(
-                            color: definition.accent,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              definition.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: Color(0xFF252B35),
-                                fontSize: 14,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              '${definition.market} · ${definition.code} · ${definition.sector}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: Color(0xFF9299A3),
-                                fontSize: 9,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (favorite)
-                        const Padding(
-                          padding: EdgeInsets.only(left: 6),
-                          child: Icon(
-                            Icons.star_rounded,
-                            size: 18,
-                            color: Color(0xFFFFB020),
-                          ),
-                        ),
-                      const SizedBox(width: 8),
-                      SizedBox(
-                        width: 94,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Hero(
-                              tag: 'stock-${definition.code}',
-                              child: Material(
-                                color: Colors.transparent,
+      return Material(
+        color: Colors.white,
+        child: InkWell(
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 14),
+            decoration: const BoxDecoration(
+              border: Border(bottom: BorderSide(color: _marketLine)),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Flexible(
                                 child: Text(
-                                  _displayPrice(
-                                    quote.price,
-                                    definition.currency,
-                                  ),
+                                  definition.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
-                                    color: Color(0xFF252B35),
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w900,
+                                    color: _marketInk,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
                                   ),
                                 ),
                               ),
+                              if (favorite) ...[
+                                const SizedBox(width: 5),
+                                const Icon(
+                                  Icons.star_rounded,
+                                  size: 16,
+                                  color: Color(0xFFFFB020),
+                                ),
+                              ],
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${definition.market} · ${definition.code} · ${definition.sector}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: _marketMuted,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w500,
                             ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '${rate >= 0 ? '+' : ''}${rate.toStringAsFixed(2)}%',
-                              key: Key('stock-rate-${definition.code}'),
-                              style: TextStyle(
-                                color: color,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w900,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    SizedBox(
+                      width: 104,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Hero(
+                            tag: 'stock-${definition.code}',
+                            child: Material(
+                              color: Colors.transparent,
+                              child: Text(
+                                _displayPrice(quote.price, definition.currency),
+                                style: const TextStyle(
+                                  color: _marketInk,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  fontFeatures: _marketNumberFeatures,
+                                ),
                               ),
                             ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 11),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          '게임 거래대금 ${_compactEok(turnover)} · 변동폭 ${volatility.toStringAsFixed(2)}%',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Color(0xFF626C79),
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
                           ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      SizedBox(
-                        width: 66,
-                        height: 24,
-                        child: CustomPaint(
-                          painter: _SparklinePainter(
-                            quote.sessionHistory,
-                            color,
+                          const SizedBox(height: 3),
+                          Text(
+                            '${rate >= 0 ? '+' : ''}${rate.toStringAsFixed(2)}%',
+                            key: Key('stock-rate-${definition.code}'),
+                            style: TextStyle(
+                              color: color,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              fontFeatures: _marketNumberFeatures,
+                            ),
                           ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 11),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '거래대금 ${_compactEok(turnover)} · 변동폭 ${volatility.toStringAsFixed(2)}%',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: _marketMuted,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w500,
+                          fontFeatures: _marketNumberFeatures,
                         ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.auto_awesome_rounded,
-                        size: 13,
-                        color: Color(0xFF7B61D1),
+                    ),
+                    const SizedBox(width: 12),
+                    SizedBox(
+                      width: 62,
+                      height: 24,
+                      child: CustomPaint(
+                        painter: _SparklinePainter(quote.sessionHistory, color),
                       ),
-                      const SizedBox(width: 5),
-                      Expanded(
-                        child: Text(
-                          signal,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Color(0xFF4D5562),
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
         ),
@@ -3623,8 +3601,8 @@ class _QuoteGrid extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
-      color: const Color(0xFFF7F8FA),
-      borderRadius: BorderRadius.circular(18),
+      color: _marketSurface,
+      borderRadius: BorderRadius.circular(14),
     ),
     child: Row(
       children: [
@@ -3659,9 +3637,10 @@ class _QuoteValue extends StatelessWidget {
         Text(
           _money(value.round()),
           style: const TextStyle(
-            color: Color(0xFF353B45),
+            color: _marketInk,
             fontSize: 11,
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.w600,
+            fontFeatures: _marketNumberFeatures,
           ),
         ),
       ],
@@ -3968,7 +3947,7 @@ class _MinuteChartPanelState extends State<_MinuteChartPanel> {
                       style: const TextStyle(
                         color: Color(0xFF202632),
                         fontSize: 11,
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                     const SizedBox(width: 3),
@@ -4152,7 +4131,7 @@ class _CandleChartPainter extends CustomPainter {
       final candle = visible[index];
       final x = slot * index + slot / 2;
       final rising = candle.close >= candle.open;
-      final color = rising ? const Color(0xFFF04452) : const Color(0xFF3182F6);
+      final color = rising ? const Color(0xFFF04452) : _marketAccent;
       final paint = Paint()
         ..color = color
         ..strokeWidth = 1;
@@ -4176,7 +4155,7 @@ class _CandleChartPainter extends CustomPainter {
     final current = visible.last.close;
     final currentY = yFor(current).clamp(priceTop, priceBottom);
     final currentPaint = Paint()
-      ..color = const Color(0xFF3182F6)
+      ..color = _marketAccent
       ..strokeWidth = 1;
     for (var x = 0.0; x < chartRight; x += 5) {
       canvas.drawLine(
@@ -4189,13 +4168,13 @@ class _CandleChartPainter extends CustomPainter {
       Rect.fromLTWH(chartRight, currentY - 9, axisWidth, 18),
       const Radius.circular(3),
     );
-    canvas.drawRRect(priceLabelRect, Paint()..color = const Color(0xFF3182F6));
+    canvas.drawRRect(priceLabelRect, Paint()..color = _marketAccent);
     drawText(
       _money(current.round()),
       Offset(chartRight + 4, currentY - 5.5),
       color: Colors.white,
       fontSize: 8,
-      fontWeight: FontWeight.w900,
+      fontWeight: FontWeight.w700,
     );
 
     final volumeDividerY = volumeTop - 8;
@@ -4293,7 +4272,7 @@ class _HistoricalCloseChartPainter extends CustomPainter {
         ).createShader(Offset.zero & size),
     );
     final linePaint = Paint()
-      ..color = const Color(0xFF3182F6)
+      ..color = _marketAccent
       ..strokeWidth = 2.2
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
@@ -4302,7 +4281,7 @@ class _HistoricalCloseChartPainter extends CustomPainter {
     canvas.drawCircle(
       Offset(size.width, yFor(values.last)),
       3.5,
-      Paint()..color = const Color(0xFF3182F6),
+      Paint()..color = _marketAccent,
     );
   }
 
@@ -4337,7 +4316,7 @@ class _TradingStatusRow extends StatelessWidget {
           style: const TextStyle(
             color: Color(0xFF596270),
             fontSize: 11,
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w600,
           ),
         ),
         const SizedBox(width: 18),
@@ -4384,11 +4363,9 @@ class _RangeChip extends StatelessWidget {
           child: Text(
             label,
             style: TextStyle(
-              color: selected
-                  ? const Color(0xFF3182F6)
-                  : const Color(0xFF9399A3),
+              color: selected ? _marketAccent : const Color(0xFF9399A3),
               fontSize: 11,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ),
@@ -4559,19 +4536,6 @@ String _compactEok(double value) => value >= 1000
     ? '${(value / 1000).toStringAsFixed(1)}천억원'
     : '${value.round()}억원';
 
-String _marketSignal(
-  _StockDefinition definition,
-  double rate,
-  double volatility,
-) {
-  if (rate >= 4) return '매수세가 강해지며 ${definition.sector} 종목 중 상승이 커요';
-  if (rate <= -4) return '매도 압력이 커졌어요 · 가격 변동을 확인하세요';
-  if (volatility >= 2.2) return '장중 변동성이 확대됐어요 · 고가와 저가 차이를 확인하세요';
-  if (rate >= 0.8) return '${definition.sector} 흐름보다 조금 강하게 움직이고 있어요';
-  if (rate <= -0.8) return '${definition.sector} 흐름보다 조금 약하게 움직이고 있어요';
-  return '현재가가 전일 종가 근처에서 움직이고 있어요';
-}
-
 Color _hexColor(String value) {
   final normalized = value.replaceFirst('#', '');
   final parsed = int.tryParse(normalized, radix: 16) ?? 0x607D8B;
@@ -4592,4 +4556,4 @@ String _displayUnits(double units) => units == units.roundToDouble()
     : units.toStringAsFixed(4).replaceFirst(RegExp(r'0+$'), '');
 
 Color _priceColor(double change) =>
-    change >= 0 ? const Color(0xFFF04452) : const Color(0xFF3182F6);
+    change >= 0 ? const Color(0xFFF04452) : _marketAccent;
