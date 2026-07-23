@@ -7,6 +7,7 @@ import 'package:millennium_capital/game/game_engine.dart';
 import 'package:millennium_capital/game/game_persistence.dart';
 import 'package:millennium_capital/game/game_state.dart';
 import 'package:millennium_capital/game/market_clock.dart';
+import 'package:millennium_capital/game/story_state.dart';
 import 'package:millennium_capital/main.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -83,11 +84,14 @@ void main() {
 
   Future<void> completeStoryOnboarding(WidgetTester tester) async {
     await startNewGame(tester);
-    await advanceDialogue(tester, 9);
+    await advanceDialogue(tester, 10);
     await tester.tap(find.byKey(const Key('story-intro-computer')));
     await tester.pumpAndSettle();
 
     await advanceDialogue(tester, 7);
+    await tester.tap(find.byKey(const Key('academy-tutorial-continue')));
+    await tester.pumpAndSettle();
+    await advanceDialogue(tester, 1);
     await tester.enterText(find.byKey(const Key('player-name-input')), '민준');
     await tester.pump();
     await tester.ensureVisible(find.byKey(const Key('story-next-name')));
@@ -105,6 +109,7 @@ void main() {
 
     await tester.tap(find.byKey(const Key('family-rule-report-losses')));
     await tester.pumpAndSettle();
+    await advanceDialogue(tester, 2);
     await tester.enterText(
       find.byKey(const Key('company-name-input')),
       '별빛 투자',
@@ -130,17 +135,23 @@ void main() {
 
     await startNewGame(tester);
 
-    expect(find.textContaining('새 천년을 세 분 앞둔 밤'), findsOneWidget);
-    expect(find.textContaining('작은방'), findsOneWidget);
+    expect(find.textContaining('TV 드라마 속 젊은 투자자'), findsOneWidget);
+    expect(find.textContaining('거실 · TV 앞'), findsOneWidget);
     expect(find.byKey(const Key('story-intro-computer')), findsNothing);
     expect(find.byKey(const Key('company-name-input')), findsNothing);
 
-    await advanceDialogue(tester, 9);
+    await advanceDialogue(tester, 1);
+    expect(find.textContaining('저도 주식 해 보고 싶어요'), findsOneWidget);
+    await advanceDialogue(tester, 5);
+    expect(find.textContaining('100만 원'), findsOneWidget);
+    await advanceDialogue(tester, 4);
     expect(find.byKey(const Key('story-intro-computer')), findsOneWidget);
     await tester.tap(find.byKey(const Key('story-intro-computer')));
     await tester.pumpAndSettle();
-    await advanceDialogue(tester, 4);
-    expect(find.textContaining('세뱃돈 만 원도 함께 주마'), findsOneWidget);
+    await advanceDialogue(tester, 7);
+    expect(find.byKey(const Key('academy-teacher-character')), findsOneWidget);
+    expect(find.byKey(const Key('academy-tutorial-continue')), findsOneWidget);
+    expect(find.text('시장가와 지정가'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -178,6 +189,56 @@ void main() {
     expect(find.byKey(const Key('apartment-place-bedroom')), findsOneWidget);
     expect(find.byKey(const Key('room-company-sign')), findsOneWidget);
     expect(find.byTooltip('1시간 보내기 · 게임 시간 60분 진행'), findsOneWidget);
+  });
+
+  testWidgets('father card reveals and repays the academy tuition debt', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    const engine = GameEngine();
+    final story = StoryState.newPlayer(
+      playerName: '민준',
+      introChoice: 'computer',
+      startingTrait: StoryTrait.analysis,
+      familyRule: FamilyRule.reportLosses,
+    );
+    var state = engine
+        .createNewGame('별빛 투자', story: story)
+        .copyWith(cash: academyTuitionDebtAmount + 10000);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: OrganizationScreen(
+          state: state,
+          onRequestFamilyHelp: (helperId) async => state,
+          onRepayAcademyTuitionDebt: () async {
+            final result = engine.repayAcademyTuitionDebt(state);
+            state = result.state;
+            return result;
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('academy-tuition-debt-card')), findsNothing);
+    await tester.ensureVisible(find.byKey(const Key('assignment-card-father')));
+    await tester.tap(find.byKey(const Key('assignment-card-father')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('academy-tuition-debt-card')), findsOneWidget);
+    expect(find.textContaining('1,000,000'), findsWidgets);
+
+    await tester.ensureVisible(
+      find.byKey(const Key('repay-academy-tuition-button')),
+    );
+    await tester.tap(find.byKey(const Key('repay-academy-tuition-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('학원비 전액 상환 완료'), findsOneWidget);
+    expect(state.story.academyTuitionDebt, 0);
+    expect(state.cash, 10000);
+    expect(state.brokerageCash, 10000);
   });
 
   testWidgets('existing v1 save is restored with safe story defaults', (

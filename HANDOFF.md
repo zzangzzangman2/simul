@@ -8,7 +8,7 @@
 
 저장소 루트의 기본 경로는 `/play/index.html`로 리다이렉트한다. 예전 React 게임과 실제 종가 원장, 실경영진·역사 이벤트 코드는 제거했다.
 
-신규 게임은 외할아버지가 준 세뱃돈 10,000원을 어머니 명의 교육용 증권계좌 예수금과 `family_gift` 원장에 함께 기록한다. 이 금액으로 첫 보호자 주문 권한이 열리며, 일거리로 직접 번 돈은 별도 누적한다. 기존 저장에는 세뱃돈을 소급 지급하지 않는다.
+신규 게임은 TV 드라마 속 투자자를 보고 주식에 관심을 가진 주인공의 가족 대화와 투자학원 수업으로 시작한다. 외할아버지가 준 세뱃돈 10,000원은 어머니 명의 교육용 증권계좌 예수금과 `family_gift` 원장에 함께 기록한다. 아빠가 먼저 낸 학원비 1,000,000원은 별도 가족 채무이며, 거실 조직 화면에서 아빠를 선택한 뒤 회사 통장 잔액으로 전액 상환하면 `family_debt_repayment` 원장이 남는다. 증권 예수금은 자동 출금하지 않고 기존 저장에는 선물이나 채무를 소급 적용하지 않는다.
 
 ## 확정된 하루 흐름
 
@@ -44,6 +44,8 @@
 | `flutter_app/lib/game/fictional_market.dart` | 30개 기업, IPO·분사, 수천 사건, 가격·기업행동 생성 |
 | `flutter_app/lib/game/market_data.dart` | 가상시장 자산·기업행동 모델과 시드 캐시 |
 | `flutter_app/lib/game/game_engine.dart` | 저장 v15, 주문장, 하루 진행, 숨은 시나리오, 보고서, 기업행동, 레거시 환급 |
+| `flutter_app/lib/visual_novel_onboarding.dart` | 드라마 동기, 가족 대화, 투자학원 수업과 이름·성향 선택 |
+| `flutter_app/lib/organization_screen.dart` | 가족 조사 배치와 아빠 학원비 채무 확인·상환 |
 | `flutter_app/lib/game/market_news.dart` | 전날 사실만 쓰는 일일 브리프·신문 입력 |
 | `flutter_app/lib/main.dart` | 20:00→08:00 신문 흐름, 사무실 장중 속보 |
 | `flutter_app/lib/stock_market_screen.dart` | 가상 종목, 조사보고서, 장중 속보, 주문·차트 |

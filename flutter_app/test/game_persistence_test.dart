@@ -36,6 +36,8 @@ void main() {
 
       expect(migrated, isNotNull);
       expect(migrated!.cash, 0);
+      expect(migrated.story.academyTuitionDebt, 0);
+      expect(migrated.story.academyTuitionOriginal, 0);
       expect(migrated.version, GameState.schemaVersion);
       final stored =
           jsonDecode(preferences.getString(GamePersistence.saveKey)!)

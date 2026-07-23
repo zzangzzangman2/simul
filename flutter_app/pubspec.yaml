@@ -22,6 +22,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/
+    - assets/images/주식선생님/05_6자세_슬랜더_투명_최종.png
     - assets/fonts/LICENSE-Pretendard.txt
     - assets/fonts/LICENSE-Maplestory.txt
   fonts:
