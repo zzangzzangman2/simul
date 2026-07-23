@@ -465,6 +465,13 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     if (mounted) setState(() => _state = next);
   }
 
+  Future<GameState> _completeMarketTutorial() async {
+    final next = _engine.markMarketTutorialSeen(_state!);
+    await _persistence.save(next);
+    if (mounted) setState(() => _state = next);
+    return next;
+  }
+
   Future<void> _archiveNews(String headline, List<String> eventIds) async {
     final next = _engine.archiveNews(
       _state!,
@@ -716,6 +723,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
                   onPlayChanceGame: _playAdultChanceGame,
                   onPurchaseMarketReport: _purchaseDailyMarketReport,
                   onCompleteHubTutorial: _completeHubTutorial,
+                  onCompleteMarketTutorial: _completeMarketTutorial,
                   onArchiveNews: _archiveNews,
                   onCompleteWork: _completeWork,
                   onExecuteTrade: _executeTrade,
@@ -1406,6 +1414,7 @@ class OfficeScreen extends StatelessWidget {
     this.onPlayChanceGame,
     this.onPurchaseMarketReport,
     this.onCompleteHubTutorial,
+    this.onCompleteMarketTutorial,
     this.onArchiveNews,
     this.onBuildDailyNewspaper,
     required this.onCompleteWork,
@@ -1437,6 +1446,7 @@ class OfficeScreen extends StatelessWidget {
   final Future<FinanceActionResult> Function(int stake)? onPlayChanceGame;
   final Future<FinanceActionResult> Function()? onPurchaseMarketReport;
   final Future<void> Function()? onCompleteHubTutorial;
+  final Future<GameState> Function()? onCompleteMarketTutorial;
   final Future<void> Function(String headline, List<String> eventIds)?
   onArchiveNews;
   final Future<DailyMarketNewspaper> Function(GameState)? onBuildDailyNewspaper;
@@ -1461,6 +1471,7 @@ class OfficeScreen extends StatelessWidget {
               onSetMarketMinute: onSetMarketMinute,
               onSaveMarketNotebook: onSaveMarketNotebook,
               onPurchaseReport: onPurchaseMarketReport,
+              onCompleteTutorial: onCompleteMarketTutorial,
               onExecuteTrade: onExecuteTrade,
               onCancelPendingOrder: onCancelPendingOrder,
               onTransferCash: onTransferBrokerageCash,

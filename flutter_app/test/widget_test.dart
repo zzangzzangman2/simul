@@ -478,6 +478,117 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+    'first market visit forces the guided stock and order ticket tutorial',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(360, 800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      const engine = GameEngine();
+      final persistence = GamePersistence();
+      final story = StoryState.newPlayer(
+        playerName: '민재',
+        introChoice: 'stocks',
+        startingTrait: StoryTrait.analysis,
+        familyRule: FamilyRule.reportLosses,
+      );
+      var current = engine
+          .createNewGame('별빛 투자', initialCash: 1000000, story: story)
+          .copyWith(day: 4, marketMinute: krxOpenMinute);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: StockMarketScreen(
+            state: current,
+            universe: testMarketUniverse(),
+            onCompleteTutorial: () async {
+              current = engine.markMarketTutorialSeen(current);
+              await persistence.save(current);
+              return current;
+            },
+          ),
+        ),
+      );
+      await waitForMarketHome(tester);
+      await tester.pump(const Duration(milliseconds: 600));
+
+      expect(find.byKey(const Key('market-tutorial-overlay')), findsOneWidget);
+      expect(find.byKey(const Key('market-tutorial-teacher')), findsOneWidget);
+      expect(find.byKey(const Key('market-tutorial-next')), findsOneWidget);
+
+      await tester.tap(
+        find.byKey(const Key('market-nav-account')),
+        warnIfMissed: false,
+      );
+      await tester.pump();
+      expect(find.byKey(const Key('market-home-section')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('market-tutorial-next')));
+      await tester.pump(const Duration(milliseconds: 600));
+      await tester.pump();
+      expect(find.byKey(const Key('market-tutorial-next')), findsNothing);
+      expect(find.byKey(const Key('market-tutorial-target')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('market-tutorial-target')));
+      await tester.pump(const Duration(milliseconds: 750));
+      await tester.pump();
+      expect(find.byKey(const Key('stock-row-1001')), findsOneWidget);
+      expect(find.byKey(const Key('market-tutorial-target')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('market-tutorial-target')));
+      await tester.pump(const Duration(milliseconds: 800));
+      await tester.pump();
+      expect(
+        find.byKey(const Key('market-detail-tutorial-overlay')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('market-detail-tutorial-target')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const Key('market-detail-tutorial-target')));
+      await tester.pump(const Duration(milliseconds: 600));
+      await tester.pump();
+      expect(
+        find.byKey(const Key('market-detail-tutorial-next')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const Key('market-detail-tutorial-next')));
+      await tester.pump(const Duration(milliseconds: 600));
+      await tester.pump();
+      expect(
+        find.byKey(const Key('market-detail-tutorial-target')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const Key('market-detail-tutorial-target')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 700));
+      await tester.pump();
+      expect(
+        find.byKey(const Key('market-order-tutorial-overlay')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('market-order-tutorial-done')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const Key('market-order-tutorial-done')));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(
+        find.byKey(const Key('market-order-tutorial-overlay')),
+        findsNothing,
+      );
+      expect(find.byKey(const Key('order-type-selector')), findsOneWidget);
+      expect(current.story.marketTutorialSeen, isTrue);
+      final restored = await persistence.load();
+      expect(restored!.story.marketTutorialSeen, isTrue);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('market ticks and opens a stock detail', (tester) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
     addTearDown(() => tester.binding.setSurfaceSize(null));

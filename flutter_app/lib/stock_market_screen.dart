@@ -283,6 +283,7 @@ class StockMarketScreen extends StatefulWidget {
     this.onSetMarketMinute,
     this.onSaveMarketNotebook,
     this.onPurchaseReport,
+    this.onCompleteTutorial,
     this.universe,
   });
 
@@ -291,6 +292,7 @@ class StockMarketScreen extends StatefulWidget {
   final Future<GameState> Function(Set<String>, Map<String, String>)?
   onSaveMarketNotebook;
   final Future<FinanceActionResult> Function()? onPurchaseReport;
+  final Future<GameState> Function()? onCompleteTutorial;
   final Future<TradeExecutionResult> Function(TradeOrder)? onExecuteTrade;
   final Future<FinanceActionResult> Function(String orderId)?
   onCancelPendingOrder;
@@ -329,6 +331,12 @@ class _StockMarketScreenState extends State<StockMarketScreen> {
   final Set<String> _shownBreakingNewsEventIds = <String>{};
   bool _isMarketSheetOpen = false;
   final Set<int> _shownSessionNotices = <int>{};
+  final GlobalKey _tutorialExploreKey = GlobalKey();
+  final GlobalKey _tutorialStockKey = GlobalKey();
+  int? _tutorialStep;
+
+  bool get _tutorialActive => _tutorialStep != null;
+
   bool get _hasDomesticTradingSession =>
       isMarketTradingDay(_state.currentDate) &&
       _stocks.any(
@@ -345,6 +353,7 @@ class _StockMarketScreenState extends State<StockMarketScreen> {
         _isMarketSheetOpen ||
         _isShowingBreakingNews ||
         _isShowingSessionNotice ||
+        _tutorialActive ||
         _loading ||
         _marketMinute >= krxCloseMinute ||
         _tick >= krxCloseTick ||
@@ -372,6 +381,12 @@ class _StockMarketScreenState extends State<StockMarketScreen> {
     _marketMinute = _state.marketMinute;
     _minute.value = _marketMinute;
     _tick = marketTickForMinute(_marketMinute);
+    _tutorialStep =
+        _state.story.marketTutorialEligible &&
+            !_state.story.marketTutorialSeen &&
+            widget.onCompleteTutorial != null
+        ? 0
+        : null;
     _loadFictionalMarket();
   }
 
@@ -577,6 +592,7 @@ class _StockMarketScreenState extends State<StockMarketScreen> {
 
   Future<void> _closeMarket() async {
     if (_isClosing || _allowPop) return;
+    if (_tutorialActive) return;
     if (_isExecutingTrade) {
       _closeAfterTrade = true;
       return;
@@ -987,8 +1003,68 @@ class _StockMarketScreenState extends State<StockMarketScreen> {
     return null;
   }
 
-  void _openStock(_StockDefinition stock) {
-    Navigator.of(context).push(
+  _StockDefinition? get _tutorialStock {
+    if (_stocks.isEmpty) return null;
+    for (final stock in _stocks) {
+      if (stock.code == '1001') return stock;
+    }
+    return _stocks.first;
+  }
+
+  void _handleMarketTutorialAction() {
+    switch (_tutorialStep) {
+      case 0:
+        setState(() => _tutorialStep = 1);
+        return;
+      case 1:
+        setState(() {
+          _section = _MarketSection.explore;
+          _tab = 0;
+          _searchController.clear();
+          _tutorialStep = 2;
+        });
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          final targetContext = _tutorialStockKey.currentContext;
+          if (targetContext != null) {
+            Scrollable.ensureVisible(
+              targetContext,
+              alignment: 0.62,
+              duration: const Duration(milliseconds: 420),
+              curve: Curves.easeOutCubic,
+            );
+          }
+        });
+        return;
+      case 2:
+        final stock = _tutorialStock;
+        if (stock != null) unawaited(_openStock(stock, fromTutorial: true));
+        return;
+      case null:
+      default:
+        return;
+    }
+  }
+
+  Future<GameState> _completeMarketTutorial() async {
+    final callback = widget.onCompleteTutorial;
+    if (callback == null) return _state;
+    final saved = await callback();
+    if (!mounted) return saved;
+    setState(() {
+      _state = saved;
+      _tutorialStep = null;
+    });
+    _resumeTimerIfNeeded();
+    return saved;
+  }
+
+  Future<void> _openStock(
+    _StockDefinition stock, {
+    bool fromTutorial = false,
+  }) async {
+    if (_tutorialActive && !fromTutorial) return;
+    if (fromTutorial) setState(() => _tutorialStep = 3);
+    await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => _StockDetailScreen(
           definition: stock,
@@ -1000,9 +1076,16 @@ class _StockMarketScreenState extends State<StockMarketScreen> {
           onSaveResearchNote: _saveResearchNote,
           onMarketSheetOpened: _pauseMarketForSheet,
           onMarketSheetClosed: _resumeMarketAfterSheet,
+          tutorialEnabled: fromTutorial,
+          onCompleteTutorial: _completeMarketTutorial,
         ),
       ),
     );
+    if (!mounted || !_tutorialActive) return;
+    setState(() {
+      _section = _MarketSection.explore;
+      _tutorialStep = 2;
+    });
   }
 
   List<Widget> _holdingRows({int? limit}) {
@@ -1147,7 +1230,13 @@ class _StockMarketScreenState extends State<StockMarketScreen> {
         ),
       );
     }
-    final visibleStocks = _visibleStocks;
+    final visibleStocks = [..._visibleStocks];
+    final tutorialStock = _tutorialStock;
+    if (_tutorialStep == 2 && tutorialStock != null) {
+      visibleStocks
+        ..removeWhere((stock) => stock.id == tutorialStock.id)
+        ..insert(0, tutorialStock);
+    }
     final marketListTitle = switch (_tab) {
       3 => '새로 생긴 기업',
       4 => '관심 종목',
@@ -1272,30 +1361,23 @@ class _StockMarketScreenState extends State<StockMarketScreen> {
                             onChanged: (value) => setState(() => _sort = value),
                           ),
                           const SizedBox(height: 10),
-                          ...visibleStocks.map(
-                            (stock) => _StockRow(
+                          ...visibleStocks.map((stock) {
+                            final row = _StockRow(
                               key: Key('stock-row-${stock.code}'),
                               definition: stock,
                               live: _live[stock.code]!,
                               favorite: _favoriteAssetIds.contains(stock.id),
-                              onTap: () => Navigator.of(context).push(
-                                MaterialPageRoute<void>(
-                                  builder: (_) => _StockDetailScreen(
-                                    definition: stock,
-                                    live: _live[stock.code]!,
-                                    state: _state,
-                                    minute: _minute,
-                                    onExecuteTrade: _executeTrade,
-                                    onToggleFavorite: _toggleFavorite,
-                                    onSaveResearchNote: _saveResearchNote,
-                                    onMarketSheetOpened: _pauseMarketForSheet,
-                                    onMarketSheetClosed:
-                                        _resumeMarketAfterSheet,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
+                              onTap: () => unawaited(_openStock(stock)),
+                            );
+                            if (_tutorialStep == 2 &&
+                                stock.id == tutorialStock?.id) {
+                              return RepaintBoundary(
+                                key: _tutorialStockKey,
+                                child: row,
+                              );
+                            }
+                            return row;
+                          }),
                           if (visibleStocks.isEmpty)
                             Padding(
                               padding: const EdgeInsets.symmetric(vertical: 50),
@@ -1317,6 +1399,7 @@ class _StockMarketScreenState extends State<StockMarketScreen> {
                   _MarketBottomNavigation(
                     selected: _section,
                     onChanged: (value) => setState(() => _section = value),
+                    tutorialExploreKey: _tutorialExploreKey,
                   ),
                 ],
               ),
@@ -1325,7 +1408,25 @@ class _StockMarketScreenState extends State<StockMarketScreen> {
         ),
       ),
     );
-    return _withMarketExitGuard(scene);
+    return _withMarketExitGuard(
+      Stack(
+        children: [
+          Positioned.fill(child: scene),
+          if (_tutorialActive)
+            Positioned.fill(
+              child: _MarketTutorialOverlay(
+                step: _tutorialStep!,
+                targetKey: switch (_tutorialStep) {
+                  1 => _tutorialExploreKey,
+                  2 => _tutorialStockKey,
+                  _ => null,
+                },
+                onAction: _handleMarketTutorialAction,
+              ),
+            ),
+        ],
+      ),
+    );
   }
 }
 
@@ -1340,6 +1441,8 @@ class _StockDetailScreen extends StatefulWidget {
     required this.onSaveResearchNote,
     required this.onMarketSheetOpened,
     required this.onMarketSheetClosed,
+    this.tutorialEnabled = false,
+    this.onCompleteTutorial,
   });
 
   final _StockDefinition definition;
@@ -1351,6 +1454,8 @@ class _StockDetailScreen extends StatefulWidget {
   final Future<GameState> Function(String, String) onSaveResearchNote;
   final VoidCallback onMarketSheetOpened;
   final VoidCallback onMarketSheetClosed;
+  final bool tutorialEnabled;
+  final Future<GameState> Function()? onCompleteTutorial;
 
   @override
   State<_StockDetailScreen> createState() => _StockDetailScreenState();
@@ -1358,6 +1463,10 @@ class _StockDetailScreen extends StatefulWidget {
 
 class _StockDetailScreenState extends State<_StockDetailScreen> {
   late GameState _state;
+  final ScrollController _detailScrollController = ScrollController();
+  final GlobalKey _tutorialPriceKey = GlobalKey();
+  final GlobalKey _tutorialBuyKey = GlobalKey();
+  int? _tutorialStep;
 
   _StockDefinition get definition => widget.definition;
   ValueNotifier<_LiveStock> get live => widget.live;
@@ -1368,6 +1477,13 @@ class _StockDetailScreenState extends State<_StockDetailScreen> {
   void initState() {
     super.initState();
     _state = widget.state;
+    _tutorialStep = widget.tutorialEnabled ? 0 : null;
+  }
+
+  @override
+  void dispose() {
+    _detailScrollController.dispose();
+    super.dispose();
   }
 
   Future<TradeExecutionResult> onExecuteTrade(TradeOrder order) async {
@@ -1376,7 +1492,7 @@ class _StockDetailScreenState extends State<_StockDetailScreen> {
     return result;
   }
 
-  Future<void> _openOrderSheet(bool isBuy) async {
+  Future<void> _openOrderSheet(bool isBuy, {bool fromTutorial = false}) async {
     widget.onMarketSheetOpened();
     try {
       await _showOrderSheet(
@@ -1387,9 +1503,44 @@ class _StockDetailScreenState extends State<_StockDetailScreen> {
         state: state,
         minute: minute,
         onExecuteTrade: onExecuteTrade,
+        tutorialEnabled: fromTutorial,
+        onCompleteTutorial: () async {
+          final callback = widget.onCompleteTutorial;
+          if (callback == null) return;
+          final saved = await callback();
+          if (!mounted) return;
+          setState(() {
+            _state = saved;
+            _tutorialStep = null;
+          });
+        },
       );
     } finally {
       widget.onMarketSheetClosed();
+    }
+  }
+
+  void _handleDetailTutorialAction() {
+    switch (_tutorialStep) {
+      case 0:
+        setState(() => _tutorialStep = 1);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!_detailScrollController.hasClients) return;
+          _detailScrollController.animateTo(
+            math.min(360.0, _detailScrollController.position.maxScrollExtent),
+            duration: const Duration(milliseconds: 480),
+            curve: Curves.easeOutCubic,
+          );
+        });
+        return;
+      case 1:
+        setState(() => _tutorialStep = 2);
+        return;
+      case 2:
+        unawaited(_openOrderSheet(true, fromTutorial: true));
+        return;
+      case null:
+        return;
     }
   }
 
@@ -1446,7 +1597,7 @@ class _StockDetailScreenState extends State<_StockDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<int>(
+    final scene = ValueListenableBuilder<int>(
       valueListenable: minute,
       builder: (context, currentMinute, _) => _CrtTradingRoomScene(
         minute: currentMinute,
@@ -1516,23 +1667,27 @@ class _StockDetailScreenState extends State<_StockDetailScreen> {
                         Expanded(
                           child: ListView(
                             padding: const EdgeInsets.fromLTRB(20, 16, 20, 120),
+                            controller: _detailScrollController,
                             children: [
-                              Hero(
-                                tag: 'stock-${definition.code}',
-                                child: Material(
-                                  color: Colors.transparent,
-                                  child: Text(
-                                    _displayPrice(
-                                      quote.price,
-                                      definition.currency,
-                                    ),
-                                    key: const Key('stock-detail-price'),
-                                    style: const TextStyle(
-                                      color: _marketInk,
-                                      fontSize: 34,
-                                      fontWeight: FontWeight.w700,
-                                      letterSpacing: -1.2,
-                                      fontFeatures: _marketNumberFeatures,
+                              RepaintBoundary(
+                                key: _tutorialPriceKey,
+                                child: Hero(
+                                  tag: 'stock-${definition.code}',
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: Text(
+                                      _displayPrice(
+                                        quote.price,
+                                        definition.currency,
+                                      ),
+                                      key: const Key('stock-detail-price'),
+                                      style: const TextStyle(
+                                        color: _marketInk,
+                                        fontSize: 34,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: -1.2,
+                                        fontFeatures: _marketNumberFeatures,
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -1724,25 +1879,28 @@ class _StockDetailScreenState extends State<_StockDetailScreen> {
                               const SizedBox(width: 10),
                               Expanded(
                                 flex: 2,
-                                child: FilledButton(
-                                  key: const Key('buy-stock-button'),
-                                  onPressed: definition.currency == 'KRW'
-                                      ? () => _openOrderSheet(true)
-                                      : () => _showResearchMessage(
-                                          context,
-                                          '현재 거래할 수 없는 종목입니다.',
-                                        ),
-                                  style: FilledButton.styleFrom(
-                                    minimumSize: const Size.fromHeight(52),
-                                    backgroundColor: _marketAccent,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(15),
+                                child: RepaintBoundary(
+                                  key: _tutorialBuyKey,
+                                  child: FilledButton(
+                                    key: const Key('buy-stock-button'),
+                                    onPressed: definition.currency == 'KRW'
+                                        ? () => _openOrderSheet(true)
+                                        : () => _showResearchMessage(
+                                            context,
+                                            '현재 거래할 수 없는 종목입니다.',
+                                          ),
+                                    style: FilledButton.styleFrom(
+                                      minimumSize: const Size.fromHeight(52),
+                                      backgroundColor: _marketAccent,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(15),
+                                      ),
                                     ),
-                                  ),
-                                  child: const Text(
-                                    '사기',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w700,
+                                    child: const Text(
+                                      '사기',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -1760,6 +1918,26 @@ class _StockDetailScreenState extends State<_StockDetailScreen> {
         ),
       ),
     );
+    return PopScope<void>(
+      canPop: _tutorialStep == null,
+      child: Stack(
+        children: [
+          Positioned.fill(child: scene),
+          if (_tutorialStep != null)
+            Positioned.fill(
+              child: _MarketDetailTutorialOverlay(
+                step: _tutorialStep!,
+                targetKey: switch (_tutorialStep) {
+                  0 => _tutorialPriceKey,
+                  2 => _tutorialBuyKey,
+                  _ => null,
+                },
+                onAction: _handleDetailTutorialAction,
+              ),
+            ),
+        ],
+      ),
+    );
   }
 
   static Future<void> _showOrderSheet(
@@ -1770,23 +1948,57 @@ class _StockDetailScreenState extends State<_StockDetailScreen> {
     required GameState state,
     required ValueNotifier<int> minute,
     required Future<TradeExecutionResult> Function(TradeOrder) onExecuteTrade,
+    bool tutorialEnabled = false,
+    Future<void> Function()? onCompleteTutorial,
   }) {
     return showModalBottomSheet<void>(
       context: context,
-      showDragHandle: true,
+      showDragHandle: !tutorialEnabled,
       isScrollControlled: true,
+      isDismissible: !tutorialEnabled,
+      enableDrag: !tutorialEnabled,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (sheetContext) => _OrderSheet(
-        definition: definition,
-        live: live,
-        isBuy: isBuy,
-        state: state,
-        minute: minute,
-        onExecuteTrade: onExecuteTrade,
-      ),
+      builder: (sheetContext) {
+        var showingTutorial = tutorialEnabled;
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            final orderSheet = _OrderSheet(
+              definition: definition,
+              live: live,
+              isBuy: isBuy,
+              state: state,
+              minute: minute,
+              onExecuteTrade: onExecuteTrade,
+            );
+            if (!tutorialEnabled) return orderSheet;
+            return SizedBox(
+              height: MediaQuery.sizeOf(context).height * 0.92,
+              child: PopScope<void>(
+                canPop: !showingTutorial,
+                child: Stack(
+                  children: [
+                    Positioned.fill(child: orderSheet),
+                    if (showingTutorial)
+                      Positioned.fill(
+                        child: _OrderTicketTutorialOverlay(
+                          onDone: () async {
+                            await onCompleteTutorial?.call();
+                            if (context.mounted) {
+                              setSheetState(() => showingTutorial = false);
+                            }
+                          },
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -2689,14 +2901,408 @@ class _MarketSessionNoticeCard extends StatelessWidget {
   }
 }
 
+class _MarketTutorialOverlay extends StatelessWidget {
+  const _MarketTutorialOverlay({
+    required this.step,
+    required this.targetKey,
+    required this.onAction,
+  });
+
+  final int step;
+  final GlobalKey? targetKey;
+  final VoidCallback onAction;
+
+  @override
+  Widget build(BuildContext context) => _StockTutorialGuideOverlay(
+    overlayKey: const Key('market-tutorial-overlay'),
+    actionKey: const Key('market-tutorial-next'),
+    targetActionKey: const Key('market-tutorial-target'),
+    targetKey: targetKey,
+    speaker: '한서윤 선생님',
+    message: switch (step) {
+      0 => '학원에서 배운 주문표를 실제 화면에서 연습해 볼게요. 지금부터 제가 가리키는 곳만 하나씩 눌러 보세요.',
+      1 => '아래의 ‘주식’ 탭은 거래 가능한 회사를 모아 보는 곳이에요. 노란 테두리 안을 직접 눌러 보세요.',
+      _ => '종목은 회사 한 곳을 뜻해요. 먼저 한빛통신을 눌러 가격과 회사 내용을 함께 살펴볼게요.',
+    },
+    actionLabel: '선생님과 화면 수업 시작',
+    poseAlignment: switch (step) {
+      0 => Alignment.topLeft,
+      1 => Alignment.topCenter,
+      _ => Alignment.topRight,
+    },
+    onAction: onAction,
+  );
+}
+
+class _MarketDetailTutorialOverlay extends StatelessWidget {
+  const _MarketDetailTutorialOverlay({
+    required this.step,
+    required this.targetKey,
+    required this.onAction,
+  });
+
+  final int step;
+  final GlobalKey? targetKey;
+  final VoidCallback onAction;
+
+  @override
+  Widget build(BuildContext context) => _StockTutorialGuideOverlay(
+    overlayKey: const Key('market-detail-tutorial-overlay'),
+    actionKey: const Key('market-detail-tutorial-next'),
+    targetActionKey: const Key('market-detail-tutorial-target'),
+    targetKey: targetKey,
+    speaker: '한서윤 선생님',
+    message: switch (step) {
+      0 =>
+        '가장 큰 숫자는 지금 한 주의 가격이에요. 바로 아래 등락률은 어제 종가와 비교한 값이니, 노란 테두리를 눌러 확인하세요.',
+      1 =>
+        '차트는 가격의 움직임, 아래 재무 카드는 매출·이익·현금흐름·수주를 보여줘요. 가격만 보지 말고 회사가 돈을 버는지도 함께 읽어야 해요.',
+      _ => '살 이유와 틀렸을 때 팔 기준을 정했다면 ‘사기’를 눌러 주문표를 열어요. 아직 주문이 체결되지는 않으니 안심하세요.',
+    },
+    actionLabel: '회사 숫자 확인했어요',
+    poseAlignment: switch (step) {
+      0 => Alignment.bottomLeft,
+      1 => Alignment.bottomCenter,
+      _ => Alignment.bottomRight,
+    },
+    onAction: onAction,
+  );
+}
+
+class _OrderTicketTutorialOverlay extends StatelessWidget {
+  const _OrderTicketTutorialOverlay({required this.onDone});
+
+  final Future<void> Function() onDone;
+
+  @override
+  Widget build(BuildContext context) => _StockTutorialGuideOverlay(
+    overlayKey: const Key('market-order-tutorial-overlay'),
+    actionKey: const Key('market-order-tutorial-done'),
+    targetActionKey: const Key('market-order-tutorial-target'),
+    targetKey: null,
+    speaker: '한서윤 선생님',
+    message:
+        '이게 주문표예요. 매수·매도, 수량, 시장가·지정가, 예상 금액과 수수료를 마지막으로 확인하세요. ‘주문 제출’을 누르기 전까지는 돈이 움직이지 않아요.',
+    actionLabel: '이제 직접 주문표 살펴보기',
+    poseAlignment: Alignment.bottomCenter,
+    onAction: () => unawaited(onDone()),
+  );
+}
+
+class _StockTutorialGuideOverlay extends StatefulWidget {
+  const _StockTutorialGuideOverlay({
+    required this.overlayKey,
+    required this.actionKey,
+    required this.targetActionKey,
+    required this.targetKey,
+    required this.speaker,
+    required this.message,
+    required this.actionLabel,
+    required this.poseAlignment,
+    required this.onAction,
+  });
+
+  final Key overlayKey;
+  final Key actionKey;
+  final Key targetActionKey;
+  final GlobalKey? targetKey;
+  final String speaker;
+  final String message;
+  final String actionLabel;
+  final Alignment poseAlignment;
+  final VoidCallback onAction;
+
+  @override
+  State<_StockTutorialGuideOverlay> createState() =>
+      _StockTutorialGuideOverlayState();
+}
+
+class _StockTutorialGuideOverlayState
+    extends State<_StockTutorialGuideOverlay> {
+  final GlobalKey _layoutKey = GlobalKey();
+  Rect? _targetRect;
+  Timer? _settleTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _scheduleTargetUpdate();
+  }
+
+  @override
+  void didUpdateWidget(covariant _StockTutorialGuideOverlay oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.targetKey != widget.targetKey) {
+      _targetRect = null;
+      _scheduleTargetUpdate();
+    }
+  }
+
+  @override
+  void dispose() {
+    _settleTimer?.cancel();
+    super.dispose();
+  }
+
+  void _scheduleTargetUpdate() {
+    WidgetsBinding.instance.addPostFrameCallback((_) => _updateTargetRect());
+    _settleTimer?.cancel();
+    _settleTimer = Timer(const Duration(milliseconds: 520), _updateTargetRect);
+  }
+
+  void _updateTargetRect() {
+    if (!mounted) return;
+    final targetBox =
+        widget.targetKey?.currentContext?.findRenderObject() as RenderBox?;
+    final overlayBox =
+        _layoutKey.currentContext?.findRenderObject() as RenderBox?;
+    if (targetBox == null ||
+        overlayBox == null ||
+        !targetBox.hasSize ||
+        !overlayBox.hasSize) {
+      return;
+    }
+    final globalTopLeft = targetBox.localToGlobal(Offset.zero);
+    final localTopLeft = overlayBox.globalToLocal(globalTopLeft);
+    final next = (localTopLeft & targetBox.size).inflate(5);
+    if (_targetRect == next) return;
+    setState(() => _targetRect = next);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasTarget = widget.targetKey != null;
+    return KeyedSubtree(
+      key: widget.overlayKey,
+      child: Stack(
+        key: _layoutKey,
+        children: [
+          const Positioned.fill(
+            child: ModalBarrier(dismissible: false, color: Color(0x990C1424)),
+          ),
+          if (_targetRect != null)
+            Positioned.fromRect(
+              rect: _targetRect!,
+              child: GestureDetector(
+                key: widget.targetActionKey,
+                behavior: HitTestBehavior.opaque,
+                onTap: widget.onAction,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: const Color(0xFFFFD85E),
+                      width: 4,
+                    ),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0xAAFFD85E),
+                        blurRadius: 18,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.touch_app_rounded,
+                      color: Color(0xFFFFE58C),
+                      size: 28,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          Positioned(
+            right: -9,
+            bottom: 72,
+            child: _StockTutorialTeacher(poseAlignment: widget.poseAlignment),
+          ),
+          Positioned(
+            left: 12,
+            right: 88,
+            bottom: 185,
+            child: _StockTutorialSpeechBubble(
+              speaker: widget.speaker,
+              message: widget.message,
+              actionKey: widget.actionKey,
+              actionLabel: widget.actionLabel,
+              showAction: !hasTarget,
+              waitingForTarget: hasTarget && _targetRect == null,
+              onAction: widget.onAction,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StockTutorialTeacher extends StatelessWidget {
+  const _StockTutorialTeacher({required this.poseAlignment});
+
+  final Alignment poseAlignment;
+
+  @override
+  Widget build(BuildContext context) {
+    const dimension = 158.0;
+    return SizedBox(
+      key: const Key('market-tutorial-teacher'),
+      width: dimension,
+      height: dimension,
+      child: ClipRect(
+        child: OverflowBox(
+          alignment: poseAlignment,
+          minWidth: dimension * 3,
+          maxWidth: dimension * 3,
+          minHeight: dimension * 2,
+          maxHeight: dimension * 2,
+          child: Image.asset(
+            'assets/images/주식선생님/05_6자세_슬랜더_투명_최종.png',
+            width: dimension * 3,
+            height: dimension * 2,
+            fit: BoxFit.fill,
+            filterQuality: FilterQuality.high,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StockTutorialSpeechBubble extends StatelessWidget {
+  const _StockTutorialSpeechBubble({
+    required this.speaker,
+    required this.message,
+    required this.actionKey,
+    required this.actionLabel,
+    required this.showAction,
+    required this.waitingForTarget,
+    required this.onAction,
+  });
+
+  final String speaker;
+  final String message;
+  final Key actionKey;
+  final String actionLabel;
+  final bool showAction;
+  final bool waitingForTarget;
+  final VoidCallback onAction;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: Colors.transparent,
+    child: Container(
+      padding: const EdgeInsets.fromLTRB(14, 17, 14, 13),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFF),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFAFC2F3), width: 1.5),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x55000000),
+            blurRadius: 18,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Transform.translate(
+            offset: const Offset(0, -29),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFF536A96),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                speaker,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ),
+          Transform.translate(
+            offset: const Offset(0, -18),
+            child: Text(
+              message,
+              style: const TextStyle(
+                color: Color(0xFF24375A),
+                fontSize: 12,
+                height: 1.48,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          if (showAction)
+            SizedBox(
+              width: double.infinity,
+              height: 40,
+              child: FilledButton(
+                key: actionKey,
+                onPressed: onAction,
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF536A96),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Text(
+                  actionLabel,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            )
+          else
+            Row(
+              children: [
+                Icon(
+                  waitingForTarget
+                      ? Icons.hourglass_top_rounded
+                      : Icons.touch_app_rounded,
+                  size: 16,
+                  color: const Color(0xFF536A96),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    waitingForTarget
+                        ? '강조할 위치를 찾고 있어요…'
+                        : '노란 테두리 안을 눌러 계속하세요.',
+                    style: const TextStyle(
+                      color: Color(0xFF536A96),
+                      fontSize: 9,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+        ],
+      ),
+    ),
+  );
+}
+
 class _MarketBottomNavigation extends StatelessWidget {
   const _MarketBottomNavigation({
     required this.selected,
     required this.onChanged,
+    this.tutorialExploreKey,
   });
 
   final _MarketSection selected;
   final ValueChanged<_MarketSection> onChanged;
+  final GlobalKey? tutorialExploreKey;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -2724,30 +3330,33 @@ class _MarketBottomNavigation extends StatelessWidget {
   Widget _item(_MarketSection section, IconData icon, String label) {
     final active = selected == section;
     return Expanded(
-      child: InkWell(
-        key: Key('market-nav-${section.name}'),
-        onTap: () => onChanged(section),
-        borderRadius: BorderRadius.circular(14),
-        child: SizedBox(
-          height: 48,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: 22,
-                color: active ? _marketAccent : const Color(0xFFADB5BD),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                label,
-                style: TextStyle(
-                  color: active ? _marketAccent : const Color(0xFF8B95A1),
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
+      child: RepaintBoundary(
+        key: section == _MarketSection.explore ? tutorialExploreKey : null,
+        child: InkWell(
+          key: Key('market-nav-${section.name}'),
+          onTap: () => onChanged(section),
+          borderRadius: BorderRadius.circular(14),
+          child: SizedBox(
+            height: 48,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  icon,
+                  size: 22,
+                  color: active ? _marketAccent : const Color(0xFFADB5BD),
                 ),
-              ),
-            ],
+                const SizedBox(height: 2),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: active ? _marketAccent : const Color(0xFF8B95A1),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
