@@ -13,7 +13,7 @@ void main() {
       addTearDown(() => tester.binding.setSurfaceSize(null));
       var state = engine
           .createNewGame('소비 화면 테스트', initialCash: 100000)
-          .copyWith(decisions: const []);
+          .copyWith(brokerageCash: 0, decisions: const []);
 
       await tester.pumpWidget(
         MaterialApp(

@@ -2,11 +2,13 @@ import 'market_tick.dart';
 
 const marketDayStartMinute = 8 * 60;
 const krxOpenMinute = 9 * 60;
-const krxContinuousEndMinute = 15 * 60 + 20;
-const krxCloseMinute = 15 * 60 + 30;
+// The campaign ends in 2010. The cash equity session was extended to 15:30
+// only in 2016, so the historical campaign keeps the 15:00 close.
+const krxContinuousEndMinute = 14 * 60 + 50;
+const krxCloseMinute = 15 * 60;
 const marketDayEndMinute = 20 * 60;
 const marketTickMinutes = 1;
-const krxCloseTick = 450;
+const krxCloseTick = 420;
 
 /// 주식시장 화면이 열려 있을 때 현실 1초마다 게임 시각 1분을 진행한다.
 const marketRealtimeTickDuration = Duration(seconds: 1);
@@ -142,7 +144,7 @@ MarketClockInfo marketClockAt(int minute, {bool tradingDay = true}) {
     return const MarketClockInfo(
       phase: MarketSessionPhase.regular,
       label: '미래거래소 정규장',
-      description: '09:00~15:20 · 접속매매',
+      description: '09:00~14:50 · 접속매매',
       tradable: true,
     );
   }
@@ -150,7 +152,7 @@ MarketClockInfo marketClockAt(int minute, {bool tradingDay = true}) {
     return const MarketClockInfo(
       phase: MarketSessionPhase.closingAuction,
       label: '장마감 동시호가',
-      description: '15:20~15:30 · 종가를 결정하는 중',
+      description: '14:50~15:00 · 종가를 결정하는 중',
       tradable: true,
     );
   }
@@ -158,7 +160,7 @@ MarketClockInfo marketClockAt(int minute, {bool tradingDay = true}) {
     return const MarketClockInfo(
       phase: MarketSessionPhase.closeSettlement,
       label: '오늘 장 마감',
-      description: '15:30 종가 확정 · 추가 거래 없음',
+      description: '15:00 종가 확정 · 추가 거래 없음',
       tradable: false,
     );
   }
@@ -188,3 +190,57 @@ int marketMinuteForTick(int tick) =>
     (marketDayStartMinute +
             tick.clamp(0, generatedSessionTicks) * marketTickMinutes)
         .clamp(marketDayStartMinute, marketDayEndMinute);
+
+double marketDailyPriceLimitRate(DateTime date) {
+  // The whole playable period (2000-2010) used a ±15% daily limit.
+  if (date.isBefore(DateTime(2015, 6, 15))) return 0.15;
+  return 0.30;
+}
+
+double marketTickSize(double price, {String market = '미래시장'}) {
+  if (!price.isFinite || price <= 0) return 1;
+  if (price < 1000) return 1;
+  if (price < 5000) return 5;
+  if (price < 10000) return 10;
+  if (price < 50000) return 50;
+  if (price < 100000) return 100;
+  if (price < 500000) return market == '도전시장' ? 100 : 500;
+  return market == '도전시장' ? 100 : 1000;
+}
+
+double marketSnapPrice(
+  double price, {
+  String market = '미래시장',
+  bool roundDown = false,
+}) {
+  if (!price.isFinite || price <= 0) return 0;
+  final tick = marketTickSize(price, market: market);
+  final units = price / tick;
+  return (roundDown ? units.floor() : units.round()) * tick;
+}
+
+({double lower, double upper}) marketDailyPriceRange({
+  required double previousClose,
+  required DateTime date,
+  String market = '미래시장',
+}) {
+  if (!previousClose.isFinite || previousClose <= 0) {
+    return (lower: 0, upper: 0);
+  }
+  final rate = marketDailyPriceLimitRate(date);
+  final rawLower = previousClose * (1 - rate);
+  final lowerTick = marketTickSize(rawLower, market: market);
+  final lower = (rawLower / lowerTick).ceil() * lowerTick;
+  final upper = marketSnapPrice(
+    previousClose * (1 + rate),
+    market: market,
+    roundDown: true,
+  );
+  return (lower: lower, upper: upper);
+}
+
+bool isValidMarketOrderPrice(double price, {String market = '미래시장'}) {
+  if (!price.isFinite || price <= 0) return false;
+  final snapped = marketSnapPrice(price, market: market);
+  return (snapped - price).abs() < 0.000001;
+}

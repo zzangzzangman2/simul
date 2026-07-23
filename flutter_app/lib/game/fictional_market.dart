@@ -541,6 +541,7 @@ class FictionalMarketEvent {
     required this.revealMinute,
     required this.impactPct,
     required this.tone,
+    this.sectorImpactPcts = const <String, double>{},
   });
 
   final String id;
@@ -557,6 +558,7 @@ class FictionalMarketEvent {
   final int revealMinute;
   final double impactPct;
   final NewsTone tone;
+  final Map<String, double> sectorImpactPcts;
 
   Map<String, dynamic> toJson({bool includeHidden = true}) => {
     'id': id,
@@ -573,6 +575,8 @@ class FictionalMarketEvent {
     'tone': tone.name,
     if (includeHidden) 'reportHint': reportHint,
     if (includeHidden) 'impactPct': impactPct,
+    if (includeHidden && sectorImpactPcts.isNotEmpty)
+      'sectorImpactPcts': sectorImpactPcts,
   };
 }
 
@@ -752,8 +756,14 @@ List<_SpinoffPlan> _spinoffPlans(String seed) {
     if (!selected) continue;
     final offset =
         720 + _fictionalHash('$seed:spinoff-date:${definition.id}') % 2600;
+    final rawDate = DateTime(2000, 1, 1).add(Duration(days: offset));
+    final earliestDate = DateTime(
+      fictionalCompanyEarliestListingYear(definition),
+      1,
+      1,
+    );
     final date = _nextFictionalTradingDay(
-      DateTime(2000, 1, 1).add(Duration(days: offset)),
+      rawDate.isBefore(earliestDate) ? earliestDate : rawDate,
     );
     plans.add(_SpinoffPlan(definition: definition, date: date));
   }
@@ -784,6 +794,11 @@ List<String> _allowedArcKinds(FictionalCompanyDefinition company) =>
         'finance',
         'competition',
         'regulation',
+        'earnings',
+        'commodity',
+        'currency',
+        'labor',
+        'supply_chain',
       ],
       '반도체' || '디스플레이' || '정밀기기' || '첨단소재' => const [
         'breakthrough',
@@ -792,6 +807,12 @@ List<String> _allowedArcKinds(FictionalCompanyDefinition company) =>
         'safety',
         'competition',
         'finance',
+        'earnings',
+        'supply_chain',
+        'commodity',
+        'currency',
+        'patent',
+        'product_launch',
       ],
       '바이오' || '제약' || '의료기기' => const [
         'breakthrough',
@@ -799,6 +820,10 @@ List<String> _allowedArcKinds(FictionalCompanyDefinition company) =>
         'safety',
         'finance',
         'contract',
+        'earnings',
+        'patent',
+        'litigation',
+        'product_launch',
       ],
       '자동차' || '전지' || '로봇' || '항공·우주' => const [
         'breakthrough',
@@ -807,18 +832,51 @@ List<String> _allowedArcKinds(FictionalCompanyDefinition company) =>
         'safety',
         'regulation',
         'competition',
+        'earnings',
+        'supply_chain',
+        'commodity',
+        'currency',
+        'labor',
+        'patent',
+        'product_launch',
       ],
-      '소프트웨어' || '인터넷' || '정보보안' || '게임' => const [
+      '소프트웨어' || '인터넷' || '정보보안' || '게임' || '미디어' => const [
         'breakthrough',
         'security',
         'capacity',
         'competition',
         'regulation',
         'finance',
+        'earnings',
+        'governance',
+        'patent',
+        'litigation',
+        'merger',
+        'product_launch',
       ],
-      '건설' => const ['contract', 'capacity', 'safety', 'finance', 'regulation'],
-      '금융' ||
-      '금융기술' => const ['finance', 'regulation', 'security', 'competition'],
+      '건설' => const [
+        'contract',
+        'capacity',
+        'safety',
+        'finance',
+        'regulation',
+        'earnings',
+        'commodity',
+        'currency',
+        'labor',
+        'governance',
+      ],
+      '금융' || '금융기술' => const [
+        'finance',
+        'regulation',
+        'security',
+        'competition',
+        'earnings',
+        'governance',
+        'litigation',
+        'merger',
+        'currency',
+      ],
       '에너지' || '화학·소재' || '환경' => const [
         'capacity',
         'contract',
@@ -826,6 +884,11 @@ List<String> _allowedArcKinds(FictionalCompanyDefinition company) =>
         'regulation',
         'finance',
         'breakthrough',
+        'earnings',
+        'commodity',
+        'currency',
+        'litigation',
+        'product_launch',
       ],
       _ => const [
         'capacity',
@@ -834,8 +897,67 @@ List<String> _allowedArcKinds(FictionalCompanyDefinition company) =>
         'competition',
         'finance',
         'regulation',
+        'earnings',
+        'governance',
+        'supply_chain',
+        'currency',
+        'labor',
+        'product_launch',
       ],
     };
+
+int _fictionalGreatestCommonDivisor(int left, int right) {
+  var a = left.abs();
+  var b = right.abs();
+  while (b != 0) {
+    final remainder = a % b;
+    a = b;
+    b = remainder;
+  }
+  return a;
+}
+
+List<FictionalMarketArcScenario> _allowedArcScenarios(
+  FictionalCompanyDefinition company,
+) {
+  final allowedKinds = _allowedArcKinds(company).toSet();
+  return fictionalMarketArcScenarios
+      .where((scenario) => allowedKinds.contains(scenario.kind))
+      .toList(growable: false);
+}
+
+FictionalMarketArcScenario _arcScenarioForCompany(
+  String seed,
+  FictionalCompanyDefinition company,
+  int arc,
+) {
+  final kinds = _allowedArcKinds(company);
+  final kindStart =
+      _fictionalHash('$seed:${company.id}:arc-kind-start') % kinds.length;
+  var kindStride =
+      1 +
+      _fictionalHash('$seed:${company.id}:arc-kind-stride') %
+          (kinds.length - 1);
+  while (_fictionalGreatestCommonDivisor(kindStride, kinds.length) != 1) {
+    kindStride = kindStride % (kinds.length - 1) + 1;
+  }
+  final kind = kinds[(kindStart + arc * kindStride) % kinds.length];
+  final variants = _allowedArcScenarios(
+    company,
+  ).where((scenario) => scenario.kind == kind).toList(growable: false);
+  final variantCycle = arc ~/ kinds.length;
+  final variantStart =
+      _fictionalHash('$seed:${company.id}:$kind:variant-start') %
+      variants.length;
+  const coprimeVariantStrides = <int>[1, 3, 5, 7];
+  final variantStride =
+      coprimeVariantStrides[_fictionalHash(
+            '$seed:${company.id}:$kind:variant-stride',
+          ) %
+          coprimeVariantStrides.length];
+  return variants[(variantStart + variantCycle * variantStride) %
+      variants.length];
+}
 
 List<FictionalCompanyDefinition> _activeFictionalCompanies(
   String seed,
@@ -955,7 +1077,11 @@ List<FictionalMarketEvent> fictionalMarketEventsForDate(
   final cacheKey = '$seed:$dateKey';
   final cached = _dailyEventCache[cacheKey];
   if (cached != null) return cached;
-  final events = <FictionalMarketEvent>[..._lifecycleEventsForDate(seed, date)];
+  final events = <FictionalMarketEvent>[
+    ..._lifecycleEventsForDate(seed, date),
+    ..._historicalCatalystEventsForDate(seed, date),
+    ..._eraTechnologyEventsForDate(seed, date),
+  ];
   final active = _activeFictionalCompanies(seed, date);
   final spinoffs = _spinoffPlans(seed);
   for (var index = 0; index < spinoffs.length; index++) {
@@ -996,15 +1122,16 @@ List<FictionalMarketEvent> fictionalMarketEventsForDate(
     final stageDays = <int>[7 + offset, 34 + offset, 66 + offset, 96 + offset];
     final stage = stageDays.indexOf(localDay);
     if (stage < 0) continue;
-    final allowedKinds = _allowedArcKinds(company);
-    final kind =
-        allowedKinds[_fictionalHash('$seed:${company.id}:arc-kind:$arc') %
-            allowedKinds.length];
+    final scenario = _arcScenarioForCompany(seed, company, arc);
+    final availableProducts = fictionalProductsAvailableInYear(
+      company,
+      date.year,
+    );
     final product =
-        company.products[_fictionalHash(
+        availableProducts[_fictionalHash(
               '$seed:${company.id}:arc-product:$arc',
             ) %
-            company.products.length];
+            availableProducts.length];
     final success =
         _fictionalUnit(seed, '${company.id}:arc-outcome:$arc') >= 0.43;
     final strength =
@@ -1016,7 +1143,7 @@ List<FictionalMarketEvent> fictionalMarketEventsForDate(
         company: company,
         arc: arc,
         stage: stage,
-        kind: kind,
+        scenario: scenario,
         product: product,
         success: success,
         strength: strength,
@@ -1035,27 +1162,137 @@ FictionalMarketEvent _buildArcEvent({
   required FictionalCompanyDefinition company,
   required int arc,
   required int stage,
-  required String kind,
+  required FictionalMarketArcScenario scenario,
   required String product,
   required bool success,
   required double strength,
 }) {
+  final kind = scenario.kind;
   final revealMinute =
       9 * 60 +
       10 +
       _fictionalHash('$seed:${company.id}:reveal:$arc:$stage') % 350;
   final earlySign = _fictionalSigned(seed, '${company.id}:early:$arc') >= 0;
   final direction = stage < 2 ? earlySign : success;
-  final magnitude = <double>[0.004, 0.012, 0.055, 0.032][stage] * strength;
+  final kindMultiplier = switch (kind) {
+    'merger' => 1.85,
+    'litigation' || 'governance' => 1.55,
+    'earnings' || 'product_launch' || 'patent' => 1.35,
+    'commodity' || 'currency' || 'supply_chain' => 1.2,
+    _ => 1.0,
+  };
+  final magnitude =
+      <double>[0.004, 0.012, 0.055, 0.032][stage] * strength * kindMultiplier;
   final impact = direction ? magnitude : -magnitude;
   final isBio = company.sector == '바이오' || company.sector == '제약';
+  final year = int.parse(dateKey.substring(0, 4));
   late String eyebrow;
   late String title;
   late String body;
   late String signal;
   late String reportHint;
 
-  if (kind == 'breakthrough') {
+  if (kind == 'contract' && company.sector == '조선·기계') {
+    final vesselTypes = <String>[
+      '대형 컨테이너선',
+      '원유운반선',
+      '벌크선',
+      'LNG 운반선',
+      if (year >= 2005) '해양 시추지원선',
+      if (year >= 2008) '저연비 컨테이너선',
+    ];
+    final vessel =
+        vesselTypes[_fictionalHash('$seed:ship-type:${company.id}:$arc') %
+            vesselTypes.length];
+    final buyer = const [
+      '유럽 정기선사',
+      '중동 에너지 운송사',
+      '아시아 자원개발사',
+      '글로벌 해운 컨소시엄',
+      '국영 에너지 기업',
+    ][_fictionalHash('$seed:ship-buyer:${company.id}:$arc') % 5];
+    final count =
+        2 + _fictionalHash('$seed:ship-count:${company.id}:$arc') % 11;
+    final value =
+        (4 + _fictionalHash('$seed:ship-value:${company.id}:$arc') % 33) * 1000;
+    final advance =
+        10 + _fictionalHash('$seed:ship-advance:${company.id}:$arc') % 21;
+    final delivery =
+        18 + _fictionalHash('$seed:ship-delivery:${company.id}:$arc') % 25;
+    eyebrow = '선박 수주';
+    title = switch (stage) {
+      0 => '${company.name}, $buyer $vessel $count척 국제입찰 참여',
+      1 => '${company.name}, $vessel 우선협상·선수금 $advance% 조율',
+      2 =>
+        success
+            ? '${company.name}, $vessel $count척·$value억원 수주 확정'
+            : '${company.name}, $vessel 가격·납기 협상 결렬',
+      _ =>
+        success
+            ? '${company.name}, 선수금 유입·수주잔고 매출 전환'
+            : '${company.name}, 설계비 손실·도크 공백 부담',
+    };
+    body = switch (stage) {
+      0 => '$buyer가 발주한 $vessel $count척 사업에 참여했다. 총사업비와 경쟁사 제안은 공개되지 않았다.',
+      1 => '선수금 $advance%, 인도기간 $delivery개월, 원자재 가격조정 조항을 두고 최종 협상이 진행 중이다.',
+      2 =>
+        success
+            ? '총 $value억원 규모 계약이 확정됐다. 선수금과 후판 가격 연동 조항이 향후 이익률을 좌우한다.'
+            : '선가와 인도일 조건을 맞추지 못해 계약이 무산됐다. 이미 투입한 설계비 일부가 비용으로 남는다.',
+      _ =>
+        success
+            ? '첫 선수금이 들어오고 건조 공정이 시작됐다. 실제 이익은 후판 가격과 공정 지연 여부에 달렸다.'
+            : '후속 수주도 늦어지며 도크 가동률이 떨어졌다. 고정비와 숙련인력 유지 부담이 커졌다.',
+    };
+    signal = '수주액만 보지 말고 선수금·원가연동·인도기간·지체보상 조항을 확인해야 합니다.';
+    reportHint =
+        '$vessel 설계인력과 구매 문의가 늘었고 도크 배치가 조정되고 있으나 최종 발주서와 선수금 조건은 공개되지 않았다.';
+  } else if (kind == 'contract' && company.sector == '해운') {
+    final cargo = const [
+      '컨테이너 화물',
+      '철광석',
+      '원유',
+      'LNG',
+      '곡물',
+    ][_fictionalHash('$seed:shipping-cargo:${company.id}:$arc') % 5];
+    final customer = const [
+      '글로벌 제조기업',
+      '국제 자원개발사',
+      '대형 유통연합',
+      '국영 에너지 기업',
+    ][_fictionalHash('$seed:shipping-customer:${company.id}:$arc') % 4];
+    final years =
+        3 + _fictionalHash('$seed:shipping-years:${company.id}:$arc') % 8;
+    final volume =
+        1 + _fictionalHash('$seed:shipping-volume:${company.id}:$arc') % 9;
+    eyebrow = '장기 운송계약';
+    title = switch (stage) {
+      0 => '${company.name}, $customer $cargo 장기운송 입찰',
+      1 => '${company.name}, 운임·연료비 연동조건 막판 협상',
+      2 =>
+        success
+            ? '${company.name}, $years년·연 $volume백만톤 운송계약 확보'
+            : '${company.name}, 장기운송 계약 경쟁사에 내줘',
+      _ =>
+        success
+            ? '${company.name}, 장기물량 매출·선대 가동률 개선'
+            : '${company.name}, 유휴선박·용선료 부담 확대',
+    };
+    body = switch (stage) {
+      0 => '$customer가 발주한 $cargo 장기운송 사업에 참여했다. 확정 운임과 최소 물량은 아직 공개되지 않았다.',
+      1 => '연료비 연동, 최소보장 물량, 항만체선 비용을 두고 최종 조율이 이어지고 있다.',
+      2 =>
+        success
+            ? '$years년 동안 연 $volume백만톤을 운송하는 계약을 따냈다. 운임 조정식이 수익 안정성을 좌우한다.'
+            : '운임과 선박 투입 조건에서 합의하지 못했다. 확보해 둔 선박의 대체 화물이 필요하다.',
+      _ =>
+        success
+            ? '계약 물량이 실제 선적되며 선대 가동률이 올랐다. 연료비와 항만 적체가 남은 변수다.'
+            : '대체 화물을 충분히 찾지 못해 유휴선박과 용선료 부담이 손익에 반영됐다.',
+    };
+    signal = '계약기간보다 최소보장 물량·운임 조정식·용선료 부담을 함께 봐야 합니다.';
+    reportHint = '$cargo 항로 배선과 용선 문의가 늘었지만 최소 물량과 연료비 연동식은 확정되지 않았다.';
+  } else if (kind == 'breakthrough') {
     final step = isBio
         ? ['후보물질 선정', '초기 시험', '핵심 임상 결과', success ? '허가·출시 준비' : '연구 방향 재검토']
         : [
@@ -1115,6 +1352,100 @@ FictionalMarketEvent _buildArcEvent({
         : '자금조달 조건이나 규제 기준이 예상보다 까다로워졌다. 지분 희석과 일정 지연 가능성이 생겼다.';
     signal = '성장 계획이 좋아도 조달 금리와 새 주식 발행 조건을 확인해야 합니다.';
     reportHint = '재무·법무 조직의 외부 자문이 늘어 자금조달이나 인허가 변화를 준비하는 모습이다.';
+  } else if (kind == 'earnings') {
+    final estimateGap =
+        6 + _fictionalHash('$seed:earnings-gap:${company.id}:$arc') % 29;
+    eyebrow = '실적 변동';
+    title = stage < 2
+        ? '${company.name}, $product 분기 실적 추정치 변화'
+        : '${company.name}, 영업이익 ${success ? '예상 $estimateGap% 상회' : '예상 $estimateGap% 하회'}';
+    body = stage < 2
+        ? '$product 출하·판매와 비용 집행이 기존 계획에서 달라지고 있다. 최종 매출과 일회성 항목은 아직 확정되지 않았다.'
+        : success
+        ? '판매량과 제품 구성이 개선돼 시장 기대를 웃돌았다. 현금흐름과 다음 분기 주문도 함께 늘었다.'
+        : '판매 둔화와 비용 증가가 겹쳐 시장 기대를 밑돌았다. 재고와 매출채권 부담이 커졌다.';
+    signal = '매출보다 영업이익률·현금흐름·일회성 항목을 나눠 봐야 합니다.';
+    reportHint = '$product 출하와 판촉비 집행이 평소 범위를 벗어나 실적 추정치 조정 가능성이 있다.';
+  } else if (kind == 'governance') {
+    eyebrow = '경영·지배구조';
+    title = stage < 2
+        ? '${company.name}, 이사회·경영진 변화 가능성'
+        : '${company.name}, 지배구조 점검 ${success ? '독립성 강화' : '이해상충 확인'}';
+    body = stage < 2
+        ? '주요 투자와 내부거래를 둘러싸고 이사회 검토 범위가 넓어졌다. 인사와 책임소재는 확정되지 않았다.'
+        : success
+        ? '독립 이사와 내부통제 권한을 강화하고 문제 거래를 정리했다. 자금조달 신뢰가 회복될 수 있다.'
+        : '특수관계 거래와 승인 절차의 문제가 확인됐다. 경영진 교체와 추가 조사 가능성이 생겼다.';
+    signal = '경영진 이름보다 이사회 독립성·내부거래·자금 사용처가 중요합니다.';
+    reportHint = '이사회 회의와 외부 법률자문이 늘었고 주요 투자안의 승인 절차가 길어지고 있다.';
+  } else if (kind == 'supply_chain' ||
+      kind == 'commodity' ||
+      kind == 'currency') {
+    final label = switch (kind) {
+      'supply_chain' => '공급망',
+      'commodity' => '원자재',
+      _ => '환율',
+    };
+    eyebrow = '$label 변화';
+    title = stage < 2
+        ? '${company.name}, $product $label 위험 대응'
+        : '${company.name}, $product $label ${success ? '비용 방어' : '원가 충격'}';
+    body = stage < 2
+        ? '$product의 조달가격과 납기 변동이 커져 대체 공급처와 가격 조정 협상이 진행 중이다.'
+        : success
+        ? '장기계약·재고관리·판매가격 조정으로 비용 충격을 제한했다. 공급 안정성도 개선됐다.'
+        : '핵심 투입재 가격과 납기 문제가 생산차질로 번졌다. 긴급조달 비용과 고객 보상 부담이 생겼다.';
+    signal = '가격 방향만 보지 말고 재고일수·헤지·판매가격 전가 시차를 확인해야 합니다.';
+    reportHint = '$product 구매단가와 납기가 흔들리며 대체 공급처 심사와 환헤지 거래가 늘고 있다.';
+  } else if (kind == 'patent' || kind == 'litigation') {
+    final patent = kind == 'patent';
+    eyebrow = patent ? '특허·기술권리' : '소송·분쟁';
+    title = stage < 2
+        ? '${company.name}, $product ${patent ? '핵심특허 심사·협상' : '법적분쟁 대응'}'
+        : '${company.name}, $product ${success ? '권리·협상 우위 확보' : '판매제한·배상 위험'}';
+    body = stage < 2
+        ? '$product의 기술권리와 계약 해석을 두고 외부 심사와 협상이 진행되고 있다. 최종 판단은 나오지 않았다.'
+        : success
+        ? '핵심 권리와 계약상 지위를 인정받아 경쟁사 견제와 실시료 수입 가능성이 커졌다.'
+        : '불리한 판단으로 설계변경·판매제한·배상 비용 가능성이 생겼다. 출시 일정도 다시 계산해야 한다.';
+    signal = '승패뿐 아니라 판매금지 범위·배상 상한·대체설계 기간을 확인해야 합니다.';
+    reportHint = '$product 관련 특허대리인과 법률자문 비용이 늘고 경쟁사와의 기술문서 교환이 중단됐다.';
+  } else if (kind == 'merger') {
+    eyebrow = '인수·합병';
+    title = stage < 2
+        ? '${company.name}, 동종기업 인수·사업결합 검토'
+        : '${company.name}, 사업결합 ${success ? '조건부 승인·통합 착수' : '협상 결렬·비용 반영'}';
+    body = stage < 2
+        ? '시장점유율과 기술인력을 확보하기 위한 거래가 검토되고 있다. 가격과 자금조달 방식은 확정되지 않았다.'
+        : success
+        ? '거래 조건과 승인을 확보해 통합을 시작했다. 중복비용 절감과 고객 이탈 방지가 다음 과제다.'
+        : '가격·규제·실사 문제로 거래가 무산됐다. 자문료와 인수 준비비가 손실로 남았다.';
+    signal = '인수 발표보다 지불가격·신주발행·부채·통합비용을 계산해야 합니다.';
+    reportHint = '외부 실사와 자금조달 자문이 늘고 일부 조직의 채용·투자가 일시 중단됐다.';
+  } else if (kind == 'labor') {
+    eyebrow = '노사·인력';
+    title = stage < 2
+        ? '${company.name}, $product 생산인력 협상'
+        : '${company.name}, 노사협상 ${success ? '타결·가동 정상화' : '중단·납기 차질'}';
+    body = stage < 2
+        ? '임금·교대제·외주 범위를 두고 협상이 진행 중이다. 생산 일정에 미칠 영향은 확정되지 않았다.'
+        : success
+        ? '협상을 마치고 생산과 연구 일정을 정상화했다. 숙련인력 이탈 위험도 낮아졌다.'
+        : '작업중단과 인력 이탈이 발생해 생산량과 납기 계획이 흔들렸다. 위약금 가능성도 생겼다.';
+    signal = '임금 인상률뿐 아니라 가동중단 일수와 고객 납기 보상 조건을 봐야 합니다.';
+    reportHint = '교대조 편성과 외주 발주가 바뀌고 인사·노무 회의가 평소보다 잦아졌다.';
+  } else if (kind == 'product_launch') {
+    eyebrow = '신제품 출시';
+    title = stage < 2
+        ? '${company.name}, $product 출시·고객검증 준비'
+        : '${company.name}, $product ${success ? '초기 주문 돌풍' : '판매 부진·재고 부담'}';
+    body = stage < 2
+        ? '$product의 가격·유통·초도물량이 조율되고 있다. 예약 수요가 반복 구매로 이어질지는 아직 알 수 없다.'
+        : success
+        ? '초기 판매와 재주문이 계획을 웃돌았다. 생산수율과 고객지원 투자가 성장 속도를 결정한다.'
+        : '초기 판매가 계획에 못 미쳐 재고와 판촉비가 늘었다. 가격 인하와 제품 수정이 검토된다.';
+    signal = '출시 당일 판매보다 재주문·반품·수율·마케팅비를 확인해야 합니다.';
+    reportHint = '$product 초도생산과 유통점 교육이 시작됐지만 예약 취소율과 실제 판매가는 공개되지 않았다.';
   } else {
     eyebrow = '산업 경쟁';
     title = stage < 2
@@ -1128,6 +1459,15 @@ FictionalMarketEvent _buildArcEvent({
     signal = '시장 성장률보다 이 회사가 실제로 지키는 점유율과 가격 결정력을 봐야 합니다.';
     reportHint = '$product 영업조직의 판촉과 가격 협상이 늘어 경쟁 강도가 높아진 것으로 보인다.';
   }
+
+  eyebrow = '$eyebrow · ${scenario.focus}';
+  if (stage < 2) {
+    body = '$body ${scenario.leadingSignal}.';
+    reportHint = '$reportHint 핵심 관찰축은 ${scenario.focus}이다.';
+  } else {
+    body = '$body ${success ? scenario.upside : scenario.downside}.';
+  }
+  signal = '$signal 이번 사건의 핵심 검증축은 ${scenario.focus}입니다.';
 
   final tone = !direction && stage >= 2
       ? NewsTone.shock
@@ -1168,6 +1508,232 @@ Map<String, dynamic> hiddenFictionalMarketScenario(
   ).map((event) => event.toJson()).toList(growable: false),
 };
 
+Map<String, List<FictionalCompanyRelation>> _buildCompanyRelations(
+  String seed,
+  List<FictionalCompanyDefinition> definitions,
+) {
+  final result = <String, List<FictionalCompanyRelation>>{
+    for (final company in definitions) company.id: <FictionalCompanyRelation>[],
+  };
+
+  void add(
+    FictionalCompanyDefinition company,
+    FictionalCompanyDefinition related,
+    FictionalCompanyRelationType type,
+    double strength,
+  ) {
+    if (company.id == related.id) return;
+    final relations = result[company.id]!;
+    if (relations.any(
+      (relation) =>
+          relation.relatedAssetId == related.id && relation.type == type,
+    )) {
+      return;
+    }
+    relations.add(
+      FictionalCompanyRelation(
+        relatedAssetId: related.id,
+        relatedName: related.name,
+        type: type,
+        strength: strength.clamp(0.05, 0.8).toDouble(),
+      ),
+    );
+  }
+
+  for (final company in definitions) {
+    if (company.parentAssetId != null) {
+      FictionalCompanyDefinition? parent;
+      for (final candidate in definitions) {
+        if (candidate.id == company.parentAssetId) {
+          parent = candidate;
+          break;
+        }
+      }
+      if (parent != null) {
+        add(company, parent, FictionalCompanyRelationType.parent, 0.55);
+        add(parent, company, FictionalCompanyRelationType.subsidiary, 0.38);
+      }
+    }
+
+    final competitors = definitions
+        .where(
+          (candidate) =>
+              candidate.id != company.id && candidate.sector == company.sector,
+        )
+        .toList(growable: false);
+    if (competitors.isNotEmpty) {
+      final competitor =
+          competitors[_fictionalHash('$seed:competitor:${company.id}') %
+              competitors.length];
+      add(
+        company,
+        competitor,
+        FictionalCompanyRelationType.competitor,
+        0.22 + _fictionalUnit(seed, 'competitor-strength:${company.id}') * 0.24,
+      );
+    }
+
+    final crossSector = definitions
+        .where(
+          (candidate) =>
+              candidate.id != company.id &&
+              candidate.sector != company.sector &&
+              candidate.parentAssetId != company.id,
+        )
+        .toList(growable: false);
+    if (crossSector.isEmpty) continue;
+    final supplier =
+        crossSector[_fictionalHash('$seed:supplier:${company.id}') %
+            crossSector.length];
+    add(
+      company,
+      supplier,
+      FictionalCompanyRelationType.supplier,
+      0.18 + _fictionalUnit(seed, 'supplier-strength:${company.id}') * 0.25,
+    );
+    add(
+      supplier,
+      company,
+      FictionalCompanyRelationType.customer,
+      0.16 + _fictionalUnit(seed, 'customer-strength:${company.id}') * 0.23,
+    );
+    final partner =
+        crossSector[_fictionalHash('$seed:partner:${company.id}') %
+            crossSector.length];
+    add(
+      company,
+      partner,
+      FictionalCompanyRelationType.partner,
+      0.14 + _fictionalUnit(seed, 'partner-strength:${company.id}') * 0.22,
+    );
+  }
+  return {
+    for (final entry in result.entries)
+      entry.key: List<FictionalCompanyRelation>.unmodifiable(entry.value),
+  };
+}
+
+List<FictionalFinancialSnapshot> _buildCompanyFinancials({
+  required String seed,
+  required FictionalCompanyDefinition company,
+  required Map<String, double> prices,
+  required Map<String, double> businessImpacts,
+  required Map<String, double> backlogImpacts,
+}) {
+  if (prices.isEmpty) return const <FictionalFinancialSnapshot>[];
+  final quarterEnds = <String, String>{};
+  for (final date in prices.keys) {
+    final parsed = DateTime.parse(date);
+    final key = '${parsed.year}-Q${(parsed.month - 1) ~/ 3 + 1}';
+    quarterEnds[key] = date;
+  }
+  final shares =
+      3000000 + _fictionalHash('$seed:shares:${company.id}') % 27000001;
+  final firstPrice = prices.values.first;
+  final salesMultiple =
+      0.8 + _fictionalUnit(seed, 'sales-multiple:${company.id}') * 2.7;
+  var revenue = math.max(
+    100000000,
+    (firstPrice * shares / salesMultiple / 4).round(),
+  );
+  final baseMargin =
+      0.035 + _fictionalUnit(seed, 'margin:${company.id}') * 0.17;
+  var cash = (revenue * (0.35 + _fictionalUnit(seed, 'cash:${company.id}')))
+      .round();
+  var debt =
+      (revenue * (0.25 + _fictionalUnit(seed, 'debt:${company.id}') * 1.6))
+          .round();
+  var equity = math.max(revenue, cash + revenue * 2 - debt).round();
+  final backlogHeavy =
+      company.sector.contains('조선') ||
+      company.sector.contains('건설') ||
+      company.sector.contains('기계') ||
+      company.sector.contains('항공') ||
+      company.sector.contains('방산');
+  var backlog = (revenue * (backlogHeavy ? 4.2 : 0.55)).round();
+  var outstanding = shares;
+  var previousYear = 0;
+  final snapshots = <FictionalFinancialSnapshot>[];
+
+  for (final entry in quarterEnds.entries) {
+    final impact = businessImpacts[entry.key] ?? 0;
+    final backlogImpact = backlogImpacts[entry.key] ?? 0;
+    final growth =
+        (-0.025 +
+                _fictionalUnit(seed, 'growth:${company.id}:${entry.key}') *
+                    0.11 +
+                impact * 0.65)
+            .clamp(-0.28, 0.38)
+            .toDouble();
+    revenue = math.max(10000000, (revenue * (1 + growth)).round());
+    final margin =
+        (baseMargin +
+                _fictionalSigned(seed, 'margin:${company.id}:${entry.key}') *
+                    0.025 +
+                impact * 0.22)
+            .clamp(-0.22, 0.36)
+            .toDouble();
+    final operatingProfit = (revenue * margin).round();
+    final surprise =
+        (impact * 0.75 +
+                _fictionalSigned(seed, 'consensus:${company.id}:${entry.key}') *
+                    0.055)
+            .clamp(-0.38, 0.38)
+            .toDouble();
+    final consensus = surprise <= -0.95
+        ? operatingProfit
+        : (operatingProfit / (1 + surprise)).round();
+    final interest = (debt * 0.0125).round();
+    final netIncome = ((operatingProfit - interest) * 0.76).round();
+    final operatingCashFlow =
+        (netIncome +
+                revenue *
+                    (0.018 +
+                        _fictionalSigned(
+                              seed,
+                              'cashflow:${company.id}:${entry.key}',
+                            ) *
+                            0.025))
+            .round();
+    cash = math.max(0, cash + operatingCashFlow - (revenue * 0.045).round());
+    debt = math.max(
+      0,
+      (debt * 0.985 - math.max(0, operatingCashFlow) * 0.08).round(),
+    );
+    equity = math.max(1000000, equity + netIncome).round();
+    backlog = math.max(
+      0,
+      (backlog * (backlogHeavy ? 0.86 : 0.72) +
+              revenue *
+                  (backlogHeavy ? 0.92 : 0.18) *
+                  (1 + backlogImpact * 4).clamp(0.15, 2.8))
+          .round(),
+    );
+    final year = int.parse(entry.key.substring(0, 4));
+    if (year != previousYear &&
+        _fictionalHash('$seed:rights-select:${company.id}:$year') % 100 < 24) {
+      outstanding = (outstanding * 1.08).round();
+    }
+    previousYear = year;
+    snapshots.add(
+      FictionalFinancialSnapshot(
+        period: entry.value,
+        revenue: revenue,
+        operatingProfit: operatingProfit,
+        consensusOperatingProfit: consensus,
+        netIncome: netIncome,
+        operatingCashFlow: operatingCashFlow,
+        cash: cash,
+        debt: debt,
+        equity: equity,
+        sharesOutstanding: outstanding,
+        orderBacklog: backlog,
+      ),
+    );
+  }
+  return List<FictionalFinancialSnapshot>.unmodifiable(snapshots);
+}
+
 FictionalMarketUniverse buildFictionalMarketUniverse(String seed) {
   final spinoffs = _spinoffPlans(seed);
   final listings = _generatedListingPlans(seed);
@@ -1176,6 +1742,13 @@ FictionalMarketUniverse buildFictionalMarketUniverse(String seed) {
     ...spinoffs.map((plan) => plan.definition),
     ...listings.map((plan) => plan.definition),
   ];
+  final relationsByAsset = _buildCompanyRelations(seed, definitions);
+  final quarterlyBusinessImpacts = <String, Map<String, double>>{
+    for (final company in definitions) company.id: <String, double>{},
+  };
+  final quarterlyBacklogImpacts = <String, Map<String, double>>{
+    for (final company in definitions) company.id: <String, double>{},
+  };
   final listingDates = <String, DateTime>{
     for (final plan in spinoffs) plan.definition.id: plan.date,
     for (final plan in listings) plan.definition.id: plan.listingDate,
@@ -1217,22 +1790,78 @@ FictionalMarketUniverse buildFictionalMarketUniverse(String seed) {
         final companyNoise =
             _fictionalSigned(seed, 'company:${company.id}:$dateKey') *
             company.volatility;
-        final eventImpact = events.fold<double>(0, (sum, event) {
+        final directEventImpact = events.fold<double>(0, (sum, event) {
+          if (event.companyId == fictionalWholeMarketCompanyId) {
+            return sum +
+                event.impactPct +
+                (event.sectorImpactPcts[company.sector] ?? 0);
+          }
           if (event.companyId == company.id) return sum + event.impactPct;
           if (event.sector == company.sector) {
             return sum + event.impactPct * 0.12;
           }
           return sum;
         });
+        var relationImpact = 0.0;
+        var resolvedRelationImpact = 0.0;
+        for (final relation
+            in relationsByAsset[company.id] ??
+                const <FictionalCompanyRelation>[]) {
+          final factor =
+              relation.type == FictionalCompanyRelationType.competitor
+              ? -relation.strength * 0.55
+              : relation.type == FictionalCompanyRelationType.parent ||
+                    relation.type == FictionalCompanyRelationType.subsidiary
+              ? relation.strength * 0.7
+              : relation.strength * 0.42;
+          for (final event in events) {
+            if (event.companyId != relation.relatedAssetId) continue;
+            relationImpact += event.impactPct * factor;
+            if (event.stage >= 2) {
+              resolvedRelationImpact += event.impactPct * factor;
+            }
+          }
+        }
+        final eventImpact = directEventImpact + relationImpact;
+        final quarterKey = '${date.year}-Q${(date.month - 1) ~/ 3 + 1}';
+        final resolvedDirectImpact = events.fold<double>(0, (sum, event) {
+          if (event.stage < 2) return sum;
+          if (event.companyId == company.id) return sum + event.impactPct;
+          return sum;
+        });
+        quarterlyBusinessImpacts[company.id]![quarterKey] =
+            (quarterlyBusinessImpacts[company.id]![quarterKey] ?? 0) +
+            resolvedDirectImpact +
+            resolvedRelationImpact * 0.55;
+        final backlogEventImpact = events.fold<double>(0, (sum, event) {
+          if (event.stage < 2 || event.companyId != company.id) return sum;
+          final text = '${event.eyebrow} ${event.title}';
+          final isOrderEvent =
+              text.contains('수주') ||
+              text.contains('계약') ||
+              text.contains('공급') ||
+              text.contains('주문');
+          return isOrderEvent ? sum + event.impactPct : sum;
+        });
+        quarterlyBacklogImpacts[company.id]![quarterKey] =
+            (quarterlyBacklogImpacts[company.id]![quarterKey] ?? 0) +
+            backlogEventImpact;
+        final dailyLimit = marketDailyPriceLimitRate(date);
         final dailyReturn = (macro + sector + companyNoise + eventImpact)
-            .clamp(-0.24, 0.29)
+            .clamp(-dailyLimit, dailyLimit)
             .toDouble();
         final raw = (previous * (1 + dailyReturn))
             .clamp(120, 2500000)
             .toDouble();
-        final rounded = raw >= 1000
-            ? (raw / 10).round() * 10.0
-            : raw.roundToDouble();
+        final range = marketDailyPriceRange(
+          previousClose: previous,
+          date: date,
+          market: company.market,
+        );
+        final rounded = marketSnapPrice(
+          raw.clamp(range.lower, range.upper).toDouble(),
+          market: company.market,
+        );
         current[company.id] = rounded;
         prices[company.id]![dateKey] = rounded;
       }
@@ -1327,8 +1956,8 @@ FictionalMarketUniverse buildFictionalMarketUniverse(String seed) {
   }
 
   return FictionalMarketUniverse(
-    schemaVersion: 5,
-    sourceName: 'seeded-fictional-market-v2',
+    schemaVersion: 7,
+    sourceName: 'seeded-fictional-market-v4-fundamentals-relations',
     assets: definitions
         .map((company) {
           final listed = listingDates[company.id];
@@ -1350,6 +1979,16 @@ FictionalMarketUniverse buildFictionalMarketUniverse(String seed) {
             parentAssetId: company.parentAssetId,
             listedOn: listed == null ? null : marketDateKey(listed),
             delistedOn: delisted == null ? null : marketDateKey(delisted),
+            financials: _buildCompanyFinancials(
+              seed: seed,
+              company: company,
+              prices: prices[company.id]!,
+              businessImpacts: quarterlyBusinessImpacts[company.id] ?? const {},
+              backlogImpacts: quarterlyBacklogImpacts[company.id] ?? const {},
+            ),
+            relations:
+                relationsByAsset[company.id] ??
+                const <FictionalCompanyRelation>[],
           );
         })
         .toList(growable: false),

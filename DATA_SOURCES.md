@@ -8,6 +8,8 @@
 - 2000~2010 일별 종가와 장중 경로의 기준값
 - 분사 후보와 매년 신규상장 기업
 - 업종별 연속 사건, 유상증자, 분할, 신규상장, 상장폐지
+- `market_era_events.dart`의 2000~2010 시대 기술 80종과 시장 촉매 44종
+- 18개 기업 사건 대분류 아래 실적·회계·수주·공급망·환율·원자재·특허·소송·M&A·노무 등 독립 인과 문법 144종
 - 오늘의 비공개 시나리오와 장중 공개 시각
 
 같은 시드와 같은 선택은 같은 세계를 만든다. 새 게임은 새 시드를 받아 기업 이름은 같아도 미래가 달라진다. 과거의 `market-history.json`, 실경영진 초상, 실제시장 수집 스크립트는 제품에서 제거했다.
@@ -16,7 +18,7 @@
 
 2000년 이후 국내 시장에서 반복된 공시·산업 사건을 “사실 사전”이 아니라 “인과 문법”으로 참고한다. 예를 들어 `대규모 투자 → 자금 부담 → 수율 검증 → 고객 인증 → 증설 회수`나 `수주 증가 → 원재료 상승 → 공정 지연 → 인도 → 충당금` 같은 순서를 추출한다.
 
-실제 회사명, 인물명, 기사 문장, 실제 날짜와 수치를 가상기업에 그대로 이식하지 않는다. 복수 사례에서 공통 구조를 뽑고 업종·제품·회사 체력·시드에 맞춰 다시 조합한다.
+실제 회사명, 인물명, 기사 문장과 기업별 실적 수치를 가상기업에 그대로 이식하지 않는다. 복수 사례에서 공통 구조를 뽑고 업종·제품·회사 체력·시드에 맞춰 다시 조합한다. 세계 경기·감염병·통화정책처럼 시장 전체가 실제로 함께 겪은 사건은 연도와 공개일을 시대 앵커로 사용할 수 있지만, 기사 문장과 실제 상장사 이름은 쓰지 않고 충격 강도와 업종 전이는 월드시드로 다시 계산한다.
 
 ## 2000~2026 연대별 사건 문법 매트릭스
 
@@ -76,6 +78,31 @@
 - 한국은행 2020년 이후 개인투자·해외증권 수요 변화: https://www.bok.or.kr/portal/bbs/B0000347/view.do?menuNo=201106&nttId=10082962
 - 금융위원회 2022년 회사채·은행채 구축효과 대응: https://fsc.go.kr/no010101/78809
 - 금융위원회 2022~2023 PF-ABCP 차환·유동성 악순환 자료: https://www.fsc.go.kr/po010102/80034
+
+### 2000~2010 기술·세계시장 시대 앵커
+
+- Apple 2007 멀티터치 스마트 단말 발표: https://www.apple.com/newsroom/2007/01/09Apple-Reinvents-the-Phone-with-iPhone/
+- Google 2006 사용자 동영상 플랫폼 인수 발표: https://googlepress.blogspot.com/2006/10/google-to-acquire-youtube-for-165_09.html
+- Android Developers 2008 개방형 스마트폰 SDK 1.0: https://android-developers.googleblog.com/2008/09/announcing-android-10-sdk-release-1.html
+- Apple 2008 모바일 응용프로그램 장터 초기 확산: https://www.apple.com/newsroom/2008/07/14iPhone-App-Store-Downloads-Top-10-Million-in-First-Weekend/
+- AWS 2006 인터넷 객체저장 서비스 공개: https://aws.amazon.com/about-aws/whats-new/2006/03/13/announcing-amazon-s3---simple-storage-service/
+- 3GPP LTE Release 8 표준화 연혁: https://www.3gpp.org/ftp/information/presentations/presentations_2010/2010_06_Latin_America/3GPP%20RAN_3GPP%20seminar%20in%20Miami_rev4.pdf
+- ITU IMT-2000과 2000~2001 3세대 이동통신 상용화: https://www.itu.int/ITU-D/ict/update/pdf/Update_2_01.pdf
+- Bluetooth SIG 2000년 근거리 무선기기 상용화: https://www.bluetooth.com/bluetooth-le-primer/
+- NHGRI 2001 유전체 초안과 2003 인간게놈프로젝트 완료 연표: https://www.genome.gov/human-genome-project/timeline
+- FDA 2006 예방형 바이러스 백신 최초 허가 근거: https://www.fda.gov/downloads/BiologicsBloodVaccines/Vaccines/ApprovedProducts/UCM622941.pdf
+- 미국 에너지부 2000~2007 반도체 조명 연구·상용화 연혁: https://www.energy.gov/cmei/ssl/technology-roadmap-archives
+- WTO 중국 가입일과 무역체제 편입: https://www.wto.org/english/thewto_E/countries_E/china_E.htm
+- Federal Reserve 2001년 9월 금융시장 충격: https://www.federalreservehistory.org/essays/september-11
+- Federal Reserve 2007~2009 세계 금융위기: https://www.federalreservehistory.org/essays/great-recession-of-200709
+- SEC 2002 회계 스캔들과 공시·감사 개혁: https://www.sec.gov/news/extra/initsfy2002.htm
+- WHO 2003 SARS 연표: https://www.who.int/emergencies/disease-outbreak-news/item/2003_07_04-en
+- WHO 2005 H5N1 확산: https://www.who.int/emergencies/disease-outbreak-news/item/2005_08_18-en
+- WHO 2009 H1N1 국제 보건비상 연표: https://www.who.int/groups/h1n1-ihr-emergency-committee
+- IEA 2008 기록적 고유가와 공급 제약: https://www.iea.org/news/despite-slowing-oil-demand-iea-sees-continued-market-tightness-over-the-medium-term
+- 한국은행 2008년 금융·외환시장 동향: https://www.bok.or.kr/portal/bbs/P0000551/view.do?menuNo=200484&nttId=148295
+
+이 자료는 실제 브랜드를 게임에 재현하기 위한 목록이 아니다. 발표 연도와 산업 파급 순서만 사용해 12가지 협약 방식과 `해외 원천기술 협약 → 국내 시제품 → 양산 검증 → 성공·실패 → 상용화·손상차손`으로 변환한다.
 
 ### 시장 규모와 산업 통계
 

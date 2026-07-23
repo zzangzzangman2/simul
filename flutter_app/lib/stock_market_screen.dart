@@ -240,7 +240,7 @@ class _MarketHomeAppBar extends StatelessWidget {
                   ),
                 ),
                 Tooltip(
-                  message: '장 마감 15:30',
+                  message: '장 마감 15:00',
                   child: FilledButton(
                     key: const Key('market-jump-close-button'),
                     onPressed: onJumpToClose,
@@ -255,7 +255,7 @@ class _MarketHomeAppBar extends StatelessWidget {
                       disabledForegroundColor: const Color(0xFFB3BAC4),
                     ),
                     child: const Text(
-                      '15:30',
+                      '15:00',
                       style: TextStyle(
                         fontSize: 9,
                         fontWeight: FontWeight.w700,
@@ -278,6 +278,7 @@ class StockMarketScreen extends StatefulWidget {
     super.key,
     required this.state,
     this.onExecuteTrade,
+    this.onCancelPendingOrder,
     this.onTransferCash,
     this.onSetMarketMinute,
     this.onSaveMarketNotebook,
@@ -291,6 +292,8 @@ class StockMarketScreen extends StatefulWidget {
   onSaveMarketNotebook;
   final Future<FinanceActionResult> Function()? onPurchaseReport;
   final Future<TradeExecutionResult> Function(TradeOrder)? onExecuteTrade;
+  final Future<FinanceActionResult> Function(String orderId)?
+  onCancelPendingOrder;
   final Future<FinanceActionResult> Function(int amount, bool deposit)?
   onTransferCash;
   final FictionalMarketUniverse? universe;
@@ -757,6 +760,31 @@ class _StockMarketScreenState extends State<StockMarketScreen> {
     }
   }
 
+  Future<void> _cancelPendingOrder(String orderId) async {
+    final callback = widget.onCancelPendingOrder;
+    if (callback == null || _isExecutingTrade || _isClosing) return;
+    _isExecutingTrade = true;
+    _timer?.cancel();
+    _timer = null;
+    if (mounted) setState(() {});
+    try {
+      final synced = await widget.onSetMarketMinute?.call(_marketMinute);
+      if (synced != null) _state = synced;
+      final result = await callback(orderId);
+      if (result.success && mounted) {
+        setState(() => _state = result.state);
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(result.message)));
+    } finally {
+      _isExecutingTrade = false;
+      _resumeTimerIfNeeded();
+      if (mounted) setState(() {});
+    }
+  }
+
   Future<FinanceActionResult> _transferCash(int amount, bool deposit) async {
     final callback = widget.onTransferCash;
     if (callback == null) {
@@ -1066,6 +1094,18 @@ class _StockMarketScreenState extends State<StockMarketScreen> {
               ? null
               : () => _openTransferSheet(false),
         ),
+        if (_state.pendingOrders.isNotEmpty) ...[
+          const SizedBox(height: 22),
+          _MarketSectionTitle(title: '미체결 주문 ${_state.pendingOrders.length}'),
+          const SizedBox(height: 8),
+          for (final order in _state.pendingOrders)
+            _PendingOrderRow(
+              order: order,
+              onCancel: widget.onCancelPendingOrder == null
+                  ? null
+                  : () => _cancelPendingOrder(order.id),
+            ),
+        ],
         const SizedBox(height: 22),
         _MarketSectionTitle(title: '보유 종목 ${rows.length}'),
         const SizedBox(height: 8),
@@ -1219,7 +1259,7 @@ class _StockMarketScreenState extends State<StockMarketScreen> {
                           ),
                           const SizedBox(height: 7),
                           const Text(
-                            '오늘의 사건과 세계 시드가 반영되며 15:30에 가상 종가가 확정됩니다.',
+                            '오늘의 사건과 세계 시드가 반영되며 15:00에 가상 종가가 확정됩니다.',
                             style: TextStyle(
                               color: Color(0xFF8A919E),
                               fontSize: 12,
@@ -1422,6 +1462,7 @@ class _StockDetailScreenState extends State<_StockDetailScreen> {
                     final change = quote.price - quote.previousClose;
                     final rate = change / quote.previousClose * 100;
                     final color = _priceColor(change);
+                    final financial = definition.financialAt(state.currentDate);
                     return Column(
                       children: [
                         Padding(
@@ -1519,6 +1560,14 @@ class _StockDetailScreenState extends State<_StockDetailScreen> {
                               ),
                               const SizedBox(height: 24),
                               _QuoteGrid(quote: quote),
+                              if (financial != null) ...[
+                                const SizedBox(height: 18),
+                                _CompanyFundamentalsCard(
+                                  snapshot: financial,
+                                  price: quote.price,
+                                  relations: definition.relations,
+                                ),
+                              ],
                               const SizedBox(height: 28),
                               const Divider(color: Color(0xFFF0F1F3)),
                               const SizedBox(height: 20),
@@ -1755,6 +1804,216 @@ class _StockDetailScreenState extends State<_StockDetailScreen> {
   }
 }
 
+class _CompanyFundamentalsCard extends StatelessWidget {
+  const _CompanyFundamentalsCard({
+    required this.snapshot,
+    required this.price,
+    required this.relations,
+  });
+
+  final FictionalFinancialSnapshot snapshot;
+  final double price;
+  final List<FictionalCompanyRelation> relations;
+
+  @override
+  Widget build(BuildContext context) {
+    final marketCap = (price * snapshot.sharesOutstanding).round();
+    final per = snapshot.eps <= 0 ? null : price / snapshot.eps;
+    final pbr = snapshot.bps <= 0 ? null : price / snapshot.bps;
+    final surprise = snapshot.earningsSurprisePct;
+    final visibleRelations = relations.take(4).toList(growable: false);
+    return Container(
+      key: const Key('company-fundamentals-card'),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: _marketLine),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  '분기 재무와 시장 기대',
+                  style: TextStyle(
+                    color: _marketInk,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Text(
+                snapshot.period,
+                style: const TextStyle(
+                  color: _marketMuted,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 13),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _FundamentalMetric(
+                label: '시가총액',
+                value: _compactWonAmount(marketCap),
+              ),
+              _FundamentalMetric(
+                label: '매출',
+                value: _compactWonAmount(snapshot.revenue),
+              ),
+              _FundamentalMetric(
+                label: '영업이익',
+                value: _compactWonAmount(snapshot.operatingProfit),
+                tone: snapshot.operatingProfit,
+              ),
+              _FundamentalMetric(
+                label: '영업현금흐름',
+                value: _compactWonAmount(snapshot.operatingCashFlow),
+                tone: snapshot.operatingCashFlow,
+              ),
+              _FundamentalMetric(
+                label: 'PER',
+                value: per == null ? '적자' : '${per.toStringAsFixed(1)}배',
+              ),
+              _FundamentalMetric(
+                label: 'PBR',
+                value: pbr == null ? '-' : '${pbr.toStringAsFixed(1)}배',
+              ),
+              _FundamentalMetric(
+                label: 'ROE',
+                value: '${snapshot.roe.toStringAsFixed(1)}%',
+                tone: snapshot.roe.round(),
+              ),
+              _FundamentalMetric(
+                label: '수주잔고',
+                value: _compactWonAmount(snapshot.orderBacklog),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            '시장 예상 대비 영업이익 '
+            '${surprise >= 0 ? '+' : ''}${surprise.toStringAsFixed(1)}% · '
+            '영업이익률 ${snapshot.operatingMargin.toStringAsFixed(1)}% · '
+            '현금 ${_compactWonAmount(snapshot.cash)} / '
+            '차입금 ${_compactWonAmount(snapshot.debt)}',
+            style: TextStyle(
+              color: surprise >= 0
+                  ? const Color(0xFF18794E)
+                  : const Color(0xFFB42332),
+              fontSize: 11,
+              height: 1.45,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          if (visibleRelations.isNotEmpty) ...[
+            const Divider(height: 24, color: _marketLine),
+            const Text(
+              '사업 관계망',
+              style: TextStyle(
+                color: _marketInk,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 7),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final relation in visibleRelations)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 9,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(color: _marketLine),
+                    ),
+                    child: Text(
+                      '${_relationLabel(relation.type)} · '
+                      '${relation.relatedName}',
+                      style: const TextStyle(
+                        color: _marketMuted,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  static String _relationLabel(FictionalCompanyRelationType type) =>
+      switch (type) {
+        FictionalCompanyRelationType.supplier => '공급사',
+        FictionalCompanyRelationType.customer => '고객사',
+        FictionalCompanyRelationType.competitor => '경쟁사',
+        FictionalCompanyRelationType.partner => '협력사',
+        FictionalCompanyRelationType.parent => '모회사',
+        FictionalCompanyRelationType.subsidiary => '자회사',
+      };
+}
+
+class _FundamentalMetric extends StatelessWidget {
+  const _FundamentalMetric({
+    required this.label,
+    required this.value,
+    this.tone,
+  });
+
+  final String label;
+  final String value;
+  final int? tone;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    width: 112,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            color: _marketMuted,
+            fontSize: 9,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: tone == null
+                ? _marketInk
+                : tone! >= 0
+                ? const Color(0xFF18794E)
+                : const Color(0xFFB42332),
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            fontFeatures: _marketNumberFeatures,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 class _OrderSheet extends StatefulWidget {
   const _OrderSheet({
     required this.definition,
@@ -1781,6 +2040,8 @@ class _OrderSheetState extends State<_OrderSheet> {
       '주문을 저장하지 못했어요. 저장 공간을 확인하고 다시 시도해 주세요.';
 
   double _quantity = 1;
+  TradeOrderType _orderType = TradeOrderType.market;
+  double? _limitPrice;
   bool _submitting = false;
   TradeExecutionResult? _result;
 
@@ -1789,6 +2050,10 @@ class _OrderSheetState extends State<_OrderSheet> {
     super.initState();
     widget.live.addListener(_handleMarketUpdate);
     widget.minute.addListener(_handleMarketUpdate);
+    _limitPrice = marketSnapPrice(
+      widget.live.value.price,
+      market: widget.definition.market,
+    );
     if (!widget.isBuy && (_position?.units ?? 0) < 1) {
       _quantity = _position?.units ?? 1;
     }
@@ -1815,23 +2080,67 @@ class _OrderSheetState extends State<_OrderSheet> {
   _LiveStock get _quote => widget.live.value;
   int get _marketMinute => widget.minute.value;
   double get _executionPrice => _quote.price;
-  int get _notional => (_executionPrice * _quantity).round();
+  double get _orderPrice => _orderType == TradeOrderType.limit
+      ? (_limitPrice ?? _executionPrice)
+      : _executionPrice;
+  int get _rawNotional => (_orderPrice * _quantity).round();
+  double get _marketImpact => _orderType == TradeOrderType.market
+      ? gameMarketImpactRate(_rawNotional)
+      : 0;
+  int get _notional => _orderType == TradeOrderType.market
+      ? gameTradeNotional(
+          side: widget.isBuy ? TradeSide.buy : TradeSide.sell,
+          unitPrice: _executionPrice,
+          quantity: _quantity,
+        )
+      : _rawNotional;
   int get _fee => gameTradingFeeForState(widget.state, _notional);
   double get _feeRate => gameTradingFeeRateForState(widget.state);
   int get _settlement => widget.isBuy ? _notional + _fee : _notional - _fee;
   double get _maxQuantity {
-    if (!widget.isBuy) return _position?.units ?? 0;
-    if (_executionPrice <= 0) return 0;
-    var quantity = (widget.state.brokerageCash / _executionPrice).floor();
-    while (quantity > 0) {
-      final notional = (_executionPrice * quantity).round();
-      final fee = gameTradingFeeForState(widget.state, notional);
-      if (notional + fee <= widget.state.brokerageCash) {
-        return quantity.toDouble();
-      }
-      quantity -= 1;
+    if (!widget.isBuy) {
+      final held = math.max(
+        0.0,
+        (_position?.units ?? 0) -
+            widget.state.pendingSellReservedUnits(widget.definition.id),
+      );
+      if (_executionPrice <= 0) return 0;
+      final liquidUnits =
+          gameMarketOrderNotionalLimit(_orderPrice) / _orderPrice;
+      return math.min(held, liquidUnits);
     }
-    return 0;
+    return gameMaxBuyQuantity(widget.state, _orderPrice).toDouble();
+  }
+
+  ({double lower, double upper}) get _dailyRange => marketDailyPriceRange(
+    previousClose: _quote.previousClose,
+    date: widget.state.currentDate,
+    market: widget.definition.market,
+  );
+
+  bool get _validLimitPrice =>
+      _orderType == TradeOrderType.market ||
+      (_limitPrice != null &&
+          isValidMarketOrderPrice(
+            _limitPrice!,
+            market: widget.definition.market,
+          ) &&
+          _limitPrice! >= _dailyRange.lower &&
+          _limitPrice! <= _dailyRange.upper);
+
+  void _changeLimitPrice(int direction) {
+    final current = _limitPrice ?? _executionPrice;
+    final tick = marketTickSize(current, market: widget.definition.market);
+    setState(() {
+      _limitPrice = marketSnapPrice(
+        (current + tick * direction).clamp(
+          _dailyRange.lower,
+          _dailyRange.upper,
+        ),
+        market: widget.definition.market,
+      );
+      _result = null;
+    });
   }
 
   bool get _tradable {
@@ -1867,6 +2176,9 @@ class _OrderSheetState extends State<_OrderSheet> {
               .first,
           marketMinute: _marketMinute,
           isTradingDay: _quote.isTradingDay,
+          type: _orderType,
+          limitPrice: _orderType == TradeOrderType.limit ? _limitPrice : null,
+          previousClose: _quote.previousClose,
         ),
       );
     } catch (_) {
@@ -1901,6 +2213,7 @@ class _OrderSheetState extends State<_OrderSheet> {
         _tradable &&
         _quantity > 0 &&
         _quantity <= maxQuantity &&
+        _validLimitPrice &&
         !_submitting &&
         _result?.success != true;
     return SafeArea(
@@ -1933,6 +2246,91 @@ class _OrderSheetState extends State<_OrderSheet> {
                   fontWeight: FontWeight.w700,
                 ),
               ),
+              const SizedBox(height: 14),
+              SegmentedButton<TradeOrderType>(
+                key: const Key('order-type-selector'),
+                segments: const [
+                  ButtonSegment(
+                    value: TradeOrderType.market,
+                    label: Text('시장가'),
+                  ),
+                  ButtonSegment(
+                    value: TradeOrderType.limit,
+                    label: Text('지정가'),
+                  ),
+                ],
+                selected: {_orderType},
+                onSelectionChanged: (value) => setState(() {
+                  _orderType = value.first;
+                  _limitPrice ??= marketSnapPrice(
+                    _executionPrice,
+                    market: widget.definition.market,
+                  );
+                  _result = null;
+                }),
+                showSelectedIcon: false,
+              ),
+              if (_orderType == TradeOrderType.limit) ...[
+                const SizedBox(height: 12),
+                Container(
+                  key: const Key('limit-price-control'),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 7,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF4F6F8),
+                    borderRadius: BorderRadius.circular(13),
+                  ),
+                  child: Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          '지정가',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                      IconButton(
+                        key: const Key('limit-price-minus'),
+                        onPressed: (_limitPrice ?? 0) > _dailyRange.lower
+                            ? () => _changeLimitPrice(-1)
+                            : null,
+                        icon: const Icon(Icons.remove_rounded),
+                      ),
+                      SizedBox(
+                        width: 92,
+                        child: Text(
+                          '${_money((_limitPrice ?? 0).round())}원',
+                          key: const Key('limit-price-value'),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            fontFeatures: _marketNumberFeatures,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        key: const Key('limit-price-plus'),
+                        onPressed: (_limitPrice ?? 0) < _dailyRange.upper
+                            ? () => _changeLimitPrice(1)
+                            : null,
+                        icon: const Icon(Icons.add_rounded),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  '오늘 주문 범위 ${_money(_dailyRange.lower.round())}~'
+                  '${_money(_dailyRange.upper.round())}원 · 미체결은 장 마감에 자동 취소',
+                  style: const TextStyle(
+                    color: Color(0xFF7B8491),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
               const SizedBox(height: 16),
               Container(
                 padding: const EdgeInsets.all(14),
@@ -2011,7 +2409,12 @@ class _OrderSheetState extends State<_OrderSheet> {
                       ],
                     ),
                     const Divider(),
-                    _OrderSummaryRow(label: '주문 금액', value: _notional),
+                    _OrderSummaryRow(
+                      label: _marketImpact > 0
+                          ? '시장충격 ${(_marketImpact * 100).toStringAsFixed(2)}% 반영'
+                          : '주문 금액',
+                      value: _notional,
+                    ),
                     _OrderSummaryRow(label: '증권 수수료', value: _fee),
                     _OrderSummaryRow(
                       label: widget.isBuy ? '총 결제액' : '예상 수령액',
@@ -2024,14 +2427,14 @@ class _OrderSheetState extends State<_OrderSheet> {
               if (!_authorityReady || !_tradable || maxQuantity <= 0) ...[
                 const SizedBox(height: 10),
                 Text(
-                  !_authorityReady
-                      ? '직접 번 종잣돈 10,000원을 먼저 마련해야 보호자 주문 승인을 받을 수 있습니다.'
-                      : !_tradable
+                  !_tradable
                       ? '현재는 주문 가능한 거래 시간이 아닙니다.'
+                      : !_authorityReady
+                      ? '직접 번 종잣돈 10,000원을 먼저 마련해야 보호자 주문 승인을 받을 수 있습니다.'
                       : widget.isBuy
                       ? '1주를 살 현금이 부족합니다.'
                       : '보유 수량이 없습니다.',
-                  key: !_authorityReady
+                  key: _tradable && !_authorityReady
                       ? const Key('order-authority-warning')
                       : null,
                   style: const TextStyle(
@@ -2089,6 +2492,8 @@ class _OrderSheetState extends State<_OrderSheet> {
                     : Text(
                         _result?.success == true
                             ? '완료'
+                            : !_tradable
+                            ? '거래 시간에 주문 가능'
                             : !_authorityReady
                             ? '종잣돈 10,000원 달성 후 주문 가능'
                             : '부모님 승인으로 주문 실행',
@@ -2146,11 +2551,11 @@ class _MarketSessionNoticeCard extends StatelessWidget {
         ? const Color(0xFF00B875)
         : const Color(0xFF52627A);
     final pale = isOpening ? const Color(0xFFEAFBF4) : const Color(0xFFEEF2F8);
-    final time = isOpening ? '09:00' : '15:30';
+    final time = isOpening ? '09:00' : '15:00';
     final title = isOpening ? '장이 시작되었습니다' : '장이 마감되었습니다';
     final description = isOpening
         ? '정규장이 열렸어요.\n이제 국내 종목의 움직임을 확인해 보세요.'
-        : '정규장이 마감됐어요.\n오늘의 15:30 종가가 기준 가격으로 확정됐어요.';
+        : '정규장이 마감됐어요.\n오늘의 15:00 종가가 기준 가격으로 확정됐어요.';
     return SafeArea(
       child: Center(
         child: Padding(
@@ -2671,6 +3076,61 @@ class _MarketRankingRow extends StatelessWidget {
   );
 }
 
+class _PendingOrderRow extends StatelessWidget {
+  const _PendingOrderRow({required this.order, this.onCancel});
+
+  final PendingTradeOrder order;
+  final VoidCallback? onCancel;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    key: Key('pending-order-${order.id}'),
+    margin: const EdgeInsets.only(bottom: 8),
+    padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(13),
+      border: Border.all(color: _marketLine),
+    ),
+    child: Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${order.name} · '
+                '${order.side == PendingOrderSide.buy ? '매수' : '매도'}',
+                style: const TextStyle(
+                  color: _marketInk,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${_money(order.limitPrice.round())}원 · '
+                '${_displayUnits(order.remainingQuantity)}주 대기'
+                '${order.filledQuantity > 0 ? ' · ${_displayUnits(order.filledQuantity)}주 체결' : ''}',
+                style: const TextStyle(
+                  color: _marketMuted,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+        TextButton(
+          key: Key('cancel-pending-order-${order.id}'),
+          onPressed: onCancel,
+          child: const Text('취소'),
+        ),
+      ],
+    ),
+  );
+}
+
 class _BrokerageAccountCard extends StatelessWidget {
   const _BrokerageAccountCard({
     required this.state,
@@ -2768,8 +3228,8 @@ class _BrokerageAccountCard extends StatelessWidget {
                   children: [
                     Expanded(
                       child: _AccountMetric(
-                        label: '예수금',
-                        value: '${_money(state.brokerageCash)}원',
+                        label: '주문 가능',
+                        value: '${_money(state.availableBrokerageCash)}원',
                       ),
                     ),
                     Expanded(
@@ -2803,7 +3263,10 @@ class _BrokerageAccountCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            '누적 증권 수수료 ${_money(totalFees)}원 · 매매 수수료율 0.250%',
+            state.pendingBuyReservedCash > 0
+                ? '미체결 매수 예약 ${_money(state.pendingBuyReservedCash)}원 · '
+                      '예수금 ${_money(state.brokerageCash)}원'
+                : '누적 증권 수수료 ${_money(totalFees)}원 · 매매 수수료율 0.250%',
             key: const Key('market-account-fees'),
             style: const TextStyle(
               color: Color(0xFF8B95A1),
@@ -3042,8 +3505,9 @@ class _BrokerageTransferSheetState extends State<_BrokerageTransferSheet> {
   bool _processing = false;
   String? _error;
 
-  int get _maxAmount =>
-      widget.deposit ? widget.state.bankCash : widget.state.brokerageCash;
+  int get _maxAmount => widget.deposit
+      ? widget.state.bankCash
+      : widget.state.availableBrokerageCash;
   int get _amount =>
       int.tryParse(_controller.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
 
@@ -3106,7 +3570,7 @@ class _BrokerageTransferSheetState extends State<_BrokerageTransferSheet> {
           Text(
             widget.deposit
                 ? '회사 통장 ${_money(widget.state.bankCash)}원에서 옮겨요.'
-                : '출금 가능 예수금은 ${_money(widget.state.brokerageCash)}원이에요.',
+                : '출금 가능 예수금은 ${_money(widget.state.availableBrokerageCash)}원이에요.',
             style: const TextStyle(
               color: Color(0xFF6B7684),
               fontWeight: FontWeight.w700,
@@ -4259,7 +4723,7 @@ class _TradingStatusRow extends StatelessWidget {
               : minute < krxOpenMinute
               ? '개장 전 · 09:00부터 1분봉 생성'
               : minute >= krxCloseMinute
-              ? '정규장 마감 · 15:30 종가 고정'
+              ? '정규장 마감 · 15:00 종가 고정'
               : '가상 장중 · 현실 1초마다 게임 1분 진행',
           style: const TextStyle(
             color: Color(0xFF596270),
@@ -4389,6 +4853,8 @@ class _StockDefinition {
     required this.question,
     required this.accent,
     required this.generation,
+    required this.financials,
+    required this.relations,
   });
 
   factory _StockDefinition.fromAsset(FictionalMarketAsset asset) =>
@@ -4408,6 +4874,8 @@ class _StockDefinition {
             : asset.question,
         accent: _hexColor(asset.colorHex),
         generation: asset.generation,
+        financials: asset.financials,
+        relations: asset.relations,
       );
 
   final String id;
@@ -4421,6 +4889,18 @@ class _StockDefinition {
   final String question;
   final Color accent;
   final int generation;
+  final List<FictionalFinancialSnapshot> financials;
+  final List<FictionalCompanyRelation> relations;
+
+  FictionalFinancialSnapshot? financialAt(DateTime date) {
+    final key = marketDateKey(date);
+    FictionalFinancialSnapshot? result;
+    for (final snapshot in financials) {
+      if (snapshot.period.compareTo(key) > 0) break;
+      result = snapshot;
+    }
+    return result;
+  }
 }
 
 class _LiveStock {
@@ -4489,6 +4969,21 @@ double _simulatedTurnover(_StockDefinition definition, _LiveStock quote) {
 String _compactEok(double value) => value >= 1000
     ? '${(value / 1000).toStringAsFixed(1)}천억원'
     : '${value.round()}억원';
+
+String _compactWonAmount(int value) {
+  final sign = value < 0 ? '-' : '';
+  final amount = value.abs();
+  if (amount >= 1000000000000) {
+    return '$sign${(amount / 1000000000000).toStringAsFixed(1)}조원';
+  }
+  if (amount >= 100000000) {
+    return '$sign${(amount / 100000000).toStringAsFixed(1)}억원';
+  }
+  if (amount >= 10000) {
+    return '$sign${(amount / 10000).toStringAsFixed(0)}만원';
+  }
+  return '$sign${_money(amount)}원';
+}
 
 Color _hexColor(String value) {
   final normalized = value.replaceFirst('#', '');

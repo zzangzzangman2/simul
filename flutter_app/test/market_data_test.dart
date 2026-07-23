@@ -40,6 +40,31 @@ void main() {
     },
   );
 
+  test(
+    'seeded companies expose quarterly fundamentals and business relations',
+    () {
+      final universe = buildFictionalMarketUniverse('fundamental-test-seed');
+      final asset = universe.assets.firstWhere(
+        (candidate) => candidate.financials.length >= 4,
+      );
+      final snapshot = asset.financialAtOrBefore(DateTime(2005, 12, 31));
+
+      expect(universe.schemaVersion, greaterThanOrEqualTo(7));
+      expect(snapshot, isNotNull);
+      expect(snapshot!.revenue, greaterThan(0));
+      expect(snapshot.sharesOutstanding, greaterThan(0));
+      expect(snapshot.equity, greaterThan(0));
+      expect(snapshot.consensusOperatingProfit, isNot(0));
+      expect(asset.relations, isNotEmpty);
+      expect(
+        asset.relations.every(
+          (relation) => relation.relatedAssetId != asset.id,
+        ),
+        isTrue,
+      );
+    },
+  );
+
   test('market parser rejects duplicate assets and invalid prices', () {
     Map<String, dynamic> asset(String id, String symbol, Object price) => {
       'id': id,
