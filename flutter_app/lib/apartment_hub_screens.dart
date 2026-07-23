@@ -2,8 +2,15 @@ part of 'main.dart';
 
 enum _ApartmentPlace { bedroom, livingRoom, kitchen }
 
+const _hubDisplayFont = 'Maplestory';
+
 String _apartmentDateLabel(DateTime date) {
   const weekdays = <String>['월요일', '화요일', '수요일', '목요일', '금요일', '토요일', '일요일'];
+  return '${date.month}월 ${date.day}일 ${weekdays[date.weekday - 1]}';
+}
+
+String _apartmentHudDateLabel(DateTime date) {
+  const weekdays = <String>['월', '화', '수', '목', '금', '토', '일'];
   return '${date.month}월 ${date.day}일 ${weekdays[date.weekday - 1]}';
 }
 
@@ -23,6 +30,7 @@ class ApartmentHubScreen extends StatefulWidget {
     required this.onAdvanceDay,
     required this.onAdvanceBatch,
     required this.onOpenEnding,
+    this.onClaimMission,
     this.onTutorialComplete,
   });
 
@@ -39,6 +47,7 @@ class ApartmentHubScreen extends StatefulWidget {
   final VoidCallback onAdvanceDay;
   final VoidCallback onAdvanceBatch;
   final VoidCallback onOpenEnding;
+  final Future<MissionClaimResult> Function()? onClaimMission;
   final Future<void> Function()? onTutorialComplete;
 
   @override
@@ -64,6 +73,14 @@ class _ApartmentHubScreenState extends State<ApartmentHubScreen> {
   @override
   Widget build(BuildContext context) {
     final details = _ApartmentPlaceDetails.forPlace(_place);
+    final missionProgress = const GameEngine().missionProgress(widget.state);
+    final placeIndex = _ApartmentPlace.values.indexOf(_place);
+    final previousPlace = placeIndex > 0
+        ? _ApartmentPlace.values[placeIndex - 1]
+        : null;
+    final nextPlace = placeIndex < _ApartmentPlace.values.length - 1
+        ? _ApartmentPlace.values[placeIndex + 1]
+        : null;
     return ClipRect(
       child: Stack(
         fit: StackFit.expand,
@@ -97,9 +114,9 @@ class _ApartmentHubScreenState extends State<ApartmentHubScreen> {
             child: IgnorePointer(child: _ApartmentSceneVignette()),
           ),
           Positioned(
-            left: 10,
-            top: 10,
-            right: 10,
+            left: 6,
+            top: 6,
+            right: 6,
             child: _ApartmentLocationHeader(
               details: details,
               state: widget.state,
@@ -109,14 +126,38 @@ class _ApartmentHubScreenState extends State<ApartmentHubScreen> {
             ),
           ),
           Positioned(
-            left: 10,
-            right: 10,
-            bottom: 9,
-            child: _ApartmentTravelDock(place: _place, onMove: _moveTo),
+            left: 56,
+            right: 56,
+            bottom: 10,
+            child: Center(
+              child: _ApartmentMissionCard(
+                progress: missionProgress,
+                onOpen: widget.onOpenDecisions,
+                onClaim: widget.onClaimMission,
+              ),
+            ),
           ),
           Positioned(
-            right: 10,
-            top: 126,
+            left: 6,
+            bottom: 38,
+            child: _ApartmentRoomArrow(
+              destination: previousPlace,
+              flipHorizontally: true,
+              onMove: _moveTo,
+            ),
+          ),
+          Positioned(
+            right: 6,
+            bottom: 38,
+            child: _ApartmentRoomArrow(
+              destination: nextPlace,
+              flipHorizontally: false,
+              onMove: _moveTo,
+            ),
+          ),
+          Positioned(
+            right: 7,
+            top: 118,
             child: _ApartmentActionRail(
               hasPendingDecision: widget.state.pendingDecisions.isNotEmpty,
               campaignComplete: widget.state.campaignComplete,
@@ -177,7 +218,7 @@ class _HubTutorialOverlay extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               const Text(
-                '아래 이동 독에서는 어느 방으로든 바로 이동할 수 있어요. 노란 테두리는 확인할 안건이 있다는 뜻입니다.',
+                '화면 아래 양옆의 화살표로 이전 방과 다음 방으로 이동해요. 노란 테두리는 확인할 안건이 있다는 뜻입니다.',
                 style: TextStyle(fontSize: 12, height: 1.5),
               ),
               const SizedBox(height: 16),
@@ -237,8 +278,7 @@ class _ApartmentPlaceScene extends StatelessWidget {
         if (place == _ApartmentPlace.bedroom) ...[
           _ApartmentObjectHotspot(
             interactionKey: const Key('open-market-button'),
-            alignment: const Alignment(-0.58, -0.14),
-            icon: Icons.desktop_windows_rounded,
+            alignment: const Alignment(-0.63, -0.22),
             eyebrow: '컴퓨터 켜기',
             label: '주식시장',
             accent: const Color(0xFF80D8FF),
@@ -246,8 +286,7 @@ class _ApartmentPlaceScene extends StatelessWidget {
           ),
           _ApartmentObjectHotspot(
             interactionKey: const Key('open-ledger-button'),
-            alignment: const Alignment(0.72, 0.36),
-            icon: Icons.inventory_2_rounded,
+            alignment: const Alignment(0.56, -0.02),
             eyebrow: '장부 펼치기',
             label: '서류함',
             accent: const Color(0xFFFFC78E),
@@ -257,8 +296,7 @@ class _ApartmentPlaceScene extends StatelessWidget {
         if (place == _ApartmentPlace.livingRoom) ...[
           _ApartmentObjectHotspot(
             interactionKey: const Key('open-organization-button'),
-            alignment: const Alignment(-0.52, 0.06),
-            icon: Icons.family_restroom_rounded,
+            alignment: const Alignment(-0.72, -0.25),
             eyebrow: '함께 이야기',
             label: '가족·조직',
             accent: const Color(0xFFFFD27A),
@@ -266,10 +304,7 @@ class _ApartmentPlaceScene extends StatelessWidget {
           ),
           _ApartmentObjectHotspot(
             interactionKey: const Key('open-decisions-button'),
-            alignment: const Alignment(0.02, 0.48),
-            icon: state.pendingDecisions.isEmpty
-                ? Icons.drafts_rounded
-                : Icons.mark_email_unread_rounded,
+            alignment: const Alignment(0.22, 0.10),
             eyebrow: '새 편지 확인',
             label: state.pendingDecisions.isEmpty
                 ? '안건 편지'
@@ -284,8 +319,7 @@ class _ApartmentPlaceScene extends StatelessWidget {
         if (place == _ApartmentPlace.kitchen)
           _ApartmentObjectHotspot(
             interactionKey: const Key('open-work-button'),
-            alignment: const Alignment(-0.68, 0.06),
-            icon: Icons.phone_in_talk_rounded,
+            alignment: const Alignment(-0.65, -0.08),
             eyebrow: '일거리 찾기',
             label: '일거리 전화',
             accent: const Color(0xFF98E5C1),
@@ -339,65 +373,65 @@ class _ApartmentLocationHeader extends StatelessWidget {
         : ((state.progression.experience - currentLevelXp) /
                   (nextLevelXp - currentLevelXp))
               .clamp(0.0, 1.0);
+    final weather = _ApartmentWeather.forState(state);
 
     return Semantics(
       container: true,
       label: '${details.title}, ${state.companyName}, $activeSaveSlot번 저장 슬롯',
-      child: ClipRRect(
+      child: Container(
         key: const Key('room-company-sign'),
-        borderRadius: BorderRadius.circular(24),
-        child: BackdropFilter(
-          filter: ui.ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(10, 9, 8, 9),
-            decoration: BoxDecoration(
-              color: const Color(0xEFFFFAF0),
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: const Color(0xF2FFFFFF), width: 1.5),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x330F1724),
-                  blurRadius: 18,
-                  offset: Offset(0, 8),
-                ),
-              ],
+        height: 100,
+        padding: const EdgeInsets.all(3),
+        decoration: BoxDecoration(
+          color: const Color(0xFF243451),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: const Color(0xFF18243A), width: 1.5),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x66070A12),
+              blurRadius: 12,
+              offset: Offset(0, 5),
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
+          ],
+        ),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(8, 6, 7, 6),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xFFFFF9EA), Color(0xFFF4E6C5)],
+            ),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFD99B2B), width: 1.5),
+          ),
+          child: Column(
+            children: [
+              Expanded(
+                child: Row(
                   children: [
                     Container(
-                      width: 48,
+                      width: 47,
                       height: 48,
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            details.accent,
-                            details.accent.withValues(alpha: 0.72),
-                          ],
+                        color: const Color(0xFFFFD66F),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: const Color(0xFF9C681B),
+                          width: 1.5,
                         ),
-                        borderRadius: BorderRadius.circular(17),
-                        boxShadow: [
-                          BoxShadow(
-                            color: details.accent.withValues(alpha: 0.34),
-                            blurRadius: 11,
-                            offset: const Offset(0, 5),
-                          ),
-                        ],
                       ),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text(
+                          const Text(
                             'DAY',
                             style: TextStyle(
-                              color: _ink.withValues(alpha: 0.66),
-                              fontSize: 7,
+                              fontFamily: _hubDisplayFont,
+                              color: Color(0xFF76501B),
+                              fontSize: 7.5,
                               height: 1,
-                              fontWeight: FontWeight.w900,
+                              fontWeight: FontWeight.w700,
                               letterSpacing: 0.7,
                             ),
                           ),
@@ -405,94 +439,87 @@ class _ApartmentLocationHeader extends StatelessWidget {
                           Text(
                             '${state.day}',
                             style: const TextStyle(
+                              fontFamily: _hubDisplayFont,
                               color: _ink,
                               fontSize: 19,
                               height: 1,
-                              fontWeight: FontWeight.w900,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 9),
                     Expanded(
                       child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            children: [
-                              Icon(
-                                details.icon,
-                                color: details.accent,
-                                size: 15,
-                              ),
-                              const SizedBox(width: 5),
-                              Expanded(
-                                child: Text(
-                                  details.title,
-                                  key: const Key('apartment-location-title'),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: _ink,
-                                    fontSize: 15,
-                                    height: 1.1,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: -0.45,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 3),
-                          KeyedSubtree(
-                            key: const Key('room-company-name'),
-                            child: Text(
-                              state.companyName,
-                              key: const Key('company-header-title'),
-                              maxLines: 1,
-                              softWrap: false,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: details.accent.computeLuminance() > 0.7
-                                    ? const Color(0xFF8A5F20)
-                                    : details.accent,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w900,
-                              ),
+                          Text(
+                            details.title,
+                            key: const Key('apartment-location-title'),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontFamily: _hubDisplayFont,
+                              color: _ink,
+                              fontSize: 14.5,
+                              height: 1.05,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.4,
                             ),
                           ),
-                          const SizedBox(height: 4),
+                          const SizedBox(height: 3),
                           Row(
                             children: [
-                              Text(
-                                'LV.$level',
-                                style: const TextStyle(
-                                  color: Color(0xFF667189),
-                                  fontSize: 8,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
                               Expanded(
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(99),
-                                  child: LinearProgressIndicator(
-                                    value: levelProgress,
-                                    minHeight: 4,
-                                    backgroundColor: const Color(0xFFDDE2EA),
-                                    valueColor: AlwaysStoppedAnimation(
-                                      details.accent,
+                                child: KeyedSubtree(
+                                  key: const Key('room-company-name'),
+                                  child: Text(
+                                    state.companyName,
+                                    key: const Key('company-header-title'),
+                                    maxLines: 1,
+                                    softWrap: false,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontFamily: _hubDisplayFont,
+                                      color: Color(0xFF8B5C17),
+                                      fontSize: 9.5,
+                                      height: 1,
+                                      fontWeight: FontWeight.w700,
                                     ),
                                   ),
                                 ),
                               ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'LV.$level',
+                                style: const TextStyle(
+                                  fontFamily: _hubDisplayFont,
+                                  color: Color(0xFF59667D),
+                                  fontSize: 8.5,
+                                  height: 1,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
                             ],
+                          ),
+                          const SizedBox(height: 5),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(99),
+                            child: LinearProgressIndicator(
+                              value: levelProgress,
+                              minHeight: 5,
+                              backgroundColor: const Color(0xFFD8CAB0),
+                              valueColor: AlwaysStoppedAnimation(
+                                details.accent,
+                              ),
+                            ),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 9),
                     Stack(
                       clipBehavior: Clip.none,
                       children: [
@@ -501,16 +528,20 @@ class _ApartmentLocationHeader extends StatelessWidget {
                           tooltip: '저장 및 게임 메뉴',
                           onPressed: onOpenGameMenu,
                           style: IconButton.styleFrom(
-                            backgroundColor: _ink,
+                            backgroundColor: const Color(0xFF243451),
                             foregroundColor: Colors.white,
                             minimumSize: const Size(44, 44),
+                            side: const BorderSide(
+                              color: Color(0xFFDCA538),
+                              width: 1.5,
+                            ),
                           ),
-                          icon: const Icon(Icons.menu_rounded),
+                          icon: const Icon(Icons.menu_rounded, size: 23),
                         ),
                         if (lastSavedAt != null)
                           const Positioned(
-                            right: 2,
-                            top: 1,
+                            right: -1,
+                            top: -1,
                             child: DecoratedBox(
                               decoration: BoxDecoration(
                                 color: Color(0xFF55C88A),
@@ -519,38 +550,420 @@ class _ApartmentLocationHeader extends StatelessWidget {
                                   BorderSide(color: Colors.white, width: 2),
                                 ),
                               ),
-                              child: SizedBox(width: 10, height: 10),
+                              child: SizedBox(width: 11, height: 11),
                             ),
                           ),
                       ],
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                Row(
+              ),
+              const SizedBox(height: 5),
+              Container(
+                height: 27,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF243451),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFDCA538)),
+                ),
+                child: Row(
                   children: [
                     Expanded(
-                      flex: 5,
-                      child: _ApartmentHudChip(
+                      flex: 13,
+                      child: _ApartmentStatusChip(
                         icon: Icons.schedule_rounded,
+                        iconColor: const Color(0xFFFFD66F),
                         label:
+                            '${_apartmentHudDateLabel(state.currentDate)} · ${marketTimeLabel(state.marketMinute)}',
+                        semanticLabel:
                             '${_apartmentDateLabel(state.currentDate)} · ${marketTimeLabel(state.marketMinute)}',
                       ),
                     ),
-                    const SizedBox(width: 6),
+                    const _ApartmentStatusDivider(),
                     Expanded(
-                      flex: 3,
-                      child: _ApartmentHudChip(
-                        icon: Icons.savings_rounded,
+                      flex: 9,
+                      child: _ApartmentStatusChip(
+                        icon: Icons.payments_rounded,
+                        iconColor: const Color(0xFFFFC66F),
                         label: '${_money(state.cash)}원',
-                        accent: const Color(0xFFFFB84D),
                       ),
                     ),
-                    const SizedBox(width: 6),
-                    _ApartmentHudChip(label: 'S$activeSaveSlot'),
+                    const _ApartmentStatusDivider(),
+                    Expanded(
+                      flex: 9,
+                      child: _ApartmentStatusChip(
+                        icon: Icons.wb_sunny_rounded,
+                        iconColor: const Color(0xFF83DBB7),
+                        label: weather.label,
+                        trailing: 'S$activeSaveSlot',
+                      ),
+                    ),
                   ],
                 ),
-              ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ApartmentStatusDivider extends StatelessWidget {
+  const _ApartmentStatusDivider();
+
+  @override
+  Widget build(BuildContext context) =>
+      Container(width: 1, height: 14, color: const Color(0x66F3C960));
+}
+
+class _ApartmentStatusChip extends StatelessWidget {
+  const _ApartmentStatusChip({
+    required this.icon,
+    required this.iconColor,
+    required this.label,
+    this.trailing,
+    this.semanticLabel,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final String label;
+  final String? trailing;
+  final String? semanticLabel;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    label: semanticLabel ?? label,
+    excludeSemantics: true,
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      child: Row(
+        children: [
+          Icon(icon, color: iconColor, size: 14),
+          const SizedBox(width: 4),
+          Expanded(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                label,
+                maxLines: 1,
+                softWrap: false,
+                style: const TextStyle(
+                  fontFamily: _hubDisplayFont,
+                  color: Colors.white,
+                  fontSize: 9.2,
+                  height: 1,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+          if (trailing != null) ...[
+            const SizedBox(width: 3),
+            Text(
+              trailing!,
+              style: const TextStyle(
+                fontFamily: _hubDisplayFont,
+                color: Color(0xFFFFD66F),
+                fontSize: 7.2,
+                height: 1,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ],
+      ),
+    ),
+  );
+}
+
+class _ApartmentWeather {
+  const _ApartmentWeather(this.label);
+
+  final String label;
+
+  static _ApartmentWeather forState(GameState state) {
+    final seed = state.simulationSeed.codeUnits.fold<int>(
+      state.day * 17,
+      (value, unit) => (value * 31 + unit) & 0x7fffffff,
+    );
+    const labels = <String>['맑음', '구름', '포근', '찬바람'];
+    return _ApartmentWeather(labels[seed % labels.length]);
+  }
+}
+
+class _ApartmentMissionCard extends StatefulWidget {
+  const _ApartmentMissionCard({
+    required this.progress,
+    required this.onOpen,
+    required this.onClaim,
+  });
+
+  final MissionProgressView? progress;
+  final VoidCallback onOpen;
+  final Future<MissionClaimResult> Function()? onClaim;
+
+  @override
+  State<_ApartmentMissionCard> createState() => _ApartmentMissionCardState();
+}
+
+class _ApartmentMissionCardState extends State<_ApartmentMissionCard> {
+  bool _claiming = false;
+
+  Future<void> _claim() async {
+    final progress = widget.progress;
+    final onClaim = widget.onClaim;
+    if (_claiming ||
+        progress == null ||
+        !progress.complete ||
+        onClaim == null) {
+      return;
+    }
+    setState(() => _claiming = true);
+    try {
+      final result = await onClaim();
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(result.message)));
+    } finally {
+      if (mounted) setState(() => _claiming = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = widget.progress;
+    final complete = progress?.complete ?? false;
+    return Semantics(
+      container: true,
+      button: true,
+      label: progress == null
+          ? '모든 미션 완료'
+          : '현재 미션 ${progress.mission.title}, ${progress.current}/${progress.mission.target}',
+      child: Material(
+        key: const Key('hub-mission-card'),
+        color: Colors.transparent,
+        child: Container(
+          width: 248,
+          height: 104,
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFF8E9),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: const Color(0xFF243451), width: 2.5),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x66070A12),
+                blurRadius: 12,
+                offset: Offset(0, 5),
+              ),
+            ],
+          ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(15),
+            onTap: widget.onOpen,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(11, 9, 10, 8),
+              child: progress == null
+                  ? const Row(
+                      children: [
+                        _ApartmentMissionEmblem(),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '모든 미션 완료!',
+                                style: TextStyle(
+                                  fontFamily: _hubDisplayFont,
+                                  color: _ink,
+                                  fontSize: 15,
+                                  height: 1,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              SizedBox(height: 7),
+                              Text(
+                                '성장 기록 보기  ›',
+                                style: TextStyle(
+                                  fontFamily: _hubDisplayFont,
+                                  color: Color(0xFF6B7485),
+                                  fontSize: 10,
+                                  height: 1,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    )
+                  : Column(
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            const _ApartmentMissionEmblem(),
+                            const SizedBox(width: 9),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      const Text(
+                                        '현재 미션',
+                                        style: TextStyle(
+                                          fontFamily: _hubDisplayFont,
+                                          color: Color(0xFF9B681C),
+                                          fontSize: 8.5,
+                                          height: 1,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                      const Spacer(),
+                                      if (progress.remainingDays != null)
+                                        Text(
+                                          '${progress.remainingDays}일 남음',
+                                          style: const TextStyle(
+                                            fontFamily: _hubDisplayFont,
+                                            color: Color(0xFF9A5146),
+                                            fontSize: 8,
+                                            height: 1,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    progress.mission.title,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontFamily: _hubDisplayFont,
+                                      color: _ink,
+                                      fontSize: 14.5,
+                                      height: 1,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: -0.35,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 5),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                progress.mission.objective,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontFamily: _hubDisplayFont,
+                                  color: Color(0xFF5E6675),
+                                  fontSize: 9,
+                                  height: 1,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              '${progress.current.clamp(0, progress.mission.target)}/${progress.mission.target}',
+                              style: const TextStyle(
+                                fontFamily: _hubDisplayFont,
+                                color: _ink,
+                                fontSize: 8.5,
+                                height: 1,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(99),
+                          child: LinearProgressIndicator(
+                            value: progress.ratio,
+                            minHeight: 5,
+                            backgroundColor: const Color(0xFFD9CDB5),
+                            valueColor: const AlwaysStoppedAnimation(
+                              Color(0xFF4EBA8E),
+                            ),
+                          ),
+                        ),
+                        const Spacer(),
+                        Row(
+                          children: [
+                            Text(
+                              '보상  ${progress.mission.experienceReward} XP',
+                              style: const TextStyle(
+                                fontFamily: _hubDisplayFont,
+                                color: Color(0xFF8A5A16),
+                                fontSize: 8.5,
+                                height: 1,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            if (progress.mission.cashReward > 0) ...[
+                              const SizedBox(width: 7),
+                              Text(
+                                '+${_money(progress.mission.cashReward)}원',
+                                style: const TextStyle(
+                                  fontFamily: _hubDisplayFont,
+                                  color: Color(0xFF2E8063),
+                                  fontSize: 8.5,
+                                  height: 1,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                            const Spacer(),
+                            if (complete)
+                              SizedBox(
+                                height: 23,
+                                child: FilledButton(
+                                  key: const Key('hub-claim-mission-reward'),
+                                  onPressed: _claiming ? null : _claim,
+                                  style: FilledButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                    ),
+                                    backgroundColor: const Color(0xFF243451),
+                                    foregroundColor: Colors.white,
+                                    textStyle: const TextStyle(
+                                      fontFamily: _hubDisplayFont,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                  ),
+                                  child: Text(_claiming ? '저장 중' : '보상 받기'),
+                                ),
+                              )
+                            else
+                              const Text(
+                                '자세히  ›',
+                                style: TextStyle(
+                                  fontFamily: _hubDisplayFont,
+                                  color: Color(0xFF243451),
+                                  fontSize: 9,
+                                  height: 1,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
             ),
           ),
         ),
@@ -559,43 +972,19 @@ class _ApartmentLocationHeader extends StatelessWidget {
   }
 }
 
-class _ApartmentHudChip extends StatelessWidget {
-  const _ApartmentHudChip({this.icon, required this.label, this.accent});
-
-  final IconData? icon;
-  final String label;
-  final Color? accent;
+class _ApartmentMissionEmblem extends StatelessWidget {
+  const _ApartmentMissionEmblem();
 
   @override
   Widget build(BuildContext context) => Container(
-    height: 27,
-    padding: EdgeInsets.symmetric(horizontal: icon == null ? 8 : 7),
+    width: 32,
+    height: 32,
     decoration: BoxDecoration(
-      color: const Color(0xFFF1F3F7),
-      borderRadius: BorderRadius.circular(99),
+      color: const Color(0xFFFFD66F),
+      shape: BoxShape.circle,
+      border: Border.all(color: const Color(0xFF9C681B), width: 1.5),
     ),
-    child: Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (icon != null) ...[
-          Icon(icon, color: accent ?? const Color(0xFF76829A), size: 12),
-          const SizedBox(width: 4),
-        ],
-        Flexible(
-          child: Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: _ink,
-              fontSize: 9,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ),
-      ],
-    ),
+    child: const Icon(Icons.star_rounded, color: Color(0xFF243451), size: 20),
   );
 }
 
@@ -603,7 +992,6 @@ class _ApartmentObjectHotspot extends StatelessWidget {
   const _ApartmentObjectHotspot({
     required this.interactionKey,
     required this.alignment,
-    required this.icon,
     required this.eyebrow,
     required this.label,
     required this.accent,
@@ -613,7 +1001,6 @@ class _ApartmentObjectHotspot extends StatelessWidget {
 
   final Key interactionKey;
   final Alignment alignment;
-  final IconData icon;
   final String eyebrow;
   final String label;
   final Color accent;
@@ -636,24 +1023,24 @@ class _ApartmentObjectHotspot extends StatelessWidget {
           button: true,
           label: '$label 열기',
           child: SizedBox(
-            width: 58,
-            height: 58,
+            width: 66,
+            height: 48,
             child: Material(
               color: Colors.transparent,
               child: InkWell(
                 key: interactionKey,
                 onTap: onTap,
-                customBorder: const CircleBorder(),
+                borderRadius: BorderRadius.circular(24),
                 child: Stack(
                   clipBehavior: Clip.none,
                   children: [
                     Ink(
                       decoration: BoxDecoration(
-                        color: const Color(0xEFFFFAF0),
-                        shape: BoxShape.circle,
+                        color: const Color(0xF7FFF8E9),
+                        borderRadius: BorderRadius.circular(24),
                         border: Border.all(
-                          color: attention ? _coral : Colors.white,
-                          width: attention ? 2.6 : 2,
+                          color: attention ? _coral : _ink,
+                          width: attention ? 2.4 : 1.8,
                         ),
                         boxShadow: [
                           const BoxShadow(
@@ -670,15 +1057,16 @@ class _ApartmentObjectHotspot extends StatelessWidget {
                           ),
                         ],
                       ),
-                      child: Center(
-                        child: Container(
-                          width: 42,
-                          height: 42,
-                          decoration: BoxDecoration(
-                            color: accent,
-                            shape: BoxShape.circle,
+                      child: const Center(
+                        child: Text(
+                          '누르기',
+                          style: TextStyle(
+                            fontFamily: _hubDisplayFont,
+                            color: _ink,
+                            fontSize: 11,
+                            height: 1,
+                            fontWeight: FontWeight.w700,
                           ),
-                          child: Icon(icon, color: _ink, size: 22),
                         ),
                       ),
                     ),
@@ -732,82 +1120,50 @@ class _ApartmentActionRail extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ended = marketMinute >= marketDayEndMinute;
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(22),
-      child: BackdropFilter(
-        filter: ui.ImageFilter.blur(sigmaX: 13, sigmaY: 13),
-        child: Container(
-          width: 58,
-          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 6),
-          decoration: BoxDecoration(
-            color: const Color(0xDFFFFAF0),
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: const Color(0xEFFFFFFF), width: 1.4),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x380B1423),
-                blurRadius: 14,
-                offset: Offset(0, 7),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _ApartmentRailButton(
-                buttonKey: const Key('advance-hour-button'),
-                tooltip: '1시간 보내기 · 게임 시간 60분 진행',
-                icon: hasPendingDecision || ended
-                    ? Icons.lock_clock_rounded
-                    : Icons.more_time_rounded,
-                color: const Color(0xFF4B9F87),
-                onPressed: hasPendingDecision || ended ? null : onAdvanceHour,
-              ),
-              const SizedBox(height: 6),
-              _ApartmentRailButton(
-                buttonKey: const Key('advance-day-button'),
-                tooltip: campaignComplete
-                    ? '최종 결산 열기'
-                    : '하루 보내기 · 신문 확인 후 다음 날 08:00',
-                icon: campaignComplete
-                    ? Icons.emoji_events_rounded
-                    : Icons.bedtime_rounded,
-                color: _coral,
-                onPressed: hasPendingDecision
-                    ? null
-                    : campaignComplete
-                    ? onOpenEnding
-                    : onAdvanceDay,
-              ),
-              const SizedBox(height: 6),
-              _ApartmentRailButton(
-                buttonKey: const Key('advance-batch-button'),
-                tooltip: '빠르게 진행 · 여러 날을 한 번에',
-                icon: Icons.fast_forward_rounded,
-                color: const Color(0xFFFFD05A),
-                foreground: _ink,
-                onPressed: hasPendingDecision || campaignComplete
-                    ? null
-                    : onAdvanceBatch,
-              ),
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 6),
-                child: SizedBox(
-                  width: 28,
-                  child: Divider(height: 1, color: Color(0xFFD9DDE4)),
-                ),
-              ),
-              _ApartmentRailButton(
-                buttonKey: const Key('hub-help-button'),
-                tooltip: '아이콘 사용법 보기',
-                icon: Icons.help_outline_rounded,
-                color: const Color(0xFF74819A),
-                onPressed: onHelp,
-              ),
-            ],
-          ),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _ApartmentRailButton(
+          buttonKey: const Key('advance-hour-button'),
+          tooltip: '1시간 보내기 · 게임 시간 60분 진행',
+          assetPath: 'assets/images/hud_clean_hourglass.png',
+          disabled: hasPendingDecision || ended,
+          onPressed: hasPendingDecision || ended ? null : onAdvanceHour,
         ),
-      ),
+        const SizedBox(height: 7),
+        _ApartmentRailButton(
+          buttonKey: const Key('advance-day-button'),
+          tooltip: campaignComplete
+              ? '최종 결산 열기'
+              : '하루 보내기 · 신문 확인 후 다음 날 08:00',
+          assetPath: campaignComplete
+              ? 'assets/images/hud_clean_quest.png'
+              : 'assets/images/hud_clean_moon.png',
+          disabled: hasPendingDecision,
+          onPressed: hasPendingDecision
+              ? null
+              : campaignComplete
+              ? onOpenEnding
+              : onAdvanceDay,
+        ),
+        const SizedBox(height: 7),
+        _ApartmentRailButton(
+          buttonKey: const Key('advance-batch-button'),
+          tooltip: '빠르게 진행 · 여러 날을 한 번에',
+          assetPath: 'assets/images/hud_clean_fast.png',
+          disabled: hasPendingDecision || campaignComplete,
+          onPressed: hasPendingDecision || campaignComplete
+              ? null
+              : onAdvanceBatch,
+        ),
+        const SizedBox(height: 7),
+        _ApartmentRailButton(
+          buttonKey: const Key('hub-help-button'),
+          tooltip: '아이콘 사용법 보기',
+          assetPath: 'assets/images/hud_clean_quest.png',
+          onPressed: onHelp,
+        ),
+      ],
     );
   }
 }
@@ -816,18 +1172,16 @@ class _ApartmentRailButton extends StatelessWidget {
   const _ApartmentRailButton({
     required this.buttonKey,
     required this.tooltip,
-    required this.icon,
-    required this.color,
+    required this.assetPath,
     required this.onPressed,
-    this.foreground = Colors.white,
+    this.disabled = false,
   });
 
   final Key buttonKey;
   final String tooltip;
-  final IconData icon;
-  final Color color;
+  final String assetPath;
   final VoidCallback? onPressed;
-  final Color foreground;
+  final bool disabled;
 
   @override
   Widget build(BuildContext context) => Tooltip(
@@ -837,126 +1191,114 @@ class _ApartmentRailButton extends StatelessWidget {
       button: true,
       label: tooltip,
       child: SizedBox(
-        width: 46,
-        height: 48,
+        width: 50,
+        height: 50,
         child: ElevatedButton(
           key: buttonKey,
           onPressed: onPressed,
           style: ElevatedButton.styleFrom(
             padding: EdgeInsets.zero,
-            elevation: 0,
-            backgroundColor: color,
-            foregroundColor: foreground,
-            disabledBackgroundColor: const Color(0xFFE1E4E8),
-            disabledForegroundColor: const Color(0xFF9AA2AF),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
+            elevation: disabled ? 1 : 5,
+            shadowColor: const Color(0x660B1423),
+            backgroundColor: const Color(0xF7FFF8E9),
+            foregroundColor: _ink,
+            disabledBackgroundColor: const Color(0xE8EEE8DC),
+            disabledForegroundColor: const Color(0xFF8C8F96),
+            shape: const CircleBorder(
+              side: BorderSide(color: Color(0xFF243451), width: 2),
             ),
           ),
-          child: Icon(icon, size: 21),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Opacity(
+                opacity: disabled ? 0.34 : 1,
+                child: Image.asset(
+                  assetPath,
+                  width: 37,
+                  height: 37,
+                  fit: BoxFit.contain,
+                  filterQuality: FilterQuality.high,
+                ),
+              ),
+              if (disabled)
+                Container(
+                  width: 19,
+                  height: 19,
+                  decoration: BoxDecoration(
+                    color: const Color(0xE623314C),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: const Color(0xFFFFE7A8)),
+                  ),
+                  child: const Icon(
+                    Icons.lock_rounded,
+                    size: 11,
+                    color: Colors.white,
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     ),
   );
 }
 
-class _ApartmentTravelDock extends StatelessWidget {
-  const _ApartmentTravelDock({required this.place, required this.onMove});
+class _ApartmentRoomArrow extends StatelessWidget {
+  const _ApartmentRoomArrow({
+    required this.destination,
+    required this.flipHorizontally,
+    required this.onMove,
+  });
 
-  final _ApartmentPlace place;
+  final _ApartmentPlace? destination;
+  final bool flipHorizontally;
   final ValueChanged<_ApartmentPlace> onMove;
 
   @override
-  Widget build(BuildContext context) => Align(
-    alignment: Alignment.bottomCenter,
-    child: Semantics(
-      container: true,
-      label: '아파트 장소 이동',
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(22),
-        child: BackdropFilter(
-          filter: ui.ImageFilter.blur(sigmaX: 13, sigmaY: 13),
-          child: Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: const Color(0xDFFFFAF0),
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: const Color(0xEFFFFFFF), width: 1.4),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x3D0B1423),
-                  blurRadius: 14,
-                  offset: Offset(0, 7),
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                for (
-                  var index = 0;
-                  index < _ApartmentPlace.values.length;
-                  index++
-                ) ...[
-                  if (index > 0) const SizedBox(width: 6),
-                  _ApartmentTravelButton(
-                    place: _ApartmentPlace.values[index],
-                    selected: _ApartmentPlace.values[index] == place,
-                    onTap: () => onMove(_ApartmentPlace.values[index]),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
-      ),
-    ),
-  );
-}
-
-class _ApartmentTravelButton extends StatelessWidget {
-  const _ApartmentTravelButton({
-    required this.place,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final _ApartmentPlace place;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
   Widget build(BuildContext context) {
-    final details = _ApartmentPlaceDetails.forPlace(place);
+    final target = destination;
+    final details = target == null
+        ? null
+        : _ApartmentPlaceDetails.forPlace(target);
+    final tooltip = details == null ? '더 이동할 방이 없어요' : '${details.title}으로 이동';
     return Tooltip(
-      message: selected ? '${details.title} · 현재 위치' : '${details.title}으로 이동',
+      message: tooltip,
       waitDuration: const Duration(milliseconds: 280),
       child: Semantics(
         button: true,
-        selected: selected,
-        label: '${details.title}으로 이동',
-        child: SizedBox(
-          width: 48,
-          height: 48,
-          child: ElevatedButton(
-            key: Key('apartment-go-${details.id}'),
-            onPressed: selected ? null : onTap,
-            style: ElevatedButton.styleFrom(
-              padding: EdgeInsets.zero,
-              elevation: 0,
-              backgroundColor: details.accent,
-              foregroundColor: _ink,
-              disabledBackgroundColor: details.accent,
-              disabledForegroundColor: _ink,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: BorderSide(
-                  color: selected ? _ink : Colors.transparent,
-                  width: selected ? 2 : 0,
+        enabled: target != null,
+        label: tooltip,
+        child: Opacity(
+          opacity: target == null ? 0.24 : 1,
+          child: SizedBox(
+            width: 50,
+            height: 50,
+            child: ElevatedButton(
+              key: details == null ? null : Key('apartment-go-${details.id}'),
+              onPressed: target == null ? null : () => onMove(target),
+              style: ElevatedButton.styleFrom(
+                padding: EdgeInsets.zero,
+                elevation: target == null ? 0 : 5,
+                shadowColor: const Color(0x660B1423),
+                backgroundColor: const Color(0xF7FFF8E9),
+                foregroundColor: _ink,
+                disabledBackgroundColor: const Color(0xE8EEE8DC),
+                shape: const CircleBorder(
+                  side: BorderSide(color: Color(0xFF243451), width: 2),
+                ),
+              ),
+              child: Transform.flip(
+                flipX: flipHorizontally,
+                child: Image.asset(
+                  'assets/images/hud_clean_arrow_right.png',
+                  width: 35,
+                  height: 35,
+                  fit: BoxFit.contain,
+                  filterQuality: FilterQuality.high,
                 ),
               ),
             ),
-            child: Icon(details.icon, size: 21),
           ),
         ),
       ),
@@ -1018,7 +1360,7 @@ class _ApartmentPlaceDetails {
           title: '가족 아파트 · 작은방',
           shortTitle: '작은방',
           hint: '주식 보기 · 장부 정리',
-          assetPath: 'assets/images/bg_bedroom_premium_2000.png',
+          assetPath: 'assets/images/bg_bedroom_cartoon_2000.png',
           icon: Icons.bedroom_parent_rounded,
           accent: Color(0xFF82D7FF),
         ),
@@ -1027,7 +1369,7 @@ class _ApartmentPlaceDetails {
           title: '가족 아파트 · 거실',
           shortTitle: '거실',
           hint: '안건 확인 · 가족 이야기',
-          assetPath: 'assets/images/bg_living_room_premium_2000.png',
+          assetPath: 'assets/images/bg_living_room_cartoon_2000.png',
           icon: Icons.weekend_rounded,
           accent: Color(0xFFFFCB78),
         ),
@@ -1036,7 +1378,7 @@ class _ApartmentPlaceDetails {
           title: '가족 아파트 · 부엌',
           shortTitle: '부엌',
           hint: '일거리 찾기 · 종잣돈 벌기',
-          assetPath: 'assets/images/bg_kitchen_premium_2000.png',
+          assetPath: 'assets/images/bg_kitchen_cartoon_2000.png',
           icon: Icons.kitchen_rounded,
           accent: Color(0xFF8CE3BE),
         ),

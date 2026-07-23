@@ -1325,7 +1325,6 @@ class OfficeScreen extends StatelessWidget {
               state: state,
               onSetMarketMinute: onSetMarketMinute,
               onSaveMarketNotebook: onSaveMarketNotebook,
-              onClaimMission: onClaimMission,
               onPurchaseReport: onPurchaseMarketReport,
               onExecuteTrade: onExecuteTrade,
               onTransferCash: onTransferBrokerageCash,
@@ -1357,6 +1356,7 @@ class OfficeScreen extends StatelessWidget {
         onOpenEnding: () => Navigator.of(
           context,
         ).push(_gameSceneRoute<void>(CampaignEndingScreen(state: state))),
+        onClaimMission: onClaimMission,
         onTutorialComplete: onCompleteHubTutorial,
       ),
     ),

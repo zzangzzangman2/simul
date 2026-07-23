@@ -220,6 +220,8 @@ test("keeps Gemini credentials server-side and forces the news JSON schema", asy
   assert.match(generator, /responseJsonSchema: articleSchema/);
   assert.match(generator, /minimum: -30/);
   assert.match(generator, /maximum: 50/);
+  assert.doesNotMatch(generator, /가격 엔진에 전달/);
+  assert.match(generator, /가격·거래·저장 상태에는 사용하지 않음/);
   assert.doesNotMatch(generator, /body\.companyName/);
   assert.doesNotMatch(generator, /body\.action/);
   assert.doesNotMatch(generator, /NEXT_PUBLIC_[A-Z_]*(?:KEY|SECRET)/);
