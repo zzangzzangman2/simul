@@ -17,20 +17,6 @@ void main() {
     );
   }
 
-  GameState unlockApple(GameState state) {
-    state = resolveFirst(state, 'research_products');
-    state = state.copyWith(day: 2557, cash: 1000000);
-    return engine.advanceOneDay(state);
-  }
-
-  GameState advanceUntilDecision(GameState state, {int limit = 30}) {
-    var next = state;
-    for (var i = 0; i < limit && next.pendingDecisions.isEmpty; i++) {
-      next = engine.advanceOneDay(next);
-    }
-    return next;
-  }
-
   test('new game starts as a guardian-approved family research desk', () {
     final story = StoryState.newPlayer(
       playerName: '민준',
@@ -62,60 +48,68 @@ void main() {
     expect(state.toJson(), afterFirst.toJson());
   });
 
-  test('Apple control is gated until 2007 and preserves divergence price', () {
-    var state = engine.createNewGame('테스트 연구소');
-    state = resolveFirst(state, 'research_products');
-    expect(state.pendingDecisions, isEmpty);
+  test('new games start with Hanbit Telecom in a fictional world', () {
+    final state = engine.createNewGame(
+      '테스트 연구소',
+      worldSeed: 'fictional-start-fixture',
+    );
 
-    state = state.copyWith(day: 2557, cash: 1000000);
-    state = engine.advanceOneDay(state);
-    expect(state.pendingDecisions.first.title, contains('Apple'));
-    final historical = engine.visiblePrice(state);
-    state = resolveFirst(state, 'acquire_control');
-
-    expect(state.company.worldMode, WorldMode.diverged);
-    expect(state.company.divergedAtDay, 2558);
-    expect(state.company.simulatedPrice, historical);
-    expect(state.company.historicalPriceAtDivergence, historical);
+    expect(state.company.id, 'hanbit_telecom');
+    expect(state.company.name, '한빛통신');
+    expect(state.company.worldMode, CompanyWorldMode.fictional);
+    expect(state.company.worldStartedAtDay, 1);
+    expect(state.simulationSeed, 'fictional-start-fixture');
   });
 
-  test('same seed and same choices produce the same delayed result', () {
-    GameState play(GameState state) {
-      state = unlockApple(state);
-      state = resolveFirst(state, 'acquire_control');
-      state = resolveFirst(state, 'approve_full');
-      state = advanceUntilDecision(state);
-      state = resolveFirst(state, 'fix_quality');
-      state = advanceUntilDecision(state);
-      state = resolveFirst(state, 'launch_now');
-      state = advanceUntilDecision(state);
-      return state;
-    }
+  test('same world seed produces the same hidden future', () async {
+    final first = engine.createNewGame('같은 연구소', worldSeed: 'same-world-seed');
+    final second = engine.createNewGame('같은 연구소', worldSeed: 'same-world-seed');
+    final firstUniverse = await FictionalMarketUniverse.load(
+      seed: first.simulationSeed,
+    );
+    final secondUniverse = await FictionalMarketUniverse.load(
+      seed: second.simulationSeed,
+    );
+    final firstHanbit = firstUniverse.assets.firstWhere(
+      (asset) => asset.id == 'hanbit_telecom',
+    );
+    final secondHanbit = secondUniverse.assets.firstWhere(
+      (asset) => asset.id == 'hanbit_telecom',
+    );
 
-    final first = play(engine.createNewGame('같은 연구소'));
-    final second = play(engine.createNewGame('같은 연구소'));
-
-    expect(first.toJson(), second.toJson());
-    expect(first.project?.status, ProjectStatus.completed);
+    expect(
+      first.story.storyFlags['hiddenMarketScenario'],
+      second.story.storyFlags['hiddenMarketScenario'],
+    );
+    expect(
+      firstUniverse.assets.map((asset) => asset.name),
+      secondUniverse.assets.map((asset) => asset.name),
+    );
+    expect(
+      firstHanbit.quoteAtOrBefore(first.currentDate)?.close,
+      secondHanbit.quoteAtOrBefore(second.currentDate)?.close,
+    );
   });
 
-  test('approval and rejection retain different tradeoffs', () {
-    var approved = unlockApple(engine.createNewGame('승인 연구소'));
-    approved = resolveFirst(approved, 'acquire_control');
-    final beforeApproval = approved;
-    approved = resolveFirst(approved, 'approve_full');
+  test('daily report reveals signals once without exposing outcomes', () {
+    final state = engine.createNewGame(
+      '보고서 연구소',
+      initialCash: 5000,
+      worldSeed: 'report-world-seed',
+    );
+    final purchased = engine.purchaseDailyMarketReport(state);
+    final repeated = engine.purchaseDailyMarketReport(purchased.state);
+    final reports =
+        purchased.state.story.storyFlags['dailyMarketReports'] as Map;
+    final items = reports[marketDateKey(state.currentDate)] as List;
 
-    expect(approved.cash, lessThan(beforeApproval.cash));
-    expect(approved.company.morale, greaterThan(beforeApproval.company.morale));
-    expect(approved.company.risk, greaterThan(beforeApproval.company.risk));
-
-    var rejected = unlockApple(engine.createNewGame('거절 연구소'));
-    rejected = resolveFirst(rejected, 'acquire_control');
-    rejected = resolveFirst(rejected, 'reject_project');
-
-    expect(rejected.cash, greaterThan(approved.cash));
-    expect(rejected.company.morale, lessThan(approved.company.morale));
-    expect(rejected.project?.status, ProjectStatus.cancelled);
+    expect(purchased.success, isTrue);
+    expect(purchased.state.cash, 5000 - dailyMarketReportPrice);
+    expect(items, isNotEmpty);
+    expect(items.toString(), isNot(contains('impactPct')));
+    expect(items.toString(), isNot(contains('success')));
+    expect(repeated.success, isFalse);
+    expect(repeated.state.toJson(), purchased.state.toJson());
   });
 
   test('family helper fatigue, daily limit, and recovery are persisted', () {
@@ -203,17 +197,17 @@ void main() {
     expect(state.story.storyFlags['guardianConsent'], isTrue);
   });
 
-  TradeOrder samsungOrder({
+  TradeOrder hanbitOrder({
     required TradeSide side,
     required double quantity,
     double unitPrice = 10000,
     String quoteDate = '2000-01-04',
   }) => TradeOrder(
     side: side,
-    assetId: 'samsung',
-    symbol: '005930',
-    name: '삼성전자',
-    market: 'KOSPI',
+    assetId: 'hanbit_telecom',
+    symbol: '1001',
+    name: '한빛통신',
+    market: fictionalMainMarket,
     currency: 'KRW',
     quantity: quantity,
     unitPrice: unitPrice,
@@ -230,7 +224,7 @@ void main() {
           .copyWith(day: 4, marketMinute: 9 * 60);
       final result = engine.executeTrade(
         state,
-        samsungOrder(side: TradeSide.buy, quantity: 10),
+        hanbitOrder(side: TradeSide.buy, quantity: 10),
       );
 
       expect(result.success, isTrue);
@@ -242,8 +236,11 @@ void main() {
       expect(result.state.positions.single.totalCost, 100250);
       expect(result.state.ledger.last.amount, -100250);
       expect(result.state.ledger.last.counterAccount, 'market_security');
-      expect(result.state.portfolioValue(const {'samsung': 11000}), 110000);
-      expect(result.state.totalAum(const {'samsung': 11000}), 209750);
+      expect(
+        result.state.portfolioValue(const {'hanbit_telecom': 11000}),
+        110000,
+      );
+      expect(result.state.totalAum(const {'hanbit_telecom': 11000}), 209750);
       final restored = GameState.fromJson(result.state.toJson());
       expect(restored.positions.single.units, 10);
       expect(restored.positions.single.totalCost, 100250);
@@ -255,11 +252,11 @@ void main() {
         .createNewGame('매도 연구소', initialCash: 200000)
         .copyWith(day: 4, marketMinute: 9 * 60);
     state = engine
-        .executeTrade(state, samsungOrder(side: TradeSide.buy, quantity: 10))
+        .executeTrade(state, hanbitOrder(side: TradeSide.buy, quantity: 10))
         .state;
     final result = engine.executeTrade(
       state,
-      samsungOrder(side: TradeSide.sell, quantity: 4, unitPrice: 11000),
+      hanbitOrder(side: TradeSide.sell, quantity: 4, unitPrice: 11000),
     );
 
     expect(result.success, isTrue);
@@ -312,7 +309,7 @@ void main() {
 
     final buyWithoutEnoughDeposit = engine.executeTrade(
       state,
-      samsungOrder(side: TradeSide.buy, quantity: 3),
+      hanbitOrder(side: TradeSide.buy, quantity: 3),
     );
     expect(buyWithoutEnoughDeposit.success, isFalse);
     expect(buyWithoutEnoughDeposit.message, contains('예수금'));
@@ -324,7 +321,7 @@ void main() {
         .copyWith(day: 4, marketMinute: 9 * 60);
     final result = engine.executeTrade(
       state,
-      samsungOrder(side: TradeSide.buy, quantity: 2),
+      hanbitOrder(side: TradeSide.buy, quantity: 2),
     );
 
     expect(result.success, isFalse);
@@ -338,16 +335,16 @@ void main() {
         .copyWith(day: 4, marketMinute: 9 * 60);
     final invalidQuantity = engine.executeTrade(
       state,
-      samsungOrder(side: TradeSide.buy, quantity: 0),
+      hanbitOrder(side: TradeSide.buy, quantity: 0),
     );
     final closed = engine.executeTrade(
       state.copyWith(marketMinute: 20 * 60),
       TradeOrder(
         side: TradeSide.buy,
-        assetId: 'samsung',
-        symbol: '005930',
-        name: '삼성전자',
-        market: 'KOSPI',
+        assetId: 'hanbit_telecom',
+        symbol: '1001',
+        name: '한빛통신',
+        market: fictionalMainMarket,
         currency: 'KRW',
         quantity: 1,
         unitPrice: 10000,
@@ -358,7 +355,7 @@ void main() {
     );
     final excessSell = engine.executeTrade(
       state,
-      samsungOrder(side: TradeSide.sell, quantity: 1),
+      hanbitOrder(side: TradeSide.sell, quantity: 1),
     );
 
     expect(invalidQuantity.success, isFalse);
@@ -369,7 +366,7 @@ void main() {
   });
 
   test(
-    'React v3 date, fractional positions, cash, and team migrate to v13',
+    'React v3 date, fractional positions, cash, and team migrate to v14',
     () {
       final state = engine.migrate({
         'version': 3,
@@ -378,23 +375,23 @@ void main() {
         'cash': 765432,
         'team': 3,
         'positions': {
-          'samsung': {'units': 2.5, 'cost': 15000},
+          'hanbit_telecom': {'units': 2.5, 'cost': 15000},
         },
       });
 
       expect(state.version, GameState.schemaVersion);
-      expect(GameState.schemaVersion, 13);
+      expect(GameState.schemaVersion, 14);
       expect(state.day, 5);
       expect(state.cash, 765432);
       expect(state.brokerageCash, 765432);
       expect(state.team, 3);
-      expect(state.positions.single.assetId, 'samsung');
+      expect(state.positions.single.assetId, 'hanbit_telecom');
       expect(state.positions.single.units, 2.5);
       expect(state.positions.single.totalCost, 15000);
     },
   );
 
-  test('React v3 foreign positions recover their cost into KRW cash', () {
+  test('unsupported legacy positions recover their cost into KRW cash', () {
     final state = engine.migrate({
       'version': 3,
       'companyName': '해외 복구 연구소',
@@ -402,7 +399,7 @@ void main() {
       'cash': 1000,
       'team': 1,
       'positions': {
-        'apple': {'units': 3.25, 'cost': 90000},
+        'legacy_overseas_asset': {'units': 3.25, 'cost': 90000},
       },
     });
 
@@ -420,14 +417,14 @@ void main() {
           'cash': 1000,
           'team': 1,
           'positions': {
-            'samsung': {'units': 2.5, 'cost': 15000},
+            'hanbit_telecom': {'units': 2.5, 'cost': 15000},
           },
         })
         .copyWith(marketMinute: 9 * 60);
 
     final result = engine.executeTrade(
       migrated,
-      samsungOrder(
+      hanbitOrder(
         side: TradeSide.sell,
         quantity: 2.5,
         unitPrice: 8000,
@@ -449,7 +446,7 @@ void main() {
         .copyWith(day: 4, marketMinute: 9 * 60);
     final result = engine.executeTrade(
       state,
-      samsungOrder(side: TradeSide.buy, quantity: 1.5),
+      hanbitOrder(side: TradeSide.buy, quantity: 1.5),
     );
 
     expect(result.success, isFalse);
@@ -463,7 +460,7 @@ void main() {
         .copyWith(day: 4, marketMinute: 9 * 60);
     final result = engine.executeTrade(
       state,
-      samsungOrder(side: TradeSide.buy, quantity: 1, quoteDate: '2000-01-03'),
+      hanbitOrder(side: TradeSide.buy, quantity: 1, quoteDate: '2000-01-03'),
     );
 
     expect(result.success, isFalse);
@@ -477,7 +474,7 @@ void main() {
         .copyWith(day: 4, marketMinute: 10 * 60);
     final result = engine.executeTrade(
       state,
-      samsungOrder(side: TradeSide.buy, quantity: 1),
+      hanbitOrder(side: TradeSide.buy, quantity: 1),
     );
 
     expect(result.success, isFalse);
@@ -493,10 +490,10 @@ void main() {
       state,
       const TradeOrder(
         side: TradeSide.buy,
-        assetId: 'apple',
-        symbol: 'AAPL',
-        name: 'Apple',
-        market: 'NASDAQ',
+        assetId: 'legacy_overseas_asset',
+        symbol: 'LGCY',
+        name: '해외 가상자산',
+        market: '해외시장',
         currency: 'USD',
         quantity: 1,
         unitPrice: 1,
@@ -521,7 +518,7 @@ void main() {
               assetId: 'sample',
               symbol: '000001',
               name: '샘플',
-              market: 'KOSPI',
+              market: fictionalMainMarket,
               currency: 'KRW',
               units: 10,
               totalCost: 50000,
@@ -594,7 +591,7 @@ void main() {
     );
     final result = engine.executeTrade(
       state,
-      samsungOrder(side: TradeSide.buy, quantity: 15),
+      hanbitOrder(side: TradeSide.buy, quantity: 15),
     );
     expect(result.success, isFalse);
     expect(result.message, contains('100000'));
@@ -637,13 +634,13 @@ void main() {
     expect(state.story.accountAuthorityLevel, greaterThanOrEqualTo(4));
   });
 
-  test('a diverged save without simulated price advances safely', () {
+  test('a fictional-world save without simulated price advances safely', () {
     final base = engine.createNewGame('분기 저장 방어').copyWith(decisions: const []);
     final state = base.copyWith(
       company: base.company.copyWith(
-        worldMode: WorldMode.diverged,
-        divergedAtDay: 10,
-        historicalPriceAtDivergence: 1200,
+        worldMode: CompanyWorldMode.fictional,
+        worldStartedAtDay: 10,
+        worldReferencePrice: 1200,
       ),
     );
     final next = engine.advanceOneDay(state);

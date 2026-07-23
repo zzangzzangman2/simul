@@ -1,8 +1,15 @@
-import 'dart:convert';
+import 'market_clock.dart';
 
-import 'package:flutter/services.dart';
+part 'fictional_market.dart';
 
-enum MarketCorporateActionType { split, dividend }
+enum MarketCorporateActionType {
+  split,
+  dividend,
+  rightsIssue,
+  materialSpinoff,
+  spinoff,
+  delisting,
+}
 
 class MarketCorporateAction {
   const MarketCorporateAction({
@@ -15,6 +22,10 @@ class MarketCorporateAction {
     required this.amount,
     required this.currency,
     required this.source,
+    this.relatedAssetId,
+    this.relatedSymbol,
+    this.relatedName,
+    this.relatedMarket,
   });
 
   factory MarketCorporateAction.fromJson(
@@ -61,6 +72,10 @@ class MarketCorporateAction {
       amount: amount,
       currency: currency,
       source: source,
+      relatedAssetId: json['relatedAssetId'] as String?,
+      relatedSymbol: json['relatedSymbol'] as String?,
+      relatedName: json['relatedName'] as String?,
+      relatedMarket: json['relatedMarket'] as String?,
     );
   }
 
@@ -73,12 +88,16 @@ class MarketCorporateAction {
   final double amount;
   final String currency;
   final String source;
+  final String? relatedAssetId;
+  final String? relatedSymbol;
+  final String? relatedName;
+  final String? relatedMarket;
 
   double get unitFactor => numerator / denominator;
 }
 
-class HistoricalMarketPoint {
-  const HistoricalMarketPoint({required this.date, required this.close});
+class MarketPoint {
+  const MarketPoint({required this.date, required this.close});
 
   final String date;
   final double close;
@@ -86,8 +105,8 @@ class HistoricalMarketPoint {
   DateTime get parsedDate => DateTime.parse(date);
 }
 
-class HistoricalMarketQuote {
-  const HistoricalMarketQuote({
+class FictionalMarketQuote {
+  const FictionalMarketQuote({
     required this.date,
     required this.close,
     required this.isExactDate,
@@ -98,8 +117,8 @@ class HistoricalMarketQuote {
   final bool isExactDate;
 }
 
-class HistoricalMarketAsset {
-  HistoricalMarketAsset({
+class FictionalMarketAsset {
+  FictionalMarketAsset({
     required this.id,
     required this.symbol,
     required this.name,
@@ -110,10 +129,16 @@ class HistoricalMarketAsset {
     required this.currency,
     required Map<String, double> prices,
     this.corporateActions = const <MarketCorporateAction>[],
+    this.summary = '',
+    this.question = '',
+    this.generation = 0,
+    this.parentAssetId,
+    this.listedOn,
+    this.delistedOn,
   }) : _dates = prices.keys.toList()..sort(),
        _prices = prices;
 
-  factory HistoricalMarketAsset.fromJson(Map<String, dynamic> json) {
+  factory FictionalMarketAsset.fromJson(Map<String, dynamic> json) {
     final id = json['id'] as String? ?? '';
     final symbol = json['symbol'] as String? ?? '';
     final name = json['name'] as String? ?? '';
@@ -153,7 +178,7 @@ class HistoricalMarketAsset {
     if (actions.map((action) => action.id).toSet().length != actions.length) {
       throw FormatException('Duplicate corporate action id for $id');
     }
-    return HistoricalMarketAsset(
+    return FictionalMarketAsset(
       id: id,
       symbol: symbol,
       name: name,
@@ -164,6 +189,12 @@ class HistoricalMarketAsset {
       currency: currency,
       prices: prices,
       corporateActions: actions,
+      summary: json['summary'] as String? ?? '',
+      question: json['question'] as String? ?? '',
+      generation: (json['generation'] as num?)?.toInt() ?? 0,
+      parentAssetId: json['parentAssetId'] as String?,
+      listedOn: json['listedOn'] as String?,
+      delistedOn: json['delistedOn'] as String?,
     );
   }
 
@@ -176,6 +207,12 @@ class HistoricalMarketAsset {
   final String colorHex;
   final String currency;
   final List<MarketCorporateAction> corporateActions;
+  final String summary;
+  final String question;
+  final int generation;
+  final String? parentAssetId;
+  final String? listedOn;
+  final String? delistedOn;
   final List<String> _dates;
   final Map<String, double> _prices;
 
@@ -184,12 +221,13 @@ class HistoricalMarketAsset {
   String? get firstTradeDate => _dates.isEmpty ? null : _dates.first;
   String? get lastTradeDate => _dates.isEmpty ? null : _dates.last;
 
-  HistoricalMarketQuote? quoteAtOrBefore(DateTime date) {
+  FictionalMarketQuote? quoteAtOrBefore(DateTime date) {
     final key = _dateKey(date);
+    if (delistedOn != null && key.compareTo(delistedOn!) >= 0) return null;
     final index = _indexAtOrBefore(key);
     if (index < 0) return null;
     final quoteDate = _dates[index];
-    return HistoricalMarketQuote(
+    return FictionalMarketQuote(
       date: quoteDate,
       close: _prices[quoteDate]!,
       isExactDate: quoteDate == key,
@@ -202,19 +240,13 @@ class HistoricalMarketAsset {
     return _prices[_dates[index - 1]];
   }
 
-  List<HistoricalMarketPoint> historyThrough(
-    DateTime date, {
-    int count = 4000,
-  }) {
+  List<MarketPoint> historyThrough(DateTime date, {int count = 4000}) {
     final index = _indexAtOrBefore(_dateKey(date));
-    if (index < 0 || count <= 0) return const <HistoricalMarketPoint>[];
+    if (index < 0 || count <= 0) return const <MarketPoint>[];
     final start = (index - count + 1).clamp(0, index);
-    return <HistoricalMarketPoint>[
+    return <MarketPoint>[
       for (var cursor = start; cursor <= index; cursor++)
-        HistoricalMarketPoint(
-          date: _dates[cursor],
-          close: _prices[_dates[cursor]]!,
-        ),
+        MarketPoint(date: _dates[cursor], close: _prices[_dates[cursor]]!),
     ];
   }
 
@@ -242,17 +274,16 @@ class HistoricalMarketAsset {
   }
 }
 
-class HistoricalMarketUniverse {
-  static const _defaultAssetPath = 'assets/market/market-history.json';
-  static Future<HistoricalMarketUniverse>? _cachedDefaultLoad;
+class FictionalMarketUniverse {
+  static final Map<String, Future<FictionalMarketUniverse>> _seededLoads = {};
 
-  const HistoricalMarketUniverse({
+  const FictionalMarketUniverse({
     required this.schemaVersion,
     required this.sourceName,
     required this.assets,
   });
 
-  factory HistoricalMarketUniverse.fromJson(Map<String, dynamic> json) {
+  factory FictionalMarketUniverse.fromJson(Map<String, dynamic> json) {
     final schemaVersion = (json['schemaVersion'] as num?)?.toInt() ?? 0;
     if (schemaVersion < 4) {
       throw FormatException('Unsupported market data schema: $schemaVersion');
@@ -266,7 +297,7 @@ class HistoricalMarketUniverse {
     final assets = rawAssets
         .map(
           (asset) =>
-              HistoricalMarketAsset.fromJson(asset as Map<String, dynamic>),
+              FictionalMarketAsset.fromJson(asset as Map<String, dynamic>),
         )
         .toList(growable: false);
     if (assets.isEmpty) throw const FormatException('Market assets are empty');
@@ -283,7 +314,7 @@ class HistoricalMarketUniverse {
     if (actionIds.toSet().length != actionIds.length) {
       throw const FormatException('Duplicate corporate action id');
     }
-    return HistoricalMarketUniverse(
+    return FictionalMarketUniverse(
       schemaVersion: schemaVersion,
       sourceName: sourceName,
       assets: assets,
@@ -292,7 +323,7 @@ class HistoricalMarketUniverse {
 
   final int schemaVersion;
   final String sourceName;
-  final List<HistoricalMarketAsset> assets;
+  final List<FictionalMarketAsset> assets;
 
   List<MarketCorporateAction> corporateActionsOn(DateTime date) {
     final key = _dateKey(date);
@@ -309,30 +340,16 @@ class HistoricalMarketUniverse {
     });
   }
 
-  static Future<HistoricalMarketUniverse> load({
-    String assetPath = _defaultAssetPath,
+  static Future<FictionalMarketUniverse> load({
+    String seed = 'simul-preview',
     bool forceRefresh = false,
   }) {
-    if (assetPath != _defaultAssetPath) return _loadFromAsset(assetPath);
-    if (forceRefresh) _cachedDefaultLoad = null;
-    return _cachedDefaultLoad ??= _loadFromAsset(assetPath).onError((
-      error,
-      stackTrace,
-    ) {
-      _cachedDefaultLoad = null;
-      Error.throwWithStackTrace(
-        error ?? StateError('시장 데이터 로드 실패'),
-        stackTrace,
-      );
-    });
-  }
-
-  static Future<HistoricalMarketUniverse> _loadFromAsset(
-    String assetPath,
-  ) async {
-    final raw = await rootBundle.loadString(assetPath);
-    return HistoricalMarketUniverse.fromJson(
-      jsonDecode(raw) as Map<String, dynamic>,
+    if (forceRefresh) _seededLoads.remove(seed);
+    return _seededLoads.putIfAbsent(
+      seed,
+      () => Future<FictionalMarketUniverse>.value(
+        buildFictionalMarketUniverse(seed),
+      ),
     );
   }
 }

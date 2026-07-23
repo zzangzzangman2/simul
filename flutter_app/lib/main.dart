@@ -8,7 +8,7 @@ import 'game/dynamic_news.dart';
 import 'game/game_engine.dart';
 import 'game/game_persistence.dart';
 import 'game/game_state.dart';
-import 'game/historical_executives.dart';
+
 import 'game/market_clock.dart';
 import 'game/market_data.dart';
 import 'game/market_tick.dart';
@@ -325,7 +325,9 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     final current = _state!;
     var next = current;
     var advanced = false;
-    final universe = await HistoricalMarketUniverse.load();
+    final universe = await FictionalMarketUniverse.load(
+      seed: next.simulationSeed,
+    );
     for (var i = 0; i < requestedDays; i++) {
       if (next.pendingDecisions.isNotEmpty || next.campaignComplete) break;
       final before = next;
@@ -388,6 +390,14 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     return result;
   }
 
+  Future<FinanceActionResult> _purchaseDailyMarketReport() async {
+    final result = _engine.purchaseDailyMarketReport(_state!);
+    if (!result.success) return result;
+    await _persistence.save(result.state);
+    if (mounted) setState(() => _state = result.state);
+    return result;
+  }
+
   Future<void> _completeHubTutorial() async {
     final next = _engine.markHubTutorialSeen(_state!);
     await _persistence.save(next);
@@ -443,10 +453,10 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
 
   Future<TradeExecutionResult> _executeTrade(TradeOrder order) async {
     final current = _state!;
-    HistoricalTradeQuote? quote;
+    MarketTradeQuote? quote;
     try {
-      quote = resolveHistoricalTradeQuote(
-        await HistoricalMarketUniverse.load(),
+      quote = resolveMarketTradeQuote(
+        await FictionalMarketUniverse.load(seed: current.simulationSeed),
         current,
         order.assetId,
       );
@@ -575,6 +585,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
                   onPurchaseSpendingOption: _purchaseSpendingOption,
                   onSellRealEstate: _sellRealEstate,
                   onPlayChanceGame: _playAdultChanceGame,
+                  onPurchaseMarketReport: _purchaseDailyMarketReport,
                   onCompleteHubTutorial: _completeHubTutorial,
                   onArchiveNews: _archiveNews,
                   onCompleteWork: _completeWork,
@@ -1262,6 +1273,7 @@ class OfficeScreen extends StatelessWidget {
     this.onPurchaseSpendingOption,
     this.onSellRealEstate,
     this.onPlayChanceGame,
+    this.onPurchaseMarketReport,
     this.onCompleteHubTutorial,
     this.onArchiveNews,
     this.onBuildDailyNewspaper,
@@ -1290,6 +1302,7 @@ class OfficeScreen extends StatelessWidget {
   onPurchaseSpendingOption;
   final Future<FinanceActionResult> Function(String assetId)? onSellRealEstate;
   final Future<FinanceActionResult> Function(int stake)? onPlayChanceGame;
+  final Future<FinanceActionResult> Function()? onPurchaseMarketReport;
   final Future<void> Function()? onCompleteHubTutorial;
   final Future<void> Function(String headline, List<String> eventIds)?
   onArchiveNews;
@@ -1313,6 +1326,7 @@ class OfficeScreen extends StatelessWidget {
               onSetMarketMinute: onSetMarketMinute,
               onSaveMarketNotebook: onSaveMarketNotebook,
               onClaimMission: onClaimMission,
+              onPurchaseReport: onPurchaseMarketReport,
               onExecuteTrade: onExecuteTrade,
               onTransferCash: onTransferBrokerageCash,
             ),
@@ -1482,9 +1496,28 @@ class OfficeScreen extends StatelessWidget {
 
   Future<void> _handleAdvanceHour(BuildContext context) async {
     final target = math.min(state.marketMinute + 60, marketDayEndMinute);
+    final alreadyRevealed = engine
+        .revealedMarketEvents(state)
+        .map((event) => event.id)
+        .toSet();
     try {
       final saved = await onSetMarketMinute(target);
       if (saved.marketMinute != target) return;
+      final breaking = engine
+          .revealedMarketEvents(saved)
+          .where((event) => !alreadyRevealed.contains(event.id))
+          .toList(growable: false);
+      for (final event in breaking) {
+        if (!context.mounted) return;
+        await showModalBottomSheet<void>(
+          context: context,
+          isScrollControlled: true,
+          useSafeArea: true,
+          backgroundColor: Colors.transparent,
+          builder: (_) =>
+              NewsBulletinSheet(event: event, date: saved.currentDate),
+        );
+      }
     } catch (_) {
       if (context.mounted) _showSaveFailure(context);
       return;
@@ -1579,13 +1612,14 @@ class OfficeScreen extends StatelessWidget {
 
   Future<void> _advanceDayWithNewspaper(BuildContext context) async {
     final navigator = Navigator.of(context);
+    final morningDate = state.currentDate.add(const Duration(days: 1));
     final loadingRoute = _gameSceneRoute<void>(
-      NewsGeneratingScene(date: state.currentDate),
+      NewsGeneratingScene(date: morningDate),
     );
     navigator.push<void>(loadingRoute);
     final stopwatch = Stopwatch()..start();
     final client = DynamicNewsClient();
-    DailyMarketNewspaper newspaper;
+    late DailyMarketNewspaper newspaper;
     final closingDay = state.day;
     try {
       var closingState = state;
@@ -1593,6 +1627,7 @@ class OfficeScreen extends StatelessWidget {
         closingState = await onSetMarketMinute(marketDayEndMinute);
       }
       if (!context.mounted) return;
+
       final baseNewspaper = onBuildDailyNewspaper == null
           ? await buildDailyMarketNewspaper(closingState)
           : await onBuildDailyNewspaper!(closingState);
@@ -1606,16 +1641,26 @@ class OfficeScreen extends StatelessWidget {
       newspaper = baseNewspaper.withDynamicArticle(article);
       await onArchiveNews?.call(
         newspaper.headline,
-        historicalNewsEventsForDate(closingState.currentDate)
-            .map(
-              (event) =>
-                  '${event.year}-${event.month}-${event.day}-${event.title}',
-            )
-            .toList(growable: false),
+        marketNewsEventsForState(
+          closingState,
+        ).map((event) => event.id).toList(growable: false),
       );
+
       final remaining = 350 - stopwatch.elapsedMilliseconds;
       if (remaining > 0) {
         await Future<void>.delayed(Duration(milliseconds: remaining));
+      }
+      if (!context.mounted) return;
+
+      var advancedState = await onAdvanceDay();
+      if (advancedState.day <= closingDay) {
+        throw StateError('다음 날 08:00 상태를 만들지 못했습니다.');
+      }
+      if (advancedState.marketMinute != marketDayStartMinute) {
+        advancedState = await onSetMarketMinute(marketDayStartMinute);
+      }
+      if (advancedState.marketMinute != marketDayStartMinute) {
+        throw StateError('다음 날 시작 시각을 08:00으로 저장하지 못했습니다.');
       }
     } finally {
       client.close();
@@ -1625,17 +1670,6 @@ class OfficeScreen extends StatelessWidget {
     await navigator.push<bool>(
       _gameSceneRoute<bool>(KoreaEconomicNewspaperScene(newspaper: newspaper)),
     );
-    if (!context.mounted) return;
-    var advancedState = await onAdvanceDay();
-    if (advancedState.day <= closingDay) {
-      throw StateError('신문을 닫은 뒤 다음 날짜로 진행하지 못했습니다.');
-    }
-    if (advancedState.marketMinute != marketDayStartMinute) {
-      advancedState = await onSetMarketMinute(marketDayStartMinute);
-    }
-    if (advancedState.marketMinute != marketDayStartMinute) {
-      throw StateError('다음 날 시작 시각을 08:00으로 저장하지 못했습니다.');
-    }
   }
 
   void _openDecision(BuildContext context) {
@@ -1979,9 +2013,9 @@ class NewsGeneratingScene extends StatelessWidget {
                 child: Column(
                   children: [
                     const _SceneClockStrip(
-                      location: '우리 집 거실 · 편집 마감',
-                      caption: '오늘의 선택과 시장 기록을 기사로 엮고 있다.',
-                      minute: marketDayEndMinute,
+                      location: '우리 집 거실 · 오전 08:00',
+                      caption: '전날 신문을 인쇄하고 오늘의 숨은 시장을 정하고 있다.',
+                      minute: marketDayStartMinute,
                       costLabel: 'AI 특별판',
                     ),
                     Expanded(
@@ -2015,7 +2049,7 @@ class NewsGeneratingScene extends StatelessWidget {
                               ),
                               const SizedBox(height: 18),
                               const Text(
-                                '뉴스를 생성 중입니다',
+                                '조간신문과 오늘의 시장을 준비 중입니다…',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   color: Color(0xFF171512),
@@ -2026,7 +2060,7 @@ class NewsGeneratingScene extends StatelessWidget {
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                '${date.year}년의 시대 흐름과\n오늘의 행동을 취재하고 있어요.',
+                                '${date.year}년 ${date.month}월 ${date.day}일 아침을 여는 중입니다.\n신문에는 전날 시장에서 확인된 사실만 담습니다.',
                                 textAlign: TextAlign.center,
                                 style: const TextStyle(
                                   color: Color(0xFF615B52),
@@ -2046,7 +2080,7 @@ class NewsGeneratingScene extends StatelessWidget {
                               ),
                               const SizedBox(height: 14),
                               const Text(
-                                '연결이 늦어지면 기존 시장 기록으로 신문을 완성합니다.',
+                                '연결이 늦어지면 저장된 전날 시장 기록으로 신문을 완성합니다.',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   color: Color(0xFF777168),
@@ -2093,9 +2127,9 @@ class KoreaEconomicNewspaperScene extends StatelessWidget {
               child: Column(
                 children: [
                   _SceneClockStrip(
-                    location: '우리 집 거실 · 저녁 신문',
-                    caption: '가족이 식탁에 둘러앉아 오늘의 시장을 정리한다.',
-                    minute: marketDayEndMinute,
+                    location: '우리 집 거실 · 조간신문',
+                    caption: '가족이 전날 시장을 읽고 오늘의 선택을 준비한다.',
+                    minute: marketDayStartMinute,
                     costLabel: '하루 결산',
                     onBack: () => Navigator.of(context).pop(true),
                   ),
@@ -2355,7 +2389,8 @@ class _OfficeStatusCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final diverged = state.company.worldMode == WorldMode.diverged;
+    final fictionalWorld =
+        state.company.worldMode == CompanyWorldMode.fictional;
     final authority = state.story.accountAuthorityLevel;
     final orderLimit = switch (authority) {
       0 => '관찰 전용',
@@ -2387,13 +2422,13 @@ class _OfficeStatusCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
                 decoration: BoxDecoration(
-                  color: diverged
+                  color: fictionalWorld
                       ? const Color(0xFFFFE3DF)
                       : const Color(0xFFDFF7EF),
                   borderRadius: BorderRadius.circular(9),
                 ),
                 child: Text(
-                  diverged ? '대체역사 진행 중' : 'FAMILY RESEARCH DESK',
+                  fictionalWorld ? '가상 세계 진행 중' : 'FAMILY RESEARCH DESK',
                   style: const TextStyle(
                     color: _ink,
                     fontSize: 8,
@@ -2424,8 +2459,8 @@ class _OfficeStatusCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            diverged
-                ? '분기 DAY ${state.company.divergedAtDay} · ${state.company.divergenceReason}'
+            fictionalWorld
+                ? '분기 DAY ${state.company.worldStartedAtDay} · ${state.company.worldPremise}'
                 : '계좌 명의: 어머니 · 생활비와 분리 · 대출·미수·신용 금지',
             style: const TextStyle(
               color: Color(0xFF7B849A),
@@ -2675,7 +2710,7 @@ class _MarketStatusPill extends StatelessWidget {
 class NewsBulletinSheet extends StatelessWidget {
   const NewsBulletinSheet({super.key, required this.event, required this.date});
 
-  final HistoricalNewsEvent event;
+  final FictionalMarketEvent event;
   final DateTime date;
 
   @override
@@ -2710,32 +2745,38 @@ class NewsBulletinSheet extends StatelessWidget {
             const SizedBox(height: 16),
             Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: tone.accent,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(tone.icon, color: Colors.white, size: 15),
-                      const SizedBox(width: 6),
-                      Text(
-                        '속보 · ${event.eyebrow}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w900,
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: tone.accent,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(tone.icon, color: Colors.white, size: 15),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            '속보 · ${event.eyebrow}',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-                const Spacer(),
+                const SizedBox(width: 8),
                 Text(
                   dateLabel,
                   style: const TextStyle(
@@ -2888,7 +2929,7 @@ class KoreaEconomicNewspaperSheet extends StatelessWidget {
             ),
             const Divider(color: Color(0xFF24211C), thickness: 1),
             const Text(
-              '한국경제신문',
+              '새천년경제',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: Color(0xFF171512),
@@ -3039,7 +3080,7 @@ class KoreaEconomicNewspaperSheet extends StatelessWidget {
                 key: const Key('newspaper-next-day-button'),
                 onPressed: () => Navigator.of(context).pop(true),
                 icon: const Icon(Icons.wb_sunny_rounded),
-                label: const Text('신문 읽고 다음 날 08:00'),
+                label: const Text('신문 덮고 오늘 08:00 시작'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFFFDF68),
                   foregroundColor: const Color(0xFF24211C),
@@ -3050,7 +3091,7 @@ class KoreaEconomicNewspaperSheet extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             const Text(
-              '게임 내 비공식 재현판이며 실제 한국경제신문과 무관합니다.',
+              '모든 회사·시장·기사는 게임을 위해 생성된 가상 기록입니다.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: Color(0xFF777168),
@@ -3762,7 +3803,7 @@ String _money(int value) {
 }
 
 double? _portfolioPriceAtCurrentTime(
-  HistoricalMarketAsset asset,
+  FictionalMarketAsset asset,
   GameState state,
 ) {
   final quote = asset.quoteAtOrBefore(state.currentDate);

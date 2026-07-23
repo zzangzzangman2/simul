@@ -9,10 +9,10 @@ void main() {
 
   TradeOrder buySamsung() => const TradeOrder(
     side: TradeSide.buy,
-    assetId: 'kr-005930',
-    symbol: '005930.KS',
-    name: '삼성전자',
-    market: 'KOSPI',
+    assetId: 'hanbit_telecom',
+    symbol: '1001',
+    name: '한빛통신',
+    market: '미래시장',
     currency: 'KRW',
     quantity: 1,
     unitPrice: 10000,

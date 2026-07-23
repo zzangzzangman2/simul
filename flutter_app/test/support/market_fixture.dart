@@ -1,14 +1,14 @@
 import 'package:millennium_capital/game/market_data.dart';
 
-HistoricalMarketUniverse testMarketUniverse() => HistoricalMarketUniverse(
+FictionalMarketUniverse testMarketUniverse() => FictionalMarketUniverse(
   schemaVersion: 1,
   sourceName: 'widget-test',
   assets: [
-    HistoricalMarketAsset(
-      id: 'kr-005930',
-      symbol: '005930.KS',
-      name: '삼성전자',
-      market: 'KOSPI',
+    FictionalMarketAsset(
+      id: 'hanbit_telecom',
+      symbol: '1001',
+      name: '한빛통신',
+      market: fictionalMainMarket,
       country: 'KR',
       sector: '반도체',
       colorHex: '#2F7DF4',

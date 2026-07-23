@@ -141,7 +141,7 @@ MarketClockInfo marketClockAt(int minute, {bool tradingDay = true}) {
   if (value < krxContinuousEndMinute) {
     return const MarketClockInfo(
       phase: MarketSessionPhase.regular,
-      label: 'KRX 정규장',
+      label: '미래거래소 정규장',
       description: '09:00~15:20 · 접속매매',
       tradable: true,
     );

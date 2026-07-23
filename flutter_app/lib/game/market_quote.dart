@@ -3,8 +3,8 @@ import 'market_clock.dart';
 import 'market_data.dart';
 import 'market_tick.dart';
 
-class HistoricalTradeQuote {
-  const HistoricalTradeQuote({
+class MarketTradeQuote {
+  const MarketTradeQuote({
     required this.asset,
     required this.quoteDate,
     required this.unitPrice,
@@ -12,19 +12,19 @@ class HistoricalTradeQuote {
     required this.isTradingDay,
   });
 
-  final HistoricalMarketAsset asset;
+  final FictionalMarketAsset asset;
   final String quoteDate;
   final double unitPrice;
   final int marketMinute;
   final bool isTradingDay;
 }
 
-HistoricalTradeQuote? resolveHistoricalTradeQuote(
-  HistoricalMarketUniverse universe,
+MarketTradeQuote? resolveMarketTradeQuote(
+  FictionalMarketUniverse universe,
   GameState state,
   String assetId,
 ) {
-  HistoricalMarketAsset? asset;
+  FictionalMarketAsset? asset;
   for (final candidate in universe.assets) {
     if (candidate.id == assetId) {
       asset = candidate;
@@ -40,10 +40,13 @@ HistoricalTradeQuote? resolveHistoricalTradeQuote(
       ? generatedFullMarketDayPath(
           previousClose: previousClose,
           officialClose: quote.close,
-          seed: marketStockSeed(asset.code, state.currentDate),
+          seed: marketStockSeed(
+            '${state.simulationSeed}:${asset.code}',
+            state.currentDate,
+          ),
         )[marketTickForMinute(state.marketMinute)]
       : quote.close;
-  return HistoricalTradeQuote(
+  return MarketTradeQuote(
     asset: asset,
     quoteDate: state.currentDate.toIso8601String().split('T').first,
     unitPrice: unitPrice,

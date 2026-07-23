@@ -60,10 +60,10 @@ void main() {
     await tester.pump();
     for (var attempt = 0; attempt < 30; attempt++) {
       await tester.pump(const Duration(milliseconds: 100));
-      if (find.byKey(const Key('stock-row-005930')).evaluate().isNotEmpty) {
+      if (find.byKey(const Key('stock-row-1001')).evaluate().isNotEmpty) {
         await tester.drag(find.byType(Scrollable).first, const Offset(0, -240));
         await tester.pump();
-        await tester.ensureVisible(find.byKey(const Key('stock-row-005930')));
+        await tester.ensureVisible(find.byKey(const Key('stock-row-1001')));
         return;
       }
     }
@@ -325,19 +325,19 @@ void main() {
           day: 4,
           positions: const [
             PortfolioPosition(
-              assetId: 'kr-005930',
-              symbol: '005930.KS',
-              name: '삼성전자',
-              market: 'KOSPI',
+              assetId: 'hanbit_telecom',
+              symbol: '1001',
+              name: '한빛통신',
+              market: '미래시장',
               currency: 'KRW',
               units: 10,
               totalCost: 60000,
             ),
             PortfolioPosition(
               assetId: 'us-aapl',
-              symbol: 'AAPL',
+              symbol: 'LGCY',
               name: '애플',
-              market: 'NASDAQ',
+              market: '해외시장',
               currency: 'USD',
               units: 2,
               totalCost: 30000,
@@ -355,13 +355,13 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('삼성전자'), findsOneWidget);
+    expect(find.text('한빛통신'), findsOneWidget);
     final samsungDetails = tester.widget<Text>(
       find.textContaining('10주 · 평균 6,000원'),
     );
     expect(samsungDetails.data, contains('%'));
     final samsungTile = tester.widget<ListTile>(
-      find.ancestor(of: find.text('삼성전자'), matching: find.byType(ListTile)),
+      find.ancestor(of: find.text('한빛통신'), matching: find.byType(ListTile)),
     );
     final samsungValue = (samsungTile.trailing! as Text).data!;
     expect(samsungValue, endsWith('원'));
@@ -409,7 +409,7 @@ void main() {
     await tester.scrollUntilVisible(card, 300, scrollable: ledgerScroll);
     expect(card, findsOneWidget);
     expect(find.text('새천년 시장의 첫 기록'), findsOneWidget);
-    expect(find.textContaining('역사 사건 2건'), findsOneWidget);
+    expect(find.textContaining('시장 사건 2건'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -468,7 +468,7 @@ void main() {
     expect(find.byKey(const Key('market-nav-account')), findsOneWidget);
     await openMarketExplore(tester);
 
-    expect(find.text('2000년 국내 종목'), findsOneWidget);
+    expect(find.text('가상시장 종목'), findsOneWidget);
     expect(find.byKey(const Key('market-phone-status-bar')), findsOneWidget);
     expect(find.byKey(const Key('market-home-app-bar')), findsOneWidget);
     expect(find.byKey(const Key('market-phone-status-time')), findsOneWidget);
@@ -477,21 +477,21 @@ void main() {
     expect(find.byKey(const Key('market-mission-card')), findsNothing);
     await tester.tap(find.byKey(const Key('market-sort-name')));
     await tester.pump();
-    if (find.byKey(const Key('stock-row-005930')).evaluate().isEmpty) {
+    if (find.byKey(const Key('stock-row-1001')).evaluate().isEmpty) {
       await tester.scrollUntilVisible(
-        find.byKey(const Key('stock-row-005930')),
+        find.byKey(const Key('stock-row-1001')),
         220,
         scrollable: find.byType(Scrollable).first,
       );
       await tester.pump();
     }
-    expect(find.byKey(const Key('stock-row-005930')), findsOneWidget);
+    expect(find.byKey(const Key('stock-row-1001')), findsOneWidget);
     final clock = find.byKey(const Key('market-phone-status-time'));
     final before = tester.widget<Text>(clock.first).data;
     await tester.pump(marketRealtimeTickDuration);
-    if (find.byKey(const Key('stock-rate-005930')).evaluate().isEmpty) {
+    if (find.byKey(const Key('stock-rate-1001')).evaluate().isEmpty) {
       await tester.scrollUntilVisible(
-        find.byKey(const Key('stock-row-005930')),
+        find.byKey(const Key('stock-row-1001')),
         180,
         scrollable: find.byType(Scrollable).first,
       );
@@ -501,25 +501,25 @@ void main() {
     expect(after, isNot(before));
     expect(after, contains('09:01'));
 
-    await tester.ensureVisible(find.byKey(const Key('stock-row-005930')));
+    await tester.ensureVisible(find.byKey(const Key('stock-row-1001')));
     await tester.pump();
-    await tester.tap(find.byKey(const Key('stock-row-005930')));
+    await tester.tap(find.byKey(const Key('stock-row-1001')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
-    expect(find.text('삼성전자'), findsWidgets);
+    expect(find.text('한빛통신'), findsWidgets);
     expect(find.byKey(const Key('market-phone-status-bar')), findsWidgets);
     expect(find.byKey(const Key('stock-detail-price')), findsOneWidget);
     expect(find.byKey(const Key('minute-interval-selector')), findsOneWidget);
     expect(find.byKey(const Key('minute-candle-chart')), findsOneWidget);
     expect(find.byKey(const Key('chart-time-axis')), findsOneWidget);
-    expect(find.text('재현 장중 · 현실 1초마다 게임 1분 진행'), findsOneWidget);
+    expect(find.text('가상 장중 · 현실 1초마다 게임 1분 진행'), findsOneWidget);
     expect(
       tester.widget<Text>(find.byKey(const Key('chart-window-label'))).data,
       contains('최대 최근 90분'),
     );
     expect(
       tester.widget<Text>(find.byKey(const Key('chart-window-label'))).data,
-      allOf(contains('90개 캔들'), contains('전일 재현 포함')),
+      allOf(contains('90개 캔들'), contains('전 거래일 포함')),
     );
     expect(find.textContaining('전일 '), findsWidgets);
     expect(find.text('오늘 09:00'), findsOneWidget);
@@ -533,7 +533,7 @@ void main() {
     );
     await tester.tap(find.byKey(const Key('chart-range-day')));
     await tester.pump();
-    expect(find.byKey(const Key('historical-close-chart')), findsOneWidget);
+    expect(find.byKey(const Key('daily-close-chart')), findsOneWidget);
     expect(find.textContaining('일봉'), findsOneWidget);
     await tester.tap(find.byKey(const Key('chart-range-week')));
     await tester.pump();
@@ -543,7 +543,7 @@ void main() {
     expect(find.textContaining('월봉'), findsOneWidget);
     await tester.tap(find.byKey(const Key('chart-range-year')));
     await tester.pump();
-    expect(find.byKey(const Key('historical-close-chart')), findsOneWidget);
+    expect(find.byKey(const Key('daily-close-chart')), findsOneWidget);
     expect(find.textContaining('년봉'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('toggle-market-favorite')));
@@ -575,11 +575,11 @@ void main() {
     expect(find.text('제품 경쟁력과 다음 실적을 확인한다.'), findsOneWidget);
     expect(
       (current.story.storyFlags['marketFavoriteAssetIds'] as List<dynamic>),
-      contains('kr-005930'),
+      contains('hanbit_telecom'),
     );
     expect(
       (current.story.storyFlags['marketResearchNotes']
-          as Map<dynamic, dynamic>)['kr-005930'],
+          as Map<dynamic, dynamic>)['hanbit_telecom'],
       '제품 경쟁력과 다음 실적을 확인한다.',
     );
     await tester.pump(const Duration(seconds: 4));
@@ -611,17 +611,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
     await tester.scrollUntilVisible(
-      find.byKey(const Key('historical-executive-section')),
+      find.text('오늘의 조사 질문'),
       220,
       scrollable: find.byType(Scrollable).last,
     );
-    expect(find.text('그날의 경영진'), findsOneWidget);
-    expect(find.text('이건희'), findsOneWidget);
-    expect(find.text('윤종용'), findsOneWidget);
-    expect(
-      find.byKey(const Key('executive-portrait-lee_kun_hee')),
-      findsOneWidget,
-    );
+    expect(find.text('오늘의 조사 질문'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -640,10 +634,10 @@ void main() {
           brokerageCash: 50000,
           positions: const [
             PortfolioPosition(
-              assetId: 'kr-005930',
-              symbol: '005930',
-              name: '삼성전자',
-              market: 'KOSPI',
+              assetId: 'hanbit_telecom',
+              symbol: '1001',
+              name: '한빛통신',
+              market: '미래시장',
               currency: 'KRW',
               units: 2,
               totalCost: 20050,
@@ -656,7 +650,7 @@ void main() {
               amount: -20050,
               account: 'cash',
               counterAccount: 'market_security',
-              description: '삼성전자 매수 · 증권 수수료 50원',
+              description: '한빛통신 매수 · 증권 수수료 50원',
               sourceId: 'test-buy',
               notional: 20000,
               tradingFee: 50,
@@ -689,7 +683,7 @@ void main() {
 
     expect(find.byKey(const Key('market-account-summary')), findsNothing);
     expect(
-      find.byKey(const Key('market-account-position-kr-005930')),
+      find.byKey(const Key('market-account-position-hanbit_telecom')),
       findsNothing,
     );
     await tester.tap(find.byKey(const Key('market-nav-account')));
@@ -714,7 +708,7 @@ void main() {
     expect(find.byKey(const Key('market-account-summary')), findsOneWidget);
     expect(find.textContaining('누적 증권 수수료 50원'), findsOneWidget);
     await tester.scrollUntilVisible(
-      find.byKey(const Key('market-account-position-kr-005930')),
+      find.byKey(const Key('market-account-position-hanbit_telecom')),
       240,
       scrollable: find.descendant(
         of: find.byKey(const Key('market-account-section')),
@@ -723,14 +717,17 @@ void main() {
     );
     await tester.pump();
     expect(
-      find.byKey(const Key('market-account-position-kr-005930')),
+      find.byKey(const Key('market-account-position-hanbit_telecom')),
       findsOneWidget,
     );
 
-    final value = find.byKey(const Key('position-value-kr-005930'));
+    final value = find.byKey(const Key('position-value-hanbit_telecom'));
     final before = tester.widget<Text>(value).data;
-    await tester.pump(const Duration(seconds: 1));
-    final after = tester.widget<Text>(value).data;
+    var after = before;
+    for (var attempt = 0; attempt < 10 && after == before; attempt++) {
+      await tester.pump(marketRealtimeTickDuration);
+      after = tester.widget<Text>(value).data;
+    }
     expect(after, isNot(before));
     expect(tester.takeException(), isNull);
   });
@@ -960,7 +957,7 @@ void main() {
     expect(tester.widget<Text>(clock.first).data, contains('09:01'));
 
     await openMarketExplore(tester);
-    await tester.tap(find.byKey(const Key('stock-row-005930')));
+    await tester.tap(find.byKey(const Key('stock-row-1001')));
     await tester.pumpAndSettle();
     expect(find.textContaining('1분봉'), findsWidgets);
     expect(find.textContaining('현실 1초마다 게임 1분 진행'), findsOneWidget);
@@ -994,9 +991,9 @@ void main() {
       ),
     );
     await openMarketExplore(tester);
-    await tester.ensureVisible(find.byKey(const Key('stock-row-005930')));
+    await tester.ensureVisible(find.byKey(const Key('stock-row-1001')));
     await tester.pump();
-    await tester.tap(find.byKey(const Key('stock-row-005930')));
+    await tester.tap(find.byKey(const Key('stock-row-1001')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
@@ -1078,7 +1075,7 @@ void main() {
       ),
     );
     await openMarketExplore(tester);
-    await tester.tap(find.byKey(const Key('stock-row-005930')));
+    await tester.tap(find.byKey(const Key('stock-row-1001')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('buy-stock-button')));
     await tester.pumpAndSettle();
@@ -1115,7 +1112,7 @@ void main() {
       ),
     );
     await openMarketExplore(tester);
-    await tester.tap(find.byKey(const Key('stock-row-005930')));
+    await tester.tap(find.byKey(const Key('stock-row-1001')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('buy-stock-button')));
     await tester.pumpAndSettle();
@@ -1179,7 +1176,7 @@ void main() {
       expect(button('market-jump-close-button').onPressed, isNotNull);
       expect(
         tester.widget<Text>(find.byKey(const Key('market-header-status'))).data,
-        contains('KRX 정규장'),
+        contains('미래거래소 정규장'),
       );
       expect(
         find.byKey(const Key('market-session-open-dialog')),
@@ -1299,8 +1296,8 @@ void main() {
     await tester.pump();
     await openMarketExplore(tester);
 
-    await tester.ensureVisible(find.byKey(const Key('stock-row-005930')));
-    await tester.tap(find.byKey(const Key('stock-row-005930')));
+    await tester.ensureVisible(find.byKey(const Key('stock-row-1001')));
+    await tester.tap(find.byKey(const Key('stock-row-1001')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.byKey(const Key('buy-stock-button')));

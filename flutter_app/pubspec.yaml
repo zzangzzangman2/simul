@@ -22,8 +22,6 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/
-    - assets/images/executives/
-    - assets/market/
     - assets/fonts/LICENSE-Pretendard.txt
   fonts:
     - family: Pretendard
