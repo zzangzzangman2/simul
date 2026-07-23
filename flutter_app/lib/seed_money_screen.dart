@@ -716,94 +716,167 @@ class DishwashingMiniGame extends StatefulWidget {
 }
 
 class _DishwashingMiniGameState extends State<DishwashingMiniGame> {
-  static const _dishSteps = <List<String>>[
-    ['rinse', 'scrub', 'finish'],
-    ['scrub', 'rinse', 'finish'],
-    ['rinse', 'rinse', 'finish'],
-    ['scrub', 'scrub', 'finish'],
-    ['rinse', 'scrub', 'finish'],
+  static const _dishNames = <String>['밥그릇', '머그컵', '프라이팬', '도시락통'];
+  static const _grimeLayouts = <List<Offset>>[
+    [Offset(86, 82), Offset(146, 73), Offset(117, 127)],
+    [Offset(92, 70), Offset(149, 108), Offset(101, 139)],
+    [
+      Offset(74, 75),
+      Offset(124, 64),
+      Offset(162, 92),
+      Offset(97, 126),
+      Offset(151, 139),
+    ],
+    [Offset(78, 76), Offset(139, 70), Offset(173, 112), Offset(105, 137)],
   ];
-  static const _actionLabels = <String, String>{
-    'rinse': '헹구기',
-    'scrub': '닦기',
-    'finish': '마무리',
-  };
-  Timer? _previewTimer;
+
   int _dish = 0;
-  int _step = 0;
   int _mistakes = 0;
-  bool _showSequence = true;
+  int _combo = 0;
+  int _bestCombo = 0;
+  int _dishMistakes = 0;
+  bool _wet = false;
+  bool _rinsed = false;
+  final Set<int> _cleanedGrime = <int>{};
 
-  List<String> get _steps => _dishSteps[_dish];
+  List<Offset> get _grime => _grimeLayouts[_dish];
+  bool get _allClean => _cleanedGrime.length == _grime.length;
 
-  @override
-  void initState() {
-    super.initState();
-    _schedulePreviewEnd();
-  }
-
-  @override
-  void dispose() {
-    _previewTimer?.cancel();
-    super.dispose();
-  }
-
-  void _schedulePreviewEnd() {
-    _previewTimer?.cancel();
-    _previewTimer = Timer(const Duration(milliseconds: 1400), () {
-      if (mounted && _dish < _dishSteps.length) {
-        setState(() => _showSequence = false);
-      }
+  void _markMistake() {
+    setState(() {
+      _mistakes++;
+      _dishMistakes++;
+      _combo = 0;
     });
   }
 
-  void _tap(String action) {
-    if (_dish >= _dishSteps.length || _showSequence) return;
-    if (action != _steps[_step]) {
-      setState(() => _mistakes++);
+  void _wetDish() {
+    if (_wet || _rinsed) {
+      _markMistake();
       return;
     }
-    final completedDish = _step == _steps.length - 1;
-    setState(() {
-      if (completedDish) {
-        _dish++;
-        _step = 0;
-        _showSequence = _dish < _dishSteps.length;
-      } else {
-        _step++;
+    setState(() => _wet = true);
+  }
+
+  void _cleanSpot(int index) {
+    if (!_wet || _rinsed) {
+      _markMistake();
+      return;
+    }
+    if (_cleanedGrime.contains(index)) return;
+    setState(() => _cleanedGrime.add(index));
+  }
+
+  void _scrubAt(Offset localPosition) {
+    if (!_wet || _rinsed) return;
+    final cleaned = <int>{};
+    for (var index = 0; index < _grime.length; index++) {
+      if ((_grime[index] - localPosition).distance <= 31) {
+        cleaned.add(index);
       }
+    }
+    if (cleaned.isEmpty) return;
+    setState(() => _cleanedGrime.addAll(cleaned));
+  }
+
+  void _rinseDish() {
+    if (!_wet || !_allClean || _rinsed) {
+      _markMistake();
+      return;
+    }
+    setState(() => _rinsed = true);
+  }
+
+  void _rackDish() {
+    if (!_rinsed) {
+      _markMistake();
+      return;
+    }
+    setState(() {
+      if (_dishMistakes == 0) {
+        _combo++;
+        _bestCombo = math.max(_bestCombo, _combo);
+      }
+      _dish++;
+      _wet = false;
+      _rinsed = false;
+      _dishMistakes = 0;
+      _cleanedGrime.clear();
     });
-    if (completedDish && _dish < _dishSteps.length) _schedulePreviewEnd();
   }
 
   @override
   Widget build(BuildContext context) {
-    final done = _dish >= _dishSteps.length;
-    final score = (100 - _mistakes * 8).clamp(40, 100);
+    final done = _dish >= _dishNames.length;
+    final score = (100 - _mistakes * 7).clamp(40, 100);
+    final stageProgress = done
+        ? 1.0
+        : (_wet ? 0.16 : 0.0) +
+              (_cleanedGrime.length / _grime.length) * 0.5 +
+              (_rinsed ? 0.25 : 0.0);
     return _MiniGameShell(
-      title: '저녁 설거지',
-      subtitle: '순서를 기억해서 다섯 장을 깨끗하게',
-      backgroundAsset: 'assets/images/bg_kitchen_1999.png',
-      progress: (_dish + (_step / 3)) / _dishSteps.length,
+      title: '설거지 러시 V2',
+      subtitle: '물을 묻히고 얼룩을 문질러 건조대까지',
+      backgroundAsset: 'assets/images/bg_kitchen_cartoon_2000.png',
+      progress: done ? 1 : (_dish + stageProgress) / _dishNames.length,
       child: done
           ? _MiniGameResult(
               activityId: 'dishes',
               score: score,
-              title: _mistakes == 0 ? '반짝반짝 완벽해!' : '깨끗하게 정리 완료!',
+              title: _mistakes == 0 ? '반짝반짝 완벽 콤보!' : '주방 정리 완료!',
               detail:
-                  '순서 실수 $_mistakes회 · 기본 용돈 ${300 + score * 5}원 · 성향/스킬 보너스 별도',
+                  '최고 콤보 ${math.max(_bestCombo, _combo)} · 실수 $_mistakes회 · 기본 용돈 ${300 + score * 5}원',
             )
           : Column(
               children: [
                 Container(
-                  width: 190,
-                  height: 190,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 9,
+                  ),
                   decoration: BoxDecoration(
-                    color: const Color(0xEEF2F8F8),
-                    shape: BoxShape.circle,
+                    color: const Color(0xE6112438),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${_dish + 1}/${_dishNames.length} · ${_dishNames[_dish]}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                      const Icon(
+                        Icons.local_fire_department_rounded,
+                        color: _yellow,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 3),
+                      Text(
+                        '콤보 $_combo',
+                        style: const TextStyle(
+                          color: Color(0xFFFFE9A8),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  width: 248,
+                  height: 218,
+                  decoration: BoxDecoration(
+                    color: const Color(0xE6DCEEF1),
+                    borderRadius: BorderRadius.circular(30),
                     border: Border.all(
-                      color: const Color(0xFFB7D5D2),
-                      width: 8,
+                      color: const Color(0xFFF4FFFF),
+                      width: 3,
                     ),
                     boxShadow: const [
                       BoxShadow(
@@ -813,97 +886,132 @@ class _DishwashingMiniGameState extends State<DishwashingMiniGame> {
                       ),
                     ],
                   ),
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      Icon(
-                        _showSequence
-                            ? Icons.visibility_rounded
-                            : Icons.psychology_alt_rounded,
-                        color: _showSequence
-                            ? const Color(0xFF5A8D89)
-                            : _yellow,
-                        size: 74,
-                      ),
-                      Positioned(
-                        bottom: 24,
-                        child: Text(
-                          '${_dish + 1}번째 접시',
-                          style: const TextStyle(
-                            color: _ink,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 18),
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 180),
-                  child: _showSequence
-                      ? Container(
-                          key: const Key('dish-sequence-preview'),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 13,
-                            vertical: 9,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xDD10243A),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: Text(
-                            '순서 외우기 · ${_steps.map((step) => _actionLabels[step]).join(' → ')}',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w900,
+                  child: GestureDetector(
+                    key: const Key('dish-scrub-board'),
+                    behavior: HitTestBehavior.opaque,
+                    onPanStart: (details) => _scrubAt(details.localPosition),
+                    onPanUpdate: (details) => _scrubAt(details.localPosition),
+                    child: Stack(
+                      children: [
+                        Center(
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            width: _dish == 2 ? 205 : 185,
+                            height: _dish == 2 ? 154 : 170,
+                            decoration: BoxDecoration(
+                              color: _rinsed
+                                  ? const Color(0xFFF8FFFF)
+                                  : const Color(0xFFF3F0E7),
+                              shape: _dish == 2
+                                  ? BoxShape.rectangle
+                                  : BoxShape.circle,
+                              borderRadius: _dish == 2
+                                  ? BorderRadius.circular(52)
+                                  : null,
+                              border: Border.all(
+                                color: _wet
+                                    ? const Color(0xFF6FC7E7)
+                                    : const Color(0xFFB5C4C7),
+                                width: 8,
+                              ),
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: Color(0x33243451),
+                                  blurRadius: 8,
+                                  offset: Offset(0, 5),
+                                ),
+                              ],
                             ),
                           ),
-                        )
-                      : const Text(
-                          '순서를 숨겼어요 · 기억한 순서대로 눌러 보세요',
-                          key: Key('dish-recall-prompt'),
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w900,
-                            shadows: [
-                              Shadow(color: Colors.black54, blurRadius: 6),
-                            ],
-                          ),
                         ),
+                        for (var index = 0; index < _grime.length; index++)
+                          if (!_cleanedGrime.contains(index))
+                            Positioned(
+                              left: _grime[index].dx - 18,
+                              top: _grime[index].dy - 18,
+                              child: Semantics(
+                                button: true,
+                                label: '얼룩 ${index + 1} 닦기',
+                                child: InkWell(
+                                  key: Key('dish-grime-$_dish-$index'),
+                                  onTap: () => _cleanSpot(index),
+                                  customBorder: const CircleBorder(),
+                                  child: Container(
+                                    width: 36,
+                                    height: 36,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xBFA16A42),
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: const Color(0x99FFF0C8),
+                                        width: 2,
+                                      ),
+                                    ),
+                                    child: const Icon(
+                                      Icons.blur_on_rounded,
+                                      color: Color(0xFFFBE3B1),
+                                      size: 19,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        if (_allClean && !_rinsed)
+                          const Center(
+                            child: Icon(
+                              Icons.auto_awesome_rounded,
+                              color: Color(0xFFFFC94F),
+                              size: 54,
+                            ),
+                          ),
+                        if (_rinsed)
+                          const Center(
+                            child: Icon(
+                              Icons.check_circle_rounded,
+                              color: Color(0xFF4BB58D),
+                              size: 60,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Row(
                   children: [
                     _GameAction(
-                      key: const Key('dish-rinse'),
+                      key: const Key('dish-wet'),
                       icon: Icons.water_drop_rounded,
-                      label: '헹구기',
-                      onTap: _showSequence ? null : () => _tap('rinse'),
+                      label: '물 묻히기',
+                      onTap: _wet || _rinsed ? null : _wetDish,
                     ),
                     const SizedBox(width: 8),
                     _GameAction(
-                      key: const Key('dish-scrub'),
-                      icon: Icons.cleaning_services_rounded,
-                      label: '닦기',
-                      onTap: _showSequence ? null : () => _tap('scrub'),
-                    ),
-                    const SizedBox(width: 8),
-                    _GameAction(
-                      key: const Key('dish-finish'),
+                      key: const Key('dish-rinse'),
                       icon: Icons.shower_rounded,
-                      label: '마무리',
-                      onTap: _showSequence ? null : () => _tap('finish'),
+                      label: '헹구기',
+                      onTap: _wet && _allClean && !_rinsed
+                          ? _rinseDish
+                          : _markMistake,
+                    ),
+                    const SizedBox(width: 8),
+                    _GameAction(
+                      key: const Key('dish-rack'),
+                      icon: Icons.dry_cleaning_rounded,
+                      label: '건조대',
+                      onTap: _rinsed ? _rackDish : _markMistake,
                     ),
                   ],
                 ),
                 const SizedBox(height: 9),
                 Text(
-                  '실수 $_mistakes회 · 연속 정확도가 보너스를 결정해요',
+                  !_wet
+                      ? '먼저 물을 묻혀요'
+                      : !_allClean
+                      ? '얼룩을 손가락으로 문지르거나 하나씩 눌러요'
+                      : !_rinsed
+                      ? '깨끗해졌어요 · 헹구기!'
+                      : '건조대로 옮기면 콤보 성공',
                   style: const TextStyle(
                     color: Color(0xFFFFF1C5),
                     fontSize: 10,
@@ -924,123 +1032,343 @@ class StationerySortMiniGame extends StatefulWidget {
 }
 
 class _StationerySortMiniGameState extends State<StationerySortMiniGame> {
-  static const _items = <(String, IconData, String)>[
-    ('공책', Icons.menu_book_rounded, 'school'),
-    ('연필', Icons.edit_rounded, 'school'),
-    ('사탕', Icons.cake_rounded, 'snack'),
-    ('딱지', Icons.style_rounded, 'toy'),
-    ('지우개', Icons.crop_7_5_rounded, 'school'),
-    ('과자', Icons.cookie_rounded, 'snack'),
-    ('구슬', Icons.circle, 'toy'),
-    ('자', Icons.straighten_rounded, 'school'),
+  static const _stock = <(String, String, IconData)>[
+    ('notebook', '공책', Icons.menu_book_rounded),
+    ('pencil', '연필', Icons.edit_rounded),
+    ('eraser', '지우개', Icons.crop_7_5_rounded),
+    ('candy', '사탕', Icons.cake_rounded),
+    ('snack', '과자', Icons.cookie_rounded),
+    ('marbles', '구슬', Icons.bubble_chart_rounded),
+  ];
+  static const _orders = <(String, List<String>)>[
+    ('새 학기 준비', ['notebook', 'pencil', 'pencil', 'eraser']),
+    ('쉬는 시간 간식', ['candy', 'candy', 'snack']),
+    ('구슬치기 약속', ['marbles', 'marbles', 'marbles', 'candy']),
+    ('동생 선물 꾸러미', ['notebook', 'pencil', 'snack', 'marbles']),
   ];
   int _index = 0;
-  int _correct = 0;
   int _mistakes = 0;
+  int _streak = 0;
+  int _bestStreak = 0;
+  final Map<String, int> _basket = <String, int>{};
 
-  void _choose(String category) {
-    if (_index >= _items.length) return;
+  String _nameOf(String id) => _stock.firstWhere((item) => item.$1 == id).$2;
+
+  int _targetCount(String id) =>
+      _orders[_index].$2.where((item) => item == id).length;
+
+  void _addItem(String id) {
+    if (_index >= _orders.length) return;
+    setState(() => _basket[id] = (_basket[id] ?? 0) + 1);
+  }
+
+  void _removeItem(String id) {
+    final count = _basket[id] ?? 0;
+    if (count == 0) return;
     setState(() {
-      if (category == _items[_index].$3) {
-        _correct++;
+      if (count == 1) {
+        _basket.remove(id);
+      } else {
+        _basket[id] = count - 1;
+      }
+    });
+  }
+
+  void _packOrder() {
+    final target = <String, int>{};
+    for (final id in _orders[_index].$2) {
+      target[id] = (target[id] ?? 0) + 1;
+    }
+    final correct =
+        target.length == _basket.length &&
+        target.entries.every((entry) => _basket[entry.key] == entry.value);
+    setState(() {
+      if (correct) {
+        _streak++;
+        _bestStreak = math.max(_bestStreak, _streak);
         _index++;
       } else {
         _mistakes++;
+        _streak = 0;
       }
+      _basket.clear();
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final done = _index >= _items.length;
-    final score = (_correct * 12 + (4 - _mistakes).clamp(0, 4)).clamp(40, 100);
+    final done = _index >= _orders.length;
+    final score = (100 - _mistakes * 7).clamp(40, 100);
+    final order = done ? null : _orders[_index];
+    final patience = (1 - (_mistakes.clamp(0, 4) / 4)).clamp(0.0, 1.0);
     return _MiniGameShell(
-      title: '문방구 재고 정리',
-      subtitle: '물건을 보고 맞는 진열장으로 분류하세요',
+      title: '문방구 주문 포장 V2',
+      subtitle: '손님 메모를 보고 필요한 물건을 정확히 담아주세요',
       backgroundAsset: 'assets/images/bg_stationery_shop_2000.webp',
-      progress: _index / _items.length,
+      progress: done
+          ? 1
+          : (_index + (_basket.isEmpty ? 0 : 0.45)) / _orders.length,
       child: done
           ? _MiniGameResult(
               activityId: 'stationery',
               score: score,
-              title: score >= 90 ? '사장님도 놀란 진열 실력!' : '재고 정리 완료!',
+              title: _mistakes == 0 ? '단골손님 예약 완료!' : '오늘 주문 포장 끝!',
               detail:
-                  '정답 $_correct개 · 실수 $_mistakes회 · 기본 수당 ${600 + score * 4}원 · 보너스 별도',
+                  '최고 연속 포장 $_bestStreak건 · 실수 $_mistakes회 · 기본 수당 ${600 + score * 4}원',
             )
           : Column(
               children: [
                 Container(
-                  key: Key('sort-item-$_index'),
-                  width: 180,
-                  height: 180,
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 11),
                   decoration: BoxDecoration(
                     color: const Color(0xF7FFF8E8),
-                    borderRadius: BorderRadius.circular(32),
+                    borderRadius: BorderRadius.circular(22),
                     border: Border.all(
                       color: const Color(0xFFE3C68B),
-                      width: 3,
+                      width: 2,
                     ),
                     boxShadow: const [
                       BoxShadow(
                         color: Color(0x44000000),
-                        blurRadius: 18,
-                        offset: Offset(0, 8),
+                        blurRadius: 14,
+                        offset: Offset(0, 6),
                       ),
                     ],
                   ),
                   child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(
-                        _items[_index].$2,
-                        color: const Color(0xFFB47435),
-                        size: 76,
+                      Row(
+                        children: [
+                          Container(
+                            width: 34,
+                            height: 34,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFFFD873),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.receipt_long_rounded,
+                              color: _ink,
+                              size: 19,
+                            ),
+                          ),
+                          const SizedBox(width: 9),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '주문 ${_index + 1} · ${order!.$1}',
+                                  style: const TextStyle(
+                                    color: _ink,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                                const Text(
+                                  '메모에 적힌 수량만큼 담기',
+                                  style: TextStyle(
+                                    color: Color(0xFF84745E),
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Text(
+                            '연속 $_streak',
+                            style: const TextStyle(
+                              color: _coral,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        _items[_index].$1,
-                        style: const TextStyle(
-                          color: _ink,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w900,
-                        ),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: _stock
+                            .where((item) => _targetCount(item.$1) > 0)
+                            .map(
+                              (item) => Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 9,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(99),
+                                  border: Border.all(
+                                    color: const Color(0xFFE7D5AE),
+                                  ),
+                                ),
+                                child: Text(
+                                  '${item.$2} × ${_targetCount(item.$1)}',
+                                  style: const TextStyle(
+                                    color: _ink,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ),
+                            )
+                            .toList(),
+                      ),
+                      const SizedBox(height: 9),
+                      Row(
+                        children: [
+                          const Text(
+                            '손님 기다림',
+                            style: TextStyle(
+                              color: Color(0xFF84745E),
+                              fontSize: 9,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(99),
+                              child: LinearProgressIndicator(
+                                minHeight: 7,
+                                value: patience,
+                                backgroundColor: const Color(0xFFE6DDD0),
+                                valueColor: AlwaysStoppedAnimation(
+                                  patience > 0.5
+                                      ? const Color(0xFF64B98F)
+                                      : _coral,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 18),
-                Row(
-                  children: [
-                    _GameAction(
-                      key: const Key('sort-school'),
-                      icon: Icons.school_rounded,
-                      label: '학용품',
-                      onTap: () => _choose('school'),
-                    ),
-                    const SizedBox(width: 8),
-                    _GameAction(
-                      key: const Key('sort-snack'),
-                      icon: Icons.cookie_rounded,
-                      label: '간식',
-                      onTap: () => _choose('snack'),
-                    ),
-                    const SizedBox(width: 8),
-                    _GameAction(
-                      key: const Key('sort-toy'),
-                      icon: Icons.toys_rounded,
-                      label: '완구',
-                      onTap: () => _choose('toy'),
-                    ),
-                  ],
-                ),
                 const SizedBox(height: 10),
-                Text(
-                  '${_index + 1} / ${_items.length} · 실수 $_mistakes회',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w900,
-                    shadows: [Shadow(color: Colors.black54, blurRadius: 5)],
+                Container(
+                  padding: const EdgeInsets.all(9),
+                  decoration: BoxDecoration(
+                    color: const Color(0xE6132538),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: const Color(0x33FFFFFF)),
+                  ),
+                  child: GridView.count(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    crossAxisCount: 3,
+                    childAspectRatio: 1.1,
+                    mainAxisSpacing: 7,
+                    crossAxisSpacing: 7,
+                    children: _stock
+                        .map(
+                          (item) => FilledButton(
+                            key: Key('stock-${item.$1}'),
+                            onPressed: () => _addItem(item.$1),
+                            style: FilledButton.styleFrom(
+                              padding: const EdgeInsets.all(5),
+                              foregroundColor: _ink,
+                              backgroundColor: const Color(0xFFFDF6E6),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(15),
+                              ),
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(item.$3, color: _coral, size: 25),
+                                const SizedBox(height: 3),
+                                Text(
+                                  item.$2,
+                                  style: const TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ),
+                const SizedBox(height: 9),
+                Container(
+                  width: double.infinity,
+                  constraints: const BoxConstraints(minHeight: 58),
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xF7FFFFFF),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: const Color(0xFFD8E0E8)),
+                  ),
+                  child: _basket.isEmpty
+                      ? const Center(
+                          child: Text(
+                            '바구니가 비어 있어요',
+                            style: TextStyle(
+                              color: Color(0xFF8B94A3),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        )
+                      : Wrap(
+                          spacing: 6,
+                          runSpacing: 5,
+                          children: _basket.entries
+                              .map(
+                                (entry) => InkWell(
+                                  key: Key('basket-${entry.key}'),
+                                  onTap: () => _removeItem(entry.key),
+                                  borderRadius: BorderRadius.circular(99),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 9,
+                                      vertical: 7,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFFFE6DA),
+                                      borderRadius: BorderRadius.circular(99),
+                                    ),
+                                    child: Text(
+                                      '${_nameOf(entry.key)} × ${entry.value}  −',
+                                      style: const TextStyle(
+                                        color: _ink,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                        ),
+                ),
+                const SizedBox(height: 9),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: FilledButton.icon(
+                    key: const Key('pack-order'),
+                    onPressed: _packOrder,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: _coral,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(17),
+                      ),
+                    ),
+                    icon: const Icon(Icons.inventory_2_rounded),
+                    label: Text(
+                      '포장 완료 · 실수 $_mistakes회',
+                      style: const TextStyle(fontWeight: FontWeight.w900),
+                    ),
                   ),
                 ),
               ],
@@ -1057,26 +1385,66 @@ class FleaMarketMiniGame extends StatefulWidget {
 }
 
 class _FleaMarketMiniGameState extends State<FleaMarketMiniGame> {
-  static const _sales = <(String, int, int, List<int>)>[
-    ('과학 만화책', 1200, 2000, [600, 700, 800, 900]),
-    ('퍼즐 상자', 2500, 5000, [1500, 2000, 2500, 3000]),
-    ('동화책 세 권', 1800, 5000, [2800, 3000, 3200, 3500]),
-    ('장난감 자동차', 3500, 10000, [5500, 6000, 6500, 7000]),
-    ('백과사전 낱권', 4200, 10000, [5200, 5600, 5800, 6200]),
+  static const _sales = <(String, int, int, int)>[
+    ('과학 만화책', 1000, 1500, 5000),
+    ('별자리 상자', 2000, 3000, 5000),
+    ('동화책 세 권', 1500, 2500, 5000),
+    ('장난감 자동차', 3000, 4500, 10000),
   ];
   int _index = 0;
-  int _correct = 0;
+  int _offer = _sales.first.$2;
+  int _patience = 3;
+  int _dealPoints = 0;
+  int _correctChange = 0;
   int _mistakes = 0;
+  bool _negotiating = true;
+  final List<int> _changeNotes = <int>[];
 
-  void _choose(int value) {
-    if (_index >= _sales.length) return;
-    final answer = _sales[_index].$3 - _sales[_index].$2;
+  int get _changeTotal => _changeNotes.fold(0, (total, value) => total + value);
+
+  void _counterOffer() {
+    final next = _offer + 500;
     setState(() {
-      if (value == answer) {
-        _correct++;
-        _index++;
+      if (next <= _sales[_index].$3) {
+        _offer = next;
       } else {
         _mistakes++;
+        _patience = math.max(0, _patience - 1);
+      }
+    });
+  }
+
+  void _acceptOffer() {
+    setState(() {
+      _dealPoints += _offer == _sales[_index].$3 ? 10 : 5;
+      _negotiating = false;
+    });
+  }
+
+  void _addChange(int value) {
+    setState(() => _changeNotes.add(value));
+  }
+
+  void _undoChange() {
+    if (_changeNotes.isEmpty) return;
+    setState(() => _changeNotes.removeLast());
+  }
+
+  void _submitChange() {
+    final due = _sales[_index].$4 - _offer;
+    setState(() {
+      if (_changeTotal == due) {
+        _correctChange++;
+        _index++;
+        if (_index < _sales.length) {
+          _offer = _sales[_index].$2;
+          _patience = 3;
+          _negotiating = true;
+          _changeNotes.clear();
+        }
+      } else {
+        _mistakes++;
+        _changeNotes.clear();
       }
     });
   }
@@ -1084,23 +1452,26 @@ class _FleaMarketMiniGameState extends State<FleaMarketMiniGame> {
   @override
   Widget build(BuildContext context) {
     final done = _index >= _sales.length;
-    final score = (_correct * 19 + (5 - _mistakes).clamp(0, 5)).clamp(40, 100);
+    final score = (20 + _dealPoints + _correctChange * 10 - _mistakes * 5)
+        .clamp(40, 100);
     final sale = done ? null : _sales[_index];
+    final due = done ? 0 : sale!.$4 - _offer;
+    final phaseProgress = done ? 1.0 : (_negotiating ? 0.2 : 0.65);
     return _MiniGameShell(
-      title: '가족 벼룩장터',
-      subtitle: '천천히 계산해 정확한 거스름돈을 건네요',
-      backgroundAsset: 'assets/images/bg_living_room_1999.png',
-      progress: _index / _sales.length,
+      title: '동네 벼룩장터 V2',
+      subtitle: '가격을 흥정하고 지폐를 직접 골라 거스름돈을 주세요',
+      backgroundAsset: 'assets/images/bg_living_room_cartoon_2000.png',
+      progress: done ? 1 : (_index + phaseProgress) / _sales.length,
       child: done
           ? _MiniGameResult(
               activityId: 'flea_market',
               score: score,
-              title: score >= 90 ? '오늘 계산대는 완벽했어!' : '벼룩장터 마감!',
+              title: _mistakes == 0 ? '흥정도 계산도 완벽!' : '벼룩장터 마감!',
               detail:
-                  '정답 $_correct개 · 다시 계산 $_mistakes회 · 기본 몫 ${400 + score * 12}원 · 보너스 별도',
+                  '정확한 계산 $_correctChange건 · 실수 $_mistakes회 · 기본 몫 ${400 + score * 12}원',
             )
           : Container(
-              padding: const EdgeInsets.all(17),
+              padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: const Color(0xF7FFF9EA),
                 borderRadius: BorderRadius.circular(24),
@@ -1115,71 +1486,71 @@ class _FleaMarketMiniGameState extends State<FleaMarketMiniGame> {
               ),
               child: Column(
                 children: [
-                  const Icon(Icons.storefront_rounded, color: _coral, size: 42),
-                  const SizedBox(height: 5),
-                  Text(
-                    sale!.$1,
-                    style: const TextStyle(
-                      color: _ink,
-                      fontSize: 19,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      _PricePaper(label: '가격', value: sale.$2),
-                      const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 8),
-                        child: Icon(Icons.arrow_forward_rounded, color: _coral),
+                      Container(
+                        width: 43,
+                        height: 43,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFFFDB76),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.storefront_rounded,
+                          color: _ink,
+                          size: 25,
+                        ),
                       ),
-                      _PricePaper(label: '받은 돈', value: sale.$3),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  const Text(
-                    '거스름돈은 얼마일까?',
-                    style: TextStyle(
-                      color: Color(0xFF6D7180),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 9),
-                  GridView.count(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    crossAxisCount: 2,
-                    childAspectRatio: 2.5,
-                    mainAxisSpacing: 8,
-                    crossAxisSpacing: 8,
-                    children: sale.$4
-                        .map(
-                          (value) => OutlinedButton(
-                            key: Key('change-$value'),
-                            onPressed: () => _choose(value),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: _ink,
-                              backgroundColor: Colors.white,
-                              side: const BorderSide(color: Color(0xFFD7C49A)),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(13),
-                              ),
-                            ),
-                            child: Text(
-                              '${_money(value)}원',
+                      const SizedBox(width: 9),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${_index + 1}/${_sales.length} · ${sale!.$1}',
                               style: const TextStyle(
+                                color: _ink,
+                                fontSize: 17,
                                 fontWeight: FontWeight.w900,
                               ),
                             ),
-                          ),
-                        )
-                        .toList(),
+                            Text(
+                              _negotiating ? '손님과 가격 흥정 중' : '거스름돈 계산 중',
+                              style: const TextStyle(
+                                color: Color(0xFF7C746A),
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 180),
+                    child: _negotiating
+                        ? _FleaNegotiationPanel(
+                            offer: _offer,
+                            patience: _patience,
+                            onCounter: _counterOffer,
+                            onAccept: _acceptOffer,
+                          )
+                        : _FleaChangePanel(
+                            salePrice: _offer,
+                            paid: sale.$4,
+                            due: due,
+                            selected: _changeTotal,
+                            canUndo: _changeNotes.isNotEmpty,
+                            onAdd: _addChange,
+                            onUndo: _undoChange,
+                            onSubmit: _submitChange,
+                          ),
+                  ),
+                  const SizedBox(height: 9),
                   Text(
-                    '${_index + 1} / ${_sales.length} · 다시 계산 $_mistakes회',
+                    '실수 $_mistakes회',
                     style: const TextStyle(
                       color: Color(0xFF8B7354),
                       fontSize: 10,
@@ -1191,6 +1562,276 @@ class _FleaMarketMiniGameState extends State<FleaMarketMiniGame> {
             ),
     );
   }
+}
+
+class _FleaNegotiationPanel extends StatelessWidget {
+  const _FleaNegotiationPanel({
+    required this.offer,
+    required this.patience,
+    required this.onCounter,
+    required this.onAccept,
+  });
+
+  final int offer;
+  final int patience;
+  final VoidCallback onCounter;
+  final VoidCallback onAccept;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    key: const ValueKey('negotiating'),
+    children: [
+      Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(13),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFF0C7),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFFE6C679)),
+        ),
+        child: Column(
+          children: [
+            const Text(
+              '현재 제안',
+              style: TextStyle(
+                color: Color(0xFF8A7856),
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            Text(
+              '${_money(offer)}원',
+              style: const TextStyle(
+                color: _ink,
+                fontSize: 28,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(
+                3,
+                (index) => Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 3),
+                  child: Icon(
+                    index < patience
+                        ? Icons.favorite_rounded
+                        : Icons.favorite_border_rounded,
+                    color: index < patience ? _coral : const Color(0xFFB7AFA3),
+                    size: 20,
+                  ),
+                ),
+              ),
+            ),
+            const Text(
+              '욕심내면 손님 인내심이 줄어요',
+              style: TextStyle(
+                color: Color(0xFF8A7856),
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+      const SizedBox(height: 10),
+      Row(
+        children: [
+          Expanded(
+            child: SizedBox(
+              height: 52,
+              child: OutlinedButton.icon(
+                key: const Key('deal-counter'),
+                onPressed: onCounter,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: _ink,
+                  backgroundColor: Colors.white,
+                  side: const BorderSide(color: _coral, width: 2),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                icon: const Icon(Icons.add_rounded),
+                label: const Text(
+                  '500원 흥정',
+                  style: TextStyle(fontWeight: FontWeight.w900),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: SizedBox(
+              height: 52,
+              child: FilledButton.icon(
+                key: const Key('deal-accept'),
+                onPressed: onAccept,
+                style: FilledButton.styleFrom(
+                  backgroundColor: _coral,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                icon: const Icon(Icons.handshake_rounded),
+                label: const Text(
+                  '거래 확정',
+                  style: TextStyle(fontWeight: FontWeight.w900),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    ],
+  );
+}
+
+class _FleaChangePanel extends StatelessWidget {
+  const _FleaChangePanel({
+    required this.salePrice,
+    required this.paid,
+    required this.due,
+    required this.selected,
+    required this.canUndo,
+    required this.onAdd,
+    required this.onUndo,
+    required this.onSubmit,
+  });
+
+  final int salePrice;
+  final int paid;
+  final int due;
+  final int selected;
+  final bool canUndo;
+  final ValueChanged<int> onAdd;
+  final VoidCallback onUndo;
+  final VoidCallback onSubmit;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    key: const ValueKey('making-change'),
+    children: [
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          _PricePaper(label: '판매가', value: salePrice),
+          const Icon(Icons.arrow_forward_rounded, color: _coral),
+          _PricePaper(label: '받은 돈', value: paid),
+        ],
+      ),
+      const SizedBox(height: 10),
+      Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFFE8F3EA),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          children: [
+            const Text(
+              '내가 고른 돈',
+              style: TextStyle(
+                color: Color(0xFF647769),
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const Spacer(),
+            Text(
+              '${_money(selected)}원 / ${_money(due)}원',
+              style: const TextStyle(
+                color: _ink,
+                fontSize: 14,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+      ),
+      const SizedBox(height: 10),
+      Wrap(
+        spacing: 7,
+        runSpacing: 7,
+        alignment: WrapAlignment.center,
+        children: [100, 500, 1000, 5000]
+            .map(
+              (value) => SizedBox(
+                width: 68,
+                height: 46,
+                child: FilledButton(
+                  key: Key('change-note-$value'),
+                  onPressed: () => onAdd(value),
+                  style: FilledButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    backgroundColor: const Color(0xFFDAE9D6),
+                    foregroundColor: _ink,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(13),
+                      side: const BorderSide(color: Color(0xFF8EB58D)),
+                    ),
+                  ),
+                  child: Text(
+                    '${_money(value)}원',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ),
+            )
+            .toList(),
+      ),
+      const SizedBox(height: 10),
+      Row(
+        children: [
+          SizedBox(
+            width: 76,
+            height: 48,
+            child: OutlinedButton(
+              key: const Key('change-undo'),
+              onPressed: canUndo ? onUndo : null,
+              style: OutlinedButton.styleFrom(
+                padding: EdgeInsets.zero,
+                foregroundColor: _ink,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(15),
+                ),
+              ),
+              child: const Text(
+                '한 장 빼기',
+                style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: SizedBox(
+              height: 48,
+              child: FilledButton.icon(
+                key: const Key('change-submit'),
+                onPressed: onSubmit,
+                style: FilledButton.styleFrom(
+                  backgroundColor: _coral,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                ),
+                icon: const Icon(Icons.payments_rounded, size: 18),
+                label: const Text(
+                  '거스름돈 건네기',
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    ],
+  );
 }
 
 class _MiniGameShell extends StatelessWidget {
