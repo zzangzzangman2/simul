@@ -872,6 +872,7 @@ class PortfolioLedgerScreen extends StatefulWidget {
     required this.state,
     this.onPurchaseSpendingOption,
     this.onSellRealEstate,
+    this.onConfigureRealEstateLease,
     this.onPlayChanceGame,
     this.universe,
   });
@@ -880,6 +881,11 @@ class PortfolioLedgerScreen extends StatefulWidget {
   final Future<FinanceActionResult> Function(String optionId)?
   onPurchaseSpendingOption;
   final Future<FinanceActionResult> Function(String assetId)? onSellRealEstate;
+  final Future<FinanceActionResult> Function(
+    String assetId,
+    RealEstateLeaseType leaseType,
+  )?
+  onConfigureRealEstateLease;
   final Future<FinanceActionResult> Function(int stake)? onPlayChanceGame;
   final FictionalMarketUniverse? universe;
 
@@ -909,6 +915,19 @@ class _PortfolioLedgerScreenState extends State<PortfolioLedgerScreen> {
     return result;
   }
 
+  Future<FinanceActionResult> _configureLease(
+    String assetId,
+    RealEstateLeaseType leaseType,
+  ) async {
+    final handler = widget.onConfigureRealEstateLease;
+    if (handler == null) return _disabledFinanceResult();
+    final result = await handler(assetId, leaseType);
+    if (mounted && result.success) {
+      setState(() => _state = result.state);
+    }
+    return result;
+  }
+
   Future<FinanceActionResult> _playChance(int stake) async {
     final handler = widget.onPlayChanceGame;
     if (handler == null) return _disabledFinanceResult();
@@ -930,6 +949,7 @@ class _PortfolioLedgerScreenState extends State<PortfolioLedgerScreen> {
           state: state,
           onPurchase: _purchase,
           onSellRealEstate: _sell,
+          onConfigureLease: _configureLease,
           onPlayChanceGame: _playChance,
         ),
       ),
@@ -941,7 +961,10 @@ class _PortfolioLedgerScreenState extends State<PortfolioLedgerScreen> {
     super.initState();
     _state = widget.state;
     _universeFuture = widget.universe == null
-        ? FictionalMarketUniverse.load(seed: state.simulationSeed)
+        ? FictionalMarketUniverse.load(
+            seed: state.simulationSeed,
+            throughDate: state.currentDate,
+          )
         : Future.value(widget.universe!);
   }
 
@@ -949,6 +972,7 @@ class _PortfolioLedgerScreenState extends State<PortfolioLedgerScreen> {
     setState(() {
       _universeFuture = FictionalMarketUniverse.load(
         seed: state.simulationSeed,
+        throughDate: state.currentDate,
         forceRefresh: true,
       );
     });

@@ -9,6 +9,16 @@ const generatedRegularTradingTicks =
 const generatedPostCloseTicks =
     generatedSessionTicks - generatedRegularSessionTicks;
 
+class MarketTimedImpact {
+  const MarketTimedImpact({
+    required this.revealMinute,
+    required this.impactRate,
+  });
+
+  final int revealMinute;
+  final double impactRate;
+}
+
 class MarketCandle {
   const MarketCandle({
     required this.open,
@@ -37,10 +47,15 @@ List<double> generatedMarketPath({
   required double officialClose,
   int totalTicks = generatedSessionTicks,
   int seed = 0,
+  double dailyLimitRate = 0.15,
 }) {
   if (totalTicks <= 0 || previousClose <= 0) {
     return <double>[officialClose];
   }
+
+  final normalizedDailyLimitRate = dailyLimitRate.isFinite
+      ? dailyLimitRate.clamp(0.01, 0.99).toDouble()
+      : 0.15;
 
   final raw = <double>[0];
   var velocity = 0.0;
@@ -72,8 +87,8 @@ List<double> generatedMarketPath({
     (officialClose - previousClose).abs() * 1.45,
     previousClose * rangeRate * 2.25,
   );
-  final dailyLower = previousClose * 0.85;
-  final dailyUpper = previousClose * 1.15;
+  final dailyLower = previousClose * (1 - normalizedDailyLimitRate);
+  final dailyUpper = previousClose * (1 + normalizedDailyLimitRate);
   final lower = math.max(
     dailyLower,
     math.min(previousClose, officialClose) - corridor,
@@ -155,18 +170,83 @@ List<double> generatedFullMarketDayPath({
   required double previousClose,
   required double officialClose,
   int seed = 0,
+  double dailyLimitRate = 0.15,
+  List<MarketTimedImpact> timedImpacts = const <MarketTimedImpact>[],
 }) {
   final regular = generatedMarketPath(
     previousClose: previousClose,
     officialClose: officialClose,
     totalTicks: generatedRegularTradingTicks,
     seed: seed,
+    dailyLimitRate: dailyLimitRate,
+  );
+  final causalRegular = _applyTimedMarketImpacts(
+    regular,
+    previousClose: previousClose,
+    dailyLimitRate: dailyLimitRate,
+    timedImpacts: timedImpacts,
   );
   return <double>[
     ...List<double>.filled(generatedPreOpenTicks, previousClose),
-    ...regular,
+    ...causalRegular,
     ...List<double>.filled(generatedPostCloseTicks, officialClose),
   ];
+}
+
+List<double> _applyTimedMarketImpacts(
+  List<double> regular, {
+  required double previousClose,
+  required double dailyLimitRate,
+  required List<MarketTimedImpact> timedImpacts,
+}) {
+  if (regular.length <= 2 || timedImpacts.isEmpty || previousClose <= 0) {
+    return regular;
+  }
+  final totalTicks = regular.length - 1;
+  final normalizedLimit = dailyLimitRate.isFinite
+      ? dailyLimitRate.clamp(0.01, 0.99).toDouble()
+      : 0.15;
+  final lower = previousClose * (1 - normalizedLimit);
+  final upper = previousClose * (1 + normalizedLimit);
+  final result = List<double>.from(regular);
+
+  for (var step = 1; step < totalTicks; step++) {
+    final standardProgress = step / totalTicks;
+    var logAdjustment = 0.0;
+    for (final timedImpact in timedImpacts) {
+      if (!timedImpact.impactRate.isFinite ||
+          timedImpact.impactRate.abs() < 0.0000001) {
+        continue;
+      }
+      final impact = timedImpact.impactRate
+          .clamp(-normalizedLimit * 0.85, normalizedLimit * 0.85)
+          .toDouble();
+      final revealTick = (timedImpact.revealMinute - 9 * 60)
+          .clamp(0, totalTicks)
+          .toInt();
+      var disclosedProgress = 0.0;
+      if (step >= revealTick) {
+        final burstProgress = ((step - revealTick + 1) / 5)
+            .clamp(0.0, 1.0)
+            .toDouble();
+        final remainingTicks = math.max(1, totalTicks - revealTick);
+        final tailProgress = ((step - revealTick) / remainingTicks)
+            .clamp(0.0, 1.0)
+            .toDouble();
+        disclosedProgress = burstProgress * 0.75 + tailProgress * 0.25;
+      }
+      logAdjustment += impact * (disclosedProgress - standardProgress);
+    }
+    final adjusted = (regular[step] * math.exp(logAdjustment))
+        .clamp(lower, upper)
+        .toDouble();
+    final tickSize = _tickSize(adjusted);
+    result[step] = (adjusted / tickSize).roundToDouble() * tickSize;
+  }
+  result
+    ..first = regular.first
+    ..last = regular.last;
+  return result;
 }
 
 double generatedMarketTick({
@@ -175,12 +255,14 @@ double generatedMarketTick({
   required int tickIndex,
   int totalTicks = generatedSessionTicks,
   int seed = 0,
+  double dailyLimitRate = 0.15,
 }) {
   final path = generatedMarketPath(
     previousClose: previousClose,
     officialClose: officialClose,
     totalTicks: totalTicks,
     seed: seed,
+    dailyLimitRate: dailyLimitRate,
   );
   return path[tickIndex.clamp(0, path.length - 1)];
 }
@@ -191,6 +273,8 @@ List<MarketCandle> aggregateMarketCandles(
   int tickMinutes = 1,
   int? seed,
   int startMinuteOffset = 0,
+  double? lowerPriceLimit,
+  double? upperPriceLimit,
 }) {
   if (prices.isEmpty) return const <MarketCandle>[];
   if (intervalMinutes <= 0 || tickMinutes <= 0) {
@@ -202,6 +286,12 @@ List<MarketCandle> aggregateMarketCandles(
       '$tickMinutes-minute ticks.',
     );
   }
+  final lowerBound = lowerPriceLimit != null && lowerPriceLimit.isFinite
+      ? lowerPriceLimit
+      : double.negativeInfinity;
+  final upperBound = upperPriceLimit != null && upperPriceLimit.isFinite
+      ? upperPriceLimit
+      : double.infinity;
   final interval = math.max(1, intervalMinutes ~/ tickMinutes);
   if (prices.length == 1) return const <MarketCandle>[];
 
@@ -227,8 +317,14 @@ List<MarketCandle> aggregateMarketCandles(
         final lowerWick = _unit(seed, absoluteMinute * 23 + 2027) < wickChance
             ? tickSize
             : 0.0;
-        final minuteHigh = math.max(open, close) + upperWick;
-        final minuteLow = math.max(tickSize, math.min(open, close) - lowerWick);
+        final minuteHigh = math.min(
+          upperBound,
+          math.max(open, close) + upperWick,
+        );
+        final minuteLow = math.max(
+          lowerBound,
+          math.max(tickSize, math.min(open, close) - lowerWick),
+        );
         high = math.max(high, minuteHigh);
         low = math.min(low, minuteLow);
 

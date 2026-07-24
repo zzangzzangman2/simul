@@ -3,6 +3,7 @@ import 'package:millennium_capital/game/game_engine.dart';
 import 'package:millennium_capital/game/game_state.dart';
 import 'package:millennium_capital/game/market_clock.dart';
 import 'package:millennium_capital/game/market_data.dart';
+import 'package:millennium_capital/game/order_book.dart';
 import 'package:millennium_capital/game/seed_money_content.dart';
 import 'package:millennium_capital/game/story_state.dart';
 
@@ -507,7 +508,7 @@ void main() {
         side: TradeSide.buy,
         quantity: 5000,
         type: TradeOrderType.limit,
-        limitPrice: 10000,
+        limitPrice: 10200,
       ),
     );
 
@@ -521,6 +522,119 @@ void main() {
       result.pendingQuantity,
     );
     expect(result.state.positions.single.units, result.filledQuantity);
+    expect(result.averageFillPrice, lessThanOrEqualTo(10200));
+  });
+
+  test('limit fills use displayed asks without market impact', () {
+    final state = engine
+        .createNewGame('호가 체결가 연구소', initialCash: 100000000)
+        .copyWith(day: 4, marketMinute: krxOpenMinute);
+    final snapshot = buildGameOrderBookSnapshot(
+      assetId: 'hanbit_telecom',
+      day: state.day,
+      minute: state.marketMinute,
+      currentPrice: 10000,
+      previousClose: 10000,
+      date: state.currentDate,
+      market: '미래시장',
+    );
+    final limitPrice = snapshot.asks.first.price;
+    final result = engine.executeTrade(
+      state,
+      hanbitOrder(
+        side: TradeSide.buy,
+        quantity: 5,
+        type: TradeOrderType.limit,
+        limitPrice: limitPrice,
+      ),
+    );
+
+    expect(result.success, isTrue);
+    expect(result.filledQuantity, 5);
+    expect(result.averageFillPrice, limitPrice);
+    expect(result.notional, (limitPrice * 5).round());
+    expect(result.state.ledger.last.orderType, TradeOrderType.limit.name);
+    expect(result.state.ledger.last.tradeQuantity, 5);
+    expect(
+      gameConsumedOrderBookFillUnits(
+        result.state,
+        assetId: 'hanbit_telecom',
+        marketMinute: krxOpenMinute,
+        side: TradeSide.buy,
+      ),
+      5,
+    );
+  });
+
+  test('a displayed bid wall keeps a resting buy behind queue', () {
+    final state = engine
+        .createNewGame('매수벽 대기 연구소', initialCash: 100000000)
+        .copyWith(day: 4, marketMinute: krxOpenMinute);
+    final snapshot = buildGameOrderBookSnapshot(
+      assetId: 'hanbit_telecom',
+      day: state.day,
+      minute: state.marketMinute,
+      currentPrice: 10000,
+      previousClose: 10000,
+      date: state.currentDate,
+      market: '미래시장',
+    );
+    final wall = snapshot.bids.firstWhere((level) => level.isWall);
+    final placed = engine.executeTrade(
+      state,
+      hanbitOrder(
+        side: TradeSide.buy,
+        quantity: 10,
+        type: TradeOrderType.limit,
+        limitPrice: wall.price,
+      ),
+    );
+    final queued = placed.state.pendingOrders.single;
+    expect(queued.queueAheadQuantity, wall.quantity);
+
+    final processed = engine.processPendingOrdersAtQuote(
+      placed.state,
+      assetId: 'hanbit_telecom',
+      unitPrice: wall.price,
+      marketMinute: krxOpenMinute,
+      isTradingDay: true,
+      previousClose: 10000,
+    );
+    final waiting = processed.pendingOrders.single;
+    expect(waiting.remainingQuantity, 10);
+    expect(waiting.queueAheadQuantity, lessThan(queued.queueAheadQuantity));
+    expect(waiting.queueAheadQuantity, greaterThan(0));
+  });
+
+  test('a buy limit stays unfilled when the price runs away above it', () {
+    final state = engine
+        .createNewGame('달아나는 호가 연구소', initialCash: 100000000)
+        .copyWith(day: 4, marketMinute: 9 * 60);
+    final placed = engine.executeTrade(
+      state,
+      hanbitOrder(
+        side: TradeSide.buy,
+        quantity: 25,
+        type: TradeOrderType.limit,
+        limitPrice: 9000,
+      ),
+    );
+
+    expect(placed.success, isTrue);
+    expect(placed.filledQuantity, 0);
+    expect(placed.state.pendingOrders, hasLength(1));
+
+    final ranAway = engine.processPendingOrdersAtQuote(
+      placed.state.copyWith(marketMinute: 9 * 60 + 1),
+      assetId: 'hanbit_telecom',
+      unitPrice: 10500,
+      marketMinute: 9 * 60 + 1,
+      isTradingDay: true,
+    );
+
+    expect(ranAway.pendingOrders.single.remainingQuantity, 25);
+    expect(ranAway.positions, isEmpty);
+    expect(ranAway.availableBrokerageCash, lessThan(ranAway.brokerageCash));
   });
 
   test('pending day orders expire at the historical 15:00 close', () {
@@ -542,6 +656,11 @@ void main() {
 
     expect(expired.pendingOrders, isEmpty);
     expect(expired.ledger.last.counterAccount, 'day_order_expiry');
+    expect(
+      expired.ledger.last.sourceId,
+      'expire-${placed.state.pendingOrders.single.id}',
+    );
+    expect(expired.ledger.last.tradeQuantity, 0);
   });
 
   test('pre-v15 saves migrate with an empty pending-order book', () {

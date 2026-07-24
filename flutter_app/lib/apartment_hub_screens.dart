@@ -126,20 +126,17 @@ class _ApartmentHubScreenState extends State<ApartmentHubScreen> {
             ),
           ),
           Positioned(
-            left: 56,
-            right: 56,
-            bottom: 10,
-            child: Center(
-              child: _ApartmentMissionCard(
-                progress: missionProgress,
-                onOpen: widget.onOpenDecisions,
-                onClaim: widget.onClaimMission,
-              ),
+            right: 10,
+            bottom: 100,
+            child: _ApartmentMissionCard(
+              progress: missionProgress,
+              onOpen: widget.onOpenDecisions,
+              onClaim: widget.onClaimMission,
             ),
           ),
           Positioned(
-            left: 6,
-            bottom: 38,
+            left: 10,
+            bottom: 24,
             child: _ApartmentRoomArrow(
               destination: previousPlace,
               flipHorizontally: true,
@@ -147,8 +144,8 @@ class _ApartmentHubScreenState extends State<ApartmentHubScreen> {
             ),
           ),
           Positioned(
-            right: 6,
-            bottom: 38,
+            right: 10,
+            bottom: 24,
             child: _ApartmentRoomArrow(
               destination: nextPlace,
               flipHorizontally: false,
@@ -177,6 +174,487 @@ class _ApartmentHubScreenState extends State<ApartmentHubScreen> {
       ),
     );
   }
+}
+
+class HomeComputerScreen extends StatelessWidget {
+  const HomeComputerScreen({
+    super.key,
+    required this.state,
+    required this.onOpenStockMarket,
+    required this.onOpenRealEstate,
+  });
+
+  final GameState state;
+  final VoidCallback onOpenStockMarket;
+  final VoidCallback onOpenRealEstate;
+
+  @override
+  Widget build(BuildContext context) {
+    final date = state.currentDate;
+    final hour = state.marketMinute ~/ 60;
+    final minute = state.marketMinute % 60;
+    final clock =
+        '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
+    final dateLabel =
+        '${date.year}.${date.month.toString().padLeft(2, '0')}.${date.day.toString().padLeft(2, '0')}';
+    return Scaffold(
+      key: const Key('home-computer-screen'),
+      backgroundColor: const Color(0xFF071A35),
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final compact = constraints.maxHeight < 700;
+            final windowHeight = (constraints.maxHeight - (compact ? 148 : 190))
+                .clamp(280.0, 360.0);
+            return Stack(
+              fit: StackFit.expand,
+              children: [
+                const DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Color(0xFF075B79),
+                        Color(0xFF1E91A5),
+                        Color(0xFF0E405F),
+                      ],
+                    ),
+                  ),
+                ),
+                const Positioned(
+                  right: -58,
+                  top: 72,
+                  child: IgnorePointer(
+                    child: SizedBox(
+                      width: 210,
+                      height: 210,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: Color(0x247DE5D5),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const Positioned(
+                  left: -72,
+                  bottom: 70,
+                  child: IgnorePointer(
+                    child: SizedBox(
+                      width: 230,
+                      height: 230,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: Color(0x1FFFE29A),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: 12,
+                  right: 8,
+                  top: 8,
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.computer_rounded,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '새천년 홈 PC',
+                              style: TextStyle(
+                                fontFamily: _hubDisplayFont,
+                                color: Colors.white,
+                                fontSize: 15,
+                                height: 1,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              '내 컴퓨터 · 온라인',
+                              style: TextStyle(
+                                fontFamily: _hubDisplayFont,
+                                color: Color(0xFFD2F4F3),
+                                fontSize: 9,
+                                height: 1,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        key: const Key('home-computer-close'),
+                        tooltip: '컴퓨터 화면 닫기',
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: const Icon(Icons.power_settings_new_rounded),
+                        color: Colors.white,
+                        iconSize: 23,
+                      ),
+                    ],
+                  ),
+                ),
+                Positioned(
+                  left: 14,
+                  right: 14,
+                  top: compact ? 58 : 78,
+                  height: windowHeight,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF0F1E8),
+                      border: Border.all(
+                        color: const Color(0xFFE6F4FF),
+                        width: 2,
+                      ),
+                      borderRadius: BorderRadius.circular(6),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x66031220),
+                          blurRadius: 18,
+                          offset: Offset(0, 9),
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: Column(
+                        children: [
+                          Container(
+                            height: 36,
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            decoration: const BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [Color(0xFF153B78), Color(0xFF2E70B5)],
+                              ),
+                            ),
+                            child: const Row(
+                              children: [
+                                Icon(
+                                  Icons.language_rounded,
+                                  color: Colors.white,
+                                  size: 18,
+                                ),
+                                SizedBox(width: 7),
+                                Expanded(
+                                  child: Text(
+                                    '온라인 자산센터',
+                                    style: TextStyle(
+                                      fontFamily: _hubDisplayFont,
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                                _ComputerWindowDot(color: Color(0xFFBBD7F6)),
+                                SizedBox(width: 5),
+                                _ComputerWindowDot(color: Color(0xFFFFD66F)),
+                                SizedBox(width: 5),
+                                _ComputerWindowDot(color: Color(0xFFFF8B83)),
+                              ],
+                            ),
+                          ),
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(
+                                14,
+                                14,
+                                14,
+                                16,
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    '실행할 프로그램을 선택하세요',
+                                    style: TextStyle(
+                                      fontFamily: _hubDisplayFont,
+                                      color: _ink,
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: -0.3,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  const Text(
+                                    '주식과 부동산 시장은 각각 별도 프로그램으로 열립니다.',
+                                    maxLines: 2,
+                                    style: TextStyle(
+                                      fontFamily: _hubDisplayFont,
+                                      color: Color(0xFF697486),
+                                      fontSize: 9.5,
+                                      height: 1.35,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 13),
+                                  Expanded(
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: _ComputerAppTile(
+                                            interactionKey: const Key(
+                                              'computer-stock-market-app',
+                                            ),
+                                            icon:
+                                                Icons.candlestick_chart_rounded,
+                                            iconColor: const Color(0xFF55C7A1),
+                                            title: '미래 증권',
+                                            subtitle: '주식시장',
+                                            status: '시세 · 주문',
+                                            onTap: onOpenStockMarket,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: _ComputerAppTile(
+                                            interactionKey: const Key(
+                                              'computer-real-estate-app',
+                                            ),
+                                            icon: Icons.apartment_rounded,
+                                            iconColor: const Color(0xFFFFA45C),
+                                            title: '한마음 부동산',
+                                            subtitle: '서울·경기 매물',
+                                            status: '지도 · 계약',
+                                            onTap: onOpenRealEstate,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: 7,
+                  right: 7,
+                  bottom: 7,
+                  height: 48,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7),
+                    decoration: BoxDecoration(
+                      color: const Color(0xEDE4E8E0),
+                      border: Border.all(color: const Color(0xFFFFFFFF)),
+                      borderRadius: BorderRadius.circular(7),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x55031220),
+                          blurRadius: 9,
+                          offset: Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          height: 32,
+                          padding: const EdgeInsets.symmetric(horizontal: 11),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF3A8D67),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: Colors.white, width: 1.2),
+                          ),
+                          child: const Row(
+                            children: [
+                              Icon(
+                                Icons.window_rounded,
+                                color: Colors.white,
+                                size: 17,
+                              ),
+                              SizedBox(width: 6),
+                              Text(
+                                '시작',
+                                style: TextStyle(
+                                  fontFamily: _hubDisplayFont,
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 7),
+                        const Icon(
+                          Icons.signal_wifi_4_bar_rounded,
+                          color: Color(0xFF26415E),
+                          size: 19,
+                        ),
+                        const Spacer(),
+                        Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              clock,
+                              style: const TextStyle(
+                                fontFamily: _hubDisplayFont,
+                                color: Color(0xFF20344F),
+                                fontSize: 10,
+                                height: 1,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              dateLabel,
+                              style: const TextStyle(
+                                fontFamily: _hubDisplayFont,
+                                color: Color(0xFF5B6776),
+                                fontSize: 8,
+                                height: 1,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _ComputerAppTile extends StatelessWidget {
+  const _ComputerAppTile({
+    required this.interactionKey,
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.subtitle,
+    required this.status,
+    required this.onTap,
+  });
+
+  final Key interactionKey;
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final String subtitle;
+  final String status;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: Colors.transparent,
+    child: InkWell(
+      key: interactionKey,
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(7),
+      child: Ink(
+        decoration: BoxDecoration(
+          color: const Color(0xFFF9FAF4),
+          borderRadius: BorderRadius.circular(7),
+          border: Border.all(color: const Color(0xFF94A4B7), width: 1.5),
+          boxShadow: const [
+            BoxShadow(color: Colors.white, offset: Offset(-2, -2)),
+            BoxShadow(color: Color(0xFF9AA7AF), offset: Offset(2, 2)),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(9, 12, 9, 9),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 58,
+                height: 58,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF172C4A),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF6E89AC)),
+                ),
+                child: Icon(icon, color: iconColor, size: 34),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontFamily: _hubDisplayFont,
+                  color: _ink,
+                  fontSize: 12,
+                  height: 1,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.25,
+                ),
+              ),
+              const SizedBox(height: 5),
+              Text(
+                subtitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontFamily: _hubDisplayFont,
+                  color: Color(0xFF586476),
+                  fontSize: 9,
+                  height: 1,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE5E9E4),
+                  borderRadius: BorderRadius.circular(99),
+                ),
+                child: Text(
+                  status,
+                  maxLines: 1,
+                  style: const TextStyle(
+                    fontFamily: _hubDisplayFont,
+                    color: Color(0xFF486070),
+                    fontSize: 8,
+                    height: 1,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+class _ComputerWindowDot extends StatelessWidget {
+  const _ComputerWindowDot({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+    decoration: BoxDecoration(
+      color: color,
+      borderRadius: BorderRadius.circular(2),
+      border: Border.all(color: const Color(0x66000000)),
+    ),
+    child: const SizedBox(width: 13, height: 13),
+  );
 }
 
 class _HubTutorialOverlay extends StatelessWidget {
@@ -280,7 +758,7 @@ class _ApartmentPlaceScene extends StatelessWidget {
             interactionKey: const Key('open-market-button'),
             alignment: const Alignment(-0.63, -0.22),
             eyebrow: '컴퓨터 켜기',
-            label: '주식시장',
+            label: '홈 PC',
             accent: const Color(0xFF80D8FF),
             onTap: onOpenMarket,
           ),
@@ -737,6 +1215,9 @@ class _ApartmentMissionCardState extends State<_ApartmentMissionCard> {
   Widget build(BuildContext context) {
     final progress = widget.progress;
     final complete = progress?.complete ?? false;
+    final current = progress == null
+        ? 0
+        : progress.current.clamp(0, progress.mission.target);
     return Semantics(
       container: true,
       button: true,
@@ -747,223 +1228,129 @@ class _ApartmentMissionCardState extends State<_ApartmentMissionCard> {
         key: const Key('hub-mission-card'),
         color: Colors.transparent,
         child: Container(
-          width: 248,
-          height: 104,
+          width: 202,
+          height: 62,
           decoration: BoxDecoration(
-            color: const Color(0xFFFFF8E9),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: const Color(0xFF243451), width: 2.5),
+            color: const Color(0xF5FFF8E9),
+            borderRadius: BorderRadius.circular(13),
+            border: Border.all(color: const Color(0xFF243451), width: 1.5),
             boxShadow: const [
               BoxShadow(
-                color: Color(0x66070A12),
-                blurRadius: 12,
-                offset: Offset(0, 5),
+                color: Color(0x4D070A12),
+                blurRadius: 8,
+                offset: Offset(0, 3),
               ),
             ],
           ),
           child: InkWell(
-            borderRadius: BorderRadius.circular(15),
+            borderRadius: BorderRadius.circular(12),
             onTap: widget.onOpen,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(11, 9, 10, 8),
-              child: progress == null
-                  ? const Row(
-                      children: [
-                        _ApartmentMissionEmblem(),
-                        SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '모든 미션 완료!',
-                                style: TextStyle(
-                                  fontFamily: _hubDisplayFont,
-                                  color: _ink,
-                                  fontSize: 15,
-                                  height: 1,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              SizedBox(height: 7),
-                              Text(
-                                '성장 기록 보기  ›',
-                                style: TextStyle(
-                                  fontFamily: _hubDisplayFont,
-                                  color: Color(0xFF6B7485),
-                                  fontSize: 10,
-                                  height: 1,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    )
-                  : Column(
+              padding: const EdgeInsets.fromLTRB(8, 7, 7, 7),
+              child: Row(
+                children: [
+                  const _ApartmentMissionEmblem(),
+                  const SizedBox(width: 7),
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
-                            const _ApartmentMissionEmblem(),
-                            const SizedBox(width: 9),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      const Text(
-                                        '현재 미션',
-                                        style: TextStyle(
-                                          fontFamily: _hubDisplayFont,
-                                          color: Color(0xFF9B681C),
-                                          fontSize: 8.5,
-                                          height: 1,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                      const Spacer(),
-                                      if (progress.remainingDays != null)
-                                        Text(
-                                          '${progress.remainingDays}일 남음',
-                                          style: const TextStyle(
-                                            fontFamily: _hubDisplayFont,
-                                            color: Color(0xFF9A5146),
-                                            fontSize: 8,
-                                            height: 1,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    progress.mission.title,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontFamily: _hubDisplayFont,
-                                      color: _ink,
-                                      fontSize: 14.5,
-                                      height: 1,
-                                      fontWeight: FontWeight.w700,
-                                      letterSpacing: -0.35,
-                                    ),
-                                  ),
-                                ],
+                            Text(
+                              progress == null ? '미션 완료' : '현재 미션',
+                              style: const TextStyle(
+                                fontFamily: _hubDisplayFont,
+                                color: Color(0xFF9B681C),
+                                fontSize: 8,
+                                height: 1,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const Spacer(),
+                            Text(
+                              progress == null
+                                  ? '기록 보기'
+                                  : '$current/${progress.mission.target}',
+                              style: const TextStyle(
+                                fontFamily: _hubDisplayFont,
+                                color: Color(0xFF6B7485),
+                                fontSize: 8,
+                                height: 1,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
                           ],
                         ),
                         const SizedBox(height: 5),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                progress.mission.objective,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontFamily: _hubDisplayFont,
-                                  color: Color(0xFF5E6675),
-                                  fontSize: 9,
-                                  height: 1,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              '${progress.current.clamp(0, progress.mission.target)}/${progress.mission.target}',
-                              style: const TextStyle(
-                                fontFamily: _hubDisplayFont,
-                                color: _ink,
-                                fontSize: 8.5,
-                                height: 1,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(99),
-                          child: LinearProgressIndicator(
-                            value: progress.ratio,
-                            minHeight: 5,
-                            backgroundColor: const Color(0xFFD9CDB5),
-                            valueColor: const AlwaysStoppedAnimation(
-                              Color(0xFF4EBA8E),
-                            ),
+                        Text(
+                          progress?.mission.title ?? '모든 미션을 완료했어요!',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontFamily: _hubDisplayFont,
+                            color: _ink,
+                            fontSize: 11.5,
+                            height: 1,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.25,
                           ),
                         ),
-                        const Spacer(),
-                        Row(
-                          children: [
-                            Text(
-                              '보상  ${progress.mission.experienceReward} XP',
-                              style: const TextStyle(
-                                fontFamily: _hubDisplayFont,
-                                color: Color(0xFF8A5A16),
-                                fontSize: 8.5,
-                                height: 1,
-                                fontWeight: FontWeight.w700,
+                        if (progress != null) ...[
+                          const SizedBox(height: 6),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(99),
+                            child: LinearProgressIndicator(
+                              value: progress.ratio,
+                              minHeight: 4,
+                              backgroundColor: const Color(0xFFD9CDB5),
+                              valueColor: const AlwaysStoppedAnimation(
+                                Color(0xFF4EBA8E),
                               ),
                             ),
-                            if (progress.mission.cashReward > 0) ...[
-                              const SizedBox(width: 7),
-                              Text(
-                                '+${_money(progress.mission.cashReward)}원',
-                                style: const TextStyle(
-                                  fontFamily: _hubDisplayFont,
-                                  color: Color(0xFF2E8063),
-                                  fontSize: 8.5,
-                                  height: 1,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
-                            const Spacer(),
-                            if (complete)
-                              SizedBox(
-                                height: 23,
-                                child: FilledButton(
-                                  key: const Key('hub-claim-mission-reward'),
-                                  onPressed: _claiming ? null : _claim,
-                                  style: FilledButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 10,
-                                    ),
-                                    backgroundColor: const Color(0xFF243451),
-                                    foregroundColor: Colors.white,
-                                    textStyle: const TextStyle(
-                                      fontFamily: _hubDisplayFont,
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                  ),
-                                  child: Text(_claiming ? '저장 중' : '보상 받기'),
-                                ),
-                              )
-                            else
-                              const Text(
-                                '자세히  ›',
-                                style: TextStyle(
-                                  fontFamily: _hubDisplayFont,
-                                  color: Color(0xFF243451),
-                                  fontSize: 9,
-                                  height: 1,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ],
                     ),
+                  ),
+                  const SizedBox(width: 7),
+                  if (complete)
+                    SizedBox(
+                      width: 30,
+                      height: 30,
+                      child: FilledButton(
+                        key: const Key('hub-claim-mission-reward'),
+                        onPressed: _claiming ? null : _claim,
+                        style: FilledButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          minimumSize: Size.zero,
+                          backgroundColor: const Color(0xFF243451),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(9),
+                          ),
+                        ),
+                        child: _claiming
+                            ? const SizedBox(
+                                width: 12,
+                                height: 12,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(Icons.card_giftcard_rounded, size: 17),
+                      ),
+                    )
+                  else
+                    const Icon(
+                      Icons.chevron_right_rounded,
+                      color: Color(0xFF243451),
+                      size: 22,
+                    ),
+                ],
+              ),
             ),
           ),
         ),
@@ -1265,32 +1652,28 @@ class _ApartmentRoomArrow extends StatelessWidget {
         enabled: target != null,
         label: tooltip,
         child: Opacity(
-          opacity: target == null ? 0.24 : 1,
-          child: SizedBox(
-            width: 50,
-            height: 50,
-            child: ElevatedButton(
-              key: details == null ? null : Key('apartment-go-${details.id}'),
-              onPressed: target == null ? null : () => onMove(target),
-              style: ElevatedButton.styleFrom(
-                padding: EdgeInsets.zero,
-                elevation: target == null ? 0 : 5,
-                shadowColor: const Color(0x660B1423),
-                backgroundColor: const Color(0xF7FFF8E9),
-                foregroundColor: _ink,
-                disabledBackgroundColor: const Color(0xE8EEE8DC),
-                shape: const CircleBorder(
-                  side: BorderSide(color: Color(0xFF243451), width: 2),
-                ),
-              ),
-              child: Transform.flip(
-                flipX: flipHorizontally,
-                child: Image.asset(
-                  'assets/images/hud_clean_arrow_right.png',
-                  width: 35,
-                  height: 35,
-                  fit: BoxFit.contain,
-                  filterQuality: FilterQuality.high,
+          opacity: target == null ? 0.22 : 1,
+          child: SizedBox.square(
+            dimension: 68,
+            child: Material(
+              color: Colors.transparent,
+              child: InkResponse(
+                key: details == null ? null : Key('apartment-go-${details.id}'),
+                onTap: target == null ? null : () => onMove(target),
+                radius: 34,
+                splashColor: const Color(0x44FFD76A),
+                highlightColor: Colors.transparent,
+                child: Center(
+                  child: Transform.flip(
+                    flipX: flipHorizontally,
+                    child: Image.asset(
+                      'assets/images/hud_clean_arrow_right.png',
+                      width: 56,
+                      height: 56,
+                      fit: BoxFit.contain,
+                      filterQuality: FilterQuality.high,
+                    ),
+                  ),
                 ),
               ),
             ),

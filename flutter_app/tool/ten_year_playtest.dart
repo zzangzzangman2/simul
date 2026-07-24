@@ -157,7 +157,25 @@ Future<void> main() async {
   var generatedIpoTrades = 0;
   var workedDays = 0;
   var peakAssets = 0;
+  var peakAssetsDate = state.currentDate;
   var maxDrawdown = 0.0;
+  var maxDrawdownPeakDate = state.currentDate;
+  var maxDrawdownTroughDate = state.currentDate;
+  var maxDrawdownPeakAssets = 0;
+  var maxDrawdownTroughAssets = 0;
+  final lastMarketCloses = <String, double>{};
+  var equalWeightMarketIndex = 1.0;
+  var marketPeakIndex = 1.0;
+  var marketPeakDate = state.currentDate;
+  var marketMaxDrawdown = 0.0;
+  var marketMaxDrawdownPeakDate = state.currentDate;
+  var marketMaxDrawdownTroughDate = state.currentDate;
+  for (final asset in universe.assets) {
+    final baseline = asset.quoteAtOrBefore(state.campaignStartDate);
+    if (baseline != null) {
+      lastMarketCloses[asset.id] = baseline.close;
+    }
+  }
   var lastRebalanceMonth = '';
   var lastSavedYear = state.currentDate.year;
 
@@ -301,18 +319,54 @@ Future<void> main() async {
       lastSavedYear = state.currentDate.year;
     }
 
-    final prices = <String, double>{
-      for (final asset in universe.assets)
-        if (asset.quoteAtOrBefore(state.currentDate) case final quote?)
-          asset.id: quote.close,
-    };
+    final prices = <String, double>{};
+    final marketDailyReturns = <double>[];
+    for (final asset in universe.assets) {
+      final quote = asset.quoteAtOrBefore(state.currentDate);
+      if (quote == null) continue;
+      prices[asset.id] = quote.close;
+      if (quote.isExactDate) {
+        final previous = lastMarketCloses[asset.id];
+        if (previous != null && previous > 0) {
+          marketDailyReturns.add(quote.close / previous - 1);
+        }
+        lastMarketCloses[asset.id] = quote.close;
+      }
+    }
+    if (marketDailyReturns.isNotEmpty) {
+      final averageReturn =
+          marketDailyReturns.fold<double>(0, (sum, value) => sum + value) /
+          marketDailyReturns.length;
+      equalWeightMarketIndex *= 1 + averageReturn;
+      if (equalWeightMarketIndex > marketPeakIndex) {
+        marketPeakIndex = equalWeightMarketIndex;
+        marketPeakDate = state.currentDate;
+      }
+      final marketDrawdown =
+          (marketPeakIndex - equalWeightMarketIndex) / marketPeakIndex;
+      if (marketDrawdown > marketMaxDrawdown) {
+        marketMaxDrawdown = marketDrawdown;
+        marketMaxDrawdownPeakDate = marketPeakDate;
+        marketMaxDrawdownTroughDate = state.currentDate;
+      }
+    }
     final assets =
         state.cash +
         state.portfolioValue(prices) +
         state.personalFinance.estimatedPropertyValueAt(state.day);
-    peakAssets = math.max(peakAssets, assets);
+    if (assets > peakAssets) {
+      peakAssets = assets;
+      peakAssetsDate = state.currentDate;
+    }
     if (peakAssets > 0) {
-      maxDrawdown = math.max(maxDrawdown, (peakAssets - assets) / peakAssets);
+      final drawdown = (peakAssets - assets) / peakAssets;
+      if (drawdown > maxDrawdown) {
+        maxDrawdown = drawdown;
+        maxDrawdownPeakDate = peakAssetsDate;
+        maxDrawdownTroughDate = state.currentDate;
+        maxDrawdownPeakAssets = peakAssets;
+        maxDrawdownTroughAssets = assets;
+      }
     }
   }
 
@@ -342,6 +396,15 @@ Future<void> main() async {
     'brokerageCash': state.brokerageCash,
     'portfolioValue': state.portfolioValue(prices),
     'maxDrawdownPct': double.parse((maxDrawdown * 100).toStringAsFixed(2)),
+    'maxDrawdownPeakDate': marketDateKey(maxDrawdownPeakDate),
+    'maxDrawdownTroughDate': marketDateKey(maxDrawdownTroughDate),
+    'maxDrawdownPeakAssets': maxDrawdownPeakAssets,
+    'maxDrawdownTroughAssets': maxDrawdownTroughAssets,
+    'marketMaxDrawdownPct': double.parse(
+      (marketMaxDrawdown * 100).toStringAsFixed(2),
+    ),
+    'marketMaxDrawdownPeakDate': marketDateKey(marketMaxDrawdownPeakDate),
+    'marketMaxDrawdownTroughDate': marketDateKey(marketMaxDrawdownTroughDate),
     'newsArchiveDays':
         ((state.story.storyFlags['newsArchive'] as List?) ?? const []).length,
     'unpaidOperatingCost': state.story.flagInt('unpaidOperatingCost'),
@@ -353,6 +416,8 @@ Future<void> main() async {
       generatedIpoTrades == 0 ||
       resolvedDecisions < 20 ||
       maxDrawdown > 0.65 ||
+      marketMaxDrawdown < 0.35 ||
+      marketMaxDrawdown > 0.75 ||
       state.story.flagInt('unpaidOperatingCost') != 0) {
     throw StateError(
       'Full-campaign playtest regression: ${jsonEncode(result)}',

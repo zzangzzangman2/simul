@@ -59,6 +59,7 @@ void main() {
         previousClose: 10000,
         officialClose: 11200,
         seed: 77,
+        dailyLimitRate: marketDailyPriceLimitRate(DateTime(2010, 1, 4)),
       );
       expect(path, hasLength(generatedSessionTicks + 1));
       expect(
@@ -103,6 +104,51 @@ void main() {
     expect(isValidMarketOrderPrice(10025), isFalse);
   });
 
+  test('post-2015 intraday paths use the 30 percent daily limits', () {
+    final date = DateTime(2026, 4, 7);
+    final rate = marketDailyPriceLimitRate(date);
+    final upperPath = generatedFullMarketDayPath(
+      previousClose: 10000,
+      officialClose: 13000,
+      seed: 17,
+      dailyLimitRate: rate,
+    );
+    final lowerPath = generatedFullMarketDayPath(
+      previousClose: 10000,
+      officialClose: 7000,
+      seed: 31,
+      dailyLimitRate: rate,
+    );
+
+    expect(upperPath.every((price) => price >= 7000 && price <= 13000), isTrue);
+    expect(lowerPath.every((price) => price >= 7000 && price <= 13000), isTrue);
+    final upperCandles = aggregateMarketCandles(
+      upperPath.sublist(generatedPreOpenTicks, krxCloseTick + 1),
+      1,
+      seed: 91,
+      lowerPriceLimit: 7000,
+      upperPriceLimit: 13000,
+    );
+    expect(
+      upperCandles.every(
+        (candle) => candle.low >= 7000 && candle.high <= 13000,
+      ),
+      isTrue,
+    );
+    expect(
+      upperPath[krxCloseTick - 1],
+      greaterThan(11500),
+      reason: '상한가 종가 직전에 과거 15% 경계에 갇히면 안 된다.',
+    );
+    expect(
+      lowerPath[krxCloseTick - 1],
+      lessThan(8500),
+      reason: '하한가 종가 직전에 과거 15% 경계에 갇히면 안 된다.',
+    );
+    expect(upperPath[krxCloseTick], 13000);
+    expect(lowerPath[krxCloseTick], 7000);
+  });
+
   test('saved clock resets to 08:00 after the newspaper advances a day', () {
     const engine = GameEngine();
     final state = engine
@@ -140,5 +186,35 @@ void main() {
       advanceGameTime(19 * 60 + 30, workActionMinutes),
       marketDayEndMinute,
     );
+  });
+
+  test('timed impacts do not diverge before the earlier public reveal', () {
+    final earlier = generatedFullMarketDayPath(
+      previousClose: 10000,
+      officialClose: 11000,
+      seed: 71,
+      dailyLimitRate: 0.30,
+      timedImpacts: const [
+        MarketTimedImpact(revealMinute: 13 * 60, impactRate: 0.08),
+      ],
+    );
+    final later = generatedFullMarketDayPath(
+      previousClose: 10000,
+      officialClose: 11000,
+      seed: 71,
+      dailyLimitRate: 0.30,
+      timedImpacts: const [
+        MarketTimedImpact(revealMinute: 14 * 60, impactRate: 0.08),
+      ],
+    );
+    final earlierRevealTick = marketTickForMinute(13 * 60);
+
+    expect(
+      earlier.take(earlierRevealTick),
+      orderedEquals(later.take(earlierRevealTick)),
+    );
+    expect(earlier[earlierRevealTick], isNot(later[earlierRevealTick]));
+    expect(earlier.last, 11000);
+    expect(later.last, 11000);
   });
 }

@@ -1,11 +1,17 @@
 part of 'main.dart';
 
 const _onboardingBeatCount = 31;
+const _storyCharacterBottomInset = 122.0;
+const _storyCharacterHeightFactor = 0.78;
+const _storyCharacterAspectRatio = 2 / 3;
+
+typedef NewGameCreator =
+    Future<void> Function(NewGameSetup setup, ValueChanged<String> onProgress);
 
 class VisualNovelOnboardingScreen extends StatefulWidget {
   const VisualNovelOnboardingScreen({super.key, required this.onCreate});
 
-  final ValueChanged<NewGameSetup> onCreate;
+  final NewGameCreator onCreate;
 
   @override
   State<VisualNovelOnboardingScreen> createState() =>
@@ -20,6 +26,8 @@ class _VisualNovelOnboardingScreenState
   String? _introChoice;
   StoryTrait? _trait;
   FamilyRule? _familyRule;
+  bool _isCreating = false;
+  String _creationStatus = '투자연구소 정보를 정리하는 중…';
 
   @override
   void dispose() {
@@ -48,11 +56,17 @@ class _VisualNovelOnboardingScreenState
   };
 
   String? get _character => switch (_beat) {
-    1 || 5 || 7 || 10 || 15 || 23 || 25 => 'assets/images/character_hero.png',
-    4 || 6 || 12 => 'assets/images/character_father.png',
-    2 => 'assets/images/character_sister.png',
+    1 ||
+    5 ||
+    7 ||
+    10 ||
+    15 ||
+    23 ||
+    25 => 'assets/images/character_hero_title_style_v2.png',
+    4 || 6 || 12 => 'assets/images/character_father_title_style_v2.png',
+    2 => 'assets/images/character_sister_title_style_v2.png',
     9 || 11 => 'assets/images/character_grandfather.png',
-    3 || 13 => 'assets/images/character_mother.png',
+    3 || 13 => 'assets/images/character_mother_title_style_v2.png',
     _ => null,
   };
 
@@ -65,7 +79,16 @@ class _VisualNovelOnboardingScreenState
   bool get _isAcademyTeacherBeat =>
       _beat >= 17 && _beat <= 22 || _beat == 24 || _beat >= 27;
 
-  Alignment get _teacherPoseAlignment => Alignment.topCenter;
+  String get _teacherPoseAsset => switch (_beat) {
+    17 => 'assets/images/주식선생님/24_포즈3_주인공그림체_공통슬롯_투명.png',
+    18 || 28 => 'assets/images/주식선생님/22_포즈1_주인공그림체_공통슬롯_투명.png',
+    19 || 21 => 'assets/images/주식선생님/26_포즈5_주인공그림체_공통슬롯_투명.png',
+    20 || 29 => 'assets/images/주식선생님/23_포즈2_주인공그림체_공통슬롯_투명.png',
+    22 => 'assets/images/주식선생님/27_포즈6_주인공그림체_공통슬롯_투명.png',
+    24 || 27 => 'assets/images/주식선생님/25_포즈4_주인공그림체_공통슬롯_투명.png',
+    30 => 'assets/images/주식선생님/24_포즈3_주인공그림체_공통슬롯_투명.png',
+    _ => 'assets/images/주식선생님/26_포즈5_주인공그림체_공통슬롯_투명.png',
+  };
 
   bool get _isNarration =>
       _beat == 0 || _beat == 8 || _beat == 14 || _beat == 16 || _beat == 26;
@@ -91,67 +114,79 @@ class _VisualNovelOnboardingScreenState
 
   String get _line => switch (_beat) {
     0 =>
-      'TV 드라마 속 젊은 투자자가 작은 회사의 가능성을 먼저 알아보고 모두를 놀라게 했다. 엔딩 음악이 끝났는데도 내 눈은 화면에서 떨어지지 않았다.',
-    1 => '저도 주식 해 보고 싶어요. 멋진 회사를 남들보다 먼저 찾아내는 거, 진짜 멋있잖아요!',
-    2 => '드라마 한 편 보고 벌써 투자자야? 넥타이부터 사 달라고 하겠네.',
-    3 => '멋있어 보이는 장면 뒤에는 잃을 수도 있는 진짜 돈이 있어. 버튼부터 누르는 건 안 돼.',
-    4 => '그래도 정말 배우고 싶다면 먼저 투자학원 입문반부터 다녀. 회사와 주문이 뭔지는 알고 시작해야지.',
-    5 => '학원이요? 저도 갈래요. 그런데 학원비는 얼마예요?',
-    6 => '100만 원이다. 내가 먼저 내주마. 공짜 용돈은 아니고, 네 장부에 “아빠에게 갚을 학원비”로 적는 거야.',
-    7 => '약속할게요. 제가 돈을 벌면 아빠가 먼저 내준 학원비부터 꼭 갚을게요.',
+      'TV 드라마에서 작은 회사의 가능성을 먼저 알아본 투자자가 모두를 놀라게 했다. 엔딩 음악이 끝났는데도 나는 리모컨을 내려놓지 못했다.',
+    1 => '나도 주식 해 보고 싶어요! 저 사람처럼 좋은 회사를 먼저 찾으면 진짜 신날 것 같아요.',
+    2 => '드라마 한 편 보고 벌써 투자자야? 내일 넥타이부터 사 달라고 하겠네.',
+    3 => '주식은 게임 점수가 아니라 진짜 돈이 움직이는 일이야. 먼저 배우고, 어른과 같이 해 보자.',
+    4 => '정말 궁금하면 청소년 투자학교 입문반에 가 보자. 회사와 주문이 뭔지부터 천천히 배우는 거야.',
+    5 => '투자학교요? 우와, 저도 갈래요! 거기 가면 주식 화면도 직접 눌러 볼 수 있어요?',
+    6 => '수업료는 100만 원이야. 아빠가 먼저 내 줄게. 용돈은 아니니까 나중에 장부에 어떻게 갚을지도 같이 적자.',
+    7 => '네! 몰래 사지 않고, 배운 건 집에 와서 꼭 보여드릴게요.',
     8 => '주말 아침, 소식을 들은 외할아버지가 낡은 투자 장부와 세뱃돈 봉투를 들고 찾아왔다.',
-    9 => '배우겠다고 마음먹은 건 좋구나. 이 장부와 세뱃돈 만 원을 첫 투자금으로 주마. 학원비 빚과 투자금은 절대 섞지 말거라.',
-    10 => '외할아버지가 물었다. “학원에서 가장 먼저 무엇을 배우고 싶니?”',
+    9 => '배우고 싶다는 마음이 기특하구나. 이 장부와 세뱃돈 만 원을 줄 테니, 처음에는 아주 작게 연습해 보렴.',
+    10 => '음… 저는 학원에서 뭘 제일 먼저 배우면 좋을까요?',
     11 => _introResponse,
-    12 => '입문반 수업은 내가 먼저 신청해 뒀다. 배운 뒤에도 모르는 주문은 반드시 우리에게 물어봐.',
-    13 => '세뱃돈은 어머니 명의 교육용 증권계좌에 넣을게. 생활비, 학원비 빚, 투자금은 각각 따로 기록하자.',
+    12 => '수업을 듣고도 헷갈리는 주문은 그냥 누르지 말고 꼭 우리에게 물어봐.',
+    13 => '세뱃돈은 엄마가 교육용 계좌에 따로 넣어 둘게. 네가 무엇을 사고 왜 샀는지도 같이 적어 보자.',
     14 =>
-      '며칠 뒤, 집으로 ‘새천년 청소년 투자학교’의 남색 초대장이 도착했다. 만 10세부터 19세까지만 등록할 수 있고, 첫 주문은 반드시 보호자와 함께 복기한다는 학교였다.',
-    15 => '정말 10대만 오는 곳이구나. 종목을 찍어 주는 학원이 아니라, 내 돈을 스스로 설명하는 법을 배우는 학교래.',
+      '며칠 뒤, 집으로 ‘새천년 청소년 투자학교’의 남색 초대장이 왔다. 만 10세부터 19세까지만 다니며, 첫 주문은 보호자와 함께 돌아보는 학교였다.',
+    15 => '진짜 10대만 오는 곳이네! 무슨 종목을 사라고 외우는 곳이 아니라, 제가 고른 이유를 말하는 곳이래요.',
     16 =>
-      '첫 등교 날. 학생들은 실습실 밖에서 오리엔테이션을 듣고 있었고, 나는 먼저 교탁과 주식 단말이 놓인 조용한 교실에 들어섰다. 곧 문이 열리고 담임 선생님이 교탁 옆에 섰다.',
+      '첫 등교 날. 나는 교탁과 주식 단말이 놓인 조용한 교실에 먼저 들어갔다. 잠시 뒤 문이 열리고 담임 선생님이 교탁 옆에 섰다.',
     17 =>
-      '반가워요. 10대 입문반을 맡은 한서윤입니다. 여기는 빨리 부자가 되는 종목을 찍어 주는 곳이 아니라, 자기 판단을 말할 수 있는 투자자를 키우는 학교예요.',
-    18 => '주식 한 주는 회사의 아주 작은 조각이에요. 가격표만 사는 게 아니라 그 회사의 제품, 실적, 위험을 함께 사는 거죠.',
-    19 => '그럼 가격이 오르는 회사가 무조건 좋은 회사인 건가요?',
+      '안녕하세요! 10대 입문반을 맡은 한서윤이에요. 여기서는 “이 종목 사세요”라고 답을 주지 않아요. 회사와 숫자를 보고 스스로 고르는 법을 연습할 거예요.',
+    18 =>
+      '주식 한 주는 회사의 아주 작은 조각이에요. 주식을 사면 가격표뿐 아니라 그 회사가 잘될 가능성과 어려워질 위험도 함께 갖게 돼요.',
+    19 => '그럼 가격이 제일 많이 오른 회사가 제일 좋은 회사예요?',
     20 =>
-      '아니에요. 가격이 오른다는 건 사려는 사람이 더 급했다는 뜻일 뿐이에요. 회사·매수와 매도·가격 방식을 따로 확인해 볼까요?',
-    21 => '시장가랑 지정가는 언제 골라야 해요? 빨리 사는 게 항상 좋은 건 아니죠?',
+      '꼭 그렇지는 않아요. 가격은 사람들의 주문 때문에 먼저 움직일 수도 있거든요. 회사, 매수와 매도, 주문 가격을 하나씩 볼까요?',
+    21 => '시장가랑 지정가는 이름이 어려워요. 빨리 사고 싶을 때는 그냥 시장가를 누르면 돼요?',
     22 =>
-      '맞아요. 시장가는 빠른 체결, 지정가는 원하는 가격을 우선해요. 수수료까지 확인한 뒤 투자노트 첫 장에 이름을 적어 볼까요?',
+      '시장가는 빨리 사고팔 때, 지정가는 원하는 가격을 정할 때 써요. 둘 다 장단점이 있으니 수수료까지 보고 고르면 돼요. 먼저 이름을 알려 줄래요?',
     23 =>
-      '${_playerController.text.trim()}입니다. 드라마처럼 멋있어 보이는 것보다, 제가 왜 사는지 설명할 수 있는 투자자가 될래요.',
-    24 => '첫 조사 과제입니다. 어떤 기준을 가장 먼저 연습해 보고 싶나요?',
+      '저는 ${_playerController.text.trim()}예요. 멋져 보이는 것보다, 제가 왜 샀는지 제 말로 설명해 보고 싶어요.',
+    24 => '좋아요. 첫 번째로 어떤 걸 연습해 보고 싶어요?',
     25 => _traitResponse,
-    26 => '수업 마지막 화면 실습을 앞두고, 선생님은 가족이 적어 보낸 투자 약속 카드와 세뱃돈 장부를 교탁 위에 펼쳤다.',
-    27 => '가족과 약속한 원칙 가운데 첫 주문부터 반드시 지킬 한 가지를 골라 볼까요?',
-    28 =>
-      '아빠가 먼저 낸 학원비 1,000,000원은 투자금이 아니에요. 나중에 회사 통장에 돈이 모이면 거실에서 아빠에게 갚아야 해요.',
-    29 =>
-      '외할아버지의 세뱃돈 10,000원은 교육용 증권계좌에 들어 있어요. 이제 화면 실습에 표시할 투자연구소 이름을 정해 볼까요?',
-    _ => '좋아요. 이름을 적으면 집으로 돌아가기 전에 실제 주식 화면을 열어, 제가 가리키는 곳을 함께 눌러 볼게요.',
+    26 => '선생님은 컴퓨터 옆에 작은 주문표를 놓았다. 이제 직접 매수와 매도를 해 볼 시간이었다.',
+    27 => '주문 버튼을 누르기 전에, 오늘부터 지킬 약속 하나만 골라 볼까요?',
+    28 => _lessonRuleResponse,
+    29 => '좋아요. 이제 교실 컴퓨터로 실제 주문 화면을 연습할 거예요. 그 전에 투자노트 표지에 붙일 이름도 하나 정해 볼까요?',
+    _ => '어렵게 짓지 않아도 돼요. 마음에 드는 이름이면 충분해요. 이름을 적으면 같이 주식 화면을 열어 봐요!',
   };
 
   String get _introResponse => switch (_introChoice) {
-    'computer' => '컴퓨터는 빠르지만 답을 대신 정해 주지는 않는단다. 회사 소식을 찾고 서로 맞는지 확인하는 법부터 배우렴.',
-    'y2k' => '돈을 지키는 질문부터 배우겠다는 건 좋은 시작이다. 모르는 위험은 작게 시작해서 확인하면 돼.',
-    'stocks' => '좋은 회사를 고르는 눈은 하루아침에 생기지 않는다. 제품을 보고 숫자를 읽고, 틀릴 가능성도 함께 적어 보렴.',
+    'computer' =>
+      '좋은 질문이구나. 컴퓨터는 빠르지만 답을 대신 골라 주지는 않아. 회사 소식을 찾고 서로 맞는지 확인하는 법부터 배우렴.',
+    'y2k' => '돈을 잃지 않는 법이 궁금하구나. 처음에는 조금만 해 보고, 모르는 위험을 하나씩 확인하면 된단다.',
+    'stocks' => '좋은 회사는 하루 만에 알아보기 어려워. 무엇을 파는 회사인지 보고, 숫자도 천천히 읽어 보렴.',
     _ => '',
   };
 
   String get _traitResponse => switch (_trait) {
-    StoryTrait.stability => '먼저 돈을 잃지 않는 방법을 배우고 싶다. 그래야 오래 계속할 수 있을 것 같다.',
-    StoryTrait.innovation => '사람들의 생활을 바꾸는 제품을 찾아보고 싶다. 새 기술 이야기는 언제나 두근거린다.',
-    StoryTrait.analysis => '숫자가 왜 오르고 내리는지 직접 적어 보고 싶다. 하나씩 비교하면 길이 보일 것 같다.',
-    StoryTrait.control => '회사가 어떤 선택을 하는지 알아보고 싶다. 주주가 회사에 어떤 목소리를 내는지도 궁금하다.',
+    StoryTrait.stability => '돈을 잃지 않는 법부터 배우고 싶어요! 그래야 오래 해 볼 수 있잖아요.',
+    StoryTrait.innovation => '사람들이 “우와!” 할 물건을 만드는 회사를 찾아보고 싶어요.',
+    StoryTrait.analysis => '신문에 나오는 숫자가 왜 오르내리는지 궁금해요. 제가 직접 비교해 볼래요.',
+    StoryTrait.control => '주주가 되면 회사에 어떤 말을 할 수 있는지 궁금해요.',
     null => '',
   };
+
+  String get _lessonRuleResponse => switch (_familyRule) {
+    FamilyRule.reportLosses =>
+      '좋아요. 손해가 나도 숨기지 않고 그대로 적기! 틀린 이유를 찾으면 다음 주문은 더 잘할 수 있어요.',
+    FamilyRule.noHotTips =>
+      '좋아요. 누가 좋다고 해도 바로 사지 않고, 내가 먼저 회사를 확인하기! 아주 중요한 약속이에요.',
+    FamilyRule.keepCash =>
+      '좋아요. 가진 돈을 한 번에 다 쓰지 않고 조금 남겨 두기! 다음 기회를 기다릴 수 있어요.',
+    null => '',
+  };
+
   void _next() {
     FocusManager.instance.primaryFocus?.unfocus();
     setState(() => _beat += 1);
   }
 
-  void _finish() {
+  Future<void> _finish() async {
+    if (_isCreating) return;
     final playerName = _playerController.text.trim();
     final companyName = _companyController.text.trim().replaceAll(
       RegExp(r'\s+'),
@@ -165,15 +200,27 @@ class _VisualNovelOnboardingScreenState
       return;
     }
     FocusManager.instance.primaryFocus?.unfocus();
-    widget.onCreate(
-      NewGameSetup(
-        playerName: playerName,
-        companyName: companyName,
-        introChoice: _introChoice!,
-        startingTrait: _trait!,
-        familyRule: _familyRule!,
-      ),
-    );
+    setState(() {
+      _isCreating = true;
+      _creationStatus = '투자연구소 정보를 정리하는 중…';
+    });
+    await WidgetsBinding.instance.endOfFrame;
+    try {
+      await widget.onCreate(
+        NewGameSetup(
+          playerName: playerName,
+          companyName: companyName,
+          introChoice: _introChoice!,
+          startingTrait: _trait!,
+          familyRule: _familyRule!,
+        ),
+        (status) {
+          if (mounted) setState(() => _creationStatus = status);
+        },
+      );
+    } finally {
+      if (mounted) setState(() => _isCreating = false);
+    }
   }
 
   @override
@@ -187,107 +234,89 @@ class _VisualNovelOnboardingScreenState
     return Scaffold(
       backgroundColor: const Color(0xFF171B2A),
       resizeToAvoidBottomInset: false,
-      body: Stack(
-        key: const Key('onboarding-stage'),
-        fit: StackFit.expand,
-        children: [
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 700),
-            child: _LivingBackground(
-              key: ValueKey(_background),
-              asset: _background,
-            ),
-          ),
-          const DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Color(0x33000000),
-                  Colors.transparent,
-                  Color(0xA6000000),
-                ],
-                stops: [0, 0.52, 1],
-              ),
-            ),
-          ),
-          SafeArea(
-            child: Align(
-              alignment: Alignment.topCenter,
-              child: _SceneLabel(
-                date: _dateLabel,
-                location: _location,
-                progress: (_beat + 1) / _onboardingBeatCount,
-              ),
-            ),
-          ),
-
-          if (_isAcademyTeacherBeat)
-            Positioned.fill(
-              bottom: 112,
-              child: Align(
-                alignment: Alignment.bottomCenter,
-                child: _AcademyTeacherPose(
-                  poseAlignment: _teacherPoseAlignment,
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final sceneCharacterAsset = _isAcademyTeacherBeat
+              ? _teacherPoseAsset
+              : _character;
+          return Stack(
+            key: const Key('onboarding-stage'),
+            fit: StackFit.expand,
+            children: [
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 700),
+                child: _LivingBackground(
+                  key: ValueKey(_background),
+                  asset: _background,
                 ),
               ),
-            )
-          else if (_character != null)
-            Positioned.fill(
-              bottom: 122,
-              child: AnimatedOpacity(
-                duration: const Duration(milliseconds: 180),
-                opacity: 1,
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 420),
-                  transitionBuilder: (child, animation) => FadeTransition(
-                    opacity: animation,
-                    child: SlideTransition(
-                      position: Tween<Offset>(
-                        begin: const Offset(0, 0.06),
-                        end: Offset.zero,
-                      ).animate(animation),
-                      child: child,
-                    ),
+              const DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Color(0x33000000),
+                      Colors.transparent,
+                      Color(0xA6000000),
+                    ],
+                    stops: [0, 0.52, 1],
                   ),
+                ),
+              ),
+              SafeArea(
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  child: _SceneLabel(
+                    date: _dateLabel,
+                    location: _location,
+                    progress: (_beat + 1) / _onboardingBeatCount,
+                  ),
+                ),
+              ),
+
+              if (sceneCharacterAsset != null)
+                Positioned.fill(
+                  bottom: _storyCharacterBottomInset,
+                  child: _OnboardingCharacterSlot(
+                    key: const Key('story-character-stage-slot'),
+                    asset: sceneCharacterAsset,
+                    alignment: _isAcademyTeacherBeat
+                        ? Alignment.bottomCenter
+                        : _characterAlignment,
+                    characterKey: _isAcademyTeacherBeat
+                        ? const Key('academy-teacher-character')
+                        : const Key('story-character-character'),
+                  ),
+                ),
+              AnimatedPositioned(
+                key: const Key('keyboard-name-panel'),
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOutCubic,
+                left: 12,
+                right: 12,
+                bottom: keyboardLift + 10,
+                child: SafeArea(
+                  top: false,
                   child: Align(
-                    key: ValueKey('$_character-$_beat'),
-                    alignment: _characterAlignment,
-                    child: FractionallySizedBox(
-                      heightFactor: 0.78,
-                      child: Image.asset(
-                        _character!,
-                        fit: BoxFit.contain,
-                        filterQuality: FilterQuality.high,
+                    alignment: Alignment.bottomCenter,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 560),
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 260),
+                        child: _buildDialogue(context),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
-          AnimatedPositioned(
-            key: const Key('keyboard-name-panel'),
-            duration: const Duration(milliseconds: 180),
-            curve: Curves.easeOutCubic,
-            left: 12,
-            right: 12,
-            bottom: keyboardLift + 10,
-            child: SafeArea(
-              top: false,
-              child: Align(
-                alignment: Alignment.bottomCenter,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 560),
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 260),
-                    child: _buildDialogue(context),
-                  ),
+              if (_isCreating)
+                Positioned.fill(
+                  child: _NewGamePreparationOverlay(status: _creationStatus),
                 ),
-              ),
-            ),
-          ),
-        ],
+            ],
+          );
+        },
       ),
     );
   }
@@ -444,17 +473,17 @@ class _VisualNovelOnboardingScreenState
     choices: [
       _NovelChoice(
         key: const Key('family-rule-report-losses'),
-        label: '손실을 숨기지 않는다',
+        label: '손해가 나도 숨기지 않고 적기',
         onTap: () => _chooseFamilyRule(FamilyRule.reportLosses),
       ),
       _NovelChoice(
         key: const Key('family-rule-no-hot-tips'),
-        label: '남이 찍어준 종목은 사지 않는다',
+        label: '남이 좋다고 해도 바로 사지 않기',
         onTap: () => _chooseFamilyRule(FamilyRule.noHotTips),
       ),
       _NovelChoice(
         key: const Key('family-rule-keep-cash'),
-        label: '언제나 현금을 남겨 둔다',
+        label: '돈을 한 번에 다 쓰지 않기',
         onTap: () => _chooseFamilyRule(FamilyRule.keepCash),
       ),
     ],
@@ -483,7 +512,7 @@ class _VisualNovelOnboardingScreenState
         ),
         _NovelNextButton(
           key: const Key('create-company-button'),
-          label: '투자연구소 이름을 적고 시장 실습 시작',
+          label: '투자노트 이름을 적고 주문 연습 시작',
           enabled: _companyController.text.trim().isNotEmpty,
           onTap: _finish,
         ),
@@ -504,6 +533,94 @@ class _VisualNovelOnboardingScreenState
     focusedBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(14),
       borderSide: const BorderSide(color: _coral, width: 2),
+    ),
+  );
+}
+
+class _NewGamePreparationOverlay extends StatelessWidget {
+  const _NewGamePreparationOverlay({required this.status});
+
+  final String status;
+
+  @override
+  Widget build(BuildContext context) => ColoredBox(
+    key: const Key('new-game-preparation-overlay'),
+    color: const Color(0xD9171B2A),
+    child: SafeArea(
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Container(
+            width: double.infinity,
+            constraints: const BoxConstraints(maxWidth: 340),
+            padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF8E7),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: const Color(0xFFFFE4A3), width: 2),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x66000000),
+                  blurRadius: 30,
+                  offset: Offset(0, 14),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.savings_rounded,
+                  color: Color(0xFF536A96),
+                  size: 48,
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  '첫 투자 수업을 준비하고 있어요',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Color(0xFF33405F),
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.6,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Semantics(
+                  liveRegion: true,
+                  child: Text(
+                    status,
+                    key: const Key('new-game-preparation-status'),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Color(0xFF66728A),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      height: 1.45,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 22),
+                const LinearProgressIndicator(
+                  minHeight: 9,
+                  backgroundColor: Color(0xFFE8E1D1),
+                  color: Color(0xFFFFA45F),
+                ),
+                const SizedBox(height: 14),
+                const Text(
+                  '준비가 끝나면 자동으로 주식 화면으로 넘어갑니다.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Color(0xFF8B877F),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     ),
   );
 }
@@ -529,40 +646,52 @@ class _LivingBackground extends StatelessWidget {
   );
 }
 
-class _AcademyTeacherPose extends StatelessWidget {
-  const _AcademyTeacherPose({required this.poseAlignment});
+class _OnboardingCharacterSlot extends StatelessWidget {
+  const _OnboardingCharacterSlot({
+    super.key,
+    required this.asset,
+    required this.alignment,
+    required this.characterKey,
+  });
 
-  final Alignment poseAlignment;
+  final String asset;
+  final Alignment alignment;
+  final Key characterKey;
 
   @override
-  Widget build(BuildContext context) {
-    final size = MediaQuery.sizeOf(context);
-    final dimension = math
-        .min(size.width * 1.28, size.height * 0.68)
-        .clamp(440.0, 520.0)
-        .toDouble();
-    return SizedBox(
-      key: const Key('academy-teacher-character'),
-      width: dimension,
-      height: dimension,
-      child: ClipRect(
-        child: OverflowBox(
-          alignment: poseAlignment,
-          minWidth: dimension * 3,
-          maxWidth: dimension * 3,
-          minHeight: dimension * 2,
-          maxHeight: dimension * 2,
-          child: Image.asset(
-            'assets/images/주식선생님/06_6자세_블라우스_스커트_투명.png',
-            width: dimension * 3,
-            height: dimension * 2,
-            fit: BoxFit.fill,
-            filterQuality: FilterQuality.high,
-          ),
-        ),
+  Widget build(BuildContext context) => AnimatedOpacity(
+    duration: const Duration(milliseconds: 180),
+    opacity: 1,
+    child: AnimatedSwitcher(
+      duration: const Duration(milliseconds: 220),
+      switchInCurve: Curves.easeOut,
+      switchOutCurve: Curves.easeIn,
+      transitionBuilder: (child, animation) =>
+          FadeTransition(opacity: animation, child: child),
+      child: LayoutBuilder(
+        key: ValueKey('$asset-${alignment.x}-${alignment.y}'),
+        builder: (context, constraints) {
+          final characterHeight =
+              constraints.maxHeight * _storyCharacterHeightFactor;
+          return Align(
+            alignment: alignment,
+            child: SizedBox(
+              key: characterKey,
+              width: characterHeight * _storyCharacterAspectRatio,
+              height: characterHeight,
+              child: Image.asset(
+                asset,
+                fit: BoxFit.contain,
+                alignment: Alignment.bottomCenter,
+                filterQuality: FilterQuality.high,
+                gaplessPlayback: true,
+              ),
+            ),
+          );
+        },
       ),
-    );
-  }
+    ),
+  );
 }
 
 class _AcademyLessonRow extends StatelessWidget {

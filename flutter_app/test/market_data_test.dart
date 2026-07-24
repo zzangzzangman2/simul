@@ -17,6 +17,50 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test(
+    'dated market load stops at the requested day and caches by cutoff',
+    () async {
+      final cutoff = DateTime(2000, 1, 10);
+      final firstFuture = FictionalMarketUniverse.load(
+        seed: 'dated-load-test',
+        throughDate: cutoff,
+        forceRefresh: true,
+      );
+      final repeatedFuture = FictionalMarketUniverse.load(
+        seed: 'dated-load-test',
+        throughDate: cutoff,
+      );
+
+      expect(identical(firstFuture, repeatedFuture), isTrue);
+      final first = await firstFuture;
+      final hanbit = first.assets.singleWhere(
+        (asset) => asset.id == 'hanbit_telecom',
+      );
+      expect(hanbit.quoteAtOrBefore(cutoff), isNotNull);
+      expect(
+        first.assets.every(
+          (asset) =>
+              asset.lastTradeDate == null ||
+              !DateTime.parse(asset.lastTradeDate!).isAfter(cutoff),
+        ),
+        isTrue,
+      );
+
+      final later = await FictionalMarketUniverse.load(
+        seed: 'dated-load-test',
+        throughDate: DateTime(2000, 1, 31),
+        forceRefresh: true,
+      );
+      final laterHanbit = later.assets.singleWhere(
+        (asset) => asset.id == 'hanbit_telecom',
+      );
+      expect(
+        laterHanbit.historyThrough(DateTime(2000, 1, 31)).length,
+        greaterThan(hanbit.historyThrough(cutoff).length),
+      );
+    },
+  );
+
+  test(
     'market universe contains 50 fixed fictional firms and later generations',
     () async {
       final universe = await FictionalMarketUniverse.load(seed: 'roster-test');

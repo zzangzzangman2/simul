@@ -371,6 +371,37 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+    'a slot deleted from a full save list starts a new game when tapped',
+    (tester) async {
+      final preferences = await SharedPreferences.getInstance();
+      final persistence = GamePersistence(preferences: preferences);
+      for (var slot = 1; slot <= GamePersistence.slotCount; slot++) {
+        await persistence.saveToSlot(engine.createNewGame('$slot번 회사'), slot);
+      }
+
+      await tester.pumpWidget(MillenniumCapitalApp(persistence: persistence));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('new-game-button')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('save-slot-screen')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('delete-save-slot-3')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('confirm-delete-slot-3')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('빈 슬롯'), findsOneWidget);
+      expect(find.text('이 슬롯을 눌러 바로 새 게임을 시작하세요.'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('load-save-slot-3')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(VisualNovelOnboardingScreen), findsOneWidget);
+      expect(find.byKey(const Key('save-slot-screen')), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('game menu performs a manual save in the active slot', (
     tester,
   ) async {

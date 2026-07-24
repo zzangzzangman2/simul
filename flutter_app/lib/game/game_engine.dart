@@ -3,8 +3,13 @@ import 'dart:math' as math;
 import 'game_state.dart';
 import 'market_clock.dart';
 import 'market_data.dart';
+import 'order_book.dart';
 import 'mission_progression.dart';
 import 'organization_state.dart';
+import 'real_estate_financing.dart';
+import 'real_estate_market.dart';
+import 'real_estate_rental.dart';
+import 'real_estate_world.dart';
 import 'personal_finance_state.dart';
 import 'seed_money_content.dart';
 import 'story_state.dart';
@@ -116,17 +121,29 @@ int gameAvailableLimitFillUnits({
   required int minute,
   required double unitPrice,
 }) {
-  if (assetId.isEmpty || unitPrice <= 0 || !unitPrice.isFinite) return 0;
-  var hash = day * 1009 + minute * 9176;
-  for (final unit in assetId.codeUnits) {
-    hash = ((hash * 31) ^ unit) & 0x7fffffff;
-  }
-  final base = 120 + hash % 1881;
-  final auctionMultiplier =
-      minute < krxOpenMinute + 5 || minute >= krxContinuousEndMinute ? 2 : 1;
-  final notionalCap = gameMarketOrderNotionalLimit(unitPrice);
-  return math.min(base * auctionMultiplier, notionalCap ~/ unitPrice);
+  return gameOrderBookExecutionCapacity(
+    assetId: assetId,
+    day: day,
+    minute: minute,
+    unitPrice: unitPrice,
+  );
 }
+
+int gameConsumedOrderBookFillUnits(
+  GameState state, {
+  required String assetId,
+  required int marketMinute,
+  required TradeSide side,
+}) => state.ledger
+    .where(
+      (entry) =>
+          entry.day == state.day &&
+          entry.assetId == assetId &&
+          entry.marketMinute == marketMinute &&
+          entry.tradeSide == side.name &&
+          entry.orderType == TradeOrderType.limit.name,
+    )
+    .fold<int>(0, (sum, entry) => sum + entry.tradeQuantity.ceil());
 
 class TradeOrder {
   const TradeOrder({
@@ -144,6 +161,7 @@ class TradeOrder {
     this.type = TradeOrderType.market,
     this.limitPrice,
     this.previousClose = 0,
+    this.isLimitFill = false,
   });
 
   final TradeSide side;
@@ -160,6 +178,9 @@ class TradeOrder {
   final TradeOrderType type;
   final double? limitPrice;
   final double previousClose;
+
+  /// 엔진이 호가 잔량을 소모해 만든 내부 지정가 체결이다.
+  final bool isLimitFill;
 }
 
 class TradeExecutionResult {
@@ -173,6 +194,7 @@ class TradeExecutionResult {
     this.orderId,
     this.filledQuantity = 0,
     this.pendingQuantity = 0,
+    this.averageFillPrice = 0,
   });
 
   final GameState state;
@@ -184,6 +206,7 @@ class TradeExecutionResult {
   final String? orderId;
   final double filledQuantity;
   final double pendingQuantity;
+  final double averageFillPrice;
 }
 
 class FinanceActionResult {
@@ -198,6 +221,22 @@ class FinanceActionResult {
   final bool success;
   final String message;
   final int cashDelta;
+}
+
+class _RentalMonthPreparation {
+  const _RentalMonthPreparation({
+    required this.assets,
+    required this.expiringAssetIds,
+    required this.rentalIncome,
+    required this.repairCost,
+    required this.entries,
+  });
+
+  final List<OwnedRealEstate> assets;
+  final Set<String> expiringAssetIds;
+  final int rentalIncome;
+  final int repairCost;
+  final List<LedgerEntry> entries;
 }
 
 class MissionProgressView {
@@ -805,23 +844,39 @@ class GameEngine {
       if (state.pendingOrders.every((pending) => pending.id != orderId)) break;
       orderSequence += 1;
     } while (true);
-    final marketable = order.side == TradeSide.buy
-        ? limitPrice >= order.unitPrice
-        : limitPrice <= order.unitPrice;
-    final capacity = marketable
-        ? gameAvailableLimitFillUnits(
-            assetId: order.assetId,
-            day: state.day,
-            minute: order.marketMinute,
-            unitPrice: order.unitPrice,
-          )
-        : 0;
-    final fillQuantity = math.min(order.quantity, capacity.toDouble());
+    final snapshot = buildGameOrderBookSnapshot(
+      assetId: order.assetId,
+      day: state.day,
+      minute: order.marketMinute,
+      currentPrice: order.unitPrice,
+      previousClose: reference,
+      date: state.currentDate,
+      market: order.market,
+      tradingDay: order.isTradingDay,
+    );
+    final consumed = gameConsumedOrderBookFillUnits(
+      state,
+      assetId: order.assetId,
+      marketMinute: order.marketMinute,
+      side: order.side,
+    );
+    final availableCapacity = math.max(
+      0,
+      snapshot.executionCapacity - consumed,
+    );
+    final plan = gameOrderBookLimitFillPlan(
+      snapshot: snapshot,
+      isBuy: order.side == TradeSide.buy,
+      requestedQuantity: order.quantity,
+      limitPrice: limitPrice,
+      availableCapacity: availableCapacity,
+    );
+    final fillQuantity = plan.filledQuantity.toDouble();
     var nextState = state;
     var filledNotional = 0;
     var filledFee = 0;
     var realizedPnl = 0;
-    if (fillQuantity > 0) {
+    if (plan.hasFill) {
       final fill = executeTrade(
         state,
         TradeOrder(
@@ -832,11 +887,13 @@ class GameEngine {
           market: order.market,
           currency: order.currency,
           quantity: fillQuantity,
-          unitPrice: order.unitPrice,
+          unitPrice: plan.averagePrice,
           quoteDate: order.quoteDate,
           marketMinute: order.marketMinute,
           isTradingDay: order.isTradingDay,
+          limitPrice: limitPrice,
           previousClose: order.previousClose,
+          isLimitFill: true,
         ),
       );
       if (!fill.success) return fill;
@@ -848,6 +905,25 @@ class GameEngine {
 
     final remaining = order.quantity - fillQuantity;
     if (remaining > 0.000001) {
+      final samePriceOrder = nextState.pendingOrders
+          .where(
+            (pending) =>
+                pending.assetId == order.assetId &&
+                pending.side ==
+                    (order.side == TradeSide.buy
+                        ? PendingOrderSide.buy
+                        : PendingOrderSide.sell) &&
+                (pending.limitPrice - limitPrice).abs() < 0.000001,
+          )
+          .firstOrNull;
+      final queueAhead = plan.hasFill
+          ? 0.0
+          : samePriceOrder?.queueAheadQuantity ??
+                gameOrderBookQueueAhead(
+                  snapshot: snapshot,
+                  isBuy: order.side == TradeSide.buy,
+                  limitPrice: limitPrice,
+                );
       nextState = nextState.copyWith(
         pendingOrders: [
           ...nextState.pendingOrders,
@@ -867,6 +943,7 @@ class GameEngine {
             placedDate: stateDate,
             placedMinute: order.marketMinute,
             placedSequence: orderSequence,
+            queueAheadQuantity: queueAhead,
           ),
         ],
       );
@@ -887,6 +964,7 @@ class GameEngine {
       orderId: remaining > 0.000001 ? orderId : null,
       filledQuantity: fillQuantity,
       pendingQuantity: remaining,
+      averageFillPrice: plan.averagePrice,
     );
   }
 
@@ -934,6 +1012,7 @@ class GameEngine {
     required double unitPrice,
     required int marketMinute,
     required bool isTradingDay,
+    double previousClose = 0,
   }) {
     if (state.pendingOrders.every((order) => order.assetId != assetId)) {
       return state;
@@ -943,14 +1022,40 @@ class GameEngine {
       tradingDay: isTradingDay && isMarketTradingDay(state.currentDate),
     );
     if (!clock.tradable) return state;
-    var capacity = gameAvailableLimitFillUnits(
+    final snapshot = buildGameOrderBookSnapshot(
       assetId: assetId,
       day: state.day,
       minute: marketMinute,
-      unitPrice: unitPrice,
+      currentPrice: unitPrice,
+      previousClose: previousClose > 0 ? previousClose : unitPrice,
+      date: state.currentDate,
+      market: state.pendingOrders
+          .firstWhere((order) => order.assetId == assetId)
+          .market,
+      tradingDay: isTradingDay,
     );
-    if (capacity <= 0) return state;
+    if (snapshot.executionCapacity <= 0) return state;
 
+    var buyCapacity = math.max(
+      0,
+      snapshot.executionCapacity -
+          gameConsumedOrderBookFillUnits(
+            state,
+            assetId: assetId,
+            marketMinute: marketMinute,
+            side: TradeSide.buy,
+          ),
+    );
+    var sellCapacity = math.max(
+      0,
+      snapshot.executionCapacity -
+          gameConsumedOrderBookFillUnits(
+            state,
+            assetId: assetId,
+            marketMinute: marketMinute,
+            side: TradeSide.sell,
+          ),
+    );
     var next = state;
     final candidates =
         state.pendingOrders.where((order) => order.assetId == assetId).toList()
@@ -970,53 +1075,99 @@ class GameEngine {
             if (sequenceOrder != 0) return sequenceOrder;
             return left.id.compareTo(right.id);
           });
+
     for (final candidate in candidates) {
-      if (capacity <= 0) break;
-      final marketable = candidate.side == PendingOrderSide.buy
-          ? candidate.limitPrice >= unitPrice
-          : candidate.limitPrice <= unitPrice;
-      if (!marketable) continue;
-      final quantity = math.min(
-        candidate.remainingQuantity,
-        capacity.toDouble(),
+      final currentIndex = next.pendingOrders.indexWhere(
+        (order) => order.id == candidate.id,
       );
+      if (currentIndex < 0) continue;
+      final current = next.pendingOrders[currentIndex];
+      final isBuy = current.side == PendingOrderSide.buy;
+      var capacity = isBuy ? buyCapacity : sellCapacity;
+      if (capacity <= 0) continue;
+
+      final aggressivePlan = gameOrderBookLimitFillPlan(
+        snapshot: snapshot,
+        isBuy: isBuy,
+        requestedQuantity: current.remainingQuantity,
+        limitPrice: current.limitPrice,
+        availableCapacity: capacity,
+      );
+      var fillQuantity = aggressivePlan.filledQuantity.toDouble();
+      var fillPrice = aggressivePlan.averagePrice;
+      var queueAhead = current.queueAheadQuantity;
+
+      if (!aggressivePlan.hasFill) {
+        final touched = isBuy
+            ? current.limitPrice >= unitPrice
+            : current.limitPrice <= unitPrice;
+        if (!touched) continue;
+        final consumedQueue = math.min(queueAhead.ceil(), capacity);
+        queueAhead = math.max(0, queueAhead - consumedQueue);
+        capacity -= consumedQueue;
+        if (queueAhead > 0 || capacity <= 0) {
+          final pending = [...next.pendingOrders];
+          pending[currentIndex] = current.copyWith(
+            queueAheadQuantity: queueAhead,
+          );
+          next = next.copyWith(pendingOrders: pending);
+          if (isBuy) {
+            buyCapacity = capacity;
+          } else {
+            sellCapacity = capacity;
+          }
+          continue;
+        }
+        fillQuantity = math.min(current.remainingQuantity, capacity.toDouble());
+        fillPrice = current.limitPrice;
+      }
+      if (fillQuantity <= 0 || fillPrice <= 0) continue;
+
       final withoutCurrent = next.copyWith(
         pendingOrders: next.pendingOrders
-            .where((order) => order.id != candidate.id)
+            .where((order) => order.id != current.id)
             .toList(growable: false),
         marketMinute: marketMinute,
       );
       final fill = executeTrade(
         withoutCurrent,
         TradeOrder(
-          side: candidate.side == PendingOrderSide.buy
-              ? TradeSide.buy
-              : TradeSide.sell,
-          assetId: candidate.assetId,
-          symbol: candidate.symbol,
-          name: candidate.name,
-          market: candidate.market,
-          currency: candidate.currency,
-          quantity: quantity,
-          unitPrice: unitPrice,
+          side: isBuy ? TradeSide.buy : TradeSide.sell,
+          assetId: current.assetId,
+          symbol: current.symbol,
+          name: current.name,
+          market: current.market,
+          currency: current.currency,
+          quantity: fillQuantity,
+          unitPrice: fillPrice,
           quoteDate: marketDateKey(state.currentDate),
           marketMinute: marketMinute,
           isTradingDay: isTradingDay,
-          previousClose: unitPrice,
+          limitPrice: current.limitPrice,
+          previousClose: previousClose > 0 ? previousClose : unitPrice,
+          isLimitFill: true,
         ),
       );
       if (!fill.success) continue;
       next = fill.state;
-      final remaining = candidate.remainingQuantity - quantity;
+      final remaining = current.remainingQuantity - fillQuantity;
       if (remaining > 0.000001) {
         next = next.copyWith(
           pendingOrders: [
             ...next.pendingOrders,
-            candidate.copyWith(remainingQuantity: remaining),
+            current.copyWith(
+              remainingQuantity: remaining,
+              queueAheadQuantity: 0,
+            ),
           ],
         );
       }
-      capacity -= quantity.ceil();
+      capacity -= fillQuantity.ceil();
+      if (isBuy) {
+        buyCapacity = capacity;
+      } else {
+        sellCapacity = capacity;
+      }
     }
     return next;
   }
@@ -1033,28 +1184,34 @@ class GameEngine {
         .toList(growable: false);
     if (expired.isEmpty) return state;
     final ids = expired.map((order) => order.id).toSet();
-    final sourceId = 'expire-orders-${state.day}-${state.marketMinute}';
     return state.copyWith(
       pendingOrders: state.pendingOrders
           .where((order) => !ids.contains(order.id))
           .toList(growable: false),
       ledger: [
         ...state.ledger,
-        LedgerEntry(
-          id: sourceId,
-          day: state.day,
-          amount: 0,
-          account: 'brokerage_order',
-          counterAccount: 'day_order_expiry',
-          description: '장 마감 · 미체결 ${expired.length}건 자동 취소',
-          sourceId: sourceId,
-        ),
+        for (final order in expired)
+          LedgerEntry(
+            id: 'expire-${order.id}',
+            day: state.day,
+            amount: 0,
+            account: 'brokerage_order',
+            counterAccount: 'day_order_expiry',
+            description:
+                '장 마감 · ${order.name} '
+                '${_tradeUnits(order.remainingQuantity)}주 미체결 자동 취소',
+            sourceId: 'expire-${order.id}',
+            assetId: order.assetId,
+            tradeSide: order.side.name,
+            marketMinute: state.marketMinute,
+            orderType: TradeOrderType.limit.name,
+          ),
       ],
     );
   }
 
   TradeExecutionResult executeTrade(GameState state, TradeOrder order) {
-    if (order.type == TradeOrderType.limit) {
+    if (order.type == TradeOrderType.limit && !order.isLimitFill) {
       return _placeLimitOrder(state, order);
     }
     TradeExecutionResult reject(String message) =>
@@ -1071,6 +1228,16 @@ class GameEngine {
     }
     if (!order.unitPrice.isFinite || order.unitPrice <= 0) {
       return reject('유효한 현재가가 없습니다.');
+    }
+    if (order.isLimitFill) {
+      final limitPrice = order.limitPrice;
+      if (limitPrice == null ||
+          (order.side == TradeSide.buy &&
+              order.unitPrice > limitPrice + 0.000001) ||
+          (order.side == TradeSide.sell &&
+              order.unitPrice + 0.000001 < limitPrice)) {
+        return reject('지정가 범위를 벗어난 체결은 처리할 수 없습니다.');
+      }
     }
     final stateDate = state.currentDate.toIso8601String().split('T').first;
     if (order.quoteDate != stateDate) {
@@ -1106,11 +1273,13 @@ class GameEngine {
         return reject('현재 계좌 권한의 1회 주문 한도는 $limit원입니다.');
       }
     }
-    final notional = gameTradeNotional(
-      side: order.side,
-      unitPrice: order.unitPrice,
-      quantity: order.quantity,
-    );
+    final notional = order.isLimitFill
+        ? rawNotional
+        : gameTradeNotional(
+            side: order.side,
+            unitPrice: order.unitPrice,
+            quantity: order.quantity,
+          );
     final fee = gameTradingFeeForState(state, notional);
     final index = state.positions.indexWhere(
       (position) => position.assetId == order.assetId,
@@ -1231,6 +1400,14 @@ class GameEngine {
           tradingFee: fee,
           disposedCost: disposedCost,
           realizedPnl: realizedPnl,
+          assetId: order.assetId,
+          tradeSide: order.side.name,
+          tradeQuantity: order.quantity,
+          tradeUnitPrice: notional / order.quantity,
+          marketMinute: order.marketMinute,
+          orderType: order.isLimitFill
+              ? TradeOrderType.limit.name
+              : order.type.name,
         ),
       ],
     );
@@ -1244,6 +1421,7 @@ class GameEngine {
       fee: fee,
       realizedPnl: realizedPnl,
       filledQuantity: order.quantity,
+      averageFillPrice: notional / order.quantity,
     );
   }
 
@@ -1433,6 +1611,7 @@ class GameEngine {
         ? 0
         : (score * 100 ~/ result.maxScore);
     final baseReward = switch (result.activityId) {
+      'rider' => 700 + normalized * 15,
       'dishes' => 500 + normalized * 8,
       'stationery' => 800 + normalized * 7,
       'flea_market' => 700 + normalized * 15,
@@ -1454,6 +1633,7 @@ class GameEngine {
     if (reward <= 0) return state;
 
     final activityLabel = switch (result.activityId) {
+      'rider' => '동네 축제 킥보드 코스',
       'dishes' => '저녁 설거지',
       'stationery' => '문방구 재고 정리',
       'flea_market' => '가족 벼룩장터',
@@ -1637,7 +1817,17 @@ class GameEngine {
   }
 
   FinanceActionResult purchaseSpendingOption(GameState state, String optionId) {
-    final option = spendingOptionById(optionId);
+    final financingRequest = parseRealEstateFinancingRequest(optionId);
+    final baseOptionId = financingRequest.baseOptionId;
+    final listingRef = parseRealEstateListingOptionId(baseOptionId);
+    final listing = listingRef == null
+        ? null
+        : realEstateListingByRef(listingRef, state.simulationSeed);
+    final option = listing == null
+        ? spendingOptionById(baseOptionId)
+        : spendingOptionById('market_${listing.asset.id}');
+    final effectiveOptionId = listing?.optionId ?? baseOptionId;
+    final effectiveTitle = listing?.displayName ?? option?.title ?? '부동산';
     if (option == null) {
       return FinanceActionResult(
         state: state,
@@ -1650,6 +1840,15 @@ class GameEngine {
         state: state,
         success: false,
         message: '${option.unlockYear}년부터 선택할 수 있습니다.',
+      );
+    }
+    final availableFrom =
+        listing?.asset.availableFrom ?? option.marketAsset?.availableFrom;
+    if (availableFrom != null && state.currentDate.isBefore(availableFrom)) {
+      return FinanceActionResult(
+        state: state,
+        success: false,
+        message: '${availableFrom.year}년 ${availableFrom.month}월부터 선택할 수 있습니다.',
       );
     }
     if (option.requiresEmployee && state.organization.employees.isEmpty) {
@@ -1668,7 +1867,49 @@ class GameEngine {
       );
     }
     final finance = state.personalFinance;
-    if (option.isRealEstate && finance.ownsRealEstate(option.id)) {
+    final purchaseQuote =
+        listing?.quoteAt(state.currentDate) ??
+        option.quoteAt(state.currentDate);
+    if (financingRequest.requestedLtvPercent > 0 &&
+        (!option.isRealEstate || purchaseQuote == null)) {
+      return FinanceActionResult(
+        state: state,
+        success: false,
+        message: '이 항목에는 부동산 담보대출을 사용할 수 없습니다.',
+      );
+    }
+    final financingTerms = purchaseQuote == null
+        ? const RealEstateFinancingTerms(
+            maxLtvPercent: 0,
+            annualInterestRate: 0,
+            termMonths: 0,
+            eraLabel: '현금 매입',
+          )
+        : realEstateFinancingTermsAt(
+            state.currentDate,
+            listing?.asset.type ??
+                option.marketAsset?.type ??
+                RealEstateAssetType.commercialUnit,
+          );
+    if (financingRequest.requestedLtvPercent > financingTerms.maxLtvPercent) {
+      return FinanceActionResult(
+        state: state,
+        success: false,
+        message: financingTerms.available
+            ? '현재 최대 LTV는 ${financingTerms.maxLtvPercent}%입니다.'
+            : '현재는 이 매물에 담보대출을 사용할 수 없습니다.',
+      );
+    }
+    final financingPlan = purchaseQuote == null
+        ? null
+        : financingTerms.planFor(
+            purchaseQuote,
+            financingRequest.requestedLtvPercent,
+          );
+    final purchaseCost =
+        financingPlan?.cashRequired ?? purchaseQuote?.totalCash ?? option.cost;
+    final purchaseBookValue = purchaseQuote?.totalCash ?? option.cost;
+    if (option.isRealEstate && finance.ownsRealEstate(effectiveOptionId)) {
       return FinanceActionResult(
         state: state,
         success: false,
@@ -1691,7 +1932,7 @@ class GameEngine {
       SpendingRepeat.yearly => '${state.currentDate.year}',
     };
     if (option.repeat != SpendingRepeat.once &&
-        finance.lastPurchasePeriods[option.id] == period) {
+        finance.lastPurchasePeriods[effectiveOptionId] == period) {
       return FinanceActionResult(
         state: state,
         success: false,
@@ -1700,11 +1941,11 @@ class GameEngine {
             : '올해는 이미 선택했습니다.',
       );
     }
-    if (state.bankCash < option.cost) {
+    if (state.bankCash < purchaseCost) {
       return FinanceActionResult(
         state: state,
         success: false,
-        message: '은행 잔고가 ${option.cost - state.bankCash}원 부족합니다.',
+        message: '은행 잔고가 ${purchaseCost - state.bankCash}원 부족합니다.',
       );
     }
 
@@ -1718,22 +1959,37 @@ class GameEngine {
     if (option.isRealEstate) {
       realEstate.add(
         OwnedRealEstate(
-          id: '${option.id}-${state.day}',
-          optionId: option.id,
-          name: option.title,
-          purchasePrice: option.cost,
+          id: '$effectiveOptionId-${state.day}',
+          optionId: effectiveOptionId,
+          name: effectiveTitle,
+          purchasePrice: purchaseBookValue,
           acquiredDay: state.day,
-          monthlyIncome: option.monthlyIncome,
-          monthlyCost: option.monthlyCost,
+          monthlyIncome:
+              listing?.monthlyRentAt(state.currentDate) ??
+              option.monthlyIncomeAt(state.currentDate),
+          monthlyCost:
+              listing?.monthlyOperatingCostAt(state.currentDate) ??
+              option.monthlyCostAt(state.currentDate),
+          marketAssetId: listing?.asset.id ?? option.marketAssetId,
+          marketPriceAtPurchase: purchaseQuote?.marketPrice ?? option.cost,
+          acquisitionCosts: purchaseQuote?.acquisitionCosts ?? 0,
+          purchaseDateIso: state.currentDate.toIso8601String(),
+          marketListingIndex: listing?.index,
+          realEstateWorldSeed: listing?.worldSeed ?? '',
+          cashInvestedAtPurchase: purchaseCost,
+          mortgageOriginalPrincipal: financingPlan?.principal ?? 0,
+          mortgageBalance: financingPlan?.principal ?? 0,
+          mortgageAnnualInterestRate: financingPlan?.annualInterestRate ?? 0,
+          mortgageTermMonths: financingPlan?.termMonths ?? 0,
         ),
       );
     }
-    final periods = {...finance.lastPurchasePeriods, option.id: period};
+    final periods = {...finance.lastPurchasePeriods, effectiveOptionId: period};
     final nextFinance = finance.copyWith(
       realEstate: realEstate,
       permanentPurchases: permanentPurchases,
       lastPurchasePeriods: periods,
-      totalSpent: finance.totalSpent + option.cost,
+      totalSpent: finance.totalSpent + purchaseCost,
     );
     final flags = <String, dynamic>{
       ...state.story.storyFlags,
@@ -1752,9 +2008,9 @@ class GameEngine {
           state.story.siblingAffinity + (option.familyTrustDelta > 0 ? 1 : 0),
       storyFlags: flags,
     );
-    final sourceId = 'spending-${option.id}-${state.day}-$period';
+    final sourceId = 'spending-$effectiveOptionId-${state.day}-$period';
     final next = state.copyWith(
-      cash: state.cash - option.cost,
+      cash: state.cash - purchaseCost,
       personalFinance: nextFinance,
       progression: state.progression.record('finance_purchases'),
       story: nextStory,
@@ -1763,22 +2019,43 @@ class GameEngine {
         LedgerEntry(
           id: sourceId,
           day: state.day,
-          amount: -option.cost,
+          amount: -purchaseCost,
+          notional: purchaseQuote?.marketPrice ?? option.cost,
+          tradingFee: purchaseQuote?.acquisitionCosts ?? 0,
           account: 'company_bank',
           counterAccount: option.isRealEstate
               ? 'real_estate_asset'
               : 'discretionary_expense',
-          description: option.title,
+          description: effectiveTitle,
           sourceId: sourceId,
         ),
+        if (financingPlan?.hasMortgage ?? false)
+          LedgerEntry(
+            id: '$sourceId-mortgage',
+            day: state.day,
+            amount: 0,
+            notional: financingPlan!.principal,
+            account: 'real_estate_asset',
+            counterAccount: 'mortgage_payable',
+            description:
+                '$effectiveTitle 담보대출 LTV ${financingPlan.appliedLtvPercent}% · '
+                '연 ${(financingPlan.annualInterestRate * 100).toStringAsFixed(2)}%',
+            sourceId: sourceId,
+          ),
       ],
       processedEventIds: [...state.processedEventIds, sourceId],
     );
     return FinanceActionResult(
       state: next,
       success: true,
-      message: '${option.title} 지출이 장부에 반영됐습니다.',
-      cashDelta: -option.cost,
+      message: purchaseQuote == null
+          ? '$effectiveTitle 지출이 장부에 반영됐습니다. 남은 현금 ${next.cash}원'
+          : financingPlan?.hasMortgage ?? false
+          ? '$effectiveTitle 매입: 현금 $purchaseCost원 + 대출 ${financingPlan!.principal}원'
+                ' · 월 원리금 ${financingPlan.monthlyPayment}원 · 남은 현금 ${next.cash}원'
+          : '$effectiveTitle 매입: 매매가 ${purchaseQuote.marketPrice}원'
+                ' + 부대비용 ${purchaseQuote.acquisitionCosts}원 · 남은 현금 ${next.cash}원',
+      cashDelta: -purchaseCost,
     );
   }
 
@@ -1793,6 +2070,13 @@ class GameEngine {
       );
     }
     final asset = assets[index];
+    if (asset.hasActiveLease) {
+      return FinanceActionResult(
+        state: state,
+        success: false,
+        message: '임대 계약이 끝나고 보증금을 정산한 뒤 매각할 수 있습니다.',
+      );
+    }
     if (state.day - asset.acquiredDay < 30) {
       return FinanceActionResult(
         state: state,
@@ -1800,7 +2084,16 @@ class GameEngine {
         message: '취득 후 30일이 지나야 매각할 수 있습니다.',
       );
     }
-    final proceeds = asset.estimatedSaleValue(state.day);
+    final grossProceeds = asset.estimatedSaleValue(state.day);
+    final mortgagePayoff = asset.mortgageBalance;
+    final proceeds = grossProceeds - mortgagePayoff;
+    if (proceeds < 0 && state.bankCash < -proceeds) {
+      return FinanceActionResult(
+        state: state,
+        success: false,
+        message: '매각 순액이 부족합니다. 대출 상환 부족분 ${-proceeds}원을 먼저 마련해야 합니다.',
+      );
+    }
     final sourceId = 'real-estate-sale-${asset.id}-${state.day}';
     final remaining = [...assets]..removeAt(index);
     final next = state.copyWith(
@@ -1812,19 +2105,174 @@ class GameEngine {
           id: sourceId,
           day: state.day,
           amount: proceeds,
+          notional: grossProceeds,
+          disposedCost: asset.purchasePrice,
+          realizedPnl: grossProceeds - asset.purchasePrice,
           account: 'company_bank',
           counterAccount: 'real_estate_sale',
           description: '${asset.name} 매각',
           sourceId: sourceId,
         ),
+        if (mortgagePayoff > 0)
+          LedgerEntry(
+            id: '$sourceId-mortgage-payoff',
+            day: state.day,
+            amount: 0,
+            notional: mortgagePayoff,
+            account: 'mortgage_payable',
+            counterAccount: 'real_estate_sale',
+            description: '${asset.name} 매각과 동시에 담보대출 상환',
+            sourceId: sourceId,
+          ),
       ],
       processedEventIds: [...state.processedEventIds, sourceId],
     );
     return FinanceActionResult(
       state: next,
       success: true,
-      message: '${asset.name}을 $proceeds원에 매각했습니다.',
+      message: mortgagePayoff > 0
+          ? '${asset.name} 매각대금 $grossProceeds원에서 대출 $mortgagePayoff원을 상환해 순액 $proceeds원이 반영됐습니다.'
+          : '${asset.name}을 $proceeds원에 매각했습니다.',
       cashDelta: proceeds,
+    );
+  }
+
+  FinanceActionResult configureRealEstateLease(
+    GameState state,
+    String assetId,
+    RealEstateLeaseType leaseType,
+  ) {
+    final assets = state.personalFinance.realEstate;
+    final index = assets.indexWhere((asset) => asset.id == assetId);
+    if (index < 0) {
+      return FinanceActionResult(
+        state: state,
+        success: false,
+        message: '보유 부동산을 찾지 못했습니다.',
+      );
+    }
+    final asset = assets[index];
+    if (leaseType == RealEstateLeaseType.automatic) {
+      return FinanceActionResult(
+        state: state,
+        success: false,
+        message: '기존 자동운영으로 되돌릴 수 없습니다.',
+      );
+    }
+    if (asset.hasActiveLease && asset.leaseRemainingMonths > 0) {
+      return FinanceActionResult(
+        state: state,
+        success: false,
+        message: '현재 임대차 계약이 끝난 뒤에 운영 방식을 바꿀 수 있습니다.',
+      );
+    }
+    if (asset.optionId == 'owner_office' ||
+        asset.optionId == 'family_home_trust') {
+      return FinanceActionResult(
+        state: state,
+        success: false,
+        message: '직접 사용하는 사무실·가족 주택은 임대할 수 없습니다.',
+      );
+    }
+    final assetType =
+        asset.marketAsset?.type ?? RealEstateAssetType.commercialUnit;
+    if (!realEstateSupportsManagedLease(assetType)) {
+      return FinanceActionResult(
+        state: state,
+        success: false,
+        message: '랜드마크 지분은 직접 임대차 계약을 맺을 수 없습니다.',
+      );
+    }
+    if (leaseType == RealEstateLeaseType.jeonse &&
+        !realEstateSupportsJeonse(assetType)) {
+      return FinanceActionResult(
+        state: state,
+        success: false,
+        message: '전세는 주거·오피스텔 자산에서만 선택할 수 있습니다.',
+      );
+    }
+    final marketRent =
+        asset.generatedListing?.monthlyRentAt(state.currentDate) ??
+        asset.marketAsset?.monthlyRentAt(state.currentDate) ??
+        asset.monthlyIncome;
+    final terms = realEstateLeaseTermsAt(
+      date: state.currentDate,
+      type: assetType,
+      leaseType: leaseType,
+      marketValue: asset.estimatedMarketValue(state.day),
+      marketMonthlyRent: marketRent,
+    );
+    if (terms.initialCashDelta < 0 &&
+        state.bankCash < -terms.initialCashDelta) {
+      return FinanceActionResult(
+        state: state,
+        success: false,
+        message: '임대 중개·입주 정비비를 낼 회사 통장 현금이 부족합니다.',
+      );
+    }
+    final reliability = leaseType == RealEstateLeaseType.vacant
+        ? 0
+        : realEstateTenantReliability(
+            worldSeed: asset.realEstateWorldSeed.isEmpty
+                ? state.simulationSeed
+                : asset.realEstateWorldSeed,
+            assetId: asset.id,
+            contractDate: state.currentDate,
+            leaseType: leaseType,
+          );
+    final updated = asset.copyWith(
+      leaseType: leaseType,
+      leaseDeposit: terms.deposit,
+      leaseMonthlyRent: terms.monthlyRent,
+      leaseRemainingMonths: terms.contractMonths,
+      tenantReliability: reliability,
+      rentArrearsMonths: 0,
+      vacancyMonths: 0,
+      lastRentalEvent: leaseType == RealEstateLeaseType.vacant
+          ? '공실 전환 · 새 계약을 기다리는 중'
+          : '${leaseType.label} 계약 체결 · 보증금은 반환 부채',
+    );
+    final nextAssets = [...assets]..[index] = updated;
+    final sourceId =
+        'real-estate-lease-${asset.id}-${leaseType.name}-${state.day}';
+    final next = state.copyWith(
+      cash: state.cash + terms.initialCashDelta,
+      personalFinance: state.personalFinance.copyWith(realEstate: nextAssets),
+      ledger: [
+        ...state.ledger,
+        if (terms.deposit > 0)
+          LedgerEntry(
+            id: '$sourceId-deposit',
+            day: state.day,
+            amount: terms.deposit,
+            notional: terms.deposit,
+            account: 'company_bank',
+            counterAccount: 'tenant_deposit_payable',
+            description: '${asset.name} ${leaseType.label} 보증금 수령',
+            sourceId: sourceId,
+          ),
+        if (terms.placementFee > 0)
+          LedgerEntry(
+            id: '$sourceId-fee',
+            day: state.day,
+            amount: -terms.placementFee,
+            account: 'company_bank',
+            counterAccount: 'rental_placement_fee',
+            description: '${asset.name} 임대 중개·입주 정비비',
+            sourceId: sourceId,
+          ),
+      ],
+      processedEventIds: [...state.processedEventIds, sourceId],
+    );
+    return FinanceActionResult(
+      state: next,
+      success: true,
+      message: leaseType == RealEstateLeaseType.vacant
+          ? '${asset.name}을 공실로 전환했습니다.'
+          : '${asset.name} ${leaseType.label} 계약: 보증금 ${terms.deposit}원'
+                '${terms.monthlyRent > 0 ? ' · 월세 ${terms.monthlyRent}원' : ''}'
+                ' · ${terms.contractMonths}개월 · 세입자 신뢰도 $reliability',
+      cashDelta: terms.initialCashDelta,
     );
   }
 
@@ -2462,6 +2910,103 @@ class GameEngine {
     return prepareHiddenMarketScenario(processed);
   }
 
+  _RentalMonthPreparation _prepareRentalMonth(
+    GameState state,
+    String sourceId,
+  ) {
+    final assets = <OwnedRealEstate>[];
+    final expiringAssetIds = <String>{};
+    final entries = <LedgerEntry>[];
+    var rentalIncome = 0;
+    var repairCost = 0;
+    for (final asset in state.personalFinance.realEstate) {
+      if (asset.leaseType == RealEstateLeaseType.automatic) {
+        rentalIncome += asset.monthlyIncomeAt(state.currentDate);
+        assets.add(asset);
+        continue;
+      }
+      final incident = realEstateRentalIncidentAt(
+        worldSeed: asset.realEstateWorldSeed.isEmpty
+            ? state.simulationSeed
+            : asset.realEstateWorldSeed,
+        assetId: asset.id,
+        date: state.currentDate,
+        tenantReliability: asset.tenantReliability,
+        marketValue: asset.estimatedMarketValue(state.day),
+        baseMonthlyCost: asset.monthlyCostAt(state.currentDate),
+        rentBearing: asset.leaseType == RealEstateLeaseType.monthlyRent,
+      );
+      var arrears = asset.rentArrearsMonths;
+      var vacancyMonths = asset.vacancyMonths;
+      var eventLabel = incident.incident.label;
+      if (asset.leaseType == RealEstateLeaseType.vacant) {
+        vacancyMonths += 1;
+        eventLabel = incident.repairCost > 0
+            ? '공실 $vacancyMonths개월 · ${incident.incident.label}'
+            : '공실 $vacancyMonths개월';
+      } else if (asset.leaseType == RealEstateLeaseType.monthlyRent) {
+        if (incident.incident == RealEstateRentalIncident.lateRent) {
+          arrears += 1;
+          eventLabel = '월세 $arrears개월 연체';
+          entries.add(
+            LedgerEntry(
+              id: '$sourceId-rent-arrears-${asset.id}',
+              day: state.day,
+              amount: 0,
+              notional: asset.leaseMonthlyRent,
+              account: 'rent_receivable',
+              counterAccount: 'tenant_rent_arrears',
+              description: '${asset.name} 월세 연체',
+              sourceId: sourceId,
+            ),
+          );
+        } else {
+          rentalIncome += asset.leaseMonthlyRent * (1 + arrears);
+          if (arrears > 0) {
+            eventLabel = '밀린 월세 $arrears개월분 회수';
+          }
+          arrears = 0;
+        }
+      }
+      if (incident.repairCost > 0) {
+        repairCost += incident.repairCost;
+        entries.add(
+          LedgerEntry(
+            id: '$sourceId-repair-${asset.id}',
+            day: state.day,
+            amount: 0,
+            notional: incident.repairCost,
+            account: 'property_maintenance',
+            counterAccount: 'rental_repair_event',
+            description: '${asset.name} ${incident.incident.label}',
+            sourceId: sourceId,
+          ),
+        );
+      }
+      final remainingMonths = asset.hasActiveLease
+          ? math.max(0, asset.leaseRemainingMonths - 1)
+          : 0;
+      final updated = asset.copyWith(
+        leaseRemainingMonths: remainingMonths,
+        rentArrearsMonths: arrears,
+        vacancyMonths: vacancyMonths,
+        lastRentalEvent: eventLabel,
+        totalRepairCosts: asset.totalRepairCosts + incident.repairCost,
+      );
+      if (asset.hasActiveLease && remainingMonths == 0) {
+        expiringAssetIds.add(asset.id);
+      }
+      assets.add(updated);
+    }
+    return _RentalMonthPreparation(
+      assets: assets,
+      expiringAssetIds: expiringAssetIds,
+      rentalIncome: rentalIncome,
+      repairCost: repairCost,
+      entries: entries,
+    );
+  }
+
   GameState _applyMonthlyEconomy(GameState state) {
     if (state.currentDate.day != 1) return state;
     final sourceId =
@@ -2482,11 +3027,14 @@ class GameEngine {
           state.organization.employees.length,
         ) +
         (state.progression.hasSkill('research_habit') ? 20000 : 0);
-    final basePropertyIncome = state.personalFinance.monthlyPropertyIncome;
+    final rentalMonth = _prepareRentalMonth(state, sourceId);
+    final basePropertyIncome = rentalMonth.rentalIncome;
     final propertyIncome = state.progression.hasSkill('property_operation')
         ? (basePropertyIncome * 1.1).round()
         : basePropertyIncome;
-    final propertyCost = state.personalFinance.monthlyPropertyCost;
+    final propertyCost =
+        state.personalFinance.monthlyPropertyCostAt(state.currentDate) +
+        rentalMonth.repairCost;
     final managementFee = state.story.fundLaunched
         ? (state.story.externalAum * 0.0005).round()
         : 0;
@@ -2506,31 +3054,272 @@ class GameEngine {
         controlledIncome +
         propertyIncome;
     final flags = Map<String, dynamic>.from(state.story.storyFlags);
+    final entries = <LedgerEntry>[...rentalMonth.entries];
     final priorUnpaid = state.story.flagInt('unpaidOperatingCost');
+    final priorMortgageDeficiency = state.story.flagInt(
+      'mortgageDeficiencyDebt',
+    );
+    final priorTenantDepositDebt = state.story.flagInt('tenantDepositDebt');
     final availableBank = state.bankCash + income;
     final currentExpenses = payroll + rent + propertyCost;
-    final totalDue = priorUnpaid + currentExpenses;
-    final paidTotal = math.min(availableBank, totalDue);
-    var remainingPayment = paidTotal;
-    final paidPrior = math.min(priorUnpaid, remainingPayment);
-    remainingPayment -= paidPrior;
-    final paidPayroll = math.min(payroll, remainingPayment);
-    remainingPayment -= paidPayroll;
-    final paidRent = math.min(rent, remainingPayment);
-    remainingPayment -= paidRent;
-    final paidPropertyCost = math.min(propertyCost, remainingPayment);
+    var remainingBank = availableBank;
+    final paidPrior = math.min(priorUnpaid, remainingBank);
+    remainingBank -= paidPrior;
+    final paidMortgageDeficiency = math.min(
+      priorMortgageDeficiency,
+      remainingBank,
+    );
+    remainingBank -= paidMortgageDeficiency;
+    final paidTenantDepositDebt = math.min(
+      priorTenantDepositDebt,
+      remainingBank,
+    );
+    remainingBank -= paidTenantDepositDebt;
+
+    final leaseReadyAssets = <OwnedRealEstate>[];
+    var tenantAuctionMortgageDeficiency = 0;
+    var newTenantDepositDebt = 0;
+    var tenantAuctionCount = 0;
+    for (final asset in rentalMonth.assets) {
+      if (!rentalMonth.expiringAssetIds.contains(asset.id)) {
+        leaseReadyAssets.add(asset);
+        continue;
+      }
+      final rentClaim = math.min(
+        asset.leaseDeposit,
+        asset.leaseMonthlyRent * asset.rentArrearsMonths,
+      );
+      final depositDue = asset.leaseDeposit - rentClaim;
+      if (remainingBank >= depositDue) {
+        remainingBank -= depositDue;
+        entries.add(
+          LedgerEntry(
+            id: '$sourceId-deposit-refund-${asset.id}',
+            day: state.day,
+            amount: -depositDue,
+            notional: asset.leaseDeposit,
+            account: 'tenant_deposit_payable',
+            counterAccount: 'company_bank',
+            description: '${asset.name} 계약 만료 보증금 반환',
+            sourceId: sourceId,
+          ),
+        );
+        if (rentClaim > 0) {
+          entries.add(
+            LedgerEntry(
+              id: '$sourceId-deposit-rent-offset-${asset.id}',
+              day: state.day,
+              amount: 0,
+              notional: rentClaim,
+              account: 'tenant_deposit_payable',
+              counterAccount: 'rent_receivable',
+              description: '${asset.name} 보증금에서 밀린 월세 상계',
+              sourceId: sourceId,
+            ),
+          );
+        }
+        leaseReadyAssets.add(
+          asset.copyWith(
+            leaseType: RealEstateLeaseType.vacant,
+            leaseDeposit: 0,
+            leaseMonthlyRent: 0,
+            leaseRemainingMonths: 0,
+            tenantReliability: 0,
+            rentArrearsMonths: 0,
+            vacancyMonths: 0,
+            lastRentalEvent: '계약 만료 · 보증금 반환 완료 · 공실 전환',
+          ),
+        );
+        continue;
+      }
+
+      tenantAuctionCount += 1;
+      final grossSale = asset.estimatedSaleValue(state.day);
+      final mortgagePayoff = asset.mortgageBalance;
+      final saleAfterMortgage = math.max(0, grossSale - mortgagePayoff);
+      tenantAuctionMortgageDeficiency += math.max(
+        0,
+        mortgagePayoff - grossSale,
+      );
+      final depositFromSale = math.min(depositDue, saleAfterMortgage);
+      final depositAfterSale = depositDue - depositFromSale;
+      final bankContribution = math.min(remainingBank, depositAfterSale);
+      remainingBank -= bankContribution;
+      final depositDeficiency = depositAfterSale - bankContribution;
+      newTenantDepositDebt += depositDeficiency;
+      final auctionEquity = math.max(0, saleAfterMortgage - depositDue);
+      remainingBank += auctionEquity;
+      entries.addAll([
+        LedgerEntry(
+          id: '$sourceId-tenant-auction-${asset.id}',
+          day: state.day,
+          amount: auctionEquity,
+          notional: grossSale,
+          disposedCost: asset.purchasePrice,
+          realizedPnl: grossSale - asset.purchasePrice,
+          account: 'company_bank',
+          counterAccount: 'tenant_deposit_auction_sale',
+          description: '${asset.name} 보증금 반환 불능 경매',
+          sourceId: sourceId,
+        ),
+        if (bankContribution > 0)
+          LedgerEntry(
+            id: '$sourceId-tenant-auction-bank-${asset.id}',
+            day: state.day,
+            amount: -bankContribution,
+            account: 'tenant_deposit_payable',
+            counterAccount: 'company_bank',
+            description: '${asset.name} 보증금 반환 회사 통장 충당',
+            sourceId: sourceId,
+          ),
+        LedgerEntry(
+          id: '$sourceId-tenant-auction-deposit-${asset.id}',
+          day: state.day,
+          amount: 0,
+          notional: depositFromSale + rentClaim,
+          account: 'tenant_deposit_payable',
+          counterAccount: 'tenant_deposit_auction_sale',
+          description: '${asset.name} 경매대금 보증금 정산',
+          sourceId: sourceId,
+        ),
+        if (depositDeficiency > 0)
+          LedgerEntry(
+            id: '$sourceId-tenant-auction-deficiency-${asset.id}',
+            day: state.day,
+            amount: 0,
+            notional: depositDeficiency,
+            account: 'tenant_deposit_debt',
+            counterAccount: 'tenant_deposit_payable',
+            description: '${asset.name} 경매 후 미반환 보증금',
+            sourceId: sourceId,
+          ),
+      ]);
+    }
+
+    final paidPayroll = math.min(payroll, remainingBank);
+    remainingBank -= paidPayroll;
+    final paidRent = math.min(rent, remainingBank);
+    remainingBank -= paidRent;
+    final paidPropertyCost = math.min(propertyCost, remainingBank);
+    remainingBank -= paidPropertyCost;
     final paidCurrent = paidPayroll + paidRent + paidPropertyCost;
     final unpaidCurrent = currentExpenses - paidCurrent;
     final unpaidOperatingCost = priorUnpaid - paidPrior + unpaidCurrent;
-    final cashDelta = income - paidTotal;
-    final endingCash = state.cash + cashDelta;
-    final economicNet = income - currentExpenses;
+
+    final mortgageDue = leaseReadyAssets.fold<int>(
+      0,
+      (sum, asset) => sum + asset.monthlyMortgagePayment,
+    );
+    final updatedRealEstate = <OwnedRealEstate>[];
+    var foreclosureCash = 0;
+    var newMortgageDeficiency = tenantAuctionMortgageDeficiency;
+    var mortgageArrearsCount = 0;
+    var foreclosureCount = 0;
+    for (final asset in leaseReadyAssets) {
+      if (!asset.hasMortgage) {
+        updatedRealEstate.add(asset);
+        continue;
+      }
+      final due = asset.monthlyMortgagePayment;
+      final beforeBalance = asset.mortgageBalance;
+      final interestPortion = asset.nextMortgageInterest;
+      late OwnedRealEstate updated;
+      if (remainingBank >= due) {
+        remainingBank -= due;
+        updated = asset.recordMortgagePayment();
+        entries.add(
+          LedgerEntry(
+            id: '$sourceId-mortgage-${asset.id}',
+            day: state.day,
+            amount: -due,
+            notional: beforeBalance - updated.mortgageBalance,
+            tradingFee: interestPortion,
+            account: 'company_bank',
+            counterAccount: 'mortgage_payment',
+            description: '${asset.name} 월 원리금 상환',
+            sourceId: sourceId,
+          ),
+        );
+      } else {
+        updated = asset.recordMissedMortgagePayment();
+        mortgageArrearsCount += 1;
+        entries.add(
+          LedgerEntry(
+            id: '$sourceId-mortgage-arrears-${asset.id}',
+            day: state.day,
+            amount: 0,
+            notional: due,
+            account: 'mortgage_payable',
+            counterAccount: 'mortgage_arrears',
+            description:
+                '${asset.name} 원리금 연체 ${updated.mortgageMissedPayments}회',
+            sourceId: sourceId,
+          ),
+        );
+      }
+      if (updated.mortgageMissedPayments < 3) {
+        updatedRealEstate.add(updated);
+        continue;
+      }
+
+      foreclosureCount += 1;
+      final grossSale = updated.estimatedSaleValue(state.day);
+      final payoff = updated.mortgageBalance;
+      final equity = math.max(0, grossSale - payoff);
+      final deficiency = math.max(0, payoff - grossSale);
+      foreclosureCash += equity;
+      newMortgageDeficiency += deficiency;
+      entries.addAll([
+        LedgerEntry(
+          id: '$sourceId-foreclosure-${asset.id}',
+          day: state.day,
+          amount: equity,
+          notional: grossSale,
+          disposedCost: asset.purchasePrice,
+          realizedPnl: grossSale - asset.purchasePrice,
+          account: 'company_bank',
+          counterAccount: 'mortgage_foreclosure_sale',
+          description: '${asset.name} 3회 연체 강제매각',
+          sourceId: sourceId,
+        ),
+        LedgerEntry(
+          id: '$sourceId-foreclosure-payoff-${asset.id}',
+          day: state.day,
+          amount: 0,
+          notional: math.min(grossSale, payoff),
+          account: 'mortgage_payable',
+          counterAccount: 'mortgage_foreclosure_sale',
+          description: '${asset.name} 강제매각 대출 상환',
+          sourceId: sourceId,
+        ),
+        if (deficiency > 0)
+          LedgerEntry(
+            id: '$sourceId-foreclosure-deficiency-${asset.id}',
+            day: state.day,
+            amount: 0,
+            notional: deficiency,
+            account: 'mortgage_deficiency',
+            counterAccount: 'mortgage_payable',
+            description: '${asset.name} 강제매각 후 결손채무',
+            sourceId: sourceId,
+          ),
+      ]);
+    }
+
+    final endingCash = remainingBank + foreclosureCash;
+    final economicNet = income - currentExpenses - mortgageDue;
+    final remainingMortgageDeficiency =
+        priorMortgageDeficiency -
+        paidMortgageDeficiency +
+        newMortgageDeficiency;
+    final remainingTenantDepositDebt =
+        priorTenantDepositDebt - paidTenantDepositDebt + newTenantDepositDebt;
     final history = ((flags['performanceHistory'] as List?) ?? const [])
         .map((item) => Map<String, dynamic>.from(item as Map))
         .toList();
     history.add({
       'day': state.day,
-      'cash': endingCash,
+      'cash': state.brokerageCash + endingCash,
       'portfolioCost': state.portfolioCost,
       'realizedPnl': state.ledger.fold<int>(
         0,
@@ -2547,7 +3336,40 @@ class GameEngine {
       flags['unpaidOperatingCost'] = unpaidOperatingCost;
       flags['reputation'] = (state.story.reputation - 2).clamp(0, 100);
     }
-    final entries = <LedgerEntry>[];
+    if (remainingMortgageDeficiency > 0) {
+      flags['mortgageDeficiencyDebt'] = remainingMortgageDeficiency;
+    } else {
+      flags.remove('mortgageDeficiencyDebt');
+    }
+    if (remainingTenantDepositDebt > 0) {
+      flags['tenantDepositDebt'] = remainingTenantDepositDebt;
+    } else {
+      flags.remove('tenantDepositDebt');
+    }
+    if (tenantAuctionCount > 0) {
+      flags['tenantDepositAuctionCount'] =
+          state.story.flagInt('tenantDepositAuctionCount') + tenantAuctionCount;
+    }
+    if (mortgageArrearsCount > 0) {
+      flags['mortgageArrearsCount'] = mortgageArrearsCount;
+      final reputation =
+          (flags['reputation'] as num?)?.toInt() ?? state.story.reputation;
+      flags['reputation'] = (reputation - 1).clamp(0, 100);
+    } else {
+      flags.remove('mortgageArrearsCount');
+    }
+    if (foreclosureCount > 0) {
+      final reputation =
+          (flags['reputation'] as num?)?.toInt() ?? state.story.reputation;
+      flags['reputation'] = (reputation - foreclosureCount * 10).clamp(0, 100);
+      flags['mortgageForeclosureCount'] =
+          state.story.flagInt('mortgageForeclosureCount') + foreclosureCount;
+    }
+    if (tenantAuctionCount > 0) {
+      final reputation =
+          (flags['reputation'] as num?)?.toInt() ?? state.story.reputation;
+      flags['reputation'] = (reputation - tenantAuctionCount * 8).clamp(0, 100);
+    }
     void addEntry(String suffix, int amount, String account, String label) {
       if (amount == 0) return;
       entries.add(
@@ -2579,6 +3401,18 @@ class GameEngine {
       'accounts_payable',
       '이전 미지급 운영비 지급',
     );
+    addEntry(
+      'mortgage-deficiency-payment',
+      -paidMortgageDeficiency,
+      'mortgage_deficiency',
+      '강제매각 결손채무 상환',
+    );
+    addEntry(
+      'tenant-deposit-debt-payment',
+      -paidTenantDepositDebt,
+      'tenant_deposit_debt',
+      '미반환 세입자 보증금 상환',
+    );
     addEntry('payroll', -paidPayroll, 'salary_expense', '직원 월 급여 지급');
     addEntry('rent', -paidRent, 'rent_expense', '사무실 월 임대료 지급');
     addEntry(
@@ -2605,13 +3439,19 @@ class GameEngine {
       'research_income',
       researchRevenue,
     );
-    if (unpaidOperatingCost == 0 && economicNet >= 0) {
+    if (unpaidOperatingCost == 0 &&
+        remainingMortgageDeficiency == 0 &&
+        remainingTenantDepositDebt == 0 &&
+        mortgageArrearsCount == 0 &&
+        tenantAuctionCount == 0 &&
+        economicNet >= 0) {
       progression = progression.record('positive_months');
     }
     return state.copyWith(
-      cash: endingCash,
+      cash: state.brokerageCash + endingCash,
       progression: progression,
       personalFinance: state.personalFinance.copyWith(
+        realEstate: updatedRealEstate,
         totalPropertyIncome:
             state.personalFinance.totalPropertyIncome + propertyIncome,
       ),

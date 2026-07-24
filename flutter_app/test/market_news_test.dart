@@ -344,7 +344,7 @@ void main() {
       final finance = universe.assets.singleWhere(
         (asset) => asset.id == 'daon_finance',
       );
-      final quote = finance.quoteAtOrBefore(DateTime(2008, 9, 15))!;
+      final quote = finance.quoteAtOrBefore(DateTime(2008, 9, 16))!;
       final previous = finance.previousCloseBefore(quote.date)!;
       final dailyReturn = quote.close / previous - 1;
 

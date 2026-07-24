@@ -22,7 +22,27 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/
+    - assets/images/real_estate/
     - assets/images/주식선생님/06_6자세_블라우스_스커트_투명.png
+    - assets/images/주식선생님/07_교실고정포즈_고해상도_투명.png
+    - assets/images/주식선생님/08_포즈1_포인터_고해상도_투명.png
+    - assets/images/주식선생님/09_포즈2_왼쪽설명_고해상도_투명.png
+    - assets/images/주식선생님/10_포즈3_양손설명_고해상도_투명.png
+    - assets/images/주식선생님/11_포즈4_교재_고해상도_투명.png
+    - assets/images/주식선생님/12_포즈5_경청_고해상도_투명.png
+    - assets/images/주식선생님/13_포즈6_핵심강조_고해상도_투명.png
+    - assets/images/주식선생님/14_포즈1_공통슬롯_투명.png
+    - assets/images/주식선생님/15_포즈2_공통슬롯_투명.png
+    - assets/images/주식선생님/16_포즈3_공통슬롯_투명.png
+    - assets/images/주식선생님/17_포즈4_공통슬롯_투명.png
+    - assets/images/주식선생님/18_포즈5_공통슬롯_투명.png
+    - assets/images/주식선생님/19_포즈6_공통슬롯_투명.png
+    - assets/images/주식선생님/22_포즈1_주인공그림체_공통슬롯_투명.png
+    - assets/images/주식선생님/23_포즈2_주인공그림체_공통슬롯_투명.png
+    - assets/images/주식선생님/24_포즈3_주인공그림체_공통슬롯_투명.png
+    - assets/images/주식선생님/25_포즈4_주인공그림체_공통슬롯_투명.png
+    - assets/images/주식선생님/26_포즈5_주인공그림체_공통슬롯_투명.png
+    - assets/images/주식선생님/27_포즈6_주인공그림체_공통슬롯_투명.png
     - assets/fonts/LICENSE-Pretendard.txt
     - assets/fonts/LICENSE-Maplestory.txt
   fonts:

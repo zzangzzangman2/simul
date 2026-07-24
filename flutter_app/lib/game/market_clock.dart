@@ -13,7 +13,8 @@ const marketDayEndMinute = 20 * 60;
 const marketTickMinutes = 1;
 const krxCloseTick = 420;
 
-/// 주식시장 화면이 열려 있을 때 현실 1초마다 게임 시각 1분을 진행한다.
+/// 주식시장 화면의 기본 배속은 현실 1초마다 게임 시각 1분이다.
+/// 화면 배속은 이 주기를 유지한 채 한 번에 1·3·10분을 순차 처리한다.
 const marketRealtimeTickDuration = Duration(seconds: 1);
 
 const decisionActionMinutes = 30;

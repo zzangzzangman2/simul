@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 
 import 'game/dynamic_news.dart';
@@ -13,15 +14,21 @@ import 'game/market_clock.dart';
 import 'game/market_data.dart';
 import 'game/market_tick.dart';
 import 'game/market_news.dart';
+import 'game/order_book.dart';
 import 'game/market_quote.dart';
 import 'game/mission_progression.dart';
 import 'game/organization_state.dart';
+import 'game/real_estate_financing.dart';
+import 'game/real_estate_rental.dart';
+import 'game/real_estate_world.dart';
 import 'game/personal_finance_state.dart';
+import 'game/real_estate_market.dart';
 import 'game/seed_money_content.dart';
 import 'game/story_state.dart';
 
 part 'organization_screen.dart';
 part 'apartment_hub_screens.dart';
+part 'rider_mini_game.dart';
 part 'save_menu_screens.dart';
 part 'asset_spending_screen.dart';
 part 'room_screens.dart';
@@ -147,6 +154,21 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     });
   }
 
+  void _startNewGameInSlot(int slot) {
+    GameSaveSlot? target;
+    for (final candidate in _slots) {
+      if (candidate.slot == slot) {
+        target = candidate;
+        break;
+      }
+    }
+    if (target == null || !target.isEmpty) return;
+    setState(() {
+      _newGameSlot = slot;
+      _view = _AppView.onboarding;
+    });
+  }
+
   void _showContinue() => setState(() => _view = _AppView.continueGame);
 
   void _showTitle() => setState(() {
@@ -230,7 +252,12 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     unawaited(_restoreGame(retry: true));
   }
 
-  Future<void> _createCompany(NewGameSetup setup) async {
+  Future<void> _createCompany(
+    NewGameSetup setup,
+    ValueChanged<String> onProgress,
+  ) async {
+    onProgress('투자 세계의 첫날을 계산하는 중…');
+    await Future<void>.delayed(Duration.zero);
     final story = StoryState.newPlayer(
       playerName: setup.playerName,
       introChoice: setup.introChoice,
@@ -242,6 +269,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
       story: story,
       initialCash: initialCompanyCash,
     );
+    onProgress('첫 저장 파일을 안전하게 만드는 중…');
     final slot = _newGameSlot;
     if (slot == null) {
       _showTitle();
@@ -258,6 +286,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
       return;
     }
     if (!mounted) return;
+    onProgress('저장 슬롯을 확인하는 중…');
     final slots = await _persistence.listSlots();
     if (!mounted) return;
     setState(() {
@@ -270,6 +299,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
           ?.savedAt;
       _view = _AppView.game;
     });
+    onProgress('첫 주식 수업 화면을 여는 중…');
     _scheduleMarketTutorialLaunch();
   }
 
@@ -387,6 +417,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     var advanced = false;
     final universe = await FictionalMarketUniverse.load(
       seed: next.simulationSeed,
+      throughDate: next.currentDate.add(Duration(days: requestedDays + 7)),
     );
     for (var i = 0; i < requestedDays; i++) {
       if (next.pendingDecisions.isNotEmpty || next.campaignComplete) break;
@@ -490,6 +521,21 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     return result;
   }
 
+  Future<FinanceActionResult> _configureRealEstateLease(
+    String assetId,
+    RealEstateLeaseType leaseType,
+  ) async {
+    final result = _engine.configureRealEstateLease(
+      _state!,
+      assetId,
+      leaseType,
+    );
+    if (!result.success) return result;
+    await _persistence.save(result.state);
+    if (mounted) setState(() => _state = result.state);
+    return result;
+  }
+
   Future<FinanceActionResult> _playAdultChanceGame(int stake) async {
     final result = _engine.playAdultChanceGame(_state!, stake);
     if (!result.success) return result;
@@ -536,6 +582,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     if (target > current.marketMinute && current.pendingOrders.isNotEmpty) {
       final universe = await FictionalMarketUniverse.load(
         seed: current.simulationSeed,
+        throughDate: current.currentDate,
       );
       final paths =
           <String, ({FictionalMarketAsset asset, List<double> path})>{};
@@ -556,13 +603,12 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
         paths[assetId] = (
           asset: asset,
           path: quote.isExactDate
-              ? generatedFullMarketDayPath(
+              ? generatedMarketDayPathForAsset(
+                  asset: asset,
+                  simulationSeed: current.simulationSeed,
+                  date: current.currentDate,
                   previousClose: previousClose,
                   officialClose: quote.close,
-                  seed: marketStockSeed(
-                    '${current.simulationSeed}:${asset.code}',
-                    current.currentDate,
-                  ),
                 )
               : <double>[quote.close],
         );
@@ -584,6 +630,11 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
             unitPrice: entry.path[pathIndex],
             marketMinute: cursor,
             isTradingDay: entry.path.length > 1,
+            previousClose:
+                entry.asset.previousCloseBefore(
+                  entry.asset.quoteAtOrBefore(current.currentDate)!.date,
+                ) ??
+                entry.path.first,
           );
         }
       }
@@ -630,7 +681,10 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     MarketTradeQuote? quote;
     try {
       quote = resolveMarketTradeQuote(
-        await FictionalMarketUniverse.load(seed: current.simulationSeed),
+        await FictionalMarketUniverse.load(
+          seed: current.simulationSeed,
+          throughDate: current.currentDate,
+        ),
         current,
         order.assetId,
       );
@@ -742,6 +796,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
                   activeSlot: _activeSlot,
                   onLoad: _continueSlot,
                   onDelete: _deleteSaveSlot,
+                  onCreate: _startNewGameInSlot,
                   onBack: _showTitle,
                 ),
                 _AppView.onboarding => VisualNovelOnboardingScreen(
@@ -766,6 +821,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
                   onLaunchFund: _launchFund,
                   onPurchaseSpendingOption: _purchaseSpendingOption,
                   onSellRealEstate: _sellRealEstate,
+                  onConfigureRealEstateLease: _configureRealEstateLease,
                   onPlayChanceGame: _playAdultChanceGame,
                   onPurchaseMarketReport: _purchaseDailyMarketReport,
                   onCompleteHubTutorial: _completeHubTutorial,
@@ -1065,7 +1121,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             width: 82,
             height: 118,
             child: Image.asset(
-              'assets/images/hero-boy.png',
+              'assets/images/character_hero_title_style_v2.png',
               fit: BoxFit.contain,
             ),
           ),
@@ -1457,6 +1513,7 @@ class OfficeScreen extends StatelessWidget {
     this.onLaunchFund,
     this.onPurchaseSpendingOption,
     this.onSellRealEstate,
+    this.onConfigureRealEstateLease,
     this.onPlayChanceGame,
     this.onPurchaseMarketReport,
     this.onCompleteHubTutorial,
@@ -1489,6 +1546,11 @@ class OfficeScreen extends StatelessWidget {
   final Future<FinanceActionResult> Function(String optionId)?
   onPurchaseSpendingOption;
   final Future<FinanceActionResult> Function(String assetId)? onSellRealEstate;
+  final Future<FinanceActionResult> Function(
+    String assetId,
+    RealEstateLeaseType leaseType,
+  )?
+  onConfigureRealEstateLease;
   final Future<FinanceActionResult> Function(int stake)? onPlayChanceGame;
   final Future<FinanceActionResult> Function()? onPurchaseMarketReport;
   final Future<void> Function()? onCompleteHubTutorial;
@@ -1503,6 +1565,74 @@ class OfficeScreen extends StatelessWidget {
   final Future<FinanceActionResult> Function(int amount, bool deposit)?
   onTransferBrokerageCash;
 
+  void _openStockMarket(BuildContext context) {
+    Navigator.of(context).push<void>(
+      _gameSceneRoute<void>(
+        StockMarketScreen(
+          state: state,
+          onSetMarketMinute: onSetMarketMinute,
+          onSaveMarketNotebook: onSaveMarketNotebook,
+          onPurchaseReport: onPurchaseMarketReport,
+          onCompleteTutorial: onCompleteMarketTutorial,
+          onExecuteTrade: onExecuteTrade,
+          onCancelPendingOrder: onCancelPendingOrder,
+          onTransferCash: onTransferBrokerageCash,
+        ),
+      ),
+    );
+  }
+
+  void _openRealEstateMarket(BuildContext context) {
+    Navigator.of(context).push<void>(
+      _gameSceneRoute<void>(
+        AssetSpendingScreen(
+          state: state,
+          realEstateOnly: true,
+          onPurchase:
+              onPurchaseSpendingOption ??
+              (optionId) async => FinanceActionResult(
+                state: state,
+                success: false,
+                message: '이 화면에서는 저장 기능을 사용할 수 없습니다.',
+              ),
+          onSellRealEstate:
+              onSellRealEstate ??
+              (assetId) async => FinanceActionResult(
+                state: state,
+                success: false,
+                message: '이 화면에서는 저장 기능을 사용할 수 없습니다.',
+              ),
+          onConfigureLease:
+              onConfigureRealEstateLease ??
+              (assetId, leaseType) async => FinanceActionResult(
+                state: state,
+                success: false,
+                message: '이 화면에서는 저장 기능을 사용할 수 없습니다.',
+              ),
+          onPlayChanceGame:
+              onPlayChanceGame ??
+              (stake) async => FinanceActionResult(
+                state: state,
+                success: false,
+                message: '이 화면에서는 저장 기능을 사용할 수 없습니다.',
+              ),
+        ),
+      ),
+    );
+  }
+
+  void _openHomeComputer(BuildContext context) {
+    Navigator.of(context).push<void>(
+      _gameSceneRoute<void>(
+        HomeComputerScreen(
+          state: state,
+          onOpenStockMarket: () => _openStockMarket(context),
+          onOpenRealEstate: () => _openRealEstateMarket(context),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: const Color(0xFF17130F),
@@ -1510,20 +1640,7 @@ class OfficeScreen extends StatelessWidget {
       child: ApartmentHubScreen(
         state: state,
         onOpenDecisions: () => _openDecision(context),
-        onOpenMarket: () => Navigator.of(context).push(
-          _gameSceneRoute<void>(
-            StockMarketScreen(
-              state: state,
-              onSetMarketMinute: onSetMarketMinute,
-              onSaveMarketNotebook: onSaveMarketNotebook,
-              onPurchaseReport: onPurchaseMarketReport,
-              onCompleteTutorial: onCompleteMarketTutorial,
-              onExecuteTrade: onExecuteTrade,
-              onCancelPendingOrder: onCancelPendingOrder,
-              onTransferCash: onTransferBrokerageCash,
-            ),
-          ),
-        ),
+        onOpenMarket: () => _openHomeComputer(context),
         onOpenLedger: () => _openLedger(context),
         onOpenOrganization: () => Navigator.of(context).push(
           _gameSceneRoute<void>(
@@ -1907,6 +2024,7 @@ class OfficeScreen extends StatelessWidget {
                 success: false,
                 message: '이 화면에서는 저장 기능을 사용할 수 없습니다.',
               ),
+          onConfigureRealEstateLease: onConfigureRealEstateLease,
           onPlayChanceGame:
               onPlayChanceGame ??
               (stake) async => FinanceActionResult(
@@ -3055,6 +3173,7 @@ class NewsBulletinSheet extends StatelessWidget {
             SizedBox(
               height: 52,
               child: ElevatedButton.icon(
+                key: const Key('market-breaking-news-confirm'),
                 onPressed: () => Navigator.of(context).pop(),
                 icon: const Icon(Icons.check_rounded),
                 label: const Text('확인했어요'),
@@ -3500,7 +3619,10 @@ class _EndingMarketSummary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<FictionalMarketUniverse>(
-      future: FictionalMarketUniverse.load(seed: state.simulationSeed),
+      future: FictionalMarketUniverse.load(
+        seed: state.simulationSeed,
+        throughDate: state.currentDate,
+      ),
       builder: (context, snapshot) {
         final universe = snapshot.data;
         if (universe == null) {
@@ -4062,10 +4184,12 @@ double? _portfolioPriceAtCurrentTime(
   if (quote == null) return null;
   if (!quote.isExactDate) return quote.close;
   final previousClose = asset.previousCloseBefore(quote.date) ?? quote.close;
-  final path = generatedFullMarketDayPath(
+  final path = generatedMarketDayPathForAsset(
+    asset: asset,
+    simulationSeed: state.simulationSeed,
+    date: state.currentDate,
     previousClose: previousClose,
     officialClose: quote.close,
-    seed: marketStockSeed(asset.code, state.currentDate),
   );
   return path[marketTickForMinute(
     state.marketMinute,

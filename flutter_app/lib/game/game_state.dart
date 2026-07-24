@@ -27,6 +27,7 @@ class PendingTradeOrder {
     required this.placedDate,
     required this.placedMinute,
     required this.placedSequence,
+    this.queueAheadQuantity = 0,
   });
 
   final String id;
@@ -42,10 +43,14 @@ class PendingTradeOrder {
   final String placedDate;
   final int placedMinute;
   final int placedSequence;
+  final double queueAheadQuantity;
 
   double get filledQuantity => originalQuantity - remainingQuantity;
 
-  PendingTradeOrder copyWith({double? remainingQuantity}) => PendingTradeOrder(
+  PendingTradeOrder copyWith({
+    double? remainingQuantity,
+    double? queueAheadQuantity,
+  }) => PendingTradeOrder(
     id: id,
     side: side,
     assetId: assetId,
@@ -59,6 +64,7 @@ class PendingTradeOrder {
     placedDate: placedDate,
     placedMinute: placedMinute,
     placedSequence: placedSequence,
+    queueAheadQuantity: queueAheadQuantity ?? this.queueAheadQuantity,
   );
 
   Map<String, dynamic> toJson() => {
@@ -75,6 +81,7 @@ class PendingTradeOrder {
     'placedDate': placedDate,
     'placedMinute': placedMinute,
     'placedSequence': placedSequence,
+    'queueAheadQuantity': queueAheadQuantity,
   };
 
   factory PendingTradeOrder.fromJson(Map<String, dynamic> json) {
@@ -98,6 +105,7 @@ class PendingTradeOrder {
       placedDate: json['placedDate'] as String? ?? '',
       placedMinute: (json['placedMinute'] as num?)?.toInt() ?? 0,
       placedSequence: (json['placedSequence'] as num?)?.toInt() ?? 0,
+      queueAheadQuantity: (json['queueAheadQuantity'] as num?)?.toDouble() ?? 0,
     );
   }
 
@@ -112,6 +120,8 @@ class PendingTradeOrder {
       remainingQuantity.isFinite &&
       remainingQuantity > 0 &&
       remainingQuantity <= originalQuantity &&
+      queueAheadQuantity.isFinite &&
+      queueAheadQuantity >= 0 &&
       placedDate.length == 10 &&
       placedSequence >= 0;
 }
@@ -794,6 +804,12 @@ class LedgerEntry {
     this.tradingFee = 0,
     this.disposedCost = 0,
     this.realizedPnl = 0,
+    this.assetId = '',
+    this.tradeSide = '',
+    this.tradeQuantity = 0,
+    this.tradeUnitPrice = 0,
+    this.marketMinute = -1,
+    this.orderType = '',
   });
 
   final String id;
@@ -807,6 +823,12 @@ class LedgerEntry {
   final int tradingFee;
   final int disposedCost;
   final int realizedPnl;
+  final String assetId;
+  final String tradeSide;
+  final double tradeQuantity;
+  final double tradeUnitPrice;
+  final int marketMinute;
+  final String orderType;
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -820,6 +842,12 @@ class LedgerEntry {
     'tradingFee': tradingFee,
     'disposedCost': disposedCost,
     'realizedPnl': realizedPnl,
+    if (assetId.isNotEmpty) 'assetId': assetId,
+    if (tradeSide.isNotEmpty) 'tradeSide': tradeSide,
+    if (tradeQuantity > 0) 'tradeQuantity': tradeQuantity,
+    if (tradeUnitPrice > 0) 'tradeUnitPrice': tradeUnitPrice,
+    if (marketMinute >= 0) 'marketMinute': marketMinute,
+    if (orderType.isNotEmpty) 'orderType': orderType,
   };
 
   factory LedgerEntry.fromJson(Map<String, dynamic> json) => LedgerEntry(
@@ -834,5 +862,11 @@ class LedgerEntry {
     tradingFee: (json['tradingFee'] as num?)?.toInt() ?? 0,
     disposedCost: (json['disposedCost'] as num?)?.toInt() ?? 0,
     realizedPnl: (json['realizedPnl'] as num?)?.toInt() ?? 0,
+    assetId: json['assetId'] as String? ?? '',
+    tradeSide: json['tradeSide'] as String? ?? '',
+    tradeQuantity: (json['tradeQuantity'] as num?)?.toDouble() ?? 0,
+    tradeUnitPrice: (json['tradeUnitPrice'] as num?)?.toDouble() ?? 0,
+    marketMinute: (json['marketMinute'] as num?)?.toInt() ?? -1,
+    orderType: json['orderType'] as String? ?? '',
   );
 }

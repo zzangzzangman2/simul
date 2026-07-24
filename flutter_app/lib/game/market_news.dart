@@ -313,6 +313,7 @@ Future<DailyMarketNewspaper> buildDailyMarketNewspaper(
   final brief = buildDailyBrief(state);
   final universe = await FictionalMarketUniverse.load(
     seed: state.simulationSeed,
+    throughDate: state.currentDate,
   );
   final movers = <DailyMarketMover>[];
   for (final asset in universe.assets.where((asset) => asset.isDomestic)) {

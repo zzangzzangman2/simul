@@ -1,3 +1,8 @@
+import 'real_estate_market.dart';
+import 'real_estate_financing.dart';
+import 'real_estate_rental.dart';
+import 'real_estate_world.dart';
+
 enum SpendingCategory { family, education, business, realEstate, social }
 
 enum SpendingRepeat { once, monthly, yearly }
@@ -16,6 +21,7 @@ class SpendingOption {
     this.isRealEstate = false,
     this.monthlyIncome = 0,
     this.monthlyCost = 0,
+    this.marketAssetId,
     this.researchIncomeBonus = 0,
     this.researchIncomePerEmployeeBonus = 0,
     this.reputationDelta = 0,
@@ -34,13 +40,27 @@ class SpendingOption {
   final bool isRealEstate;
   final int monthlyIncome;
   final int monthlyCost;
+  final String? marketAssetId;
   final int researchIncomeBonus;
   final int researchIncomePerEmployeeBonus;
   final int reputationDelta;
   final int familyTrustDelta;
+
+  RealEstateMarketAsset? get marketAsset =>
+      marketAssetId == null ? null : realEstateMarketAssetById(marketAssetId!);
+
+  RealEstatePurchaseQuote? quoteAt(DateTime date) => marketAsset?.quoteAt(date);
+
+  int costAt(DateTime date) => quoteAt(date)?.totalCash ?? cost;
+
+  int monthlyIncomeAt(DateTime date) =>
+      marketAsset?.monthlyRentAt(date) ?? monthlyIncome;
+
+  int monthlyCostAt(DateTime date) =>
+      marketAsset?.monthlyOperatingCostAt(date) ?? monthlyCost;
 }
 
-const spendingCatalog = <SpendingOption>[
+final spendingCatalog = <SpendingOption>[
   SpendingOption(
     id: 'family_outing',
     title: '가족과 보내는 하루',
@@ -132,6 +152,30 @@ const spendingCatalog = <SpendingOption>[
     monthlyCost: 80000,
     familyTrustDelta: 8,
   ),
+  ...realEstateMarketCatalog.map((asset) {
+    final openingQuote = asset.quoteAt(asset.availableFrom);
+    return SpendingOption(
+      id: 'market_${asset.id}',
+      title: asset.name,
+      description: asset.sourceNote,
+      category: SpendingCategory.realEstate,
+      unlockYear: asset.availableFrom.year,
+      cost: openingQuote.totalCash,
+      requiresLegalCompany: asset.requiresLegalCompany,
+      isRealEstate: true,
+      monthlyIncome: asset.monthlyRentAt(asset.availableFrom),
+      monthlyCost: asset.monthlyOperatingCostAt(asset.availableFrom),
+      reputationDelta: switch (asset.tier) {
+        RealEstateInvestmentTier.starter => 1,
+        RealEstateInvestmentTier.income => 2,
+        RealEstateInvestmentTier.apartment => 3,
+        RealEstateInvestmentTier.prestige => 5,
+        RealEstateInvestmentTier.building => 7,
+        RealEstateInvestmentTier.landmark => 10,
+      },
+      marketAssetId: asset.id,
+    );
+  }),
 ];
 
 SpendingOption? spendingOptionById(String id) {
@@ -150,6 +194,28 @@ class OwnedRealEstate {
     required this.acquiredDay,
     required this.monthlyIncome,
     required this.monthlyCost,
+    this.marketAssetId,
+    this.marketPriceAtPurchase = 0,
+    this.acquisitionCosts = 0,
+    this.purchaseDateIso = '',
+    this.marketListingIndex,
+    this.realEstateWorldSeed = '',
+    this.cashInvestedAtPurchase = 0,
+    this.mortgageOriginalPrincipal = 0,
+    this.mortgageBalance = 0,
+    this.mortgageAnnualInterestRate = 0,
+    this.mortgageTermMonths = 0,
+    this.mortgagePaymentsMade = 0,
+    this.mortgageMissedPayments = 0,
+    this.leaseType = RealEstateLeaseType.automatic,
+    this.leaseDeposit = 0,
+    this.leaseMonthlyRent = 0,
+    this.leaseRemainingMonths = 0,
+    this.tenantReliability = 0,
+    this.rentArrearsMonths = 0,
+    this.vacancyMonths = 0,
+    this.lastRentalEvent = '',
+    this.totalRepairCosts = 0,
   });
 
   final String id;
@@ -159,12 +225,187 @@ class OwnedRealEstate {
   final int acquiredDay;
   final int monthlyIncome;
   final int monthlyCost;
+  final String? marketAssetId;
+  final int marketPriceAtPurchase;
+  final int acquisitionCosts;
+  final String purchaseDateIso;
+  final int? marketListingIndex;
+  final String realEstateWorldSeed;
+  final int cashInvestedAtPurchase;
+  final int mortgageOriginalPrincipal;
+  final int mortgageBalance;
+  final double mortgageAnnualInterestRate;
+  final int mortgageTermMonths;
+  final int mortgagePaymentsMade;
+  final int mortgageMissedPayments;
+  final RealEstateLeaseType leaseType;
+  final int leaseDeposit;
+  final int leaseMonthlyRent;
+  final int leaseRemainingMonths;
+  final int tenantReliability;
+  final int rentArrearsMonths;
+  final int vacancyMonths;
+  final String lastRentalEvent;
+  final int totalRepairCosts;
 
-  int estimatedSaleValue(int currentDay) {
+  bool get hasMortgage => mortgageBalance > 0;
+
+  bool get hasManagedLease => leaseType != RealEstateLeaseType.automatic;
+
+  bool get hasActiveLease =>
+      leaseType == RealEstateLeaseType.monthlyRent ||
+      leaseType == RealEstateLeaseType.jeonse;
+
+  int get effectiveCashInvestedAtPurchase =>
+      cashInvestedAtPurchase > 0 ? cashInvestedAtPurchase : purchasePrice;
+
+  int get mortgageRemainingMonths {
+    final remaining = mortgageTermMonths - mortgagePaymentsMade;
+    return remaining > 0 ? remaining : 1;
+  }
+
+  int get monthlyMortgagePayment {
+    if (!hasMortgage) return 0;
+    final calculated = mortgageMonthlyPayment(
+      mortgageBalance,
+      mortgageAnnualInterestRate,
+      mortgageRemainingMonths,
+    );
+    final finalPayoff = mortgageBalance + nextMortgageInterest;
+    return calculated < finalPayoff ? calculated : finalPayoff;
+  }
+
+  int get nextMortgageInterest =>
+      mortgageMonthlyInterest(mortgageBalance, mortgageAnnualInterestRate);
+
+  OwnedRealEstate recordMortgagePayment() {
+    if (!hasMortgage) return this;
+    final due = monthlyMortgagePayment;
+    final interest = nextMortgageInterest;
+    final principalPaid = (due - interest).clamp(0, mortgageBalance).toInt();
+    return copyWith(
+      mortgageBalance: mortgageBalance - principalPaid,
+      mortgagePaymentsMade: mortgagePaymentsMade + 1,
+      mortgageMissedPayments: 0,
+    );
+  }
+
+  OwnedRealEstate recordMissedMortgagePayment() {
+    if (!hasMortgage) return this;
+    return copyWith(
+      mortgageBalance: mortgageBalance + nextMortgageInterest,
+      mortgageMissedPayments: mortgageMissedPayments + 1,
+    );
+  }
+
+  OwnedRealEstate copyWith({
+    int? mortgageBalance,
+    int? mortgagePaymentsMade,
+    int? mortgageMissedPayments,
+    RealEstateLeaseType? leaseType,
+    int? leaseDeposit,
+    int? leaseMonthlyRent,
+    int? leaseRemainingMonths,
+    int? tenantReliability,
+    int? rentArrearsMonths,
+    int? vacancyMonths,
+    String? lastRentalEvent,
+    int? totalRepairCosts,
+  }) => OwnedRealEstate(
+    id: id,
+    optionId: optionId,
+    name: name,
+    purchasePrice: purchasePrice,
+    acquiredDay: acquiredDay,
+    monthlyIncome: monthlyIncome,
+    monthlyCost: monthlyCost,
+    marketAssetId: marketAssetId,
+    marketPriceAtPurchase: marketPriceAtPurchase,
+    acquisitionCosts: acquisitionCosts,
+    purchaseDateIso: purchaseDateIso,
+    marketListingIndex: marketListingIndex,
+    realEstateWorldSeed: realEstateWorldSeed,
+    cashInvestedAtPurchase: cashInvestedAtPurchase,
+    mortgageOriginalPrincipal: mortgageOriginalPrincipal,
+    mortgageBalance: mortgageBalance ?? this.mortgageBalance,
+    mortgageAnnualInterestRate: mortgageAnnualInterestRate,
+    mortgageTermMonths: mortgageTermMonths,
+    mortgagePaymentsMade: mortgagePaymentsMade ?? this.mortgagePaymentsMade,
+    mortgageMissedPayments:
+        mortgageMissedPayments ?? this.mortgageMissedPayments,
+    leaseType: leaseType ?? this.leaseType,
+    leaseDeposit: leaseDeposit ?? this.leaseDeposit,
+    leaseMonthlyRent: leaseMonthlyRent ?? this.leaseMonthlyRent,
+    leaseRemainingMonths: leaseRemainingMonths ?? this.leaseRemainingMonths,
+    tenantReliability: tenantReliability ?? this.tenantReliability,
+    rentArrearsMonths: rentArrearsMonths ?? this.rentArrearsMonths,
+    vacancyMonths: vacancyMonths ?? this.vacancyMonths,
+    lastRentalEvent: lastRentalEvent ?? this.lastRentalEvent,
+    totalRepairCosts: totalRepairCosts ?? this.totalRepairCosts,
+  );
+
+  RealEstateMarketAsset? get marketAsset =>
+      marketAssetId == null ? null : realEstateMarketAssetById(marketAssetId!);
+
+  GeneratedRealEstateListing? get generatedListing {
+    final assetId = marketAssetId;
+    final listingIndex = marketListingIndex;
+    if (assetId == null ||
+        listingIndex == null ||
+        realEstateWorldSeed.isEmpty) {
+      return null;
+    }
+    return realEstateListingByRef(
+      RealEstateListingRef(assetId: assetId, listingIndex: listingIndex),
+      realEstateWorldSeed,
+    );
+  }
+
+  DateTime _dateAtDay(int day) {
+    final purchaseDate = DateTime.tryParse(purchaseDateIso);
+    if (purchaseDate != null) {
+      return purchaseDate.add(
+        Duration(days: (day - acquiredDay).clamp(0, 20000).toInt()),
+      );
+    }
+    return DateTime(2000).add(Duration(days: day.clamp(1, 20000).toInt() - 1));
+  }
+
+  int estimatedMarketValue(int currentDay) {
+    final listing = generatedListing;
+    if (listing != null) return listing.priceAt(_dateAtDay(currentDay));
+    final asset = marketAsset;
+    if (asset != null) return asset.priceAt(_dateAtDay(currentDay));
     final heldYears = ((currentDay - acquiredDay).clamp(0, 5000) / 365).floor();
     final valueRate = (90 + heldYears * 2).clamp(90, 115);
     return (purchasePrice * valueRate / 100).round();
   }
+
+  int estimatedSaleValue(int currentDay) {
+    final listing = generatedListing;
+    if (listing != null) {
+      final date = _dateAtDay(currentDay);
+      return (listing.priceAt(date) - listing.saleCostsAt(date))
+          .clamp(0, 1 << 62)
+          .toInt();
+    }
+    final asset = marketAsset;
+    if (asset == null) return estimatedMarketValue(currentDay);
+    final date = _dateAtDay(currentDay);
+    return (asset.priceAt(date) - asset.saleCostsAt(date))
+        .clamp(0, 1 << 62)
+        .toInt();
+  }
+
+  int monthlyIncomeAt(DateTime date) => switch (leaseType) {
+    RealEstateLeaseType.automatic =>
+      generatedListing?.monthlyRentAt(date) ?? monthlyIncome,
+    RealEstateLeaseType.monthlyRent => leaseMonthlyRent,
+    RealEstateLeaseType.vacant || RealEstateLeaseType.jeonse => 0,
+  };
+
+  int monthlyCostAt(DateTime date) =>
+      generatedListing?.monthlyOperatingCostAt(date) ?? monthlyCost;
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -174,18 +415,71 @@ class OwnedRealEstate {
     'acquiredDay': acquiredDay,
     'monthlyIncome': monthlyIncome,
     'monthlyCost': monthlyCost,
+    'marketAssetId': marketAssetId,
+    'marketPriceAtPurchase': marketPriceAtPurchase,
+    'acquisitionCosts': acquisitionCosts,
+    'purchaseDateIso': purchaseDateIso,
+    'marketListingIndex': marketListingIndex,
+    'realEstateWorldSeed': realEstateWorldSeed,
+    'cashInvestedAtPurchase': cashInvestedAtPurchase,
+    'mortgageOriginalPrincipal': mortgageOriginalPrincipal,
+    'mortgageBalance': mortgageBalance,
+    'mortgageAnnualInterestRate': mortgageAnnualInterestRate,
+    'mortgageTermMonths': mortgageTermMonths,
+    'mortgagePaymentsMade': mortgagePaymentsMade,
+    'mortgageMissedPayments': mortgageMissedPayments,
+    'leaseType': leaseType.name,
+    'leaseDeposit': leaseDeposit,
+    'leaseMonthlyRent': leaseMonthlyRent,
+    'leaseRemainingMonths': leaseRemainingMonths,
+    'tenantReliability': tenantReliability,
+    'rentArrearsMonths': rentArrearsMonths,
+    'vacancyMonths': vacancyMonths,
+    'lastRentalEvent': lastRentalEvent,
+    'totalRepairCosts': totalRepairCosts,
   };
 
-  factory OwnedRealEstate.fromJson(Map<String, dynamic> json) =>
-      OwnedRealEstate(
-        id: json['id'] as String? ?? '',
-        optionId: json['optionId'] as String? ?? '',
-        name: json['name'] as String? ?? '부동산',
-        purchasePrice: (json['purchasePrice'] as num?)?.toInt() ?? 0,
-        acquiredDay: (json['acquiredDay'] as num?)?.toInt() ?? 1,
-        monthlyIncome: (json['monthlyIncome'] as num?)?.toInt() ?? 0,
-        monthlyCost: (json['monthlyCost'] as num?)?.toInt() ?? 0,
-      );
+  factory OwnedRealEstate.fromJson(
+    Map<String, dynamic> json,
+  ) => OwnedRealEstate(
+    id: json['id'] as String? ?? '',
+    optionId: json['optionId'] as String? ?? '',
+    name: json['name'] as String? ?? '부동산',
+    purchasePrice: (json['purchasePrice'] as num?)?.toInt() ?? 0,
+    acquiredDay: (json['acquiredDay'] as num?)?.toInt() ?? 1,
+    monthlyIncome: (json['monthlyIncome'] as num?)?.toInt() ?? 0,
+    monthlyCost: (json['monthlyCost'] as num?)?.toInt() ?? 0,
+    marketAssetId: json['marketAssetId'] as String?,
+    marketPriceAtPurchase:
+        (json['marketPriceAtPurchase'] as num?)?.toInt() ?? 0,
+    acquisitionCosts: (json['acquisitionCosts'] as num?)?.toInt() ?? 0,
+    purchaseDateIso: json['purchaseDateIso'] as String? ?? '',
+    marketListingIndex: (json['marketListingIndex'] as num?)?.toInt(),
+    realEstateWorldSeed: json['realEstateWorldSeed'] as String? ?? '',
+    cashInvestedAtPurchase:
+        (json['cashInvestedAtPurchase'] as num?)?.toInt() ?? 0,
+    mortgageOriginalPrincipal:
+        (json['mortgageOriginalPrincipal'] as num?)?.toInt() ?? 0,
+    mortgageBalance: (json['mortgageBalance'] as num?)?.toInt() ?? 0,
+    mortgageAnnualInterestRate:
+        (json['mortgageAnnualInterestRate'] as num?)?.toDouble() ?? 0,
+    mortgageTermMonths: (json['mortgageTermMonths'] as num?)?.toInt() ?? 0,
+    mortgagePaymentsMade: (json['mortgagePaymentsMade'] as num?)?.toInt() ?? 0,
+    mortgageMissedPayments:
+        (json['mortgageMissedPayments'] as num?)?.toInt() ?? 0,
+    leaseType: RealEstateLeaseType.values.firstWhere(
+      (value) => value.name == json['leaseType'],
+      orElse: () => RealEstateLeaseType.automatic,
+    ),
+    leaseDeposit: (json['leaseDeposit'] as num?)?.toInt() ?? 0,
+    leaseMonthlyRent: (json['leaseMonthlyRent'] as num?)?.toInt() ?? 0,
+    leaseRemainingMonths: (json['leaseRemainingMonths'] as num?)?.toInt() ?? 0,
+    tenantReliability: (json['tenantReliability'] as num?)?.toInt() ?? 0,
+    rentArrearsMonths: (json['rentArrearsMonths'] as num?)?.toInt() ?? 0,
+    vacancyMonths: (json['vacancyMonths'] as num?)?.toInt() ?? 0,
+    lastRentalEvent: json['lastRentalEvent'] as String? ?? '',
+    totalRepairCosts: (json['totalRepairCosts'] as num?)?.toInt() ?? 0,
+  );
 }
 
 class PersonalFinanceState {
@@ -232,9 +526,22 @@ class PersonalFinanceState {
   int get propertyBookValue =>
       realEstate.fold<int>(0, (sum, asset) => sum + asset.purchasePrice);
 
+  int get totalMortgageBalance =>
+      realEstate.fold<int>(0, (sum, asset) => sum + asset.mortgageBalance);
+
+  int get totalTenantDepositLiability => realEstate.fold<int>(
+    0,
+    (sum, asset) => sum + (asset.hasActiveLease ? asset.leaseDeposit : 0),
+  );
+
+  int get monthlyMortgagePayment => realEstate.fold<int>(
+    0,
+    (sum, asset) => sum + asset.monthlyMortgagePayment,
+  );
+
   int estimatedPropertyValueAt(int day) => realEstate.fold<int>(
     0,
-    (sum, asset) => sum + asset.estimatedSaleValue(day),
+    (sum, asset) => sum + asset.estimatedMarketValue(day),
   );
 
   int get monthlyPropertyIncome =>
@@ -242,6 +549,14 @@ class PersonalFinanceState {
 
   int get monthlyPropertyCost =>
       realEstate.fold<int>(0, (sum, asset) => sum + asset.monthlyCost);
+
+  int monthlyPropertyIncomeAt(DateTime date) => realEstate.fold<int>(
+    0,
+    (sum, asset) => sum + asset.monthlyIncomeAt(date),
+  );
+
+  int monthlyPropertyCostAt(DateTime date) =>
+      realEstate.fold<int>(0, (sum, asset) => sum + asset.monthlyCostAt(date));
 
   int monthlyResearchBonusAt(int year, int employeeCount) {
     var total = 0;

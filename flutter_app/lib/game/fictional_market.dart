@@ -2025,7 +2025,10 @@ List<FictionalFinancialSnapshot> _buildCompanyFinancials({
   return List<FictionalFinancialSnapshot>.unmodifiable(snapshots);
 }
 
-FictionalMarketUniverse buildFictionalMarketUniverse(String seed) {
+FictionalMarketUniverse buildFictionalMarketUniverse(
+  String seed, {
+  DateTime? throughDate,
+}) {
   final spinoffs = _spinoffPlans(seed);
   final listings = _generatedListingPlans(seed);
   final definitions = <FictionalCompanyDefinition>[
@@ -2052,8 +2055,20 @@ FictionalMarketUniverse buildFictionalMarketUniverse(String seed) {
     for (final definition in definitions) definition.id: <String, double>{},
   };
   final current = <String, double>{};
-  var date = DateTime(1999, 12, 30);
-  final end = DateTime(fictionalCampaignEndYear, 12, 31);
+  final start = DateTime(1999, 12, 30);
+  final campaignEnd = DateTime(fictionalCampaignEndYear, 12, 31);
+  final requestedEnd = throughDate ?? campaignEnd;
+  final normalizedRequestedEnd = DateTime(
+    requestedEnd.year,
+    requestedEnd.month,
+    requestedEnd.day,
+  );
+  final end = normalizedRequestedEnd.isBefore(start)
+      ? start
+      : normalizedRequestedEnd.isAfter(campaignEnd)
+      ? campaignEnd
+      : normalizedRequestedEnd;
+  var date = start;
   while (!date.isAfter(end)) {
     if (isMarketTradingDay(date)) {
       final dateKey = marketDateKey(date);

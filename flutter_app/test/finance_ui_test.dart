@@ -34,13 +34,19 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('asset-spending-screen')), findsOneWidget);
-      expect(
-        find.byKey(const Key('spending-option-family_outing')),
-        findsOneWidget,
+      final familyOuting = find.byKey(
+        const Key('spending-option-family_outing'),
       );
+      await tester.scrollUntilVisible(
+        familyOuting,
+        320,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pump();
+      expect(familyOuting, findsOneWidget);
       expect(tester.takeException(), isNull);
 
-      await tester.tap(find.byKey(const Key('spending-option-family_outing')));
+      await tester.tap(familyOuting);
       await tester.pumpAndSettle();
       expect(find.text('지출 확정'), findsOneWidget);
       await tester.tap(find.text('지출 확정'));
@@ -49,7 +55,11 @@ void main() {
       expect(state.cash, 80000);
       expect(state.personalFinance.totalSpent, 20000);
       expect(find.textContaining('80,000원'), findsWidgets);
-      await tester.drag(find.byType(ListView), const Offset(0, -3000));
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('adult-chance-card')),
+        500,
+        scrollable: find.byType(Scrollable).first,
+      );
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('adult-chance-card')), findsOneWidget);
 

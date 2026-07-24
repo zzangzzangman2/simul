@@ -140,3 +140,29 @@ node scripts/generate-market-corpus.mjs <timeline.txt> flutter_app/lib/game/mark
 5. 업종 허용표를 통과하지 못한 조합은 생성 단계에서 제외한다.
 6. 현실 사례의 결과를 오늘 신문이나 유료 보고서로 미리 누설하지 않는다.
 7. 새 레퍼런스를 추가하면 URL, 자료 종류, 추출한 인과 문법을 이 문서에 기록한다.
+
+## 서울·경기 부동산 가격·거래비용
+
+### 1차 자료
+
+- 국토교통부 실거래가 공개시스템 GIS: https://rt.molit.go.kr/pt/gis/gis.do?mobileAt=&srhThingSecd=C
+- 서울 열린데이터광장 부동산 실거래가 정보: https://data.seoul.go.kr/dataList/OA-21275/A/1/datasetView.do
+- 한국부동산원 상업용부동산 임대동향조사: https://www.reb.or.kr/reb/cm/cntnts/cntntsView.do?cntntsId=1049&mi=10335&statId=S237220284
+- 서울시 부동산 중개보수 요율표: https://land.seoul.go.kr/land/broker/brokerageCommission.do
+- 서울시 부동산 취득세 안내: https://news.seoul.go.kr/gov/archives/200082
+
+### 개별 거래 기준점 보조 자료
+
+- 2025 한남더힐·나인원한남·아크로서울포레스트·래미안원베일리 고가 거래 정리: https://www.newsspace.kr/mobile/article.html?no=6720
+- 판교푸르지오그랑블·과천푸르지오써밋·광교중흥S클래스 거래 정리: https://v.daum.net/v/zElHpUe756?f=m
+- 2025 판교 테크원 매각 보도: https://www.yna.co.kr/view/AKR20251013110200008
+- 2018 센트로폴리스·삼성물산 서초사옥·알파돔시티 매각 보도: https://www.yna.co.kr/view/AKR20190103150600003
+- 2025 SI타워 매각 보도: https://www.yna.co.kr/view/AKR20250807046000003
+
+적용 규칙:
+
+1. 실제 이름을 쓰는 아파트는 면적과 거래 시점을 함께 고정하고 실제 거래 앵커만 `실거래`로 표시한다.
+2. 실제 이름을 쓰는 빌딩은 공개된 전체 매각대금만 `실제 빌딩 매각`으로 표시한다.
+3. 2000~2005와 실거래 앵커 사이 값은 지수 역산·보간 또는 시장평가이며 실거래로 표시하지 않는다.
+4. 2026 최신 미공개 구간은 `게임 연장`으로 표시한다.
+5. 세금과 중개보수는 게임이 다주택 여부·법인 구조·면제·누진 예외를 모두 알 수 없으므로 단순화된 추정치로 고지한다.

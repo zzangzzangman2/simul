@@ -1,4 +1,7 @@
+import 'dart:collection';
 import 'dart:math' as math;
+
+import 'package:flutter/foundation.dart' show compute;
 
 import 'market_clock.dart';
 
@@ -424,7 +427,9 @@ class FictionalMarketAsset {
 }
 
 class FictionalMarketUniverse {
-  static final Map<String, Future<FictionalMarketUniverse>> _seededLoads = {};
+  static const int _maximumCachedLoads = 2;
+  static final LinkedHashMap<String, Future<FictionalMarketUniverse>>
+  _seededLoads = LinkedHashMap();
 
   const FictionalMarketUniverse({
     required this.schemaVersion,
@@ -491,16 +496,66 @@ class FictionalMarketUniverse {
 
   static Future<FictionalMarketUniverse> load({
     String seed = 'simul-preview',
+    DateTime? throughDate,
     bool forceRefresh = false,
   }) {
-    if (forceRefresh) _seededLoads.remove(seed);
-    return _seededLoads.putIfAbsent(
-      seed,
-      () => Future<FictionalMarketUniverse>.value(
-        buildFictionalMarketUniverse(seed),
-      ),
-    );
+    final normalizedThroughDate = throughDate == null
+        ? null
+        : DateTime(throughDate.year, throughDate.month, throughDate.day);
+    final cacheKey = normalizedThroughDate == null
+        ? '$seed|full'
+        : '$seed|${_dateKey(normalizedThroughDate)}';
+    if (forceRefresh) _seededLoads.remove(cacheKey);
+    final cached = _seededLoads.remove(cacheKey);
+    if (cached != null) {
+      _seededLoads[cacheKey] = cached;
+      return cached;
+    }
+
+    late final Future<FictionalMarketUniverse> pending;
+    pending = () async {
+      try {
+        // 첫 프레임을 먼저 그리고, 네이티브에서는 별도 isolate에서
+        // 장기 월드를 생성한다. Web에서도 compute의 호환 경로를 사용한다.
+        await Future<void>.delayed(Duration.zero);
+        if (normalizedThroughDate == null) {
+          // 전체 27년 월드는 isolate 간 대형 객체 복사 비용이 더 크므로
+          // 검증 도구에서는 현재 isolate에서 한 번만 생성한다.
+          return buildFictionalMarketUniverse(seed);
+        }
+        return await compute(
+          _buildFictionalMarketUniverseInBackground,
+          <String, Object?>{
+            'seed': seed,
+            'throughDateMillis': normalizedThroughDate.millisecondsSinceEpoch,
+          },
+          debugLabel: 'fictional-market-$cacheKey',
+        );
+      } catch (_) {
+        if (identical(_seededLoads[cacheKey], pending)) {
+          _seededLoads.remove(cacheKey);
+        }
+        rethrow;
+      }
+    }();
+    _seededLoads[cacheKey] = pending;
+    while (_seededLoads.length > _maximumCachedLoads) {
+      _seededLoads.remove(_seededLoads.keys.first);
+    }
+    return pending;
   }
+}
+
+FictionalMarketUniverse _buildFictionalMarketUniverseInBackground(
+  Map<String, Object?> request,
+) {
+  final millis = request['throughDateMillis'] as int?;
+  return buildFictionalMarketUniverse(
+    request['seed']! as String,
+    throughDate: millis == null
+        ? null
+        : DateTime.fromMillisecondsSinceEpoch(millis),
+  );
 }
 
 bool _isValidDateKey(String value) {

@@ -106,9 +106,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('360px work hub and all three mini-games stay inside', (
-    tester,
-  ) async {
+  testWidgets('360px work hub and rider stay inside', (tester) async {
     await usePhoneSurface(tester);
     final state = newState();
     await tester.pumpWidget(
@@ -123,11 +121,7 @@ void main() {
     expect(find.byKey(const Key('seed-money-summary')), findsOneWidget);
     expect(tester.takeException(), isNull);
 
-    for (final game in <Widget>[
-      const DishwashingMiniGame(),
-      const StationerySortMiniGame(),
-      const FleaMarketMiniGame(),
-    ]) {
+    for (final game in <Widget>[const RiderMiniGame()]) {
       await tester.pumpWidget(MaterialApp(home: game));
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
@@ -196,14 +190,41 @@ void main() {
     expect(tester.takeException(), isNull);
 
     await tester.tap(find.byKey(const Key('open-market-button')));
+    await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
-    final marketRoute = find.byType(StockMarketScreen, skipOffstage: false);
-    expect(marketRoute, findsOneWidget);
+    final computerRoute = find.byType(HomeComputerScreen, skipOffstage: false);
+    expect(computerRoute, findsOneWidget);
+    expect(find.byKey(const Key('home-computer-screen')), findsOneWidget);
+    expect(find.byType(StockMarketScreen), findsNothing);
+    final stockApp = find.byKey(const Key('computer-stock-market-app'));
+    final realEstateApp = find.byKey(const Key('computer-real-estate-app'));
+    expect(stockApp.hitTestable(), findsOneWidget);
+    expect(realEstateApp.hitTestable(), findsOneWidget);
+    expect(tester.getSize(stockApp).width, greaterThanOrEqualTo(120));
+    expect(tester.getSize(realEstateApp), tester.getSize(stockApp));
     expect(
       find.byKey(const Key('hub-mission-card')).hitTestable(),
       findsNothing,
     );
+
+    await tester.tap(stockApp);
+    await tester.pump(const Duration(milliseconds: 500));
+    final marketRoute = find.byType(StockMarketScreen, skipOffstage: false);
+    expect(marketRoute, findsOneWidget);
     Navigator.of(tester.element(marketRoute)).pop();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('home-computer-screen')), findsOneWidget);
+
+    await tester.tap(realEstateApp);
+    await tester.pumpAndSettle();
+    final realEstateRoute = find.byKey(const Key('real-estate-market-screen'));
+    expect(realEstateRoute, findsOneWidget);
+    expect(find.text('부동산 시장'), findsOneWidget);
+    expect(find.byKey(const Key('real-estate-metro-map')), findsOneWidget);
+    Navigator.of(tester.element(realEstateRoute)).pop();
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('home-computer-close')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('hub-mission-card')), findsOneWidget);
 
@@ -215,6 +236,30 @@ void main() {
     );
     expectRoomHotspots(['open-decisions-button', 'open-organization-button']);
     expect(find.byKey(const Key('hub-mission-card')), findsOneWidget);
+    final leftArrow = find.byKey(const Key('apartment-go-bedroom'));
+    final rightArrow = find.byKey(const Key('apartment-go-kitchen'));
+    expect(leftArrow, findsOneWidget);
+    expect(rightArrow, findsOneWidget);
+    final leftArrowRect = tester.getRect(leftArrow);
+    final rightArrowRect = tester.getRect(rightArrow);
+    expect(leftArrowRect.size, rightArrowRect.size);
+    expect(leftArrowRect.width, 68);
+    expect(leftArrowRect.height, 68);
+    expect(leftArrowRect.bottom, closeTo(rightArrowRect.bottom, 0.01));
+    expect(
+      leftArrowRect.left,
+      closeTo(phoneSize.width - rightArrowRect.right, 0.01),
+    );
+
+    final missionRect = tester.getRect(
+      find.byKey(const Key('hub-mission-card')),
+    );
+    expect(missionRect.width, 202);
+    expect(missionRect.height, 62);
+    expect(missionRect.right, closeTo(rightArrowRect.right, 0.01));
+    expect(missionRect.bottom, lessThan(rightArrowRect.top));
+    expect(missionRect.overlaps(rightArrowRect), isFalse);
+    expect(missionRect.overlaps(leftArrowRect), isFalse);
     expect(find.byKey(const Key('open-market-button')), findsNothing);
     expect(find.byKey(const Key('open-ledger-button')), findsNothing);
 
@@ -402,9 +447,16 @@ void main() {
   ) async {
     await usePhoneSurface(tester);
     var created = false;
+    final creationGate = Completer<void>();
     await tester.pumpWidget(
       MaterialApp(
-        home: VisualNovelOnboardingScreen(onCreate: (_) => created = true),
+        home: VisualNovelOnboardingScreen(
+          onCreate: (_, onProgress) async {
+            created = true;
+            onProgress('테스트 시장 준비 중…');
+            await creationGate.future;
+          },
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -426,13 +478,12 @@ void main() {
       final teacher = find.byKey(const Key('academy-teacher-character'));
       if (teacher.evaluate().isNotEmpty) {
         final teacherRect = tester.getRect(teacher);
-        expect(teacherRect.center.dx, closeTo(phoneSize.width / 2, 0.1));
-        expect(teacherRect.top, greaterThanOrEqualTo(0));
-        expect(teacherRect.bottom, lessThanOrEqualTo(phoneSize.height));
-        expect(
-          teacherRect.height,
-          greaterThanOrEqualTo(phoneSize.height * 0.5),
-        );
+        expect(teacherRect.left, closeTo(3.72, 0.01));
+        expect(teacherRect.center.dx, closeTo(phoneSize.width / 2, 0.01));
+        expect(teacherRect.top, closeTo(149.16, 0.01));
+        expect(teacherRect.width, closeTo(352.56, 0.01));
+        expect(teacherRect.height, closeTo(528.84, 0.01));
+        expect(teacherRect.bottom, closeTo(678, 0.01));
       }
       expect(tester.takeException(), isNull);
     }
@@ -455,10 +506,7 @@ void main() {
     final academyTeacherRect = tester.getRect(
       find.byKey(const Key('academy-teacher-character')),
     );
-    expect(
-      academyTeacherRect.height,
-      greaterThanOrEqualTo(phoneSize.height * 0.5),
-    );
+    expect(academyTeacherRect.height, closeTo(528.84, 0.01));
     await tester.tap(find.byKey(const Key('academy-tutorial-continue')));
     await tester.pumpAndSettle();
     expectPortraitInside();
@@ -497,9 +545,17 @@ void main() {
     await tester.pump();
     await tester.ensureVisible(find.byKey(const Key('create-company-button')));
     await tester.tap(find.byKey(const Key('create-company-button')));
-    await tester.pumpAndSettle();
+    await tester.pump();
 
     expect(created, isTrue);
+    expect(
+      find.byKey(const Key('new-game-preparation-overlay')),
+      findsOneWidget,
+    );
+    await tester.pump();
+    expect(find.text('테스트 시장 준비 중…'), findsOneWidget);
+    creationGate.complete();
+    await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
   });
 
@@ -507,7 +563,9 @@ void main() {
     await usePhoneSurface(tester);
     addTearDown(tester.view.resetViewInsets);
     await tester.pumpWidget(
-      MaterialApp(home: VisualNovelOnboardingScreen(onCreate: (_) {})),
+      MaterialApp(
+        home: VisualNovelOnboardingScreen(onCreate: (_, onProgress) async {}),
+      ),
     );
     await tester.pumpAndSettle();
 
