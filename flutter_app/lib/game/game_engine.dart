@@ -2757,10 +2757,10 @@ class GameEngine {
             body: '버틸 현금과 고객에게 설명할 원칙을 다시 적습니다.',
           ),
           (
-            id: 'final-year',
+            id: 'adult-investor-year',
             date: DateTime(2010, 1, 4),
-            title: '마지막 해의 투자 서한',
-            body: '10년의 선택을 정리하고 마지막 해에 지킬 기준을 고릅니다.',
+            title: '성인 투자자의 첫 투자 서한',
+            body: '지난 10년의 선택을 정리하고 성인이 된 뒤 지킬 장기 원칙을 고릅니다.',
           ),
         ];
     var next = state;

@@ -1339,13 +1339,13 @@ void main() {
     );
   });
 
-  test('the campaign cannot advance beyond 2010-12-31', () {
+  test('the campaign cannot advance beyond 2026-12-31', () {
     final state = engine
         .createNewGame('캠페인 종료 테스트')
         .copyWith(day: GameState.maxCampaignDay, decisions: const []);
     final next = engine.advanceOneDay(state);
     expect(next.day, GameState.maxCampaignDay);
-    expect(next.currentDate, DateTime(2010, 12, 31));
+    expect(next.currentDate, DateTime(2026, 12, 31));
     expect(next.toJson(), state.toJson());
   });
 }

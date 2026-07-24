@@ -423,6 +423,17 @@ void main() {
         expect(rect.top, greaterThanOrEqualTo(0));
         expect(rect.bottom, lessThanOrEqualTo(phoneSize.height));
       }
+      final teacher = find.byKey(const Key('academy-teacher-character'));
+      if (teacher.evaluate().isNotEmpty) {
+        final teacherRect = tester.getRect(teacher);
+        expect(teacherRect.center.dx, closeTo(phoneSize.width / 2, 0.1));
+        expect(teacherRect.top, greaterThanOrEqualTo(0));
+        expect(teacherRect.bottom, lessThanOrEqualTo(phoneSize.height));
+        expect(
+          teacherRect.height,
+          greaterThanOrEqualTo(phoneSize.height * 0.5),
+        );
+      }
       expect(tester.takeException(), isNull);
     }
 
@@ -435,7 +446,7 @@ void main() {
     await tester.pumpAndSettle();
     expectPortraitInside();
 
-    for (var index = 0; index < 7; index++) {
+    for (var index = 0; index < 9; index++) {
       await tester.tap(find.byKey(const Key('story-continue')));
       await tester.pumpAndSettle();
       expectPortraitInside();
@@ -506,7 +517,7 @@ void main() {
     }
     await tester.tap(find.byKey(const Key('story-intro-computer')));
     await tester.pumpAndSettle();
-    for (var index = 0; index < 7; index++) {
+    for (var index = 0; index < 9; index++) {
       await tester.tap(find.byKey(const Key('story-continue')));
       await tester.pumpAndSettle();
     }

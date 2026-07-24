@@ -3,6 +3,8 @@ import 'dart:math' as math;
 import 'market_clock.dart';
 
 part 'fictional_market.dart';
+part 'market_corpus_calibration.dart';
+part 'market_corpus_events.dart';
 part 'market_arc_scenarios.dart';
 part 'market_era_events.dart';
 

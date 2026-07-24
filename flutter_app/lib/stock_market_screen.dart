@@ -1952,7 +1952,6 @@ class _StockDetailScreenState extends State<_StockDetailScreen> {
     Future<void> Function()? onCompleteTutorial,
   }) {
     var showingTutorial = tutorialEnabled;
-    var completingTutorial = false;
     return showModalBottomSheet<void>(
       context: context,
       showDragHandle: !tutorialEnabled,
@@ -1966,14 +1965,21 @@ class _StockDetailScreenState extends State<_StockDetailScreen> {
       builder: (sheetContext) {
         return StatefulBuilder(
           builder: (context, setSheetState) {
-            final orderSheet = _OrderSheet(
-              definition: definition,
-              live: live,
-              isBuy: isBuy,
-              state: state,
-              minute: minute,
-              onExecuteTrade: onExecuteTrade,
-            );
+            final Widget orderSheet = tutorialEnabled
+                ? _PracticalTradeTutorialSheet(
+                    definition: definition,
+                    sourceLive: live,
+                    sourceState: state,
+                    onCompleteTutorial: onCompleteTutorial,
+                  )
+                : _OrderSheet(
+                    definition: definition,
+                    live: live,
+                    isBuy: isBuy,
+                    state: state,
+                    minute: minute,
+                    onExecuteTrade: onExecuteTrade,
+                  );
             if (!tutorialEnabled) return orderSheet;
             return SizedBox(
               height: MediaQuery.sizeOf(context).height * 0.92,
@@ -1986,23 +1992,7 @@ class _StockDetailScreenState extends State<_StockDetailScreen> {
                       Positioned.fill(
                         child: _OrderTicketTutorialOverlay(
                           onDone: () async {
-                            if (completingTutorial) return;
-                            completingTutorial = true;
                             setSheetState(() => showingTutorial = false);
-                            try {
-                              await onCompleteTutorial?.call();
-                            } catch (_) {
-                              if (!context.mounted) return;
-                              ScaffoldMessenger.of(context)
-                                ..hideCurrentSnackBar()
-                                ..showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      '완료 기록을 저장하지 못했어요. 다음 접속 때 다시 시도할게요.',
-                                    ),
-                                  ),
-                                );
-                            }
                           },
                         ),
                       ),
@@ -2240,14 +2230,550 @@ class _FundamentalMetric extends StatelessWidget {
   );
 }
 
+enum _PracticalTradeTutorialPhase { buy, priceMove, sell, summary }
+
+class _PracticalTradeTutorialSheet extends StatefulWidget {
+  const _PracticalTradeTutorialSheet({
+    required this.definition,
+    required this.sourceLive,
+    required this.sourceState,
+    required this.onCompleteTutorial,
+  });
+
+  final _StockDefinition definition;
+  final ValueNotifier<_LiveStock> sourceLive;
+  final GameState sourceState;
+  final Future<void> Function()? onCompleteTutorial;
+
+  @override
+  State<_PracticalTradeTutorialSheet> createState() =>
+      _PracticalTradeTutorialSheetState();
+}
+
+class _PracticalTradeTutorialSheetState
+    extends State<_PracticalTradeTutorialSheet> {
+  static const _practiceSeedMoney = 1000000;
+  static const _practiceMinute = krxOpenMinute + 10;
+  static const _engine = GameEngine();
+
+  late GameState _practiceState;
+  late final ValueNotifier<_LiveStock> _practiceLive;
+  late final ValueNotifier<int> _practiceMinuteNotifier;
+  _PracticalTradeTutorialPhase _phase = _PracticalTradeTutorialPhase.buy;
+  double _buyPrice = 0;
+  double _sellPrice = 0;
+  int _realizedPnl = 0;
+  bool _finishing = false;
+  bool _allowPop = false;
+
+  @override
+  void initState() {
+    super.initState();
+    var practiceDay = widget.sourceState.day;
+    for (var offset = 0; offset < 14; offset += 1) {
+      if (isMarketTradingDay(widget.sourceState.dateForDay(practiceDay))) {
+        break;
+      }
+      practiceDay += 1;
+    }
+    final sourceQuote = widget.sourceLive.value;
+    _practiceLive = ValueNotifier<_LiveStock>(
+      _LiveStock(
+        price: sourceQuote.price,
+        previousClose: sourceQuote.previousClose,
+        officialClose: sourceQuote.officialClose,
+        isTradingDay: true,
+        open: sourceQuote.open,
+        high: sourceQuote.high,
+        low: sourceQuote.low,
+        history: List<MarketPoint>.from(sourceQuote.history),
+        sessionHistory: List<double>.from(sourceQuote.sessionHistory),
+        sessionPath: List<double>.from(sourceQuote.sessionPath),
+      ),
+    );
+    _practiceMinuteNotifier = ValueNotifier<int>(_practiceMinute);
+    _practiceState = widget.sourceState.copyWith(
+      day: practiceDay,
+      marketMinute: _practiceMinute,
+      cash: _practiceSeedMoney,
+      brokerageCash: _practiceSeedMoney,
+      positions: const <PortfolioPosition>[],
+      pendingOrders: const <PendingTradeOrder>[],
+      story: widget.sourceState.story.copyWith(accountAuthorityLevel: 5),
+      ledger: const <LedgerEntry>[],
+    );
+  }
+
+  @override
+  void dispose() {
+    _practiceLive.dispose();
+    _practiceMinuteNotifier.dispose();
+    super.dispose();
+  }
+
+  Future<TradeExecutionResult> _executePracticeOrder(TradeOrder order) async {
+    final result = _engine.executeTrade(_practiceState, order);
+    if (result.success && mounted) {
+      setState(() {
+        _practiceState = result.state;
+        if (order.side == TradeSide.sell) {
+          _realizedPnl = result.realizedPnl;
+        }
+      });
+    }
+    return result;
+  }
+
+  void _showPriceMove() {
+    _buyPrice = _practiceLive.value.price;
+    final movedPrice = marketSnapPrice(
+      _buyPrice * 1.06,
+      market: widget.definition.market,
+    );
+    _sellPrice = movedPrice;
+    final quote = _practiceLive.value;
+    _practiceLive.value = quote.copyWith(
+      price: movedPrice,
+      high: math.max(quote.high, movedPrice),
+      sessionHistory: <double>[...quote.sessionHistory, movedPrice],
+    );
+    setState(() => _phase = _PracticalTradeTutorialPhase.priceMove);
+  }
+
+  void _openSellPractice() {
+    setState(() => _phase = _PracticalTradeTutorialPhase.sell);
+  }
+
+  void _showSummary() {
+    setState(() => _phase = _PracticalTradeTutorialPhase.summary);
+  }
+
+  Future<void> _finishTutorial() async {
+    if (_finishing) return;
+    setState(() => _finishing = true);
+    try {
+      await widget.onCompleteTutorial?.call();
+      if (!mounted) return;
+      setState(() => _allowPop = true);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) Navigator.of(context).pop();
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _finishing = false);
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('튜토리얼 완료 기록을 저장하지 못했어요. 다시 시도해 주세요.')),
+        );
+    }
+  }
+
+  Widget _practiceHeader({
+    required String phaseLabel,
+    required String description,
+  }) => Container(
+    key: const Key('tutorial-seed-balance'),
+    width: double.infinity,
+    margin: const EdgeInsets.fromLTRB(16, 12, 16, 2),
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      gradient: const LinearGradient(
+        colors: <Color>[Color(0xFFFFF7D6), Color(0xFFFFE49A)],
+      ),
+      borderRadius: BorderRadius.circular(17),
+      border: Border.all(color: const Color(0xFFE7BE45)),
+    ),
+    child: Row(
+      children: [
+        Container(
+          width: 42,
+          height: 42,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(Icons.school_rounded, color: Color(0xFF715716)),
+        ),
+        const SizedBox(width: 11),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                phaseLabel,
+                style: const TextStyle(
+                  color: Color(0xFF715716),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                description,
+                style: const TextStyle(
+                  color: Color(0xFF4E4325),
+                  fontSize: 11,
+                  height: 1.35,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            const Text(
+              '연습용',
+              style: TextStyle(
+                color: Color(0xFF8D762E),
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            Text(
+              '${_money(_practiceState.brokerageCash)}원',
+              style: const TextStyle(
+                color: Color(0xFF3F351A),
+                fontSize: 14,
+                fontWeight: FontWeight.w900,
+                fontFeatures: _marketNumberFeatures,
+              ),
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
+
+  Widget _orderPractice({required bool isBuy}) => Column(
+    key: Key(isBuy ? 'tutorial-buy-order' : 'tutorial-sell-order'),
+    children: [
+      _practiceHeader(
+        phaseLabel: isBuy ? '실전 연습 1 / 3 · 매수' : '실전 연습 3 / 3 · 매도',
+        description: isBuy
+            ? '이 100만 원은 지금 수업에서만 쓰며 실제 계좌에는 남지 않아요.'
+            : '변한 가격과 예상 수령액을 확인하고 보유 주식을 직접 팔아 보세요.',
+      ),
+      Expanded(
+        child: _OrderSheet(
+          key: ValueKey(isBuy ? 'practice-buy-sheet' : 'practice-sell-sheet'),
+          definition: widget.definition,
+          live: _practiceLive,
+          isBuy: isBuy,
+          state: _practiceState,
+          minute: _practiceMinuteNotifier,
+          onExecuteTrade: _executePracticeOrder,
+          balanceLabel: isBuy ? '연습용 주문 가능 예수금' : null,
+          submitLabel: isBuy ? '연습 매수 주문 실행' : '연습 매도 주문 실행',
+          successLabel: isBuy ? '가격 변화 확인하기' : '매도 결과 확인하기',
+          onSuccessContinue: isBuy ? _showPriceMove : _showSummary,
+        ),
+      ),
+    ],
+  );
+
+  Widget _priceMoveView() {
+    final position = _practiceState.positions
+        .where((item) => item.assetId == widget.definition.id)
+        .firstOrNull;
+    final units = position?.units ?? 0;
+    final estimatedChange = ((_sellPrice - _buyPrice) * units).round();
+    return SafeArea(
+      child: SingleChildScrollView(
+        key: const Key('tutorial-price-change'),
+        padding: const EdgeInsets.fromLTRB(20, 22, 20, 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '실전 연습 2 / 3 · 가격 변화',
+              style: TextStyle(
+                color: _marketAccent,
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              '매수 뒤 가격이 움직였어요',
+              style: TextStyle(
+                color: _marketInk,
+                fontSize: 24,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              '보유 중에는 화면의 손익일 뿐이에요. 실제 손익은 팔아서 거래가 끝나야 확정됩니다.',
+              style: TextStyle(
+                color: _marketMuted,
+                height: 1.5,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 22),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEAF8F2),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFF8ED6B7)),
+              ),
+              child: Column(
+                children: [
+                  _PracticePriceRow(label: '내 매수가', price: _buyPrice),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 10),
+                    child: Icon(
+                      Icons.arrow_downward_rounded,
+                      color: Color(0xFF168B5E),
+                    ),
+                  ),
+                  _PracticePriceRow(
+                    label: '변경된 현재가',
+                    price: _sellPrice,
+                    emphasized: true,
+                  ),
+                  const Divider(height: 28),
+                  Row(
+                    children: [
+                      Text('보유 ${_displayUnits(units)}주'),
+                      const Spacer(),
+                      Text(
+                        '평가 변화 +${_money(estimatedChange)}원',
+                        style: const TextStyle(
+                          color: Color(0xFF168B5E),
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                key: const Key('tutorial-price-change-continue'),
+                onPressed: _openSellPractice,
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(54),
+                  backgroundColor: const Color(0xFFF04452),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                child: const Text(
+                  '이제 직접 팔아 보기',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _summaryView() => SafeArea(
+    child: SingleChildScrollView(
+      key: const Key('tutorial-trade-summary'),
+      padding: const EdgeInsets.fromLTRB(20, 28, 20, 24),
+      child: Column(
+        children: [
+          const Icon(
+            Icons.verified_rounded,
+            size: 64,
+            color: Color(0xFF20A675),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            '매수부터 매도까지 완료!',
+            style: TextStyle(
+              color: _marketInk,
+              fontSize: 25,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            '100만 원으로 주문하고, 가격 변화를 확인하고, 다시 팔아 실현손익까지 만들었어요.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: _marketMuted,
+              height: 1.5,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 22),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF5F7FA),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Column(
+              children: [
+                _PracticeSummaryRow(
+                  label: '시작 연습금',
+                  value: '${_money(_practiceSeedMoney)}원',
+                ),
+                _PracticeSummaryRow(
+                  label: '매도 후 연습금',
+                  value: '${_money(_practiceState.brokerageCash)}원',
+                ),
+                _PracticeSummaryRow(
+                  label: '확정된 실현손익',
+                  value:
+                      '${_realizedPnl >= 0 ? '+' : ''}${_money(_realizedPnl)}원',
+                  strong: true,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            '연습용 100만 원과 거래 기록은 수업을 마치면 사라지며, 실제 세이브의 현금과 보유 주식은 바뀌지 않습니다.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Color(0xFF8B6F21),
+              fontSize: 11,
+              height: 1.45,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              key: const Key('market-practical-tutorial-complete'),
+              onPressed: _finishing ? null : _finishTutorial,
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(54),
+                backgroundColor: _marketAccent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+              child: _finishing
+                  ? const SizedBox.square(
+                      dimension: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Text(
+                      '수업 마치고 실제 계좌로 돌아가기',
+                      style: TextStyle(fontWeight: FontWeight.w800),
+                    ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+
+  @override
+  Widget build(BuildContext context) => PopScope<void>(
+    canPop: _allowPop,
+    child: KeyedSubtree(
+      key: const Key('market-practical-tutorial'),
+      child: switch (_phase) {
+        _PracticalTradeTutorialPhase.buy => _orderPractice(isBuy: true),
+        _PracticalTradeTutorialPhase.priceMove => _priceMoveView(),
+        _PracticalTradeTutorialPhase.sell => _orderPractice(isBuy: false),
+        _PracticalTradeTutorialPhase.summary => _summaryView(),
+      },
+    ),
+  );
+}
+
+class _PracticePriceRow extends StatelessWidget {
+  const _PracticePriceRow({
+    required this.label,
+    required this.price,
+    this.emphasized = false,
+  });
+
+  final String label;
+  final double price;
+  final bool emphasized;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      Text(
+        label,
+        style: const TextStyle(
+          color: _marketMuted,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      const Spacer(),
+      Text(
+        _displayPrice(price, 'KRW'),
+        style: TextStyle(
+          color: emphasized ? const Color(0xFF168B5E) : _marketInk,
+          fontSize: emphasized ? 23 : 18,
+          fontWeight: FontWeight.w900,
+          fontFeatures: _marketNumberFeatures,
+        ),
+      ),
+    ],
+  );
+}
+
+class _PracticeSummaryRow extends StatelessWidget {
+  const _PracticeSummaryRow({
+    required this.label,
+    required this.value,
+    this.strong = false,
+  });
+
+  final String label;
+  final String value;
+  final bool strong;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 6),
+    child: Row(
+      children: [
+        Text(label),
+        const Spacer(),
+        Text(
+          value,
+          style: TextStyle(
+            color: strong ? const Color(0xFF168B5E) : _marketInk,
+            fontWeight: FontWeight.w900,
+            fontFeatures: _marketNumberFeatures,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 class _OrderSheet extends StatefulWidget {
   const _OrderSheet({
+    super.key,
     required this.definition,
     required this.live,
     required this.isBuy,
     required this.state,
     required this.minute,
     required this.onExecuteTrade,
+    this.balanceLabel,
+    this.submitLabel,
+    this.successLabel = '완료',
+    this.onSuccessContinue,
   });
 
   final _StockDefinition definition;
@@ -2256,6 +2782,10 @@ class _OrderSheet extends StatefulWidget {
   final GameState state;
   final ValueNotifier<int> minute;
   final Future<TradeExecutionResult> Function(TradeOrder) onExecuteTrade;
+  final String? balanceLabel;
+  final String? submitLabel;
+  final String successLabel;
+  final VoidCallback? onSuccessContinue;
 
   @override
   State<_OrderSheet> createState() => _OrderSheetState();
@@ -2615,7 +3145,7 @@ class _OrderSheetState extends State<_OrderSheet> {
                         Expanded(
                           child: Text(
                             widget.isBuy
-                                ? '주문 가능 예수금 ${_money(widget.state.brokerageCash)}원'
+                                ? '${widget.balanceLabel ?? '주문 가능 예수금'} ${_money(widget.state.brokerageCash)}원'
                                 : '보유 ${_displayUnits(_position?.units ?? 0)}주',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -2696,7 +3226,8 @@ class _OrderSheetState extends State<_OrderSheet> {
               FilledButton(
                 key: const Key('request-parent-order-approval'),
                 onPressed: _result?.success == true
-                    ? () => Navigator.of(context).pop()
+                    ? (widget.onSuccessContinue ??
+                          () => Navigator.of(context).pop())
                     : canSubmit
                     ? _submit
                     : null,
@@ -2717,12 +3248,12 @@ class _OrderSheetState extends State<_OrderSheet> {
                       )
                     : Text(
                         _result?.success == true
-                            ? '완료'
+                            ? widget.successLabel
                             : !_tradable
                             ? '거래 시간에 주문 가능'
                             : !_authorityReady
                             ? '종잣돈 10,000원 달성 후 주문 가능'
-                            : '부모님 승인으로 주문 실행',
+                            : widget.submitLabel ?? '부모님 승인으로 주문 실행',
                         style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
               ),
@@ -2939,11 +3470,7 @@ class _MarketTutorialOverlay extends StatelessWidget {
       _ => '종목은 회사 한 곳을 뜻해요. 먼저 한빛통신을 눌러 가격과 회사 내용을 함께 살펴볼게요.',
     },
     actionLabel: '선생님과 화면 수업 시작',
-    poseAlignment: switch (step) {
-      0 => Alignment.topLeft,
-      1 => Alignment.topCenter,
-      _ => Alignment.topRight,
-    },
+    poseAlignment: Alignment.topCenter,
     onAction: onAction,
   );
 }
@@ -2974,11 +3501,7 @@ class _MarketDetailTutorialOverlay extends StatelessWidget {
       _ => '살 이유와 틀렸을 때 팔 기준을 정했다면 ‘사기’를 눌러 주문표를 열어요. 아직 주문이 체결되지는 않으니 안심하세요.',
     },
     actionLabel: '회사 숫자 확인했어요',
-    poseAlignment: switch (step) {
-      0 => Alignment.bottomLeft,
-      1 => Alignment.bottomCenter,
-      _ => Alignment.bottomRight,
-    },
+    poseAlignment: Alignment.topCenter,
     onAction: onAction,
   );
 }
@@ -2996,9 +3519,9 @@ class _OrderTicketTutorialOverlay extends StatelessWidget {
     targetKey: null,
     speaker: '한서윤 선생님',
     message:
-        '이게 주문표예요. 매수·매도, 수량, 시장가·지정가, 예상 금액과 수수료를 마지막으로 확인하세요. ‘주문 제출’을 누르기 전까지는 돈이 움직이지 않아요.',
-    actionLabel: '이제 직접 주문표 살펴보기',
-    poseAlignment: Alignment.bottomCenter,
+        '지금부터 수업에서만 쓰는 연습용 시드머니 100만 원을 드릴게요. 직접 매수하고, 가격 변화를 본 뒤, 다시 매도해 실현손익까지 확인해 봐요. 실제 계좌 돈은 전혀 움직이지 않아요.',
+    actionLabel: '연습용 100만 원으로 시작',
+    poseAlignment: Alignment.topCenter,
     onAction: () => unawaited(onDone()),
   );
 }
@@ -3176,15 +3699,15 @@ class _StockTutorialTeacher extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final height = width * 1.03;
-    final cellDimension = width * 1.66;
+    final height = width * 1.42;
+    final cellDimension = height;
     final cropAlignment = Alignment(
       poseAlignment.x < -0.5
           ? -0.84
           : poseAlignment.x > 0.5
           ? 0.84
           : 0,
-      poseAlignment.y < 0 ? -1 : 0.52,
+      poseAlignment.y < 0 ? -1 : 1,
     );
     return SizedBox(
       key: const Key('market-tutorial-teacher'),
@@ -3198,7 +3721,7 @@ class _StockTutorialTeacher extends StatelessWidget {
           minHeight: cellDimension * 2,
           maxHeight: cellDimension * 2,
           child: Image.asset(
-            'assets/images/주식선생님/05_6자세_슬랜더_투명_최종.png',
+            'assets/images/주식선생님/06_6자세_블라우스_스커트_투명.png',
             key: const Key('market-tutorial-teacher-upper-body'),
             width: cellDimension * 3,
             height: cellDimension * 2,

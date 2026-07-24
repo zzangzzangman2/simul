@@ -694,7 +694,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
       scaffoldMessengerKey: _scaffoldMessengerKey,
       navigatorKey: _navigatorKey,
       debugShowCheckedModeBanner: false,
-      title: '부자되기 시뮬레이션',
+      title: '초딩부터 건물주',
       theme: ThemeData(
         useMaterial3: true,
         fontFamily: 'Pretendard',
@@ -746,7 +746,6 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
                 ),
                 _AppView.onboarding => VisualNovelOnboardingScreen(
                   onCreate: _createCompany,
-                  onExit: _showTitle,
                 ),
                 _AppView.game when _state != null => OfficeScreen(
                   state: _state!,
@@ -3138,7 +3137,7 @@ class KoreaEconomicNewspaperSheet extends StatelessWidget {
               ),
             ),
             const Text(
-              '2000~2010 시장 시뮬레이션 특별판',
+              '2000~2026 시장 시뮬레이션 특별판',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
             ),
@@ -3433,13 +3432,13 @@ class CampaignEndingScreen extends StatelessWidget {
         .length;
     return Scaffold(
       backgroundColor: const Color(0xFFF6F1E5),
-      appBar: AppBar(title: const Text('2010 최종 결산')),
+      appBar: AppBar(title: const Text('2026 최종 결산')),
       body: ListView(
         padding: const EdgeInsets.all(18),
         children: [
           const Icon(Icons.emoji_events_rounded, size: 72, color: _coral),
           const Text(
-            '새천년의 10년을 완주했습니다',
+            '새천년 이후 27년을 완주했습니다',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
           ),

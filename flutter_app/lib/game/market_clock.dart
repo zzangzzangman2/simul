@@ -1,9 +1,12 @@
+import 'market_corpus_calendar.dart';
 import 'market_tick.dart';
 
+const fictionalCampaignStartYear = 2000;
+const fictionalCampaignEndYear = 2026;
 const marketDayStartMinute = 8 * 60;
 const krxOpenMinute = 9 * 60;
-// The campaign ends in 2010. The cash equity session was extended to 15:30
-// only in 2016, so the historical campaign keeps the 15:00 close.
+// 미래거래소는 실제 거래소를 복제하지 않는 가상시장이다. 저장·주문·차트의
+// 일관성을 위해 2000~2026 캠페인 전체에서 15:00 마감을 사용한다.
 const krxContinuousEndMinute = 14 * 60 + 50;
 const krxCloseMinute = 15 * 60;
 const marketDayEndMinute = 20 * 60;
@@ -45,60 +48,7 @@ class MarketClockInfo {
   final bool tradable;
 }
 
-const _krxClosedWeekdays = <String>{
-  '2000-01-03',
-  '2005-12-30',
-  '2006-01-30',
-  '2006-03-01',
-  '2006-05-01',
-  '2006-05-05',
-  '2006-06-06',
-  '2006-07-17',
-  '2006-08-15',
-  '2006-10-03',
-  '2006-10-05',
-  '2006-10-06',
-  '2006-12-25',
-  '2006-12-29',
-  '2007-01-01',
-  '2007-02-19',
-  '2007-03-02',
-  '2007-05-01',
-  '2007-05-24',
-  '2007-06-06',
-  '2007-07-17',
-  '2007-08-15',
-  '2007-09-24',
-  '2007-09-25',
-  '2007-09-26',
-  '2007-10-03',
-  '2007-12-19',
-  '2007-12-25',
-  '2007-12-31',
-  '2008-01-01',
-  '2008-02-06',
-  '2008-02-07',
-  '2008-02-08',
-  '2008-04-09',
-  '2009-01-01',
-  '2009-01-26',
-  '2009-01-27',
-  '2009-05-01',
-  '2009-05-05',
-  '2009-10-02',
-  '2009-12-25',
-  '2009-12-31',
-  '2010-01-01',
-  '2010-02-15',
-  '2010-03-01',
-  '2010-05-05',
-  '2010-05-21',
-  '2010-06-02',
-  '2010-09-21',
-  '2010-09-22',
-  '2010-09-23',
-  '2010-12-31',
-};
+const _krxClosedWeekdays = <String>{'2000-01-03'};
 
 String marketDateKey(DateTime date) =>
     '${date.year.toString().padLeft(4, '0')}-'
@@ -107,6 +57,12 @@ String marketDateKey(DateTime date) =>
 
 bool isMarketTradingDay(DateTime date) {
   if (date.weekday >= DateTime.saturday) return false;
+  final dateKey = marketDateKey(date);
+  if (dateKey.compareTo(fictionalCorpusFirstTradingDate) >= 0 &&
+      dateKey.compareTo(fictionalCorpusLastTradingDate) <= 0) {
+    return fictionalCorpusTradingDateKeys.contains(dateKey);
+  }
+
   final fixedHoliday = switch ((date.month, date.day)) {
     (1, 1) ||
     (3, 1) ||
@@ -119,7 +75,7 @@ bool isMarketTradingDay(DateTime date) {
     (12, 25) => true,
     _ => false,
   };
-  return !fixedHoliday && !_krxClosedWeekdays.contains(marketDateKey(date));
+  return !fixedHoliday && !_krxClosedWeekdays.contains(dateKey);
 }
 
 MarketClockInfo marketClockAt(int minute, {bool tradingDay = true}) {
@@ -192,7 +148,7 @@ int marketMinuteForTick(int tick) =>
         .clamp(marketDayStartMinute, marketDayEndMinute);
 
 double marketDailyPriceLimitRate(DateTime date) {
-  // The whole playable period (2000-2010) used a ±15% daily limit.
+  // 가격제한폭 확대 시점만 반영하고, 장 운영 시간은 가상시장 규칙을 따른다.
   if (date.isBefore(DateTime(2015, 6, 15))) return 0.15;
   return 0.30;
 }

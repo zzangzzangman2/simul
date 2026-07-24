@@ -17,16 +17,16 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test(
-    'market universe contains 30 fixed fictional firms and later generations',
+    'market universe contains 50 fixed fictional firms and later generations',
     () async {
       final universe = await FictionalMarketUniverse.load(seed: 'roster-test');
 
       expect(universe.schemaVersion, greaterThanOrEqualTo(5));
       expect(
         universe.assets.where((asset) => asset.generation == 0),
-        hasLength(30),
+        hasLength(50),
       );
-      expect(universe.assets.length, greaterThan(70));
+      expect(universe.assets.length, greaterThan(90));
       expect(
         universe.assets,
         everyElement(

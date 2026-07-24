@@ -34,6 +34,13 @@ void main() {
     expect(isMarketTradingDay(DateTime(2000, 1, 4)), isTrue);
   });
 
+  test('corpus trading calendar preserves later exchange holidays', () {
+    expect(isMarketTradingDay(DateTime(2022, 9, 8)), isTrue);
+    expect(isMarketTradingDay(DateTime(2022, 9, 9)), isFalse);
+    expect(isMarketTradingDay(DateTime(2023, 1, 23)), isFalse);
+    expect(isMarketTradingDay(DateTime(2026, 7, 23)), isTrue);
+  });
+
   test('market tick advances one game minute per real second', () {
     expect(marketTickMinutes, 1);
     expect(marketRealtimeTickDuration, const Duration(seconds: 1));
@@ -79,6 +86,7 @@ void main() {
 
   test('campaign-era price limits and quote units are enforced', () {
     expect(marketDailyPriceLimitRate(DateTime(2010, 12, 31)), 0.15);
+    expect(marketDailyPriceLimitRate(DateTime(2026, 12, 31)), 0.30);
     expect(marketDailyPriceLimitRate(DateTime(2015, 6, 15)), 0.30);
     expect(marketTickSize(999), 1);
     expect(marketTickSize(1000), 5);

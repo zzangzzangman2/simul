@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'market_clock.dart';
 import 'mission_progression.dart';
 import 'organization_state.dart';
 import 'personal_finance_state.dart';
@@ -148,7 +149,7 @@ class GameState {
   });
 
   static const schemaVersion = 15;
-  static const maxCampaignDay = 4018;
+  static const maxCampaignDay = 9862;
 
   final int version;
   final String companyName;
@@ -213,7 +214,8 @@ class GameState {
       campaignStartDate.add(Duration(days: value - 1));
 
   DateTime get currentDate => dateForDay(day);
-  bool get campaignComplete => !currentDate.isBefore(DateTime(2010, 12, 31));
+  bool get campaignComplete =>
+      !currentDate.isBefore(DateTime(fictionalCampaignEndYear, 12, 31));
 
   List<DecisionCardData> get pendingDecisions => decisions
       .where((decision) => decision.status == DecisionStatus.pending)

@@ -12,7 +12,7 @@ import 'package:millennium_capital/game/seed_money_content.dart';
 import 'package:millennium_capital/game/story_state.dart';
 
 const _engine = GameEngine();
-const _seed = 'codex-ten-year-fair-play-v2';
+const _seed = 'codex-full-campaign-fair-play-v3';
 
 GameState _checkedTransition(GameState before, GameState after, String action) {
   final ledgerDelta = after.ledger
@@ -138,7 +138,7 @@ TradeOrder _order({
 Future<void> main() async {
   final universe = await FictionalMarketUniverse.load(seed: _seed);
   var state = _engine.createNewGame(
-    '10년 직접 플레이 연구소',
+    '27년 직접 플레이 연구소',
     initialCash: 0,
     worldSeed: _seed,
     story: StoryState.newPlayer(
@@ -349,11 +349,14 @@ Future<void> main() async {
   if (buys < 20 ||
       sells < 20 ||
       rejections != 0 ||
-      saveReloads != 10 ||
+      saveReloads != fictionalCampaignEndYear - fictionalCampaignStartYear ||
       generatedIpoTrades == 0 ||
       resolvedDecisions < 20 ||
+      maxDrawdown > 0.65 ||
       state.story.flagInt('unpaidOperatingCost') != 0) {
-    throw StateError('Ten-year playtest regression: ${jsonEncode(result)}');
+    throw StateError(
+      'Full-campaign playtest regression: ${jsonEncode(result)}',
+    );
   }
   print(const JsonEncoder.withIndent('  ').convert(result));
 }

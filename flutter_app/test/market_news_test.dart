@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:millennium_capital/game/game_engine.dart';
 import 'package:millennium_capital/game/game_state.dart';
 import 'package:millennium_capital/game/market_data.dart';
+import 'package:millennium_capital/game/market_corpus_calendar.dart';
 import 'package:millennium_capital/game/market_clock.dart';
 import 'package:millennium_capital/game/market_news.dart';
 
@@ -16,15 +17,48 @@ void main() {
       .copyWith(day: dayFor(date), cash: cash);
 
   group('가상 시장 사건', () {
-    test('시작 상장사는 고정된 가상 기업 30개다', () {
-      expect(fixedFictionalCompanies, hasLength(30));
+    test('시작 상장사는 고정된 가상 기업 50개다', () {
+      expect(fixedFictionalCompanies, hasLength(50));
       expect(
         fixedFictionalCompanies.map((company) => company.id).toSet(),
-        hasLength(30),
+        hasLength(50),
       );
       expect(
         fixedFictionalCompanies.map((company) => company.name),
-        containsAll(<String>['한빛통신', '청해중공업', '태성바이오']),
+        containsAll(<String>[
+          '한빛통신',
+          '청해중공업',
+          '태성바이오',
+          '하늘항공',
+          '바른증권',
+          '강산제철',
+          '철마방산',
+          '바람자원',
+        ]),
+      );
+    });
+
+    test('시장 타임라인 코퍼스 전체가 시드형 보정 자료로 포함된다', () {
+      expect(fictionalCorpusSourceEventCount, 439);
+      expect(fictionalCorpusSourceShockDayCount, 975);
+      expect(fictionalCorpusSourceTradingDayCount, 6545);
+      expect(fictionalCorpusEventPatterns, hasLength(439));
+      expect(
+        fictionalCorpusDailySamples,
+        hasLength(6545 * fictionalCorpusDailySampleStride),
+      );
+      expect(fictionalCorpusTradingDateKeys, hasLength(6545));
+      final events = fictionalMarketEventsForDate(
+        'corpus-regression-seed',
+        DateTime(2004, 6, 15),
+      );
+      final repeated = fictionalMarketEventsForDate(
+        'corpus-regression-seed',
+        DateTime(2004, 6, 15),
+      );
+      expect(
+        events.map((item) => item.toJson()),
+        repeated.map((item) => item.toJson()),
       );
     });
 
@@ -45,7 +79,7 @@ void main() {
           reason: kind,
         );
       }
-      expect(fictionalEraTechnologies, hasLength(80));
+      expect(fictionalEraTechnologies, hasLength(112));
       expect(
         fictionalHistoricalMarketCatalysts.length,
         greaterThanOrEqualTo(40),
@@ -82,11 +116,11 @@ void main() {
       );
     });
 
-    test('80개 시대 기술은 허용 연도 안에서 국내기업 4단계 사건이 된다', () {
+    test('112개 시대 기술은 허용 연도 안에서 국내기업 4단계 사건이 된다', () {
       final technologyEvents = <FictionalMarketEvent>[];
       for (
         var date = DateTime(2000, 1, 1);
-        date.isBefore(DateTime(2011, 1, 1));
+        date.isBefore(DateTime(2027, 1, 1));
         date = date.add(const Duration(days: 1))
       ) {
         technologyEvents.addAll(
@@ -257,11 +291,11 @@ void main() {
       expect(firstSequence, isNot(secondSequence));
     });
 
-    test('한 세계에 수천 개의 연속 사건이 결정론적으로 생성된다', () {
+    test('한 세계에 2000~2026 연속 사건이 결정론적으로 생성된다', () {
       var count = 0;
       for (
         var date = DateTime(2000, 1, 1);
-        date.isBefore(DateTime(2011, 1, 1));
+        date.isBefore(DateTime(2027, 1, 1));
         date = date.add(const Duration(days: 1))
       ) {
         final first = fictionalMarketEventsForDate(seed, date);
@@ -272,7 +306,7 @@ void main() {
         );
         count += first.length;
       }
-      expect(count, greaterThan(8500));
+      expect(count, greaterThan(25000));
     });
 
     test('조선 회사에는 바이오·반도체 전용 사건이 섞이지 않는다', () {
@@ -294,7 +328,7 @@ void main() {
 
     test('신규상장·유상증자·분할·상장폐지가 세계 생애주기에 들어간다', () async {
       final universe = await FictionalMarketUniverse.load(seed: seed);
-      expect(universe.assets.length, greaterThan(70));
+      expect(universe.assets.length, greaterThan(180));
       final actions = universe.assets
           .expand((asset) => asset.corporateActions)
           .map((action) => action.type)

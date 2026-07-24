@@ -18,7 +18,7 @@ class _GameTitleScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Scaffold(
     key: const Key('game-title-screen'),
-    backgroundColor: _cream,
+    backgroundColor: const Color(0xFF061F2A),
     body: Stack(
       fit: StackFit.expand,
       children: [
@@ -27,7 +27,7 @@ class _GameTitleScreen extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [Color(0xFFDDF8F3), Color(0xFFEAF8F0), _cream],
+              colors: [Color(0xFF061923), Color(0xFF0B3340), Color(0xFF102A37)],
             ),
           ),
         ),
@@ -39,7 +39,7 @@ class _GameTitleScreen extends StatelessWidget {
             height: 180,
             decoration: const BoxDecoration(
               shape: BoxShape.circle,
-              color: Color(0x66FFDF68),
+              color: Color(0x55FFD15B),
             ),
           ),
         ),
@@ -51,7 +51,7 @@ class _GameTitleScreen extends StatelessWidget {
             height: 116,
             decoration: const BoxDecoration(
               shape: BoxShape.circle,
-              color: Color(0x55FF7D72),
+              color: Color(0x44F44D46),
             ),
           ),
         ),
@@ -77,14 +77,16 @@ class _GameTitleScreen extends StatelessWidget {
                             vertical: 7,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.86),
+                            color: const Color(
+                              0xFF0B2632,
+                            ).withValues(alpha: 0.84),
                             borderRadius: BorderRadius.circular(99),
-                            border: Border.all(color: const Color(0xFFBBDDD7)),
+                            border: Border.all(color: const Color(0x66FFD76A)),
                           ),
                           child: const Text(
                             '서울 · 2000년',
                             style: TextStyle(
-                              color: Color(0xFF39766D),
+                              color: Color(0xFFFFE49A),
                               fontSize: 10,
                               fontWeight: FontWeight.w900,
                               letterSpacing: 0.5,
@@ -95,7 +97,7 @@ class _GameTitleScreen extends StatelessWidget {
                         Text(
                           '$occupiedSlots / ${GamePersistence.slotCount} 저장',
                           style: const TextStyle(
-                            color: Color(0xFF66837E),
+                            color: Color(0xFFB9D6D7),
                             fontSize: 10,
                             fontWeight: FontWeight.w900,
                           ),
@@ -127,23 +129,31 @@ class _GameTitleScreen extends StatelessWidget {
                     ),
                     SizedBox(height: compact ? 7 : 9),
                     Text(
-                      '부자되기\n시뮬레이션',
+                      '초딩부터 건물주',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        color: _ink,
-                        fontSize: compact ? 31 : 35,
-                        height: 0.98,
+                        color: const Color(0xFFFFF4C6),
+                        fontFamily: 'Maplestory',
+                        fontSize: compact ? 31 : 37,
+                        height: 1,
                         fontWeight: FontWeight.w900,
-                        letterSpacing: -1.8,
+                        letterSpacing: -2,
+                        shadows: const [
+                          Shadow(
+                            color: Color(0xFFE6463E),
+                            offset: Offset(0, 3),
+                          ),
+                          Shadow(color: Color(0xAAFFCF4D), blurRadius: 18),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 8),
                     const Text(
-                      '2000년 서울, 우리 가족의 작은 저금통부터 시작해요',
+                      '세뱃돈 1만원으로 시작하는 꼬마 투자왕의 꿈',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        color: Color(0xFF58736E),
-                        fontSize: 12,
+                        color: Color(0xFFD4E8E3),
+                        fontSize: 11,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
@@ -151,37 +161,10 @@ class _GameTitleScreen extends StatelessWidget {
                     Expanded(
                       child: Center(
                         child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxHeight: 260),
+                          constraints: const BoxConstraints(maxHeight: 282),
                           child: AspectRatio(
                             aspectRatio: 1.5,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(26),
-                                border: Border.all(
-                                  color: Colors.white,
-                                  width: 4,
-                                ),
-                                boxShadow: const [
-                                  BoxShadow(
-                                    color: Color(0x1F496A63),
-                                    blurRadius: 20,
-                                    offset: Offset(0, 8),
-                                  ),
-                                ],
-                              ),
-                              clipBehavior: Clip.antiAlias,
-                              child: Semantics(
-                                key: const Key('title-cartoon-hero'),
-                                image: true,
-                                label: '서울 2000년 부자되기 카툰 일러스트',
-                                child: Image.asset(
-                                  'assets/images/title_wealth_sim_hero.webp',
-                                  fit: BoxFit.cover,
-                                  alignment: const Alignment(0, 0.38),
-                                ),
-                              ),
-                            ),
+                            child: const _AnimatedTitleHero(),
                           ),
                         ),
                       ),
@@ -193,7 +176,7 @@ class _GameTitleScreen extends StatelessWidget {
                       label: '처음하기',
                       detail: occupiedSlots >= GamePersistence.slotCount
                           ? '슬롯이 가득 찼어요 · 저장 삭제 후 시작'
-                          : '새로운 부자 이야기를 시작해요',
+                          : '나만의 건물주 이야기를 시작해요',
                       filled: true,
                       onPressed: onNewGame,
                     ),
@@ -227,6 +210,218 @@ class _GameTitleScreen extends StatelessWidget {
       ],
     ),
   );
+}
+
+class _AnimatedTitleHero extends StatefulWidget {
+  const _AnimatedTitleHero();
+
+  @override
+  State<_AnimatedTitleHero> createState() => _AnimatedTitleHeroState();
+}
+
+class _AnimatedTitleHeroState extends State<_AnimatedTitleHero>
+    with SingleTickerProviderStateMixin {
+  static const _asset = 'assets/images/title_elementary_landlord_hero.png';
+
+  late final AnimationController _motion;
+
+  @override
+  void initState() {
+    super.initState();
+    _motion = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 8),
+    );
+    final isWidgetTest = WidgetsBinding.instance.runtimeType
+        .toString()
+        .contains('TestWidgetsFlutterBinding');
+    if (!isWidgetTest) _motion.repeat();
+  }
+
+  @override
+  void dispose() {
+    _motion.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(26),
+      border: Border.all(color: const Color(0xFFFFD86A), width: 2),
+      boxShadow: const [
+        BoxShadow(
+          color: Color(0x66FFB83E),
+          blurRadius: 22,
+          spreadRadius: -5,
+          offset: Offset(0, 8),
+        ),
+      ],
+    ),
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(23),
+      child: AnimatedBuilder(
+        animation: _motion,
+        builder: (context, _) {
+          final breath = math.sin(_motion.value * math.pi * 2);
+          final breeze = math.sin(_motion.value * math.pi * 4);
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              Transform.scale(
+                scale: 1.018 + breath * 0.006,
+                alignment: Alignment.center,
+                child: Transform.translate(
+                  offset: Offset(0, breath * 1.7),
+                  child: Semantics(
+                    key: const Key('title-cartoon-hero'),
+                    image: true,
+                    label: '초딩부터 건물주, 액자 밖으로 손을 내미는 꼬마 투자자',
+                    child: Image.asset(_asset, fit: BoxFit.cover),
+                  ),
+                ),
+              ),
+              Transform.rotate(
+                angle: breeze * 0.007,
+                alignment: const Alignment(-0.78, 0.66),
+                child: ClipPath(
+                  clipper: _HeroHandClipper(),
+                  child: Image.asset(_asset, fit: BoxFit.cover),
+                ),
+              ),
+              Transform.rotate(
+                angle: breeze * -0.005,
+                alignment: const Alignment(0.1, -0.72),
+                child: ClipPath(
+                  clipper: _HeroBeretClipper(),
+                  child: Image.asset(_asset, fit: BoxFit.cover),
+                ),
+              ),
+              CustomPaint(painter: _HeroMotionPainter(_motion.value)),
+              const DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Colors.transparent, Color(0x18001822)],
+                    stops: [0.68, 1],
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    ),
+  );
+}
+
+class _HeroHandClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) => Path()
+    ..moveTo(0, size.height * 0.36)
+    ..lineTo(size.width * 0.38, size.height * 0.33)
+    ..lineTo(size.width * 0.48, size.height)
+    ..lineTo(0, size.height)
+    ..close();
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
+}
+
+class _HeroBeretClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) => Path()
+    ..moveTo(size.width * 0.37, 0)
+    ..lineTo(size.width * 0.73, 0)
+    ..lineTo(size.width * 0.7, size.height * 0.48)
+    ..lineTo(size.width * 0.4, size.height * 0.52)
+    ..close();
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
+}
+
+class _HeroMotionPainter extends CustomPainter {
+  const _HeroMotionPainter(this.progress);
+
+  final double progress;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final glow = Paint()
+      ..color = const Color(
+        0xFFFFE779,
+      ).withValues(alpha: 0.45 + 0.35 * math.sin(progress * math.pi * 6).abs())
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
+    final crisp = Paint()..color = const Color(0xFFFFF7BF);
+    final sparkles = <Offset>[
+      Offset(size.width * 0.12, size.height * 0.26),
+      Offset(size.width * 0.78, size.height * 0.18),
+      Offset(size.width * 0.87, size.height * 0.58),
+      Offset(size.width * 0.62, size.height * 0.82),
+    ];
+    for (var i = 0; i < sparkles.length; i++) {
+      final pulse = (math.sin(progress * math.pi * 2 + i * 1.7) + 1) * 0.5;
+      final point = sparkles[i];
+      canvas.drawCircle(point, 2 + pulse * 3, glow);
+      canvas.drawCircle(point, 0.8 + pulse, crisp);
+    }
+
+    final arrowPaint = Paint()
+      ..color = const Color(
+        0xFFFF4E45,
+      ).withValues(alpha: 0.25 + progress * 0.55)
+      ..strokeWidth = 2.5
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+    for (var i = 0; i < 3; i++) {
+      final local = (progress + i / 3) % 1;
+      final x = size.width * (0.58 + i * 0.12);
+      final y = size.height * (0.78 - local * 0.55);
+      canvas.drawLine(Offset(x, y + 9), Offset(x, y), arrowPaint);
+      canvas.drawLine(Offset(x, y), Offset(x - 4, y + 4), arrowPaint);
+      canvas.drawLine(Offset(x, y), Offset(x + 4, y + 4), arrowPaint);
+    }
+
+    final notePaint = Paint()..color = const Color(0x99BDE9D0);
+    final coinPaint = Paint()..color = const Color(0xCCFFD65A);
+    for (var i = 0; i < 8; i++) {
+      final local = (progress + i * 0.137) % 1;
+      final x = size.width * ((i * 0.283 + local * 0.16) % 1);
+      final y = size.height * (1.05 - local * 1.12);
+      if (i.isEven) {
+        canvas.drawOval(
+          Rect.fromCenter(
+            center: Offset(x, y),
+            width: 3 + local * 5,
+            height: 1.5 + local * 2.5,
+          ),
+          coinPaint,
+        );
+      } else {
+        canvas.save();
+        canvas.translate(x, y);
+        canvas.rotate(math.sin(progress * math.pi * 2 + i) * 0.45);
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            Rect.fromCenter(
+              center: Offset.zero,
+              width: 7 + local * 5,
+              height: 4 + local * 3,
+            ),
+            const Radius.circular(1),
+          ),
+          notePaint,
+        );
+        canvas.restore();
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _HeroMotionPainter oldDelegate) =>
+      oldDelegate.progress != progress;
 }
 
 class _TitleActionButton extends StatelessWidget {

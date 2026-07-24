@@ -27,7 +27,7 @@ test("opens the Flutter family-story prologue from the default route", async () 
     readFile(new URL("../flutter_app/lib/main.dart", import.meta.url), "utf8"),
     readFile(new URL("../flutter_app/lib/stock_market_screen.dart", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../public/og-apartment-v2.png", import.meta.url)),
+    readFile(new URL("../public/og.png", import.meta.url)),
   ]);
   assert.match(page, /redirect\("\/play\/index\.html"\)/);
   assert.doesNotMatch(page, /GameClient/);
@@ -36,24 +36,24 @@ test("opens the Flutter family-story prologue from the default route", async () 
   assert.doesNotMatch(flutterIndex, /투자회사 설립/);
   assert.match(flutterIndex, /2000년 서울/);
   assert.match(flutterIndex, /모바일 세로형 생활·투자 시뮬레이션/);
-  assert.match(flutterIndex, /property="og:image" content="\/og-apartment-v2\.png"/);
+  assert.match(flutterIndex, /property="og:image" content="\/og\.png"/);
   assert.match(flutterIndex, /name="twitter:card" content="summary_large_image"/);
   assert.doesNotMatch(flutterIndex, /초기자본 100만원/);
   assert.match(onboarding, /1999\.12\.31\s+·\s+21:40/);
   assert.match(onboarding, /TV 드라마 속 젊은 투자자/);
   assert.match(onboarding, /100만 원이다\. 내가 먼저 내주마/);
-  assert.match(onboarding, /bg_stock_academy_2000_v1\.png/);
+  assert.match(onboarding, /bg_stock_academy_2000_v3\.png/);
   assert.match(onboarding, /academy-tutorial-continue/);
-  assert.match(onboarding, /주식선생님\/05_6자세_슬랜더_투명_최종\.png/);
+  assert.match(onboarding, /주식선생님\/06_6자세_블라우스_스커트_투명\.png/);
   assert.match(onboarding, /가격이 오르는 회사가 무조건 좋은 회사인 건가요/);
   assert.match(onboarding, /시장가랑 지정가는 언제 골라야 해요/);
   assert.match(onboarding, /투자연구소 이름을 정해 볼까요/);
   assert.match(onboarding, /투자연구소 이름을 적고 시장 실습 시작/);
   assert.match(main, /academy-market-tutorial-screen/);
   assert.match(stockMarket, /market-tutorial-teacher-upper-body/);
-  assert.match(layout, /부자되기 시뮬레이션/);
-  assert.match(layout, /images: \[\{ url: `\$\{origin\}\/og-apartment-v2\.png`, width: 1672, height: 941/);
-  assert.match(layout, /themeColor: "#DDF8F3"/);
+  assert.match(layout, /초딩부터 건물주/);
+  assert.match(layout, /images: \[\{ url: `\$\{origin\}\/og\.png`, width: 1734, height: 907/);
+  assert.match(layout, /themeColor: "#061F2A"/);
   assert.doesNotMatch(layout, /100만원으로 시작/);
   assert.ok(socialCard.byteLength > 1_000_000);
 });
@@ -131,13 +131,13 @@ test("keeps Flutter launch metadata aligned with the current starting conditions
   ]);
   const parsedManifest = JSON.parse(manifest);
 
-  assert.match(flutterTemplate, /부자되기 시뮬레이션/);
+  assert.match(flutterTemplate, /초딩부터 건물주/);
   assert.match(flutterTemplate, /2000년 서울/);
   assert.match(flutterTemplate, /세뱃돈 1만원/);
-  assert.match(flutterTemplate, /property="og:image" content="\/og-apartment-v2\.png"/);
-  assert.match(flutterTemplate, /name="twitter:image" content="\/og-apartment-v2\.png"/);
+  assert.match(flutterTemplate, /property="og:image" content="\/og\.png"/);
+  assert.match(flutterTemplate, /name="twitter:image" content="\/og\.png"/);
   assert.doesNotMatch(flutterTemplate, /초기자본 100만원/);
-  assert.equal(parsedManifest.name, "부자되기 시뮬레이션");
+  assert.equal(parsedManifest.name, "초딩부터 건물주");
   assert.match(parsedManifest.description, /2000년 서울/);
   assert.match(parsedManifest.description, /세뱃돈 1만원/);
   assert.doesNotMatch(parsedManifest.description, /초기자본 100만원/);
@@ -152,7 +152,7 @@ test("ships a fixed fictional roster and an expanding market generator", async (
     source.indexOf("const fixedFictionalCompanies"),
     source.indexOf("const _spinoffBlueprints"),
   );
-  assert.equal((fixedRoster.match(/FictionalCompanyDefinition\(/g) ?? []).length, 30);
+  assert.equal((fixedRoster.match(/FictionalCompanyDefinition\(/g) ?? []).length, 50);
   assert.match(source, /한빛통신/);
   assert.match(source, /rightsIssue/);
   assert.match(source, /materialSpinoff/);
@@ -216,7 +216,7 @@ test("validates the dynamic news API before invoking Gemini", async () => {
   );
 
   assert.equal(response.status, 400);
-  assert.match((await response.json()).error, /2000~2010/);
+  assert.match((await response.json()).error, /2000~2026/);
 });
 
 test("keeps Gemini credentials server-side and forces the news JSON schema", async () => {
@@ -270,7 +270,7 @@ test("allows local Flutter Web preflight and rejects unknown origins", async () 
   );
   assert.equal(rejected.status, 403);
 });
-test("keeps the Flutter host fixed while the mobile keyboard shrinks the visual viewport", async () => {
+test("tracks mobile browser chrome while keeping the Flutter host fixed for the keyboard", async () => {
   const [flutterTemplate, flutterBootstrap] = await Promise.all([
     readFile(new URL("../flutter_app/web/index.html", import.meta.url), "utf8"),
     readFile(new URL("../flutter_app/web/flutter_bootstrap.js", import.meta.url), "utf8"),
@@ -301,13 +301,13 @@ test("keeps the Flutter host fixed while the mobile keyboard shrinks the visual 
     },
   };
   const viewport = {
-    height: 800,
+    height: 860,
     addEventListener(type, listener) {
       viewportListeners.set(type, listener);
     },
   };
   const fakeWindow = {
-    innerHeight: 800,
+    innerHeight: 1024,
     visualViewport: viewport,
     scrollX: 0,
     scrollY: 24,
@@ -328,20 +328,35 @@ test("keeps the Flutter host fixed while the mobile keyboard shrinks the visual 
   const document = {
     documentElement: root,
     body,
+    activeElement: null,
     getElementById(id) {
       return id === "flutter_host" ? host : null;
     },
   };
 
   vm.runInNewContext(script, { document, window: fakeWindow });
-  assert.equal(cssProperties.get("--app-height"), "800px");
-  assert.equal(host.style.height, "800px");
+  assert.equal(cssProperties.get("--app-height"), "860px");
+  assert.equal(host.style.height, "860px");
 
+  fakeWindow.innerHeight = 940;
+  viewport.height = 940;
+  viewportListeners.get("resize")();
+  assert.equal(cssProperties.get("--app-height"), "940px");
+  assert.equal(host.style.height, "940px");
+
+  document.activeElement = { tagName: "INPUT", isContentEditable: false };
   fakeWindow.innerHeight = 480;
   viewport.height = 480;
   viewportListeners.get("resize")();
-  assert.equal(cssProperties.get("--app-height"), "800px");
-  assert.equal(host.style.height, "800px");
+  assert.equal(cssProperties.get("--app-height"), "940px");
+  assert.equal(host.style.height, "940px");
+
+  document.activeElement = null;
+  fakeWindow.innerHeight = 860;
+  viewport.height = 860;
+  viewportListeners.get("resize")();
+  assert.equal(cssProperties.get("--app-height"), "860px");
+  assert.equal(host.style.height, "860px");
 
   fakeWindow.scrollY = 160;
   body.scrollTop = 160;

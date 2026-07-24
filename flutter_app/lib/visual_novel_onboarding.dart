@@ -1,14 +1,11 @@
 part of 'main.dart';
 
+const _onboardingBeatCount = 31;
+
 class VisualNovelOnboardingScreen extends StatefulWidget {
-  const VisualNovelOnboardingScreen({
-    super.key,
-    required this.onCreate,
-    this.onExit,
-  });
+  const VisualNovelOnboardingScreen({super.key, required this.onCreate});
 
   final ValueChanged<NewGameSetup> onCreate;
-  final VoidCallback? onExit;
 
   @override
   State<VisualNovelOnboardingScreen> createState() =>
@@ -34,23 +31,24 @@ class _VisualNovelOnboardingScreenState
   String get _background => switch (_beat) {
     <= 7 => 'assets/images/bg_living_room_1999.png',
     <= 13 => 'assets/images/bg_kitchen_1999.png',
-    _ => 'assets/images/bg_stock_academy_2000_v1.png',
+    _ => 'assets/images/bg_stock_academy_2000_v3.png',
   };
 
   String get _location => switch (_beat) {
     <= 7 => '거실 · TV 앞',
     <= 13 => '부엌 식탁',
-    _ => '새천년 투자학원 · 입문반',
+    _ => '새천년 청소년 투자학교 · 10대 입문반',
   };
 
   String get _dateLabel => switch (_beat) {
     <= 7 => '1999.12.31  ·  21:40',
     <= 13 => '2000.01.02  ·  일요일',
+    <= 16 => '2000년 1월  ·  첫 등교',
     _ => '2000년 1월  ·  첫 수업',
   };
 
   String? get _character => switch (_beat) {
-    1 || 5 || 7 || 10 || 21 || 23 => 'assets/images/character_hero.png',
+    1 || 5 || 7 || 10 || 15 || 23 || 25 => 'assets/images/character_hero.png',
     4 || 6 || 12 => 'assets/images/character_father.png',
     2 => 'assets/images/character_sister.png',
     9 || 11 => 'assets/images/character_grandfather.png',
@@ -65,27 +63,16 @@ class _VisualNovelOnboardingScreenState
   };
 
   bool get _isAcademyTeacherBeat =>
-      _beat >= 15 && _beat <= 20 || _beat == 22 || _beat >= 25;
+      _beat >= 17 && _beat <= 22 || _beat == 24 || _beat >= 27;
 
-  Alignment get _teacherPoseAlignment => switch (_beat) {
-    15 => Alignment.topLeft,
-    16 => Alignment.topCenter,
-    17 => Alignment.topRight,
-    18 => Alignment.bottomLeft,
-    19 => Alignment.bottomRight,
-    25 => Alignment.topLeft,
-    26 => Alignment.bottomCenter,
-    27 => Alignment.bottomRight,
-    28 => Alignment.topCenter,
-    _ => Alignment.bottomCenter,
-  };
+  Alignment get _teacherPoseAlignment => Alignment.topCenter;
 
   bool get _isNarration =>
-      _beat == 0 || _beat == 8 || _beat == 14 || _beat == 24;
+      _beat == 0 || _beat == 8 || _beat == 14 || _beat == 16 || _beat == 26;
 
   String get _speaker => switch (_beat) {
-    0 || 8 || 14 || 24 => '이야기',
-    1 || 5 || 7 || 10 || 21 || 23 =>
+    0 || 8 || 14 || 16 || 26 => '이야기',
+    1 || 5 || 7 || 10 || 15 || 23 || 25 =>
       _playerController.text.trim().isEmpty
           ? '나'
           : _playerController.text.trim(),
@@ -93,9 +80,9 @@ class _VisualNovelOnboardingScreenState
     3 || 13 => '엄마',
     4 || 6 || 12 => '아빠',
     9 || 11 => '외할아버지',
-    15 || 16 || 18 || 20 || 22 => '한서윤 선생님',
-    25 || 26 || 27 || 28 => '한서윤 선생님',
-    17 || 19 =>
+    17 || 18 || 20 || 22 || 24 => '한서윤 선생님',
+    27 || 28 || 29 || 30 => '한서윤 선생님',
+    19 || 21 =>
       _playerController.text.trim().isEmpty
           ? '나'
           : _playerController.text.trim(),
@@ -119,24 +106,28 @@ class _VisualNovelOnboardingScreenState
     12 => '입문반 수업은 내가 먼저 신청해 뒀다. 배운 뒤에도 모르는 주문은 반드시 우리에게 물어봐.',
     13 => '세뱃돈은 어머니 명의 교육용 증권계좌에 넣을게. 생활비, 학원비 빚, 투자금은 각각 따로 기록하자.',
     14 =>
-      '첫 수업 날. 중학생과 고등학생들 사이에서 발이 바닥에 닿지 않는 의자에 앉았지만, 칠판의 차트만큼은 누구보다 크게 보였다.',
-    15 => '반가워요. 입문반을 맡은 한서윤입니다. 오늘은 종목 추천 대신, 주문하기 전에 반드시 알아야 할 것부터 배울 거예요.',
-    16 => '주식 한 주는 회사의 아주 작은 조각이에요. 가격표만 사는 게 아니라 그 회사의 제품, 실적, 위험을 함께 사는 거죠.',
-    17 => '그럼 가격이 오르는 회사가 무조건 좋은 회사인 건가요?',
-    18 =>
-      '아니에요. 가격이 오른다는 건 사려는 사람이 더 급했다는 뜻일 뿐이에요. 회사·매수와 매도·가격 방식을 따로 확인해 볼까요?',
-    19 => '시장가랑 지정가는 언제 골라야 해요? 빨리 사는 게 항상 좋은 건 아니죠?',
+      '며칠 뒤, 집으로 ‘새천년 청소년 투자학교’의 남색 초대장이 도착했다. 만 10세부터 19세까지만 등록할 수 있고, 첫 주문은 반드시 보호자와 함께 복기한다는 학교였다.',
+    15 => '정말 10대만 오는 곳이구나. 종목을 찍어 주는 학원이 아니라, 내 돈을 스스로 설명하는 법을 배우는 학교래.',
+    16 =>
+      '첫 등교 날. 학생들은 실습실 밖에서 오리엔테이션을 듣고 있었고, 나는 먼저 교탁과 주식 단말이 놓인 조용한 교실에 들어섰다. 곧 문이 열리고 담임 선생님이 교탁 옆에 섰다.',
+    17 =>
+      '반가워요. 10대 입문반을 맡은 한서윤입니다. 여기는 빨리 부자가 되는 종목을 찍어 주는 곳이 아니라, 자기 판단을 말할 수 있는 투자자를 키우는 학교예요.',
+    18 => '주식 한 주는 회사의 아주 작은 조각이에요. 가격표만 사는 게 아니라 그 회사의 제품, 실적, 위험을 함께 사는 거죠.',
+    19 => '그럼 가격이 오르는 회사가 무조건 좋은 회사인 건가요?',
     20 =>
+      '아니에요. 가격이 오른다는 건 사려는 사람이 더 급했다는 뜻일 뿐이에요. 회사·매수와 매도·가격 방식을 따로 확인해 볼까요?',
+    21 => '시장가랑 지정가는 언제 골라야 해요? 빨리 사는 게 항상 좋은 건 아니죠?',
+    22 =>
       '맞아요. 시장가는 빠른 체결, 지정가는 원하는 가격을 우선해요. 수수료까지 확인한 뒤 투자노트 첫 장에 이름을 적어 볼까요?',
-    21 =>
+    23 =>
       '${_playerController.text.trim()}입니다. 드라마처럼 멋있어 보이는 것보다, 제가 왜 사는지 설명할 수 있는 투자자가 될래요.',
-    22 => '첫 조사 과제입니다. 어떤 기준을 가장 먼저 연습해 보고 싶나요?',
-    23 => _traitResponse,
-    24 => '수업 마지막 화면 실습을 앞두고, 선생님은 가족이 적어 보낸 투자 약속 카드와 세뱃돈 장부를 교탁 위에 펼쳤다.',
-    25 => '가족과 약속한 원칙 가운데 첫 주문부터 반드시 지킬 한 가지를 골라 볼까요?',
-    26 =>
+    24 => '첫 조사 과제입니다. 어떤 기준을 가장 먼저 연습해 보고 싶나요?',
+    25 => _traitResponse,
+    26 => '수업 마지막 화면 실습을 앞두고, 선생님은 가족이 적어 보낸 투자 약속 카드와 세뱃돈 장부를 교탁 위에 펼쳤다.',
+    27 => '가족과 약속한 원칙 가운데 첫 주문부터 반드시 지킬 한 가지를 골라 볼까요?',
+    28 =>
       '아빠가 먼저 낸 학원비 1,000,000원은 투자금이 아니에요. 나중에 회사 통장에 돈이 모이면 거실에서 아빠에게 갚아야 해요.',
-    27 =>
+    29 =>
       '외할아버지의 세뱃돈 10,000원은 교육용 증권계좌에 들어 있어요. 이제 화면 실습에 표시할 투자연구소 이름을 정해 볼까요?',
     _ => '좋아요. 이름을 적으면 집으로 돌아가기 전에 실제 주식 화면을 열어, 제가 가리키는 곳을 함께 눌러 볼게요.',
   };
@@ -189,7 +180,7 @@ class _VisualNovelOnboardingScreenState
   Widget build(BuildContext context) {
     final viewInsets = MediaQuery.viewInsetsOf(context);
     final isKeyboardOpen = viewInsets.bottom > 0;
-    final isNameEntry = _beat == 20 || _beat == 28;
+    final isNameEntry = _beat == 22 || _beat == 30;
     final keyboardLift = isKeyboardOpen && isNameEntry
         ? viewInsets.bottom
         : 0.0;
@@ -227,34 +218,20 @@ class _VisualNovelOnboardingScreenState
               child: _SceneLabel(
                 date: _dateLabel,
                 location: _location,
-                progress: (_beat + 1) / 29,
+                progress: (_beat + 1) / _onboardingBeatCount,
               ),
             ),
           ),
-          if (widget.onExit != null)
-            SafeArea(
+
+          if (_isAcademyTeacherBeat)
+            Positioned.fill(
+              bottom: 112,
               child: Align(
-                alignment: Alignment.topLeft,
-                child: Padding(
-                  padding: const EdgeInsets.all(8),
-                  child: IconButton.filledTonal(
-                    key: const Key('onboarding-exit-button'),
-                    tooltip: '타이틀로',
-                    onPressed: widget.onExit,
-                    style: IconButton.styleFrom(
-                      backgroundColor: const Color(0xB3151B28),
-                      foregroundColor: Colors.white,
-                    ),
-                    icon: const Icon(Icons.arrow_back_rounded),
-                  ),
+                alignment: Alignment.bottomCenter,
+                child: _AcademyTeacherPose(
+                  poseAlignment: _teacherPoseAlignment,
                 ),
               ),
-            ),
-          if (_isAcademyTeacherBeat)
-            Positioned(
-              right: -18,
-              bottom: 112,
-              child: _AcademyTeacherPose(poseAlignment: _teacherPoseAlignment),
             )
           else if (_character != null)
             Positioned.fill(
@@ -317,11 +294,11 @@ class _VisualNovelOnboardingScreenState
 
   Widget _buildDialogue(BuildContext context) {
     if (_beat == 10) return _introChoices();
-    if (_beat == 18) return _academyTutorial();
-    if (_beat == 20) return _nameEntry();
-    if (_beat == 22) return _traitChoices();
-    if (_beat == 25) return _familyChoices();
-    if (_beat == 28) return _researchDeskName();
+    if (_beat == 20) return _academyTutorial();
+    if (_beat == 22) return _nameEntry();
+    if (_beat == 24) return _traitChoices();
+    if (_beat == 27) return _familyChoices();
+    if (_beat == 30) return _researchDeskName();
 
     return _NovelDialogue(
       key: ValueKey(_beat),
@@ -457,7 +434,7 @@ class _VisualNovelOnboardingScreenState
 
   void _chooseTrait(StoryTrait trait) => setState(() {
     _trait = trait;
-    _beat = 23;
+    _beat = 25;
   });
 
   Widget _familyChoices() => _NovelDialogue(
@@ -485,7 +462,7 @@ class _VisualNovelOnboardingScreenState
 
   void _chooseFamilyRule(FamilyRule rule) => setState(() {
     _familyRule = rule;
-    _beat = 26;
+    _beat = 28;
   });
 
   Widget _researchDeskName() => _NovelDialogue(
@@ -562,7 +539,7 @@ class _AcademyTeacherPose extends StatelessWidget {
     final size = MediaQuery.sizeOf(context);
     final dimension = math
         .min(size.width * 1.28, size.height * 0.68)
-        .clamp(300.0, 520.0)
+        .clamp(440.0, 520.0)
         .toDouble();
     return SizedBox(
       key: const Key('academy-teacher-character'),
@@ -576,7 +553,7 @@ class _AcademyTeacherPose extends StatelessWidget {
           minHeight: dimension * 2,
           maxHeight: dimension * 2,
           child: Image.asset(
-            'assets/images/주식선생님/05_6자세_슬랜더_투명_최종.png',
+            'assets/images/주식선생님/06_6자세_블라우스_스커트_투명.png',
             width: dimension * 3,
             height: dimension * 2,
             fit: BoxFit.fill,

@@ -428,6 +428,266 @@ const fixedFictionalCompanies = <FictionalCompanyDefinition>[
     summary: '물과 폐기물을 정화하고 자원으로 되돌리는 환경 기업입니다.',
     question: '정책 지원이 줄어도 기술과 계약만으로 수익을 낼 수 있을까?',
   ),
+  FictionalCompanyDefinition(
+    id: 'haneul_air',
+    symbol: '1031',
+    name: '하늘항공',
+    market: fictionalMainMarket,
+    sector: '항공운송',
+    colorHex: '#3F6FA6',
+    initialPrice: 18600,
+    volatility: 0.036,
+    products: ['국내선 여객', '국제선 여객', '전자항공권', '항공화물 추적'],
+    summary: '여객과 고부가 화물을 함께 운송하는 항공사입니다.',
+    question: '유가와 환율, 탑승률 변화를 감당할 현금과 노선 경쟁력이 있을까?',
+  ),
+  FictionalCompanyDefinition(
+    id: 'gureum_tour',
+    symbol: '1032',
+    name: '구름여행',
+    market: fictionalGrowthMarket,
+    sector: '호텔·여행',
+    colorHex: '#4D8FB4',
+    initialPrice: 9200,
+    volatility: 0.044,
+    products: ['도시호텔', '패키지여행', '온라인 예약', '휴양지 리조트'],
+    summary: '호텔 객실과 여행상품을 묶어 판매하는 관광 기업입니다.',
+    question: '경기와 감염병에 민감한 예약률을 고정비보다 안정적으로 지킬 수 있을까?',
+  ),
+  FictionalCompanyDefinition(
+    id: 'miso_insurance',
+    symbol: '1033',
+    name: '미소보험',
+    market: fictionalMainMarket,
+    sector: '보험',
+    colorHex: '#48618C',
+    initialPrice: 23100,
+    volatility: 0.024,
+    products: ['생명보험', '자동차보험', '변액보험', '온라인 보험'],
+    summary: '생명·손해보험 계약과 장기 운용자산을 함께 관리하는 보험사입니다.',
+    question: '보험료 성장보다 손해율과 금리 변화에 더 잘 대비하고 있을까?',
+  ),
+  FictionalCompanyDefinition(
+    id: 'bareun_securities',
+    symbol: '1034',
+    name: '바른증권',
+    market: fictionalMainMarket,
+    sector: '증권',
+    colorHex: '#405376',
+    initialPrice: 14700,
+    volatility: 0.039,
+    products: ['주식중개', '채권인수', '온라인 거래', '자산관리계좌'],
+    summary: '개인 중개와 기업 자금조달을 연결하는 증권사입니다.',
+    question: '거래대금 호황이 끝나도 자본과 유동성을 지킬 수 있을까?',
+  ),
+  FictionalCompanyDefinition(
+    id: 'dasom_card',
+    symbol: '1035',
+    name: '다솜카드',
+    market: fictionalGrowthMarket,
+    sector: '소비자금융',
+    colorHex: '#8B557E',
+    initialPrice: 10400,
+    volatility: 0.046,
+    products: ['신용카드', '할부금융', '포인트망', '휴대전화 본인인증'],
+    summary: '결제와 할부를 제공하고 가맹점망을 운영하는 소비자금융사입니다.',
+    question: '회원 증가가 연체율과 단기 카드채 부담을 넘어설 수 있을까?',
+  ),
+  FictionalCompanyDefinition(
+    id: 'gangsan_steel',
+    symbol: '1036',
+    name: '강산제철',
+    market: fictionalMainMarket,
+    sector: '철강',
+    colorHex: '#596775',
+    initialPrice: 29600,
+    volatility: 0.028,
+    products: ['열연강판', '조선용 후판', '자동차강판', '고장력 특수강'],
+    summary: '자동차·조선·건설에 산업용 강재를 공급하는 제철 기업입니다.',
+    question: '철광석 가격과 대륙권 증설 속에서도 가동률과 제품 마진을 지킬 수 있을까?',
+  ),
+  FictionalCompanyDefinition(
+    id: 'bitgaram_power',
+    symbol: '1037',
+    name: '빛가람전력',
+    market: fictionalMainMarket,
+    sector: '전력·유틸리티',
+    colorHex: '#B08A2E',
+    initialPrice: 27300,
+    volatility: 0.021,
+    products: ['화력발전', '송배전망', '가스복합발전', '지능형 전력계량'],
+    summary: '발전소와 전국 송배전 설비를 운영하는 전력 기업입니다.',
+    question: '연료비와 규제요금을 맞추면서 안정적인 설비투자를 이어갈 수 있을까?',
+  ),
+  FictionalCompanyDefinition(
+    id: 'dawon_electronics',
+    symbol: '1038',
+    name: '다원전자',
+    market: fictionalMainMarket,
+    sector: '전자·가전',
+    colorHex: '#3C7F91',
+    initialPrice: 38700,
+    volatility: 0.031,
+    products: ['브라운관 텔레비전', '생활가전', '디지털 텔레비전', '연결형 가전'],
+    summary: '영상기기와 생활가전을 대량 생산해 국내외에 판매하는 전자 기업입니다.',
+    question: '기존 제품의 현금흐름으로 디지털 전환과 해외 경쟁을 버틸 수 있을까?',
+  ),
+  FictionalCompanyDefinition(
+    id: 'hanul_equipment',
+    symbol: '1039',
+    name: '한울장비',
+    market: fictionalGrowthMarket,
+    sector: '반도체장비',
+    colorHex: '#715AA8',
+    initialPrice: 12600,
+    volatility: 0.052,
+    products: ['세정장비', '박막증착장비', '검사장비', '대구경 웨이퍼 장비'],
+    summary: '반도체 공정용 정밀 장비를 국산화하는 기술 기업입니다.',
+    question: '고객 인증을 통과해 설비투자 주기와 소수 고객 의존을 견딜 수 있을까?',
+  ),
+  FictionalCompanyDefinition(
+    id: 'saeron_materials',
+    symbol: '1040',
+    name: '새론건재',
+    market: fictionalMainMarket,
+    sector: '건자재',
+    colorHex: '#8A775F',
+    initialPrice: 17200,
+    volatility: 0.025,
+    products: ['시멘트', '레미콘', '단열재', '저탄소 콘크리트'],
+    summary: '주택과 기반시설 현장에 시멘트·레미콘·단열재를 공급합니다.',
+    question: '건설경기 둔화와 에너지 비용을 출하량과 가격으로 흡수할 수 있을까?',
+  ),
+  FictionalCompanyDefinition(
+    id: 'goun_cosmetics',
+    symbol: '1041',
+    name: '고운화장품',
+    market: fictionalGrowthMarket,
+    sector: '화장품',
+    colorHex: '#D06F9A',
+    initialPrice: 11300,
+    volatility: 0.043,
+    products: ['기초화장품', '색조화장품', '기능성 화장품', '수출 전용 브랜드'],
+    summary: '연구소와 브랜드 매장을 함께 운영하는 미용 소비재 기업입니다.',
+    question: '광고 유행을 넘어 재구매와 해외 유통망을 만들 수 있을까?',
+  ),
+  FictionalCompanyDefinition(
+    id: 'meari_entertainment',
+    symbol: '1042',
+    name: '메아리엔터',
+    market: fictionalGrowthMarket,
+    sector: '엔터테인먼트',
+    colorHex: '#C45183',
+    initialPrice: 7800,
+    volatility: 0.057,
+    products: ['음반제작', '공연기획', '연예인 매니지먼트', '온라인 팬공동체'],
+    summary: '음악·공연과 소속 창작자의 활동을 기획하는 문화 기업입니다.',
+    question: '한 팀의 인기와 선급비용을 반복 가능한 지식재산 매출로 바꿀 수 있을까?',
+  ),
+  FictionalCompanyDefinition(
+    id: 'cheolma_defense',
+    symbol: '1043',
+    name: '철마방산',
+    market: fictionalMainMarket,
+    sector: '방산',
+    colorHex: '#53634B',
+    initialPrice: 25800,
+    volatility: 0.032,
+    products: ['장갑차', '감시레이더', '유도무기', '무인정찰기'],
+    summary: '국방용 차량·전자장비와 정밀체계를 개발하는 방산 기업입니다.',
+    question: '긴 개발기간과 수출 허가 위험을 실제 수주잔고가 뒷받침할까?',
+  ),
+  FictionalCompanyDefinition(
+    id: 'saetgang_refining',
+    symbol: '1044',
+    name: '샛강정유',
+    market: fictionalMainMarket,
+    sector: '정유',
+    colorHex: '#9A633A',
+    initialPrice: 34400,
+    volatility: 0.030,
+    products: ['휘발유', '경유', '윤활유', '저유황 청정연료'],
+    summary: '수입 원유를 정제해 연료와 산업용 기초원료를 공급합니다.',
+    question: '유가 방향보다 정제마진과 재고평가 변동을 안정적으로 관리할 수 있을까?',
+  ),
+  FictionalCompanyDefinition(
+    id: 'nuri_powertech',
+    symbol: '1045',
+    name: '누리전력기기',
+    market: fictionalMainMarket,
+    sector: '전력기기',
+    colorHex: '#B17A35',
+    initialPrice: 21800,
+    volatility: 0.029,
+    products: ['산업용 전선', '대형 변압기', '광통신 전력선', '초고압 직류설비'],
+    summary: '발전소와 공장에 전선·변압기·전력제어 설비를 공급합니다.',
+    question: '구리 가격과 대형 프로젝트 납기를 수주 조건에 제대로 반영했을까?',
+  ),
+  FictionalCompanyDefinition(
+    id: 'duwon_packaging',
+    symbol: '1046',
+    name: '두원포장',
+    market: fictionalMainMarket,
+    sector: '포장·제지',
+    colorHex: '#8E7C58',
+    initialPrice: 13900,
+    volatility: 0.022,
+    products: ['인쇄용지', '골판지', '무균 식품포장', '생분해 포장재'],
+    summary: '종이와 식품·택배용 포장재를 생산하는 생활소재 기업입니다.',
+    question: '펄프와 에너지 가격 상승을 제품 구성과 장기계약으로 넘길 수 있을까?',
+  ),
+  FictionalCompanyDefinition(
+    id: 'haeoreum_leisure',
+    symbol: '1047',
+    name: '해오름레저',
+    market: fictionalGrowthMarket,
+    sector: '레저',
+    colorHex: '#3F9A91',
+    initialPrice: 8800,
+    volatility: 0.041,
+    products: ['놀이공원', '휴양콘도', '계절 축제', '온라인 입장예약'],
+    summary: '놀이공원과 휴양시설을 운영해 가족 여가 수요를 모읍니다.',
+    question: '날씨와 경기 변화에도 방문객당 매출이 높은 고정비를 감당할까?',
+  ),
+  FictionalCompanyDefinition(
+    id: 'ondam_furniture',
+    symbol: '1048',
+    name: '온담가구',
+    market: fictionalMainMarket,
+    sector: '가구',
+    colorHex: '#A06F58',
+    initialPrice: 15200,
+    volatility: 0.024,
+    products: ['가정용 가구', '사무용 가구', '조립식 수납', '친환경 인테리어'],
+    summary: '주거와 사무공간용 가구를 설계·생산·유통합니다.',
+    question: '주택경기와 목재 가격 변화에도 재고와 매장 수익을 지킬 수 있을까?',
+  ),
+  FictionalCompanyDefinition(
+    id: 'hangyeol_trading',
+    symbol: '1049',
+    name: '한결상사',
+    market: fictionalMainMarket,
+    sector: '종합상사',
+    colorHex: '#4E7180',
+    initialPrice: 24700,
+    volatility: 0.027,
+    products: ['원자재 무역', '산업기계 수출', '해외 프로젝트', '글로벌 공급망 관리'],
+    summary: '원자재·기계 교역과 해외 프로젝트 금융을 연결하는 종합상사입니다.',
+    question: '큰 매출 뒤의 얇은 마진과 환율·거래상대방 위험을 통제하고 있을까?',
+  ),
+  FictionalCompanyDefinition(
+    id: 'baram_resources',
+    symbol: '1050',
+    name: '바람자원',
+    market: fictionalGrowthMarket,
+    sector: '자원개발',
+    colorHex: '#786441',
+    initialPrice: 10100,
+    volatility: 0.049,
+    products: ['석탄광산', '비철금속 광산', '유전·가스전 지분', '폐금속 회수'],
+    summary: '국내외 광구와 에너지 개발권에 투자하는 자원 기업입니다.',
+    question: '탐사 기대를 실제 매장량·생산비·현금 회수로 증명할 수 있을까?',
+  ),
 ];
 
 const _spinoffBlueprints = <FictionalCompanyDefinition>[
@@ -663,7 +923,11 @@ List<_GeneratedListingPlan> _generatedListingPlans(String seed) {
   if (cached != null) return cached;
   final plans = <_GeneratedListingPlan>[];
   var serial = 0;
-  for (var year = 2000; year <= 2010; year++) {
+  for (
+    var year = fictionalCampaignStartYear;
+    year <= fictionalCampaignEndYear;
+    year++
+  ) {
     final count = 4 + _fictionalHash('$seed:ipo-count:$year') % 5;
     for (var index = 0; index < count; index++) {
       serial += 1;
@@ -688,7 +952,10 @@ List<_GeneratedListingPlan> _generatedListingPlans(String seed) {
         ),
       );
       final delistingDate =
-          delistRoll < 0.18 && rawDelistingDate.isBefore(DateTime(2010, 12, 20))
+          delistRoll < 0.18 &&
+              rawDelistingDate.isBefore(
+                DateTime(fictionalCampaignEndYear, 12, 20),
+              )
           ? _nextFictionalTradingDay(rawDelistingDate)
           : null;
       final id = 'ipo_${year}_${serial.toString().padLeft(3, '0')}';
@@ -787,7 +1054,7 @@ bool isFictionalMarketAssetId(String id, {required String seed}) {
 
 List<String> _allowedArcKinds(FictionalCompanyDefinition company) =>
     switch (company.sector) {
-      '조선·기계' || '해운' => const [
+      '조선·기계' || '해운' || '철강' || '종합상사' => const [
         'capacity',
         'contract',
         'safety',
@@ -800,7 +1067,7 @@ List<String> _allowedArcKinds(FictionalCompanyDefinition company) =>
         'labor',
         'supply_chain',
       ],
-      '반도체' || '디스플레이' || '정밀기기' || '첨단소재' => const [
+      '반도체' || '반도체장비' || '디스플레이' || '정밀기기' || '첨단소재' || '전력기기' => const [
         'breakthrough',
         'capacity',
         'contract',
@@ -825,7 +1092,7 @@ List<String> _allowedArcKinds(FictionalCompanyDefinition company) =>
         'litigation',
         'product_launch',
       ],
-      '자동차' || '전지' || '로봇' || '항공·우주' => const [
+      '자동차' || '전자·가전' || '전지' || '로봇' || '항공·우주' || '방산' => const [
         'breakthrough',
         'capacity',
         'contract',
@@ -840,7 +1107,7 @@ List<String> _allowedArcKinds(FictionalCompanyDefinition company) =>
         'patent',
         'product_launch',
       ],
-      '소프트웨어' || '인터넷' || '정보보안' || '게임' || '미디어' => const [
+      '소프트웨어' || '인터넷' || '정보보안' || '게임' || '미디어' || '엔터테인먼트' => const [
         'breakthrough',
         'security',
         'capacity',
@@ -854,7 +1121,7 @@ List<String> _allowedArcKinds(FictionalCompanyDefinition company) =>
         'merger',
         'product_launch',
       ],
-      '건설' => const [
+      '건설' || '건자재' => const [
         'contract',
         'capacity',
         'safety',
@@ -866,7 +1133,7 @@ List<String> _allowedArcKinds(FictionalCompanyDefinition company) =>
         'labor',
         'governance',
       ],
-      '금융' || '금융기술' => const [
+      '금융' || '금융기술' || '보험' || '증권' || '소비자금융' => const [
         'finance',
         'regulation',
         'security',
@@ -877,7 +1144,7 @@ List<String> _allowedArcKinds(FictionalCompanyDefinition company) =>
         'merger',
         'currency',
       ],
-      '에너지' || '화학·소재' || '환경' => const [
+      '에너지' || '전력·유틸리티' || '정유' || '자원개발' || '화학·소재' || '환경' => const [
         'capacity',
         'contract',
         'safety',
@@ -888,6 +1155,29 @@ List<String> _allowedArcKinds(FictionalCompanyDefinition company) =>
         'commodity',
         'currency',
         'litigation',
+        'product_launch',
+      ],
+      '항공운송' || '호텔·여행' || '레저' => const [
+        'capacity',
+        'competition',
+        'finance',
+        'regulation',
+        'earnings',
+        'safety',
+        'commodity',
+        'currency',
+        'labor',
+        'product_launch',
+      ],
+      '화장품' || '가구' || '포장·제지' => const [
+        'capacity',
+        'competition',
+        'finance',
+        'regulation',
+        'earnings',
+        'supply_chain',
+        'commodity',
+        'currency',
         'product_launch',
       ],
       _ => const [
@@ -1080,6 +1370,7 @@ List<FictionalMarketEvent> fictionalMarketEventsForDate(
   final events = <FictionalMarketEvent>[
     ..._lifecycleEventsForDate(seed, date),
     ..._historicalCatalystEventsForDate(seed, date),
+    ..._corpusScenarioEventsForDate(seed, date),
     ..._eraTechnologyEventsForDate(seed, date),
   ];
   final active = _activeFictionalCompanies(seed, date);
@@ -1118,7 +1409,7 @@ List<FictionalMarketEvent> fictionalMarketEventsForDate(
     final arcLength = 120;
     final arc = day ~/ arcLength;
     final localDay = day % arcLength;
-    final offset = _fictionalHash('${company.id}:arc-offset') % 19;
+    final offset = _fictionalHash('$seed:${company.id}:arc-offset:$arc') % 19;
     final stageDays = <int>[7 + offset, 34 + offset, 66 + offset, 96 + offset];
     final stage = stageDays.indexOf(localDay);
     if (stage < 0) continue;
@@ -1762,23 +2053,47 @@ FictionalMarketUniverse buildFictionalMarketUniverse(String seed) {
   };
   final current = <String, double>{};
   var date = DateTime(1999, 12, 30);
-  final end = DateTime(2010, 12, 31);
+  final end = DateTime(fictionalCampaignEndYear, 12, 31);
   while (!date.isAfter(end)) {
     if (isMarketTradingDay(date)) {
       final dateKey = marketDateKey(date);
       final events = fictionalMarketEventsForDate(seed, date);
+      final corpusSample = _fictionalCorpusDailySampleForDate(seed, date);
+      final corpusLargeReturn = corpusSample.largeReturn * 0.34;
       final macro =
-          _fictionalSigned(seed, 'macro:$dateKey') * 0.008 +
+          corpusLargeReturn.clamp(-0.026, 0.026) +
+          _fictionalSigned(seed, 'macro:$dateKey') * 0.0045 +
           _fictionalSigned(
                 seed,
                 'regime:${date.difference(DateTime(2000, 1, 1)).inDays ~/ 90}',
               ) *
-              0.0018;
+              0.0014;
       for (final company in definitions) {
         final listed = listingDates[company.id];
         final delisted = delistingDates[company.id];
         if (listed != null && date.isBefore(listed)) continue;
         if (delisted != null && !date.isBefore(delisted)) continue;
+        final corpusMarketReturn =
+            (company.market == fictionalGrowthMarket
+                ? corpusSample.growthReturn
+                : corpusSample.largeReturn) *
+            0.12;
+        final corpusRange = company.market == fictionalGrowthMarket
+            ? corpusSample.growthRange
+            : corpusSample.largeRange;
+        final corpusGap = company.market == fictionalGrowthMarket
+            ? corpusSample.growthGap
+            : corpusSample.largeGap;
+        final corpusVolatility = company.market == fictionalGrowthMarket
+            ? corpusSample.growthVolatility
+            : corpusSample.largeVolatility;
+        final volatilityScale =
+            (0.60 +
+                    corpusRange * 6.0 +
+                    corpusGap.abs() * 2.0 +
+                    corpusVolatility * 0.45)
+                .clamp(0.72, 1.58)
+                .toDouble();
         final previous = current.putIfAbsent(
           company.id,
           () =>
@@ -1789,7 +2104,8 @@ FictionalMarketUniverse buildFictionalMarketUniverse(String seed) {
             _fictionalSigned(seed, 'sector:${company.sector}:$dateKey') * 0.006;
         final companyNoise =
             _fictionalSigned(seed, 'company:${company.id}:$dateKey') *
-            company.volatility;
+            company.volatility *
+            volatilityScale;
         final directEventImpact = events.fold<double>(0, (sum, event) {
           if (event.companyId == fictionalWholeMarketCompanyId) {
             return sum +
@@ -1846,10 +2162,44 @@ FictionalMarketUniverse buildFictionalMarketUniverse(String seed) {
         quarterlyBacklogImpacts[company.id]![quarterKey] =
             (quarterlyBacklogImpacts[company.id]![quarterKey] ?? 0) +
             backlogEventImpact;
-        final dailyLimit = marketDailyPriceLimitRate(date);
-        final dailyReturn = (macro + sector + companyNoise + eventImpact)
-            .clamp(-dailyLimit, dailyLimit)
+        final initialValuationAnchor =
+            company.initialPrice *
+            (0.82 + _fictionalUnit(seed, 'initial:${company.id}') * 0.36);
+        final daysSinceListing = math
+            .max(0, date.difference(listed ?? DateTime(1999, 12, 30)).inDays)
             .toDouble();
+        final annualGrowth =
+            -0.015 + _fictionalUnit(seed, 'long-growth:${company.id}') * 0.09;
+        final cumulativeBusinessSignal = quarterlyBusinessImpacts[company.id]!
+            .values
+            .fold<double>(0, (sum, value) => sum + value)
+            .clamp(-1.25, 1.25)
+            .toDouble();
+        final valuationAnchor =
+            (initialValuationAnchor *
+                    math.exp(
+                      annualGrowth * daysSinceListing / 365.25 +
+                          cumulativeBusinessSignal * 0.28,
+                    ))
+                .clamp(400.0, 1000000.0)
+                .toDouble();
+        final valuationGap = math
+            .log(valuationAnchor / previous)
+            .clamp(-1.6, 1.6)
+            .toDouble();
+        final valuationPull = (valuationGap * 0.0045)
+            .clamp(-0.006, 0.006)
+            .toDouble();
+        final dailyLimit = marketDailyPriceLimitRate(date);
+        final dailyReturn =
+            (macro +
+                    corpusMarketReturn +
+                    sector +
+                    companyNoise +
+                    eventImpact +
+                    valuationPull)
+                .clamp(-dailyLimit, dailyLimit)
+                .toDouble();
         final raw = (previous * (1 + dailyReturn))
             .clamp(120, 2500000)
             .toDouble();
@@ -1923,7 +2273,11 @@ FictionalMarketUniverse buildFictionalMarketUniverse(String seed) {
   }
 
   for (final company in definitions) {
-    for (var year = 2000; year <= 2010; year++) {
+    for (
+      var year = fictionalCampaignStartYear;
+      year <= fictionalCampaignEndYear;
+      year++
+    ) {
       if (_fictionalHash('$seed:rights-select:${company.id}:$year') % 100 >=
           24) {
         continue;
@@ -1956,8 +2310,8 @@ FictionalMarketUniverse buildFictionalMarketUniverse(String seed) {
   }
 
   return FictionalMarketUniverse(
-    schemaVersion: 7,
-    sourceName: 'seeded-fictional-market-v4-fundamentals-relations',
+    schemaVersion: 9,
+    sourceName: 'seeded-fictional-market-v6-2000-2026',
     assets: definitions
         .map((company) {
           final listed = listingDates[company.id];

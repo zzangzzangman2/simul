@@ -62,8 +62,8 @@ export function parseDynamicNewsRequest(value: unknown): DynamicNewsRequest {
   }
   const body = value as Record<string, unknown>;
   const year = Number(body.year);
-  if (!Number.isInteger(year) || year < 2000 || year > 2010) {
-    throw new NewsInputError("year는 2000~2010 사이의 정수여야 합니다.");
+  if (!Number.isInteger(year) || year < 2000 || year > 2026) {
+    throw new NewsInputError("year는 2000~2026 사이의 정수여야 합니다.");
   }
   const date = cleanText(body.date, "date", 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
