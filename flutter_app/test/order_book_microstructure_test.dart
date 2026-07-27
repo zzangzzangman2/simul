@@ -576,6 +576,97 @@ void main() {
   });
 
   test(
+    'synthetic prints cannot revive breached or vacuum-depleted raw depth',
+    () {
+      const structuralAssetId = 'synthetic_structural_clamp_asset';
+      const structuralSeed = 'synthetic-structural-clamp-world';
+      const previousClose = 290000.0;
+      const currentPrice = 289500.0;
+      final range = marketDailyPriceRange(
+        previousClose: previousClose,
+        date: date,
+        market: 'main',
+      );
+      final structure = buildMarketStructuralLiquidityMap(
+        worldSeed: structuralSeed,
+        assetId: structuralAssetId,
+        market: 'main',
+        referencePrice: previousClose,
+        lowerPrice: range.lower,
+        upperPrice: range.upper,
+      );
+      final support = structure.zoneAtPrice(previousClose)!;
+
+      GameOrderBookSnapshot structuralSnapshot({
+        required double sessionLow,
+        GameOrderBookSnapshot? previousSnapshot,
+      }) => buildGameOrderBookSnapshot(
+        assetId: structuralAssetId,
+        day: day,
+        minute: minute,
+        currentPrice: currentPrice,
+        previousTradePrice: previousClose,
+        previousClose: previousClose,
+        date: date,
+        market: 'main',
+        simulationSeed: structuralSeed,
+        levelCount: 25,
+        sessionLow: sessionLow,
+        sessionHigh: previousClose,
+        sharesOutstanding: 120000000,
+        previousSnapshot: previousSnapshot,
+        previousSnapshotMinute: previousSnapshot == null ? null : minute,
+        liquidityPulse: 83,
+        adaptiveLiquidityPulses: true,
+      );
+
+      final intact = structuralSnapshot(sessionLow: currentPrice);
+      final depleted = structuralSnapshot(
+        sessionLow: support.breachBoundary,
+        previousSnapshot: intact,
+      );
+      final intactByPrice = byPrice(intact);
+      final depletedByPrice = byPrice(depleted);
+      final breachedTarget = depletedByPrice[support.price]!;
+      final vacuumTarget = depletedByPrice[currentPrice]!;
+
+      expect(breachedTarget.isStructuralBreached, isTrue);
+      expect(vacuumTarget.isStructuralBreached, isFalse);
+      expect(vacuumTarget.structuralVacuumMultiplier, lessThan(1));
+
+      for (final target in [breachedTarget, vacuumTarget]) {
+        final previousTarget = intactByPrice[target.price]!;
+        expect(previousTarget.quantity, greaterThan(target.quantity));
+        final requestedQuantity = math.min(7, target.quantity);
+        expect(requestedQuantity, greaterThan(0));
+
+        final applied = gameOrderBookSnapshotAfterSyntheticTrade(
+          snapshot: depleted,
+          pulse: GameOrderBookTradePulse(
+            levelSide: target.side,
+            levelIndex: 0,
+            quantity: requestedQuantity,
+            crossedTicks: 1,
+          ),
+          absolutePrice: target.price,
+          previousSnapshot: intact,
+          availableSnapshot: depleted,
+          perMinuteBudgetUnits: target.quantity + 1,
+        );
+        final remaining = byPrice(applied)[target.price]!.quantity;
+
+        expect(remaining, target.quantity - requestedQuantity);
+        expect(
+          remaining,
+          isNot(previousTarget.quantity - requestedQuantity),
+          reason:
+              'the pre-breach raw row must not replace the current depleted row',
+        );
+      }
+    },
+  );
+
+  test(
     'sub-minute trade border keeps directional bias but crosses both sides',
     () {
       final risingPulses = [
@@ -664,6 +755,437 @@ void main() {
       );
     },
   );
+
+  test('adaptive pulses 1 through 12 stay within one execution capacity', () {
+    const executionCapacity = 100000;
+
+    for (final currentPrice in [10000.0, 11000.0]) {
+      var totalRequested = 0;
+      for (var pulse = 1; pulse <= 12; pulse += 1) {
+        final tradePulse = gameOrderBookTradePulse(
+          assetId: assetId,
+          day: day,
+          minute: minute,
+          previousPrice: 10000,
+          currentPrice: currentPrice,
+          executionCapacity: executionCapacity,
+          market: 'main',
+          simulationSeed: simulationSeed,
+          liquidityPulse: pulse,
+        )!;
+        totalRequested += tradePulse.quantity;
+
+        if (pulse < 12) {
+          expect(
+            totalRequested,
+            lessThan(executionCapacity),
+            reason:
+                'adaptive pulse $pulse exhausted the minute capacity too early',
+          );
+        }
+      }
+
+      expect(totalRequested, lessThanOrEqualTo(executionCapacity));
+    }
+  });
+
+  test(
+    'synthetic trade removes exact actual quantity at one absolute price',
+    () {
+      final raw = snapshot(pulse: 51);
+      final target = raw.asks.first;
+      expect(target.quantity, greaterThan(30));
+      const ledgerConsumption = 7.0;
+      const requestedQuantity = 13;
+      final available = gameOrderBookSnapshotAfterConsumption(
+        snapshot: raw,
+        consumedAskByPrice: {target.price: ledgerConsumption},
+        consumedCapacityUnits: ledgerConsumption.toInt(),
+      );
+      const pulse = GameOrderBookTradePulse(
+        levelSide: GameOrderBookSide.ask,
+        levelIndex: 0,
+        quantity: requestedQuantity,
+        crossedTicks: 1,
+      );
+
+      final applied = gameOrderBookSnapshotAfterSyntheticTrade(
+        snapshot: raw,
+        pulse: pulse,
+        absolutePrice: target.price,
+        previousSnapshot: raw,
+        availableSnapshot: available,
+        perMinuteBudgetUnits: 100,
+      );
+      final appliedTarget = byPrice(applied)[target.price]!;
+
+      expect(target.quantity - appliedTarget.quantity, requestedQuantity);
+      expect(
+        applied.rememberedLevels[target.price]!.quantity,
+        appliedTarget.quantity,
+      );
+      expect(applied.lastSyntheticTrade, isNotNull);
+      expect(applied.lastSyntheticTrade!.marketMinute, minute);
+      expect(applied.lastSyntheticTrade!.liquidityPulse, 51);
+      expect(applied.lastSyntheticTrade!.levelSide, GameOrderBookSide.ask);
+      expect(applied.lastSyntheticTrade!.price, target.price);
+      expect(applied.lastSyntheticTrade!.quantity, requestedQuantity);
+      expect(applied.syntheticTradeBudgetUsed, requestedQuantity);
+      expect(applied.appliedAskConsumptionByPrice, isEmpty);
+      expect(applied.appliedBidConsumptionByPrice, isEmpty);
+      expect(applied.appliedCapacityConsumptionUnits, 0);
+
+      final visible = gameOrderBookSnapshotAfterConsumption(
+        snapshot: applied,
+        consumedAskByPrice: {target.price: ledgerConsumption},
+        consumedCapacityUnits: ledgerConsumption.toInt(),
+      );
+      expect(
+        byPrice(visible)[target.price]!.quantity,
+        target.quantity - requestedQuantity - ledgerConsumption.toInt(),
+      );
+
+      final appliedToLedgerNetted = gameOrderBookSnapshotAfterSyntheticTrade(
+        snapshot: available,
+        pulse: pulse,
+        absolutePrice: target.price,
+        previousSnapshot: available,
+        availableSnapshot: available,
+        perMinuteBudgetUnits: 100,
+      );
+      expect(
+        appliedToLedgerNetted.appliedAskConsumptionByPrice,
+        available.appliedAskConsumptionByPrice,
+      );
+      expect(
+        appliedToLedgerNetted.appliedBidConsumptionByPrice,
+        available.appliedBidConsumptionByPrice,
+      );
+      expect(
+        appliedToLedgerNetted.appliedCapacityConsumptionUnits,
+        available.appliedCapacityConsumptionUnits,
+      );
+    },
+  );
+
+  test(
+    'synthetic trade token is idempotent and keeps a zero-row tombstone',
+    () {
+      final raw = snapshot(pulse: 52);
+      final target = raw.asks.first;
+      final pulse = GameOrderBookTradePulse(
+        levelSide: GameOrderBookSide.ask,
+        levelIndex: 0,
+        quantity: target.quantity + 100,
+        crossedTicks: 1,
+      );
+      final applied = gameOrderBookSnapshotAfterSyntheticTrade(
+        snapshot: raw,
+        pulse: pulse,
+        absolutePrice: target.price,
+        previousSnapshot: raw,
+        availableSnapshot: raw,
+        perMinuteBudgetUnits: target.quantity + 100,
+      );
+
+      expect(byPrice(applied)[target.price]!.quantity, 0);
+      expect(applied.lastSyntheticTrade!.quantity, target.quantity);
+      expect(applied.syntheticTradeBudgetUsed, target.quantity);
+
+      final repeated = gameOrderBookSnapshotAfterSyntheticTrade(
+        snapshot: applied,
+        pulse: pulse,
+        absolutePrice: target.price,
+        previousSnapshot: raw,
+        availableSnapshot: raw,
+        perMinuteBudgetUnits: target.quantity + 100,
+      );
+      expect(repeated, same(applied));
+
+      final visible = gameOrderBookSnapshotAfterConsumption(snapshot: applied);
+      final tombstone = visible.asks
+          .where((level) => (level.price - target.price).abs() < 0.000001)
+          .single;
+      expect(tombstone.quantity, 0);
+      expect(visible.lastSyntheticTrade, same(applied.lastSyntheticTrade));
+    },
+  );
+
+  test('retained zero row matches the exact player side and price only', () {
+    final raw = snapshot(pulse: 53);
+    final syntheticTarget = raw.asks.first;
+    final exhausted = gameOrderBookSnapshotAfterSyntheticTrade(
+      snapshot: raw,
+      pulse: GameOrderBookTradePulse(
+        levelSide: GameOrderBookSide.ask,
+        levelIndex: 0,
+        quantity: syntheticTarget.quantity,
+        crossedTicks: 1,
+      ),
+      absolutePrice: syntheticTarget.price,
+      previousSnapshot: raw,
+      availableSnapshot: raw,
+      perMinuteBudgetUnits: syntheticTarget.quantity,
+    );
+    final playerTarget = exhausted.bids.first;
+    final consumedBid = <double, double>{
+      playerTarget.price: playerTarget.quantity.toDouble(),
+    };
+
+    final visible = gameOrderBookSnapshotAfterConsumption(
+      snapshot: exhausted,
+      consumedBidByPrice: consumedBid,
+      retainedZeroLevelSide: GameOrderBookSide.bid,
+      retainedZeroPrice: playerTarget.price,
+      retainSyntheticTombstone: false,
+    );
+    final zeroRows = [
+      ...visible.asks,
+      ...visible.bids,
+    ].where((level) => level.quantity == 0).toList(growable: false);
+
+    expect(zeroRows, hasLength(1));
+    expect(zeroRows.single.side, GameOrderBookSide.bid);
+    expect(zeroRows.single.price, playerTarget.price);
+    expect(
+      visible.asks.any((level) => level.price == syntheticTarget.price),
+      isFalse,
+      reason: 'the synthetic tombstone was explicitly suppressed',
+    );
+
+    final wrongSide = gameOrderBookSnapshotAfterConsumption(
+      snapshot: exhausted,
+      consumedBidByPrice: consumedBid,
+      retainedZeroLevelSide: GameOrderBookSide.ask,
+      retainedZeroPrice: playerTarget.price,
+      retainSyntheticTombstone: false,
+    );
+    expect(
+      wrongSide.bids.any((level) => level.price == playerTarget.price),
+      isFalse,
+    );
+
+    final wrongPrice = gameOrderBookSnapshotAfterConsumption(
+      snapshot: exhausted,
+      consumedBidByPrice: consumedBid,
+      retainedZeroLevelSide: GameOrderBookSide.bid,
+      retainedZeroPrice: syntheticTarget.price,
+      retainSyntheticTombstone: false,
+    );
+    expect(
+      wrongPrice.bids.any((level) => level.price == playerTarget.price),
+      isFalse,
+    );
+  });
+
+  test('fractional consumption never rounds one partial share up', () {
+    final raw = snapshot(pulse: 54);
+    final target = raw.bids.first;
+
+    final halfApplied = gameOrderBookSnapshotAfterConsumption(
+      snapshot: raw,
+      consumedBidByPrice: <double, double>{target.price: 0.5},
+    );
+    expect(
+      byPrice(halfApplied)[target.price]!.quantity,
+      target.quantity,
+      reason: '0.5주는 정수 호가에서 1주가 빠진 것처럼 보여서는 안 됩니다.',
+    );
+
+    final wholeApplied = gameOrderBookSnapshotAfterConsumption(
+      snapshot: halfApplied,
+      consumedBidByPrice: <double, double>{target.price: 1.0},
+    );
+    expect(byPrice(wholeApplied)[target.price]!.quantity, target.quantity - 1);
+
+    final repeated = gameOrderBookSnapshotAfterConsumption(
+      snapshot: wholeApplied,
+      consumedBidByPrice: <double, double>{target.price: 1.0},
+    );
+    expect(
+      byPrice(repeated)[target.price]!.quantity,
+      target.quantity - 1,
+      reason: '누적 소수 차감 watermark를 다시 적용해 이중 차감하면 안 됩니다.',
+    );
+  });
+
+  test(
+    'same synthetic frame survives a center-price move without rerolling',
+    () {
+      final raw = snapshot(pulse: 58);
+      final target = raw.asks.first;
+      const pulse = GameOrderBookTradePulse(
+        levelSide: GameOrderBookSide.ask,
+        levelIndex: 0,
+        quantity: 9,
+        crossedTicks: 1,
+      );
+      final applied = gameOrderBookSnapshotAfterSyntheticTrade(
+        snapshot: raw,
+        pulse: pulse,
+        absolutePrice: target.price,
+        previousSnapshot: raw,
+        availableSnapshot: raw,
+        perMinuteBudgetUnits: 100,
+      );
+      final remaining = byPrice(applied)[target.price]!.quantity;
+
+      final moved = snapshot(
+        pulse: 58,
+        currentPrice: advanceTicks(10000, 8),
+        previousTradePrice: 10000,
+        previousSnapshot: applied,
+      );
+      expect(moved.rememberedLevels[target.price]!.quantity, remaining);
+      expect(moved.lastSyntheticTrade, same(applied.lastSyntheticTrade));
+      expect(moved.syntheticTradeBudgetUsed, applied.syntheticTradeBudgetUsed);
+
+      final repeated = gameOrderBookSnapshotAfterSyntheticTrade(
+        snapshot: moved,
+        pulse: pulse,
+        absolutePrice: target.price,
+        previousSnapshot: applied,
+        availableSnapshot: moved,
+        perMinuteBudgetUnits: 100,
+      );
+      expect(repeated, same(moved));
+      expect(repeated.rememberedLevels[target.price]!.quantity, remaining);
+    },
+  );
+
+  test(
+    'next pulse starts from prior raw quantity before subtracting its print',
+    () {
+      final raw = snapshot(pulse: 60);
+      final target = raw.asks.first;
+      expect(target.quantity, greaterThan(30));
+      const firstPulse = GameOrderBookTradePulse(
+        levelSide: GameOrderBookSide.ask,
+        levelIndex: 0,
+        quantity: 11,
+        crossedTicks: 1,
+      );
+      final first = gameOrderBookSnapshotAfterSyntheticTrade(
+        snapshot: raw,
+        pulse: firstPulse,
+        absolutePrice: target.price,
+        previousSnapshot: raw,
+        availableSnapshot: raw,
+        perMinuteBudgetUnits: 100,
+      );
+      final firstQuantity = byPrice(first)[target.price]!.quantity;
+
+      final nextBuilt = snapshot(pulse: 61, previousSnapshot: first);
+      const secondPulse = GameOrderBookTradePulse(
+        levelSide: GameOrderBookSide.ask,
+        levelIndex: 0,
+        quantity: 5,
+        crossedTicks: 1,
+      );
+      final second = gameOrderBookSnapshotAfterSyntheticTrade(
+        snapshot: nextBuilt,
+        pulse: secondPulse,
+        absolutePrice: target.price,
+        previousSnapshot: first,
+        availableSnapshot: nextBuilt,
+        perMinuteBudgetUnits: 100,
+      );
+
+      expect(byPrice(second)[target.price]!.quantity, firstQuantity - 5);
+      expect(second.lastSyntheticTrade!.liquidityPulse, 61);
+      expect(second.lastSyntheticTrade!.quantity, 5);
+      expect(second.syntheticTradeBudgetUsed, 16);
+
+      final sameFrameRebuild = snapshot(pulse: 61, previousSnapshot: second);
+      expect(
+        byPrice(sameFrameRebuild)[target.price]!.quantity,
+        byPrice(second)[target.price]!.quantity,
+      );
+      expect(
+        sameFrameRebuild.lastSyntheticTrade,
+        same(second.lastSyntheticTrade),
+      );
+      expect(sameFrameRebuild.syntheticTradeBudgetUsed, 16);
+    },
+  );
+
+  test('synthetic minute budget caps prints and resets on minute advance', () {
+    final raw = snapshot(pulse: 70);
+    final target = raw.asks.first;
+    expect(target.quantity, greaterThan(20));
+    const pulseQuantity = 4;
+    const budget = 6;
+
+    GameOrderBookSnapshot applyAtPulse(
+      GameOrderBookSnapshot built,
+      GameOrderBookSnapshot previous,
+    ) {
+      return gameOrderBookSnapshotAfterSyntheticTrade(
+        snapshot: built,
+        pulse: const GameOrderBookTradePulse(
+          levelSide: GameOrderBookSide.ask,
+          levelIndex: 0,
+          quantity: pulseQuantity,
+          crossedTicks: 1,
+        ),
+        absolutePrice: target.price,
+        previousSnapshot: previous,
+        availableSnapshot: built,
+        perMinuteBudgetUnits: budget,
+      );
+    }
+
+    final first = applyAtPulse(raw, raw);
+    final secondBuilt = snapshot(pulse: 71, previousSnapshot: first);
+    final second = applyAtPulse(secondBuilt, first);
+    final thirdBuilt = snapshot(pulse: 72, previousSnapshot: second);
+    final third = applyAtPulse(thirdBuilt, second);
+
+    expect(first.lastSyntheticTrade!.quantity, 4);
+    expect(first.syntheticTradeBudgetUsed, 4);
+    expect(second.lastSyntheticTrade!.quantity, 2);
+    expect(second.syntheticTradeBudgetUsed, budget);
+    expect(third.lastSyntheticTrade!.quantity, 0);
+    expect(third.syntheticTradeBudgetUsed, budget);
+    expect(target.quantity - byPrice(third)[target.price]!.quantity, budget);
+
+    final nextMinuteBuilt = buildGameOrderBookSnapshot(
+      assetId: assetId,
+      day: day,
+      minute: minute + 1,
+      currentPrice: 10000,
+      previousTradePrice: 10000,
+      previousClose: 10000,
+      date: date,
+      market: 'main',
+      simulationSeed: simulationSeed,
+      sharesOutstanding: 120000000,
+      previousSnapshot: third,
+      previousSnapshotMinute: minute,
+      liquidityPulse: 72,
+      adaptiveLiquidityPulses: true,
+    );
+    expect(nextMinuteBuilt.lastSyntheticTrade, isNull);
+    expect(nextMinuteBuilt.syntheticTradeBudgetUsed, 0);
+
+    final nextTarget = nextMinuteBuilt.asks.first;
+    final nextMinute = gameOrderBookSnapshotAfterSyntheticTrade(
+      snapshot: nextMinuteBuilt,
+      pulse: const GameOrderBookTradePulse(
+        levelSide: GameOrderBookSide.ask,
+        levelIndex: 0,
+        quantity: pulseQuantity,
+        crossedTicks: 1,
+      ),
+      absolutePrice: nextTarget.price,
+      previousSnapshot: third,
+      availableSnapshot: nextMinuteBuilt,
+      perMinuteBudgetUnits: budget,
+    );
+    expect(nextMinute.lastSyntheticTrade!.marketMinute, minute + 1);
+    expect(nextMinute.lastSyntheticTrade!.quantity, pulseQuantity);
+    expect(nextMinute.syntheticTradeBudgetUsed, pulseQuantity);
+  });
 
   test(
     'engine fills from the exact microstructure snapshot shown to the user',
@@ -892,6 +1414,170 @@ void main() {
         expect(result.message, contains('시세가 바뀌었습니다'), reason: testCase.name);
         expect(result.state, same(state), reason: testCase.name);
       }
+    },
+  );
+
+  test(
+    'partial same-side prints stay on one price while counter-side prints may bounce',
+    () {
+      GameOrderBookSnapshot manualBook({
+        required int pulse,
+        int bestAskQuantity = 20000,
+        int bestBidQuantity = 18000,
+        GameOrderBookSyntheticTrade? lastTrade,
+        int budgetUsed = 0,
+      }) {
+        final asks = <GameOrderBookLevel>[
+          GameOrderBookLevel(
+            side: GameOrderBookSide.ask,
+            price: 10000,
+            quantity: bestAskQuantity,
+            isWall: false,
+          ),
+          const GameOrderBookLevel(
+            side: GameOrderBookSide.ask,
+            price: 10050,
+            quantity: 9000,
+            isWall: false,
+          ),
+        ];
+        final bids = <GameOrderBookLevel>[
+          GameOrderBookLevel(
+            side: GameOrderBookSide.bid,
+            price: 9990,
+            quantity: bestBidQuantity,
+            isWall: false,
+          ),
+          const GameOrderBookLevel(
+            side: GameOrderBookSide.bid,
+            price: 9980,
+            quantity: 8000,
+            isWall: false,
+          ),
+        ];
+        return GameOrderBookSnapshot(
+          asks: asks,
+          bids: bids,
+          turnoverEok: 100,
+          executionCapacity: 100000,
+          totalAskQuantity: asks.fold(0, (sum, level) => sum + level.quantity),
+          totalBidQuantity: bids.fold(0, (sum, level) => sum + level.quantity),
+          tradeStrength: 100,
+          liquidityPulse: pulse,
+          adaptiveLiquidityPulses: true,
+          sourceAssetId: assetId,
+          sourceLiquidityDayKey: day,
+          sourceDateKey: marketDateKey(date),
+          sourceMarketMinute: minute,
+          sourceLastTradePrice: 10000,
+          sourceMarket: 'main',
+          sourceSimulationSeed: simulationSeed,
+          lastSyntheticTrade: lastTrade,
+          syntheticTradeBudgetUsed: budgetUsed,
+        );
+      }
+
+      final firstBook = manualBook(pulse: 0);
+      final firstAsk = gameOrderBookFirstExecutableLevel(
+        snapshot: firstBook,
+        side: GameOrderBookSide.ask,
+      )!;
+      final afterThreeThousand = gameOrderBookSnapshotAfterSyntheticTrade(
+        snapshot: firstBook,
+        pulse: const GameOrderBookTradePulse(
+          levelSide: GameOrderBookSide.ask,
+          levelIndex: 0,
+          quantity: 3000,
+          crossedTicks: 1,
+        ),
+        absolutePrice: firstAsk.price,
+      );
+      expect(afterThreeThousand.asks.first.price, 10000);
+      expect(afterThreeThousand.asks.first.quantity, 17000);
+
+      final nextBook = manualBook(
+        pulse: 1,
+        bestAskQuantity: afterThreeThousand.asks.first.quantity,
+        lastTrade: afterThreeThousand.lastSyntheticTrade,
+        budgetUsed: afterThreeThousand.syntheticTradeBudgetUsed,
+      );
+      final nextSameSide = gameOrderBookFirstExecutableLevel(
+        snapshot: nextBook,
+        side: GameOrderBookSide.ask,
+      )!;
+      expect(
+        nextSameSide.price,
+        firstAsk.price,
+        reason: '17,000주가 남은 같은 매도호가를 다음 매수체결이 건너뛰면 안 됩니다.',
+      );
+
+      final afterSameSide = gameOrderBookSnapshotAfterSyntheticTrade(
+        snapshot: nextBook,
+        pulse: const GameOrderBookTradePulse(
+          levelSide: GameOrderBookSide.ask,
+          levelIndex: 0,
+          quantity: 2000,
+          crossedTicks: 1,
+        ),
+        absolutePrice: nextSameSide.price,
+      );
+      expect(afterSameSide.asks.first.quantity, 15000);
+      expect(afterSameSide.lastSyntheticTrade?.price, firstAsk.price);
+
+      final counterBook = manualBook(
+        pulse: 1,
+        bestAskQuantity: afterThreeThousand.asks.first.quantity,
+        lastTrade: afterThreeThousand.lastSyntheticTrade,
+        budgetUsed: afterThreeThousand.syntheticTradeBudgetUsed,
+      );
+      final counterSide = gameOrderBookFirstExecutableLevel(
+        snapshot: counterBook,
+        side: GameOrderBookSide.bid,
+      )!;
+      final afterCounterSide = gameOrderBookSnapshotAfterSyntheticTrade(
+        snapshot: counterBook,
+        pulse: const GameOrderBookTradePulse(
+          levelSide: GameOrderBookSide.bid,
+          levelIndex: 0,
+          quantity: 1200,
+          crossedTicks: 1,
+        ),
+        absolutePrice: counterSide.price,
+      );
+      expect(afterCounterSide.lastSyntheticTrade?.price, 9990);
+      expect(afterCounterSide.asks.first.quantity, 17000);
+      expect(afterCounterSide.bids.first.quantity, 16800);
+
+      final depletionBook = manualBook(
+        pulse: 2,
+        bestAskQuantity: 17000,
+        lastTrade: afterCounterSide.lastSyntheticTrade,
+        budgetUsed: afterCounterSide.syntheticTradeBudgetUsed,
+      );
+      final depleted = gameOrderBookSnapshotAfterSyntheticTrade(
+        snapshot: depletionBook,
+        pulse: const GameOrderBookTradePulse(
+          levelSide: GameOrderBookSide.ask,
+          levelIndex: 0,
+          quantity: 17000,
+          crossedTicks: 1,
+        ),
+        absolutePrice: 10000,
+      );
+      final afterDepletion = manualBook(
+        pulse: 3,
+        bestAskQuantity: depleted.asks.first.quantity,
+        lastTrade: depleted.lastSyntheticTrade,
+        budgetUsed: depleted.syntheticTradeBudgetUsed,
+      );
+      expect(
+        gameOrderBookFirstExecutableLevel(
+          snapshot: afterDepletion,
+          side: GameOrderBookSide.ask,
+        )?.price,
+        10050,
+        reason: '최우선 행이 정확히 0주가 된 다음에만 같은 방향 다음 가격으로 진행해야 합니다.',
+      );
     },
   );
 }

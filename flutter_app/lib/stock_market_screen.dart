@@ -26,6 +26,23 @@ class _MarketCapRanking {
   final int companyCount;
 }
 
+typedef _DailyMarketCapSnapshot = ({
+  Map<String, int> values,
+  Map<String, _MarketCapRanking> rankings,
+});
+
+class _PlayerOrderBookPrint {
+  const _PlayerOrderBookPrint({
+    required this.levelSide,
+    required this.price,
+    required this.quantity,
+  });
+
+  final GameOrderBookSide levelSide;
+  final double price;
+  final int quantity;
+}
+
 class _PlayerTradeSignal {
   const _PlayerTradeSignal({
     required this.assetId,
@@ -33,6 +50,8 @@ class _PlayerTradeSignal {
     required this.quantity,
     required this.price,
     required this.marketMinute,
+    required this.microstructureFrame,
+    this.orderBookPrint,
   });
 
   final String assetId;
@@ -40,7 +59,106 @@ class _PlayerTradeSignal {
   final double quantity;
   final double price;
   final int marketMinute;
+  final int microstructureFrame;
+  final _PlayerOrderBookPrint? orderBookPrint;
 }
+
+_PlayerTradeSignal? _playerTradeSignalForLedgerEntry(
+  LedgerEntry entry, {
+  required int microstructureFrame,
+}) {
+  if (entry.assetId.isEmpty ||
+      !entry.tradeQuantity.isFinite ||
+      entry.tradeQuantity <= 0 ||
+      !entry.tradeUnitPrice.isFinite ||
+      entry.tradeUnitPrice <= 0 ||
+      (entry.tradeSide != TradeSide.buy.name &&
+          entry.tradeSide != TradeSide.sell.name)) {
+    return null;
+  }
+  final validFills = entry.orderBookFills
+      .where(
+        (fill) =>
+            fill.price.isFinite &&
+            fill.price > 0 &&
+            fill.quantity.isFinite &&
+            fill.quantity > 0,
+      )
+      .toList(growable: false);
+  final side = entry.tradeSide == TradeSide.buy.name
+      ? TradeSide.buy
+      : TradeSide.sell;
+  GameOrderBookSide? levelSide;
+  LedgerOrderBookFill? exactFill;
+  if (validFills.isNotEmpty &&
+      (entry.orderBookSide == GameOrderBookSide.ask.name ||
+          entry.orderBookSide == GameOrderBookSide.bid.name)) {
+    levelSide = entry.orderBookSide == GameOrderBookSide.ask.name
+        ? GameOrderBookSide.ask
+        : GameOrderBookSide.bid;
+    exactFill = validFills.last;
+  } else if (validFills.isEmpty &&
+      entry.orderType == TradeOrderType.limit.name &&
+      entry.marketMinute >= krxOpenMinute &&
+      entry.marketMinute < krxContinuousEndMinute) {
+    // A resting limit order is part of the player's own-side displayed depth.
+    // When it fills, that same-side row loses the order quantity even though
+    // the exchange ledger has no aggressive standing-book fill record.
+    levelSide = side == TradeSide.buy
+        ? GameOrderBookSide.bid
+        : GameOrderBookSide.ask;
+    exactFill = LedgerOrderBookFill(
+      price: entry.tradeUnitPrice,
+      quantity: entry.tradeQuantity,
+    );
+  }
+  final exactQuantity = exactFill?.quantity;
+  final hasWholeSharePrint =
+      exactQuantity != null &&
+      (exactQuantity - exactQuantity.roundToDouble()).abs() < 0.000001;
+  return _PlayerTradeSignal(
+    assetId: entry.assetId,
+    side: side,
+    quantity: entry.tradeQuantity,
+    price: entry.tradeUnitPrice,
+    marketMinute: entry.marketMinute,
+    microstructureFrame: math.max(0, microstructureFrame),
+    orderBookPrint:
+        levelSide == null || exactFill == null || !hasWholeSharePrint
+        ? null
+        : _PlayerOrderBookPrint(
+            levelSide: levelSide,
+            price: exactFill.price,
+            quantity: exactFill.quantity.round(),
+          ),
+  );
+}
+
+_PlayerTradeSignal? _latestPlayerTradeSignalForOrder(
+  GameState state, {
+  required String assetId,
+  required TradeSide side,
+  required int marketMinute,
+  required int microstructureFrame,
+  int minimumLedgerIndex = 0,
+}) => state.ledger
+    .skip(minimumLedgerIndex.clamp(0, state.ledger.length))
+    .toList(growable: false)
+    .reversed
+    .map(
+      (entry) => _playerTradeSignalForLedgerEntry(
+        entry,
+        microstructureFrame: microstructureFrame,
+      ),
+    )
+    .whereType<_PlayerTradeSignal>()
+    .where(
+      (signal) =>
+          signal.assetId == assetId &&
+          signal.side == side &&
+          signal.marketMinute == marketMinute,
+    )
+    .firstOrNull;
 
 const _marketInk = Color(0xFF191F28);
 const _marketMuted = Color(0xFF6B7684);
@@ -687,14 +805,16 @@ class _StockMarketScreenState extends State<StockMarketScreen>
   final Map<String, ValueNotifier<_LiveStock>> _live = {};
   late final StockOrderBookSessionCache _orderBookSessionCache;
   List<_StockDefinition> _stocks = const [];
+  Map<String, int> _dailyMarketCaps = const <String, int>{};
+  Map<String, _MarketCapRanking> _dailyMarketCapRankings =
+      const <String, _MarketCapRanking>{};
   List<LedgerEntry>? _cachedTradeLedgerSource;
   List<LedgerEntry> _cachedTradeLedgerEntries = const <LedgerEntry>[];
   Timer? _timer;
   final ValueNotifier<_MarketPlaybackSpeed> _playbackSpeedNotifier =
       ValueNotifier(_MarketPlaybackSpeed.normal);
-  final ValueNotifier<_PlayerTradeSignal?> _playerTradeNotifier = ValueNotifier(
-    null,
-  );
+  final ValueNotifier<Map<String, _PlayerTradeSignal>> _playerTradeNotifier =
+      ValueNotifier(const <String, _PlayerTradeSignal>{});
   Future<void> _marketMutationTail = Future<void>.value();
   bool _isRealtimeBatchUpdating = false;
   bool _isLifecyclePaused = false;
@@ -791,31 +911,75 @@ class _StockMarketScreenState extends State<StockMarketScreen>
     return operation;
   }
 
-  List<_PlayerTradeSignal> _newTradeSignals(
-    GameState before,
-    GameState after,
-  ) => after.ledger
-      .skip(before.ledger.length)
-      .where(
-        (entry) =>
-            entry.assetId.isNotEmpty &&
-            entry.tradeQuantity > 0 &&
-            entry.tradeUnitPrice > 0 &&
-            (entry.tradeSide == TradeSide.buy.name ||
-                entry.tradeSide == TradeSide.sell.name),
-      )
-      .map(
-        (entry) => _PlayerTradeSignal(
-          assetId: entry.assetId,
-          side: entry.tradeSide == TradeSide.buy.name
-              ? TradeSide.buy
-              : TradeSide.sell,
-          quantity: entry.tradeQuantity,
-          price: entry.tradeUnitPrice,
-          marketMinute: entry.marketMinute,
+  List<_PlayerTradeSignal> _newTradeSignals(GameState before, GameState after) {
+    final rawSignals = after.ledger
+        .skip(before.ledger.length)
+        .map((entry) {
+          final cached = _orderBookSessionCache._snapshotFor(entry.assetId);
+          final expectedSessionKey =
+              '${after.simulationSeed}:${marketDateKey(after.currentDate)}';
+          final frame =
+              cached != null &&
+                  cached.sessionKey == expectedSessionKey &&
+                  entry.marketMinute >= cached.minute
+              ? cached.microstructureFrame
+              : 0;
+          return _playerTradeSignalForLedgerEntry(
+            entry,
+            microstructureFrame: frame,
+          );
+        })
+        .whereType<_PlayerTradeSignal>()
+        .toList(growable: false);
+    return rawSignals;
+  }
+
+  void _publishPlayerTradeSignals(Iterable<_PlayerTradeSignal> signals) {
+    final batch = signals.toList(growable: false);
+    final latestByAsset = <String, _PlayerTradeSignal>{};
+    for (final signal in batch) {
+      latestByAsset[signal.assetId] = signal;
+    }
+    final next = <String, _PlayerTradeSignal>{..._playerTradeNotifier.value};
+    for (final latest in latestByAsset.values) {
+      final latestPrint = latest.orderBookPrint;
+      if (latestPrint == null) {
+        next[latest.assetId] = latest;
+        continue;
+      }
+      next[latest.assetId] = _PlayerTradeSignal(
+        assetId: latest.assetId,
+        side: latest.side,
+        quantity: latest.quantity,
+        price: latest.price,
+        marketMinute: latest.marketMinute,
+        microstructureFrame: latest.microstructureFrame,
+        orderBookPrint: _PlayerOrderBookPrint(
+          levelSide: latestPrint.levelSide,
+          price: latestPrint.price,
+          quantity: batch
+              .where(
+                (signal) =>
+                    signal.assetId == latest.assetId &&
+                    signal.marketMinute == latest.marketMinute &&
+                    signal.microstructureFrame == latest.microstructureFrame &&
+                    signal.orderBookPrint?.levelSide == latestPrint.levelSide &&
+                    (signal.orderBookPrint!.price - latestPrint.price).abs() <
+                        0.000001,
+              )
+              .fold<int>(
+                0,
+                (sum, signal) => sum + (signal.orderBookPrint?.quantity ?? 0),
+              ),
         ),
-      )
-      .toList(growable: false);
+      );
+    }
+    if (latestByAsset.isNotEmpty) {
+      _playerTradeNotifier.value = Map<String, _PlayerTradeSignal>.unmodifiable(
+        next,
+      );
+    }
+  }
 
   int _newExpiredOrderCount(GameState before, GameState after) => after.ledger
       .skip(before.ledger.length)
@@ -1012,8 +1176,11 @@ class _StockMarketScreenState extends State<StockMarketScreen>
         }
       }
       if (!mounted) return;
+      final dailyMarketCaps = _buildDailyMarketCapSnapshot(loaded);
       setState(() {
         _stocks = loaded;
+        _dailyMarketCaps = dailyMarketCaps.values;
+        _dailyMarketCapRankings = dailyMarketCaps.rankings;
         _loadProgress = 0.99;
         _loadStage = '주식 수업 화면을 여는 중…';
       });
@@ -1136,7 +1303,7 @@ class _StockMarketScreenState extends State<StockMarketScreen>
             _lastPersistedMarketMinute = _marketMinute;
             final fills = _newTradeSignals(stateBeforeMinute, next);
             if (fills.isNotEmpty) {
-              _playerTradeNotifier.value = fills.last;
+              _publishPlayerTradeSignals(fills);
               _pausePlaybackWithoutRebuild();
               pauseMessage = '내 지정가 주문이 체결되어 시장 시간을 일시정지했어요.';
             } else {
@@ -1451,7 +1618,7 @@ class _StockMarketScreenState extends State<StockMarketScreen>
       if (next != null) {
         final fills = _newTradeSignals(stateBeforeAdvance, next);
         if (fills.isNotEmpty) {
-          _playerTradeNotifier.value = fills.last;
+          _publishPlayerTradeSignals(fills);
           _pausePlaybackWithoutRebuild();
           orderUpdateMessage = fills.length == 1
               ? '시간 이동 중 미체결 주문 1건이 체결됐어요.'
@@ -1565,19 +1732,25 @@ class _StockMarketScreenState extends State<StockMarketScreen>
     _timer = null;
     if (mounted) setState(() {});
     try {
+      var ledgerLengthBeforeTrade = _state.ledger.length;
       final result = await _runMarketMutation(() async {
         final synced = await widget.onSetMarketMinute?.call(order.marketMinute);
         if (synced != null) _state = synced;
+        ledgerLengthBeforeTrade = _state.ledger.length;
         return callback(order);
       });
       if (result.success && result.filledQuantity > 0) {
-        _playerTradeNotifier.value = _PlayerTradeSignal(
+        final signal = _latestPlayerTradeSignalForOrder(
+          result.state,
           assetId: order.assetId,
           side: order.side,
-          quantity: result.filledQuantity,
-          price: result.averageFillPrice,
           marketMinute: order.marketMinute,
+          microstructureFrame: order.microstructureFrame,
+          minimumLedgerIndex: ledgerLengthBeforeTrade,
         );
+        if (signal != null) {
+          _publishPlayerTradeSignals(<_PlayerTradeSignal>[signal]);
+        }
       }
       if (result.success && mounted) {
         _timer?.cancel();
@@ -1970,7 +2143,8 @@ class _StockMarketScreenState extends State<StockMarketScreen>
             onSaveResearchNote: _saveResearchNote,
             onMarketSheetOpened: _pauseMarketForSheet,
             onMarketSheetClosed: _resumeMarketAfterSheet,
-            marketCapRanking: () => _marketCapRankingFor(stock),
+            dailyMarketCap: _dailyMarketCapFor(stock),
+            marketCapRanking: _marketCapRankingFor(stock),
             initialOrderBookSnapshot: _orderBookSessionCache._snapshotFor(
               stock.id,
             ),
@@ -1997,17 +2171,29 @@ class _StockMarketScreenState extends State<StockMarketScreen>
     });
   }
 
-  _MarketCapRanking _marketCapRankingFor(_StockDefinition selected) {
+  _DailyMarketCapSnapshot _buildDailyMarketCapSnapshot(
+    Iterable<_StockDefinition> stocks,
+  ) {
+    final values = <String, int>{};
     final entries = <MapEntry<_StockDefinition, int>>[];
-    for (final stock in _stocks) {
-      if (stock.country != 'KR' || stock.currency != 'KRW') continue;
+    for (final stock in stocks) {
       final quote = _live[stock.code]?.value;
       if (quote == null) continue;
       final sharesOutstanding = stock.asset.sharesOutstandingAtOrBefore(
         _state.currentDate,
       );
       if (sharesOutstanding == null || sharesOutstanding <= 0) continue;
-      entries.add(MapEntry(stock, (quote.price * sharesOutstanding).round()));
+      final referencePrice = quote.isTradingDay
+          ? quote.previousClose
+          : quote.officialClose;
+      final safeReferencePrice = referencePrice.isFinite && referencePrice > 0
+          ? referencePrice
+          : quote.price;
+      final marketCap = (safeReferencePrice * sharesOutstanding).round();
+      values[stock.id] = marketCap;
+      if (stock.country == 'KR' && stock.currency == 'KRW') {
+        entries.add(MapEntry(stock, marketCap));
+      }
     }
     entries.sort((left, right) {
       final marketCapOrder = right.value.compareTo(left.value);
@@ -2015,12 +2201,28 @@ class _StockMarketScreenState extends State<StockMarketScreen>
           ? marketCapOrder
           : left.key.code.compareTo(right.key.code);
     });
-    final index = entries.indexWhere((entry) => entry.key.id == selected.id);
-    return _MarketCapRanking(
-      rank: index < 0 ? null : index + 1,
-      companyCount: entries.length,
+    final rankings = <String, _MarketCapRanking>{
+      for (var index = 0; index < entries.length; index += 1)
+        entries[index].key.id: _MarketCapRanking(
+          rank: index + 1,
+          companyCount: entries.length,
+        ),
+    };
+    return (
+      values: Map<String, int>.unmodifiable(values),
+      rankings: Map<String, _MarketCapRanking>.unmodifiable(rankings),
     );
   }
+
+  int _dailyMarketCapFor(_StockDefinition stock) =>
+      _dailyMarketCaps[stock.id] ?? 0;
+
+  _MarketCapRanking _marketCapRankingFor(_StockDefinition selected) =>
+      _dailyMarketCapRankings[selected.id] ??
+      _MarketCapRanking(
+        rank: null,
+        companyCount: _dailyMarketCapRankings.length,
+      );
 
   List<Widget> _holdingRows({int? limit}) {
     final rows = <Widget>[];
@@ -2522,6 +2724,7 @@ class _StockDetailScreen extends StatefulWidget {
     required this.onSaveResearchNote,
     required this.onMarketSheetOpened,
     required this.onMarketSheetClosed,
+    required this.dailyMarketCap,
     required this.marketCapRanking,
     required this.initialOrderBookSnapshot,
     required this.onOrderBookSnapshotChanged,
@@ -2532,7 +2735,7 @@ class _StockDetailScreen extends StatefulWidget {
   final _StockDefinition definition;
   final ValueNotifier<_LiveStock> live;
   final ValueListenable<GameState> marketState;
-  final ValueListenable<_PlayerTradeSignal?> playerTrade;
+  final ValueListenable<Map<String, _PlayerTradeSignal>> playerTrade;
   final ValueNotifier<int> minute;
   final ValueNotifier<_MarketPlaybackSpeed> playbackSpeed;
   final ValueChanged<_MarketPlaybackSpeed> onPlaybackSpeedChanged;
@@ -2542,7 +2745,8 @@ class _StockDetailScreen extends StatefulWidget {
   final Future<GameState> Function(String, String) onSaveResearchNote;
   final VoidCallback onMarketSheetOpened;
   final VoidCallback onMarketSheetClosed;
-  final _MarketCapRanking Function() marketCapRanking;
+  final int dailyMarketCap;
+  final _MarketCapRanking marketCapRanking;
   final _OrderBookSessionSnapshot? initialOrderBookSnapshot;
   final ValueChanged<_OrderBookSessionSnapshot> onOrderBookSnapshotChanged;
   final bool tutorialEnabled;
@@ -2563,6 +2767,7 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
   GameState? _visibleOrderBookCacheState;
   GameOrderBookSnapshot? _visibleOrderBookCacheRaw;
   int? _visibleOrderBookCacheMinute;
+  _PlayerTradeSignal? _visibleOrderBookCachePlayerTrade;
   GameOrderBookSnapshot? _visibleOrderBookCacheValue;
   GameState? _orderBookConsumptionCacheState;
   int? _orderBookConsumptionCacheMinute;
@@ -2581,13 +2786,11 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
   _DetailedOrderSection _inlineOrderSection = _DetailedOrderSection.buy;
   bool _inlineOrderIsBuy = true;
   double? _inlineOrderLimitPrice;
+  double? _inlineOrderSelectedPrice;
   double? _inlineOrderQuantity;
   int _inlineOrderRevision = 0;
   int? _tutorialStep;
-  TradeSide? _lastPlayerTradeSide;
-  double _lastPlayerTradeQuantity = 0;
-  double _lastPlayerTradePrice = 0;
-  int _lastPlayerTradeMinute = -1;
+  _PlayerTradeSignal? _lastPlayerTradeSignal;
   List<MarketTechnicalLevel> _technicalLevels = const <MarketTechnicalLevel>[];
   String _technicalLevelsDate = '';
   double _technicalLevelsReference = 0;
@@ -2620,22 +2823,68 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
     GameOrderBookSnapshot rawSnapshot,
     int currentMinute,
   ) {
+    final playerTrade = _lastPlayerTradeSignal;
     if (identical(_visibleOrderBookCacheState, state) &&
         identical(_visibleOrderBookCacheRaw, rawSnapshot) &&
         _visibleOrderBookCacheMinute == currentMinute &&
+        identical(_visibleOrderBookCachePlayerTrade, playerTrade) &&
         _visibleOrderBookCacheValue != null) {
       return _visibleOrderBookCacheValue!;
     }
     final consumption = _orderBookConsumptionAt(currentMinute);
-    final visible = gameOrderBookSnapshotAfterConsumption(
+    final playerPrint = playerTrade?.orderBookPrint;
+    final rawPlayerSide = playerPrint?.levelSide == GameOrderBookSide.ask
+        ? rawSnapshot.asks
+        : rawSnapshot.bids;
+    final canPresentExactPlayerPrint =
+        playerTrade != null &&
+        playerPrint != null &&
+        playerTrade.assetId == definition.id &&
+        playerTrade.marketMinute == currentMinute &&
+        playerTrade.microstructureFrame == rawSnapshot.liquidityPulse &&
+        rawPlayerSide.any(
+          (level) =>
+              level.side == playerPrint.levelSide &&
+              (level.price - playerPrint.price).abs() < 0.000001,
+        );
+    var visible = gameOrderBookSnapshotAfterConsumption(
       snapshot: rawSnapshot,
       consumedAskByPrice: consumption.asks,
       consumedBidByPrice: consumption.bids,
       consumedCapacityUnits: consumption.capacityUnits,
+      retainedZeroLevelSide: canPresentExactPlayerPrint
+          ? playerPrint.levelSide
+          : null,
+      retainedZeroPrice: canPresentExactPlayerPrint ? playerPrint.price : null,
+      retainSyntheticTombstone: !canPresentExactPlayerPrint,
     );
+    final visiblePlayerSide = playerPrint?.levelSide == GameOrderBookSide.ask
+        ? visible.asks
+        : visible.bids;
+    final playerPrintIsOnScreen =
+        canPresentExactPlayerPrint &&
+        visiblePlayerSide
+            .take(_visibleOrderBookSideRows)
+            .any(
+              (level) =>
+                  level.side == playerPrint.levelSide &&
+                  (level.price - playerPrint.price).abs() < 0.000001,
+            );
+    if (canPresentExactPlayerPrint && !playerPrintIsOnScreen) {
+      // An offscreen resting-order fill must not hide the current visible
+      // generated print. Only an exact player row inside the 6+6 window gets
+      // presentation priority.
+      visible = gameOrderBookSnapshotAfterConsumption(
+        snapshot: rawSnapshot,
+        consumedAskByPrice: consumption.asks,
+        consumedBidByPrice: consumption.bids,
+        consumedCapacityUnits: consumption.capacityUnits,
+      );
+    }
     _visibleOrderBookCacheState = state;
     _visibleOrderBookCacheRaw = rawSnapshot;
     _visibleOrderBookCacheMinute = currentMinute;
+    _visibleOrderBookCachePlayerTrade = playerTrade;
     _visibleOrderBookCacheValue = visible;
     return visible;
   }
@@ -2700,15 +2949,16 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
         : canCarryForward
         ? previous.snapshot
         : null;
-    final snapshot = buildGameOrderBookSnapshot(
+    final previousTradePrice = quote.sessionHistory.length >= 2
+        ? quote.sessionHistory[quote.sessionHistory.length - 2]
+        : quote.previousClose;
+    final generatedSnapshot = buildGameOrderBookSnapshot(
       assetId: definition.id,
       day: day,
       minute: currentMinute,
       currentPrice: currentPrice,
       previousClose: quote.previousClose,
-      previousTradePrice: quote.sessionHistory.length >= 2
-          ? quote.sessionHistory[quote.sessionHistory.length - 2]
-          : quote.previousClose,
+      previousTradePrice: previousTradePrice,
       sessionLow: quote.low,
       sessionHigh: quote.high,
       date: state.currentDate,
@@ -2728,6 +2978,46 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
       liquidityPulse: microstructureFrame,
       adaptiveLiquidityPulses: true,
     );
+    var snapshot = generatedSnapshot;
+    final clock = marketClockAt(
+      currentMinute,
+      tradingDay: quote.isTradingDay && isMarketTradingDay(state.currentDate),
+    );
+    if (clock.phase == MarketSessionPhase.regular && clock.tradable) {
+      final pulse = gameOrderBookTradePulse(
+        assetId: definition.id,
+        day: day,
+        minute: currentMinute,
+        previousPrice: previousTradePrice,
+        currentPrice: currentPrice,
+        executionCapacity: generatedSnapshot.executionCapacity,
+        market: definition.market,
+        simulationSeed: state.simulationSeed,
+        liquidityPulse: microstructureFrame,
+      );
+      final consumption = _orderBookConsumptionAt(currentMinute);
+      final availableSnapshot = gameOrderBookSnapshotAfterConsumption(
+        snapshot: generatedSnapshot,
+        consumedAskByPrice: consumption.asks,
+        consumedBidByPrice: consumption.bids,
+        consumedCapacityUnits: consumption.capacityUnits,
+      );
+      final targetLevel = pulse == null
+          ? null
+          : gameOrderBookFirstExecutableLevel(
+              snapshot: availableSnapshot,
+              side: pulse.levelSide,
+            );
+      if (pulse != null && targetLevel != null) {
+        snapshot = gameOrderBookSnapshotAfterSyntheticTrade(
+          snapshot: generatedSnapshot,
+          pulse: pulse,
+          absolutePrice: targetLevel.price,
+          previousSnapshot: carrySnapshot,
+          availableSnapshot: availableSnapshot,
+        );
+      }
+    }
     final entry = (
       snapshot: snapshot,
       minute: currentMinute,
@@ -2924,14 +3214,9 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
   }
 
   void _synchronizePlayerTrade() {
-    final signal = widget.playerTrade.value;
-    if (signal == null || signal.assetId != definition.id) return;
-    void synchronize() {
-      _lastPlayerTradeSide = signal.side;
-      _lastPlayerTradeQuantity = signal.quantity;
-      _lastPlayerTradePrice = signal.price;
-      _lastPlayerTradeMinute = signal.marketMinute;
-    }
+    final signal = widget.playerTrade.value[definition.id];
+    if (identical(signal, _lastPlayerTradeSignal)) return;
+    void synchronize() => _lastPlayerTradeSignal = signal;
 
     if (mounted) {
       setState(synchronize);
@@ -2972,17 +3257,23 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
   Future<TradeExecutionResult> onExecuteTrade(TradeOrder order) async {
     _isDetailTradeInFlight = true;
     _cancelOrderBookPulse();
+    final ledgerLengthBeforeTrade = _state.ledger.length;
     try {
       final result = await widget.onExecuteTrade(order);
       if (result.success && mounted) {
+        final signal = result.filledQuantity <= 0
+            ? null
+            : _latestPlayerTradeSignalForOrder(
+                result.state,
+                assetId: order.assetId,
+                side: order.side,
+                marketMinute: order.marketMinute,
+                microstructureFrame: order.microstructureFrame,
+                minimumLedgerIndex: ledgerLengthBeforeTrade,
+              );
         setState(() {
           _state = result.state;
-          if (result.filledQuantity > 0) {
-            _lastPlayerTradeSide = order.side;
-            _lastPlayerTradeQuantity = result.filledQuantity;
-            _lastPlayerTradePrice = result.averageFillPrice;
-            _lastPlayerTradeMinute = order.marketMinute;
-          }
+          if (signal != null) _lastPlayerTradeSignal = signal;
         });
       }
       return result;
@@ -3009,6 +3300,11 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
         marketState: widget.marketState,
         minute: minute,
         liquidityPulse: _orderBookPulseFrame.value,
+        marketSnapshotReader: () => _continuousOrderBookSnapshot(
+          live.value,
+          minute.value,
+          _orderBookPulseFrame.value,
+        ),
         onExecuteTrade: onExecuteTrade,
         onCancelPendingOrder: widget.onCancelPendingOrder,
         initialOrderType: limitPrice == null ? null : TradeOrderType.limit,
@@ -3073,9 +3369,15 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
         limitPrice ?? _inlineOrderLimitPrice ?? live.value.price,
         market: definition.market,
       );
+      _inlineOrderSelectedPrice = _inlineOrderLimitPrice;
       _inlineOrderQuantity = quantity;
       _inlineOrderRevision += 1;
     });
+  }
+
+  void _updateInlineOrderSelectedPrice(double? price) {
+    if (_inlineOrderSelectedPrice == price) return;
+    setState(() => _inlineOrderSelectedPrice = price);
   }
 
   void _showInlineOrderSection(_DetailedOrderSection section) {
@@ -3122,6 +3424,7 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
           live.value.price,
           market: definition.market,
         );
+        _inlineOrderSelectedPrice ??= _inlineOrderLimitPrice;
       }
     });
     _ensureOrderBookPulseTimer();
@@ -3133,33 +3436,16 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
 
   double _tutorialBestAskPrice() {
     final quote = live.value;
-    _refreshTechnicalLevels(quote);
-    final snapshot = buildGameOrderBookSnapshot(
-      assetId: definition.id,
-      day: marketLiquidityDayKey(state.currentDate),
-      minute: minute.value,
-      currentPrice: quote.price,
-      previousClose: quote.previousClose,
-      previousTradePrice: quote.sessionHistory.length >= 2
-          ? quote.sessionHistory[quote.sessionHistory.length - 2]
-          : quote.previousClose,
-      sessionLow: quote.low,
-      sessionHigh: quote.high,
-      date: state.currentDate,
-      market: definition.market,
-      simulationSeed: state.simulationSeed,
-      tradingDay: quote.isTradingDay,
-      sharesOutstanding: definition.asset.sharesOutstandingAtOrBefore(
-        state.currentDate,
-      ),
-      isIpoFirstTradingDay: definition.asset.isIpoFirstTradingDay(
-        state.currentDate,
-      ),
-      technicalLevels: _technicalLevels,
-      liquidityPulse: _orderBookPulseFrame.value,
-      adaptiveLiquidityPulses: true,
+    final snapshot = _continuousOrderBookSnapshot(
+      quote,
+      minute.value,
+      _orderBookPulseFrame.value,
     );
-    return snapshot.asks.isEmpty ? quote.price : snapshot.asks.first.price;
+    final bestAsk = gameOrderBookFirstExecutableLevel(
+      snapshot: snapshot,
+      side: GameOrderBookSide.ask,
+    );
+    return bestAsk?.price ?? quote.price;
   }
 
   void _handleDetailTutorialAction() {
@@ -3449,12 +3735,7 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
                                         snapshot: snapshot,
                                         availableHeight:
                                             detailConstraints.maxHeight,
-                                        playerTradeSide: _lastPlayerTradeSide,
-                                        playerTradeQuantity:
-                                            _lastPlayerTradeQuantity,
-                                        playerTradePrice: _lastPlayerTradePrice,
-                                        playerTradeMinute:
-                                            _lastPlayerTradeMinute,
+                                        playerTrade: _lastPlayerTradeSignal,
                                         tutorialHeaderKey:
                                             _tutorialOrderBookHeaderKey,
                                         tutorialBestAskKey: _tutorialBestAskKey,
@@ -3479,14 +3760,15 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
                                           minute.value,
                                           _orderBookPulseFrame.value,
                                         ),
-                                    playerTradeSide: _lastPlayerTradeSide,
-                                    playerTradeMinute: _lastPlayerTradeMinute,
+                                    playerTrade: _lastPlayerTradeSignal,
                                     availableHeight:
                                         detailConstraints.maxHeight,
                                     section: _inlineOrderSection,
                                     formRevision: _inlineOrderRevision,
                                     initialLimitPrice:
                                         _inlineOrderLimitPrice ?? quote.price,
+                                    selectedLimitPrice:
+                                        _inlineOrderSelectedPrice,
                                     initialQuantity: _inlineOrderQuantity,
                                     onExecuteTrade: onExecuteTrade,
                                     onSelectBuy: () => _showInlineOrder(true),
@@ -3496,6 +3778,8 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
                                       _inlineOrderIsBuy,
                                       limitPrice: price,
                                     ),
+                                    onSelectedLimitPriceChanged:
+                                        _updateInlineOrderSelectedPrice,
                                     onCancelPendingOrder:
                                         widget.onCancelPendingOrder,
                                     onAmendPendingOrder: _amendInlineOrder,
@@ -3532,8 +3816,8 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
                                       definition: definition,
                                       snapshot: financial,
                                       sharesOutstanding: sharesOutstanding,
-                                      price: quote.price,
-                                      ranking: widget.marketCapRanking(),
+                                      marketCap: widget.dailyMarketCap,
+                                      ranking: widget.marketCapRanking,
                                       ownedShares: ownedShares ?? 0,
                                     ),
                                     const SizedBox(height: 18),
@@ -3541,6 +3825,7 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
                                       snapshot: financial,
                                       sharesOutstanding: sharesOutstanding,
                                       price: quote.price,
+                                      marketCap: widget.dailyMarketCap,
                                       relations: definition.relations,
                                     ),
                                   ],
@@ -3683,6 +3968,7 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
     required ValueListenable<GameState> marketState,
     required ValueNotifier<int> minute,
     required int liquidityPulse,
+    ValueGetter<GameOrderBookSnapshot>? marketSnapshotReader,
     required Future<TradeExecutionResult> Function(TradeOrder) onExecuteTrade,
     Future<void> Function(String orderId)? onCancelPendingOrder,
     TradeOrderType? initialOrderType,
@@ -3700,6 +3986,7 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
             marketState: marketState,
             minute: minute,
             liquidityPulse: liquidityPulse,
+            marketSnapshotReader: marketSnapshotReader,
             onExecuteTrade: onExecuteTrade,
             onCancelPendingOrder: onCancelPendingOrder,
             initialIsBuy: isBuy,
@@ -3906,18 +4193,19 @@ class _InlineOrderWorkspace extends StatelessWidget {
     required this.minute,
     required this.liquidityPulseListenable,
     required this.marketSnapshotReader,
-    required this.playerTradeSide,
-    required this.playerTradeMinute,
+    required this.playerTrade,
     required this.availableHeight,
     required this.section,
     required this.formRevision,
     required this.initialLimitPrice,
+    required this.selectedLimitPrice,
     required this.initialQuantity,
     required this.onExecuteTrade,
     required this.onSelectBuy,
     required this.onSelectSell,
     required this.onSelectSection,
     required this.onSelectPrice,
+    required this.onSelectedLimitPriceChanged,
     required this.onCancelPendingOrder,
     required this.onAmendPendingOrder,
     required this.onSuccessContinue,
@@ -3930,18 +4218,19 @@ class _InlineOrderWorkspace extends StatelessWidget {
   final ValueNotifier<int> minute;
   final ValueListenable<int> liquidityPulseListenable;
   final ValueGetter<GameOrderBookSnapshot> marketSnapshotReader;
-  final TradeSide? playerTradeSide;
-  final int playerTradeMinute;
+  final _PlayerTradeSignal? playerTrade;
   final double availableHeight;
   final _DetailedOrderSection section;
   final int formRevision;
   final double initialLimitPrice;
+  final double? selectedLimitPrice;
   final double? initialQuantity;
   final Future<TradeExecutionResult> Function(TradeOrder) onExecuteTrade;
   final VoidCallback onSelectBuy;
   final VoidCallback onSelectSell;
   final ValueChanged<_DetailedOrderSection> onSelectSection;
   final ValueChanged<double> onSelectPrice;
+  final ValueChanged<double?> onSelectedLimitPriceChanged;
   final Future<void> Function(String orderId)? onCancelPendingOrder;
   final Future<void> Function(PendingTradeOrder order) onAmendPendingOrder;
   final VoidCallback onSuccessContinue;
@@ -4044,6 +4333,8 @@ class _InlineOrderWorkspace extends StatelessWidget {
                           submitLabel: isBuy ? '매수 주문' : '매도 주문',
                           successLabel: '다음 주문',
                           onSuccessContinue: onSuccessContinue,
+                          onSelectedLimitPriceChanged:
+                              onSelectedLimitPriceChanged,
                           compact: true,
                         )
                       : section == _DetailedOrderSection.balance
@@ -4071,9 +4362,8 @@ class _InlineOrderWorkspace extends StatelessWidget {
                       state: state,
                       minute: minute.value,
                       snapshot: marketSnapshotReader(),
-                      playerTradeSide: playerTradeSide,
-                      playerTradeMinute: playerTradeMinute,
-                      selectedPrice: isOrderForm ? initialLimitPrice : null,
+                      playerTrade: playerTrade,
+                      selectedPrice: isOrderForm ? selectedLimitPrice : null,
                       onSelectPrice: onSelectPrice,
                     ),
                   ),
@@ -4386,8 +4676,7 @@ class _CompactOrderBookRail extends StatefulWidget {
     required this.state,
     required this.minute,
     required this.snapshot,
-    required this.playerTradeSide,
-    required this.playerTradeMinute,
+    required this.playerTrade,
     required this.selectedPrice,
     required this.onSelectPrice,
   });
@@ -4397,8 +4686,7 @@ class _CompactOrderBookRail extends StatefulWidget {
   final GameState state;
   final int minute;
   final GameOrderBookSnapshot snapshot;
-  final TradeSide? playerTradeSide;
-  final int playerTradeMinute;
+  final _PlayerTradeSignal? playerTrade;
   final double? selectedPrice;
   final ValueChanged<double> onSelectPrice;
 
@@ -4446,40 +4734,50 @@ class _CompactOrderBookRailState extends State<_CompactOrderBookRail> {
       widget.quote.price,
       market: widget.definition.market,
     );
-    final previousPrice = widget.quote.sessionHistory.length >= 2
-        ? widget.quote.sessionHistory[widget.quote.sessionHistory.length - 2]
-        : widget.quote.previousClose;
     final snapshot = widget.snapshot;
     final levels = _symmetricVisibleOrderBookLevels(snapshot);
-    final generatedPulse = gameOrderBookTradePulse(
-      assetId: widget.definition.id,
-      day: marketLiquidityDayKey(widget.state.currentDate),
-      minute: widget.minute,
-      previousPrice: previousPrice,
-      currentPrice: widget.quote.price,
-      executionCapacity: snapshot.executionCapacity,
-      market: widget.definition.market,
-      simulationSeed: widget.state.simulationSeed,
-      liquidityPulse: snapshot.liquidityPulse,
-    );
-    var outlineSide = generatedPulse == null
-        ? null
-        : generatedPulse.levelSide == GameOrderBookSide.ask
-        ? TradeSide.buy
-        : TradeSide.sell;
-    if (widget.playerTradeSide != null &&
-        widget.playerTradeMinute == widget.minute) {
-      outlineSide = widget.playerTradeSide;
+    final generatedTrade = snapshot.lastSyntheticTrade;
+    final generatedSideLevels =
+        generatedTrade?.levelSide == GameOrderBookSide.ask
+        ? snapshot.asks
+        : snapshot.bids;
+    final hasCurrentGeneratedTrade =
+        generatedTrade != null &&
+        generatedTrade.quantity > 0 &&
+        generatedTrade.marketMinute == widget.minute &&
+        generatedTrade.liquidityPulse == snapshot.liquidityPulse &&
+        generatedSideLevels.firstOrNull != null &&
+        _matches(generatedSideLevels.first.price, generatedTrade.price);
+    double? outlinePrice = hasCurrentGeneratedTrade
+        ? generatedTrade.price
+        : null;
+    final playerTrade = widget.playerTrade;
+    final playerPrint = playerTrade?.orderBookPrint;
+    final playerSideLevels = playerPrint?.levelSide == GameOrderBookSide.ask
+        ? snapshot.asks
+        : snapshot.bids;
+    final hasCurrentPlayerTrade =
+        playerTrade != null &&
+        playerPrint != null &&
+        playerTrade.assetId == widget.definition.id &&
+        playerTrade.marketMinute == widget.minute &&
+        playerTrade.microstructureFrame == snapshot.liquidityPulse &&
+        playerSideLevels
+            .take(_visibleOrderBookSideRows)
+            .any(
+              (level) =>
+                  level.side == playerPrint.levelSide &&
+                  _matches(level.price, playerPrint.price),
+            );
+    if (hasCurrentPlayerTrade) {
+      outlinePrice = playerPrint.price;
     }
-    final outlinePrice = outlineSide == TradeSide.buy
-        ? snapshot.asks.firstOrNull?.price
-        : outlineSide == TradeSide.sell
-        ? snapshot.bids.firstOrNull?.price
-        : snapshot.asks
-                  .where((level) => _matches(level.price, currentPrice))
-                  .firstOrNull
-                  ?.price ??
-              snapshot.bids.firstOrNull?.price;
+    outlinePrice ??=
+        snapshot.asks
+            .where((level) => _matches(level.price, currentPrice))
+            .firstOrNull
+            ?.price ??
+        snapshot.bids.firstOrNull?.price;
     final observedMaxDepth = levels.fold<int>(
       1,
       (maximum, level) => math.max(maximum, _displayQuantity(level)),
@@ -4539,7 +4837,10 @@ class _CompactOrderBookRailState extends State<_CompactOrderBookRail> {
                   children: [
                     for (final entry in levels.asMap().entries)
                       Positioned(
-                        key: ValueKey('inline-order-book-slot-${entry.key}'),
+                        key: ValueKey((
+                          'inline-order-book-price',
+                          entry.value.price,
+                        )),
                         top: entry.key * rowHeight,
                         left: 0,
                         right: 0,
@@ -4653,9 +4954,16 @@ class _CompactOrderBookRow extends StatelessWidget {
                   children: [
                     Align(
                       alignment: Alignment.centerRight,
-                      child: FractionallySizedBox(
-                        widthFactor: depth,
-                        heightFactor: 0.78,
+                      child: TweenAnimationBuilder<double>(
+                        duration: _orderBookMotionDuration,
+                        curve: Curves.easeOutCubic,
+                        tween: Tween<double>(begin: depth, end: depth),
+                        builder: (context, animatedDepth, child) =>
+                            FractionallySizedBox(
+                              widthFactor: animatedDepth,
+                              heightFactor: 0.78,
+                              child: child,
+                            ),
                         child: ColoredBox(color: bar),
                       ),
                     ),
@@ -4835,6 +5143,7 @@ class _DetailedOrderPage extends StatefulWidget {
     required this.marketState,
     required this.minute,
     required this.liquidityPulse,
+    required this.marketSnapshotReader,
     required this.onExecuteTrade,
     required this.initialIsBuy,
     this.onCancelPendingOrder,
@@ -4848,6 +5157,7 @@ class _DetailedOrderPage extends StatefulWidget {
   final ValueListenable<GameState> marketState;
   final ValueNotifier<int> minute;
   final int liquidityPulse;
+  final ValueGetter<GameOrderBookSnapshot>? marketSnapshotReader;
   final Future<TradeExecutionResult> Function(TradeOrder) onExecuteTrade;
   final Future<void> Function(String orderId)? onCancelPendingOrder;
   final bool initialIsBuy;
@@ -5024,6 +5334,7 @@ class _DetailedOrderPageState extends State<_DetailedOrderPage> {
                     state: state,
                     minute: widget.minute,
                     liquidityPulse: widget.liquidityPulse,
+                    marketSnapshotReader: widget.marketSnapshotReader,
                     onExecuteTrade: widget.onExecuteTrade,
                     initialOrderType: _prefillOrderType,
                     initialLimitPrice: _prefillPrice,
@@ -5908,7 +6219,7 @@ class _CompanyOverviewCard extends StatelessWidget {
     required this.definition,
     required this.snapshot,
     required this.sharesOutstanding,
-    required this.price,
+    required this.marketCap,
     required this.ranking,
     required this.ownedShares,
   });
@@ -5916,13 +6227,12 @@ class _CompanyOverviewCard extends StatelessWidget {
   final _StockDefinition definition;
   final FictionalFinancialSnapshot snapshot;
   final int sharesOutstanding;
-  final double price;
+  final int marketCap;
   final _MarketCapRanking ranking;
   final double ownedShares;
 
   @override
   Widget build(BuildContext context) {
-    final marketCap = (price * sharesOutstanding).round();
     final products = definition.products.isEmpty
         ? <String>[definition.sector]
         : definition.products;
@@ -5930,8 +6240,16 @@ class _CompanyOverviewCard extends StatelessWidget {
         ? '순위 없음'
         : '${ranking.rank}위 / ${ranking.companyCount}개사';
     final facts = <_CompanyFactTile>[
-      _CompanyFactTile(label: '시가총액', value: _compactWonAmount(marketCap)),
-      _CompanyFactTile(label: '국내 시가총액 순위', value: rankLabel),
+      _CompanyFactTile(
+        label: '시가총액',
+        value: _compactWonAmount(marketCap),
+        valueKey: const Key('company-market-cap-value'),
+      ),
+      _CompanyFactTile(
+        label: '국내 시가총액 순위',
+        value: rankLabel,
+        valueKey: const Key('company-market-cap-rank-value'),
+      ),
       _CompanyFactTile(
         label: '내 보유주식수',
         value: '${_displayUnits(ownedShares)}주',
@@ -6113,17 +6431,18 @@ class _CompanyFundamentalsCard extends StatelessWidget {
     required this.snapshot,
     required this.sharesOutstanding,
     required this.price,
+    required this.marketCap,
     required this.relations,
   });
 
   final FictionalFinancialSnapshot snapshot;
   final int sharesOutstanding;
   final double price;
+  final int marketCap;
   final List<FictionalCompanyRelation> relations;
 
   @override
   Widget build(BuildContext context) {
-    final marketCap = (price * sharesOutstanding).round();
     final eps = sharesOutstanding <= 0
         ? 0.0
         : snapshot.netIncome * 4 / sharesOutstanding;
@@ -6175,6 +6494,7 @@ class _CompanyFundamentalsCard extends StatelessWidget {
               _FundamentalMetric(
                 label: '시가총액',
                 value: _compactWonAmount(marketCap),
+                valueKey: const Key('company-fundamentals-market-cap-value'),
               ),
               _FundamentalMetric(
                 label: '매출',
@@ -6284,11 +6604,13 @@ class _FundamentalMetric extends StatelessWidget {
   const _FundamentalMetric({
     required this.label,
     required this.value,
+    this.valueKey,
     this.tone,
   });
 
   final String label;
   final String value;
+  final Key? valueKey;
   final int? tone;
 
   @override
@@ -6308,6 +6630,7 @@ class _FundamentalMetric extends StatelessWidget {
         const SizedBox(height: 2),
         Text(
           value,
+          key: valueKey,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
@@ -6389,17 +6712,50 @@ class _PracticalTradeTutorialSheetState
       practiceDay += 1;
     }
     final sourceQuote = widget.sourceLive.value;
+    final practiceDate = widget.sourceState.dateForDay(practiceDay);
+    var practicePrice = sourceQuote.price;
+    final selectedBuyPrice = widget.initialBuyLimitPrice;
+    if (selectedBuyPrice != null &&
+        selectedBuyPrice.isFinite &&
+        selectedBuyPrice > 0) {
+      final tickBelow = marketTickSize(
+        math.max(0.000001, selectedBuyPrice - 0.000001),
+        market: widget.definition.market,
+      );
+      final dailyRange = marketDailyPriceRange(
+        previousClose: sourceQuote.previousClose,
+        date: practiceDate,
+        market: widget.definition.market,
+        isIpoFirstTradingDay: widget.definition.asset.isIpoFirstTradingDay(
+          practiceDate,
+        ),
+      );
+      practicePrice = marketSnapPrice(
+        (selectedBuyPrice - tickBelow)
+            .clamp(dailyRange.lower, dailyRange.upper)
+            .toDouble(),
+        market: widget.definition.market,
+      );
+    }
+    final practiceSessionHistory = sourceQuote.sessionHistory.isEmpty
+        ? <double>[practicePrice]
+        : <double>[
+            ...sourceQuote.sessionHistory.take(
+              sourceQuote.sessionHistory.length - 1,
+            ),
+            practicePrice,
+          ];
     _practiceLive = ValueNotifier<_LiveStock>(
       _LiveStock(
-        price: sourceQuote.price,
+        price: practicePrice,
         previousClose: sourceQuote.previousClose,
         officialClose: sourceQuote.officialClose,
         isTradingDay: true,
         open: sourceQuote.open,
-        high: sourceQuote.high,
-        low: sourceQuote.low,
+        high: math.max(sourceQuote.high, practicePrice),
+        low: math.min(sourceQuote.low, practicePrice),
         history: List<MarketPoint>.from(sourceQuote.history),
-        sessionHistory: List<double>.from(sourceQuote.sessionHistory),
+        sessionHistory: practiceSessionHistory,
         sessionPath: List<double>.from(sourceQuote.sessionPath),
       ),
     );
@@ -6425,7 +6781,15 @@ class _PracticalTradeTutorialSheetState
   }
 
   Future<TradeExecutionResult> _executePracticeOrder(TradeOrder order) async {
-    final result = _engine.executeTrade(_practiceState, order);
+    final stateBeforeOrder = _practiceState;
+    final result = _engine.executeTrade(stateBeforeOrder, order);
+    if (result.success && result.filledQuantity + 0.000001 < order.quantity) {
+      return TradeExecutionResult(
+        state: stateBeforeOrder,
+        success: false,
+        message: '연습 주문이 체결되지 않았어요. 호가를 다시 확인해 주세요.',
+      );
+    }
     if (result.success && mounted) {
       setState(() {
         _practiceState = result.state;
@@ -7429,10 +7793,7 @@ class _OrderBookPanel extends StatelessWidget {
     required this.minute,
     required this.snapshot,
     required this.availableHeight,
-    required this.playerTradeSide,
-    required this.playerTradeQuantity,
-    required this.playerTradePrice,
-    required this.playerTradeMinute,
+    required this.playerTrade,
     required this.onTapLevel,
     this.tutorialHeaderKey,
     this.tutorialBestAskKey,
@@ -7444,10 +7805,7 @@ class _OrderBookPanel extends StatelessWidget {
   final int minute;
   final GameOrderBookSnapshot snapshot;
   final double availableHeight;
-  final TradeSide? playerTradeSide;
-  final double playerTradeQuantity;
-  final double playerTradePrice;
-  final int playerTradeMinute;
+  final _PlayerTradeSignal? playerTrade;
   final ValueChanged<GameOrderBookLevel> onTapLevel;
   final GlobalKey? tutorialHeaderKey;
   final GlobalKey? tutorialBestAskKey;
@@ -7465,9 +7823,6 @@ class _OrderBookPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final previousTickPrice = quote.sessionHistory.length >= 2
-        ? quote.sessionHistory[quote.sessionHistory.length - 2]
-        : quote.previousClose;
     final currentDisplayPrice = marketSnapPrice(
       quote.price,
       market: definition.market,
@@ -7520,42 +7875,56 @@ class _OrderBookPanel extends StatelessWidget {
             upperPriceLimit: dailyRange.upper,
           )
         : quote.price;
-    final generatedPulse = clock.phase == MarketSessionPhase.regular
-        ? gameOrderBookTradePulse(
-            assetId: definition.id,
-            day: marketLiquidityDayKey(state.currentDate),
-            minute: minute,
-            previousPrice: previousTickPrice,
-            currentPrice: quote.price,
-            executionCapacity: snapshot.executionCapacity,
-            market: definition.market,
-            simulationSeed: state.simulationSeed,
-            liquidityPulse: snapshot.liquidityPulse,
-          )
-        : null;
+    final generatedTrade = snapshot.lastSyntheticTrade;
+    final generatedSideLevels =
+        generatedTrade?.levelSide == GameOrderBookSide.ask
+        ? snapshot.asks
+        : snapshot.bids;
+    final hasCurrentGeneratedTrade =
+        clock.phase == MarketSessionPhase.regular &&
+        generatedTrade != null &&
+        generatedTrade.quantity > 0 &&
+        generatedTrade.marketMinute == minute &&
+        generatedTrade.liquidityPulse == snapshot.liquidityPulse &&
+        generatedSideLevels.firstOrNull != null &&
+        (generatedSideLevels.first.price - generatedTrade.price).abs() <
+            0.000001;
     const fixedPanelHeight = 28.0 + 34.0 + 42.0 + 2.0;
     const closingAuctionBannerHeight = 36.0;
-    var activeTradeSide = generatedPulse == null
+    var activeTradeSide = !hasCurrentGeneratedTrade
         ? null
-        : generatedPulse.levelSide == GameOrderBookSide.ask
+        : generatedTrade.levelSide == GameOrderBookSide.ask
         ? TradeSide.buy
         : TradeSide.sell;
-    var activeTradePrice = generatedPulse == null
-        ? null
-        : generatedPulse.levelSide == GameOrderBookSide.ask
-        ? snapshot.asks.firstOrNull?.price
-        : snapshot.bids.firstOrNull?.price;
-    var activeTradeQuantity = generatedPulse?.quantity ?? 0;
-    if (clock.phase == MarketSessionPhase.regular &&
-        playerTradeSide != null &&
-        playerTradeMinute == minute &&
-        playerTradeQuantity > 0 &&
-        playerTradePrice > 0) {
-      activeTradeSide = playerTradeSide;
-      activeTradePrice = playerTradeSide == TradeSide.buy
-          ? snapshot.asks.firstOrNull?.price
-          : snapshot.bids.firstOrNull?.price;
-      activeTradeQuantity = playerTradeQuantity.round();
+    var activeTradePrice = hasCurrentGeneratedTrade
+        ? generatedTrade.price
+        : null;
+    var activeTradeQuantity = hasCurrentGeneratedTrade
+        ? generatedTrade.quantity
+        : 0;
+    final currentPlayerTrade = playerTrade;
+    final playerPrint = currentPlayerTrade?.orderBookPrint;
+    final playerSideLevels = playerPrint?.levelSide == GameOrderBookSide.ask
+        ? snapshot.asks
+        : snapshot.bids;
+    final hasCurrentPlayerTrade =
+        clock.phase == MarketSessionPhase.regular &&
+        currentPlayerTrade != null &&
+        playerPrint != null &&
+        currentPlayerTrade.assetId == definition.id &&
+        currentPlayerTrade.marketMinute == minute &&
+        currentPlayerTrade.microstructureFrame == snapshot.liquidityPulse &&
+        playerSideLevels
+            .take(_visibleOrderBookSideRows)
+            .any(
+              (level) =>
+                  level.side == playerPrint.levelSide &&
+                  (level.price - playerPrint.price).abs() < 0.000001,
+            );
+    if (hasCurrentPlayerTrade) {
+      activeTradeSide = currentPlayerTrade.side;
+      activeTradePrice = playerPrint.price;
+      activeTradeQuantity = playerPrint.quantity;
     }
 
     return Container(
@@ -7750,6 +8119,7 @@ class _OrderBookPriceLadder extends StatefulWidget {
 class _OrderBookPriceLadderState extends State<_OrderBookPriceLadder> {
   String? _depthScaleAssetId;
   double _depthScale = 0;
+  final Map<double, GlobalKey> _depthAnimationKeys = <double, GlobalKey>{};
 
   bool _matchesPrice(GameOrderBookLevel level, double? price) =>
       price != null && (level.price - price).abs() < 0.000001;
@@ -7771,6 +8141,10 @@ class _OrderBookPriceLadderState extends State<_OrderBookPriceLadder> {
   @override
   Widget build(BuildContext context) {
     final levels = _symmetricVisibleOrderBookLevels(widget.snapshot);
+    final visiblePrices = levels.map((level) => level.price).toSet();
+    _depthAnimationKeys.removeWhere(
+      (price, _) => !visiblePrices.contains(price),
+    );
     final observedMaxDepth = levels.fold<int>(
       1,
       (maximum, level) => math.max(
@@ -7782,15 +8156,13 @@ class _OrderBookPriceLadderState extends State<_OrderBookPriceLadder> {
     final rowHeight = levels.isEmpty
         ? 39.0
         : (widget.availableHeight / levels.length).clamp(22.0, 42.0).toDouble();
-    final outlinePrice = widget.activeTradeSide == TradeSide.buy
-        ? widget.snapshot.asks.firstOrNull?.price
-        : widget.activeTradeSide == TradeSide.sell
-        ? widget.snapshot.bids.firstOrNull?.price
-        : widget.snapshot.asks
-                  .where((level) => _matchesPrice(level, widget.currentPrice))
-                  .firstOrNull
-                  ?.price ??
-              widget.snapshot.bids.firstOrNull?.price;
+    final outlinePrice =
+        widget.activeTradePrice ??
+        widget.snapshot.asks
+            .where((level) => _matchesPrice(level, widget.currentPrice))
+            .firstOrNull
+            ?.price ??
+        widget.snapshot.bids.firstOrNull?.price;
     final currentRowIndex = levels.indexWhere(
       (level) => _matchesPrice(level, outlinePrice),
     );
@@ -7810,7 +8182,7 @@ class _OrderBookPriceLadderState extends State<_OrderBookPriceLadder> {
         children: [
           for (final entry in levels.asMap().entries)
             Positioned(
-              key: ValueKey('order-book-slot-${entry.key}'),
+              key: ValueKey(('order-book-price', entry.value.price)),
               top: entry.key * rowHeight,
               left: 0,
               right: 0,
@@ -7829,6 +8201,12 @@ class _OrderBookPriceLadderState extends State<_OrderBookPriceLadder> {
                     level: level,
                     rowHeight: rowHeight,
                     maxDepth: maxVisibleDepth,
+                    depthAnimationKey: _depthAnimationKeys.putIfAbsent(
+                      level.price,
+                      () => GlobalKey(
+                        debugLabel: 'order-book-depth-${level.price}',
+                      ),
+                    ),
                     playerQuantity: widget.playerQuantityForLevel(level),
                     isActive: _matchesPrice(level, widget.activeTradePrice),
                     activeTradeSide: widget.activeTradeSide,
@@ -7887,6 +8265,7 @@ class _OrderBookLevelRow extends StatelessWidget {
     required this.level,
     required this.rowHeight,
     required this.maxDepth,
+    required this.depthAnimationKey,
     required this.playerQuantity,
     required this.isActive,
     required this.activeTradeSide,
@@ -7897,6 +8276,7 @@ class _OrderBookLevelRow extends StatelessWidget {
   final GameOrderBookLevel level;
   final double rowHeight;
   final int maxDepth;
+  final GlobalKey depthAnimationKey;
   final double playerQuantity;
   final bool isActive;
   final TradeSide? activeTradeSide;
@@ -7942,6 +8322,7 @@ class _OrderBookLevelRow extends StatelessWidget {
                             isAsk: true,
                             quantity: totalQuantity,
                             depth: depth,
+                            animationKey: depthAnimationKey,
                             isActive: isActive,
                             activeQuantity: activeQuantity,
                             activeTradeSide: activeTradeSide,
@@ -7994,6 +8375,7 @@ class _OrderBookLevelRow extends StatelessWidget {
                             isAsk: false,
                             quantity: totalQuantity,
                             depth: depth,
+                            animationKey: depthAnimationKey,
                             isActive: isActive,
                             activeQuantity: activeQuantity,
                             activeTradeSide: activeTradeSide,
@@ -8017,6 +8399,7 @@ class _OrderBookQuantityCell extends StatelessWidget {
     required this.isAsk,
     required this.quantity,
     required this.depth,
+    required this.animationKey,
     required this.isActive,
     required this.activeQuantity,
     required this.activeTradeSide,
@@ -8028,6 +8411,7 @@ class _OrderBookQuantityCell extends StatelessWidget {
   final bool isAsk;
   final int quantity;
   final double depth;
+  final GlobalKey animationKey;
   final bool isActive;
   final int activeQuantity;
   final TradeSide? activeTradeSide;
@@ -8045,9 +8429,14 @@ class _OrderBookQuantityCell extends StatelessWidget {
       Align(
         alignment: isAsk ? Alignment.centerRight : Alignment.centerLeft,
         child: TweenAnimationBuilder<double>(
+          key: animationKey,
           duration: _orderBookMotionDuration,
           curve: Curves.easeOutCubic,
-          tween: Tween<double>(end: depth),
+          // A newly visible absolute price starts at its real depth. Existing
+          // prices keep this widget's keyed state and animate from their last
+          // rendered depth, so a slot change never borrows another price's
+          // wall length or grows artificially from zero.
+          tween: Tween<double>(begin: depth, end: depth),
           builder: (context, animatedDepth, child) => FractionallySizedBox(
             key: ValueKey(
               isAsk ? 'order-book-sell-depth-bar' : 'order-book-buy-depth-bar',
@@ -8139,6 +8528,7 @@ class _OrderSheet extends StatefulWidget {
     this.submitLabel,
     this.successLabel = '완료',
     this.onSuccessContinue,
+    this.onSelectedLimitPriceChanged,
     this.forceActionHighlight = false,
     this.compact = false,
   });
@@ -8159,6 +8549,7 @@ class _OrderSheet extends StatefulWidget {
   final String? submitLabel;
   final String successLabel;
   final VoidCallback? onSuccessContinue;
+  final ValueChanged<double?>? onSelectedLimitPriceChanged;
   final bool forceActionHighlight;
   final bool compact;
 
@@ -8565,6 +8956,7 @@ class _OrderSheetState extends State<_OrderSheet> {
       );
       _result = null;
     });
+    widget.onSelectedLimitPriceChanged?.call(_limitPrice);
   }
 
   bool get _tradable {
@@ -8649,6 +9041,9 @@ class _OrderSheetState extends State<_OrderSheet> {
       );
       _result = null;
     });
+    widget.onSelectedLimitPriceChanged?.call(
+      type == TradeOrderType.limit ? _limitPrice : null,
+    );
   }
 
   Widget _compactStepButton({
@@ -9122,14 +9517,7 @@ class _OrderSheetState extends State<_OrderSheet> {
                   ),
                 ],
                 selected: {_orderType},
-                onSelectionChanged: (value) => setState(() {
-                  _orderType = value.first;
-                  _limitPrice ??= marketSnapPrice(
-                    _executionPrice,
-                    market: widget.definition.market,
-                  );
-                  _result = null;
-                }),
+                onSelectionChanged: (value) => _selectOrderType(value.first),
                 showSelectedIcon: false,
               ),
               if (_orderType == TradeOrderType.limit) ...[

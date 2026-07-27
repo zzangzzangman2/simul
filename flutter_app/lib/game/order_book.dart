@@ -263,6 +263,8 @@ class GameOrderBookSnapshot {
     this.appliedAskConsumptionByPrice = const <double, double>{},
     this.appliedBidConsumptionByPrice = const <double, double>{},
     this.appliedCapacityConsumptionUnits = 0,
+    this.lastSyntheticTrade,
+    this.syntheticTradeBudgetUsed = 0,
   });
 
   final List<GameOrderBookLevel> asks;
@@ -298,6 +300,21 @@ class GameOrderBookSnapshot {
   final Map<double, double> appliedBidConsumptionByPrice;
   final int appliedCapacityConsumptionUnits;
 
+  /// Last generated market print already removed from standing depth.
+  ///
+  /// This state is deliberately separate from the ledger consumption
+  /// watermarks above. Generated market activity changes the carried book, but
+  /// must never masquerade as a player fill when the engine validates a
+  /// displayed snapshot against the persisted ledger.
+  final GameOrderBookSyntheticTrade? lastSyntheticTrade;
+
+  /// Generated-only quantity consumed during [sourceMarketMinute].
+  ///
+  /// The UI pulse owner may use this to cap all sub-minute prints to one finite
+  /// budget. It is not part of the player's shared execution-capacity
+  /// watermark and resets when the builder advances to a new minute.
+  final int syntheticTradeBudgetUsed;
+
   /// Standing liquidity already visited during this asset's current session.
   ///
   /// The visible rows are only a window onto the book. Keeping their latest
@@ -323,6 +340,27 @@ class GameOrderBookTradePulse {
 
   bool get isBuyAggressor => levelSide == GameOrderBookSide.ask;
   bool get isFastMarket => crossedTicks >= _gameOrderBookFastMoveTicks;
+}
+
+class GameOrderBookSyntheticTrade {
+  const GameOrderBookSyntheticTrade({
+    required this.marketMinute,
+    required this.liquidityPulse,
+    required this.levelSide,
+    required this.price,
+    required this.quantity,
+  });
+
+  /// `(marketMinute, liquidityPulse)` is the idempotency key.
+  final int marketMinute;
+  final int liquidityPulse;
+
+  /// Absolute standing-book side and price consumed by this generated print.
+  final GameOrderBookSide levelSide;
+  final double price;
+
+  /// Actual quantity removed after row availability and minute-budget caps.
+  final int quantity;
 }
 
 class _GameOrderBookRegime {
@@ -686,21 +724,234 @@ GameOrderBookTradePulse? gameOrderBookTradePulse({
           : GameOrderBookSide.ask;
     }
   }
-  final participation =
-      (0.08 +
-              (hash % 25) / 100 +
-              moveIntensity *
-                  (0.38 +
-                      _orderBookUnit(seededAssetId, day, minute * 89 + 4099) *
-                          0.24))
-          .clamp(0.08, 0.92)
-          .toDouble();
+  final participation = liquidityPulse <= 0
+      ? (0.08 +
+                (hash % 25) / 100 +
+                moveIntensity *
+                    (0.38 +
+                        _orderBookUnit(seededAssetId, day, minute * 89 + 4099) *
+                            0.24))
+            .clamp(0.08, 0.92)
+            .toDouble()
+      : (0.015 +
+                (hash % 36) / 1000 +
+                moveIntensity *
+                    (0.02 +
+                        _orderBookUnit(
+                              seededAssetId,
+                              day,
+                              minute * 89 + liquidityPulse * 313 + 4099,
+                            ) *
+                            0.025))
+            .clamp(0.015, 0.08)
+            .toDouble();
   final quantity = math.max(1, (executionCapacity * participation).round());
   return GameOrderBookTradePulse(
     levelSide: side,
     levelIndex: index,
     quantity: quantity,
     crossedTicks: crossedTicks,
+  );
+}
+
+/// Returns the nearest standing row that an aggressor on [side] can consume.
+///
+/// A partially consumed best row remains the target until its quantity reaches
+/// zero. Only then may a same-side print advance to the next price. Callers may
+/// still request the opposite side independently, which models the normal
+/// last-trade-price bounce between the best ask and best bid.
+GameOrderBookLevel? gameOrderBookFirstExecutableLevel({
+  required GameOrderBookSnapshot snapshot,
+  required GameOrderBookSide side,
+}) {
+  final levels = side == GameOrderBookSide.ask ? snapshot.asks : snapshot.bids;
+  for (final level in levels) {
+    if (level.quantity > 0) return level;
+  }
+  return null;
+}
+
+GameOrderBookLevel _gameOrderBookLevelWithQuantity(
+  GameOrderBookLevel level,
+  int quantity,
+) {
+  return GameOrderBookLevel(
+    side: level.side,
+    price: level.price,
+    quantity: math.max(0, quantity),
+    isWall: level.isWall,
+    structuralKind: level.structuralKind,
+    structuralStrength: level.structuralStrength,
+    structuralHoldTicks: level.structuralHoldTicks,
+    isStructuralWall: level.isStructuralWall,
+    isStructuralBreached: level.isStructuralBreached,
+    structuralVacuumMultiplier: level.structuralVacuumMultiplier,
+    isPsychological: level.isPsychological,
+    technicalPeriods: level.technicalPeriods,
+    wasLiquidityPulseTouched: level.wasLiquidityPulseTouched,
+  );
+}
+
+/// Removes one generated market print from an exact absolute-price row.
+///
+/// The caller owns pulse scheduling. [buildGameOrderBookSnapshot] never calls
+/// this helper automatically, so engine/fallback builders cannot invent an
+/// extra print. Reapplying the same `(market minute, liquidity pulse)` returns
+/// [snapshot] unchanged.
+///
+/// [perMinuteBudgetUnits] is a generated-only display-flow budget. It defaults
+/// to the snapshot's execution capacity, but does not consume or alter the
+/// player's ledger-backed capacity watermark.
+///
+/// When supplied, [previousSnapshot] is the pre-build raw carry source. The
+/// selected row is forced to that absolute price's previous raw quantity minus
+/// the actual print, so the builder's target interpolation cannot add a second
+/// change to the same row. [availableSnapshot] may be the ledger-net view used
+/// to cap the print without copying any of its ledger watermarks into the raw
+/// result.
+GameOrderBookSnapshot gameOrderBookSnapshotAfterSyntheticTrade({
+  required GameOrderBookSnapshot snapshot,
+  required GameOrderBookTradePulse pulse,
+  required double absolutePrice,
+  GameOrderBookSnapshot? previousSnapshot,
+  GameOrderBookSnapshot? availableSnapshot,
+  int? perMinuteBudgetUnits,
+}) {
+  GameOrderBookLevel? absoluteLevel(
+    GameOrderBookSnapshot source,
+    GameOrderBookSide preferredSide,
+    double price,
+  ) {
+    final preferred = preferredSide == GameOrderBookSide.ask
+        ? source.asks
+        : source.bids;
+    final opposite = preferredSide == GameOrderBookSide.ask
+        ? source.bids
+        : source.asks;
+    for (final level in [...preferred, ...opposite]) {
+      if ((level.price - price).abs() < 0.000001) return level;
+    }
+    final exact = source.rememberedLevels[price];
+    if (exact != null) return exact;
+    for (final entry in source.rememberedLevels.entries) {
+      if ((entry.key - price).abs() < 0.000001) return entry.value;
+    }
+    return null;
+  }
+
+  final marketMinute = snapshot.sourceMarketMinute;
+  if (marketMinute == null || !absolutePrice.isFinite || absolutePrice <= 0) {
+    return snapshot;
+  }
+  final liquidityPulse = snapshot.liquidityPulse;
+  final previousTrade = snapshot.lastSyntheticTrade;
+  if (previousTrade != null &&
+      previousTrade.marketMinute == marketMinute &&
+      previousTrade.liquidityPulse == liquidityPulse) {
+    return snapshot;
+  }
+
+  final sourceLevels = pulse.levelSide == GameOrderBookSide.ask
+      ? snapshot.asks
+      : snapshot.bids;
+  final targetIndex = sourceLevels.indexWhere(
+    (level) => (level.price - absolutePrice).abs() < 0.000001,
+  );
+  if (targetIndex < 0) return snapshot;
+  final target = sourceLevels[targetIndex];
+  final previousRawTarget = previousSnapshot == null
+      ? null
+      : absoluteLevel(previousSnapshot, pulse.levelSide, target.price);
+  var rawQuantity = math.max(
+    0,
+    previousRawTarget != null && previousRawTarget.quantity > 0
+        ? previousRawTarget.quantity
+        : target.quantity,
+  );
+  if (target.isStructuralBreached ||
+      target.structuralVacuumMultiplier < 0.999999) {
+    // A breached support/resistance zone must remain depleted. The raw carry
+    // source can predate the breach, so using it without this clamp would
+    // resurrect the old wall before subtracting the current print.
+    rawQuantity = math.min(rawQuantity, target.quantity);
+  }
+  final netAvailableTarget = availableSnapshot == null
+      ? target
+      : absoluteLevel(availableSnapshot, pulse.levelSide, target.price);
+  final netAvailableQuantity = math.max(0, netAvailableTarget?.quantity ?? 0);
+  final sameBudgetMinute = previousTrade?.marketMinute == marketMinute;
+  final used = sameBudgetMinute
+      ? math.max(0, snapshot.syntheticTradeBudgetUsed)
+      : 0;
+  final budget = math.max(
+    0,
+    perMinuteBudgetUnits ?? snapshot.executionCapacity,
+  );
+  final remainingBudget = math.max(0, budget - used);
+  final actualQuantity = math.min(
+    math.max(0, pulse.quantity),
+    math.min(rawQuantity, math.min(netAvailableQuantity, remainingBudget)),
+  );
+  final updatedTarget = _gameOrderBookLevelWithQuantity(
+    target,
+    rawQuantity - actualQuantity,
+  );
+
+  final asks = pulse.levelSide == GameOrderBookSide.ask
+      ? <GameOrderBookLevel>[
+          for (var index = 0; index < snapshot.asks.length; index += 1)
+            index == targetIndex ? updatedTarget : snapshot.asks[index],
+        ]
+      : snapshot.asks;
+  final bids = pulse.levelSide == GameOrderBookSide.bid
+      ? <GameOrderBookLevel>[
+          for (var index = 0; index < snapshot.bids.length; index += 1)
+            index == targetIndex ? updatedTarget : snapshot.bids[index],
+        ]
+      : snapshot.bids;
+  final totalAsk = asks.fold<int>(0, (sum, level) => sum + level.quantity);
+  final totalBid = bids.fold<int>(0, (sum, level) => sum + level.quantity);
+  final rememberedLevels = <double, GameOrderBookLevel>{
+    ...snapshot.rememberedLevels,
+    updatedTarget.price: updatedTarget,
+  };
+  final syntheticTrade = GameOrderBookSyntheticTrade(
+    marketMinute: marketMinute,
+    liquidityPulse: liquidityPulse,
+    levelSide: pulse.levelSide,
+    price: updatedTarget.price,
+    quantity: actualQuantity,
+  );
+
+  return GameOrderBookSnapshot(
+    asks: List<GameOrderBookLevel>.unmodifiable(asks),
+    bids: List<GameOrderBookLevel>.unmodifiable(bids),
+    turnoverEok: snapshot.turnoverEok,
+    executionCapacity: snapshot.executionCapacity,
+    totalAskQuantity: totalAsk,
+    totalBidQuantity: totalBid,
+    tradeStrength: totalAsk <= 0
+        ? totalBid > 0
+              ? 240
+              : 100
+        : (totalBid / totalAsk * 100).clamp(20, 240).toDouble(),
+    liquidityPulse: snapshot.liquidityPulse,
+    adaptiveLiquidityPulses: snapshot.adaptiveLiquidityPulses,
+    rememberedLevels: Map<double, GameOrderBookLevel>.unmodifiable(
+      rememberedLevels,
+    ),
+    sourceAssetId: snapshot.sourceAssetId,
+    sourceLiquidityDayKey: snapshot.sourceLiquidityDayKey,
+    sourceDateKey: snapshot.sourceDateKey,
+    sourceMarketMinute: snapshot.sourceMarketMinute,
+    sourceLastTradePrice: snapshot.sourceLastTradePrice,
+    sourceMarket: snapshot.sourceMarket,
+    sourceSimulationSeed: snapshot.sourceSimulationSeed,
+    appliedAskConsumptionByPrice: snapshot.appliedAskConsumptionByPrice,
+    appliedBidConsumptionByPrice: snapshot.appliedBidConsumptionByPrice,
+    appliedCapacityConsumptionUnits: snapshot.appliedCapacityConsumptionUnits,
+    lastSyntheticTrade: syntheticTrade,
+    syntheticTradeBudgetUsed: used + actualQuantity,
   );
 }
 
@@ -815,6 +1066,9 @@ GameOrderBookSnapshot gameOrderBookSnapshotAfterConsumption({
   Map<double, double> consumedAskByPrice = const <double, double>{},
   Map<double, double> consumedBidByPrice = const <double, double>{},
   int consumedCapacityUnits = 0,
+  GameOrderBookSide? retainedZeroLevelSide,
+  double? retainedZeroPrice,
+  bool retainSyntheticTombstone = true,
 }) {
   double quantityAtPrice(Map<double, double> quantities, double price) {
     final exact = quantities[price];
@@ -850,12 +1104,14 @@ GameOrderBookSnapshot gameOrderBookSnapshotAfterConsumption({
   ) {
     final cumulative = quantityAtPrice(consumed, level.price);
     final alreadyApplied = quantityAtPrice(applied, level.price);
-    final used = math.max(
-      0.0,
-      (cumulative.isFinite ? cumulative : 0.0) -
-          (alreadyApplied.isFinite ? alreadyApplied : 0.0),
-    );
-    final remaining = (level.quantity - (used.isFinite ? used : 0.0)).floor();
+    final cumulativeWholeUnits = math
+        .max(0.0, cumulative.isFinite ? cumulative : 0.0)
+        .floor();
+    final alreadyAppliedWholeUnits = math
+        .max(0.0, alreadyApplied.isFinite ? alreadyApplied : 0.0)
+        .floor();
+    final used = math.max(0, cumulativeWholeUnits - alreadyAppliedWholeUnits);
+    final remaining = level.quantity - used;
     return GameOrderBookLevel(
       side: level.side,
       price: level.price,
@@ -873,6 +1129,25 @@ GameOrderBookSnapshot gameOrderBookSnapshotAfterConsumption({
     );
   }
 
+  bool keepsActiveSyntheticTombstone(GameOrderBookLevel level) {
+    final trade = snapshot.lastSyntheticTrade;
+    return retainSyntheticTombstone &&
+        level.quantity <= 0 &&
+        trade != null &&
+        trade.quantity > 0 &&
+        trade.marketMinute == snapshot.sourceMarketMinute &&
+        trade.liquidityPulse == snapshot.liquidityPulse &&
+        trade.levelSide == level.side &&
+        (trade.price - level.price).abs() < 0.000001;
+  }
+
+  bool keepsRequestedTombstone(GameOrderBookLevel level) =>
+      level.quantity <= 0 &&
+      retainedZeroLevelSide == level.side &&
+      retainedZeroPrice != null &&
+      retainedZeroPrice.isFinite &&
+      (retainedZeroPrice - level.price).abs() < 0.000001;
+
   final asks = snapshot.asks
       .map(
         (level) => netLevel(
@@ -881,7 +1156,12 @@ GameOrderBookSnapshot gameOrderBookSnapshotAfterConsumption({
           snapshot.appliedAskConsumptionByPrice,
         ),
       )
-      .where((level) => level.quantity > 0)
+      .where(
+        (level) =>
+            level.quantity > 0 ||
+            keepsRequestedTombstone(level) ||
+            keepsActiveSyntheticTombstone(level),
+      )
       .toList(growable: false);
   final bids = snapshot.bids
       .map(
@@ -891,7 +1171,12 @@ GameOrderBookSnapshot gameOrderBookSnapshotAfterConsumption({
           snapshot.appliedBidConsumptionByPrice,
         ),
       )
-      .where((level) => level.quantity > 0)
+      .where(
+        (level) =>
+            level.quantity > 0 ||
+            keepsRequestedTombstone(level) ||
+            keepsActiveSyntheticTombstone(level),
+      )
       .toList(growable: false);
   final rememberedLevels = <double, GameOrderBookLevel>{
     for (final entry in snapshot.rememberedLevels.entries)
@@ -947,6 +1232,8 @@ GameOrderBookSnapshot gameOrderBookSnapshotAfterConsumption({
       snapshot.appliedCapacityConsumptionUnits,
       math.max(0, consumedCapacityUnits),
     ),
+    lastSyntheticTrade: snapshot.lastSyntheticTrade,
+    syntheticTradeBudgetUsed: snapshot.syntheticTradeBudgetUsed,
   );
 }
 
@@ -1277,6 +1564,12 @@ GameOrderBookSnapshot buildGameOrderBookSnapshot({
         : const <double, double>{},
     appliedCapacityConsumptionUnits: carriesPreviousBook && elapsedMinutes == 0
         ? previousSnapshot.appliedCapacityConsumptionUnits
+        : 0,
+    lastSyntheticTrade: carriesPreviousBook && elapsedMinutes == 0
+        ? previousSnapshot.lastSyntheticTrade
+        : null,
+    syntheticTradeBudgetUsed: carriesPreviousBook && elapsedMinutes == 0
+        ? previousSnapshot.syntheticTradeBudgetUsed
         : 0,
   );
 }
