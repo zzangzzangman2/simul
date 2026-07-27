@@ -3,6 +3,11 @@ import 'dart:math' as math;
 import 'real_estate_market.dart';
 
 const _realEstateMortgageMarker = '::mortgage::';
+const int realEstateSaleOfferValidityDays = 14;
+const double realEstateTenantAuctionSaleRate = 0.88;
+const double realEstateMortgageForeclosureSaleRate = 0.82;
+const double realEstateMortgagePrepaymentFeeRate = 0.01;
+const double realEstateVariableMortgageDiscountRate = 0.005;
 
 class RealEstateFinancingRequest {
   const RealEstateFinancingRequest({
@@ -91,6 +96,195 @@ class RealEstateFinancingPlan {
   final int monthlyPayment;
 
   bool get hasMortgage => principal > 0;
+}
+
+const double realEstateMaximumDsrRate = 0.45;
+const double realEstateAdditionalPropertyDebtRate = 0.60;
+const int realEstateMinimumMortgageCreditScore = 600;
+
+enum RealEstateForcedDispositionKind { tenantAuction, mortgageForeclosure }
+
+double realEstateForcedDispositionRate(RealEstateForcedDispositionKind kind) =>
+    switch (kind) {
+      RealEstateForcedDispositionKind.tenantAuction =>
+        realEstateTenantAuctionSaleRate,
+      RealEstateForcedDispositionKind.mortgageForeclosure =>
+        realEstateMortgageForeclosureSaleRate,
+    };
+
+class RealEstateDispositionWaterfall {
+  const RealEstateDispositionWaterfall({
+    required this.netSaleBeforeTax,
+    required this.capitalGainsTax,
+    required this.mortgagePaid,
+    required this.mortgageDeficiency,
+    required this.tenantDepositPaid,
+    required this.tenantDepositDeficiency,
+    required this.ownerProceeds,
+  });
+
+  final int netSaleBeforeTax;
+  final int capitalGainsTax;
+  final int mortgagePaid;
+  final int mortgageDeficiency;
+  final int tenantDepositPaid;
+  final int tenantDepositDeficiency;
+  final int ownerProceeds;
+}
+
+RealEstateDispositionWaterfall realEstateDispositionWaterfall({
+  required DateTime saleDate,
+  required RealEstateAssetType type,
+  required int ownedHousingCount,
+  required int holdingDays,
+  required int netSaleBeforeTax,
+  required int purchaseCost,
+  required int mortgageBalance,
+  required int tenantDepositDue,
+}) {
+  final safeNetSale = math.max(0, netSaleBeforeTax);
+  final capitalGainsTax = realEstateCapitalGainsTax(
+    saleDate: saleDate,
+    type: type,
+    ownedHousingCount: ownedHousingCount,
+    holdingDays: holdingDays,
+    netSaleBeforeTax: safeNetSale,
+    purchaseCost: purchaseCost,
+  );
+  var remaining = math.max(0, safeNetSale - capitalGainsTax);
+  final mortgagePaid = math.min(math.max(0, mortgageBalance), remaining);
+  remaining -= mortgagePaid;
+  final mortgageDeficiency = math.max(0, mortgageBalance - mortgagePaid);
+  final tenantDepositPaid = math.min(math.max(0, tenantDepositDue), remaining);
+  remaining -= tenantDepositPaid;
+  final tenantDepositDeficiency = math.max(
+    0,
+    tenantDepositDue - tenantDepositPaid,
+  );
+  return RealEstateDispositionWaterfall(
+    netSaleBeforeTax: safeNetSale,
+    capitalGainsTax: capitalGainsTax,
+    mortgagePaid: mortgagePaid,
+    mortgageDeficiency: mortgageDeficiency,
+    tenantDepositPaid: tenantDepositPaid,
+    tenantDepositDeficiency: tenantDepositDeficiency,
+    ownerProceeds: remaining,
+  );
+}
+
+class RealEstateBorrowingAssessment {
+  const RealEstateBorrowingAssessment({
+    required this.approved,
+    required this.dsr,
+    required this.maximumMonthlyDebtService,
+    required this.maximumPortfolioDebt,
+    required this.reason,
+  });
+
+  final bool approved;
+  final double dsr;
+  final int maximumMonthlyDebtService;
+  final int maximumPortfolioDebt;
+  final String reason;
+}
+
+/// 포트폴리오 전체의 원리금과 담보잔액을 함께 보는 게임용 DSR 심사.
+RealEstateBorrowingAssessment assessRealEstateBorrowing({
+  required RealEstateFinancingPlan plan,
+  required int existingMortgageBalance,
+  int existingNonMortgageDebt = 0,
+  required int existingMonthlyDebtService,
+  required int existingPropertyValue,
+  required int targetPropertyValue,
+  required int existingPropertyCount,
+  required int qualifyingMonthlyIncome,
+  int creditScore = 850,
+  bool hasDelinquency = false,
+  bool hasForeclosureHistory = false,
+}) {
+  if (!plan.hasMortgage) {
+    return const RealEstateBorrowingAssessment(
+      approved: true,
+      dsr: 0,
+      maximumMonthlyDebtService: 0,
+      maximumPortfolioDebt: 0,
+      reason: '',
+    );
+  }
+  if (hasDelinquency) {
+    return const RealEstateBorrowingAssessment(
+      approved: false,
+      dsr: 0,
+      maximumMonthlyDebtService: 0,
+      maximumPortfolioDebt: 0,
+      reason: '연체·결손채무·미반환 보증금을 먼저 정리해야 합니다.',
+    );
+  }
+  if (creditScore < realEstateMinimumMortgageCreditScore) {
+    return RealEstateBorrowingAssessment(
+      approved: false,
+      dsr: 0,
+      maximumMonthlyDebtService: 0,
+      maximumPortfolioDebt: 0,
+      reason:
+          '신용점수 $creditScore점으로 담보대출 최소 기준 '
+          '$realEstateMinimumMortgageCreditScore점에 미달합니다.',
+    );
+  }
+  if (hasForeclosureHistory && creditScore < 700) {
+    return const RealEstateBorrowingAssessment(
+      approved: false,
+      dsr: 0,
+      maximumMonthlyDebtService: 0,
+      maximumPortfolioDebt: 0,
+      reason: '강제매각 이력이 있어 신용점수 700점 이상 회복 후 신청할 수 있습니다.',
+    );
+  }
+  final safeIncome = math.max(1, qualifyingMonthlyIncome);
+  final afterMonthlyDebt = existingMonthlyDebtService + plan.monthlyPayment;
+  final dsr = afterMonthlyDebt / safeIncome;
+  final maximumMonthlyDebtService = (safeIncome * realEstateMaximumDsrRate)
+      .floor();
+  if (afterMonthlyDebt > maximumMonthlyDebtService) {
+    return RealEstateBorrowingAssessment(
+      approved: false,
+      dsr: dsr,
+      maximumMonthlyDebtService: maximumMonthlyDebtService,
+      maximumPortfolioDebt: 0,
+      reason:
+          'DSR ${(dsr * 100).toStringAsFixed(1)}%로 '
+          '한도 ${(realEstateMaximumDsrRate * 100).round()}%를 넘습니다.',
+    );
+  }
+  final afterPropertyValue = existingPropertyValue + targetPropertyValue;
+  final afterMortgage = existingMortgageBalance + plan.principal;
+  final portfolioDebtRate = existingPropertyCount == 0
+      ? plan.appliedLtvPercent / 100
+      : realEstateAdditionalPropertyDebtRate;
+  final maximumPortfolioDebt = existingPropertyCount == 0
+      ? (afterPropertyValue * plan.appliedLtvPercent) ~/ 100
+      : (afterPropertyValue * portfolioDebtRate).floor();
+  final afterPortfolioDebt =
+      afterMortgage +
+      (existingPropertyCount == 0 ? 0 : existingNonMortgageDebt);
+  if (afterPortfolioDebt > maximumPortfolioDebt) {
+    return RealEstateBorrowingAssessment(
+      approved: false,
+      dsr: dsr,
+      maximumMonthlyDebtService: maximumMonthlyDebtService,
+      maximumPortfolioDebt: maximumPortfolioDebt,
+      reason:
+          '추가 매입 후 담보대출·보증금 등 총부채가 '
+          '${(realEstateAdditionalPropertyDebtRate * 100).round()}% 한도를 넘습니다.',
+    );
+  }
+  return RealEstateBorrowingAssessment(
+    approved: true,
+    dsr: dsr,
+    maximumMonthlyDebtService: maximumMonthlyDebtService,
+    maximumPortfolioDebt: maximumPortfolioDebt,
+    reason: '',
+  );
 }
 
 RealEstateFinancingTerms realEstateFinancingTermsAt(

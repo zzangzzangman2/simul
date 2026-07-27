@@ -6,6 +6,26 @@ enum _MarketSection { home, explore, account }
 
 enum _ChartPeriod { minute, day, week, month, year }
 
+const _visibleOrderBookSideRows = 6;
+const _orderBookMotionDuration = Duration(milliseconds: 72);
+
+List<GameOrderBookLevel> _symmetricVisibleOrderBookLevels(
+  GameOrderBookSnapshot snapshot,
+) => <GameOrderBookLevel>[
+  ...snapshot.asks
+      .take(_visibleOrderBookSideRows)
+      .toList(growable: false)
+      .reversed,
+  ...snapshot.bids.take(_visibleOrderBookSideRows),
+];
+
+class _MarketCapRanking {
+  const _MarketCapRanking({required this.rank, required this.companyCount});
+
+  final int? rank;
+  final int companyCount;
+}
+
 class _PlayerTradeSignal {
   const _PlayerTradeSignal({
     required this.assetId,
@@ -534,6 +554,98 @@ class _MarketPlaybackBar extends StatelessWidget {
   );
 }
 
+class _MarketNewsTicker extends StatelessWidget {
+  const _MarketNewsTicker({required this.event});
+
+  final FictionalMarketEvent event;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    key: const Key('background-news-ticker'),
+    height: 34,
+    padding: const EdgeInsets.symmetric(horizontal: 12),
+    decoration: const BoxDecoration(
+      color: Color(0xFFFFF8E3),
+      border: Border(bottom: BorderSide(color: Color(0xFFF1E4B8))),
+    ),
+    child: Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF04452),
+            borderRadius: BorderRadius.circular(5),
+          ),
+          child: const Text(
+            '속보',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 9,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 220),
+            child: Text(
+              '${event.companyName} · ${event.title}',
+              key: ValueKey<String>(event.id),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Color(0xFF4C4328),
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+typedef MarketUniverseLoader =
+    Future<FictionalMarketUniverse> Function({
+      required String seed,
+      required DateTime? throughDate,
+      required bool forceRefresh,
+    });
+
+typedef _OrderBookSessionSnapshot = ({
+  GameOrderBookSnapshot snapshot,
+  int minute,
+  double price,
+  int microstructureFrame,
+  String sessionKey,
+});
+
+typedef _OrderBookConsumptionView = ({
+  Map<double, double> asks,
+  Map<double, double> bids,
+  int capacityUnits,
+});
+
+/// Keeps deterministic order-book continuity while stock-market routes are
+/// opened and closed within the same running game.
+///
+/// The detail screen still validates each snapshot's simulation seed and
+/// market date before restoring it, so a cache retained across a day or world
+/// change cannot leak stale depth into the new session.
+class StockOrderBookSessionCache {
+  final Map<String, _OrderBookSessionSnapshot> _snapshots =
+      <String, _OrderBookSessionSnapshot>{};
+
+  _OrderBookSessionSnapshot? _snapshotFor(String assetId) =>
+      _snapshots[assetId];
+
+  void _remember(String assetId, _OrderBookSessionSnapshot snapshot) {
+    _snapshots[assetId] = snapshot;
+  }
+}
+
 class StockMarketScreen extends StatefulWidget {
   const StockMarketScreen({
     super.key,
@@ -546,6 +658,8 @@ class StockMarketScreen extends StatefulWidget {
     this.onPurchaseReport,
     this.onCompleteTutorial,
     this.universe,
+    this.universeLoader,
+    this.orderBookSessionCache,
   });
 
   final GameState state;
@@ -560,6 +674,8 @@ class StockMarketScreen extends StatefulWidget {
   final Future<FinanceActionResult> Function(int amount, bool deposit)?
   onTransferCash;
   final FictionalMarketUniverse? universe;
+  final MarketUniverseLoader? universeLoader;
+  final StockOrderBookSessionCache? orderBookSessionCache;
 
   @override
   State<StockMarketScreen> createState() => _StockMarketScreenState();
@@ -569,7 +685,10 @@ class _StockMarketScreenState extends State<StockMarketScreen>
     with WidgetsBindingObserver {
   final _searchController = TextEditingController();
   final Map<String, ValueNotifier<_LiveStock>> _live = {};
+  late final StockOrderBookSessionCache _orderBookSessionCache;
   List<_StockDefinition> _stocks = const [];
+  List<LedgerEntry>? _cachedTradeLedgerSource;
+  List<LedgerEntry> _cachedTradeLedgerEntries = const <LedgerEntry>[];
   Timer? _timer;
   final ValueNotifier<_MarketPlaybackSpeed> _playbackSpeedNotifier =
       ValueNotifier(_MarketPlaybackSpeed.normal);
@@ -583,6 +702,7 @@ class _StockMarketScreenState extends State<StockMarketScreen>
   final ValueNotifier<int> _minute = ValueNotifier(marketDayStartMinute);
   int _tick = 0;
   late int _marketMinute;
+  late int _lastPersistedMarketMinute;
   late final ValueNotifier<GameState> _marketStateNotifier;
   GameState get _state => _marketStateNotifier.value;
   set _state(GameState value) => _marketStateNotifier.value = value;
@@ -591,6 +711,7 @@ class _StockMarketScreenState extends State<StockMarketScreen>
   _MarketSort _sort = _MarketSort.turnover;
   _MarketSection _section = _MarketSection.home;
   bool _loading = true;
+  bool _marketLoadInFlight = false;
   double _loadProgress = 0.08;
   String _loadStage = '가상 기업 명단을 확인하는 중…';
   String? _loadError;
@@ -608,7 +729,9 @@ class _StockMarketScreenState extends State<StockMarketScreen>
   bool _isShowingSessionNotice = false;
   bool _isShowingBreakingNews = false;
   final Set<String> _shownBreakingNewsEventIds = <String>{};
+  FictionalMarketEvent? _latestBackgroundNews;
   bool _isMarketSheetOpen = false;
+  String? _openedAssetId;
   final Set<int> _shownSessionNotices = <int>{};
   final GlobalKey _tutorialExploreKey = GlobalKey();
   final GlobalKey _tutorialStockKey = GlobalKey();
@@ -740,13 +863,17 @@ class _StockMarketScreenState extends State<StockMarketScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _orderBookSessionCache =
+        widget.orderBookSessionCache ?? StockOrderBookSessionCache();
     _marketStateNotifier = ValueNotifier(widget.state);
     _marketMinute = _state.marketMinute;
+    _lastPersistedMarketMinute = _marketMinute;
     _minute.value = _marketMinute;
     _tick = marketTickForMinute(_marketMinute);
     _tutorialStep =
         _state.story.marketTutorialEligible &&
             !_state.story.marketTutorialSeen &&
+            isMarketTradingDay(_state.currentDate) &&
             widget.onCompleteTutorial != null
         ? 0
         : null;
@@ -754,23 +881,25 @@ class _StockMarketScreenState extends State<StockMarketScreen>
   }
 
   Future<void> _loadFictionalMarket({bool forceRefresh = false}) async {
+    if (_marketLoadInFlight) return;
+    _marketLoadInFlight = true;
     final stopwatch = Stopwatch()..start();
-    if (forceRefresh) {
-      for (final notifier in _live.values) {
-        notifier.dispose();
-      }
-      _live.clear();
-      if (mounted) {
-        setState(() {
-          _stocks = const [];
-          _loadError = null;
-          _loading = true;
-          _loadProgress = 0.08;
-          _loadStage = '시장 데이터를 다시 준비하는 중…';
-        });
-      }
-    }
     try {
+      if (forceRefresh) {
+        for (final notifier in _live.values) {
+          notifier.dispose();
+        }
+        _live.clear();
+        if (mounted) {
+          setState(() {
+            _stocks = const [];
+            _loadError = null;
+            _loading = true;
+            _loadProgress = 0.08;
+            _loadStage = '시장 데이터를 다시 준비하는 중…';
+          });
+        }
+      }
       // Give the browser a chance to paint the progress card before any
       // deterministic market generation begins.
       await Future<void>.delayed(Duration.zero);
@@ -779,13 +908,21 @@ class _StockMarketScreenState extends State<StockMarketScreen>
         _loadProgress = 0.12;
         _loadStage = '${_state.currentDate.year}년 기업과 거래일을 만드는 중…';
       });
-      final universe =
+      final loader = widget.universeLoader;
+      final loadedUniverse =
           widget.universe ??
-          await FictionalMarketUniverse.load(
-            seed: _state.simulationSeed,
-            throughDate: _state.currentDate,
-            forceRefresh: forceRefresh,
-          );
+          await (loader == null
+              ? FictionalMarketUniverse.load(
+                  seed: _state.simulationSeed,
+                  throughDate: _state.currentDate,
+                  forceRefresh: forceRefresh,
+                )
+              : loader(
+                  seed: _state.simulationSeed,
+                  throughDate: _state.currentDate,
+                  forceRefresh: forceRefresh,
+                ));
+      final universe = loadedUniverse.asOf(_state.currentDate);
       if (!mounted) return;
       setState(() {
         _loadProgress = 0.62;
@@ -800,16 +937,24 @@ class _StockMarketScreenState extends State<StockMarketScreen>
         final quote = asset.quoteAtOrBefore(_state.currentDate);
         if (quote != null) {
           final stock = _StockDefinition.fromAsset(asset);
-          final previousClose =
-              asset.previousCloseBefore(quote.date) ?? quote.close;
-          final history = asset.historyThrough(_state.currentDate);
+          final rawPreviousClose = asset.unadjustedReferenceCloseFor(
+            quote.date,
+          );
+          final marketReferenceClose = asset.marketReferenceCloseOn(
+            DateTime.parse(quote.date),
+            previousClose: rawPreviousClose,
+          );
+          // The live list needs 13 displayed flow rows, their predecessor for
+          // the oldest return, and today's possibly hidden pre-open point.
+          // Long-range charts query the asset directly.
+          final history = asset.historyThrough(_state.currentDate, count: 15);
           loaded.add(stock);
           final path = quote.isExactDate
               ? generatedMarketDayPathForAsset(
                   asset: asset,
                   simulationSeed: _state.simulationSeed,
                   date: _state.currentDate,
-                  previousClose: previousClose,
+                  previousClose: rawPreviousClose,
                   officialClose: quote.close,
                 )
               : <double>[quote.close];
@@ -818,15 +963,37 @@ class _StockMarketScreenState extends State<StockMarketScreen>
               : 0;
           final sessionHistory = path.take(pathIndex + 1).toList();
           final startingPrice = sessionHistory.last;
+          late final List<double> tradingHistory;
+          if (quote.isExactDate && pathIndex >= generatedPreOpenTicks) {
+            tradingHistory = path.sublist(generatedPreOpenTicks, pathIndex + 1);
+          } else if (!quote.isExactDate) {
+            final settledPath = generatedMarketDayPathForAsset(
+              asset: asset,
+              simulationSeed: _state.simulationSeed,
+              date: DateTime.parse(quote.date),
+              previousClose: rawPreviousClose,
+              officialClose: quote.close,
+            );
+            final continuousEnd = math.min(
+              settledPath.length,
+              generatedPreOpenTicks + generatedContinuousTradingTicks,
+            );
+            tradingHistory = settledPath.sublist(
+              generatedPreOpenTicks,
+              continuousEnd,
+            )..add(quote.close);
+          } else {
+            tradingHistory = <double>[marketReferenceClose];
+          }
           _live[stock.code] = ValueNotifier(
             _LiveStock(
               price: startingPrice,
-              previousClose: previousClose,
+              previousClose: marketReferenceClose,
               officialClose: quote.close,
               isTradingDay: quote.isExactDate,
-              open: sessionHistory.first,
-              high: sessionHistory.reduce(math.max),
-              low: sessionHistory.reduce(math.min),
+              open: tradingHistory.first,
+              high: tradingHistory.reduce(math.max),
+              low: tradingHistory.reduce(math.min),
               history: history,
               sessionHistory: sessionHistory,
               sessionPath: path,
@@ -859,11 +1026,14 @@ class _StockMarketScreenState extends State<StockMarketScreen>
       setState(() => _loading = false);
       _resumeTimerIfNeeded();
     } catch (error) {
+      _marketLoadInFlight = false;
       if (!mounted) return;
       setState(() {
         _loadError = '$error';
         _loading = false;
       });
+    } finally {
+      _marketLoadInFlight = false;
     }
   }
 
@@ -952,13 +1122,18 @@ class _StockMarketScreenState extends State<StockMarketScreen>
         final stateBeforeMinute = _state;
         final largeMove = _advanceOneMarketMinute();
         final callback = widget.onSetMarketMinute;
-        if (stateBeforeMinute.pendingOrders.isNotEmpty && callback != null) {
+        final shouldPersistMinute =
+            stateBeforeMinute.pendingOrders.isNotEmpty ||
+            _marketMinute - _lastPersistedMarketMinute >= 30 ||
+            _marketMinute >= krxCloseMinute;
+        if (shouldPersistMinute && callback != null) {
           try {
             final next = await _runMarketMutation(
               () => callback(_marketMinute),
             );
             if (!mounted) return;
             _state = next;
+            _lastPersistedMarketMinute = _marketMinute;
             final fills = _newTradeSignals(stateBeforeMinute, next);
             if (fills.isNotEmpty) {
               _playerTradeNotifier.value = fills.last;
@@ -985,9 +1160,13 @@ class _StockMarketScreenState extends State<StockMarketScreen>
             _isShowingSessionNotice) {
           break;
         }
-        if (largeMove) {
+        if (largeMove != null) {
           _pausePlaybackWithoutRebuild();
-          pauseMessage = '1분 급등락이 감지되어 시장 시간을 일시정지했어요.';
+          pauseMessage =
+              '${largeMove.name}이(가) 1분 동안 '
+              '${largeMove.rate >= 0 ? '+' : ''}'
+              '${largeMove.rate.toStringAsFixed(2)}% 움직여 '
+              '시장 시간을 일시정지했어요.';
           break;
         }
       }
@@ -1002,32 +1181,51 @@ class _StockMarketScreenState extends State<StockMarketScreen>
     }
   }
 
-  bool _advanceOneMarketMinute() {
+  ({String name, double rate})? _advanceOneMarketMinute() {
     if (_isExecutingTrade ||
         _isTransferringCash ||
         _isClosing ||
         _marketMinute >= krxCloseMinute ||
         _tick >= krxCloseTick) {
-      return false;
+      return null;
     }
     _tick += 1;
     _marketMinute = marketMinuteForTick(_tick);
     _minute.value = _marketMinute;
-    var largeMove = false;
+    _state = _state.copyWith(marketMinute: _marketMinute);
+    final watchedAssetIds = <String>{
+      ..._favoriteAssetIds,
+      ..._state.positions.map((position) => position.assetId),
+      ?_openedAssetId,
+    };
+    ({String name, double rate})? largeMove;
     for (var index = 0; index < _stocks.length; index++) {
-      final notifier = _live[_stocks[index].code]!;
+      final stock = _stocks[index];
+      final notifier = _live[stock.code]!;
       final current = notifier.value;
       if (!current.isTradingDay) continue;
       final nextPrice = current.sessionPath[_tick];
       current.sessionHistory.add(nextPrice);
-      if (current.price > 0 &&
-          ((nextPrice - current.price) / current.price).abs() >= 0.03) {
-        largeMove = true;
+      if (current.price > 0 && watchedAssetIds.contains(stock.id)) {
+        final rate = (nextPrice - current.price) / current.price * 100;
+        if (rate.abs() >= 3 &&
+            (largeMove == null || rate.abs() > largeMove.rate.abs())) {
+          largeMove = (name: stock.name, rate: rate);
+        }
       }
       notifier.value = current.copyWith(
         price: nextPrice,
-        high: nextPrice > current.high ? nextPrice : current.high,
-        low: nextPrice < current.low ? nextPrice : current.low,
+        open: _marketMinute == krxOpenMinute ? nextPrice : current.open,
+        high: _marketMinute == krxOpenMinute
+            ? nextPrice
+            : nextPrice > current.high
+            ? nextPrice
+            : current.high,
+        low: _marketMinute == krxOpenMinute
+            ? nextPrice
+            : nextPrice < current.low
+            ? nextPrice
+            : current.low,
       );
     }
     return largeMove;
@@ -1047,7 +1245,36 @@ class _StockMarketScreenState extends State<StockMarketScreen>
       _maybeShowSessionNotice(previousMinute, currentMinute);
       return;
     }
-    unawaited(_showBreakingNewsEvents(events, previousMinute, currentMinute));
+    final watchedAssetIds = <String>{
+      ..._favoriteAssetIds,
+      ..._state.positions.map((position) => position.assetId),
+      ?_openedAssetId,
+    };
+    final modalEvents = events
+        .where(
+          (event) =>
+              event.companyId == fictionalWholeMarketCompanyId ||
+              watchedAssetIds.contains(event.companyId),
+        )
+        .toList(growable: false);
+    final tickerEvents = events
+        .where((event) => !modalEvents.contains(event))
+        .toList(growable: false);
+    if (tickerEvents.isNotEmpty) {
+      _shownBreakingNewsEventIds.addAll(tickerEvents.map((event) => event.id));
+      if (mounted) {
+        setState(() => _latestBackgroundNews = tickerEvents.last);
+      } else {
+        _latestBackgroundNews = tickerEvents.last;
+      }
+    }
+    if (modalEvents.isEmpty) {
+      _maybeShowSessionNotice(previousMinute, currentMinute);
+      return;
+    }
+    unawaited(
+      _showBreakingNewsEvents(modalEvents, previousMinute, currentMinute),
+    );
   }
 
   Future<void> _showBreakingNewsEvents(
@@ -1056,6 +1283,7 @@ class _StockMarketScreenState extends State<StockMarketScreen>
     int currentMinute,
   ) async {
     if (!mounted || _isShowingBreakingNews) return;
+    final resumeSpeed = _playbackSpeed;
     _setPlaybackSpeed(_MarketPlaybackSpeed.paused);
     _isShowingBreakingNews = true;
     _timer?.cancel();
@@ -1074,7 +1302,7 @@ class _StockMarketScreenState extends State<StockMarketScreen>
     }
     if (!mounted) return;
     _isShowingBreakingNews = false;
-    setState(() {});
+    setState(() => _playbackSpeed = resumeSpeed);
     _maybeShowSessionNotice(previousMinute, currentMinute);
     _resumeTimerIfNeeded();
   }
@@ -1206,6 +1434,7 @@ class _StockMarketScreenState extends State<StockMarketScreen>
     }
     if (requestedMinute <= _marketMinute) return;
     final previousMinute = _marketMinute;
+    final stateBeforeAdvance = _state;
     final targetMinute = math.min(requestedMinute, krxCloseMinute);
     final targetTick = marketTickForMinute(targetMinute);
     _isAdvancingHour = true;
@@ -1218,6 +1447,25 @@ class _StockMarketScreenState extends State<StockMarketScreen>
       );
       if (next != null) _state = next;
       if (!mounted) return;
+      String? orderUpdateMessage;
+      if (next != null) {
+        final fills = _newTradeSignals(stateBeforeAdvance, next);
+        if (fills.isNotEmpty) {
+          _playerTradeNotifier.value = fills.last;
+          _pausePlaybackWithoutRebuild();
+          orderUpdateMessage = fills.length == 1
+              ? '시간 이동 중 미체결 주문 1건이 체결됐어요.'
+              : '시간 이동 중 미체결 주문 ${fills.length}건이 체결됐어요.';
+        }
+        final expiredCount = _newExpiredOrderCount(stateBeforeAdvance, next);
+        if (expiredCount > 0) {
+          _pausePlaybackWithoutRebuild();
+          final expiryMessage = '장 마감으로 미체결 주문 $expiredCount건이 자동 취소됐어요.';
+          orderUpdateMessage = orderUpdateMessage == null
+              ? expiryMessage
+              : '$orderUpdateMessage $expiryMessage';
+        }
+      }
       _tick = targetTick;
       _marketMinute = targetMinute;
       _minute.value = _marketMinute;
@@ -1226,10 +1474,14 @@ class _StockMarketScreenState extends State<StockMarketScreen>
         final current = notifier.value;
         if (!current.isTradingDay) continue;
         final sessionHistory = current.sessionPath.take(_tick + 1).toList();
+        final tradingHistory = sessionHistory.length > generatedPreOpenTicks
+            ? sessionHistory.sublist(generatedPreOpenTicks)
+            : <double>[current.previousClose];
         notifier.value = current.copyWith(
           price: sessionHistory.last,
-          high: sessionHistory.reduce(math.max),
-          low: sessionHistory.reduce(math.min),
+          open: tradingHistory.first,
+          high: tradingHistory.reduce(math.max),
+          low: tradingHistory.reduce(math.min),
           sessionHistory: sessionHistory,
         );
       }
@@ -1242,6 +1494,11 @@ class _StockMarketScreenState extends State<StockMarketScreen>
       }
       setState(() {});
       _handleMarketTimeCrossed(previousMinute, _marketMinute);
+      if (orderUpdateMessage != null) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text(orderUpdateMessage)));
+      }
       _resumeTimerIfNeeded();
     } catch (_) {
       _isAdvancingHour = false;
@@ -1293,7 +1550,9 @@ class _StockMarketScreenState extends State<StockMarketScreen>
             _state.currentDate.toIso8601String().split('T').first ||
         order.marketMinute != _marketMinute ||
         order.unitPrice != current.price ||
-        order.isTradingDay != current.isTradingDay) {
+        order.isTradingDay != current.isTradingDay ||
+        order.isIpoFirstTradingDay !=
+            definition.asset.isIpoFirstTradingDay(_state.currentDate)) {
       return TradeExecutionResult(
         state: _state,
         success: false,
@@ -1471,6 +1730,14 @@ class _StockMarketScreenState extends State<StockMarketScreen>
         .toList(growable: false);
   }
 
+  bool get _canPurchaseDailyReport =>
+      isMarketTradingDay(_state.currentDate) &&
+      _marketMinute < krxCloseMinute &&
+      fictionalMarketEventsForDate(
+        _state.simulationSeed,
+        _state.currentDate,
+      ).any((event) => event.revealMinute > _marketMinute);
+
   Future<void> _purchaseDailyReport() async {
     final callback = widget.onPurchaseReport;
     if (callback == null || _isPurchasingReport) return;
@@ -1550,16 +1817,33 @@ class _StockMarketScreenState extends State<StockMarketScreen>
     return _persistMarketNotebook(favorites, notes);
   }
 
+  double _turnoverFor(_StockDefinition definition, _LiveStock quote) {
+    if (!quote.isTradingDay || !isMarketTradingDay(_state.currentDate)) {
+      return 0;
+    }
+    return gameEstimatedTurnoverEok(
+      assetId: definition.id,
+      day: marketLiquidityDayKey(_state.currentDate),
+      minute: _state.marketMinute,
+      unitPrice: quote.price,
+      previousClose: quote.previousClose,
+      simulationSeed: _state.simulationSeed,
+      sharesOutstanding: definition.asset.sharesOutstandingAtOrBefore(
+        _state.currentDate,
+      ),
+    );
+  }
+
   List<_StockDefinition> _sortedStocks(Iterable<_StockDefinition> source) {
     final visible = source.toList();
     visible.sort((left, right) {
       final leftQuote = _live[left.code]!.value;
       final rightQuote = _live[right.code]!.value;
       return switch (_sort) {
-        _MarketSort.turnover => _simulatedTurnover(
+        _MarketSort.turnover => _turnoverFor(
           right,
           rightQuote,
-        ).compareTo(_simulatedTurnover(left, leftQuote)),
+        ).compareTo(_turnoverFor(left, leftQuote)),
         _MarketSort.gainers => _changeRate(
           rightQuote,
         ).compareTo(_changeRate(leftQuote)),
@@ -1666,26 +1950,41 @@ class _StockMarketScreenState extends State<StockMarketScreen>
   }) async {
     if (_tutorialActive && !fromTutorial) return;
     if (fromTutorial) setState(() => _tutorialStep = 3);
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => _StockDetailScreen(
-          definition: stock,
-          live: _live[stock.code]!,
-          marketState: _marketStateNotifier,
-          playerTrade: _playerTradeNotifier,
-          minute: _minute,
-          playbackSpeed: _playbackSpeedNotifier,
-          onPlaybackSpeedChanged: _setPlaybackSpeed,
-          onExecuteTrade: _executeTrade,
-          onToggleFavorite: _toggleFavorite,
-          onSaveResearchNote: _saveResearchNote,
-          onMarketSheetOpened: _pauseMarketForSheet,
-          onMarketSheetClosed: _resumeMarketAfterSheet,
-          tutorialEnabled: fromTutorial,
-          onCompleteTutorial: _completeMarketTutorial,
+    _openedAssetId = stock.id;
+    try {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => _StockDetailScreen(
+            definition: stock,
+            live: _live[stock.code]!,
+            marketState: _marketStateNotifier,
+            playerTrade: _playerTradeNotifier,
+            minute: _minute,
+            playbackSpeed: _playbackSpeedNotifier,
+            onPlaybackSpeedChanged: _setPlaybackSpeed,
+            onExecuteTrade: _executeTrade,
+            onCancelPendingOrder: widget.onCancelPendingOrder == null
+                ? null
+                : _cancelPendingOrder,
+            onToggleFavorite: _toggleFavorite,
+            onSaveResearchNote: _saveResearchNote,
+            onMarketSheetOpened: _pauseMarketForSheet,
+            onMarketSheetClosed: _resumeMarketAfterSheet,
+            marketCapRanking: () => _marketCapRankingFor(stock),
+            initialOrderBookSnapshot: _orderBookSessionCache._snapshotFor(
+              stock.id,
+            ),
+            onOrderBookSnapshotChanged: (snapshot) {
+              _orderBookSessionCache._remember(stock.id, snapshot);
+            },
+            tutorialEnabled: fromTutorial,
+            onCompleteTutorial: _completeMarketTutorial,
+          ),
         ),
-      ),
-    );
+      );
+    } finally {
+      _openedAssetId = null;
+    }
     if (!mounted) return;
     if (fromTutorial && !_tutorialActive) {
       await Navigator.of(context).maybePop();
@@ -1696,6 +1995,31 @@ class _StockMarketScreenState extends State<StockMarketScreen>
       _section = _MarketSection.explore;
       _tutorialStep = 2;
     });
+  }
+
+  _MarketCapRanking _marketCapRankingFor(_StockDefinition selected) {
+    final entries = <MapEntry<_StockDefinition, int>>[];
+    for (final stock in _stocks) {
+      if (stock.country != 'KR' || stock.currency != 'KRW') continue;
+      final quote = _live[stock.code]?.value;
+      if (quote == null) continue;
+      final sharesOutstanding = stock.asset.sharesOutstandingAtOrBefore(
+        _state.currentDate,
+      );
+      if (sharesOutstanding == null || sharesOutstanding <= 0) continue;
+      entries.add(MapEntry(stock, (quote.price * sharesOutstanding).round()));
+    }
+    entries.sort((left, right) {
+      final marketCapOrder = right.value.compareTo(left.value);
+      return marketCapOrder != 0
+          ? marketCapOrder
+          : left.key.code.compareTo(right.key.code);
+    });
+    final index = entries.indexWhere((entry) => entry.key.id == selected.id);
+    return _MarketCapRanking(
+      rank: index < 0 ? null : index + 1,
+      companyCount: entries.length,
+    );
   }
 
   List<Widget> _holdingRows({int? limit}) {
@@ -1717,52 +2041,121 @@ class _StockMarketScreenState extends State<StockMarketScreen>
     return rows;
   }
 
+  List<LedgerEntry> get _tradeLedgerEntries {
+    final ledger = _state.ledger;
+    if (identical(ledger, _cachedTradeLedgerSource)) {
+      return _cachedTradeLedgerEntries;
+    }
+    _cachedTradeLedgerSource = ledger;
+    _cachedTradeLedgerEntries = ledger
+        .where(
+          (entry) =>
+              entry.assetId.isNotEmpty &&
+              entry.tradeQuantity > 0 &&
+              entry.tradeUnitPrice > 0 &&
+              (entry.tradeSide == TradeSide.buy.name ||
+                  entry.tradeSide == TradeSide.sell.name),
+        )
+        .toList(growable: false)
+        .reversed
+        .toList(growable: false);
+    return _cachedTradeLedgerEntries;
+  }
+
+  String _tradeAssetName(String assetId) =>
+      _stocks
+          .where((definition) => definition.id == assetId)
+          .firstOrNull
+          ?.name ??
+      assetId;
+
+  Future<void> _openTradeJournal() async {
+    final entries = _tradeLedgerEntries;
+    if (entries.isEmpty || !mounted) return;
+    _pauseMarketForSheet();
+    try {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        showDragHandle: true,
+        backgroundColor: Colors.white,
+        builder: (_) => _TradeJournalSheet(
+          state: _state,
+          entries: entries,
+          assetNameFor: _tradeAssetName,
+        ),
+      );
+    } finally {
+      _resumeMarketAfterSheet();
+    }
+  }
+
   Widget _buildHomeSection() {
     final domestic = _stocks
         .where((stock) => stock.country == 'KR' && stock.currency == 'KRW')
         .toList();
     final ranked = _sortedStocks(domestic);
     final reportItems = _dailyReportItems;
-    return ListView(
+    return ListView.builder(
       key: const Key('market-home-section'),
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 28),
-      children: [
-        _DailyMarketReportCard(
-          items: reportItems,
-          cash: _state.cash,
-          purchasing: _isPurchasingReport,
-          onPurchase: widget.onPurchaseReport == null
-              ? null
-              : _purchaseDailyReport,
-        ),
-        const SizedBox(height: 20),
-        _MarketSectionTitle(
-          title: '오늘의 종목 순위',
-          action: '전체 종목',
-          onAction: () => setState(() => _section = _MarketSection.explore),
-        ),
-        const Text(
-          '현재가·등락률·게임 거래대금을 한 줄에서 비교해요.',
-          style: TextStyle(
-            color: Color(0xFF8A919E),
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 9),
-        _MarketSortBar(
-          selected: _sort,
-          compact: true,
-          onChanged: (value) => setState(() => _sort = value),
-        ),
-        const SizedBox(height: 9),
-        _MarketRankingTable(stocks: ranked, live: _live, onOpen: _openStock),
-      ],
+      itemCount: ranked.length + 1,
+      itemBuilder: (context, index) {
+        if (index > 0) {
+          final stock = ranked[index - 1];
+          return _MarketRankingRow(
+            key: Key('market-ranking-row-${stock.code}'),
+            rank: index,
+            definition: stock,
+            live: _live[stock.code]!,
+            turnoverFor: _turnoverFor,
+            onTap: () => _openStock(stock),
+          );
+        }
+        return Column(
+          key: const Key('market-ranking-table'),
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _DailyMarketReportCard(
+              items: reportItems,
+              cash: _state.bankCash,
+              purchasing: _isPurchasingReport,
+              canPurchase: _canPurchaseDailyReport,
+              onPurchase: widget.onPurchaseReport == null
+                  ? null
+                  : _purchaseDailyReport,
+            ),
+            const SizedBox(height: 20),
+            _MarketSectionTitle(
+              title: '오늘의 종목 순위',
+              action: '전체 종목',
+              onAction: () => setState(() => _section = _MarketSection.explore),
+            ),
+            const Text(
+              '현재가·등락률·게임 거래대금을 한 줄에서 비교해요.',
+              style: TextStyle(
+                color: Color(0xFF8A919E),
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 9),
+            _MarketSortBar(
+              selected: _sort,
+              compact: true,
+              onChanged: (value) => setState(() => _sort = value),
+            ),
+            const SizedBox(height: 9),
+          ],
+        );
+      },
     );
   }
 
   Widget _buildAccountSection() {
     final rows = _holdingRows();
+    final trades = _tradeLedgerEntries;
     return ListView(
       key: const Key('market-account-section'),
       padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
@@ -1780,12 +2173,30 @@ class _StockMarketScreenState extends State<StockMarketScreen>
         _BrokerageAccountCard(
           state: _state,
           prices: _currentPrices,
+          tradeEntries: trades,
           onDeposit: widget.onTransferCash == null
               ? null
               : () => _openTransferSheet(true),
           onWithdraw: widget.onTransferCash == null
               ? null
               : () => _openTransferSheet(false),
+        ),
+        const SizedBox(height: 22),
+        _MarketSectionTitle(
+          title: '매매일지 ${trades.length}',
+          action: trades.isEmpty ? null : '전체 보기',
+          onAction: trades.isEmpty
+              ? null
+              : () => unawaited(_openTradeJournal()),
+        ),
+        const SizedBox(height: 8),
+        _TradeJournalPreview(
+          state: _state,
+          entries: trades.take(3).toList(growable: false),
+          assetNameFor: _tradeAssetName,
+          onOpenAll: trades.isEmpty
+              ? null
+              : () => unawaited(_openTradeJournal()),
         ),
         if (_state.pendingOrders.isNotEmpty) ...[
           const SizedBox(height: 22),
@@ -1931,104 +2342,103 @@ class _StockMarketScreenState extends State<StockMarketScreen>
                         _marketMinute < krxCloseMinute,
                     onChanged: _setPlaybackSpeed,
                   ),
+                  if (_latestBackgroundNews case final event?)
+                    _MarketNewsTicker(event: event),
                   Expanded(
                     child: switch (_section) {
                       _MarketSection.home => _buildHomeSection(),
                       _MarketSection.account => _buildAccountSection(),
-                      _MarketSection.explore => ListView(
+                      _MarketSection.explore => ListView.builder(
                         padding: const EdgeInsets.fromLTRB(18, 4, 18, 30),
-                        children: [
-                          TextField(
-                            key: const Key('market-search-input'),
-                            controller: _searchController,
-                            onChanged: (_) => setState(() {}),
-                            decoration: InputDecoration(
-                              hintText: '회사명이나 종목코드 검색',
-                              prefixIcon: const Icon(Icons.search_rounded),
-                              filled: true,
-                              fillColor: Colors.white,
-                              contentPadding: const EdgeInsets.symmetric(
-                                vertical: 12,
-                              ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(15),
-                                borderSide: BorderSide.none,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 14),
-                          _MarketTabs(
-                            selected: _tab,
-                            onChanged: (value) => setState(() => _tab = value),
-                          ),
-                          const SizedBox(height: 18),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  marketListTitle,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: Color(0xFF202632),
-                                    fontSize: 19,
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: -0.6,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              const Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  _LiveDot(),
-                                  SizedBox(width: 5),
-                                  Text(
-                                    '세계 시드 연동',
-                                    style: TextStyle(
-                                      color: Color(0xFF26845B),
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w600,
+                        itemCount: visibleStocks.isEmpty
+                            ? 2
+                            : visibleStocks.length + 1,
+                        itemBuilder: (context, index) {
+                          if (index == 0) {
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                TextField(
+                                  key: const Key('market-search-input'),
+                                  controller: _searchController,
+                                  onChanged: (_) => setState(() {}),
+                                  decoration: InputDecoration(
+                                    hintText: '회사명이나 종목코드 검색',
+                                    prefixIcon: const Icon(
+                                      Icons.search_rounded,
+                                    ),
+                                    filled: true,
+                                    fillColor: Colors.white,
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      vertical: 12,
+                                    ),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(15),
+                                      borderSide: BorderSide.none,
                                     ),
                                   ),
-                                ],
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 7),
-                          const Text(
-                            '오늘의 사건과 세계 시드가 반영되며 15:00에 가상 종가가 확정됩니다.',
-                            style: TextStyle(
-                              color: Color(0xFF8A919E),
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          _MarketSortBar(
-                            selected: _sort,
-                            onChanged: (value) => setState(() => _sort = value),
-                          ),
-                          const SizedBox(height: 10),
-                          ...visibleStocks.map((stock) {
-                            final row = _StockRow(
-                              key: Key('stock-row-${stock.code}'),
-                              definition: stock,
-                              live: _live[stock.code]!,
-                              favorite: _favoriteAssetIds.contains(stock.id),
-                              onTap: () => unawaited(_openStock(stock)),
+                                ),
+                                const SizedBox(height: 14),
+                                _MarketTabs(
+                                  selected: _tab,
+                                  onChanged: (value) =>
+                                      setState(() => _tab = value),
+                                ),
+                                const SizedBox(height: 18),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        marketListTitle,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: Color(0xFF202632),
+                                          fontSize: 19,
+                                          fontWeight: FontWeight.w700,
+                                          letterSpacing: -0.6,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    const Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        _LiveDot(),
+                                        SizedBox(width: 5),
+                                        Text(
+                                          '세계 시드 연동',
+                                          style: TextStyle(
+                                            color: Color(0xFF26845B),
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 7),
+                                const Text(
+                                  '오늘의 사건과 세계 시드가 반영되며 15:00에 가상 종가가 확정됩니다.',
+                                  style: TextStyle(
+                                    color: Color(0xFF8A919E),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                _MarketSortBar(
+                                  selected: _sort,
+                                  onChanged: (value) =>
+                                      setState(() => _sort = value),
+                                ),
+                                const SizedBox(height: 10),
+                              ],
                             );
-                            if (_tutorialStep == 2 &&
-                                stock.id == tutorialStock?.id) {
-                              return RepaintBoundary(
-                                key: _tutorialStockKey,
-                                child: row,
-                              );
-                            }
-                            return row;
-                          }),
-                          if (visibleStocks.isEmpty)
-                            Padding(
+                          }
+                          if (visibleStocks.isEmpty) {
+                            return Padding(
                               padding: const EdgeInsets.symmetric(vertical: 50),
                               child: Center(
                                 child: Text(
@@ -2040,8 +2450,26 @@ class _StockMarketScreenState extends State<StockMarketScreen>
                                   textAlign: TextAlign.center,
                                 ),
                               ),
-                            ),
-                        ],
+                            );
+                          }
+                          final stock = visibleStocks[index - 1];
+                          final row = _StockRow(
+                            key: Key('stock-row-${stock.code}'),
+                            definition: stock,
+                            live: _live[stock.code]!,
+                            turnoverFor: _turnoverFor,
+                            favorite: _favoriteAssetIds.contains(stock.id),
+                            onTap: () => unawaited(_openStock(stock)),
+                          );
+                          if (_tutorialStep == 2 &&
+                              stock.id == tutorialStock?.id) {
+                            return RepaintBoundary(
+                              key: _tutorialStockKey,
+                              child: row,
+                            );
+                          }
+                          return row;
+                        },
                       ),
                     },
                   ),
@@ -2089,10 +2517,14 @@ class _StockDetailScreen extends StatefulWidget {
     required this.playbackSpeed,
     required this.onPlaybackSpeedChanged,
     required this.onExecuteTrade,
+    required this.onCancelPendingOrder,
     required this.onToggleFavorite,
     required this.onSaveResearchNote,
     required this.onMarketSheetOpened,
     required this.onMarketSheetClosed,
+    required this.marketCapRanking,
+    required this.initialOrderBookSnapshot,
+    required this.onOrderBookSnapshotChanged,
     this.tutorialEnabled = false,
     this.onCompleteTutorial,
   });
@@ -2105,10 +2537,14 @@ class _StockDetailScreen extends StatefulWidget {
   final ValueNotifier<_MarketPlaybackSpeed> playbackSpeed;
   final ValueChanged<_MarketPlaybackSpeed> onPlaybackSpeedChanged;
   final Future<TradeExecutionResult> Function(TradeOrder) onExecuteTrade;
+  final Future<void> Function(String orderId)? onCancelPendingOrder;
   final Future<GameState> Function(String) onToggleFavorite;
   final Future<GameState> Function(String, String) onSaveResearchNote;
   final VoidCallback onMarketSheetOpened;
   final VoidCallback onMarketSheetClosed;
+  final _MarketCapRanking Function() marketCapRanking;
+  final _OrderBookSessionSnapshot? initialOrderBookSnapshot;
+  final ValueChanged<_OrderBookSessionSnapshot> onOrderBookSnapshotChanged;
   final bool tutorialEnabled;
   final Future<GameState> Function()? onCompleteTutorial;
 
@@ -2116,37 +2552,375 @@ class _StockDetailScreen extends StatefulWidget {
   State<_StockDetailScreen> createState() => _StockDetailScreenState();
 }
 
-class _StockDetailScreenState extends State<_StockDetailScreen> {
+enum _StockDetailTab { quote, order, chart, info }
+
+class _StockDetailScreenState extends State<_StockDetailScreen>
+    with WidgetsBindingObserver {
   late GameState _state;
   final ScrollController _detailScrollController = ScrollController();
+  final Map<String, _OrderBookSessionSnapshot> _orderBookSnapshotCache = {};
+  _OrderBookSessionSnapshot? _latestOrderBookSnapshot;
+  GameState? _visibleOrderBookCacheState;
+  GameOrderBookSnapshot? _visibleOrderBookCacheRaw;
+  int? _visibleOrderBookCacheMinute;
+  GameOrderBookSnapshot? _visibleOrderBookCacheValue;
+  GameState? _orderBookConsumptionCacheState;
+  int? _orderBookConsumptionCacheMinute;
+  _OrderBookConsumptionView? _orderBookConsumptionCacheValue;
+  late final ValueNotifier<int> _orderBookPulseFrame;
+  Timer? _orderBookPulseTimer;
+  DateTime? _orderBookPulseDueAt;
+  bool _isDetailLifecyclePaused = false;
+  bool _isDetailOverlayOpen = false;
+  bool _isDetailTradeInFlight = false;
   final GlobalKey _tutorialPriceKey = GlobalKey();
-  final GlobalKey _tutorialBuyKey = GlobalKey();
+  final GlobalKey _tutorialChartKey = GlobalKey();
   final GlobalKey _tutorialOrderBookHeaderKey = GlobalKey();
   final GlobalKey _tutorialBestAskKey = GlobalKey();
+  _StockDetailTab _detailTab = _StockDetailTab.quote;
+  _DetailedOrderSection _inlineOrderSection = _DetailedOrderSection.buy;
+  bool _inlineOrderIsBuy = true;
+  double? _inlineOrderLimitPrice;
+  double? _inlineOrderQuantity;
+  int _inlineOrderRevision = 0;
   int? _tutorialStep;
   TradeSide? _lastPlayerTradeSide;
   double _lastPlayerTradeQuantity = 0;
   double _lastPlayerTradePrice = 0;
   int _lastPlayerTradeMinute = -1;
+  List<MarketTechnicalLevel> _technicalLevels = const <MarketTechnicalLevel>[];
+  String _technicalLevelsDate = '';
+  double _technicalLevelsReference = 0;
 
   _StockDefinition get definition => widget.definition;
   ValueNotifier<_LiveStock> get live => widget.live;
   GameState get state => _state;
   ValueNotifier<int> get minute => widget.minute;
+  String get _orderBookSessionKey =>
+      '${state.simulationSeed}:${marketDateKey(state.currentDate)}';
+
+  void _refreshTechnicalLevels(_LiveStock quote) {
+    final dateKey = marketDateKey(_state.currentDate);
+    if (_technicalLevelsDate == dateKey &&
+        (_technicalLevelsReference - quote.previousClose).abs() < 0.000001) {
+      return;
+    }
+    _technicalLevels = marketTechnicalLevelsForAsset(
+      asset: definition.asset,
+      sessionDate: _state.currentDate,
+      referencePrice: quote.previousClose,
+    );
+    _technicalLevelsDate = dateKey;
+    _technicalLevelsReference = quote.previousClose;
+    _orderBookSnapshotCache.clear();
+    _latestOrderBookSnapshot = null;
+  }
+
+  GameOrderBookSnapshot _visibleOrderBookSnapshot(
+    GameOrderBookSnapshot rawSnapshot,
+    int currentMinute,
+  ) {
+    if (identical(_visibleOrderBookCacheState, state) &&
+        identical(_visibleOrderBookCacheRaw, rawSnapshot) &&
+        _visibleOrderBookCacheMinute == currentMinute &&
+        _visibleOrderBookCacheValue != null) {
+      return _visibleOrderBookCacheValue!;
+    }
+    final consumption = _orderBookConsumptionAt(currentMinute);
+    final visible = gameOrderBookSnapshotAfterConsumption(
+      snapshot: rawSnapshot,
+      consumedAskByPrice: consumption.asks,
+      consumedBidByPrice: consumption.bids,
+      consumedCapacityUnits: consumption.capacityUnits,
+    );
+    _visibleOrderBookCacheState = state;
+    _visibleOrderBookCacheRaw = rawSnapshot;
+    _visibleOrderBookCacheMinute = currentMinute;
+    _visibleOrderBookCacheValue = visible;
+    return visible;
+  }
+
+  _OrderBookConsumptionView _orderBookConsumptionAt(int currentMinute) {
+    if (identical(_orderBookConsumptionCacheState, state) &&
+        _orderBookConsumptionCacheMinute == currentMinute &&
+        _orderBookConsumptionCacheValue != null) {
+      return _orderBookConsumptionCacheValue!;
+    }
+    final consumption = (
+      asks: gameConsumedOrderBookUnitsByPrice(
+        state,
+        assetId: definition.id,
+        marketMinute: currentMinute,
+        bookSide: GameOrderBookSide.ask,
+      ),
+      bids: gameConsumedOrderBookUnitsByPrice(
+        state,
+        assetId: definition.id,
+        marketMinute: currentMinute,
+        bookSide: GameOrderBookSide.bid,
+      ),
+      capacityUnits: gameConsumedOrderBookFillUnits(
+        state,
+        assetId: definition.id,
+        marketMinute: currentMinute,
+        side: TradeSide.buy,
+      ),
+    );
+    _orderBookConsumptionCacheState = state;
+    _orderBookConsumptionCacheMinute = currentMinute;
+    _orderBookConsumptionCacheValue = consumption;
+    return consumption;
+  }
+
+  GameOrderBookSnapshot _continuousOrderBookSnapshot(
+    _LiveStock quote,
+    int currentMinute,
+    int microstructureFrame,
+  ) {
+    _refreshTechnicalLevels(quote);
+    final day = marketLiquidityDayKey(state.currentDate);
+    final cacheKey =
+        '${state.simulationSeed}:${definition.id}:$day:'
+        '$currentMinute:$microstructureFrame';
+    final currentPrice = marketSnapPrice(
+      quote.price,
+      market: definition.market,
+    );
+    final cached = _orderBookSnapshotCache[cacheKey];
+    if (cached != null && (cached.price - currentPrice).abs() < 0.000001) {
+      return _visibleOrderBookSnapshot(cached.snapshot, currentMinute);
+    }
+    final previous = _latestOrderBookSnapshot;
+    final canCarryForward =
+        previous != null &&
+        currentMinute >= previous.minute &&
+        microstructureFrame >= previous.microstructureFrame;
+    final carrySnapshot = canCarryForward && previous.minute < currentMinute
+        ? _visibleOrderBookSnapshot(previous.snapshot, previous.minute)
+        : canCarryForward
+        ? previous.snapshot
+        : null;
+    final snapshot = buildGameOrderBookSnapshot(
+      assetId: definition.id,
+      day: day,
+      minute: currentMinute,
+      currentPrice: currentPrice,
+      previousClose: quote.previousClose,
+      previousTradePrice: quote.sessionHistory.length >= 2
+          ? quote.sessionHistory[quote.sessionHistory.length - 2]
+          : quote.previousClose,
+      sessionLow: quote.low,
+      sessionHigh: quote.high,
+      date: state.currentDate,
+      market: definition.market,
+      simulationSeed: state.simulationSeed,
+      levelCount: gameOrderBookLevelCount,
+      tradingDay: quote.isTradingDay,
+      sharesOutstanding: definition.asset.sharesOutstandingAtOrBefore(
+        state.currentDate,
+      ),
+      isIpoFirstTradingDay: definition.asset.isIpoFirstTradingDay(
+        state.currentDate,
+      ),
+      previousSnapshot: carrySnapshot,
+      previousSnapshotMinute: canCarryForward ? previous.minute : null,
+      technicalLevels: _technicalLevels,
+      liquidityPulse: microstructureFrame,
+      adaptiveLiquidityPulses: true,
+    );
+    final entry = (
+      snapshot: snapshot,
+      minute: currentMinute,
+      price: currentPrice,
+      microstructureFrame: microstructureFrame,
+      sessionKey: _orderBookSessionKey,
+    );
+    _orderBookSnapshotCache[cacheKey] = entry;
+    _latestOrderBookSnapshot = entry;
+    widget.onOrderBookSnapshotChanged(entry);
+    while (_orderBookSnapshotCache.length > 6) {
+      _orderBookSnapshotCache.remove(_orderBookSnapshotCache.keys.first);
+    }
+    return _visibleOrderBookSnapshot(snapshot, currentMinute);
+  }
+
+  bool get _showsLiveOrderBook =>
+      _detailTab == _StockDetailTab.quote ||
+      _detailTab == _StockDetailTab.order;
+
+  bool get _canRunOrderBookPulse {
+    if (!mounted ||
+        _isDetailLifecyclePaused ||
+        _isDetailOverlayOpen ||
+        _isDetailTradeInFlight ||
+        widget.tutorialEnabled ||
+        widget.playbackSpeed.value == _MarketPlaybackSpeed.paused ||
+        !_showsLiveOrderBook ||
+        ModalRoute.of(context)?.isCurrent == false) {
+      return false;
+    }
+    final quote = live.value;
+    final tradingDay =
+        quote.isTradingDay && isMarketTradingDay(_state.currentDate);
+    final clock = marketClockAt(minute.value, tradingDay: tradingDay);
+    return clock.phase == MarketSessionPhase.regular && clock.tradable;
+  }
+
+  Duration _adaptiveOrderBookPulseDelay() {
+    final quote = live.value;
+    final previousTradePrice = quote.sessionHistory.length >= 2
+        ? quote.sessionHistory[quote.sessionHistory.length - 2]
+        : quote.previousClose;
+    final fullDayTurnoverEok = gameEstimatedFullDayTurnoverEok(
+      assetId: definition.id,
+      day: marketLiquidityDayKey(_state.currentDate),
+      referencePrice: quote.previousClose,
+      simulationSeed: _state.simulationSeed,
+      sharesOutstanding: definition.asset.sharesOutstandingAtOrBefore(
+        _state.currentDate,
+      ),
+    );
+    final pulseHz = gameOrderBookAdaptivePulseHz(
+      fullDayTurnoverEok: fullDayTurnoverEok,
+      currentPrice: quote.price,
+      previousTradePrice: previousTradePrice,
+      previousClose: quote.previousClose,
+      market: definition.market,
+      tradeStrength: _latestOrderBookSnapshot == null
+          ? 100
+          : _visibleOrderBookSnapshot(
+              _latestOrderBookSnapshot!.snapshot,
+              minute.value,
+            ).tradeStrength,
+      tradingSessionActive: true,
+      playbackActive: true,
+    );
+    final safeHz = pulseHz.isFinite && pulseHz > 0
+        ? pulseHz
+        : gameOrderBookMinimumAdaptivePulseHz;
+    final microseconds = (Duration.microsecondsPerSecond / safeHz)
+        .round()
+        .clamp(
+          (Duration.microsecondsPerSecond / gameOrderBookMaximumAdaptivePulseHz)
+              .round(),
+          (Duration.microsecondsPerSecond / gameOrderBookMinimumAdaptivePulseHz)
+              .round(),
+        );
+    return Duration(microseconds: microseconds);
+  }
+
+  void _cancelOrderBookPulse() {
+    _orderBookPulseTimer?.cancel();
+    _orderBookPulseTimer = null;
+    _orderBookPulseDueAt = null;
+  }
+
+  void _handleOrderBookPulseTimer() {
+    final dueAt = _orderBookPulseDueAt;
+    if (dueAt == null) {
+      _orderBookPulseTimer = null;
+      return;
+    }
+    final now = DateTime.now();
+    if (now.isBefore(dueAt)) {
+      _orderBookPulseTimer = Timer(
+        dueAt.difference(now),
+        _handleOrderBookPulseTimer,
+      );
+      return;
+    }
+    _orderBookPulseTimer = null;
+    _orderBookPulseDueAt = null;
+    if (!_canRunOrderBookPulse) return;
+    _orderBookPulseFrame.value += 1;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _ensureOrderBookPulseTimer();
+    });
+  }
+
+  void _ensureOrderBookPulseTimer() {
+    if (!_canRunOrderBookPulse) {
+      _cancelOrderBookPulse();
+      return;
+    }
+    final delay = _adaptiveOrderBookPulseDelay();
+    final now = DateTime.now();
+    final dueAt = _orderBookPulseDueAt;
+    if (_orderBookPulseTimer != null &&
+        dueAt != null &&
+        !delay.isNegative &&
+        now.add(delay).isAfter(dueAt)) {
+      // Do not postpone a low-liquidity pulse every time the game minute
+      // changes. Only a newly faster regime may pull the next pulse forward.
+      return;
+    }
+    _cancelOrderBookPulse();
+    _orderBookPulseDueAt = now.add(delay);
+    _orderBookPulseTimer = Timer(delay, _handleOrderBookPulseTimer);
+  }
+
+  void _handleOrderBookPulseInput() {
+    _ensureOrderBookPulseTimer();
+  }
+
+  void _setDetailOverlayOpen(bool value) {
+    if (_isDetailOverlayOpen == value) return;
+    _isDetailOverlayOpen = value;
+    if (value) {
+      _cancelOrderBookPulse();
+    } else {
+      _ensureOrderBookPulseTimer();
+    }
+  }
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _state = widget.marketState.value;
+    _refreshTechnicalLevels(live.value);
+    final initialSnapshot = widget.initialOrderBookSnapshot;
+    final canRestoreSnapshot =
+        initialSnapshot != null &&
+        initialSnapshot.sessionKey == _orderBookSessionKey &&
+        minute.value >= initialSnapshot.minute;
+    _orderBookPulseFrame = ValueNotifier<int>(
+      canRestoreSnapshot ? initialSnapshot.microstructureFrame : 0,
+    );
+    if (canRestoreSnapshot) {
+      _latestOrderBookSnapshot = initialSnapshot;
+      final currentPrice = marketSnapPrice(
+        live.value.price,
+        market: definition.market,
+      );
+      if (minute.value == initialSnapshot.minute &&
+          (currentPrice - initialSnapshot.price).abs() < 0.000001) {
+        final day = marketLiquidityDayKey(_state.currentDate);
+        final cacheKey =
+            '${_state.simulationSeed}:${definition.id}:$day:'
+            '${initialSnapshot.minute}:${initialSnapshot.microstructureFrame}';
+        _orderBookSnapshotCache[cacheKey] = initialSnapshot;
+      }
+    }
     widget.marketState.addListener(_synchronizeMarketState);
     widget.playerTrade.addListener(_synchronizePlayerTrade);
+    widget.playbackSpeed.addListener(_handleOrderBookPulseInput);
+    widget.minute.addListener(_handleOrderBookPulseInput);
+    live.addListener(_handleOrderBookPulseInput);
     _synchronizePlayerTrade();
     _tutorialStep = widget.tutorialEnabled ? 0 : null;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _ensureOrderBookPulseTimer();
+    });
   }
 
   void _synchronizeMarketState() {
     if (!mounted) return;
-    setState(() => _state = widget.marketState.value);
+    setState(() {
+      _state = widget.marketState.value;
+      _refreshTechnicalLevels(live.value);
+    });
+    _ensureOrderBookPulseTimer();
   }
 
   void _synchronizePlayerTrade() {
@@ -2167,34 +2941,64 @@ class _StockDetailScreenState extends State<_StockDetailScreen> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState appState) {
+    final paused =
+        appState == AppLifecycleState.inactive ||
+        appState == AppLifecycleState.paused ||
+        appState == AppLifecycleState.hidden ||
+        appState == AppLifecycleState.detached;
+    _isDetailLifecyclePaused = paused;
+    if (paused) {
+      _cancelOrderBookPulse();
+    } else if (appState == AppLifecycleState.resumed) {
+      _ensureOrderBookPulseTimer();
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _cancelOrderBookPulse();
     widget.marketState.removeListener(_synchronizeMarketState);
     widget.playerTrade.removeListener(_synchronizePlayerTrade);
+    widget.playbackSpeed.removeListener(_handleOrderBookPulseInput);
+    widget.minute.removeListener(_handleOrderBookPulseInput);
+    live.removeListener(_handleOrderBookPulseInput);
+    _orderBookPulseFrame.dispose();
     _detailScrollController.dispose();
     super.dispose();
   }
 
   Future<TradeExecutionResult> onExecuteTrade(TradeOrder order) async {
-    final result = await widget.onExecuteTrade(order);
-    if (result.success && mounted) {
-      setState(() {
-        _state = result.state;
-        if (result.filledQuantity > 0) {
-          _lastPlayerTradeSide = order.side;
-          _lastPlayerTradeQuantity = result.filledQuantity;
-          _lastPlayerTradePrice = result.averageFillPrice;
-          _lastPlayerTradeMinute = order.marketMinute;
-        }
-      });
+    _isDetailTradeInFlight = true;
+    _cancelOrderBookPulse();
+    try {
+      final result = await widget.onExecuteTrade(order);
+      if (result.success && mounted) {
+        setState(() {
+          _state = result.state;
+          if (result.filledQuantity > 0) {
+            _lastPlayerTradeSide = order.side;
+            _lastPlayerTradeQuantity = result.filledQuantity;
+            _lastPlayerTradePrice = result.averageFillPrice;
+            _lastPlayerTradeMinute = order.marketMinute;
+          }
+        });
+      }
+      return result;
+    } finally {
+      _isDetailTradeInFlight = false;
+      if (mounted) _ensureOrderBookPulseTimer();
     }
-    return result;
   }
 
   Future<void> _openOrderSheet(
     bool isBuy, {
     bool fromTutorial = false,
     double? limitPrice,
+    _DetailedOrderSection? initialSection,
   }) async {
+    _setDetailOverlayOpen(true);
     widget.onMarketSheetOpened();
     try {
       await _showOrderSheet(
@@ -2202,11 +3006,14 @@ class _StockDetailScreenState extends State<_StockDetailScreen> {
         definition: definition,
         live: live,
         isBuy: isBuy,
-        state: state,
+        marketState: widget.marketState,
         minute: minute,
+        liquidityPulse: _orderBookPulseFrame.value,
         onExecuteTrade: onExecuteTrade,
+        onCancelPendingOrder: widget.onCancelPendingOrder,
         initialOrderType: limitPrice == null ? null : TradeOrderType.limit,
         initialLimitPrice: limitPrice,
+        initialSection: initialSection,
         tutorialEnabled: fromTutorial,
         onCompleteTutorial: () async {
           final callback = widget.onCompleteTutorial;
@@ -2221,10 +3028,77 @@ class _StockDetailScreenState extends State<_StockDetailScreen> {
       );
     } finally {
       widget.onMarketSheetClosed();
+      _setDetailOverlayOpen(false);
     }
     if (fromTutorial && _tutorialStep == null && mounted) {
       await Navigator.of(context).maybePop();
     }
+  }
+
+  Future<void> _openQuoteQuickActions(GameOrderBookLevel level) async {
+    _setDetailOverlayOpen(true);
+    widget.onMarketSheetOpened();
+    try {
+      final action = await showDialog<_QuoteQuickAction>(
+        context: context,
+        barrierColor: const Color(0x990A1020),
+        builder: (_) => _QuoteQuickActionsDialog(price: level.price),
+      );
+      if (!mounted || action == null) return;
+      if (action == _QuoteQuickAction.amendCancel) {
+        setState(() {
+          _detailTab = _StockDetailTab.order;
+          _inlineOrderSection = _DetailedOrderSection.amendCancel;
+        });
+        return;
+      }
+      _showInlineOrder(
+        action == _QuoteQuickAction.buy,
+        limitPrice: level.price,
+      );
+    } finally {
+      widget.onMarketSheetClosed();
+      _setDetailOverlayOpen(false);
+    }
+  }
+
+  void _showInlineOrder(bool isBuy, {double? limitPrice, double? quantity}) {
+    setState(() {
+      _detailTab = _StockDetailTab.order;
+      _inlineOrderSection = isBuy
+          ? _DetailedOrderSection.buy
+          : _DetailedOrderSection.sell;
+      _inlineOrderIsBuy = isBuy;
+      _inlineOrderLimitPrice = marketSnapPrice(
+        limitPrice ?? _inlineOrderLimitPrice ?? live.value.price,
+        market: definition.market,
+      );
+      _inlineOrderQuantity = quantity;
+      _inlineOrderRevision += 1;
+    });
+  }
+
+  void _showInlineOrderSection(_DetailedOrderSection section) {
+    setState(() => _inlineOrderSection = section);
+  }
+
+  Future<void> _amendInlineOrder(PendingTradeOrder order) async {
+    final cancel = widget.onCancelPendingOrder;
+    if (cancel == null) return;
+    await cancel(order.id);
+    if (!mounted) return;
+    _showInlineOrder(
+      order.side == PendingOrderSide.buy,
+      limitPrice: order.limitPrice,
+      quantity: order.remainingQuantity,
+    );
+  }
+
+  void _resetInlineOrderForm() {
+    setState(() {
+      _inlineOrderQuantity = null;
+      _inlineOrderRevision += 1;
+    });
   }
 
   void _scrollDetailTutorialTo(double offset) {
@@ -2239,17 +3113,51 @@ class _StockDetailScreenState extends State<_StockDetailScreen> {
     );
   }
 
+  void _selectDetailTab(_StockDetailTab tab) {
+    if (_detailTab == tab) return;
+    setState(() {
+      _detailTab = tab;
+      if (tab == _StockDetailTab.order) {
+        _inlineOrderLimitPrice ??= marketSnapPrice(
+          live.value.price,
+          market: definition.market,
+        );
+      }
+    });
+    _ensureOrderBookPulseTimer();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_detailScrollController.hasClients) return;
+      _detailScrollController.jumpTo(0);
+    });
+  }
+
   double _tutorialBestAskPrice() {
     final quote = live.value;
+    _refreshTechnicalLevels(quote);
     final snapshot = buildGameOrderBookSnapshot(
       assetId: definition.id,
-      day: state.day,
+      day: marketLiquidityDayKey(state.currentDate),
       minute: minute.value,
       currentPrice: quote.price,
       previousClose: quote.previousClose,
+      previousTradePrice: quote.sessionHistory.length >= 2
+          ? quote.sessionHistory[quote.sessionHistory.length - 2]
+          : quote.previousClose,
+      sessionLow: quote.low,
+      sessionHigh: quote.high,
       date: state.currentDate,
       market: definition.market,
+      simulationSeed: state.simulationSeed,
       tradingDay: quote.isTradingDay,
+      sharesOutstanding: definition.asset.sharesOutstandingAtOrBefore(
+        state.currentDate,
+      ),
+      isIpoFirstTradingDay: definition.asset.isIpoFirstTradingDay(
+        state.currentDate,
+      ),
+      technicalLevels: _technicalLevels,
+      liquidityPulse: _orderBookPulseFrame.value,
+      adaptiveLiquidityPulses: true,
     );
     return snapshot.asks.isEmpty ? quote.price : snapshot.asks.first.price;
   }
@@ -2257,16 +3165,22 @@ class _StockDetailScreenState extends State<_StockDetailScreen> {
   void _handleDetailTutorialAction() {
     switch (_tutorialStep) {
       case 0:
-        setState(() => _tutorialStep = 1);
-        _scrollDetailTutorialTo(620);
+        setState(() {
+          _detailTab = _StockDetailTab.chart;
+          _tutorialStep = 1;
+        });
+        _scrollDetailTutorialTo(0);
         return;
       case 1:
-        setState(() => _tutorialStep = 2);
-        _scrollDetailTutorialTo(40);
+        setState(() {
+          _detailTab = _StockDetailTab.quote;
+          _tutorialStep = 2;
+        });
+        _scrollDetailTutorialTo(0);
         return;
       case 2:
         setState(() => _tutorialStep = 3);
-        _scrollDetailTutorialTo(170);
+        _scrollDetailTutorialTo(80);
         return;
       case 3:
         unawaited(
@@ -2309,16 +3223,22 @@ class _StockDetailScreenState extends State<_StockDetailScreen> {
   }
 
   Future<void> _editResearchNote() async {
-    final value = await showModalBottomSheet<String>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _ResearchNoteEditor(
-        companyName: definition.name,
-        initialValue: _researchNote,
-      ),
-    );
+    _setDetailOverlayOpen(true);
+    String? value;
+    try {
+      value = await showModalBottomSheet<String>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => _ResearchNoteEditor(
+          companyName: definition.name,
+          initialValue: _researchNote,
+        ),
+      );
+    } finally {
+      _setDetailOverlayOpen(false);
+    }
     if (value == null || !mounted) return;
     try {
       final saved = await widget.onSaveResearchNote(definition.id, value);
@@ -2352,6 +3272,35 @@ class _StockDetailScreenState extends State<_StockDetailScreen> {
                     final rate = change / quote.previousClose * 100;
                     final color = _priceColor(change);
                     final financial = definition.financialAt(state.currentDate);
+                    final sharesOutstanding =
+                        definition.asset.sharesOutstandingAtOrBefore(
+                          state.currentDate,
+                        ) ??
+                        financial?.sharesOutstanding ??
+                        0;
+                    final ownedShares = state.positions
+                        .where((position) => position.assetId == definition.id)
+                        .firstOrNull
+                        ?.units;
+                    final investorFlows = sharesOutstanding <= 0
+                        ? const <FictionalInvestorFlowDay>[]
+                        : buildFictionalInvestorFlowHistory(
+                            simulationSeed: state.simulationSeed,
+                            assetId: definition.id,
+                            throughDate: state.currentDate,
+                            priceHistory: quote.history,
+                            currentPrice: quote.price,
+                            sharesOutstanding: sharesOutstanding,
+                            sharesOutstandingAt:
+                                definition.asset.sharesOutstandingAtOrBefore,
+                            referenceCloseAt: (date, previousClose) =>
+                                definition.asset.marketReferenceCloseOn(
+                                  date,
+                                  previousClose: previousClose,
+                                ),
+                            currentMarketMinute: currentMinute,
+                            currentReferencePrice: quote.previousClose,
+                          );
                     return Column(
                       children: [
                         Padding(
@@ -2371,18 +3320,70 @@ class _StockDetailScreenState extends State<_StockDetailScreen> {
                                   children: [
                                     Text(
                                       definition.name,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
                                         color: Color(0xFF202632),
-                                        fontSize: 17,
-                                        fontWeight: FontWeight.w700,
+                                        fontSize: 21,
+                                        fontWeight: FontWeight.w900,
+                                        letterSpacing: -0.6,
                                       ),
                                     ),
                                     Text(
                                       '${definition.market} · ${definition.code}',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
                                         color: Color(0xFF8A919E),
                                         fontSize: 10,
                                         fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              RepaintBoundary(
+                                key: _tutorialPriceKey,
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Hero(
+                                      tag: 'stock-${definition.code}',
+                                      child: Material(
+                                        color: Colors.transparent,
+                                        child: Text(
+                                          _displayPrice(
+                                            quote.price,
+                                            definition.currency,
+                                          ),
+                                          key: const Key('stock-detail-price'),
+                                          maxLines: 1,
+                                          style: TextStyle(
+                                            color: color,
+                                            fontSize: 20,
+                                            height: 1.1,
+                                            fontWeight: FontWeight.w900,
+                                            letterSpacing: -0.5,
+                                            fontFeatures: _marketNumberFeatures,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    Text(
+                                      '${_signedDisplayPrice(change, definition.currency)}'
+                                      ' · ${_signedPercent(rate)}',
+                                      key: const Key(
+                                        'stock-detail-change-rate',
+                                      ),
+                                      maxLines: 1,
+                                      style: TextStyle(
+                                        color: color,
+                                        fontSize: 10,
+                                        height: 1.1,
+                                        fontWeight: FontWeight.w800,
+                                        fontFeatures: _marketNumberFeatures,
                                       ),
                                     ),
                                   ],
@@ -2415,267 +3416,231 @@ class _StockDetailScreenState extends State<_StockDetailScreen> {
                           ),
                         ),
                         Expanded(
-                          child: ListView(
-                            padding: const EdgeInsets.fromLTRB(20, 16, 20, 120),
-                            controller: _detailScrollController,
-                            children: [
-                              RepaintBoundary(
-                                key: _tutorialPriceKey,
-                                child: Hero(
-                                  tag: 'stock-${definition.code}',
-                                  child: Material(
-                                    color: Colors.transparent,
-                                    child: Text(
-                                      _displayPrice(
-                                        quote.price,
-                                        definition.currency,
-                                      ),
-                                      key: const Key('stock-detail-price'),
-                                      style: const TextStyle(
-                                        color: _marketInk,
-                                        fontSize: 34,
-                                        fontWeight: FontWeight.w700,
-                                        letterSpacing: -1.2,
-                                        fontFeatures: _marketNumberFeatures,
-                                      ),
+                          child: LayoutBuilder(
+                            builder: (context, detailConstraints) => ListView(
+                              key: ValueKey<_StockDetailTab>(_detailTab),
+                              padding:
+                                  _detailTab == _StockDetailTab.quote ||
+                                      _detailTab == _StockDetailTab.order
+                                  ? EdgeInsets.zero
+                                  : const EdgeInsets.fromLTRB(20, 16, 20, 28),
+                              physics:
+                                  _detailTab == _StockDetailTab.quote ||
+                                      _detailTab == _StockDetailTab.order
+                                  ? const NeverScrollableScrollPhysics()
+                                  : null,
+                              controller: _detailScrollController,
+                              children: switch (_detailTab) {
+                                _StockDetailTab.quote => <Widget>[
+                                  ValueListenableBuilder<int>(
+                                    valueListenable: _orderBookPulseFrame,
+                                    builder: (context, liquidityPulse, _) {
+                                      final snapshot =
+                                          _continuousOrderBookSnapshot(
+                                            quote,
+                                            currentMinute,
+                                            liquidityPulse,
+                                          );
+                                      return _OrderBookPanel(
+                                        definition: definition,
+                                        quote: quote,
+                                        state: state,
+                                        minute: currentMinute,
+                                        snapshot: snapshot,
+                                        availableHeight:
+                                            detailConstraints.maxHeight,
+                                        playerTradeSide: _lastPlayerTradeSide,
+                                        playerTradeQuantity:
+                                            _lastPlayerTradeQuantity,
+                                        playerTradePrice: _lastPlayerTradePrice,
+                                        playerTradeMinute:
+                                            _lastPlayerTradeMinute,
+                                        tutorialHeaderKey:
+                                            _tutorialOrderBookHeaderKey,
+                                        tutorialBestAskKey: _tutorialBestAskKey,
+                                        onTapLevel: (level) => unawaited(
+                                          _openQuoteQuickActions(level),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ],
+                                _StockDetailTab.order => <Widget>[
+                                  _InlineOrderWorkspace(
+                                    definition: definition,
+                                    state: state,
+                                    live: live,
+                                    minute: minute,
+                                    liquidityPulseListenable:
+                                        _orderBookPulseFrame,
+                                    marketSnapshotReader: () =>
+                                        _continuousOrderBookSnapshot(
+                                          live.value,
+                                          minute.value,
+                                          _orderBookPulseFrame.value,
+                                        ),
+                                    playerTradeSide: _lastPlayerTradeSide,
+                                    playerTradeMinute: _lastPlayerTradeMinute,
+                                    availableHeight:
+                                        detailConstraints.maxHeight,
+                                    section: _inlineOrderSection,
+                                    formRevision: _inlineOrderRevision,
+                                    initialLimitPrice:
+                                        _inlineOrderLimitPrice ?? quote.price,
+                                    initialQuantity: _inlineOrderQuantity,
+                                    onExecuteTrade: onExecuteTrade,
+                                    onSelectBuy: () => _showInlineOrder(true),
+                                    onSelectSell: () => _showInlineOrder(false),
+                                    onSelectSection: _showInlineOrderSection,
+                                    onSelectPrice: (price) => _showInlineOrder(
+                                      _inlineOrderIsBuy,
+                                      limitPrice: price,
+                                    ),
+                                    onCancelPendingOrder:
+                                        widget.onCancelPendingOrder,
+                                    onAmendPendingOrder: _amendInlineOrder,
+                                    onSuccessContinue: _resetInlineOrderForm,
+                                    onUnavailable: () => _showResearchMessage(
+                                      context,
+                                      '현재 거래할 수 없는 종목입니다.',
                                     ),
                                   ),
-                                ),
-                              ),
-                              const SizedBox(height: 3),
-                              Text(
-                                '어제보다 ${change >= 0 ? '+' : '-'}${_displayPrice(change.abs(), definition.currency)}  ${rate >= 0 ? '+' : ''}${rate.toStringAsFixed(2)}%',
-                                style: TextStyle(
-                                  color: color,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  fontFeatures: _marketNumberFeatures,
-                                ),
-                              ),
-                              const SizedBox(height: 20),
-                              _TradingStatusRow(
-                                quote: quote,
-                                minute: currentMinute,
-                              ),
-                              const SizedBox(height: 14),
-                              _OrderBookPanel(
-                                definition: definition,
-                                quote: quote,
-                                state: state,
-                                minute: currentMinute,
-                                playerTradeSide: _lastPlayerTradeSide,
-                                playerTradeQuantity: _lastPlayerTradeQuantity,
-                                playerTradePrice: _lastPlayerTradePrice,
-                                playerTradeMinute: _lastPlayerTradeMinute,
-                                tutorialHeaderKey: _tutorialOrderBookHeaderKey,
-                                tutorialBestAskKey: _tutorialBestAskKey,
-                                onTapLevel: (level) => unawaited(
-                                  _openOrderSheet(
-                                    level.side == GameOrderBookSide.ask,
-                                    limitPrice: level.price,
+                                ],
+                                _StockDetailTab.chart => <Widget>[
+                                  RepaintBoundary(
+                                    key: _tutorialChartKey,
+                                    child: _MinuteChartPanel(
+                                      quote: quote,
+                                      code: definition.code,
+                                      market: definition.market,
+                                      minute: currentMinute,
+                                      asset: definition.asset,
+                                      simulationSeed: state.simulationSeed,
+                                      throughDate: state.currentDate,
+                                    ),
                                   ),
-                                ),
-                              ),
-                              const SizedBox(height: 14),
-                              _MinuteChartPanel(
-                                quote: quote,
-                                code: definition.code,
-                                minute: currentMinute,
-                              ),
-                              const SizedBox(height: 24),
-                              _QuoteGrid(quote: quote),
-                              if (financial != null) ...[
-                                const SizedBox(height: 18),
-                                _CompanyFundamentalsCard(
-                                  snapshot: financial,
-                                  price: quote.price,
-                                  relations: definition.relations,
-                                ),
-                              ],
-                              const SizedBox(height: 28),
-                              const Divider(color: Color(0xFFF0F1F3)),
-                              const SizedBox(height: 20),
-                              const Text(
-                                '이 회사를 한 문장으로',
-                                style: TextStyle(
-                                  color: Color(0xFF202632),
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              const SizedBox(height: 9),
-                              Text(
-                                definition.summary,
-                                style: const TextStyle(
-                                  color: Color(0xFF5D6572),
-                                  fontSize: 14,
-                                  height: 1.55,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              const SizedBox(height: 18),
-
-                              Container(
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFF3F6FA),
-                                  borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(color: _marketLine),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
+                                  const SizedBox(height: 24),
+                                  _QuoteGrid(quote: quote),
+                                ],
+                                _StockDetailTab.info => <Widget>[
+                                  if (financial == null)
+                                    const _StockInfoUnavailable()
+                                  else ...[
+                                    _InvestorFlowCard(rows: investorFlows),
+                                    const SizedBox(height: 18),
+                                    _CompanyOverviewCard(
+                                      definition: definition,
+                                      snapshot: financial,
+                                      sharesOutstanding: sharesOutstanding,
+                                      price: quote.price,
+                                      ranking: widget.marketCapRanking(),
+                                      ownedShares: ownedShares ?? 0,
+                                    ),
+                                    const SizedBox(height: 18),
+                                    _CompanyFundamentalsCard(
+                                      snapshot: financial,
+                                      sharesOutstanding: sharesOutstanding,
+                                      price: quote.price,
+                                      relations: definition.relations,
+                                    ),
+                                  ],
+                                  const SizedBox(height: 20),
+                                  Container(
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF3F6FA),
+                                      borderRadius: BorderRadius.circular(14),
+                                      border: Border.all(color: _marketLine),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
-                                        const Expanded(
-                                          child: Text(
-                                            '오늘의 조사 질문',
-                                            style: TextStyle(
-                                              color: _marketAccent,
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w700,
+                                        Row(
+                                          children: [
+                                            const Expanded(
+                                              child: Text(
+                                                '오늘의 조사 질문',
+                                                style: TextStyle(
+                                                  color: _marketAccent,
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                              ),
+                                            ),
+                                            TextButton.icon(
+                                              key: const Key(
+                                                'open-market-research-note',
+                                              ),
+                                              onPressed: _editResearchNote,
+                                              icon: const Icon(
+                                                Icons.edit_note_rounded,
+                                                size: 18,
+                                              ),
+                                              label: Text(
+                                                _researchNote.isEmpty
+                                                    ? '노트 쓰기'
+                                                    : '노트 수정',
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          definition.question,
+                                          style: const TextStyle(
+                                            color: _marketInk,
+                                            fontSize: 14,
+                                            height: 1.45,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        if (_researchNote.isNotEmpty) ...[
+                                          const SizedBox(height: 12),
+                                          Container(
+                                            key: const Key(
+                                              'saved-research-note',
+                                            ),
+                                            width: double.infinity,
+                                            padding: const EdgeInsets.all(12),
+                                            decoration: BoxDecoration(
+                                              color: Colors.white.withValues(
+                                                alpha: 0.72,
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                            ),
+                                            child: Text(
+                                              _researchNote,
+                                              style: const TextStyle(
+                                                color: Color(0xFF59491B),
+                                                fontSize: 12,
+                                                height: 1.45,
+                                                fontWeight: FontWeight.w700,
+                                              ),
                                             ),
                                           ),
-                                        ),
-                                        TextButton.icon(
-                                          key: const Key(
-                                            'open-market-research-note',
-                                          ),
-                                          onPressed: _editResearchNote,
-                                          icon: const Icon(
-                                            Icons.edit_note_rounded,
-                                            size: 18,
-                                          ),
-                                          label: Text(
-                                            _researchNote.isEmpty
-                                                ? '노트 쓰기'
-                                                : '노트 수정',
-                                          ),
-                                        ),
+                                        ],
                                       ],
                                     ),
-                                    const SizedBox(height: 6),
-                                    Text(
-                                      definition.question,
-                                      style: const TextStyle(
-                                        color: _marketInk,
-                                        fontSize: 14,
-                                        height: 1.45,
-                                        fontWeight: FontWeight.w600,
-                                      ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  const Text(
+                                    '일별 종가와 사건은 이 세이브의 세계 시드로 고정됩니다. 같은 세이브에서는 다시 뽑히지 않으며, 새 게임에서는 다른 미래가 펼쳐집니다.',
+                                    style: TextStyle(
+                                      color: Color(0xFF9A9FA8),
+                                      fontSize: 10,
+                                      height: 1.4,
                                     ),
-                                    if (_researchNote.isNotEmpty) ...[
-                                      const SizedBox(height: 12),
-                                      Container(
-                                        key: const Key('saved-research-note'),
-                                        width: double.infinity,
-                                        padding: const EdgeInsets.all(12),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white.withValues(
-                                            alpha: 0.72,
-                                          ),
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
-                                        ),
-                                        child: Text(
-                                          _researchNote,
-                                          style: const TextStyle(
-                                            color: Color(0xFF59491B),
-                                            fontSize: 12,
-                                            height: 1.45,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                '일별 종가와 사건은 이 세이브의 세계 시드로 고정됩니다. 같은 세이브에서는 다시 뽑히지 않으며, 새 게임에서는 다른 미래가 펼쳐집니다.',
-                                style: const TextStyle(
-                                  color: Color(0xFF9A9FA8),
-                                  fontSize: 10,
-                                  height: 1.4,
-                                ),
-                              ),
-                            ],
+                                  ),
+                                ],
+                              },
+                            ),
                           ),
                         ),
-                        Container(
-                          padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
-                          decoration: const BoxDecoration(
-                            color: Colors.white,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Color(0x16000000),
-                                blurRadius: 18,
-                                offset: Offset(0, -5),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: OutlinedButton(
-                                  key: const Key('sell-stock-button'),
-                                  onPressed: definition.currency == 'KRW'
-                                      ? () => _openOrderSheet(false)
-                                      : () => _showResearchMessage(
-                                          context,
-                                          '현재 거래할 수 없는 종목입니다.',
-                                        ),
-                                  style: OutlinedButton.styleFrom(
-                                    minimumSize: const Size.fromHeight(52),
-                                    foregroundColor: const Color(0xFF38404D),
-                                    side: const BorderSide(
-                                      color: Color(0xFFD8DCE2),
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(15),
-                                    ),
-                                  ),
-                                  child: const Text(
-                                    '팔기',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                flex: 2,
-                                child: RepaintBoundary(
-                                  key: _tutorialBuyKey,
-                                  child: FilledButton(
-                                    key: const Key('buy-stock-button'),
-                                    onPressed: definition.currency == 'KRW'
-                                        ? () => _openOrderSheet(true)
-                                        : () => _showResearchMessage(
-                                            context,
-                                            '현재 거래할 수 없는 종목입니다.',
-                                          ),
-                                    style: FilledButton.styleFrom(
-                                      minimumSize: const Size.fromHeight(52),
-                                      backgroundColor: _marketAccent,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(15),
-                                      ),
-                                    ),
-                                    child: const Text(
-                                      '사기',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
+                        _StockDetailBottomNav(
+                          selected: _detailTab,
+                          onSelected: _selectDetailTab,
                         ),
                       ],
                     );
@@ -2715,14 +3680,36 @@ class _StockDetailScreenState extends State<_StockDetailScreen> {
     required _StockDefinition definition,
     required ValueNotifier<_LiveStock> live,
     required bool isBuy,
-    required GameState state,
+    required ValueListenable<GameState> marketState,
     required ValueNotifier<int> minute,
+    required int liquidityPulse,
     required Future<TradeExecutionResult> Function(TradeOrder) onExecuteTrade,
+    Future<void> Function(String orderId)? onCancelPendingOrder,
     TradeOrderType? initialOrderType,
     double? initialLimitPrice,
+    _DetailedOrderSection? initialSection,
     bool tutorialEnabled = false,
     Future<void> Function()? onCompleteTutorial,
   }) {
+    if (!tutorialEnabled) {
+      return Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) => _DetailedOrderPage(
+            definition: definition,
+            live: live,
+            marketState: marketState,
+            minute: minute,
+            liquidityPulse: liquidityPulse,
+            onExecuteTrade: onExecuteTrade,
+            onCancelPendingOrder: onCancelPendingOrder,
+            initialIsBuy: isBuy,
+            initialOrderType: initialOrderType,
+            initialLimitPrice: initialLimitPrice,
+            initialSection: initialSection,
+          ),
+        ),
+      );
+    }
     var showingTutorial = tutorialEnabled;
     return showModalBottomSheet<void>(
       context: context,
@@ -2741,21 +3728,11 @@ class _StockDetailScreenState extends State<_StockDetailScreen> {
                 ? _PracticalTradeTutorialSheet(
                     definition: definition,
                     sourceLive: live,
-                    sourceState: state,
+                    sourceState: marketState.value,
                     initialBuyLimitPrice: initialLimitPrice,
                     onCompleteTutorial: onCompleteTutorial,
                   )
-                : _OrderSheet(
-                    definition: definition,
-                    live: live,
-                    isBuy: isBuy,
-                    state: state,
-                    minute: minute,
-                    onExecuteTrade: onExecuteTrade,
-                    initialOrderType: initialOrderType,
-                    initialLimitPrice: initialLimitPrice,
-                  );
-            if (!tutorialEnabled) return orderSheet;
+                : const SizedBox.shrink();
             return SizedBox(
               height: MediaQuery.sizeOf(context).height * 0.92,
               child: PopScope<void>(
@@ -2796,22 +3773,2365 @@ class _StockDetailScreenState extends State<_StockDetailScreen> {
   }
 }
 
+class _StockDetailBottomNav extends StatelessWidget {
+  const _StockDetailBottomNav({
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final _StockDetailTab selected;
+  final ValueChanged<_StockDetailTab> onSelected;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    key: const Key('stock-detail-bottom-nav'),
+    height: 66,
+    decoration: const BoxDecoration(
+      color: Colors.white,
+      border: Border(top: BorderSide(color: Color(0xFFE1E5EB))),
+      boxShadow: [
+        BoxShadow(
+          color: Color(0x10000000),
+          blurRadius: 14,
+          offset: Offset(0, -4),
+        ),
+      ],
+    ),
+    child: Row(
+      children: [
+        _StockDetailTabButton(
+          key: const Key('stock-detail-tab-quote'),
+          label: '호가',
+          icon: Icons.format_list_numbered_rounded,
+          selected: selected == _StockDetailTab.quote,
+          onTap: () => onSelected(_StockDetailTab.quote),
+        ),
+        _StockDetailTabButton(
+          key: const Key('stock-detail-tab-order'),
+          label: '주문',
+          icon: Icons.receipt_long_rounded,
+          selected: selected == _StockDetailTab.order,
+          onTap: () => onSelected(_StockDetailTab.order),
+        ),
+        _StockDetailTabButton(
+          key: const Key('stock-detail-tab-chart'),
+          label: '차트',
+          icon: Icons.candlestick_chart_rounded,
+          selected: selected == _StockDetailTab.chart,
+          onTap: () => onSelected(_StockDetailTab.chart),
+        ),
+        _StockDetailTabButton(
+          key: const Key('stock-detail-tab-info'),
+          label: '정보',
+          icon: Icons.domain_rounded,
+          selected: selected == _StockDetailTab.info,
+          onTap: () => onSelected(_StockDetailTab.info),
+        ),
+      ],
+    ),
+  );
+}
+
+class _StockDetailTabButton extends StatelessWidget {
+  const _StockDetailTabButton({
+    super.key,
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+    child: Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            if (selected)
+              const Positioned(
+                top: 0,
+                left: 14,
+                right: 14,
+                child: SizedBox(
+                  height: 3,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: _marketAccent,
+                      borderRadius: BorderRadius.vertical(
+                        bottom: Radius.circular(99),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  icon,
+                  size: 21,
+                  color: selected ? _marketAccent : const Color(0xFF8A919E),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: selected ? _marketAccent : const Color(0xFF747C88),
+                    fontSize: 12,
+                    fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+class _InlineOrderWorkspace extends StatelessWidget {
+  const _InlineOrderWorkspace({
+    required this.definition,
+    required this.state,
+    required this.live,
+    required this.minute,
+    required this.liquidityPulseListenable,
+    required this.marketSnapshotReader,
+    required this.playerTradeSide,
+    required this.playerTradeMinute,
+    required this.availableHeight,
+    required this.section,
+    required this.formRevision,
+    required this.initialLimitPrice,
+    required this.initialQuantity,
+    required this.onExecuteTrade,
+    required this.onSelectBuy,
+    required this.onSelectSell,
+    required this.onSelectSection,
+    required this.onSelectPrice,
+    required this.onCancelPendingOrder,
+    required this.onAmendPendingOrder,
+    required this.onSuccessContinue,
+    required this.onUnavailable,
+  });
+
+  final _StockDefinition definition;
+  final GameState state;
+  final ValueNotifier<_LiveStock> live;
+  final ValueNotifier<int> minute;
+  final ValueListenable<int> liquidityPulseListenable;
+  final ValueGetter<GameOrderBookSnapshot> marketSnapshotReader;
+  final TradeSide? playerTradeSide;
+  final int playerTradeMinute;
+  final double availableHeight;
+  final _DetailedOrderSection section;
+  final int formRevision;
+  final double initialLimitPrice;
+  final double? initialQuantity;
+  final Future<TradeExecutionResult> Function(TradeOrder) onExecuteTrade;
+  final VoidCallback onSelectBuy;
+  final VoidCallback onSelectSell;
+  final ValueChanged<_DetailedOrderSection> onSelectSection;
+  final ValueChanged<double> onSelectPrice;
+  final Future<void> Function(String orderId)? onCancelPendingOrder;
+  final Future<void> Function(PendingTradeOrder order) onAmendPendingOrder;
+  final VoidCallback onSuccessContinue;
+  final VoidCallback onUnavailable;
+
+  @override
+  Widget build(BuildContext context) {
+    final canTrade = definition.currency == 'KRW';
+    final isBuy = section != _DetailedOrderSection.sell;
+    final railWidth = (MediaQuery.sizeOf(context).width * 0.39)
+        .clamp(138.0, 156.0)
+        .toDouble();
+    final isOrderForm =
+        section == _DetailedOrderSection.buy ||
+        section == _DetailedOrderSection.sell;
+    return SizedBox(
+      key: const Key('inline-order-workspace'),
+      height: availableHeight,
+      child: Column(
+        children: [
+          Container(
+            height: 42,
+            decoration: const BoxDecoration(
+              color: Color(0xFFFAFBFC),
+              border: Border(
+                top: BorderSide(color: Color(0xFFE5E8ED)),
+                bottom: BorderSide(color: Color(0xFFDDE1E8)),
+              ),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _InlineOrderTab(
+                    key: const Key('buy-stock-button'),
+                    label: '매수',
+                    selected: section == _DetailedOrderSection.buy,
+                    color: const Color(0xFFF04452),
+                    onTap: canTrade ? onSelectBuy : onUnavailable,
+                  ),
+                ),
+                Expanded(
+                  child: _InlineOrderTab(
+                    key: const Key('sell-stock-button'),
+                    label: '매도',
+                    selected: section == _DetailedOrderSection.sell,
+                    color: _marketAccent,
+                    onTap: canTrade ? onSelectSell : onUnavailable,
+                  ),
+                ),
+                Expanded(
+                  child: _InlineOrderTab(
+                    key: const Key('inline-amend-cancel-tab'),
+                    label: '정정/취소',
+                    selected: section == _DetailedOrderSection.amendCancel,
+                    onTap: () =>
+                        onSelectSection(_DetailedOrderSection.amendCancel),
+                  ),
+                ),
+                Expanded(
+                  child: _InlineOrderTab(
+                    key: const Key('inline-open-orders-tab'),
+                    label: '미체결',
+                    selected: section == _DetailedOrderSection.openOrders,
+                    onTap: () =>
+                        onSelectSection(_DetailedOrderSection.openOrders),
+                  ),
+                ),
+                Expanded(
+                  child: _InlineOrderTab(
+                    key: const Key('inline-balance-tab'),
+                    label: '잔고',
+                    selected: section == _DetailedOrderSection.balance,
+                    onTap: () => onSelectSection(_DetailedOrderSection.balance),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: isOrderForm
+                      ? _OrderSheet(
+                          key: ValueKey(
+                            'inline-order-${isBuy ? 'buy' : 'sell'}-$formRevision',
+                          ),
+                          definition: definition,
+                          live: live,
+                          isBuy: isBuy,
+                          state: state,
+                          minute: minute,
+                          liquidityPulseListenable: liquidityPulseListenable,
+                          marketSnapshotReader: marketSnapshotReader,
+                          onExecuteTrade: onExecuteTrade,
+                          initialOrderType: TradeOrderType.limit,
+                          initialLimitPrice: initialLimitPrice,
+                          initialQuantity: initialQuantity,
+                          submitLabel: isBuy ? '매수 주문' : '매도 주문',
+                          successLabel: '다음 주문',
+                          onSuccessContinue: onSuccessContinue,
+                          compact: true,
+                        )
+                      : section == _DetailedOrderSection.balance
+                      ? _InlineOrderBalancePanel(
+                          definition: definition,
+                          state: state,
+                        )
+                      : _InlinePendingOrdersPanel(
+                          definition: definition,
+                          state: state,
+                          correctionMode:
+                              section == _DetailedOrderSection.amendCancel,
+                          onCancel: onCancelPendingOrder,
+                          onAmend: onAmendPendingOrder,
+                        ),
+                ),
+                const VerticalDivider(width: 1, thickness: 1),
+                SizedBox(
+                  width: railWidth,
+                  child: ValueListenableBuilder<int>(
+                    valueListenable: liquidityPulseListenable,
+                    builder: (context, _, _) => _CompactOrderBookRail(
+                      definition: definition,
+                      quote: live.value,
+                      state: state,
+                      minute: minute.value,
+                      snapshot: marketSnapshotReader(),
+                      playerTradeSide: playerTradeSide,
+                      playerTradeMinute: playerTradeMinute,
+                      selectedPrice: isOrderForm ? initialLimitPrice : null,
+                      onSelectPrice: onSelectPrice,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InlineOrderTab extends StatelessWidget {
+  const _InlineOrderTab({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.color = const Color(0xFF353B78),
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: Colors.transparent,
+    child: InkWell(
+      onTap: onTap,
+      child: Container(
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(horizontal: 2),
+        decoration: BoxDecoration(
+          color: selected ? color.withValues(alpha: 0.08) : Colors.transparent,
+          border: Border(
+            bottom: BorderSide(
+              color: selected ? color : Colors.transparent,
+              width: 3,
+            ),
+          ),
+        ),
+        child: Text(
+          label,
+          maxLines: 1,
+          style: TextStyle(
+            color: selected ? color : const Color(0xFF777F8C),
+            fontSize: label.length > 3 ? 9 : 11,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+class _InlinePendingOrdersPanel extends StatelessWidget {
+  const _InlinePendingOrdersPanel({
+    required this.definition,
+    required this.state,
+    required this.correctionMode,
+    required this.onCancel,
+    required this.onAmend,
+  });
+
+  final _StockDefinition definition;
+  final GameState state;
+  final bool correctionMode;
+  final Future<void> Function(String orderId)? onCancel;
+  final Future<void> Function(PendingTradeOrder order) onAmend;
+
+  @override
+  Widget build(BuildContext context) {
+    final orders = state.pendingOrders
+        .where((order) => order.assetId == definition.id)
+        .toList(growable: false);
+    return ListView(
+      key: const Key('inline-pending-orders'),
+      padding: const EdgeInsets.fromLTRB(8, 10, 8, 12),
+      children: [
+        Text(
+          correctionMode ? '정정·취소' : '미체결 주문',
+          style: const TextStyle(
+            color: _marketInk,
+            fontSize: 15,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          correctionMode ? '가격을 고쳐 다시 내거나 주문을 취소합니다.' : '체결을 기다리는 주문입니다.',
+          style: const TextStyle(
+            color: _marketMuted,
+            fontSize: 10,
+            height: 1.35,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 10),
+        if (orders.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 42),
+            child: Text(
+              '이 종목의 미체결 주문이 없습니다.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Color(0xFF8A919E),
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          )
+        else
+          for (final order in orders)
+            Container(
+              margin: const EdgeInsets.only(bottom: 7),
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF7F8FA),
+                border: Border.all(color: const Color(0xFFE1E5EA)),
+                borderRadius: BorderRadius.circular(9),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        order.side == PendingOrderSide.buy ? '매수' : '매도',
+                        style: TextStyle(
+                          color: order.side == PendingOrderSide.buy
+                              ? const Color(0xFFF04452)
+                              : _marketAccent,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        '${_money(order.limitPrice.round())}원',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
+                          fontFeatures: _marketNumberFeatures,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      '미체결 ${_displayUnits(order.remainingQuantity)}주',
+                      style: const TextStyle(
+                        color: _marketMuted,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      if (correctionMode) ...[
+                        Expanded(
+                          child: SizedBox(
+                            height: 30,
+                            child: OutlinedButton(
+                              onPressed: onCancel == null
+                                  ? null
+                                  : () => unawaited(onAmend(order)),
+                              style: OutlinedButton.styleFrom(
+                                padding: EdgeInsets.zero,
+                              ),
+                              child: const Text(
+                                '정정',
+                                style: TextStyle(fontSize: 10),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                      ],
+                      Expanded(
+                        child: SizedBox(
+                          height: 30,
+                          child: OutlinedButton(
+                            onPressed: onCancel == null
+                                ? null
+                                : () => unawaited(onCancel!(order.id)),
+                            style: OutlinedButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                            ),
+                            child: const Text(
+                              '취소',
+                              style: TextStyle(fontSize: 10),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+      ],
+    );
+  }
+}
+
+class _InlineOrderBalancePanel extends StatelessWidget {
+  const _InlineOrderBalancePanel({
+    required this.definition,
+    required this.state,
+  });
+
+  final _StockDefinition definition;
+  final GameState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final position = state.positions
+        .where((item) => item.assetId == definition.id)
+        .firstOrNull;
+    final pending = state.pendingOrders
+        .where((order) => order.assetId == definition.id)
+        .length;
+    return ListView(
+      key: const Key('inline-order-balance'),
+      padding: const EdgeInsets.fromLTRB(9, 10, 9, 12),
+      children: [
+        const Text(
+          '주문 가능 잔고',
+          style: TextStyle(
+            color: _marketInk,
+            fontSize: 15,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 9),
+        _InlineBalanceRow(
+          label: '예수금',
+          value: '${_money(state.brokerageCash)}원',
+        ),
+        _InlineBalanceRow(
+          label: '주문 가능',
+          value: '${_money(state.availableBrokerageCash)}원',
+        ),
+        _InlineBalanceRow(
+          label: '보유',
+          value: '${_displayUnits(position?.units ?? 0)}주',
+        ),
+        _InlineBalanceRow(
+          label: '매입 금액',
+          value: '${_money(position?.totalCost ?? 0)}원',
+        ),
+        _InlineBalanceRow(label: '미체결', value: '$pending건'),
+      ],
+    );
+  }
+}
+
+class _InlineBalanceRow extends StatelessWidget {
+  const _InlineBalanceRow({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(vertical: 10),
+    decoration: const BoxDecoration(
+      border: Border(bottom: BorderSide(color: Color(0xFFE8EAEF))),
+    ),
+    child: Row(
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: _marketMuted,
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        Flexible(
+          child: Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: _marketInk,
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+              fontFeatures: _marketNumberFeatures,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _CompactOrderBookRail extends StatefulWidget {
+  const _CompactOrderBookRail({
+    required this.definition,
+    required this.quote,
+    required this.state,
+    required this.minute,
+    required this.snapshot,
+    required this.playerTradeSide,
+    required this.playerTradeMinute,
+    required this.selectedPrice,
+    required this.onSelectPrice,
+  });
+
+  final _StockDefinition definition;
+  final _LiveStock quote;
+  final GameState state;
+  final int minute;
+  final GameOrderBookSnapshot snapshot;
+  final TradeSide? playerTradeSide;
+  final int playerTradeMinute;
+  final double? selectedPrice;
+  final ValueChanged<double> onSelectPrice;
+
+  @override
+  State<_CompactOrderBookRail> createState() => _CompactOrderBookRailState();
+}
+
+class _CompactOrderBookRailState extends State<_CompactOrderBookRail> {
+  String? _depthScaleAssetId;
+  double _depthScale = 0;
+
+  bool _matches(double left, double? right) =>
+      right != null && (left - right).abs() < 0.000001;
+
+  int _stableDepthScale(int observed) {
+    final safeObserved = math.max(1, observed);
+    if (_depthScaleAssetId != widget.definition.id || _depthScale <= 0) {
+      _depthScaleAssetId = widget.definition.id;
+      _depthScale = safeObserved.toDouble();
+    } else if (safeObserved > _depthScale * 1.25) {
+      _depthScale = safeObserved.toDouble();
+    } else if (safeObserved < _depthScale * 0.55) {
+      _depthScale = math.max(safeObserved.toDouble(), _depthScale * 0.92);
+    }
+    return math.max(1, _depthScale.round());
+  }
+
+  int _displayQuantity(GameOrderBookLevel level) {
+    final playerQuantity = widget.state.pendingOrders
+        .where(
+          (order) =>
+              order.assetId == widget.definition.id &&
+              (order.limitPrice - level.price).abs() < 0.000001 &&
+              (level.side == GameOrderBookSide.ask
+                  ? order.side == PendingOrderSide.sell
+                  : order.side == PendingOrderSide.buy),
+        )
+        .fold<double>(0, (sum, order) => sum + order.remainingQuantity);
+    return level.quantity + playerQuantity.ceil();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final currentPrice = marketSnapPrice(
+      widget.quote.price,
+      market: widget.definition.market,
+    );
+    final previousPrice = widget.quote.sessionHistory.length >= 2
+        ? widget.quote.sessionHistory[widget.quote.sessionHistory.length - 2]
+        : widget.quote.previousClose;
+    final snapshot = widget.snapshot;
+    final levels = _symmetricVisibleOrderBookLevels(snapshot);
+    final generatedPulse = gameOrderBookTradePulse(
+      assetId: widget.definition.id,
+      day: marketLiquidityDayKey(widget.state.currentDate),
+      minute: widget.minute,
+      previousPrice: previousPrice,
+      currentPrice: widget.quote.price,
+      executionCapacity: snapshot.executionCapacity,
+      market: widget.definition.market,
+      simulationSeed: widget.state.simulationSeed,
+      liquidityPulse: snapshot.liquidityPulse,
+    );
+    var outlineSide = generatedPulse == null
+        ? null
+        : generatedPulse.levelSide == GameOrderBookSide.ask
+        ? TradeSide.buy
+        : TradeSide.sell;
+    if (widget.playerTradeSide != null &&
+        widget.playerTradeMinute == widget.minute) {
+      outlineSide = widget.playerTradeSide;
+    }
+    final outlinePrice = outlineSide == TradeSide.buy
+        ? snapshot.asks.firstOrNull?.price
+        : outlineSide == TradeSide.sell
+        ? snapshot.bids.firstOrNull?.price
+        : snapshot.asks
+                  .where((level) => _matches(level.price, currentPrice))
+                  .firstOrNull
+                  ?.price ??
+              snapshot.bids.firstOrNull?.price;
+    final observedMaxDepth = levels.fold<int>(
+      1,
+      (maximum, level) => math.max(maximum, _displayQuantity(level)),
+    );
+    final maxDepth = _stableDepthScale(observedMaxDepth);
+
+    return Container(
+      key: const Key('inline-order-book'),
+      color: Colors.white,
+      child: Column(
+        children: [
+          Container(
+            height: 28,
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            decoration: const BoxDecoration(
+              color: Color(0xFFF4F6F8),
+              border: Border(bottom: BorderSide(color: Color(0xFFDDE2E8))),
+            ),
+            child: const Row(
+              children: [
+                Expanded(
+                  flex: 6,
+                  child: Text(
+                    '가격',
+                    style: TextStyle(
+                      color: _marketMuted,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  flex: 5,
+                  child: Text(
+                    '잔량',
+                    textAlign: TextAlign.right,
+                    style: TextStyle(
+                      color: _marketMuted,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                if (levels.isEmpty) return const SizedBox.shrink();
+                final rowHeight = constraints.maxHeight / levels.length;
+                final outlineIndex = levels.indexWhere(
+                  (level) => _matches(level.price, outlinePrice),
+                );
+                return Stack(
+                  clipBehavior: Clip.hardEdge,
+                  children: [
+                    for (final entry in levels.asMap().entries)
+                      Positioned(
+                        key: ValueKey('inline-order-book-slot-${entry.key}'),
+                        top: entry.key * rowHeight,
+                        left: 0,
+                        right: 0,
+                        height: rowHeight,
+                        child: _CompactOrderBookRow(
+                          level: entry.value,
+                          quantity: _displayQuantity(entry.value),
+                          maxDepth: maxDepth,
+                          isCurrent: _matches(entry.value.price, outlinePrice),
+                          isSelected: _matches(
+                            entry.value.price,
+                            widget.selectedPrice,
+                          ),
+                          onTap: () => widget.onSelectPrice(entry.value.price),
+                        ),
+                      ),
+                    if (outlineIndex >= 0)
+                      AnimatedPositioned(
+                        key: const Key(
+                          'inline-order-book-current-price-border',
+                        ),
+                        duration: _orderBookMotionDuration,
+                        curve: Curves.easeOutCubic,
+                        top: outlineIndex * rowHeight,
+                        left: 0,
+                        right: constraints.maxWidth * 5 / 11,
+                        height: rowHeight,
+                        child: IgnorePointer(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: const Color(0xFFF04452),
+                                width: 1.7,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CompactOrderBookRow extends StatelessWidget {
+  const _CompactOrderBookRow({
+    required this.level,
+    required this.quantity,
+    required this.maxDepth,
+    required this.isCurrent,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final GameOrderBookLevel level;
+  final int quantity;
+  final int maxDepth;
+  final bool isCurrent;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final isAsk = level.side == GameOrderBookSide.ask;
+    final color = isAsk ? _marketAccent : const Color(0xFFF04452);
+    final tint = isAsk ? const Color(0xFFEAF3FF) : const Color(0xFFFFEEF3);
+    final bar = isAsk ? const Color(0x668DB8F3) : const Color(0x66EF9AB7);
+    final depth = (quantity / math.max(1, maxDepth)).clamp(0.0, 1.0);
+    return Material(
+      color: tint.withValues(alpha: isSelected ? 0.90 : 0.58),
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          key: ValueKey(
+            isAsk ? 'inline-order-book-ask-row' : 'inline-order-book-bid-row',
+          ),
+          decoration: const BoxDecoration(
+            border: Border(bottom: BorderSide(color: Color(0xFFE8EBF0))),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                flex: 6,
+                child: Container(
+                  padding: const EdgeInsets.only(left: 4),
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    _money(level.price.round()),
+                    maxLines: 1,
+                    style: TextStyle(
+                      color: color,
+                      fontSize: 10,
+                      fontWeight: isCurrent || isSelected
+                          ? FontWeight.w900
+                          : FontWeight.w800,
+                      fontFeatures: _marketNumberFeatures,
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(
+                flex: 5,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: FractionallySizedBox(
+                        widthFactor: depth,
+                        heightFactor: 0.78,
+                        child: ColoredBox(color: bar),
+                      ),
+                    ),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 4),
+                        child: Text(
+                          _money(quantity),
+                          maxLines: 1,
+                          style: const TextStyle(
+                            color: Color(0xFF343A45),
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800,
+                            fontFeatures: _marketNumberFeatures,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StockInfoUnavailable extends StatelessWidget {
+  const _StockInfoUnavailable();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    key: const Key('stock-info-unavailable'),
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      color: const Color(0xFFF7F8FA),
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: _marketLine),
+    ),
+    child: const Column(
+      children: [
+        Icon(Icons.info_outline_rounded, color: _marketMuted, size: 30),
+        SizedBox(height: 10),
+        Text(
+          '이 종목은 아직 기업정보가 준비되지 않았어요.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: _marketInk, fontWeight: FontWeight.w800),
+        ),
+      ],
+    ),
+  );
+}
+
+enum _QuoteQuickAction { buy, sell, amendCancel }
+
+enum _DetailedOrderSection { buy, sell, amendCancel, openOrders, balance }
+
+class _QuoteQuickActionsDialog extends StatelessWidget {
+  const _QuoteQuickActionsDialog({required this.price});
+
+  final double price;
+
+  @override
+  Widget build(BuildContext context) {
+    const sellColor = Color(0xFF4F75E8);
+    const buyColor = Color(0xFFEC5A91);
+    return Dialog(
+      key: const Key('quote-quick-actions'),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 18),
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 430),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              height: 76,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: FilledButton(
+                      key: const Key('quote-quick-sell'),
+                      onPressed: () =>
+                          Navigator.of(context).pop(_QuoteQuickAction.sell),
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(76),
+                        backgroundColor: sellColor,
+                        shape: const RoundedRectangleBorder(
+                          borderRadius: BorderRadius.horizontal(
+                            left: Radius.circular(14),
+                          ),
+                        ),
+                      ),
+                      child: const Text(
+                        '매도',
+                        style: TextStyle(
+                          fontSize: 23,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Container(
+                    key: const Key('quote-quick-price'),
+                    width: 132,
+                    alignment: Alignment.center,
+                    color: Colors.white,
+                    child: Text(
+                      _money(price.round()),
+                      style: const TextStyle(
+                        color: Color(0xFF202632),
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        fontFeatures: _marketNumberFeatures,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: FilledButton(
+                      key: const Key('quote-quick-buy'),
+                      onPressed: () =>
+                          Navigator.of(context).pop(_QuoteQuickAction.buy),
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(76),
+                        backgroundColor: buyColor,
+                        shape: const RoundedRectangleBorder(
+                          borderRadius: BorderRadius.horizontal(
+                            right: Radius.circular(14),
+                          ),
+                        ),
+                      ),
+                      child: const Text(
+                        '매수',
+                        style: TextStyle(
+                          fontSize: 23,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            FilledButton(
+              key: const Key('quote-quick-amend-cancel'),
+              onPressed: () =>
+                  Navigator.of(context).pop(_QuoteQuickAction.amendCancel),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(58),
+                backgroundColor: const Color(0xFF67CC8D),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text(
+                '정정 / 취소',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DetailedOrderPage extends StatefulWidget {
+  const _DetailedOrderPage({
+    required this.definition,
+    required this.live,
+    required this.marketState,
+    required this.minute,
+    required this.liquidityPulse,
+    required this.onExecuteTrade,
+    required this.initialIsBuy,
+    this.onCancelPendingOrder,
+    this.initialOrderType,
+    this.initialLimitPrice,
+    this.initialSection,
+  });
+
+  final _StockDefinition definition;
+  final ValueNotifier<_LiveStock> live;
+  final ValueListenable<GameState> marketState;
+  final ValueNotifier<int> minute;
+  final int liquidityPulse;
+  final Future<TradeExecutionResult> Function(TradeOrder) onExecuteTrade;
+  final Future<void> Function(String orderId)? onCancelPendingOrder;
+  final bool initialIsBuy;
+  final TradeOrderType? initialOrderType;
+  final double? initialLimitPrice;
+  final _DetailedOrderSection? initialSection;
+
+  @override
+  State<_DetailedOrderPage> createState() => _DetailedOrderPageState();
+}
+
+class _DetailedOrderPageState extends State<_DetailedOrderPage> {
+  late _DetailedOrderSection _section;
+  late TradeOrderType? _prefillOrderType;
+  double? _prefillPrice;
+  double? _prefillQuantity;
+  int _formRevision = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _section =
+        widget.initialSection ??
+        (widget.initialIsBuy
+            ? _DetailedOrderSection.buy
+            : _DetailedOrderSection.sell);
+    _prefillOrderType = widget.initialOrderType;
+    _prefillPrice = widget.initialLimitPrice;
+  }
+
+  bool get _isBuy => _section == _DetailedOrderSection.buy;
+
+  Future<void> _amend(PendingTradeOrder order) async {
+    final cancel = widget.onCancelPendingOrder;
+    if (cancel == null) return;
+    await cancel(order.id);
+    if (!mounted) return;
+    setState(() {
+      _section = order.side == PendingOrderSide.buy
+          ? _DetailedOrderSection.buy
+          : _DetailedOrderSection.sell;
+      _prefillOrderType = TradeOrderType.limit;
+      _prefillPrice = order.limitPrice;
+      _prefillQuantity = order.remainingQuantity;
+      _formRevision += 1;
+    });
+  }
+
+  void _selectSection(_DetailedOrderSection section) {
+    setState(() {
+      _section = section;
+      if (section == _DetailedOrderSection.buy ||
+          section == _DetailedOrderSection.sell) {
+        _formRevision += 1;
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      key: const Key('detailed-order-screen'),
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF353B78),
+        foregroundColor: Colors.white,
+        titleSpacing: 0,
+        title: const Text(
+          '상세 주문',
+          style: TextStyle(fontWeight: FontWeight.w900),
+        ),
+      ),
+      body: Column(
+        children: [
+          ValueListenableBuilder<_LiveStock>(
+            valueListenable: widget.live,
+            builder: (context, quote, _) => Container(
+              padding: const EdgeInsets.fromLTRB(16, 13, 16, 11),
+              decoration: const BoxDecoration(
+                border: Border(bottom: BorderSide(color: Color(0xFFE6E8EC))),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.definition.name,
+                          style: const TextStyle(
+                            color: Color(0xFF202632),
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${widget.definition.code} · ${widget.definition.market}',
+                          style: const TextStyle(
+                            color: Color(0xFF737B88),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    '${_money(quote.price.round())}원',
+                    key: const Key('detailed-order-current-price'),
+                    style: TextStyle(
+                      color: _priceColor(quote.price - quote.previousClose),
+                      fontSize: 25,
+                      fontWeight: FontWeight.w900,
+                      fontFeatures: _marketNumberFeatures,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _OrderPageTab(
+                  key: const Key('detailed-order-buy-tab'),
+                  label: '매수',
+                  selected: _section == _DetailedOrderSection.buy,
+                  color: const Color(0xFFEC3F7A),
+                  onTap: () => _selectSection(_DetailedOrderSection.buy),
+                ),
+                _OrderPageTab(
+                  key: const Key('detailed-order-sell-tab'),
+                  label: '매도',
+                  selected: _section == _DetailedOrderSection.sell,
+                  color: const Color(0xFF416CE5),
+                  onTap: () => _selectSection(_DetailedOrderSection.sell),
+                ),
+                _OrderPageTab(
+                  key: const Key('detailed-order-amend-tab'),
+                  label: '정정/취소',
+                  selected: _section == _DetailedOrderSection.amendCancel,
+                  onTap: () =>
+                      _selectSection(_DetailedOrderSection.amendCancel),
+                ),
+                _OrderPageTab(
+                  key: const Key('detailed-order-open-tab'),
+                  label: '미체결',
+                  selected: _section == _DetailedOrderSection.openOrders,
+                  onTap: () => _selectSection(_DetailedOrderSection.openOrders),
+                ),
+                _OrderPageTab(
+                  key: const Key('detailed-order-balance-tab'),
+                  label: '잔고',
+                  selected: _section == _DetailedOrderSection.balance,
+                  onTap: () => _selectSection(_DetailedOrderSection.balance),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: ValueListenableBuilder<GameState>(
+              valueListenable: widget.marketState,
+              builder: (context, state, _) {
+                if (_section == _DetailedOrderSection.buy ||
+                    _section == _DetailedOrderSection.sell) {
+                  return _OrderSheet(
+                    key: ValueKey('order-form-${_section.name}-$_formRevision'),
+                    definition: widget.definition,
+                    live: widget.live,
+                    isBuy: _isBuy,
+                    state: state,
+                    minute: widget.minute,
+                    liquidityPulse: widget.liquidityPulse,
+                    onExecuteTrade: widget.onExecuteTrade,
+                    initialOrderType: _prefillOrderType,
+                    initialLimitPrice: _prefillPrice,
+                    initialQuantity: _prefillQuantity,
+                    submitLabel: _isBuy ? '매수 주문' : '매도 주문',
+                  );
+                }
+                if (_section == _DetailedOrderSection.balance) {
+                  return _OrderBalancePanel(
+                    definition: widget.definition,
+                    state: state,
+                  );
+                }
+                return _DetailedPendingOrdersPanel(
+                  definition: widget.definition,
+                  state: state,
+                  correctionMode: _section == _DetailedOrderSection.amendCancel,
+                  onCancel: widget.onCancelPendingOrder,
+                  onAmend: _amend,
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OrderPageTab extends StatelessWidget {
+  const _OrderPageTab({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.color = const Color(0xFF353B78),
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    child: Container(
+      constraints: const BoxConstraints(minWidth: 82),
+      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 14),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(
+            color: selected ? color : Colors.transparent,
+            width: 3,
+          ),
+        ),
+      ),
+      child: Text(
+        label,
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          color: selected ? color : const Color(0xFF8A919E),
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    ),
+  );
+}
+
+class _DetailedPendingOrdersPanel extends StatelessWidget {
+  const _DetailedPendingOrdersPanel({
+    required this.definition,
+    required this.state,
+    required this.correctionMode,
+    required this.onCancel,
+    required this.onAmend,
+  });
+
+  final _StockDefinition definition;
+  final GameState state;
+  final bool correctionMode;
+  final Future<void> Function(String orderId)? onCancel;
+  final Future<void> Function(PendingTradeOrder order) onAmend;
+
+  @override
+  Widget build(BuildContext context) {
+    final orders = state.pendingOrders
+        .where((order) => order.assetId == definition.id)
+        .toList(growable: false);
+    return ListView(
+      key: const Key('detailed-pending-orders'),
+      padding: const EdgeInsets.all(18),
+      children: [
+        Text(
+          correctionMode ? '정정하거나 취소할 주문' : '미체결 주문',
+          style: const TextStyle(
+            color: Color(0xFF202632),
+            fontSize: 20,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          correctionMode
+              ? '정정을 누르면 기존 주문을 취소하고 같은 가격·잔여 수량으로 주문서를 다시 엽니다.'
+              : '아직 시장에서 체결되지 않고 기다리는 주문입니다.',
+          style: const TextStyle(
+            color: Color(0xFF6D7582),
+            fontSize: 12,
+            height: 1.45,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 16),
+        if (orders.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 70),
+            child: Center(
+              child: Text(
+                '이 종목의 미체결 주문이 없습니다.',
+                style: TextStyle(
+                  color: Color(0xFF8A919E),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          )
+        else
+          for (final order in orders)
+            Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8F9FB),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFE2E6EC)),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: order.side == PendingOrderSide.buy
+                              ? const Color(0xFFFFEAF1)
+                              : const Color(0xFFEAF1FF),
+                          borderRadius: BorderRadius.circular(7),
+                        ),
+                        child: Text(
+                          order.side == PendingOrderSide.buy ? '매수' : '매도',
+                          style: TextStyle(
+                            color: order.side == PendingOrderSide.buy
+                                ? const Color(0xFFDC326C)
+                                : const Color(0xFF416CE5),
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        '${_money(order.limitPrice.round())}원',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                          fontFeatures: _marketNumberFeatures,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Text(
+                        '미체결 ${_displayUnits(order.remainingQuantity)}주',
+                        style: const TextStyle(
+                          color: Color(0xFF606977),
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const Spacer(),
+                      if (correctionMode)
+                        TextButton(
+                          onPressed: onCancel == null
+                              ? null
+                              : () => onAmend(order),
+                          child: const Text('정정'),
+                        ),
+                      const SizedBox(width: 4),
+                      OutlinedButton(
+                        onPressed: onCancel == null
+                            ? null
+                            : () => onCancel!(order.id),
+                        child: const Text('취소'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+      ],
+    );
+  }
+}
+
+class _OrderBalancePanel extends StatelessWidget {
+  const _OrderBalancePanel({required this.definition, required this.state});
+
+  final _StockDefinition definition;
+  final GameState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final position = state.positions
+        .where((item) => item.assetId == definition.id)
+        .firstOrNull;
+    final pending = state.pendingOrders
+        .where((order) => order.assetId == definition.id)
+        .length;
+    return ListView(
+      key: const Key('detailed-order-balance'),
+      padding: const EdgeInsets.all(20),
+      children: [
+        const Text(
+          '주문 가능 잔고',
+          style: TextStyle(
+            color: Color(0xFF202632),
+            fontSize: 20,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 16),
+        _OrderBalanceRow(
+          label: '예수금',
+          value: '${_money(state.brokerageCash)}원',
+        ),
+        _OrderBalanceRow(
+          label: '주문 가능 예수금',
+          value: '${_money(state.availableBrokerageCash)}원',
+        ),
+        _OrderBalanceRow(
+          label: '보유 수량',
+          value: '${_displayUnits(position?.units ?? 0)}주',
+        ),
+        _OrderBalanceRow(
+          label: '매입 금액',
+          value: '${_money(position?.totalCost ?? 0)}원',
+        ),
+        _OrderBalanceRow(label: '미체결 주문', value: '$pending건'),
+      ],
+    );
+  }
+}
+
+class _OrderBalanceRow extends StatelessWidget {
+  const _OrderBalanceRow({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(vertical: 15),
+    decoration: const BoxDecoration(
+      border: Border(bottom: BorderSide(color: Color(0xFFE8EAEF))),
+    ),
+    child: Row(
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xFF69717E),
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        Text(
+          value,
+          style: const TextStyle(
+            color: Color(0xFF202632),
+            fontSize: 17,
+            fontWeight: FontWeight.w900,
+            fontFeatures: _marketNumberFeatures,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+enum _InvestorFlowView { aggregate, institutionDetail }
+
+enum _InvestorFlowUnit { shares, amount }
+
+class _InvestorFlowCard extends StatefulWidget {
+  const _InvestorFlowCard({required this.rows});
+
+  final List<FictionalInvestorFlowDay> rows;
+
+  @override
+  State<_InvestorFlowCard> createState() => _InvestorFlowCardState();
+}
+
+class _InvestorFlowCardState extends State<_InvestorFlowCard> {
+  _InvestorFlowView _view = _InvestorFlowView.aggregate;
+  _InvestorFlowUnit _unit = _InvestorFlowUnit.shares;
+
+  @override
+  Widget build(BuildContext context) {
+    final latest = widget.rows.isEmpty ? null : widget.rows.first;
+    return Container(
+      key: const Key('investor-flow-card'),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _marketLine),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.groups_2_outlined,
+                      color: _marketAccent,
+                      size: 21,
+                    ),
+                    const SizedBox(width: 7),
+                    const Text(
+                      '종목투자자',
+                      style: TextStyle(
+                        color: _marketInk,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      _unit == _InvestorFlowUnit.shares
+                          ? '순매수 · 주'
+                          : '순매수 · 금액',
+                      style: const TextStyle(
+                        color: _marketMuted,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 5),
+                const Text(
+                  '누가 사고팔았는지 일별 수급을 확인해요. +는 순매수, -는 순매도예요.',
+                  style: TextStyle(
+                    color: _marketMuted,
+                    fontSize: 11,
+                    height: 1.4,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 9),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: _InvestorFlowUnitToggle(
+                    selected: _unit,
+                    onChanged: (value) => setState(() => _unit = value),
+                  ),
+                ),
+                if (latest != null) ...[
+                  const SizedBox(height: 13),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _InvestorSummaryMetric(
+                          label: '개인',
+                          value: latest.individual,
+                          closePrice: latest.closePrice,
+                          unit: _unit,
+                          background: const Color(0xFFFFE4EF),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: _InvestorSummaryMetric(
+                          label: '외국인',
+                          value: latest.foreign,
+                          closePrice: latest.closePrice,
+                          unit: _unit,
+                          background: const Color(0xFFE1EAFF),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: _InvestorSummaryMetric(
+                          label: '기관계',
+                          value: latest.institution,
+                          closePrice: latest.closePrice,
+                          unit: _unit,
+                          background: const Color(0xFFDDF7E8),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: _InvestorSummaryMetric(
+                          label: '연기금',
+                          value: latest.pension,
+                          closePrice: latest.closePrice,
+                          unit: _unit,
+                          background: const Color(0xFFFFF0C7),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 13),
+                Container(
+                  height: 38,
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF2F4F7),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _InvestorFlowTab(
+                          key: const Key('investor-flow-aggregate-tab'),
+                          label: '주체별 수급',
+                          selected: _view == _InvestorFlowView.aggregate,
+                          onTap: () => setState(
+                            () => _view = _InvestorFlowView.aggregate,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: _InvestorFlowTab(
+                          key: const Key('investor-flow-detail-tab'),
+                          label: '기관 세부',
+                          selected:
+                              _view == _InvestorFlowView.institutionDetail,
+                          onTap: () => setState(
+                            () => _view = _InvestorFlowView.institutionDetail,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (widget.rows.isEmpty)
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 4, 16, 18),
+              child: Text(
+                '아직 표시할 수급 기록이 없어요.',
+                style: TextStyle(
+                  color: _marketMuted,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            )
+          else if (_view == _InvestorFlowView.aggregate)
+            _InvestorAggregateTable(rows: widget.rows, unit: _unit)
+          else
+            _InvestorInstitutionTable(rows: widget.rows, unit: _unit),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 10, 16, 14),
+            child: Text(
+              '게임 내 가상 거래 수급이며, 같은 세이브·종목·날짜에서는 동일하게 계산됩니다.',
+              style: TextStyle(
+                color: Color(0xFF929AA7),
+                fontSize: 9,
+                height: 1.35,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InvestorFlowUnitToggle extends StatelessWidget {
+  const _InvestorFlowUnitToggle({
+    required this.selected,
+    required this.onChanged,
+  });
+
+  final _InvestorFlowUnit selected;
+  final ValueChanged<_InvestorFlowUnit> onChanged;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    height: 30,
+    padding: const EdgeInsets.all(2),
+    decoration: BoxDecoration(
+      color: const Color(0xFFF2F4F7),
+      borderRadius: BorderRadius.circular(9),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _button(_InvestorFlowUnit.shares, '주'),
+        _button(_InvestorFlowUnit.amount, '금액'),
+      ],
+    ),
+  );
+
+  Widget _button(_InvestorFlowUnit value, String label) {
+    final active = selected == value;
+    return Material(
+      key: Key('investor-flow-unit-${value.name}'),
+      color: active ? Colors.white : Colors.transparent,
+      borderRadius: BorderRadius.circular(7),
+      child: InkWell(
+        onTap: () => onChanged(value),
+        borderRadius: BorderRadius.circular(7),
+        child: SizedBox(
+          width: 44,
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: active ? _marketInk : _marketMuted,
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _InvestorFlowTab extends StatelessWidget {
+  const _InvestorFlowTab({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: selected ? Colors.white : Colors.transparent,
+    borderRadius: BorderRadius.circular(8),
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Center(
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? _marketInk : _marketMuted,
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+class _InvestorSummaryMetric extends StatelessWidget {
+  const _InvestorSummaryMetric({
+    required this.label,
+    required this.value,
+    required this.closePrice,
+    required this.unit,
+    required this.background,
+  });
+
+  final String label;
+  final int value;
+  final double closePrice;
+  final _InvestorFlowUnit unit;
+  final Color background;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 8),
+    decoration: BoxDecoration(
+      color: background,
+      borderRadius: BorderRadius.circular(9),
+    ),
+    child: Column(
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            color: _marketMuted,
+            fontSize: 9,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 3),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            _investorFlowText(value, closePrice: closePrice, unit: unit),
+            maxLines: 1,
+            style: TextStyle(
+              color: _investorFlowColor(value),
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              fontFeatures: _marketNumberFeatures,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _InvestorAggregateTable extends StatelessWidget {
+  const _InvestorAggregateTable({required this.rows, required this.unit});
+
+  final List<FictionalInvestorFlowDay> rows;
+  final _InvestorFlowUnit unit;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    children: [
+      _InvestorAggregateRow(header: true, unit: unit),
+      for (final row in rows)
+        _InvestorAggregateRow(
+          date: row.date,
+          closePrice: row.closePrice,
+          unit: unit,
+          individual: row.individual,
+          foreign: row.foreign,
+          institution: row.institution,
+        ),
+    ],
+  );
+}
+
+class _InvestorAggregateRow extends StatelessWidget {
+  const _InvestorAggregateRow({
+    this.header = false,
+    this.date,
+    this.closePrice = 0,
+    required this.unit,
+    this.individual = 0,
+    this.foreign = 0,
+    this.institution = 0,
+  });
+
+  final bool header;
+  final DateTime? date;
+  final double closePrice;
+  final _InvestorFlowUnit unit;
+  final int individual;
+  final int foreign;
+  final int institution;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    height: header ? 38 : 41,
+    decoration: BoxDecoration(
+      color: header ? const Color(0xFFF7F8FA) : Colors.white,
+      border: const Border(top: BorderSide(color: _marketLine)),
+    ),
+    child: Row(
+      children: [
+        _InvestorTableCell(
+          text: header ? '일자' : _shortInvestorDate(date!),
+          flex: 11,
+          header: header,
+        ),
+        _InvestorTableCell(
+          text: header
+              ? '개인'
+              : _investorFlowText(
+                  individual,
+                  closePrice: closePrice,
+                  unit: unit,
+                ),
+          value: header ? null : individual,
+          flex: 10,
+          header: header,
+          headerColor: const Color(0xFFFFD7E8),
+        ),
+        _InvestorTableCell(
+          text: header
+              ? '외국인'
+              : _investorFlowText(foreign, closePrice: closePrice, unit: unit),
+          value: header ? null : foreign,
+          flex: 10,
+          header: header,
+          headerColor: const Color(0xFFD9E4FF),
+        ),
+        _InvestorTableCell(
+          text: header
+              ? '기관계'
+              : _investorFlowText(
+                  institution,
+                  closePrice: closePrice,
+                  unit: unit,
+                ),
+          value: header ? null : institution,
+          flex: 10,
+          header: header,
+          headerColor: const Color(0xFFD8F4E4),
+        ),
+      ],
+    ),
+  );
+}
+
+class _InvestorTableCell extends StatelessWidget {
+  const _InvestorTableCell({
+    required this.text,
+    required this.flex,
+    required this.header,
+    this.value,
+    this.headerColor,
+  });
+
+  final String text;
+  final int flex;
+  final bool header;
+  final int? value;
+  final Color? headerColor;
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+    flex: flex,
+    child: Container(
+      height: double.infinity,
+      alignment: Alignment.centerRight,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      color: header ? headerColor : null,
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(
+          text,
+          maxLines: 1,
+          style: TextStyle(
+            color: header
+                ? _marketInk
+                : value == null
+                ? _marketMuted
+                : _investorFlowColor(value!),
+            fontSize: header ? 10 : 11,
+            fontWeight: header ? FontWeight.w800 : FontWeight.w700,
+            fontFeatures: _marketNumberFeatures,
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+class _InvestorInstitutionTable extends StatelessWidget {
+  const _InvestorInstitutionTable({required this.rows, required this.unit});
+
+  final List<FictionalInvestorFlowDay> rows;
+  final _InvestorFlowUnit unit;
+
+  @override
+  Widget build(BuildContext context) => SingleChildScrollView(
+    scrollDirection: Axis.horizontal,
+    child: SizedBox(
+      width: 650,
+      child: Column(
+        children: [
+          _row(
+            header: true,
+            cells: const ['일자', '금융투자', '투신', '연기금', '보험', '기타기관', '기타법인'],
+          ),
+          for (final row in rows)
+            _row(
+              cells: [
+                _shortInvestorDate(row.date),
+                _investorFlowText(
+                  row.financialInvestment,
+                  closePrice: row.closePrice,
+                  unit: unit,
+                ),
+                _investorFlowText(
+                  row.investmentTrust,
+                  closePrice: row.closePrice,
+                  unit: unit,
+                ),
+                _investorFlowText(
+                  row.pension,
+                  closePrice: row.closePrice,
+                  unit: unit,
+                ),
+                _investorFlowText(
+                  row.insurance,
+                  closePrice: row.closePrice,
+                  unit: unit,
+                ),
+                _investorFlowText(
+                  row.otherInstitution,
+                  closePrice: row.closePrice,
+                  unit: unit,
+                ),
+                _investorFlowText(
+                  row.otherCorporation,
+                  closePrice: row.closePrice,
+                  unit: unit,
+                ),
+              ],
+              values: [
+                null,
+                row.financialInvestment,
+                row.investmentTrust,
+                row.pension,
+                row.insurance,
+                row.otherInstitution,
+                row.otherCorporation,
+              ],
+            ),
+        ],
+      ),
+    ),
+  );
+
+  Widget _row({
+    required List<String> cells,
+    List<int?>? values,
+    bool header = false,
+  }) => Container(
+    height: header ? 38 : 41,
+    decoration: BoxDecoration(
+      color: header ? const Color(0xFFF7F8FA) : Colors.white,
+      border: const Border(top: BorderSide(color: _marketLine)),
+    ),
+    child: Row(
+      children: [
+        for (var index = 0; index < cells.length; index += 1)
+          SizedBox(
+            width: index == 0 ? 82 : 94,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 7),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  cells[index],
+                  maxLines: 1,
+                  style: TextStyle(
+                    color: header
+                        ? _marketInk
+                        : values?[index] == null
+                        ? _marketMuted
+                        : _investorFlowColor(values![index]!),
+                    fontSize: header ? 10 : 11,
+                    fontWeight: header ? FontWeight.w800 : FontWeight.w700,
+                    fontFeatures: _marketNumberFeatures,
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
+    ),
+  );
+}
+
+class _CompanyOverviewCard extends StatelessWidget {
+  const _CompanyOverviewCard({
+    required this.definition,
+    required this.snapshot,
+    required this.sharesOutstanding,
+    required this.price,
+    required this.ranking,
+    required this.ownedShares,
+  });
+
+  final _StockDefinition definition;
+  final FictionalFinancialSnapshot snapshot;
+  final int sharesOutstanding;
+  final double price;
+  final _MarketCapRanking ranking;
+  final double ownedShares;
+
+  @override
+  Widget build(BuildContext context) {
+    final marketCap = (price * sharesOutstanding).round();
+    final products = definition.products.isEmpty
+        ? <String>[definition.sector]
+        : definition.products;
+    final rankLabel = ranking.rank == null
+        ? '순위 없음'
+        : '${ranking.rank}위 / ${ranking.companyCount}개사';
+    final facts = <_CompanyFactTile>[
+      _CompanyFactTile(label: '시가총액', value: _compactWonAmount(marketCap)),
+      _CompanyFactTile(label: '국내 시가총액 순위', value: rankLabel),
+      _CompanyFactTile(
+        label: '내 보유주식수',
+        value: '${_displayUnits(ownedShares)}주',
+        valueKey: const Key('company-owned-shares-value'),
+        highlighted: true,
+      ),
+      _CompanyFactTile(
+        label: '내 지분율',
+        value: _ownershipPercent(ownedShares, sharesOutstanding),
+        valueKey: const Key('company-ownership-percent-value'),
+        highlighted: true,
+      ),
+      _CompanyFactTile(label: '발행주식수', value: '${_money(sharesOutstanding)}주'),
+      _CompanyFactTile(label: '상장시장', value: definition.market),
+      _CompanyFactTile(label: '업종', value: definition.sector),
+      _CompanyFactTile(
+        label: '상장일',
+        value: _companyListingDate(definition.listedOn),
+      ),
+    ];
+    return Container(
+      key: const Key('company-overview-card'),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFCFCFD),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _marketLine),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.apartment_rounded, color: Color(0xFF7253C7), size: 20),
+              SizedBox(width: 7),
+              Text(
+                '기업정보',
+                style: TextStyle(
+                  color: _marketInk,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 11),
+          Text(
+            definition.summary,
+            style: const TextStyle(
+              color: Color(0xFF4E5866),
+              fontSize: 13,
+              height: 1.5,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 14),
+          for (var index = 0; index < facts.length; index += 2) ...[
+            SizedBox(
+              height: 66,
+              child: Row(
+                children: [
+                  Expanded(child: facts[index]),
+                  const SizedBox(width: 8),
+                  Expanded(child: facts[index + 1]),
+                ],
+              ),
+            ),
+            if (index + 2 < facts.length) const SizedBox(height: 8),
+          ],
+          const SizedBox(height: 13),
+          const Text(
+            '주요 사업',
+            style: TextStyle(
+              color: _marketMuted,
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 7),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (final product in products)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1EDFC),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    product,
+                    style: const TextStyle(
+                      color: Color(0xFF6448AA),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 11),
+          const Text(
+            '※ 내 지분율은 보유주식수 ÷ 발행주식수로 계산합니다.\n'
+            '국내 순위는 이 세이브의 게임 내 국내 상장사 시가총액 기준입니다.',
+            style: TextStyle(
+              color: Color(0xFF929AA7),
+              fontSize: 9,
+              height: 1.35,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CompanyFactTile extends StatelessWidget {
+  const _CompanyFactTile({
+    required this.label,
+    required this.value,
+    this.valueKey,
+    this.highlighted = false,
+  });
+
+  final String label;
+  final String value;
+  final Key? valueKey;
+  final bool highlighted;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
+    decoration: BoxDecoration(
+      color: highlighted ? const Color(0xFFFFF3F7) : const Color(0xFFF5F6F8),
+      borderRadius: BorderRadius.circular(11),
+      border: highlighted ? Border.all(color: const Color(0xFFF2B8CE)) : null,
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text(
+          label,
+          maxLines: 1,
+          style: const TextStyle(
+            color: _marketMuted,
+            fontSize: 9,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 3),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(
+            value,
+            key: valueKey,
+            maxLines: 1,
+            style: TextStyle(
+              color: highlighted ? const Color(0xFFC43E72) : _marketInk,
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              fontFeatures: _marketNumberFeatures,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 class _CompanyFundamentalsCard extends StatelessWidget {
   const _CompanyFundamentalsCard({
     required this.snapshot,
+    required this.sharesOutstanding,
     required this.price,
     required this.relations,
   });
 
   final FictionalFinancialSnapshot snapshot;
+  final int sharesOutstanding;
   final double price;
   final List<FictionalCompanyRelation> relations;
 
   @override
   Widget build(BuildContext context) {
-    final marketCap = (price * snapshot.sharesOutstanding).round();
-    final per = snapshot.eps <= 0 ? null : price / snapshot.eps;
-    final pbr = snapshot.bps <= 0 ? null : price / snapshot.bps;
+    final marketCap = (price * sharesOutstanding).round();
+    final eps = sharesOutstanding <= 0
+        ? 0.0
+        : snapshot.netIncome * 4 / sharesOutstanding;
+    final bps = sharesOutstanding <= 0
+        ? 0.0
+        : snapshot.equity / sharesOutstanding;
+    final per = eps <= 0 ? null : price / eps;
+    final pbr = bps <= 0 ? null : price / bps;
     final surprise = snapshot.earningsSurprisePct;
     final visibleRelations = relations.take(4).toList(growable: false);
     return Container(
@@ -3053,6 +6373,7 @@ class _PracticalTradeTutorialSheetState
   Timer? _priceMoveTimer;
   List<double> _priceMovePath = const <double>[];
   int _priceMoveStep = 0;
+  int _reviewBeat = 0;
 
   bool get _priceMoveComplete =>
       _priceMovePath.isNotEmpty && _priceMoveStep >= _priceMovePath.length - 1;
@@ -3184,7 +6505,18 @@ class _PracticalTradeTutorialSheetState
   }
 
   void _showReview() {
-    setState(() => _phase = _PracticalTradeTutorialPhase.review);
+    setState(() {
+      _phase = _PracticalTradeTutorialPhase.review;
+      _reviewBeat = 0;
+    });
+  }
+
+  void _advanceReview() {
+    if (_reviewBeat >= 3) {
+      _showDismissal();
+      return;
+    }
+    setState(() => _reviewBeat += 1);
   }
 
   void _showDismissal() {
@@ -3462,11 +6794,13 @@ class _PracticalTradeTutorialSheetState
                   Align(
                     alignment: Alignment.centerRight,
                     child: Text(
-                      '${changeRate >= 0 ? '+' : ''}${changeRate.toStringAsFixed(2)}%',
+                      _signedPercent(changeRate),
                       style: TextStyle(
-                        color: changeRate >= 0
+                        color: changeRate > 0
                             ? const Color(0xFF168B5E)
-                            : const Color(0xFFB42332),
+                            : changeRate < 0
+                            ? const Color(0xFFB42332)
+                            : _marketMuted,
                         fontSize: 12,
                         fontWeight: FontWeight.w900,
                       ),
@@ -3677,80 +7011,199 @@ class _PracticalTradeTutorialSheetState
     final studentName = widget.sourceState.story.playerName.trim().isEmpty
         ? '나'
         : widget.sourceState.story.playerName.trim();
-    return SafeArea(
-      child: Column(
-        children: [
-          Expanded(
-            child: SingleChildScrollView(
-              key: const Key('tutorial-post-trade-review'),
-              padding: const EdgeInsets.fromLTRB(18, 20, 18, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+    final isStudentBeat = _reviewBeat == 1;
+    final speaker = isStudentBeat ? studentName : '한서윤 선생님';
+    final characterAsset = switch (_reviewBeat) {
+      0 => 'assets/images/주식선생님/26_포즈5_주인공그림체_공통슬롯_투명.png',
+      1 => 'assets/images/character_hero_thoughtful_v1.png',
+      2 => 'assets/images/주식선생님/23_포즈2_주인공그림체_공통슬롯_투명.png',
+      _ => 'assets/images/주식선생님/27_포즈6_주인공그림체_공통슬롯_투명.png',
+    };
+    final message = switch (_reviewBeat) {
+      0 => '첫 거래, 같이 돌아볼까요?\n처음 직접 사고팔아 보니까 어땠어요?',
+      1 => '네! 사는 것보다 언제 팔지 정하는 게 더 어려웠어요.',
+      2 => '맞아요. 그래서 사기 전에 “왜 사는지”와\n“언제 다시 볼지”를 한 줄 적는 거예요.',
+      _ => '그리고 팔기 전 손익은 아직 화면 속 숫자예요.\n실제로 팔아야 결과가 확정된다는 것도 기억해요.',
+    };
+    return Stack(
+      key: const Key('tutorial-post-trade-review'),
+      fit: StackFit.expand,
+      children: [
+        Image.asset(
+          'assets/images/bg_stock_academy_2000_portrait_cartoon_v4.png',
+          key: const Key('tutorial-review-academy-background'),
+          fit: BoxFit.cover,
+          alignment: Alignment.center,
+          filterQuality: FilterQuality.high,
+        ),
+        const DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: <Color>[
+                Color(0xB3000000),
+                Color(0x12000000),
+                Color(0xD9000000),
+              ],
+              stops: <double>[0, 0.5, 1],
+            ),
+          ),
+        ),
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          child: SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: Row(
                 children: [
-                  const Text(
-                    '첫 거래, 같이 돌아볼까요?',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: _marketInk,
-                      fontSize: 24,
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xCC17233D),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: const Color(0x66FFFFFF)),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.school_rounded,
+                          size: 17,
+                          color: Color(0xFFFFD36A),
+                        ),
+                        SizedBox(width: 6),
+                        Text(
+                          '첫 거래 복습',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    '${_reviewBeat + 1} / 4',
+                    style: const TextStyle(
+                      color: Colors.white,
                       fontWeight: FontWeight.w900,
                     ),
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    '수익보다 중요한 건 내가 누른 주문을 이해하는 거예요.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: _marketMuted,
-                      height: 1.45,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  const _TutorialDialogueCard(
-                    speaker: '한서윤 선생님',
-                    message: '처음 직접 사고팔아 보니까 어땠어요? 숫자가 움직일 때 조금 떨렸죠?',
-                    teacher: true,
-                  ),
-                  const SizedBox(height: 10),
-                  _TutorialDialogueCard(
-                    speaker: studentName,
-                    message: '네! 사는 것보다 언제 팔지 정하는 게 더 어려웠어요.',
-                  ),
-                  const SizedBox(height: 10),
-                  const _TutorialDialogueCard(
-                    speaker: '한서윤 선생님',
-                    message:
-                        '맞아요. 그래서 사기 전에 “왜 사는지”와 “언제 다시 볼지”를 한 줄 적는 거예요. 팔기 전 손익은 아직 화면 속 숫자이고, 실제로 팔아야 결과가 확정된다는 것도 기억해요.',
-                    teacher: true,
                   ),
                 ],
               ),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 10, 18, 16),
-            child: SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                key: const Key('tutorial-review-continue'),
-                onPressed: _showDismissal,
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size.fromHeight(54),
-                  backgroundColor: _marketAccent,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+        ),
+        Positioned.fill(
+          bottom: _storyCharacterBottomInset,
+          child: _OnboardingCharacterSlot(
+            key: ValueKey<String>('tutorial-review-slot-$characterAsset'),
+            asset: characterAsset,
+            alignment: Alignment.bottomCenter,
+            characterKey: Key(
+              isStudentBeat
+                  ? 'tutorial-review-protagonist-character'
+                  : 'tutorial-review-teacher-character',
+            ),
+          ),
+        ),
+        Positioned(
+          left: 12,
+          right: 12,
+          bottom: 10,
+          child: SafeArea(
+            top: false,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+              decoration: BoxDecoration(
+                color: const Color(0xF7FFFFFF),
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(
+                  color: isStudentBeat
+                      ? const Color(0xFF8CB1F2)
+                      : const Color(0xFFF0A78E),
+                  width: 1.5,
+                ),
+                boxShadow: const <BoxShadow>[
+                  BoxShadow(
+                    color: Color(0x55000000),
+                    blurRadius: 18,
+                    offset: Offset(0, 7),
                   ),
-                ),
-                child: const Text(
-                  '마지막 인사 듣기',
-                  style: TextStyle(fontWeight: FontWeight.w800),
-                ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    speaker,
+                    key: ValueKey<String>('tutorial-review-speaker-$speaker'),
+                    style: TextStyle(
+                      color: isStudentBeat
+                          ? const Color(0xFF315FAD)
+                          : const Color(0xFFC35439),
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    message,
+                    key: ValueKey<int>(_reviewBeat),
+                    style: const TextStyle(
+                      color: _marketInk,
+                      fontSize: 15,
+                      height: 1.45,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      for (var index = 0; index < 4; index += 1)
+                        Container(
+                          width: index == _reviewBeat ? 18 : 7,
+                          height: 7,
+                          margin: const EdgeInsets.only(right: 5),
+                          decoration: BoxDecoration(
+                            color: index == _reviewBeat
+                                ? _marketAccent
+                                : const Color(0xFFD5DBE5),
+                            borderRadius: BorderRadius.circular(99),
+                          ),
+                        ),
+                      const Spacer(),
+                      FilledButton(
+                        key: const Key('tutorial-review-continue'),
+                        onPressed: _advanceReview,
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size(126, 46),
+                          backgroundColor: _marketAccent,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        child: Text(
+                          _reviewBeat == 3 ? '마지막 인사 듣기' : '다음 이야기',
+                          style: const TextStyle(fontWeight: FontWeight.w900),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -3974,6 +7427,8 @@ class _OrderBookPanel extends StatelessWidget {
     required this.quote,
     required this.state,
     required this.minute,
+    required this.snapshot,
+    required this.availableHeight,
     required this.playerTradeSide,
     required this.playerTradeQuantity,
     required this.playerTradePrice,
@@ -3987,6 +7442,8 @@ class _OrderBookPanel extends StatelessWidget {
   final _LiveStock quote;
   final GameState state;
   final int minute;
+  final GameOrderBookSnapshot snapshot;
+  final double availableHeight;
   final TradeSide? playerTradeSide;
   final double playerTradeQuantity;
   final double playerTradePrice;
@@ -4008,22 +7465,15 @@ class _OrderBookPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final snapshot = buildGameOrderBookSnapshot(
-      assetId: definition.id,
-      day: state.day,
-      minute: minute,
-      currentPrice: quote.price,
-      previousClose: quote.previousClose,
-      date: state.currentDate,
+    final previousTickPrice = quote.sessionHistory.length >= 2
+        ? quote.sessionHistory[quote.sessionHistory.length - 2]
+        : quote.previousClose;
+    final currentDisplayPrice = marketSnapPrice(
+      quote.price,
       market: definition.market,
-      tradingDay: quote.isTradingDay,
     );
-    final levels = [...snapshot.asks, ...snapshot.bids];
-    final maxDepth = levels.fold<int>(
-      1,
-      (maximum, level) =>
-          math.max(maximum, level.quantity + _playerQuantity(level).ceil()),
-    );
+
+    final snapshot = this.snapshot;
     final playerAskQuantity = snapshot.asks.fold<double>(
       0,
       (sum, level) => sum + _playerQuantity(level),
@@ -4036,224 +7486,132 @@ class _OrderBookPanel extends StatelessWidget {
         snapshot.totalAskQuantity + playerAskQuantity.ceil();
     final displayedBidQuantity =
         snapshot.totalBidQuantity + playerBidQuantity.ceil();
-    final displayedTradeStrength = displayedAskQuantity <= 0
-        ? 100.0
-        : (displayedBidQuantity / displayedAskQuantity * 100)
-              .clamp(20, 240)
-              .toDouble();
-    final range = marketDailyPriceRange(
-      previousClose: quote.previousClose,
-      date: state.currentDate,
-      market: definition.market,
-    );
-    final pendingOrderCount = state.pendingOrders
-        .where((order) => order.assetId == definition.id)
-        .length;
-    final previousTickPrice = quote.sessionHistory.length >= 2
-        ? quote.sessionHistory[quote.sessionHistory.length - 2]
-        : quote.previousClose;
     final clock = marketClockAt(
       minute,
       tradingDay: quote.isTradingDay && isMarketTradingDay(state.currentDate),
     );
-    GameOrderBookTradePulse? activePulse = clock.tradable
+    final lastContinuousIndex =
+        generatedPreOpenTicks + generatedContinuousTradingTicks - 1;
+    final auctionReference = quote.sessionPath.length > lastContinuousIndex
+        ? quote.sessionPath[lastContinuousIndex]
+        : quote.price;
+    final dailyRange = marketDailyPriceRange(
+      previousClose: quote.previousClose,
+      date: state.currentDate,
+      market: definition.market,
+      isIpoFirstTradingDay: definition.asset.isIpoFirstTradingDay(
+        state.currentDate,
+      ),
+    );
+    final indicativeAuctionPrice =
+        clock.phase == MarketSessionPhase.closingAuction
+        ? generatedClosingAuctionIndicativePrice(
+            referencePrice: auctionReference,
+            officialClose: quote.officialClose,
+            previousClose: quote.previousClose,
+            minute: minute,
+            seed: marketStockSeed(
+              '${state.simulationSeed}:${definition.code}',
+              state.currentDate,
+            ),
+            dailyLimitRate: marketDailyPriceLimitRate(state.currentDate),
+            market: definition.market,
+            lowerPriceLimit: dailyRange.lower,
+            upperPriceLimit: dailyRange.upper,
+          )
+        : quote.price;
+    final generatedPulse = clock.phase == MarketSessionPhase.regular
         ? gameOrderBookTradePulse(
             assetId: definition.id,
-            day: state.day,
+            day: marketLiquidityDayKey(state.currentDate),
             minute: minute,
             previousPrice: previousTickPrice,
             currentPrice: quote.price,
             executionCapacity: snapshot.executionCapacity,
             market: definition.market,
+            simulationSeed: state.simulationSeed,
+            liquidityPulse: snapshot.liquidityPulse,
           )
         : null;
-    if (clock.tradable &&
+    const fixedPanelHeight = 28.0 + 34.0 + 42.0 + 2.0;
+    const closingAuctionBannerHeight = 36.0;
+    var activeTradeSide = generatedPulse == null
+        ? null
+        : generatedPulse.levelSide == GameOrderBookSide.ask
+        ? TradeSide.buy
+        : TradeSide.sell;
+    var activeTradePrice = generatedPulse == null
+        ? null
+        : generatedPulse.levelSide == GameOrderBookSide.ask
+        ? snapshot.asks.firstOrNull?.price
+        : snapshot.bids.firstOrNull?.price;
+    var activeTradeQuantity = generatedPulse?.quantity ?? 0;
+    if (clock.phase == MarketSessionPhase.regular &&
         playerTradeSide != null &&
         playerTradeMinute == minute &&
         playerTradeQuantity > 0 &&
         playerTradePrice > 0) {
-      final levelSide = playerTradeSide == TradeSide.buy
-          ? GameOrderBookSide.ask
-          : GameOrderBookSide.bid;
-      final tradeLevels = levelSide == GameOrderBookSide.ask
-          ? snapshot.asks
-          : snapshot.bids;
-      var nearestIndex = 0;
-      var nearestDistance = double.infinity;
-      for (var index = 0; index < tradeLevels.length; index++) {
-        final distance = (tradeLevels[index].price - playerTradePrice).abs();
-        if (distance < nearestDistance) {
-          nearestDistance = distance;
-          nearestIndex = index;
-        }
-      }
-      activePulse = GameOrderBookTradePulse(
-        levelSide: levelSide,
-        levelIndex: nearestIndex,
-        quantity: playerTradeQuantity.round(),
-      );
+      activeTradeSide = playerTradeSide;
+      activeTradePrice = playerTradeSide == TradeSide.buy
+          ? snapshot.asks.firstOrNull?.price
+          : snapshot.bids.firstOrNull?.price;
+      activeTradeQuantity = playerTradeQuantity.round();
     }
-    final change = quote.price - quote.previousClose;
+
     return Container(
       key: const Key('stock-order-book'),
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE2E6EC)),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x0D18263A),
-            blurRadius: 18,
-            offset: Offset(0, 7),
-          ),
-        ],
+        border: const Border.symmetric(
+          horizontal: BorderSide(color: Color(0xFFE2E6EC)),
+        ),
       ),
       child: Column(
         children: [
-          Padding(
-            key: tutorialHeaderKey,
-            padding: const EdgeInsets.fromLTRB(14, 13, 14, 10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          if (clock.phase == MarketSessionPhase.closingAuction)
+            Container(
+              key: const Key('closing-auction-indicative-price'),
+              width: double.infinity,
+              height: closingAuctionBannerHeight,
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              alignment: Alignment.center,
+              color: const Color(0xFFFFF6D8),
+              child: Text(
+                '장마감 동시호가 · 예상체결가 '
+                '${_money(indicativeAuctionPrice.round())}원 · 15:00 단일가 체결',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Color(0xFF765C00),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  fontFeatures: _marketNumberFeatures,
+                ),
+              ),
+            ),
+          Container(
+            key: const Key('order-book-price-limits'),
+            height: 28,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            color: const Color(0xFFFAFBFC),
+            child: Row(
               children: [
-                Row(
-                  children: [
-                    const Expanded(
-                      child: Text(
-                        '10단계 호가',
-                        style: TextStyle(
-                          color: Color(0xFF202632),
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF2F5F9),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: const Text(
-                        '게임용 자동생성',
-                        style: TextStyle(
-                          color: Color(0xFF6D7786),
-                          fontSize: 9,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 3,
-                  children: [
-                    Text(
-                      '거래대금 ${_compactEok(snapshot.turnoverEok)}',
-                      key: const Key('order-book-turnover'),
-                      style: const TextStyle(
-                        color: Color(0xFF4E5968),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    Text(
-                      '체결강도 ${displayedTradeStrength.toStringAsFixed(1)}%',
-                      key: const Key('order-book-trade-strength'),
-                      style: TextStyle(
-                        color: displayedTradeStrength >= 100
-                            ? const Color(0xFFF04452)
-                            : _marketAccent,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    Text(
-                      '분당 소화 ${_money(snapshot.executionCapacity)}주',
-                      key: const Key('order-book-capacity'),
-                      style: const TextStyle(
-                        color: Color(0xFF4E5968),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    Text(
-                      '내 미체결 $pendingOrderCount건',
-                      key: const Key('order-book-pending-count'),
-                      style: const TextStyle(
-                        color: Color(0xFF4E5968),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-                if (activePulse != null) ...[
-                  const SizedBox(height: 7),
-                  AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 180),
-                    child: Container(
-                      key: ValueKey(
-                        '${activePulse.levelSide.name}-'
-                        '${activePulse.levelIndex}-$minute-'
-                        '${activePulse.quantity}',
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: activePulse.isBuyAggressor
-                            ? const Color(0xFFFFEEF0)
-                            : const Color(0xFFEAF3FF),
-                        borderRadius: BorderRadius.circular(7),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            activePulse.isBuyAggressor
-                                ? Icons.arrow_upward_rounded
-                                : Icons.arrow_downward_rounded,
-                            size: 12,
-                            color: activePulse.isBuyAggressor
-                                ? const Color(0xFFF04452)
-                                : _marketAccent,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${activePulse.isBuyAggressor ? '매수' : '매도'} 체결 '
-                            '${_money(activePulse.quantity)}주 · 네모칸 이동 중',
-                            key: const Key('order-book-active-summary'),
-                            style: TextStyle(
-                              color: activePulse.isBuyAggressor
-                                  ? const Color(0xFFF04452)
-                                  : _marketAccent,
-                              fontSize: 9,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 5),
                 Text(
-                  '상 ${_money(range.upper.round())} · 하 ${_money(range.lower.round())}'
-                  ' · 고 ${_money(quote.high.round())} · 저 ${_money(quote.low.round())}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  '상한가 ${_money(dailyRange.upper.round())}',
                   style: const TextStyle(
-                    color: Color(0xFF8A919E),
-                    fontSize: 9,
-                    fontWeight: FontWeight.w600,
+                    color: Color(0xFFF04452),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    fontFeatures: _marketNumberFeatures,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  '하한가 ${_money(dailyRange.lower.round())}',
+                  style: const TextStyle(
+                    color: _marketAccent,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
                     fontFeatures: _marketNumberFeatures,
                   ),
                 ),
@@ -4261,19 +7619,21 @@ class _OrderBookPanel extends StatelessWidget {
             ),
           ),
           Container(
-            height: 28,
+            key: tutorialHeaderKey,
+            height: 34,
             color: const Color(0xFFF7F8FA),
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 8),
             child: const Row(
               children: [
                 SizedBox(
-                  width: 72,
+                  width: 124,
                   child: Text(
-                    '구분',
+                    '매도잔량',
+                    textAlign: TextAlign.right,
                     style: TextStyle(
-                      color: Color(0xFF8A919E),
-                      fontSize: 9,
-                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF356FE5),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
                 ),
@@ -4283,149 +7643,71 @@ class _OrderBookPanel extends StatelessWidget {
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: Color(0xFF8A919E),
-                      fontSize: 9,
-                      fontWeight: FontWeight.w700,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
                 ),
                 SizedBox(
-                  width: 86,
+                  width: 124,
                   child: Text(
-                    '잔량',
-                    textAlign: TextAlign.right,
+                    '매수잔량',
+                    textAlign: TextAlign.left,
                     style: TextStyle(
-                      color: Color(0xFF8A919E),
-                      fontSize: 9,
-                      fontWeight: FontWeight.w700,
+                      color: Color(0xFFF04452),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
                 ),
               ],
             ),
           ),
-          ...snapshot.asks.reversed.toList().asMap().entries.map((entry) {
-            final levelIndex = snapshot.asks.length - 1 - entry.key;
-            final row = _OrderBookLevelRow(
-              key: Key('order-book-ask-$levelIndex'),
-              level: entry.value,
-              maxDepth: maxDepth,
-              playerQuantity: _playerQuantity(entry.value),
-              isActive:
-                  activePulse?.levelSide == GameOrderBookSide.ask &&
-                  activePulse?.levelIndex == levelIndex,
-              activeQuantity: activePulse?.quantity ?? 0,
-              onTap: definition.currency == 'KRW'
-                  ? () => onTapLevel(entry.value)
-                  : null,
-            );
-            if (levelIndex != 0 || tutorialBestAskKey == null) return row;
-            return RepaintBoundary(key: tutorialBestAskKey, child: row);
-          }),
-          Container(
-            key: const Key('order-book-current-price'),
-            height: 44,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: const BoxDecoration(
-              color: Color(0xFFFFFCF0),
-              border: Border.symmetric(
-                horizontal: BorderSide(color: Color(0xFFFFE08A)),
-              ),
+          _OrderBookPriceLadder(
+            key: ValueKey(
+              'order-book-price-ladder-${definition.id}-'
+              '${marketLiquidityDayKey(state.currentDate)}',
             ),
+            snapshot: snapshot,
+            currentPrice: currentDisplayPrice,
+            availableHeight:
+                availableHeight -
+                fixedPanelHeight -
+                (clock.phase == MarketSessionPhase.closingAuction
+                    ? closingAuctionBannerHeight
+                    : 0),
+            playerQuantityForLevel: _playerQuantity,
+            activeTradePrice: activeTradePrice,
+            activeTradeSide: activeTradeSide,
+            activeTradeQuantity: activeTradeQuantity,
+            onTapLevel: definition.currency == 'KRW' ? onTapLevel : null,
+            tutorialBestAskKey: tutorialBestAskKey,
+          ),
+          Container(
+            height: 42,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            color: const Color(0xFFFAFBFC),
             child: Row(
               children: [
-                const SizedBox(
-                  width: 72,
+                Expanded(
                   child: Text(
-                    '현재 체결가',
-                    style: TextStyle(
-                      color: Color(0xFF6E5A16),
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
+                    '매도잔량 ${_money(displayedAskQuantity)}주',
+                    style: const TextStyle(
+                      color: _marketAccent,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
                 ),
                 Expanded(
                   child: Text(
-                    '${_money(quote.price.round())}원',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: _priceColor(change),
-                      fontSize: 16,
-                      fontWeight: FontWeight.w900,
-                      fontFeatures: _marketNumberFeatures,
-                    ),
-                  ),
-                ),
-                SizedBox(
-                  width: 86,
-                  child: Text(
-                    '${change >= 0 ? '+' : ''}${_changeRate(quote).toStringAsFixed(2)}%',
+                    '매수잔량 ${_money(displayedBidQuantity)}주',
                     textAlign: TextAlign.right,
-                    style: TextStyle(
-                      color: _priceColor(change),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      fontFeatures: _marketNumberFeatures,
+                    style: const TextStyle(
+                      color: Color(0xFFF04452),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
                     ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          ...snapshot.bids.asMap().entries.map(
-            (entry) => _OrderBookLevelRow(
-              key: Key('order-book-bid-${entry.key}'),
-              level: entry.value,
-              maxDepth: maxDepth,
-              playerQuantity: _playerQuantity(entry.value),
-              isActive:
-                  activePulse?.levelSide == GameOrderBookSide.bid &&
-                  activePulse?.levelIndex == entry.key,
-              activeQuantity: activePulse?.quantity ?? 0,
-              onTap: definition.currency == 'KRW'
-                  ? () => onTapLevel(entry.value)
-                  : null,
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 11),
-            color: const Color(0xFFFAFBFC),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        '매도잔량 ${_money(displayedAskQuantity)}주',
-                        style: const TextStyle(
-                          color: _marketAccent,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: Text(
-                        '매수잔량 ${_money(displayedBidQuantity)}주',
-                        textAlign: TextAlign.right,
-                        style: const TextStyle(
-                          color: Color(0xFFF04452),
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 5),
-                const Text(
-                  '매도호가를 누르면 매수, 매수호가를 누르면 매도 지정가가 입력됩니다. '
-                  '가격이 달아나면 주문이 체결되지 않을 수 있습니다.',
-                  style: TextStyle(
-                    color: Color(0xFF7B8491),
-                    fontSize: 9,
-                    fontWeight: FontWeight.w600,
-                    height: 1.35,
                   ),
                 ),
               ],
@@ -4437,21 +7719,187 @@ class _OrderBookPanel extends StatelessWidget {
   }
 }
 
+class _OrderBookPriceLadder extends StatefulWidget {
+  const _OrderBookPriceLadder({
+    super.key,
+    required this.snapshot,
+    required this.currentPrice,
+    required this.availableHeight,
+    required this.playerQuantityForLevel,
+    required this.activeTradePrice,
+    required this.activeTradeSide,
+    required this.activeTradeQuantity,
+    required this.onTapLevel,
+    required this.tutorialBestAskKey,
+  });
+
+  final GameOrderBookSnapshot snapshot;
+  final double currentPrice;
+  final double availableHeight;
+  final double Function(GameOrderBookLevel level) playerQuantityForLevel;
+  final double? activeTradePrice;
+  final TradeSide? activeTradeSide;
+  final int activeTradeQuantity;
+  final ValueChanged<GameOrderBookLevel>? onTapLevel;
+  final GlobalKey? tutorialBestAskKey;
+
+  @override
+  State<_OrderBookPriceLadder> createState() => _OrderBookPriceLadderState();
+}
+
+class _OrderBookPriceLadderState extends State<_OrderBookPriceLadder> {
+  String? _depthScaleAssetId;
+  double _depthScale = 0;
+
+  bool _matchesPrice(GameOrderBookLevel level, double? price) =>
+      price != null && (level.price - price).abs() < 0.000001;
+
+  int _stableDepthScale(int observed) {
+    final assetId = widget.snapshot.sourceAssetId;
+    final safeObserved = math.max(1, observed);
+    if (_depthScaleAssetId != assetId || _depthScale <= 0) {
+      _depthScaleAssetId = assetId;
+      _depthScale = safeObserved.toDouble();
+    } else if (safeObserved > _depthScale * 1.25) {
+      _depthScale = safeObserved.toDouble();
+    } else if (safeObserved < _depthScale * 0.55) {
+      _depthScale = math.max(safeObserved.toDouble(), _depthScale * 0.92);
+    }
+    return math.max(1, _depthScale.round());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final levels = _symmetricVisibleOrderBookLevels(widget.snapshot);
+    final observedMaxDepth = levels.fold<int>(
+      1,
+      (maximum, level) => math.max(
+        maximum,
+        level.quantity + widget.playerQuantityForLevel(level).ceil(),
+      ),
+    );
+    final maxVisibleDepth = _stableDepthScale(observedMaxDepth);
+    final rowHeight = levels.isEmpty
+        ? 39.0
+        : (widget.availableHeight / levels.length).clamp(22.0, 42.0).toDouble();
+    final outlinePrice = widget.activeTradeSide == TradeSide.buy
+        ? widget.snapshot.asks.firstOrNull?.price
+        : widget.activeTradeSide == TradeSide.sell
+        ? widget.snapshot.bids.firstOrNull?.price
+        : widget.snapshot.asks
+                  .where((level) => _matchesPrice(level, widget.currentPrice))
+                  .firstOrNull
+                  ?.price ??
+              widget.snapshot.bids.firstOrNull?.price;
+    final currentRowIndex = levels.indexWhere(
+      (level) => _matchesPrice(level, outlinePrice),
+    );
+    final askIndexByPrice = <double, int>{
+      for (final entry in widget.snapshot.asks.asMap().entries)
+        entry.value.price: entry.key,
+    };
+    final bidIndexByPrice = <double, int>{
+      for (final entry in widget.snapshot.bids.asMap().entries)
+        entry.value.price: entry.key,
+    };
+
+    return SizedBox(
+      height: rowHeight * levels.length,
+      child: Stack(
+        clipBehavior: Clip.hardEdge,
+        children: [
+          for (final entry in levels.asMap().entries)
+            Positioned(
+              key: ValueKey('order-book-slot-${entry.key}'),
+              top: entry.key * rowHeight,
+              left: 0,
+              right: 0,
+              height: rowHeight,
+              child: Builder(
+                builder: (context) {
+                  final level = entry.value;
+                  final isAsk = level.side == GameOrderBookSide.ask;
+                  final levelIndex =
+                      (isAsk
+                          ? askIndexByPrice[level.price]
+                          : bidIndexByPrice[level.price]) ??
+                      0;
+                  Widget row = _OrderBookLevelRow(
+                    key: Key('order-book-${isAsk ? 'ask' : 'bid'}-$levelIndex'),
+                    level: level,
+                    rowHeight: rowHeight,
+                    maxDepth: maxVisibleDepth,
+                    playerQuantity: widget.playerQuantityForLevel(level),
+                    isActive: _matchesPrice(level, widget.activeTradePrice),
+                    activeTradeSide: widget.activeTradeSide,
+                    activeQuantity: widget.activeTradeQuantity,
+                    onTap: widget.onTapLevel == null
+                        ? null
+                        : () => widget.onTapLevel!(level),
+                  );
+                  if (entry.key == currentRowIndex) {
+                    row = KeyedSubtree(
+                      key: const Key('order-book-current-price'),
+                      child: row,
+                    );
+                  }
+                  if (!isAsk ||
+                      levelIndex != 0 ||
+                      widget.tutorialBestAskKey == null) {
+                    return row;
+                  }
+                  return RepaintBoundary(
+                    key: widget.tutorialBestAskKey,
+                    child: row,
+                  );
+                },
+              ),
+            ),
+          if (currentRowIndex >= 0)
+            AnimatedPositioned(
+              key: const Key('order-book-current-price-border'),
+              duration: _orderBookMotionDuration,
+              curve: Curves.easeOutCubic,
+              top: currentRowIndex * rowHeight,
+              left: 132,
+              right: 132,
+              height: rowHeight,
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: const Color(0xFFF04452),
+                      width: 2,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 class _OrderBookLevelRow extends StatelessWidget {
   const _OrderBookLevelRow({
     super.key,
     required this.level,
+    required this.rowHeight,
     required this.maxDepth,
     required this.playerQuantity,
     required this.isActive,
+    required this.activeTradeSide,
     required this.activeQuantity,
     required this.onTap,
   });
 
   final GameOrderBookLevel level;
+  final double rowHeight;
   final int maxDepth;
   final double playerQuantity;
   final bool isActive;
+  final TradeSide? activeTradeSide;
   final int activeQuantity;
   final VoidCallback? onTap;
 
@@ -4459,169 +7907,217 @@ class _OrderBookLevelRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final isAsk = level.side == GameOrderBookSide.ask;
     final levelColor = isAsk ? _marketAccent : const Color(0xFFF04452);
-    final tradeColor = isAsk ? const Color(0xFFF04452) : _marketAccent;
-    final tint = isAsk ? const Color(0xFFEAF3FF) : const Color(0xFFFFEEF0);
-    final barColor = isAsk ? const Color(0x403278D5) : const Color(0x40F04452);
+    final tradeColor = activeTradeSide == TradeSide.buy
+        ? const Color(0xFFF04452)
+        : _marketAccent;
+    final tint = isAsk ? const Color(0xFFEAF3FF) : const Color(0xFFFFEEF3);
+    final barColor = isAsk ? const Color(0x998DB8F3) : const Color(0x99EF9AB7);
     final totalQuantity = level.quantity + playerQuantity.ceil();
-    final depth = (totalQuantity / math.max(1, maxDepth)).clamp(0.04, 1.0);
-    final isWall =
-        level.isWall || playerQuantity >= math.max(1, level.quantity * 2);
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 180),
-      curve: Curves.easeOutCubic,
-      decoration: BoxDecoration(
-        color: isActive
-            ? tradeColor.withValues(alpha: 0.10)
-            : tint.withValues(alpha: 0.45),
-        border: Border.all(
-          color: isActive ? tradeColor : Colors.transparent,
-          width: isActive ? 2 : 0,
-        ),
-        boxShadow: isActive
-            ? [
-                BoxShadow(
-                  color: tradeColor.withValues(alpha: 0.22),
-                  blurRadius: 8,
-                  spreadRadius: 1,
-                ),
-              ]
-            : const [],
-      ),
+    final depth = (totalQuantity / math.max(1, maxDepth)).clamp(0.0, 1.0);
+    return Container(
+      decoration: const BoxDecoration(color: Colors.white),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
           child: SizedBox(
-            height: 41,
-            child: Stack(
-              children: [
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: FractionallySizedBox(
-                    widthFactor: depth * 0.62,
-                    child: ColoredBox(color: barColor),
+            height: rowHeight,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Row(
+                children: [
+                  Container(
+                    width: 124,
+                    height: double.infinity,
+                    decoration: BoxDecoration(
+                      color: isAsk
+                          ? tint.withValues(alpha: 0.20)
+                          : Colors.white,
+                      border: const Border(
+                        bottom: BorderSide(color: Color(0xFFE9EDF2)),
+                      ),
+                    ),
+                    child: isAsk
+                        ? _OrderBookQuantityCell(
+                            isAsk: true,
+                            quantity: totalQuantity,
+                            depth: depth,
+                            isActive: isActive,
+                            activeQuantity: activeQuantity,
+                            activeTradeSide: activeTradeSide,
+                            playerQuantity: playerQuantity,
+                            tradeColor: tradeColor,
+                            barColor: barColor,
+                          )
+                        : null,
                   ),
-                ),
-                Positioned.fill(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Row(
-                      children: [
-                        SizedBox(
-                          width: 72,
-                          child: isActive
-                              ? Container(
-                                  key: const Key('order-book-active-trade'),
-                                  alignment: Alignment.centerLeft,
-                                  child: Text(
-                                    isAsk ? '매수 체결 ↑' : '매도 체결 ↓',
-                                    style: TextStyle(
-                                      color: tradeColor,
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.w900,
-                                    ),
-                                  ),
-                                )
-                              : Row(
-                                  children: [
-                                    Text(
-                                      isAsk ? '매도' : '매수',
-                                      style: TextStyle(
-                                        color: levelColor,
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w800,
-                                      ),
-                                    ),
-                                    if (isWall) ...[
-                                      const SizedBox(width: 4),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 4,
-                                          vertical: 2,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: levelColor.withValues(
-                                            alpha: 0.12,
-                                          ),
-                                          borderRadius: BorderRadius.circular(
-                                            4,
-                                          ),
-                                        ),
-                                        child: Text(
-                                          '벽',
-                                          style: TextStyle(
-                                            color: levelColor,
-                                            fontSize: 8,
-                                            fontWeight: FontWeight.w900,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
+                  Expanded(
+                    child: Container(
+                      key: const ValueKey('order-book-price-surface'),
+                      height: double.infinity,
+                      decoration: BoxDecoration(
+                        color: tint.withValues(alpha: 0.72),
+                        border: const Border(
+                          bottom: BorderSide(color: Color(0xFFE9EDF2)),
                         ),
-                        Expanded(
-                          child: Text(
-                            '${_money(level.price.round())}원',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: isActive ? tradeColor : levelColor,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w800,
-                              fontFeatures: _marketNumberFeatures,
-                            ),
+                      ),
+                      child: Container(
+                        alignment: Alignment.center,
+                        child: Text(
+                          '${_money(level.price.round())}원',
+                          key: const ValueKey('order-book-price-label'),
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: levelColor,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
+                            fontFeatures: _marketNumberFeatures,
                           ),
                         ),
-                        SizedBox(
-                          width: 86,
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Text(
-                                _money(totalQuantity),
-                                maxLines: 1,
-                                style: const TextStyle(
-                                  color: Color(0xFF2C3440),
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  fontFeatures: _marketNumberFeatures,
-                                ),
-                              ),
-                              if (isActive)
-                                Text(
-                                  '체결 ${_money(activeQuantity)}주',
-                                  maxLines: 1,
-                                  style: TextStyle(
-                                    color: tradeColor,
-                                    fontSize: 8,
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                )
-                              else if (playerQuantity > 0)
-                                Text(
-                                  '내 주문 ${_displayUnits(playerQuantity)}주',
-                                  maxLines: 1,
-                                  style: const TextStyle(
-                                    color: Color(0xFF7A5A00),
-                                    fontSize: 8,
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
-                ),
-              ],
+                  Container(
+                    width: 124,
+                    height: double.infinity,
+                    decoration: BoxDecoration(
+                      color: isAsk
+                          ? Colors.white
+                          : tint.withValues(alpha: 0.20),
+                      border: const Border(
+                        bottom: BorderSide(color: Color(0xFFE9EDF2)),
+                      ),
+                    ),
+                    child: isAsk
+                        ? null
+                        : _OrderBookQuantityCell(
+                            isAsk: false,
+                            quantity: totalQuantity,
+                            depth: depth,
+                            isActive: isActive,
+                            activeQuantity: activeQuantity,
+                            activeTradeSide: activeTradeSide,
+                            playerQuantity: playerQuantity,
+                            tradeColor: tradeColor,
+                            barColor: barColor,
+                          ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
       ),
     );
   }
+}
+
+class _OrderBookQuantityCell extends StatelessWidget {
+  const _OrderBookQuantityCell({
+    required this.isAsk,
+    required this.quantity,
+    required this.depth,
+    required this.isActive,
+    required this.activeQuantity,
+    required this.activeTradeSide,
+    required this.playerQuantity,
+    required this.tradeColor,
+    required this.barColor,
+  });
+
+  final bool isAsk;
+  final int quantity;
+  final double depth;
+  final bool isActive;
+  final int activeQuantity;
+  final TradeSide? activeTradeSide;
+  final double playerQuantity;
+  final Color tradeColor;
+  final Color barColor;
+
+  @override
+  Widget build(BuildContext context) => Stack(
+    key: ValueKey(
+      isAsk ? 'order-book-sell-quantity-cell' : 'order-book-buy-quantity-cell',
+    ),
+    fit: StackFit.expand,
+    children: [
+      Align(
+        alignment: isAsk ? Alignment.centerRight : Alignment.centerLeft,
+        child: TweenAnimationBuilder<double>(
+          duration: _orderBookMotionDuration,
+          curve: Curves.easeOutCubic,
+          tween: Tween<double>(end: depth),
+          builder: (context, animatedDepth, child) => FractionallySizedBox(
+            key: ValueKey(
+              isAsk ? 'order-book-sell-depth-bar' : 'order-book-buy-depth-bar',
+            ),
+            widthFactor: animatedDepth,
+            heightFactor: 1,
+            child: child,
+          ),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: barColor,
+              borderRadius: BorderRadius.horizontal(
+                left: isAsk ? const Radius.circular(6) : Radius.zero,
+                right: isAsk ? Radius.zero : const Radius.circular(6),
+              ),
+            ),
+          ),
+        ),
+      ),
+      Padding(
+        padding: EdgeInsets.only(left: isAsk ? 4 : 7, right: isAsk ? 7 : 4),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: isAsk
+              ? CrossAxisAlignment.end
+              : CrossAxisAlignment.start,
+          children: [
+            Text(
+              _money(quantity),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Color(0xFF2C3440),
+                fontSize: 13,
+                height: 1,
+                fontWeight: FontWeight.w700,
+                fontFeatures: _marketNumberFeatures,
+              ),
+            ),
+            if (isActive)
+              Text(
+                '${activeTradeSide == TradeSide.buy ? '매수' : '매도'} '
+                '체결 ${_money(activeQuantity)}주',
+                key: const Key('order-book-active-trade'),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: tradeColor,
+                  fontSize: 9,
+                  height: 1,
+                  fontWeight: FontWeight.w900,
+                ),
+              )
+            else if (playerQuantity > 0)
+              Text(
+                '내 주문 ${_displayUnits(playerQuantity)}주',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Color(0xFF7A5A00),
+                  fontSize: 9,
+                  height: 1,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+          ],
+        ),
+      ),
+    ],
+  );
 }
 
 class _OrderSheet extends StatefulWidget {
@@ -4633,13 +8129,18 @@ class _OrderSheet extends StatefulWidget {
     required this.state,
     required this.minute,
     required this.onExecuteTrade,
+    this.marketSnapshotReader,
+    this.liquidityPulse = 0,
+    this.liquidityPulseListenable,
     this.initialOrderType,
     this.initialLimitPrice,
+    this.initialQuantity,
     this.balanceLabel,
     this.submitLabel,
     this.successLabel = '완료',
     this.onSuccessContinue,
     this.forceActionHighlight = false,
+    this.compact = false,
   });
 
   final _StockDefinition definition;
@@ -4648,16 +8149,33 @@ class _OrderSheet extends StatefulWidget {
   final GameState state;
   final ValueNotifier<int> minute;
   final Future<TradeExecutionResult> Function(TradeOrder) onExecuteTrade;
+  final ValueGetter<GameOrderBookSnapshot>? marketSnapshotReader;
+  final int liquidityPulse;
+  final ValueListenable<int>? liquidityPulseListenable;
   final TradeOrderType? initialOrderType;
   final double? initialLimitPrice;
+  final double? initialQuantity;
   final String? balanceLabel;
   final String? submitLabel;
   final String successLabel;
   final VoidCallback? onSuccessContinue;
   final bool forceActionHighlight;
+  final bool compact;
 
   @override
   State<_OrderSheet> createState() => _OrderSheetState();
+}
+
+class _OrderSheetMarketView {
+  const _OrderSheetMarketView({
+    required this.snapshot,
+    required this.availableCapacity,
+    required this.maximumNotional,
+  });
+
+  final GameOrderBookSnapshot snapshot;
+  final int availableCapacity;
+  final int? maximumNotional;
 }
 
 class _OrderSheetState extends State<_OrderSheet> {
@@ -4669,12 +8187,33 @@ class _OrderSheetState extends State<_OrderSheet> {
   double? _limitPrice;
   bool _submitting = false;
   TradeExecutionResult? _result;
+  List<MarketTechnicalLevel> _technicalLevels = const <MarketTechnicalLevel>[];
+  String _technicalLevelsDate = '';
+  double _technicalLevelsReference = 0;
+  GameState? _marketViewStateKey;
+  int _marketViewMinuteKey = -1;
+  int _marketViewPulseKey = -1;
+  double _marketViewPriceKey = double.nan;
+  int _marketViewHistoryLengthKey = -1;
+  double _marketViewPreviousTradeKey = double.nan;
+  _OrderSheetMarketView? _cachedMarketView;
+  _OrderSheetMarketView? _fillPlanViewKey;
+  TradeOrderType? _fillPlanTypeKey;
+  double _fillPlanQuantityKey = double.nan;
+  GameOrderBookFillPlan? _cachedMarketFillPlan;
+  bool _hasCachedMarketFillPlan = false;
+  _OrderSheetMarketView? _maxQuantityViewKey;
+  TradeOrderType? _maxQuantityTypeKey;
+  double _maxQuantityPriceKey = double.nan;
+  double? _cachedMaxQuantity;
 
   @override
   void initState() {
     super.initState();
     widget.live.addListener(_handleMarketUpdate);
     widget.minute.addListener(_handleMarketUpdate);
+    _quantity = widget.initialQuantity ?? 1;
+    _refreshTechnicalLevels();
     _orderType = widget.initialOrderType ?? TradeOrderType.market;
     _limitPrice = marketSnapPrice(
       widget.initialLimitPrice ?? widget.live.value.price,
@@ -4686,6 +8225,12 @@ class _OrderSheetState extends State<_OrderSheet> {
   }
 
   @override
+  void didUpdateWidget(covariant _OrderSheet oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _refreshTechnicalLevels();
+  }
+
+  @override
   void dispose() {
     widget.live.removeListener(_handleMarketUpdate);
     widget.minute.removeListener(_handleMarketUpdate);
@@ -4693,7 +8238,25 @@ class _OrderSheetState extends State<_OrderSheet> {
   }
 
   void _handleMarketUpdate() {
-    if (mounted) setState(() {});
+    if (mounted) {
+      setState(_refreshTechnicalLevels);
+    }
+  }
+
+  void _refreshTechnicalLevels() {
+    final quote = widget.live.value;
+    final dateKey = marketDateKey(widget.state.currentDate);
+    if (_technicalLevelsDate == dateKey &&
+        (_technicalLevelsReference - quote.previousClose).abs() < 0.000001) {
+      return;
+    }
+    _technicalLevels = marketTechnicalLevelsForAsset(
+      asset: widget.definition.asset,
+      sessionDate: widget.state.currentDate,
+      referencePrice: quote.previousClose,
+    );
+    _technicalLevelsDate = dateKey;
+    _technicalLevelsReference = quote.previousClose;
   }
 
   PortfolioPosition? get _position {
@@ -4706,42 +8269,277 @@ class _OrderSheetState extends State<_OrderSheet> {
   _LiveStock get _quote => widget.live.value;
   int get _marketMinute => widget.minute.value;
   double get _executionPrice => _quote.price;
+  _OrderSheetMarketView get _marketView {
+    final quote = _quote;
+    final marketMinute = _marketMinute;
+    final liquidityPulse = _liquidityPulse;
+    final previousTradePrice = quote.sessionHistory.length >= 2
+        ? quote.sessionHistory[quote.sessionHistory.length - 2]
+        : quote.previousClose;
+    if (identical(_marketViewStateKey, widget.state) &&
+        _marketViewMinuteKey == marketMinute &&
+        _marketViewPulseKey == liquidityPulse &&
+        (_marketViewPriceKey - quote.price).abs() < 0.000001 &&
+        _marketViewHistoryLengthKey == quote.sessionHistory.length &&
+        (_marketViewPreviousTradeKey - previousTradePrice).abs() < 0.000001 &&
+        _cachedMarketView != null) {
+      return _cachedMarketView!;
+    }
+    final provided = widget.marketSnapshotReader?.call();
+    final snapshot =
+        provided ??
+        _fallbackMarketSnapshot(
+          quote: quote,
+          previousTradePrice: previousTradePrice,
+          marketMinute: marketMinute,
+          liquidityPulse: liquidityPulse,
+        );
+    final consumedCapacity = snapshot.appliedCapacityConsumptionUnits > 0
+        ? snapshot.appliedCapacityConsumptionUnits
+        : gameConsumedOrderBookFillUnits(
+            widget.state,
+            assetId: widget.definition.id,
+            marketMinute: marketMinute,
+            side: widget.isBuy ? TradeSide.buy : TradeSide.sell,
+          );
+    final maximumNotional = !widget.isBuy
+        ? null
+        : gameBuyNotionalBudget(
+            widget.state,
+            maximumNotional: math.min(
+              gameMarketOrderNotionalLimit(
+                quote.price,
+                turnoverEok: snapshot.turnoverEok,
+              ),
+              gameOrderAuthorityLimit(widget.state),
+            ),
+          );
+    final view = _OrderSheetMarketView(
+      snapshot: snapshot,
+      availableCapacity: math.max(
+        0,
+        snapshot.executionCapacity - consumedCapacity,
+      ),
+      maximumNotional: maximumNotional,
+    );
+    _marketViewStateKey = widget.state;
+    _marketViewMinuteKey = marketMinute;
+    _marketViewPulseKey = liquidityPulse;
+    _marketViewPriceKey = quote.price;
+    _marketViewHistoryLengthKey = quote.sessionHistory.length;
+    _marketViewPreviousTradeKey = previousTradePrice;
+    _cachedMarketView = view;
+    return view;
+  }
+
+  GameOrderBookSnapshot _fallbackMarketSnapshot({
+    required _LiveStock quote,
+    required double previousTradePrice,
+    required int marketMinute,
+    required int liquidityPulse,
+  }) {
+    final rawSnapshot = buildGameOrderBookSnapshot(
+      assetId: widget.definition.id,
+      day: marketLiquidityDayKey(widget.state.currentDate),
+      minute: marketMinute,
+      currentPrice: quote.price,
+      previousClose: quote.previousClose,
+      previousTradePrice: previousTradePrice,
+      sessionLow: quote.low,
+      sessionHigh: quote.high,
+      date: widget.state.currentDate,
+      market: widget.definition.market,
+      simulationSeed: widget.state.simulationSeed,
+      tradingDay: quote.isTradingDay,
+      sharesOutstanding: _maximumPositionUnits,
+      isIpoFirstTradingDay: widget.definition.asset.isIpoFirstTradingDay(
+        widget.state.currentDate,
+      ),
+      technicalLevels: _technicalLevels,
+      liquidityPulse: liquidityPulse,
+      adaptiveLiquidityPulses: liquidityPulse > 0,
+    );
+    final consumedCapacityUnits = gameConsumedOrderBookFillUnits(
+      widget.state,
+      assetId: widget.definition.id,
+      marketMinute: marketMinute,
+      side: widget.isBuy ? TradeSide.buy : TradeSide.sell,
+    );
+    return gameOrderBookSnapshotAfterConsumption(
+      snapshot: rawSnapshot,
+      consumedAskByPrice: gameConsumedOrderBookUnitsByPrice(
+        widget.state,
+        assetId: widget.definition.id,
+        marketMinute: marketMinute,
+        bookSide: GameOrderBookSide.ask,
+      ),
+      consumedBidByPrice: gameConsumedOrderBookUnitsByPrice(
+        widget.state,
+        assetId: widget.definition.id,
+        marketMinute: marketMinute,
+        bookSide: GameOrderBookSide.bid,
+      ),
+      consumedCapacityUnits: consumedCapacityUnits,
+    );
+  }
+
+  GameOrderBookSnapshot get _marketSnapshot => _marketView.snapshot;
+
+  int get _liquidityPulse =>
+      widget.liquidityPulseListenable?.value ?? widget.liquidityPulse;
+
+  GameOrderBookFillPlan? get _marketFillPlan {
+    final view = _marketView;
+    if (identical(_fillPlanViewKey, view) &&
+        _fillPlanTypeKey == _orderType &&
+        _fillPlanQuantityKey == _quantity &&
+        _hasCachedMarketFillPlan) {
+      return _cachedMarketFillPlan;
+    }
+    GameOrderBookFillPlan? plan;
+    if (_orderType != TradeOrderType.market ||
+        _quantity <= 0 ||
+        _quantity != _quantity.roundToDouble()) {
+      plan = null;
+    } else {
+      final range = _dailyRange;
+      plan = gameOrderBookLimitFillPlan(
+        snapshot: view.snapshot,
+        isBuy: widget.isBuy,
+        requestedQuantity: _quantity,
+        limitPrice: widget.isBuy ? range.upper : range.lower,
+        availableCapacity: view.availableCapacity,
+        maximumNotional: view.maximumNotional,
+      );
+    }
+    _fillPlanViewKey = view;
+    _fillPlanTypeKey = _orderType;
+    _fillPlanQuantityKey = _quantity;
+    _cachedMarketFillPlan = plan;
+    _hasCachedMarketFillPlan = true;
+    return plan;
+  }
+
+  double get _estimatedExecutionPrice {
+    if (_orderType != TradeOrderType.market) {
+      return _limitPrice ?? _executionPrice;
+    }
+    final plan = _marketFillPlan;
+    if (plan != null && plan.hasFill) return plan.averagePrice;
+    final levels = widget.isBuy ? _marketSnapshot.asks : _marketSnapshot.bids;
+    return levels.isEmpty ? _executionPrice : levels.first.price;
+  }
+
   double get _orderPrice => _orderType == TradeOrderType.limit
       ? (_limitPrice ?? _executionPrice)
       : _executionPrice;
   int get _rawNotional => (_orderPrice * _quantity).round();
-  double get _marketImpact => _orderType == TradeOrderType.market
-      ? gameMarketImpactRate(_rawNotional)
-      : 0;
-  int get _notional => _orderType == TradeOrderType.market
-      ? gameTradeNotional(
-          side: widget.isBuy ? TradeSide.buy : TradeSide.sell,
-          unitPrice: _executionPrice,
-          quantity: _quantity,
-        )
-      : _rawNotional;
+  int get _notional {
+    if (_orderType != TradeOrderType.market) return _rawNotional;
+    final plan = _marketFillPlan;
+    if (plan != null) return plan.notional;
+    return (_estimatedExecutionPrice * _quantity).round();
+  }
+
+  String get _notionalLabel {
+    final plan = _marketFillPlan;
+    if (_orderType == TradeOrderType.market && plan != null) {
+      return '시장가 IOC 예상 ${plan.filledQuantity}/${_quantity.round()}주';
+    }
+    return '주문 금액';
+  }
+
   int get _fee => gameTradingFeeForState(widget.state, _notional);
   double get _feeRate => gameTradingFeeRateForState(widget.state);
-  int get _settlement => widget.isBuy ? _notional + _fee : _notional - _fee;
+  int get _transactionTax => widget.isBuy
+      ? 0
+      : gameSecuritiesTransactionTax(widget.state.currentDate, _notional);
+  int get _settlement =>
+      widget.isBuy ? _notional + _fee : _notional - _fee - _transactionTax;
+  int? get _maximumPositionUnits => widget.definition.asset
+      .sharesOutstandingAtOrBefore(widget.state.currentDate);
+
+  double get _ownershipAvailableUnits {
+    final maximum = _maximumPositionUnits;
+    if (maximum == null || maximum <= 0) return double.infinity;
+    final owned = _position?.units ?? 0;
+    final reserved = widget.state.pendingBuyReservedUnits(widget.definition.id);
+    return math.max(0, maximum - owned - reserved).toDouble();
+  }
+
   double get _maxQuantity {
+    final view = _marketView;
+    if (identical(_maxQuantityViewKey, view) &&
+        _maxQuantityTypeKey == _orderType &&
+        _maxQuantityPriceKey == _orderPrice &&
+        _cachedMaxQuantity != null) {
+      return _cachedMaxQuantity!;
+    }
+    late final double result;
     if (!widget.isBuy) {
       final held = math.max(
         0.0,
         (_position?.units ?? 0) -
             widget.state.pendingSellReservedUnits(widget.definition.id),
       );
-      if (_executionPrice <= 0) return 0;
-      final liquidUnits =
-          gameMarketOrderNotionalLimit(_orderPrice) / _orderPrice;
-      return math.min(held, liquidUnits);
+      if (_executionPrice <= 0) {
+        result = 0;
+      } else {
+        final liquidUnits =
+            gameMarketOrderNotionalLimit(
+              _orderPrice,
+              turnoverEok: view.snapshot.turnoverEok,
+            ) /
+            _orderPrice;
+        result = math.min(
+          math.min(held, liquidUnits),
+          _orderType == TradeOrderType.market
+              ? view.availableCapacity.toDouble()
+              : double.infinity,
+        );
+      }
+    } else {
+      final cashQuantity = gameMaxBuyQuantity(
+        widget.state,
+        _orderPrice,
+        market: widget.definition.market,
+      ).toDouble();
+      final positionLimitedQuantity = math.min(
+        cashQuantity,
+        _ownershipAvailableUnits,
+      );
+      if (_orderType != TradeOrderType.market) {
+        result = positionLimitedQuantity;
+      } else {
+        final range = _dailyRange;
+        final capacityPlan = gameOrderBookLimitFillPlan(
+          snapshot: view.snapshot,
+          isBuy: true,
+          requestedQuantity: view.availableCapacity.toDouble(),
+          limitPrice: range.upper,
+          availableCapacity: view.availableCapacity,
+          maximumNotional: view.maximumNotional,
+        );
+        result = math.min(
+          capacityPlan.filledQuantity.toDouble(),
+          positionLimitedQuantity,
+        );
+      }
     }
-    return gameMaxBuyQuantity(widget.state, _orderPrice).toDouble();
+    _maxQuantityViewKey = view;
+    _maxQuantityTypeKey = _orderType;
+    _maxQuantityPriceKey = _orderPrice;
+    _cachedMaxQuantity = result;
+    return result;
   }
 
   ({double lower, double upper}) get _dailyRange => marketDailyPriceRange(
     previousClose: _quote.previousClose,
     date: widget.state.currentDate,
     market: widget.definition.market,
+    isIpoFirstTradingDay: widget.definition.asset.isIpoFirstTradingDay(
+      widget.state.currentDate,
+    ),
   );
 
   bool get _validLimitPrice =>
@@ -4786,6 +8584,7 @@ class _OrderSheetState extends State<_OrderSheet> {
     });
     late TradeExecutionResult result;
     try {
+      final displayedSnapshot = _marketSnapshot;
       result = await widget.onExecuteTrade(
         TradeOrder(
           side: widget.isBuy ? TradeSide.buy : TradeSide.sell,
@@ -4805,6 +8604,18 @@ class _OrderSheetState extends State<_OrderSheet> {
           type: _orderType,
           limitPrice: _orderType == TradeOrderType.limit ? _limitPrice : null,
           previousClose: _quote.previousClose,
+          previousTradePrice: _quote.sessionHistory.length >= 2
+              ? _quote.sessionHistory[_quote.sessionHistory.length - 2]
+              : _quote.previousClose,
+          sessionLow: _quote.low,
+          sessionHigh: _quote.high,
+          maximumPositionUnits: _maximumPositionUnits,
+          isIpoFirstTradingDay: widget.definition.asset.isIpoFirstTradingDay(
+            widget.state.currentDate,
+          ),
+          technicalLevels: _technicalLevels,
+          microstructureFrame: _liquidityPulse,
+          displayedSnapshot: displayedSnapshot,
         ),
       );
     } catch (_) {
@@ -4829,19 +8640,442 @@ class _OrderSheetState extends State<_OrderSheet> {
     });
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final action = widget.isBuy ? '사기' : '팔기';
-    final actionColor = widget.isBuy ? _marketAccent : const Color(0xFFF04452);
+  void _selectOrderType(TradeOrderType type) {
+    setState(() {
+      _orderType = type;
+      _limitPrice ??= marketSnapPrice(
+        _executionPrice,
+        market: widget.definition.market,
+      );
+      _result = null;
+    });
+  }
+
+  Widget _compactStepButton({
+    required Key key,
+    required IconData icon,
+    required VoidCallback? onPressed,
+  }) => SizedBox(
+    width: 32,
+    height: 32,
+    child: IconButton(
+      key: key,
+      padding: EdgeInsets.zero,
+      visualDensity: VisualDensity.compact,
+      onPressed: onPressed,
+      icon: Icon(icon, size: 17),
+    ),
+  );
+
+  Widget _compactSummaryRow(String label, int value, {bool strong = false}) =>
+      Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: strong ? _marketInk : _marketMuted,
+                  fontSize: 9,
+                  fontWeight: strong ? FontWeight.w900 : FontWeight.w700,
+                ),
+              ),
+            ),
+            Text(
+              '${_money(value)}원',
+              style: TextStyle(
+                color: strong ? _marketInk : const Color(0xFF555D69),
+                fontSize: strong ? 11 : 9,
+                fontWeight: strong ? FontWeight.w900 : FontWeight.w700,
+                fontFeatures: _marketNumberFeatures,
+              ),
+            ),
+          ],
+        ),
+      );
+
+  Widget _liquidityPulseAware(Widget Function() builder) {
+    final pulse = widget.liquidityPulseListenable;
+    if (pulse == null) return builder();
+    return ValueListenableBuilder<int>(
+      valueListenable: pulse,
+      builder: (context, _, _) => builder(),
+    );
+  }
+
+  bool get _canSubmitWithLatestBook {
     final maxQuantity = _maxQuantity;
-    final canSubmit =
-        _authorityReady &&
+    return _authorityReady &&
         _tradable &&
         _quantity > 0 &&
         _quantity <= maxQuantity &&
         _validLimitPrice &&
         !_submitting &&
         _result?.success != true;
+  }
+
+  Widget _buildCompactOrder({
+    required String action,
+    required Color actionColor,
+  }) {
+    final unavailableMessage = !_tradable
+        ? '현재는 주문 가능한 거래 시간이 아닙니다.'
+        : !_authorityReady
+        ? '종잣돈 10,000원을 먼저 마련해야 주문할 수 있습니다.'
+        : widget.isBuy
+        ? '1주를 살 예수금이 부족합니다.'
+        : '매도 가능한 보유 수량이 없습니다.';
+    return Container(
+      key: const Key('inline-order-ticket'),
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(7, 7, 7, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            height: 24,
+            child: Row(
+              children: [
+                Text(
+                  '$action 주문',
+                  style: TextStyle(
+                    color: actionColor,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const Spacer(),
+                Flexible(
+                  child: Text(
+                    '현재 ${_money(_executionPrice.round())}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: _marketInk,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800,
+                      fontFeatures: _marketNumberFeatures,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 4),
+          SizedBox(
+            height: 32,
+            child: SegmentedButton<TradeOrderType>(
+              key: const Key('order-type-selector'),
+              segments: const [
+                ButtonSegment(value: TradeOrderType.market, label: Text('시장가')),
+                ButtonSegment(value: TradeOrderType.limit, label: Text('지정가')),
+              ],
+              selected: {_orderType},
+              onSelectionChanged: (value) => _selectOrderType(value.first),
+              showSelectedIcon: false,
+              expandedInsets: EdgeInsets.zero,
+              style: const ButtonStyle(
+                visualDensity: VisualDensity.compact,
+                padding: WidgetStatePropertyAll(
+                  EdgeInsets.symmetric(horizontal: 5),
+                ),
+                textStyle: WidgetStatePropertyAll(
+                  TextStyle(fontSize: 10, fontWeight: FontWeight.w800),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 5),
+          Container(
+            key: const Key('limit-price-control'),
+            height: 37,
+            decoration: BoxDecoration(
+              color: _orderType == TradeOrderType.limit
+                  ? const Color(0xFFF4F6F8)
+                  : const Color(0xFFF8F9FA),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFE1E5EA)),
+            ),
+            child: Row(
+              children: [
+                _compactStepButton(
+                  key: const Key('limit-price-minus'),
+                  icon: Icons.remove_rounded,
+                  onPressed:
+                      _orderType == TradeOrderType.limit &&
+                          (_limitPrice ?? 0) > _dailyRange.lower
+                      ? () => _changeLimitPrice(-1)
+                      : null,
+                ),
+                Expanded(
+                  child: Text(
+                    _orderType == TradeOrderType.limit
+                        ? '${_money((_limitPrice ?? 0).round())}원'
+                        : '현재가 체결',
+                    key: const Key('limit-price-value'),
+                    maxLines: 1,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: _orderType == TradeOrderType.limit
+                          ? _marketInk
+                          : _marketMuted,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                      fontFeatures: _marketNumberFeatures,
+                    ),
+                  ),
+                ),
+                _compactStepButton(
+                  key: const Key('limit-price-plus'),
+                  icon: Icons.add_rounded,
+                  onPressed:
+                      _orderType == TradeOrderType.limit &&
+                          (_limitPrice ?? 0) < _dailyRange.upper
+                      ? () => _changeLimitPrice(1)
+                      : null,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 5),
+          Container(
+            height: 37,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF4F6F8),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFE1E5EA)),
+            ),
+            child: Row(
+              children: [
+                _compactStepButton(
+                  key: const Key('order-quantity-minus'),
+                  icon: Icons.remove_rounded,
+                  onPressed: _quantity > 1
+                      ? () => setState(
+                          () => _quantity = math.max(1, _quantity - 1),
+                        )
+                      : null,
+                ),
+                Expanded(
+                  child: Text(
+                    '${_displayUnits(_quantity)}주',
+                    key: const Key('order-quantity-value'),
+                    maxLines: 1,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: _marketInk,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                      fontFeatures: _marketNumberFeatures,
+                    ),
+                  ),
+                ),
+                _liquidityPulseAware(() {
+                  final maxQuantity = _maxQuantity;
+                  return _compactStepButton(
+                    key: const Key('order-quantity-plus'),
+                    icon: Icons.add_rounded,
+                    onPressed: _quantity < maxQuantity
+                        ? () => setState(
+                            () => _quantity = math.min(
+                              maxQuantity,
+                              _quantity + 1,
+                            ),
+                          )
+                        : null,
+                  );
+                }),
+              ],
+            ),
+          ),
+          SizedBox(
+            height: 29,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    widget.isBuy
+                        ? '가능 ${_money(widget.state.availableBrokerageCash)}원'
+                        : '보유 ${_displayUnits(_position?.units ?? 0)}주',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: _marketMuted,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                _liquidityPulseAware(() {
+                  final maxQuantity = _maxQuantity;
+                  return TextButton(
+                    key: const Key('inline-order-maximum'),
+                    onPressed: maxQuantity > 0
+                        ? () => setState(() => _quantity = maxQuantity)
+                        : null,
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      minimumSize: const Size(0, 26),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    child: Text(
+                      '최대 ${_displayUnits(maxQuantity)}주',
+                      style: const TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+          _liquidityPulseAware(
+            () => Container(
+              key: const Key('inline-order-liquidity-preview'),
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8F9FB),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                children: [
+                  _compactSummaryRow('주문 금액', _notional),
+                  _compactSummaryRow(
+                    widget.isBuy ? '수수료' : '수수료·세금',
+                    _fee + _transactionTax,
+                  ),
+                  _compactSummaryRow(
+                    widget.isBuy ? '총 결제액' : '예상 수령액',
+                    _settlement,
+                    strong: true,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 5),
+          Expanded(
+            child: Align(
+              alignment: Alignment.topLeft,
+              child: _result != null
+                  ? Container(
+                      key: const Key('order-result'),
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: _result!.success
+                            ? const Color(0xFFE8F8F0)
+                            : const Color(0xFFFFECEE),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        _result!.message,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: _result!.success
+                              ? const Color(0xFF18794E)
+                              : const Color(0xFFB42332),
+                          fontSize: 9,
+                          height: 1.25,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    )
+                  : _liquidityPulseAware(() {
+                      final maxQuantity = _maxQuantity;
+                      if (!_authorityReady || !_tradable || maxQuantity <= 0) {
+                        return Text(
+                          unavailableMessage,
+                          key: _tradable && !_authorityReady
+                              ? const Key('order-authority-warning')
+                              : null,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Color(0xFFF04452),
+                            fontSize: 9,
+                            height: 1.25,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        );
+                      }
+                      return Text(
+                        _orderType == TradeOrderType.limit
+                            ? '오른쪽 호가를 누르면 주문 가격이 바뀝니다.'
+                            : '시장가는 보이는 호가부터 즉시 체결됩니다.',
+                        maxLines: 2,
+                        style: const TextStyle(
+                          color: _marketMuted,
+                          fontSize: 9,
+                          height: 1.25,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      );
+                    }),
+            ),
+          ),
+          const SizedBox(height: 5),
+          SizedBox(
+            height: 44,
+            child: _liquidityPulseAware(
+              () => FilledButton(
+                key: const Key('request-parent-order-approval'),
+                onPressed: _result?.success == true
+                    ? widget.onSuccessContinue
+                    : _canSubmitWithLatestBook
+                    ? _submit
+                    : null,
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  backgroundColor: actionColor,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                ),
+                child: _submitting
+                    ? const SizedBox.square(
+                        dimension: 19,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.3,
+                          color: Colors.white,
+                        ),
+                      )
+                    : Text(
+                        _result?.success == true
+                            ? widget.successLabel
+                            : !_tradable
+                            ? '거래 시간 아님'
+                            : !_authorityReady
+                            ? '주문 권한 필요'
+                            : widget.submitLabel ?? '$action 주문',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final action = widget.isBuy ? '매수' : '매도';
+    final actionColor = widget.isBuy ? const Color(0xFFF04452) : _marketAccent;
+    if (widget.compact) {
+      return _buildCompactOrder(action: action, actionColor: actionColor);
+    }
+    final maxQuantity = _maxQuantity;
+    final canSubmit = _canSubmitWithLatestBook;
     return SafeArea(
       child: Padding(
         padding: EdgeInsets.fromLTRB(
@@ -4865,7 +9099,9 @@ class _OrderSheetState extends State<_OrderSheet> {
               ),
               const SizedBox(height: 7),
               Text(
-                '현재 게임 체결가 ${_displayPrice(_executionPrice, widget.definition.currency)} · 증권 수수료 ${(_feeRate * 100).toStringAsFixed(3)}%',
+                '현재가 ${_displayPrice(_executionPrice, widget.definition.currency)}'
+                ' · 예상 체결가 ${_displayPrice(_estimatedExecutionPrice, widget.definition.currency)}'
+                ' · 수수료 ${(_feeRate * 100).toStringAsFixed(3)}%',
                 style: const TextStyle(
                   color: Color(0xFF5D6572),
                   fontSize: 13,
@@ -5015,7 +9251,7 @@ class _OrderSheetState extends State<_OrderSheet> {
                         Expanded(
                           child: Text(
                             widget.isBuy
-                                ? '${widget.balanceLabel ?? '주문 가능 예수금'} ${_money(widget.state.brokerageCash)}원'
+                                ? '${widget.balanceLabel ?? '주문 가능 예수금'} ${_money(widget.state.availableBrokerageCash)}원'
                                 : '보유 ${_displayUnits(_position?.units ?? 0)}주',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -5035,13 +9271,10 @@ class _OrderSheetState extends State<_OrderSheet> {
                       ],
                     ),
                     const Divider(),
-                    _OrderSummaryRow(
-                      label: _marketImpact > 0
-                          ? '시장충격 ${(_marketImpact * 100).toStringAsFixed(2)}% 반영'
-                          : '주문 금액',
-                      value: _notional,
-                    ),
+                    _OrderSummaryRow(label: _notionalLabel, value: _notional),
                     _OrderSummaryRow(label: '증권 수수료', value: _fee),
+                    if (!widget.isBuy)
+                      _OrderSummaryRow(label: '증권거래세', value: _transactionTax),
                     _OrderSummaryRow(
                       label: widget.isBuy ? '총 결제액' : '예상 수령액',
                       value: _settlement,
@@ -5166,8 +9399,10 @@ class _OrderSummaryRow extends StatelessWidget {
     padding: const EdgeInsets.symmetric(vertical: 3),
     child: Row(
       children: [
-        Text(label),
-        const Spacer(),
+        Expanded(
+          child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+        ),
+        const SizedBox(width: 8),
         Text(
           '${_money(value)}원',
           style: TextStyle(
@@ -5349,11 +9584,15 @@ class _MarketTutorialOverlay extends StatelessWidget {
     actionKey: const Key('market-tutorial-next'),
     targetActionKey: const Key('market-tutorial-target'),
     targetKey: targetKey,
+    messageId: 'market-$step',
     speaker: '한서윤 선생님',
-    message: switch (step) {
-      0 => '학원에서 배운 주문표를 실제 화면에서 연습해 볼게요. 지금부터 제가 가리키는 곳만 하나씩 눌러 보세요.',
-      1 => '아래의 ‘주식’ 탭은 거래 가능한 회사를 모아 보는 곳이에요. 노란 테두리 안을 직접 눌러 보세요.',
-      _ => '종목은 회사 한 곳을 뜻해요. 먼저 한빛통신을 눌러 가격과 회사 내용을 함께 살펴볼게요.',
+    messages: switch (step) {
+      0 => const [
+        '학원에서 배운 주문표를 이제 실제 화면에서 연습해 볼게요.',
+        '지금부터 제가 가리키는 곳만 하나씩 눌러 보세요.',
+      ],
+      1 => const ['아래의 ‘주식’ 탭은 거래 가능한 회사를 모아 보는 곳이에요.', '노란 테두리 안을 직접 눌러 보세요.'],
+      _ => const ['종목은 회사 한 곳을 뜻해요.', '먼저 한빛통신을 눌러 가격과 회사 내용을 함께 살펴볼게요.'],
     },
     actionLabel: '선생님과 화면 수업 시작',
     poseAlignment: Alignment.topCenter,
@@ -5378,18 +9617,35 @@ class _MarketDetailTutorialOverlay extends StatelessWidget {
     actionKey: const Key('market-detail-tutorial-next'),
     targetActionKey: const Key('market-detail-tutorial-target'),
     targetKey: targetKey,
+    messageId: 'market-detail-$step',
     speaker: '한서윤 선생님',
-    message: switch (step) {
-      0 =>
-        '가장 큰 숫자는 지금 한 주의 가격이에요. 바로 아래 등락률은 어제 종가와 비교한 값이니, 노란 테두리를 눌러 확인하세요.',
-      1 =>
-        '차트는 가격의 움직임, 아래 재무 카드는 매출·이익·현금흐름·수주를 보여줘요. 가격만 보지 말고 회사가 돈을 버는지도 함께 읽어야 해요.',
-      2 =>
-        '호가창은 위 5줄이 매도, 아래 5줄이 매수예요. 잔량 막대가 큰 줄은 ‘벽’이고 거래대금에 따라 벽과 분당 체결 가능 수량이 달라져요. 체결강도·상한가·하한가·고가·저가·총 매수·매도잔량도 함께 읽으세요. 화면 수량과 실제 부분체결 한도는 같은 계산이며, 개장 전과 휴장일에는 거래대금과 체결 가능량이 0이에요.',
-      _ =>
-        '매도호가를 누르면 그 가격의 매수 지정가, 매수호가를 누르면 매도 지정가가 입력돼요. 내 미체결 주문도 호가에 표시됩니다. 가격이 달아나거나 잔량이 부족하면 예수금이나 주식이 예약된 채 미체결·부분체결로 기다려요. 지금은 가장 가까운 파란 매도호가를 눌러 매수를 연습해 보세요.',
+    messages: switch (step) {
+      0 => const [
+        '가장 큰 숫자는 지금 한 주의 가격이에요.',
+        '바로 아래 등락률은 어제 종가와 비교한 값이에요.',
+        '노란 테두리를 눌러 두 숫자를 확인하세요.',
+      ],
+      1 => const [
+        '하단의 차트 탭을 누르면 가격 흐름만 따로 볼 수 있어요.',
+        '분봉과 일·주·월 종가 흐름을 바꿔 보되, 모양만 보고 서두르지는 마세요.',
+      ],
+      2 => const [
+        '파란색은 매도, 빨간색은 매수 대기 수량이에요.',
+        '수량 막대 길이와 가격을 보고 원하는 호가를 눌러보세요.',
+      ],
+      _ => const [
+        '매도호가를 누르면 그 가격이 매수 지정가에 들어가요.',
+        '반대로 매수호가를 누르면 매도 지정가가 입력돼요.',
+        '내 미체결 주문도 호가에 표시되고, 잔량이 부족하면 일부만 체결된 채 기다릴 수 있어요.',
+        '지금은 가장 가까운 파란 매도호가를 눌러 매수를 연습해 보세요.',
+      ],
     },
-    actionLabel: '회사 숫자 확인했어요',
+    actionLabel: switch (step) {
+      0 => '현재가 확인했어요',
+      1 => '차트 확인했어요',
+      2 => '호가창 확인했어요',
+      _ => '이 가격으로 연습할게요',
+    },
     poseAlignment: Alignment.topCenter,
     onAction: onAction,
   );
@@ -5410,11 +9666,20 @@ class _OrderTicketTutorialOverlay extends StatelessWidget {
     actionKey: const Key('market-order-tutorial-done'),
     targetActionKey: const Key('market-order-tutorial-target'),
     targetKey: null,
+    messageId: 'market-order-${limitPrice?.round() ?? 'start'}',
     speaker: '한서윤 선생님',
-    message: limitPrice == null
-        ? '연습 화면에서만 쓰는 가짜 돈 100만 원을 준비했어요. 먼저 한 주를 사고, 가격이 바뀐 뒤 다시 팔아 볼 거예요. 실제 돈은 전혀 움직이지 않으니 천천히 해 봐요.'
-        : '방금 누른 매도호가 ${_money(limitPrice!.round())}원이 매수 지정가에 들어왔어요. '
-              '가격·시간 순서로 체결되고, 한 번에 다 못 사면 일부만 체결될 수도 있어요. 가격이 멀어지면 주문이 기다리고, 취소하거나 15:00가 되면 예약된 돈이 풀려요. 이제 노란 테두리의 버튼으로 한 주를 직접 사 볼까요?',
+    messages: limitPrice == null
+        ? const [
+            '연습 화면에서만 쓰는 가짜 돈 100만 원을 준비했어요.',
+            '먼저 한 주를 사고, 가격이 바뀐 뒤 다시 팔아 볼 거예요.',
+            '실제 돈은 전혀 움직이지 않으니 천천히 해 봐요.',
+          ]
+        : [
+            '방금 누른 매도호가 ${_money(limitPrice!.round())}원이 매수 지정가에 들어왔어요.',
+            '주문은 가격과 시간 순서로 체결돼요. 한 번에 다 못 사면 일부만 체결될 수도 있어요.',
+            '가격이 멀어지면 주문이 기다리고, 취소하거나 15:00가 되면 예약된 돈이 풀려요.',
+            '이제 노란 테두리의 버튼으로 한 주를 직접 사 볼까요?',
+          ],
     actionLabel: '가짜 돈으로 주문 연습 시작',
     poseAlignment: Alignment.topCenter,
     onAction: () => unawaited(onDone()),
@@ -5427,19 +9692,21 @@ class _StockTutorialGuideOverlay extends StatefulWidget {
     required this.actionKey,
     required this.targetActionKey,
     required this.targetKey,
+    required this.messageId,
     required this.speaker,
-    required this.message,
+    required this.messages,
     required this.actionLabel,
     required this.poseAlignment,
     required this.onAction,
-  });
+  }) : assert(messages.length > 0);
 
   final Key overlayKey;
   final Key actionKey;
   final Key targetActionKey;
   final GlobalKey? targetKey;
+  final Object messageId;
   final String speaker;
-  final String message;
+  final List<String> messages;
   final String actionLabel;
   final Alignment poseAlignment;
   final VoidCallback onAction;
@@ -5452,8 +9719,13 @@ class _StockTutorialGuideOverlay extends StatefulWidget {
 class _StockTutorialGuideOverlayState
     extends State<_StockTutorialGuideOverlay> {
   final GlobalKey _layoutKey = GlobalKey();
+  int _messageIndex = 0;
   Rect? _targetRect;
   Timer? _settleTimer;
+
+  bool get _isLastMessage => _messageIndex >= widget.messages.length - 1;
+
+  GlobalKey? get _activeTargetKey => _isLastMessage ? widget.targetKey : null;
 
   @override
   void initState() {
@@ -5464,6 +9736,12 @@ class _StockTutorialGuideOverlayState
   @override
   void didUpdateWidget(covariant _StockTutorialGuideOverlay oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.messageId != widget.messageId) {
+      _messageIndex = 0;
+      _targetRect = null;
+      _scheduleTargetUpdate();
+      return;
+    }
     if (oldWidget.targetKey != widget.targetKey) {
       _targetRect = null;
       _scheduleTargetUpdate();
@@ -5485,7 +9763,7 @@ class _StockTutorialGuideOverlayState
   void _updateTargetRect() {
     if (!mounted) return;
     final targetBox =
-        widget.targetKey?.currentContext?.findRenderObject() as RenderBox?;
+        _activeTargetKey?.currentContext?.findRenderObject() as RenderBox?;
     final overlayBox =
         _layoutKey.currentContext?.findRenderObject() as RenderBox?;
     if (targetBox == null ||
@@ -5501,9 +9779,24 @@ class _StockTutorialGuideOverlayState
     setState(() => _targetRect = next);
   }
 
+  void _handleAction() {
+    if (_isLastMessage) {
+      widget.onAction();
+      return;
+    }
+    final nextIndex = _messageIndex + 1;
+    setState(() {
+      _messageIndex = nextIndex;
+      _targetRect = null;
+    });
+    if (nextIndex >= widget.messages.length - 1 && widget.targetKey != null) {
+      _scheduleTargetUpdate();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final hasTarget = widget.targetKey != null;
+    final hasTarget = _activeTargetKey != null;
     return LayoutBuilder(
       builder: (context, constraints) {
         final guideWidth = constraints.maxWidth;
@@ -5572,12 +9865,14 @@ class _StockTutorialGuideOverlayState
                 bottom: speechAtTop ? null : 185,
                 child: _StockTutorialSpeechBubble(
                   speaker: widget.speaker,
-                  message: widget.message,
+                  message: widget.messages[_messageIndex],
+                  page: _messageIndex + 1,
+                  pageCount: widget.messages.length,
                   actionKey: widget.actionKey,
-                  actionLabel: widget.actionLabel,
+                  actionLabel: _isLastMessage ? widget.actionLabel : '다음 설명',
                   showAction: !hasTarget,
                   waitingForTarget: hasTarget && _targetRect == null,
-                  onAction: widget.onAction,
+                  onAction: _handleAction,
                 ),
               ),
             ],
@@ -5600,35 +9895,21 @@ class _StockTutorialTeacher extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final height = width * 1.42;
-    final cellDimension = height;
-    final cropAlignment = Alignment(
-      poseAlignment.x < -0.5
-          ? -0.84
-          : poseAlignment.x > 0.5
-          ? 0.84
-          : 0,
-      poseAlignment.y < 0 ? -1 : 1,
-    );
+    final poseAsset = poseAlignment.x < -0.5
+        ? 'assets/images/주식선생님/23_포즈2_주인공그림체_공통슬롯_투명.png'
+        : poseAlignment.x > 0.5
+        ? 'assets/images/주식선생님/24_포즈3_주인공그림체_공통슬롯_투명.png'
+        : 'assets/images/주식선생님/22_포즈1_주인공그림체_공통슬롯_투명.png';
     return SizedBox(
       key: const Key('market-tutorial-teacher'),
       width: width,
       height: height,
-      child: ClipRect(
-        child: OverflowBox(
-          alignment: cropAlignment,
-          minWidth: cellDimension * 3,
-          maxWidth: cellDimension * 3,
-          minHeight: cellDimension * 2,
-          maxHeight: cellDimension * 2,
-          child: Image.asset(
-            'assets/images/주식선생님/06_6자세_블라우스_스커트_투명.png',
-            key: const Key('market-tutorial-teacher-upper-body'),
-            width: cellDimension * 3,
-            height: cellDimension * 2,
-            fit: BoxFit.fill,
-            filterQuality: FilterQuality.high,
-          ),
-        ),
+      child: Image.asset(
+        poseAsset,
+        key: const Key('market-tutorial-teacher-upper-body'),
+        fit: BoxFit.contain,
+        alignment: Alignment.bottomCenter,
+        filterQuality: FilterQuality.high,
       ),
     );
   }
@@ -5638,6 +9919,8 @@ class _StockTutorialSpeechBubble extends StatelessWidget {
   const _StockTutorialSpeechBubble({
     required this.speaker,
     required this.message,
+    required this.page,
+    required this.pageCount,
     required this.actionKey,
     required this.actionLabel,
     required this.showAction,
@@ -5647,6 +9930,8 @@ class _StockTutorialSpeechBubble extends StatelessWidget {
 
   final String speaker;
   final String message;
+  final int page;
+  final int pageCount;
   final Key actionKey;
   final String actionLabel;
   final bool showAction;
@@ -5694,14 +9979,38 @@ class _StockTutorialSpeechBubble extends StatelessWidget {
           ),
           Transform.translate(
             offset: const Offset(0, -18),
-            child: Text(
-              message,
-              style: const TextStyle(
-                color: Color(0xFF24375A),
-                fontSize: 12,
-                height: 1.48,
-                fontWeight: FontWeight.w700,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (pageCount > 1) ...[
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: Text(
+                      '$page / $pageCount',
+                      key: const Key('market-tutorial-page-indicator'),
+                      style: const TextStyle(
+                        color: Color(0xFF7C8BAA),
+                        fontSize: 9,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                ],
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 160),
+                  child: Text(
+                    message,
+                    key: ValueKey<String>(message),
+                    style: const TextStyle(
+                      color: Color(0xFF24375A),
+                      fontSize: 12,
+                      height: 1.48,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
           if (showAction)
@@ -5833,12 +10142,14 @@ class _DailyMarketReportCard extends StatelessWidget {
     required this.items,
     required this.cash,
     required this.purchasing,
+    required this.canPurchase,
     required this.onPurchase,
   });
 
   final List<Map<String, dynamic>> items;
   final int cash;
   final bool purchasing;
+  final bool canPurchase;
   final VoidCallback? onPurchase;
 
   @override
@@ -5943,7 +10254,7 @@ class _DailyMarketReportCard extends StatelessWidget {
               width: double.infinity,
               child: FilledButton.icon(
                 key: const Key('purchase-market-report-button'),
-                onPressed: purchasing ? null : onPurchase,
+                onPressed: purchasing || !canPurchase ? null : onPurchase,
                 icon: purchasing
                     ? const SizedBox(
                         width: 16,
@@ -5954,7 +10265,9 @@ class _DailyMarketReportCard extends StatelessWidget {
                 label: Text(
                   purchasing
                       ? '조사 중…'
-                      : '1,200원에 조사 보고서 구매 · 보유 ${_money(cash)}원',
+                      : canPurchase
+                      ? '1,200원에 조사 보고서 구매 · 은행 ${_money(cash)}원'
+                      : '현재 시각 이후 조사할 미공개 신호 없음',
                 ),
                 style: FilledButton.styleFrom(
                   backgroundColor: _marketAccent,
@@ -6007,45 +10320,20 @@ class _MarketSectionTitle extends StatelessWidget {
   );
 }
 
-class _MarketRankingTable extends StatelessWidget {
-  const _MarketRankingTable({
-    required this.stocks,
-    required this.live,
-    required this.onOpen,
-  });
-
-  final List<_StockDefinition> stocks;
-  final Map<String, ValueNotifier<_LiveStock>> live;
-  final ValueChanged<_StockDefinition> onOpen;
-
-  @override
-  Widget build(BuildContext context) => Column(
-    key: const Key('market-ranking-table'),
-    children: [
-      for (var index = 0; index < stocks.length; index++)
-        _MarketRankingRow(
-          key: Key('market-ranking-row-${stocks[index].code}'),
-          rank: index + 1,
-          definition: stocks[index],
-          live: live[stocks[index].code]!,
-          onTap: () => onOpen(stocks[index]),
-        ),
-    ],
-  );
-}
-
 class _MarketRankingRow extends StatelessWidget {
   const _MarketRankingRow({
     super.key,
     required this.rank,
     required this.definition,
     required this.live,
+    required this.turnoverFor,
     required this.onTap,
   });
 
   final int rank;
   final _StockDefinition definition;
   final ValueNotifier<_LiveStock> live;
+  final double Function(_StockDefinition, _LiveStock) turnoverFor;
   final VoidCallback onTap;
 
   @override
@@ -6095,7 +10383,8 @@ class _MarketRankingRow extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '${definition.code} · 거래대금 ${_compactEok(_simulatedTurnover(definition, quote))}',
+                        '${definition.code} · 거래대금 '
+                        '${_compactEok(turnoverFor(definition, quote))}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
@@ -6127,7 +10416,7 @@ class _MarketRankingRow extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '${rate >= 0 ? '+' : ''}${rate.toStringAsFixed(2)}%',
+                        _signedPercent(rate),
                         style: TextStyle(
                           color: change.abs() < 0.005
                               ? const Color(0xFF7B8491)
@@ -6147,6 +10436,381 @@ class _MarketRankingRow extends StatelessWidget {
       );
     },
   );
+}
+
+class _TradeJournalPreview extends StatelessWidget {
+  const _TradeJournalPreview({
+    required this.state,
+    required this.entries,
+    required this.assetNameFor,
+    required this.onOpenAll,
+  });
+
+  final GameState state;
+  final List<LedgerEntry> entries;
+  final String Function(String assetId) assetNameFor;
+  final VoidCallback? onOpenAll;
+
+  @override
+  Widget build(BuildContext context) {
+    if (entries.isEmpty) {
+      return Container(
+        key: const Key('trade-journal-empty'),
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(13),
+          border: Border.all(color: _marketLine),
+        ),
+        child: const Text(
+          '아직 체결된 매매가 없어요. 첫 거래 뒤 수수료와 실현손익까지 여기에 기록됩니다.',
+          style: TextStyle(
+            color: _marketMuted,
+            fontSize: 11,
+            height: 1.45,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      );
+    }
+    return Container(
+      key: const Key('trade-journal-preview'),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(color: _marketLine),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          for (var index = 0; index < entries.length; index += 1) ...[
+            _TradeJournalEntryRow(
+              state: state,
+              entry: entries[index],
+              assetName: assetNameFor(entries[index].assetId),
+              compact: true,
+            ),
+            if (index != entries.length - 1)
+              const Divider(height: 1, color: _marketLine),
+          ],
+          if (onOpenAll != null)
+            TextButton.icon(
+              key: const Key('open-trade-journal'),
+              onPressed: onOpenAll,
+              icon: const Icon(Icons.receipt_long_rounded, size: 17),
+              label: const Text('전체 체결내역과 비용 보기'),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TradeJournalSheet extends StatelessWidget {
+  const _TradeJournalSheet({
+    required this.state,
+    required this.entries,
+    required this.assetNameFor,
+  });
+
+  final GameState state;
+  final List<LedgerEntry> entries;
+  final String Function(String assetId) assetNameFor;
+
+  @override
+  Widget build(BuildContext context) {
+    final fees = entries.fold<int>(
+      0,
+      (sum, entry) => sum + entry.tradingFee + entry.transactionTax,
+    );
+    final realized = entries.fold<int>(
+      0,
+      (sum, entry) => sum + entry.realizedPnl,
+    );
+    final turnover = entries.fold<int>(
+      0,
+      (sum, entry) => sum + entry.notional.abs(),
+    );
+    return SizedBox(
+      key: const Key('trade-journal-sheet'),
+      height: MediaQuery.sizeOf(context).height * 0.9,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 2, 10, 12),
+            child: Row(
+              children: [
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '매매일지 · 거래내역',
+                        style: TextStyle(
+                          color: _marketInk,
+                          fontSize: 21,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      SizedBox(height: 3),
+                      Text(
+                        '체결 시각·평균가·비용·실현손익을 원장 그대로 보여 줍니다.',
+                        style: TextStyle(
+                          color: _marketMuted,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  tooltip: '닫기',
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close_rounded),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 0, 18, 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _TradeJournalMetric(
+                    label: '누적 거래대금',
+                    value: _compactWonAmount(turnover),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: _TradeJournalMetric(
+                    label: '수수료·세금',
+                    value: _compactWonAmount(fees),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: _TradeJournalMetric(
+                    label: '실현손익',
+                    value: realized == 0
+                        ? '0원'
+                        : '${realized > 0 ? '+' : '-'}'
+                              '${_compactWonAmount(realized.abs())}',
+                    valueColor: _priceColor(realized.toDouble()),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1, color: _marketLine),
+          Expanded(
+            child: ListView.separated(
+              key: const Key('trade-journal-list'),
+              padding: const EdgeInsets.fromLTRB(18, 4, 18, 28),
+              itemCount: entries.length,
+              separatorBuilder: (_, _) =>
+                  const Divider(height: 1, color: _marketLine),
+              itemBuilder: (_, index) {
+                final entry = entries[index];
+                return _TradeJournalEntryRow(
+                  key: Key('trade-journal-entry-${entry.id}'),
+                  state: state,
+                  entry: entry,
+                  assetName: assetNameFor(entry.assetId),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TradeJournalMetric extends StatelessWidget {
+  const _TradeJournalMetric({
+    required this.label,
+    required this.value,
+    this.valueColor = _marketInk,
+  });
+
+  final String label;
+  final String value;
+  final Color valueColor;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 10),
+    decoration: BoxDecoration(
+      color: const Color(0xFFF7F8FA),
+      borderRadius: BorderRadius.circular(10),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          maxLines: 1,
+          style: const TextStyle(
+            color: _marketMuted,
+            fontSize: 9,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 3),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(
+            value,
+            maxLines: 1,
+            style: TextStyle(
+              color: valueColor,
+              fontSize: 12,
+              fontWeight: FontWeight.w900,
+              fontFeatures: _marketNumberFeatures,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _TradeJournalEntryRow extends StatelessWidget {
+  const _TradeJournalEntryRow({
+    super.key,
+    required this.state,
+    required this.entry,
+    required this.assetName,
+    this.compact = false,
+  });
+
+  final GameState state;
+  final LedgerEntry entry;
+  final String assetName;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final isBuy = entry.tradeSide == TradeSide.buy.name;
+    final sideLabel = isBuy ? '매수' : '매도';
+    final orderLabel = entry.orderType == TradeOrderType.market.name
+        ? '시장가'
+        : entry.orderType == TradeOrderType.limit.name
+        ? '지정가'
+        : '체결';
+    final date = state.dateForDay(math.max(1, entry.day));
+    final dateLabel =
+        '${date.year}.${date.month.toString().padLeft(2, '0')}.'
+        '${date.day.toString().padLeft(2, '0')}'
+        '${entry.marketMinute >= 0 ? ' ${marketTimeLabel(entry.marketMinute)}' : ''}';
+    final notional = entry.notional > 0
+        ? entry.notional
+        : (entry.tradeUnitPrice * entry.tradeQuantity).round();
+    final sideColor = isBuy ? const Color(0xFFF04452) : _marketAccent;
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: compact ? 11 : 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                decoration: BoxDecoration(
+                  color: sideColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(7),
+                ),
+                child: Text(
+                  sideLabel,
+                  style: TextStyle(
+                    color: sideColor,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 7),
+              Expanded(
+                child: Text(
+                  assetName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: _marketInk,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              Text(
+                dateLabel,
+                style: const TextStyle(
+                  color: _marketMuted,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w600,
+                  fontFeatures: _marketNumberFeatures,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 7),
+          Text(
+            '$orderLabel · ${_displayUnits(entry.tradeQuantity)}주 · '
+            '평균 ${_money(entry.tradeUnitPrice.round())}원 · '
+            '${_money(notional)}원',
+            maxLines: compact ? 1 : 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: _marketInk,
+              fontSize: 11,
+              height: 1.35,
+              fontWeight: FontWeight.w700,
+              fontFeatures: _marketNumberFeatures,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Wrap(
+            spacing: 8,
+            runSpacing: 3,
+            children: [
+              Text(
+                '수수료 ${_money(entry.tradingFee)}원',
+                style: const TextStyle(
+                  color: _marketMuted,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              if (entry.transactionTax > 0)
+                Text(
+                  '거래세 ${_money(entry.transactionTax)}원',
+                  style: const TextStyle(
+                    color: _marketMuted,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              if (!isBuy)
+                Text(
+                  '실현손익 ${entry.realizedPnl > 0 ? '+' : ''}'
+                  '${_money(entry.realizedPnl)}원',
+                  style: TextStyle(
+                    color: _priceColor(entry.realizedPnl.toDouble()),
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _PendingOrderRow extends StatelessWidget {
@@ -6208,12 +10872,14 @@ class _BrokerageAccountCard extends StatelessWidget {
   const _BrokerageAccountCard({
     required this.state,
     required this.prices,
+    required this.tradeEntries,
     this.onDeposit,
     this.onWithdraw,
   });
 
   final GameState state;
   final Map<String, double> prices;
+  final List<LedgerEntry> tradeEntries;
   final VoidCallback? onDeposit;
   final VoidCallback? onWithdraw;
 
@@ -6224,11 +10890,11 @@ class _BrokerageAccountCard extends StatelessWidget {
     final rate = state.portfolioCost <= 0
         ? 0.0
         : pnl / state.portfolioCost * 100;
-    final totalFees = state.ledger.fold<int>(
+    final totalFees = tradeEntries.fold<int>(
       0,
-      (sum, entry) => sum + entry.tradingFee,
+      (sum, entry) => sum + entry.tradingFee + entry.transactionTax,
     );
-    final realized = state.ledger.fold<int>(
+    final realized = tradeEntries.fold<int>(
       0,
       (sum, entry) => sum + entry.realizedPnl,
     );
@@ -6325,7 +10991,7 @@ class _BrokerageAccountCard extends StatelessWidget {
                     ),
                     Expanded(
                       child: _AccountMetric(
-                        label: '누적 수수료',
+                        label: '누적 거래비용',
                         value: '${_money(totalFees)}원',
                       ),
                     ),
@@ -6339,7 +11005,7 @@ class _BrokerageAccountCard extends StatelessWidget {
             state.pendingBuyReservedCash > 0
                 ? '미체결 매수 예약 ${_money(state.pendingBuyReservedCash)}원 · '
                       '예수금 ${_money(state.brokerageCash)}원'
-                : '누적 증권 수수료 ${_money(totalFees)}원 · 매매 수수료율 0.250%',
+                : '누적 거래비용 ${_money(totalFees)}원 · 매도 시 시대별 거래세 포함',
             key: const Key('market-account-fees'),
             style: const TextStyle(
               color: Color(0xFF8B95A1),
@@ -6930,12 +11596,14 @@ class _StockRow extends StatelessWidget {
     super.key,
     required this.definition,
     required this.live,
+    required this.turnoverFor,
     required this.favorite,
     required this.onTap,
   });
 
   final _StockDefinition definition;
   final ValueNotifier<_LiveStock> live;
+  final double Function(_StockDefinition, _LiveStock) turnoverFor;
   final bool favorite;
   final VoidCallback onTap;
 
@@ -6946,7 +11614,7 @@ class _StockRow extends StatelessWidget {
       final change = quote.price - quote.previousClose;
       final rate = _changeRate(quote);
       final color = _priceColor(change);
-      final turnover = _simulatedTurnover(definition, quote);
+      final turnover = turnoverFor(definition, quote);
       final volatility = quote.previousClose <= 0
           ? 0.0
           : (quote.high - quote.low) / quote.previousClose * 100;
@@ -7028,7 +11696,7 @@ class _StockRow extends StatelessWidget {
                           ),
                           const SizedBox(height: 3),
                           Text(
-                            '${rate >= 0 ? '+' : ''}${rate.toStringAsFixed(2)}%',
+                            _signedPercent(rate),
                             key: Key('stock-rate-${definition.code}'),
                             style: TextStyle(
                               color: color,
@@ -7092,9 +11760,9 @@ class _QuoteGrid extends StatelessWidget {
     child: Row(
       children: [
         _QuoteValue(label: '전일 종가', value: quote.previousClose),
-        _QuoteValue(label: '틱 시작', value: quote.open),
-        _QuoteValue(label: '틱 최고', value: quote.high),
-        _QuoteValue(label: '틱 최저', value: quote.low),
+        _QuoteValue(label: '시가', value: quote.open),
+        _QuoteValue(label: '고가', value: quote.high),
+        _QuoteValue(label: '저가', value: quote.low),
       ],
     ),
   );
@@ -7137,12 +11805,20 @@ class _MinuteChartPanel extends StatefulWidget {
   const _MinuteChartPanel({
     required this.quote,
     required this.code,
+    required this.market,
     required this.minute,
+    required this.asset,
+    required this.simulationSeed,
+    required this.throughDate,
   });
 
   final _LiveStock quote;
   final String code;
+  final String market;
   final int minute;
+  final FictionalMarketAsset asset;
+  final String simulationSeed;
+  final DateTime throughDate;
 
   @override
   State<_MinuteChartPanel> createState() => _MinuteChartPanelState();
@@ -7165,121 +11841,164 @@ class _MinuteChartPanelState extends State<_MinuteChartPanel> {
   };
   _ChartPeriod period = _ChartPeriod.minute;
 
-  ({List<double> prices, int startMinute}) _visibleMinuteSeries({
-    required int targetMinutes,
-  }) {
-    final targetPoints = targetMinutes + 1;
+  ({List<double> prices, int startMinute, int previousSessionPointCount})
+  _visibleMinuteSeries() {
     final sessionHistory = widget.quote.sessionHistory;
     if (!widget.quote.isTradingDay ||
         widget.minute < krxOpenMinute ||
         sessionHistory.length <= generatedPreOpenTicks) {
-      return (prices: <double>[sessionHistory.last], startMinute: 0);
+      return (
+        prices: <double>[sessionHistory.last],
+        startMinute: 0,
+        previousSessionPointCount: 0,
+      );
     }
-    final visibleEnd = math.min(
-      sessionHistory.length,
-      generatedRegularSessionTicks + 1,
-    );
+    final continuousEnd =
+        generatedPreOpenTicks + generatedContinuousTradingTicks;
+    final visibleEnd = math.min(sessionHistory.length, continuousEnd);
     final prices = sessionHistory.sublist(generatedPreOpenTicks, visibleEnd);
-    if (prices.length <= targetPoints) {
-      return (prices: prices, startMinute: 0);
+    if (widget.minute >= krxCloseMinute &&
+        sessionHistory.length > generatedRegularSessionTicks) {
+      prices.add(sessionHistory[generatedRegularSessionTicks]);
     }
-    final startMinute = prices.length - targetPoints;
-    return (prices: prices.sublist(startMinute), startMinute: startMinute);
+    return (prices: prices, startMinute: 0, previousSessionPointCount: 0);
   }
 
-  List<double> _dailyCloses() {
-    final buckets = <String, double>{};
-    for (final point in widget.quote.history) {
-      buckets[_dailyBucket(point)] = point.close;
+  List<MarketDatedCandle> _dailyCandles() => recentMarketDailyCandles(
+    asset: widget.asset,
+    simulationSeed: widget.simulationSeed,
+    throughDate: widget.throughDate,
+    visibleThroughMinute: widget.minute,
+    count: switch (period) {
+      _ChartPeriod.day => 120,
+      _ChartPeriod.week => 280,
+      _ChartPeriod.month => 1380,
+      _ChartPeriod.year => 3100,
+      _ChartPeriod.minute => 0,
+    },
+  );
+
+  List<MarketCandle> _currentMinuteCandles({
+    required List<double> prices,
+    required int candleSeed,
+    required int fullDayVolume,
+    required double lowerPriceLimit,
+    required double upperPriceLimit,
+  }) {
+    if (prices.length <= 1) return const <MarketCandle>[];
+    final includesClosingAuction =
+        widget.minute >= krxCloseMinute &&
+        prices.length > generatedContinuousTradingTicks;
+    final continuousPrices = includesClosingAuction
+        ? prices.sublist(0, prices.length - 1)
+        : prices;
+    final continuousVolumes = gameContinuousMinuteVolumes(
+      fullDayVolume: fullDayVolume,
+      visibleThroughMinute: widget.minute,
+    );
+    final candles = <MarketCandle>[
+      if (continuousPrices.length > 1)
+        ...aggregateMarketCandles(
+          continuousPrices,
+          interval,
+          tickMinutes: marketTickMinutes,
+          seed: candleSeed,
+          lowerPriceLimit: lowerPriceLimit,
+          upperPriceLimit: upperPriceLimit,
+          minuteVolumes: continuousVolumes,
+          market: widget.market,
+        ),
+    ];
+    if (includesClosingAuction) {
+      final auctionOpen = continuousPrices.last;
+      final auctionClose = prices.last;
+      candles.add(
+        MarketCandle(
+          open: auctionOpen,
+          high: math.max(auctionOpen, auctionClose),
+          low: math.min(auctionOpen, auctionClose),
+          close: auctionClose,
+          startMinute: krxCloseMinute - krxOpenMinute,
+          volume: gameClosingAuctionVolume(
+            fullDayVolume: fullDayVolume,
+          ).toDouble(),
+        ),
+      );
     }
-    final values = buckets.values.toList(growable: false);
+    return candles;
+  }
+
+  List<MarketDatedCandle> _periodCandles() {
+    if (period == _ChartPeriod.minute) {
+      return const <MarketDatedCandle>[];
+    }
+    final bucket = switch (period) {
+      _ChartPeriod.day => MarketCandlePeriod.day,
+      _ChartPeriod.week => MarketCandlePeriod.week,
+      _ChartPeriod.month => MarketCandlePeriod.month,
+      _ChartPeriod.year => MarketCandlePeriod.year,
+      _ChartPeriod.minute => MarketCandlePeriod.day,
+    };
     final limit = switch (period) {
-      _ChartPeriod.day => 60,
+      _ChartPeriod.day => 120,
       _ChartPeriod.week => 52,
       _ChartPeriod.month => 60,
       _ChartPeriod.year => 12,
       _ChartPeriod.minute => 0,
     };
-    if (limit == 0 || values.length <= limit) return values;
-    return values.sublist(values.length - limit);
+    return aggregateMarketDatedCandles(
+      _dailyCandles(),
+      period: bucket,
+      maxBuckets: limit,
+    );
   }
 
-  String _dailyBucket(MarketPoint point) {
-    final date = point.parsedDate;
-    return switch (period) {
-      _ChartPeriod.day => point.date,
-      _ChartPeriod.week => _chartDateKey(
-        date.subtract(Duration(days: date.weekday - DateTime.monday)),
-      ),
-      _ChartPeriod.month =>
-        '${date.year}-${date.month.toString().padLeft(2, '0')}',
-      _ChartPeriod.year => '${date.year}',
-      _ChartPeriod.minute => point.date,
-    };
-  }
-
-  String _chartDateKey(DateTime date) =>
-      '${date.year}-${date.month.toString().padLeft(2, '0')}-'
-      '${date.day.toString().padLeft(2, '0')}';
-
-  List<String> _minuteAxisLabels(
-    int visiblePointCount, {
-    required int startMinuteOffset,
-  }) {
+  List<String> _minuteAxisLabels(List<MarketCandle> visibleCandles) {
     if (widget.minute < krxOpenMinute) {
       return <String>['', '', '개장 전 ${marketTimeLabel(widget.minute)}'];
     }
-    final endMinute = widget.minute.clamp(krxOpenMinute, krxCloseMinute);
-    if (startMinuteOffset < 0) {
-      final previousStart = (krxCloseMinute + startMinuteOffset).clamp(
-        krxOpenMinute,
-        krxCloseMinute,
-      );
-      return <String>[
-        '전일 ${marketTimeLabel(previousStart)}',
-        '오늘 09:00',
-        marketTimeLabel(endMinute),
-      ];
+    if (visibleCandles.isEmpty) {
+      return <String>['', '', marketTimeLabel(widget.minute)];
     }
-    final elapsed = math.max(0, visiblePointCount - 1);
-    final startMinute = math.max(krxOpenMinute, endMinute - elapsed);
-    final middleMinute = startMinute + (endMinute - startMinute) ~/ 2;
+
+    String labelForOffset(int offset) {
+      if (offset >= 0) {
+        return '오늘 ${marketTimeLabel((krxOpenMinute + offset).clamp(krxOpenMinute, krxCloseMinute))}';
+      }
+      final fullPointIndex = generatedContinuousTradingTicks + 1 + offset;
+      final minute = fullPointIndex >= generatedContinuousTradingTicks
+          ? krxCloseMinute
+          : krxOpenMinute +
+                fullPointIndex.clamp(0, generatedContinuousTradingTicks - 1);
+      return '전일 ${marketTimeLabel(minute)}';
+    }
+
     return <String>[
-      marketTimeLabel(startMinute),
-      marketTimeLabel(middleMinute),
-      marketTimeLabel(endMinute),
+      labelForOffset(visibleCandles.first.startMinute),
+      labelForOffset(visibleCandles[visibleCandles.length ~/ 2].startMinute),
+      visibleCandles.last.startMinute >= 0
+          ? labelForOffset(visibleCandles.last.startMinute)
+          : '오늘 ${marketTimeLabel(krxOpenMinute)}',
     ];
   }
 
-  List<String> _dailyAxisLabels() {
-    final keys = <String>[];
-    String? lastKey;
-    for (final point in widget.quote.history) {
-      final key = _dailyBucket(point);
-      if (key == lastKey) continue;
-      keys.add(key);
-      lastKey = key;
-    }
-    final limit = switch (period) {
-      _ChartPeriod.day => 60,
-      _ChartPeriod.week => 52,
-      _ChartPeriod.month => 60,
-      _ChartPeriod.year => 12,
-      _ChartPeriod.minute => 0,
-    };
-    final visible = limit > 0 && keys.length > limit
-        ? keys.sublist(keys.length - limit)
-        : keys;
-    final formatted = visible.map(_formatDailyAxisLabel).toList();
+  List<String> _dailyAxisLabels(List<MarketDatedCandle> candles) {
+    final formatted = candles
+        .map((item) => _formatDailyAxisLabel(item.date))
+        .toList(growable: false);
     return _axisTriplet(formatted);
   }
 
   String _formatDailyAxisLabel(String key) {
+    final date = DateTime.tryParse(key);
+    if (date == null) return key;
     return switch (period) {
       _ChartPeriod.day || _ChartPeriod.week =>
-        key.length >= 10 ? key.substring(5).replaceAll('-', '.') : key,
-      _ChartPeriod.month => key.replaceAll('-', '.'),
-      _ChartPeriod.year => key,
+        '${date.month.toString().padLeft(2, '0')}.'
+            '${date.day.toString().padLeft(2, '0')}',
+      _ChartPeriod.month =>
+        '${date.year}.${date.month.toString().padLeft(2, '0')}',
+      _ChartPeriod.year => '${date.year}',
       _ChartPeriod.minute => key,
     };
   }
@@ -7296,10 +12015,10 @@ class _MinuteChartPanelState extends State<_MinuteChartPanel> {
   }) {
     if (period != _ChartPeriod.minute) {
       return switch (period) {
-        _ChartPeriod.day => '일봉 · 최근 $dailyCount거래일 · 가상 종가 기반',
-        _ChartPeriod.week => '주봉 · 최근 $dailyCount주 · 가상 종가 기반',
-        _ChartPeriod.month => '월봉 · 최근 $dailyCount개월 · 가상 종가 기반',
-        _ChartPeriod.year => '년봉 · 최근 $dailyCount년 · 가상 종가 기반',
+        _ChartPeriod.day => '일봉 · 최근 $dailyCount거래일 · 5·20·60·120일 이동평균',
+        _ChartPeriod.week => '주봉 · 최근 $dailyCount주',
+        _ChartPeriod.month => '월봉 · 최근 $dailyCount개월',
+        _ChartPeriod.year => '년봉 · 최근 $dailyCount년',
         _ChartPeriod.minute => '',
       };
     }
@@ -7327,75 +12046,142 @@ class _MinuteChartPanelState extends State<_MinuteChartPanel> {
   Widget build(BuildContext context) {
     final displayMinutes = minuteWindows[interval] ?? 60;
     final displayCandleCount = math.max(1, displayMinutes ~/ interval);
-    var minuteSeries = _visibleMinuteSeries(targetMinutes: displayMinutes);
+    var minuteSeries = _visibleMinuteSeries();
     final candleSeed = widget.quote.history.isEmpty
         ? widget.code.codeUnits.fold<int>(17, (sum, unit) => sum * 31 + unit)
-        : marketStockSeed(widget.code, widget.quote.history.last.parsedDate);
+        : marketStockSeed(
+            '${widget.simulationSeed}:${widget.asset.code}',
+            widget.throughDate,
+          );
+    MarketPreviousSessionSeries? previousSessionSeries;
     if (period == _ChartPeriod.minute &&
         widget.quote.isTradingDay &&
         widget.minute >= krxOpenMinute &&
         minuteSeries.startMinute == 0) {
       final targetPoints = displayMinutes + 1;
       final missingPoints = math.min(
-        math.max(0, targetPoints - minuteSeries.prices.length),
+        math.max(0, targetPoints + 1 - minuteSeries.prices.length),
         generatedRegularTradingTicks,
       );
       if (missingPoints > 0) {
-        final previousSession = generatedPreviousSessionLeadIn(
-          previousClose: widget.quote.previousClose,
-          pointCount: missingPoints,
-          seed: candleSeed ^ 0x5F3759DF,
+        previousSessionSeries = marketPreviousSessionSeriesForAsset(
+          asset: widget.asset,
+          simulationSeed: widget.simulationSeed,
+          currentDate: widget.throughDate,
         );
-        minuteSeries = (
-          prices: <double>[...previousSession, ...minuteSeries.prices],
-          startMinute: -missingPoints,
-        );
+        final previousSession = previousSessionSeries?.prices;
+        if (previousSession != null && previousSession.isNotEmpty) {
+          minuteSeries = (
+            prices: <double>[...previousSession, ...minuteSeries.prices],
+            startMinute: -previousSession.length,
+            previousSessionPointCount: previousSession.length,
+          );
+        }
       }
     }
     final minutePrices = minuteSeries.prices;
-    final candleLimitRate = widget.quote.history.isEmpty
-        ? 0.15
-        : marketDailyPriceLimitRate(widget.quote.history.last.parsedDate);
-    final candles = period == _ChartPeriod.minute
-        ? aggregateMarketCandles(
-            minutePrices,
-            interval,
-            tickMinutes: marketTickMinutes,
-            seed: candleSeed,
-            startMinuteOffset: minuteSeries.startMinute,
-            lowerPriceLimit: widget.quote.previousClose * (1 - candleLimitRate),
-            upperPriceLimit: widget.quote.previousClose * (1 + candleLimitRate),
+    final candlePriceRange = marketDailyPriceRange(
+      previousClose: widget.quote.previousClose,
+      date: widget.throughDate,
+      market: widget.market,
+      isIpoFirstTradingDay: widget.asset.isIpoFirstTradingDay(
+        widget.throughDate,
+      ),
+    );
+    final currentFullDayVolume = widget.quote.isTradingDay
+        ? gameEstimatedFullDayVolumeUnits(
+            assetId: widget.asset.id,
+            day: marketLiquidityDayKey(widget.throughDate),
+            referencePrice: widget.quote.previousClose,
+            simulationSeed: widget.simulationSeed,
+            sharesOutstanding: widget.asset.sharesOutstandingAtOrBefore(
+              widget.throughDate,
+            ),
           )
+        : 0;
+    final candles = period == _ChartPeriod.minute
+        ? <MarketCandle>[
+            if (minuteSeries.previousSessionPointCount > 1)
+              ...aggregateMarketCandles(
+                minutePrices.sublist(0, minuteSeries.previousSessionPointCount),
+                interval,
+                tickMinutes: marketTickMinutes,
+                seed: previousSessionSeries == null
+                    ? null
+                    : marketStockSeed(
+                        '${widget.simulationSeed}:${widget.asset.code}',
+                        previousSessionSeries.date,
+                      ),
+                startMinuteOffset: -minuteSeries.previousSessionPointCount,
+                totalVolume: previousSessionSeries == null
+                    ? null
+                    : gameEstimatedFullDayVolumeUnits(
+                        assetId: widget.asset.id,
+                        day: marketLiquidityDayKey(previousSessionSeries.date),
+                        referencePrice: previousSessionSeries.referenceClose,
+                        simulationSeed: widget.simulationSeed,
+                        sharesOutstanding: widget.asset
+                            .sharesOutstandingAtOrBefore(
+                              previousSessionSeries.date,
+                            ),
+                      ).toDouble(),
+                market: widget.market,
+              ),
+            if (minutePrices.length - minuteSeries.previousSessionPointCount >
+                1)
+              ..._currentMinuteCandles(
+                prices: minutePrices.sublist(
+                  minuteSeries.previousSessionPointCount,
+                ),
+                candleSeed: candleSeed,
+                fullDayVolume: currentFullDayVolume,
+                lowerPriceLimit: candlePriceRange.lower,
+                upperPriceLimit: candlePriceRange.upper,
+              ),
+          ]
         : const <MarketCandle>[];
+    final datedDailyCandles = _periodCandles();
+    final dailyCandles = datedDailyCandles
+        .map((item) => item.candle)
+        .toList(growable: false);
     final dailyCloses = period == _ChartPeriod.minute
         ? const <double>[]
-        : _dailyCloses();
+        : dailyCandles.map((candle) => candle.close).toList(growable: false);
     final visibleCandleCount = math.min(candles.length, displayCandleCount);
-    final visibleStartMinute = candles.isEmpty
-        ? minuteSeries.startMinute
-        : candles[candles.length - visibleCandleCount].startMinute;
+    final visibleCandles = candles.isEmpty
+        ? const <MarketCandle>[]
+        : candles.sublist(candles.length - visibleCandleCount);
     final axisLabels = period == _ChartPeriod.minute
-        ? _minuteAxisLabels(
-            visibleCandleCount + 1,
-            startMinuteOffset: visibleStartMinute,
-          )
-        : _dailyAxisLabels();
+        ? _minuteAxisLabels(visibleCandles)
+        : _dailyAxisLabels(datedDailyCandles);
     return Column(
       children: [
         SizedBox(
           height: 268,
           child: CustomPaint(
-            key: Key(
-              period == _ChartPeriod.minute
-                  ? 'minute-candle-chart'
-                  : 'daily-close-chart',
-            ),
+            key: Key(switch (period) {
+              _ChartPeriod.minute => 'minute-candle-chart',
+              _ChartPeriod.day => 'daily-candle-chart',
+              _ChartPeriod.week => 'weekly-candle-chart',
+              _ChartPeriod.month => 'monthly-candle-chart',
+              _ChartPeriod.year => 'yearly-candle-chart',
+            }),
             painter: period == _ChartPeriod.minute
                 ? _CandleChartPainter(
                     candles: candles,
                     maxVisibleCandles: displayCandleCount,
                   )
-                : _DailyCloseChartPainter(values: dailyCloses),
+                : _CandleChartPainter(
+                    candles: dailyCandles,
+                    maxVisibleCandles: switch (period) {
+                      _ChartPeriod.day => 120,
+                      _ChartPeriod.week => 52,
+                      _ChartPeriod.month => 60,
+                      _ChartPeriod.year => 12,
+                      _ChartPeriod.minute => 0,
+                    },
+                    showMovingAverages: period == _ChartPeriod.day,
+                  ),
             size: Size.infinite,
           ),
         ),
@@ -7546,10 +12332,12 @@ class _CandleChartPainter extends CustomPainter {
   const _CandleChartPainter({
     required this.candles,
     required this.maxVisibleCandles,
+    this.showMovingAverages = false,
   });
 
   final List<MarketCandle> candles;
   final int maxVisibleCandles;
+  final bool showMovingAverages;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -7642,6 +12430,71 @@ class _CandleChartPainter extends CustomPainter {
 
     canvas.restore();
 
+    if (showMovingAverages) {
+      const averagePeriods = <int>[5, 20, 60, 120];
+      const averageColors = <Color>[
+        Color(0xFFFF8A00),
+        Color(0xFF8B5CF6),
+        Color(0xFF16A085),
+        Color(0xFF667085),
+      ];
+      canvas.save();
+      canvas.clipRect(Rect.fromLTRB(0, priceTop, chartRight, priceBottom));
+      for (
+        var averageIndex = 0;
+        averageIndex < averagePeriods.length;
+        averageIndex += 1
+      ) {
+        final averagePeriod = averagePeriods[averageIndex];
+        final path = Path();
+        var hasPoint = false;
+        for (var localIndex = 0; localIndex < visible.length; localIndex += 1) {
+          final globalIndex = visibleStartIndex + localIndex;
+          if (globalIndex + 1 < averagePeriod) continue;
+          var sum = 0.0;
+          for (
+            var cursor = globalIndex - averagePeriod + 1;
+            cursor <= globalIndex;
+            cursor += 1
+          ) {
+            sum += candles[cursor].close;
+          }
+          final average = sum / averagePeriod;
+          final x = slot * localIndex + slot / 2;
+          final y = yFor(average);
+          if (!hasPoint) {
+            path.moveTo(x, y);
+            hasPoint = true;
+          } else {
+            path.lineTo(x, y);
+          }
+        }
+        if (hasPoint) {
+          canvas.drawPath(
+            path,
+            Paint()
+              ..color = averageColors[averageIndex]
+              ..strokeWidth = 1.15
+              ..style = PaintingStyle.stroke,
+          );
+        }
+      }
+      canvas.restore();
+      for (
+        var averageIndex = 0;
+        averageIndex < averagePeriods.length;
+        averageIndex += 1
+      ) {
+        drawText(
+          'MA${averagePeriods[averageIndex]}',
+          Offset(3 + averageIndex * 34, 0),
+          color: averageColors[averageIndex],
+          fontSize: 7,
+          fontWeight: FontWeight.w800,
+        );
+      }
+    }
+
     final current = visible.last.close;
     final currentY = yFor(current).clamp(priceTop, priceBottom);
     final currentPaint = Paint()
@@ -7704,123 +12557,8 @@ class _CandleChartPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _CandleChartPainter oldDelegate) =>
       oldDelegate.candles != candles ||
-      oldDelegate.maxVisibleCandles != maxVisibleCandles;
-}
-
-class _DailyCloseChartPainter extends CustomPainter {
-  const _DailyCloseChartPainter({required this.values});
-
-  final List<double> values;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (values.isEmpty || size.isEmpty) return;
-    var minValue = values.reduce(math.min);
-    var maxValue = values.reduce(math.max);
-    if (minValue == maxValue) {
-      minValue *= 0.995;
-      maxValue *= 1.005;
-    }
-    final padding = (maxValue - minValue) * 0.08;
-    minValue -= padding;
-    maxValue += padding;
-    final range = maxValue - minValue;
-    double yFor(double value) =>
-        size.height - ((value - minValue) / range * size.height);
-
-    final gridPaint = Paint()
-      ..color = const Color(0xFFEFF1F4)
-      ..strokeWidth = 1;
-    for (var line = 1; line < 4; line++) {
-      final y = size.height * line / 4;
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
-    }
-
-    final linePath = Path();
-    for (var index = 0; index < values.length; index++) {
-      final x = values.length == 1
-          ? size.width
-          : size.width * index / (values.length - 1);
-      final point = Offset(x, yFor(values[index]));
-      if (index == 0) {
-        linePath.moveTo(point.dx, point.dy);
-      } else {
-        linePath.lineTo(point.dx, point.dy);
-      }
-    }
-    final fillPath = Path.from(linePath)
-      ..lineTo(size.width, size.height)
-      ..lineTo(0, size.height)
-      ..close();
-    canvas.drawPath(
-      fillPath,
-      Paint()
-        ..shader = const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color(0x453182F6), Color(0x003182F6)],
-        ).createShader(Offset.zero & size),
-    );
-    final linePaint = Paint()
-      ..color = _marketAccent
-      ..strokeWidth = 2.2
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-    canvas.drawPath(linePath, linePaint);
-    canvas.drawCircle(
-      Offset(size.width, yFor(values.last)),
-      3.5,
-      Paint()..color = _marketAccent,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant _DailyCloseChartPainter oldDelegate) =>
-      oldDelegate.values != values;
-}
-
-class _TradingStatusRow extends StatelessWidget {
-  const _TradingStatusRow({required this.quote, required this.minute});
-
-  final _LiveStock quote;
-  final int minute;
-
-  @override
-  Widget build(BuildContext context) => FittedBox(
-    fit: BoxFit.scaleDown,
-    alignment: Alignment.centerLeft,
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const _LiveDot(),
-        const SizedBox(width: 7),
-        Text(
-          !quote.isTradingDay
-              ? '장 마감'
-              : minute < krxOpenMinute
-              ? '개장 전 · 09:00부터 1분봉 생성'
-              : minute >= krxCloseMinute
-              ? '정규장 마감 · 15:00 종가 고정'
-              : '가상 장중 · 현실 1초마다 게임 1분 진행(기본) · 3배/10배 지원',
-          style: const TextStyle(
-            color: Color(0xFF596270),
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(width: 18),
-        const Text(
-          '마지막 값 = 오늘의 가상 종가',
-          style: TextStyle(
-            color: Color(0xFF9299A3),
-            fontSize: 10,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ],
-    ),
-  );
+      oldDelegate.maxVisibleCandles != maxVisibleCandles ||
+      oldDelegate.showMovingAverages != showMovingAverages;
 }
 
 class _RangeChip extends StatelessWidget {
@@ -7920,6 +12658,7 @@ class _SparklinePainter extends CustomPainter {
 
 class _StockDefinition {
   const _StockDefinition({
+    required this.asset,
     required this.id,
     required this.code,
     required this.name,
@@ -7929,6 +12668,8 @@ class _StockDefinition {
     required this.sector,
     required this.summary,
     required this.question,
+    required this.products,
+    required this.listedOn,
     required this.accent,
     required this.generation,
     required this.financials,
@@ -7937,6 +12678,7 @@ class _StockDefinition {
 
   factory _StockDefinition.fromAsset(FictionalMarketAsset asset) =>
       _StockDefinition(
+        asset: asset,
         id: asset.id,
         code: asset.code,
         name: asset.name,
@@ -7950,12 +12692,15 @@ class _StockDefinition {
         question: asset.question.isEmpty
             ? '${asset.sector} 시장이 바뀌어도 이 회사의 경쟁력은 유지될까?'
             : asset.question,
+        products: asset.products,
+        listedOn: asset.listedOn ?? asset.firstTradeDate,
         accent: _hexColor(asset.colorHex),
         generation: asset.generation,
         financials: asset.financials,
         relations: asset.relations,
       );
 
+  final FictionalMarketAsset asset;
   final String id;
   final String code;
   final String name;
@@ -7965,6 +12710,8 @@ class _StockDefinition {
   final String sector;
   final String summary;
   final String question;
+  final List<String> products;
+  final String? listedOn;
   final Color accent;
   final int generation;
   final List<FictionalFinancialSnapshot> financials;
@@ -8008,6 +12755,7 @@ class _LiveStock {
 
   _LiveStock copyWith({
     double? price,
+    double? open,
     double? high,
     double? low,
     List<MarketPoint>? history,
@@ -8018,7 +12766,7 @@ class _LiveStock {
     previousClose: previousClose,
     officialClose: officialClose,
     isTradingDay: isTradingDay,
-    open: open,
+    open: open ?? this.open,
     high: high ?? this.high,
     low: low ?? this.low,
     history: history ?? this.history,
@@ -8030,19 +12778,6 @@ class _LiveStock {
 double _changeRate(_LiveStock quote) => quote.previousClose <= 0
     ? 0
     : (quote.price - quote.previousClose) / quote.previousClose * 100;
-
-double _simulatedTurnover(_StockDefinition definition, _LiveStock quote) {
-  final hash = definition.code.codeUnits.fold<int>(
-    17,
-    (sum, unit) => sum * 31 + unit,
-  );
-  final base = 18.0 + (hash.abs() % 340);
-  final progress = quote.sessionHistory.length / generatedSessionTicks;
-  final volatility = quote.previousClose <= 0
-      ? 0.0
-      : (quote.high - quote.low).abs() / quote.previousClose;
-  return base * (1 + progress * 1.4 + volatility * 18);
-}
 
 String _compactEok(double value) => value >= 1000
     ? '${(value / 1000).toStringAsFixed(1)}천억원'
@@ -8063,6 +12798,40 @@ String _compactWonAmount(int value) {
   return '$sign${_money(amount)}원';
 }
 
+String _signedShares(int value) {
+  if (value == 0) return '0';
+  return '${value > 0 ? '+' : '-'}${_money(value.abs())}';
+}
+
+String _investorFlowText(
+  int shares, {
+  required double closePrice,
+  required _InvestorFlowUnit unit,
+}) {
+  if (unit == _InvestorFlowUnit.shares) return _signedShares(shares);
+  if (!closePrice.isFinite || closePrice <= 0 || shares == 0) return '0원';
+  final amount = (shares * closePrice).round();
+  if (amount == 0) return '0원';
+  return '${amount > 0 ? '+' : '-'}${_compactWonAmount(amount.abs())}';
+}
+
+Color _investorFlowColor(int value) {
+  if (value > 0) return const Color(0xFFE02D70);
+  if (value < 0) return const Color(0xFF2563D9);
+  return _marketMuted;
+}
+
+String _shortInvestorDate(DateTime date) =>
+    '${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}';
+
+String _companyListingDate(String? value) {
+  if (value == null || value.isEmpty) return '-';
+  final parsed = DateTime.tryParse(value);
+  if (parsed == null) return value;
+  return '${parsed.year}.${parsed.month.toString().padLeft(2, '0')}.'
+      '${parsed.day.toString().padLeft(2, '0')}';
+}
+
 Color _hexColor(String value) {
   final normalized = value.replaceFirst('#', '');
   final parsed = int.tryParse(normalized, radix: 16) ?? 0x607D8B;
@@ -8078,9 +12847,35 @@ String _displayPrice(double value, String currency) {
   };
 }
 
+String _signedDisplayPrice(double value, String currency) {
+  final rounded = value.round();
+  if (rounded == 0) return _displayPrice(0, currency);
+  return '${rounded > 0 ? '+' : '-'}'
+      '${_displayPrice(rounded.abs().toDouble(), currency)}';
+}
+
+String _signedPercent(double value, {int fractionDigits = 2}) {
+  final magnitude = value.abs().toStringAsFixed(fractionDigits);
+  final roundsToZero = double.tryParse(magnitude) == 0;
+  final sign = roundsToZero ? '' : (value > 0 ? '+' : '-');
+  return '$sign$magnitude%';
+}
+
+String _ownershipPercent(double ownedShares, int sharesOutstanding) {
+  if (ownedShares <= 0 || sharesOutstanding <= 0) return '0%';
+  final percent = ownedShares / sharesOutstanding * 100;
+  if (percent < 0.0001) return '<0.0001%';
+  if (percent < 0.01) return '${percent.toStringAsFixed(4)}%';
+  if (percent < 1) return '${percent.toStringAsFixed(3)}%';
+  return '${percent.toStringAsFixed(2)}%';
+}
+
 String _displayUnits(double units) => units == units.roundToDouble()
     ? units.toInt().toString()
     : units.toStringAsFixed(4).replaceFirst(RegExp(r'0+$'), '');
 
-Color _priceColor(double change) =>
-    change >= 0 ? const Color(0xFFF04452) : _marketAccent;
+Color _priceColor(double change) {
+  if (change > 0) return const Color(0xFFF04452);
+  if (change < 0) return _marketAccent;
+  return _marketInk;
+}

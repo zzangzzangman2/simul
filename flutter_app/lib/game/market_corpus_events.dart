@@ -359,22 +359,25 @@ double _fictionalCorpusPatternImpact(
       .toDouble();
 }
 
-List<FictionalMarketEvent> _corpusScenarioEventsForDate(
+final Map<String, Map<String, List<FictionalMarketEvent>>>
+_corpusScenarioEventScheduleCache =
+    <String, Map<String, List<FictionalMarketEvent>>>{};
+
+Map<String, List<FictionalMarketEvent>> _corpusScenarioEventSchedule(
   String seed,
-  DateTime date,
 ) {
-  if (date.year < fictionalCampaignStartYear ||
-      date.year > fictionalCampaignEndYear) {
-    return const [];
-  }
-  final dateKey = marketDateKey(date);
-  final events = <FictionalMarketEvent>[];
+  final cached = _readFictionalMarketCache(
+    _corpusScenarioEventScheduleCache,
+    seed,
+  );
+  if (cached != null) return cached;
+  final schedule = <String, List<FictionalMarketEvent>>{};
   const stageOffsets = <int>[0, 5, 21];
-  for (final planYear in <int>[date.year - 1, date.year]) {
-    if (planYear < fictionalCampaignStartYear ||
-        planYear > fictionalCampaignEndYear) {
-      continue;
-    }
+  for (
+    var planYear = fictionalCampaignStartYear;
+    planYear <= fictionalCampaignEndYear;
+    planYear += 1
+  ) {
     for (var month = 1; month <= 12; month++) {
       final planId = '$planYear-${month.toString().padLeft(2, '0')}';
       final day = 2 + _fictionalHash('$seed:corpus-event-day:$planId') % 20;
@@ -392,7 +395,7 @@ List<FictionalMarketEvent> _corpusScenarioEventsForDate(
         final stageDate = _nextFictionalTradingDay(
           startDate.add(Duration(days: stageOffsets[stage])),
         );
-        if (marketDateKey(stageDate) != dateKey) continue;
+        final dateKey = marketDateKey(stageDate);
         final impact = _fictionalCorpusPatternImpact(pattern, stage, strength);
         final positive = impact >= 0;
         final title = switch (stage) {
@@ -405,40 +408,63 @@ List<FictionalMarketEvent> _corpusScenarioEventsForDate(
           1 => '첫 충격 뒤 환율·금리·외국계 수급과 업종 회전이 이어졌다. 초기 방향이 유지되는지는 아직 확정되지 않았다.',
           _ => '기업 주문·재고·차입 조건에 후속 영향이 나타났다. 시장 전체 움직임과 회사별 대응 성과가 갈리기 시작했다.',
         };
-        events.add(
-          FictionalMarketEvent(
-            id: 'corpus-${narrative.id}-$planId-$stage',
-            date: dateKey,
-            companyId: fictionalWholeMarketCompanyId,
-            companyName: '시장 전체',
-            sector: '전체시장',
-            stage: stage,
-            eyebrow: '시드형 시장 충격',
-            title: title,
-            body: body,
-            signal: narrative.signal,
-            reportHint: stage == 0
-                ? '해외 선행시장·환율·금리·원자재·수급과 업종별 민감도를 함께 확인해야 한다.'
-                : '초기 충격 뒤 거래대금·변동성·신용잔고와 기업별 주문 변화가 갈리고 있다.',
-            revealMinute:
-                8 * 60 +
-                10 +
-                _fictionalHash('$seed:corpus-event-reveal:$planId:$stage') %
-                    430,
-            impactPct: impact,
-            sectorImpactPcts: _fictionalCorpusSectorImpacts(
-              pattern.channel,
-              impact,
-            ),
-            tone: impact < 0
-                ? NewsTone.shock
-                : stage == 0
-                ? NewsTone.breaking
-                : NewsTone.milestone,
-          ),
-        );
+        schedule
+            .putIfAbsent(dateKey, () => <FictionalMarketEvent>[])
+            .add(
+              FictionalMarketEvent(
+                id: 'corpus-${narrative.id}-$planId-$stage',
+                date: dateKey,
+                companyId: fictionalWholeMarketCompanyId,
+                companyName: '시장 전체',
+                sector: '전체시장',
+                stage: stage,
+                eyebrow: '시드형 시장 충격',
+                title: title,
+                body: body,
+                signal: narrative.signal,
+                reportHint: stage == 0
+                    ? '해외 선행시장·환율·금리·원자재·수급과 업종별 민감도를 함께 확인해야 한다.'
+                    : '초기 충격 뒤 거래대금·변동성·신용잔고와 기업별 주문 변화가 갈리고 있다.',
+                revealMinute:
+                    8 * 60 +
+                    10 +
+                    _fictionalHash('$seed:corpus-event-reveal:$planId:$stage') %
+                        430,
+                impactPct: impact,
+                sectorImpactPcts: _fictionalCorpusSectorImpacts(
+                  pattern.channel,
+                  impact,
+                ),
+                tone: impact < 0
+                    ? NewsTone.shock
+                    : stage == 0
+                    ? NewsTone.breaking
+                    : NewsTone.milestone,
+              ),
+            );
       }
     }
   }
-  return events;
+  final result = <String, List<FictionalMarketEvent>>{
+    for (final entry in schedule.entries)
+      entry.key: List<FictionalMarketEvent>.unmodifiable(entry.value),
+  };
+  _writeFictionalMarketCache(
+    _corpusScenarioEventScheduleCache,
+    seed,
+    result,
+    maximumEntries: _maxFictionalMarketSeedCacheEntries,
+  );
+  return result;
+}
+
+List<FictionalMarketEvent> _corpusScenarioEventsForDate(
+  String seed,
+  DateTime date,
+) {
+  if (date.year < fictionalCampaignStartYear ||
+      date.year > fictionalCampaignEndYear) {
+    return const [];
+  }
+  return _corpusScenarioEventSchedule(seed)[marketDateKey(date)] ?? const [];
 }

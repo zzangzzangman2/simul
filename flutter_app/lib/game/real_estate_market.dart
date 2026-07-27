@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 enum RealEstateInvestmentTier {
   starter,
   income,
@@ -112,6 +114,136 @@ class RealEstatePurchaseQuote {
       bondLegalAndRegistration;
 
   int get totalCash => marketPrice + acquisitionCosts;
+
+  RealEstatePurchaseQuote copyWith({
+    int? acquisitionTax,
+    int? localEducationTax,
+  }) => RealEstatePurchaseQuote(
+    marketPrice: marketPrice,
+    acquisitionTax: acquisitionTax ?? this.acquisitionTax,
+    localEducationTax: localEducationTax ?? this.localEducationTax,
+    ruralSpecialTax: ruralSpecialTax,
+    brokerageFee: brokerageFee,
+    brokerageVat: brokerageVat,
+    bondLegalAndRegistration: bondLegalAndRegistration,
+  );
+}
+
+/// 보유 주택 수까지 반영한 게임용 취득세 견적이다.
+///
+/// 기준 매물의 시대별 세율은 유지하되, 두 번째 주택부터 눈덩이 매입을
+/// 억제하는 단순화 중과를 더한다. 오피스텔·상가·빌딩·지분은 제외한다.
+RealEstatePurchaseQuote realEstatePortfolioAdjustedPurchaseQuote({
+  required RealEstatePurchaseQuote baseQuote,
+  required DateTime date,
+  required RealEstateAssetType type,
+  required int ownedHousingCount,
+}) {
+  if (!type.isHousing || ownedHousingCount <= 0) return baseQuote;
+  final additionalRate = switch ((date.year, ownedHousingCount)) {
+    (>= 2020, >= 2) => 0.08,
+    (>= 2020, _) => 0.04,
+    (>= 2018, >= 2) => 0.04,
+    (>= 2018, _) => 0.02,
+    (_, >= 2) => 0.02,
+    _ => 0.01,
+  };
+  final surcharge = (baseQuote.marketPrice * additionalRate).round();
+  return baseQuote.copyWith(
+    acquisitionTax: baseQuote.acquisitionTax + surcharge,
+    localEducationTax: baseQuote.localEducationTax + (surcharge * 0.1).round(),
+  );
+}
+
+/// 매각 중개비와 취득원가를 뺀 양도차익에 적용하는 게임용 양도세.
+int realEstateCapitalGainsTax({
+  required DateTime saleDate,
+  required RealEstateAssetType type,
+  required int ownedHousingCount,
+  required int holdingDays,
+  required int netSaleBeforeTax,
+  required int purchaseCost,
+}) {
+  final gain = netSaleBeforeTax - purchaseCost;
+  if (gain <= 0) return 0;
+  var rate = switch (holdingDays) {
+    < 365 => 0.40,
+    < 730 => 0.25,
+    _ => 0.15,
+  };
+  if (type.isHousing && saleDate.year >= 2018 && ownedHousingCount > 1) {
+    rate += ownedHousingCount >= 3 ? 0.20 : 0.10;
+  }
+  return (gain * rate.clamp(0.0, 0.60)).round();
+}
+
+/// 월 정산 때 별도로 빠져나가는 보유세·다주택 중과 적립액.
+int realEstateMonthlyHoldingTax({
+  required DateTime date,
+  required RealEstateAssetType type,
+  required int marketValue,
+  required int ownedHousingCount,
+}) {
+  if (marketValue <= 0) return 0;
+  var annualRate = switch (type) {
+    RealEstateAssetType.villa || RealEstateAssetType.apartment => 0.0015,
+    RealEstateAssetType.officetel => 0.0018,
+    RealEstateAssetType.commercialUnit => 0.0025,
+    RealEstateAssetType.officeBuilding => 0.0030,
+    RealEstateAssetType.landmarkFund => 0.0010,
+  };
+  if (type.isHousing && ownedHousingCount > 1) {
+    annualRate +=
+        (ownedHousingCount - 1) * (date.year >= 2020 ? 0.0025 : 0.0015);
+  }
+  final baseTax = marketValue * annualRate;
+  final highValueTax = type.isHousing && marketValue > 900000000
+      ? (marketValue - 900000000) * (date.year >= 2020 ? 0.003 : 0.002)
+      : 0.0;
+  return ((baseTax + highValueTax) / 12).round();
+}
+
+int realEstateSaleListingDays({
+  required RealEstateAssetType type,
+  required String worldSeed,
+  required String assetId,
+  required int listedDay,
+}) {
+  final spread = switch (type) {
+    RealEstateAssetType.villa ||
+    RealEstateAssetType.apartment ||
+    RealEstateAssetType.officetel => 31,
+    RealEstateAssetType.commercialUnit => 46,
+    RealEstateAssetType.officeBuilding => 61,
+    RealEstateAssetType.landmarkFund => 11,
+  };
+  final minimum = switch (type) {
+    RealEstateAssetType.landmarkFund => 5,
+    RealEstateAssetType.officeBuilding => 30,
+    _ => 14,
+  };
+  return minimum +
+      _realEstateStableHash('$worldSeed:$assetId:$listedDay:sale-wait') %
+          spread;
+}
+
+double realEstateSaleOfferRate({
+  required String worldSeed,
+  required String assetId,
+  required int listedDay,
+}) =>
+    (9300 +
+        _realEstateStableHash('$worldSeed:$assetId:$listedDay:sale-offer') %
+            901) /
+    10000;
+
+int _realEstateStableHash(String value) {
+  var hash = 2166136261;
+  for (final unit in value.codeUnits) {
+    hash ^= unit;
+    hash = (hash * 16777619) & 0x7fffffff;
+  }
+  return hash;
 }
 
 class RealEstateMarketAsset {
@@ -150,16 +282,14 @@ class RealEstateMarketAsset {
   final bool requiresLegalCompany;
 
   RealEstatePriceAnchor evidenceAt(DateTime date) {
-    var nearest = priceAnchors.first;
-    var nearestDistance = (date.difference(nearest.date).inDays).abs();
-    for (final anchor in priceAnchors.skip(1)) {
-      final distance = (date.difference(anchor.date).inDays).abs();
-      if (distance < nearestDistance) {
-        nearest = anchor;
-        nearestDistance = distance;
-      }
+    final anchors = [...priceAnchors]
+      ..sort((left, right) => left.date.compareTo(right.date));
+    var latestPublished = anchors.first;
+    for (final anchor in anchors) {
+      if (anchor.date.isAfter(date)) break;
+      latestPublished = anchor;
     }
-    return nearest;
+    return latestPublished;
   }
 
   int priceAt(DateTime date) {
@@ -180,8 +310,35 @@ class RealEstateMarketAsset {
     return anchors.last.price;
   }
 
-  int monthlyRentAt(DateTime date) =>
-      (priceAt(date) * annualGrossYield / 12).round();
+  /// 임대료는 매매가와 별도의 임대수요 지수를 중심으로 움직인다.
+  ///
+  /// 매매가를 그대로 곱하면 장기 상승장에서 가격과 월세가 같은 속도로
+  /// 복리 상승해 초기 수익률이 영원히 유지된다. 기준일 임대료는 기존
+  /// 수익률을 보존하되 이후에는 임대료 지수와 낮은 가격 탄력성만 반영해
+  /// 가격이 빠르게 오를수록 자연스럽게 cap rate가 압축되도록 한다.
+  int monthlyRentAt(DateTime date) {
+    final referenceDate = availableFrom.isAfter(DateTime(2000, 1, 1))
+        ? availableFrom
+        : DateTime(2000, 1, 1);
+    final referencePrice = priceAt(referenceDate);
+    if (referencePrice <= 0) return 0;
+    final referenceRent = referencePrice * annualGrossYield / 12;
+    final rentIndexGrowth =
+        realEstateRentIndexAt(date, type) /
+        realEstateRentIndexAt(referenceDate, type);
+    final priceGrowth = (priceAt(date) / referencePrice).clamp(0.35, 6.0);
+    final priceElasticity = switch (type) {
+      RealEstateAssetType.villa || RealEstateAssetType.apartment => 0.12,
+      RealEstateAssetType.officetel => 0.16,
+      RealEstateAssetType.commercialUnit => 0.22,
+      RealEstateAssetType.officeBuilding => 0.26,
+      RealEstateAssetType.landmarkFund => 0.18,
+    };
+    return (referenceRent *
+            rentIndexGrowth *
+            math.pow(priceGrowth, priceElasticity))
+        .round();
+  }
 
   int monthlyOperatingCostAt(DateTime date) =>
       (priceAt(date) * annualOperatingCostRate / 12).round();
@@ -265,6 +422,61 @@ class RealEstateMarketAsset {
   }
 }
 
+/// 2000년 1월을 1.0으로 둔 게임용 임대료 수요 지수다.
+///
+/// 주택·오피스텔은 가계소득과 전월세 수요, 상업용은 경기와 공실 사이클을
+/// 반영한다. 매매가격 앵커와 독립적이어서 가격 급등이 월세로 즉시
+/// 전이되지 않는다.
+double realEstateRentIndexAt(DateTime date, RealEstateAssetType type) {
+  final normalized = DateTime(date.year, date.month, date.day);
+  final start = DateTime(2000, 1, 1);
+  if (!normalized.isAfter(start)) return 1.0;
+  var index = 1.0;
+  for (var year = 2000; year < normalized.year; year += 1) {
+    index *= 1 + _realEstateAnnualRentGrowthRate(year, type);
+  }
+  final yearStart = DateTime(normalized.year, 1, 1);
+  final nextYear = DateTime(normalized.year + 1, 1, 1);
+  final elapsed = normalized.difference(yearStart).inDays;
+  final yearDays = nextYear.difference(yearStart).inDays;
+  final fraction = (elapsed / yearDays).clamp(0.0, 1.0);
+  return index *
+      math.pow(
+        1 + _realEstateAnnualRentGrowthRate(normalized.year, type),
+        fraction,
+      );
+}
+
+double _realEstateAnnualRentGrowthRate(int year, RealEstateAssetType type) {
+  final housingRate = switch (year) {
+    <= 2002 => 0.045,
+    <= 2007 => 0.035,
+    <= 2009 => 0.012,
+    <= 2012 => 0.052,
+    <= 2019 => 0.028,
+    <= 2021 => 0.055,
+    <= 2023 => 0.012,
+    _ => 0.022,
+  };
+  final commercialRate = switch (year) {
+    <= 2002 => 0.032,
+    <= 2007 => 0.026,
+    <= 2009 => -0.030,
+    <= 2012 => 0.025,
+    <= 2019 => 0.020,
+    <= 2021 => -0.018,
+    <= 2023 => 0.034,
+    _ => 0.020,
+  };
+  return switch (type) {
+    RealEstateAssetType.villa || RealEstateAssetType.apartment => housingRate,
+    RealEstateAssetType.officetel => housingRate - 0.004,
+    RealEstateAssetType.commercialUnit => commercialRate,
+    RealEstateAssetType.officeBuilding => commercialRate + 0.002,
+    RealEstateAssetType.landmarkFund => (housingRate + commercialRate) / 2,
+  };
+}
+
 RealEstatePriceAnchor _anchor(
   int year,
   int month,
@@ -295,7 +507,7 @@ final realEstateMarketCatalog = <RealEstateMarketAsset>[
         1,
         32000000,
         RealEstatePriceEvidence.indexBackcast,
-        '2006 실거래 기준가를 주택가격지수로 역산',
+        '2000년 경기 소형 오피스텔 가격지수 추정',
       ),
       _anchor(
         2006,
@@ -346,7 +558,7 @@ final realEstateMarketCatalog = <RealEstateMarketAsset>[
         1,
         28000000,
         RealEstatePriceEvidence.indexBackcast,
-        '2006 실거래 기준가를 주택가격지수로 역산',
+        '2000년 경기 역세권 오피스텔 가격지수 추정',
       ),
       _anchor(
         2006,
@@ -397,7 +609,7 @@ final realEstateMarketCatalog = <RealEstateMarketAsset>[
         1,
         42000000,
         RealEstatePriceEvidence.indexBackcast,
-        '2006 서울 실거래 기준가를 가격지수로 역산',
+        '2000년 서울 소형 오피스텔 가격지수 추정',
       ),
       _anchor(
         2006,
@@ -448,7 +660,7 @@ final realEstateMarketCatalog = <RealEstateMarketAsset>[
         1,
         47000000,
         RealEstatePriceEvidence.indexBackcast,
-        '2006 서울 연립·다세대 실거래 기준가 역산',
+        '2000년 서울 연립·다세대 가격지수 추정',
       ),
       _anchor(
         2006,
@@ -499,7 +711,7 @@ final realEstateMarketCatalog = <RealEstateMarketAsset>[
         1,
         78000000,
         RealEstatePriceEvidence.indexBackcast,
-        '2006 경기 아파트 실거래 기준가 역산',
+        '2000년 경기 소형 아파트 가격지수 추정',
       ),
       _anchor(
         2006,
@@ -550,7 +762,7 @@ final realEstateMarketCatalog = <RealEstateMarketAsset>[
         1,
         105000000,
         RealEstatePriceEvidence.indexBackcast,
-        '2006 경기 아파트 실거래 기준가 역산',
+        '2000년 경기 신도시 아파트 가격지수 추정',
       ),
       _anchor(
         2006,
@@ -1088,6 +1300,11 @@ final realEstateMarketCatalog = <RealEstateMarketAsset>[
     requiresLegalCompany: true,
   ),
 ];
+
+List<RealEstateMarketAsset> realEstateMarketCatalogAt(DateTime date) =>
+    realEstateMarketCatalog
+        .where((asset) => !date.isBefore(asset.availableFrom))
+        .toList(growable: false);
 
 RealEstateMarketAsset? realEstateMarketAssetById(String id) {
   for (final asset in realEstateMarketCatalog) {

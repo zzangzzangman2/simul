@@ -1,7 +1,7 @@
-import 'dynamic_news.dart';
 import 'game_state.dart';
 import 'market_data.dart';
 import 'market_clock.dart';
+import 'news_combinator.dart';
 
 export 'market_data.dart' show FictionalMarketEvent, NewsTone;
 
@@ -168,7 +168,9 @@ DailyBrief buildDailyBrief(GameState state) {
   final holiday = _fixedHoliday(date);
   final closed = !isMarketTradingDay(date);
 
-  final events = marketNewsEventsForState(state);
+  final events = marketNewsEventsForState(
+    state,
+  ).where((event) => event.revealMinute <= state.marketMinute).toList();
   final event = events.isEmpty ? null : events.first;
   if (event != null) {
     return DailyBrief(
@@ -231,7 +233,7 @@ class DailyMarketNewspaper {
     required this.topLosers,
     required this.headline,
     required this.summary,
-    this.dynamicArticle,
+    this.combinatorialArticle,
   });
   final DateTime date;
   final DailyBrief brief;
@@ -243,10 +245,11 @@ class DailyMarketNewspaper {
   final List<DailyMarketMover> topLosers;
   final String headline;
   final String summary;
-  final DynamicNewsArticle? dynamicArticle;
+  final CombinatorialNewsArticle? combinatorialArticle;
 
-  DailyMarketNewspaper withDynamicArticle(DynamicNewsArticle? article) {
-    if (article == null) return this;
+  DailyMarketNewspaper withCombinatorialArticle(
+    CombinatorialNewsArticle article,
+  ) {
     return DailyMarketNewspaper(
       date: date,
       brief: brief,
@@ -258,7 +261,7 @@ class DailyMarketNewspaper {
       topLosers: topLosers,
       headline: article.headline,
       summary: summary,
-      dynamicArticle: article,
+      combinatorialArticle: article,
     );
   }
 }
@@ -267,7 +270,7 @@ String _newsLimit(String value, int maxLength) => value.length <= maxLength
     ? value
     : '${value.substring(0, maxLength - 3)}...';
 
-DynamicNewsRequest dynamicNewsRequestForState(
+NewsCombinatorInput newsCombinatorInputForState(
   GameState state,
   DailyBrief brief, {
   DailyMarketNewspaper? newspaper,
@@ -278,7 +281,7 @@ DynamicNewsRequest dynamicNewsRequestForState(
   final extraEvents = brief.otherHeadlines
       .map((event) => event.title)
       .join(' · ');
-  final megaTrend = brief.headline == null
+  final marketTheme = brief.headline == null
       ? '${brief.eyebrow} · ${brief.title} · ${brief.body}'
       : '${brief.headline!.title} · ${brief.headline!.body}'
             '${extraEvents.isEmpty ? '' : ' · 그 외 소식: $extraEvents'}';
@@ -298,17 +301,22 @@ DynamicNewsRequest dynamicNewsRequestForState(
           moverText('하락 상위', newspaper.topLosers),
         ].where((text) => text.isNotEmpty).join(' ');
 
-  return DynamicNewsRequest(
+  return NewsCombinatorInput(
+    simulationSeed: state.simulationSeed,
     year: date.year,
     date: dateKey,
     marketSummary: _newsLimit(marketSummary, 700),
-    megaTrend: _newsLimit(megaTrend, 300),
+    marketTheme: _newsLimit(marketTheme, 300),
+    marketClosed: brief.marketClosed,
+    advancers: newspaper?.advancers ?? 0,
+    decliners: newspaper?.decliners ?? 0,
+    unchanged: newspaper?.unchanged ?? 0,
   );
 }
 
 Future<DailyMarketNewspaper> buildDailyMarketNewspaper(
   GameState state, {
-  DynamicNewsArticle? dynamicArticle,
+  CombinatorialNewsArticle? combinatorialArticle,
 }) async {
   final brief = buildDailyBrief(state);
   final universe = await FictionalMarketUniverse.load(
@@ -319,8 +327,13 @@ Future<DailyMarketNewspaper> buildDailyMarketNewspaper(
   for (final asset in universe.assets.where((asset) => asset.isDomestic)) {
     final quote = asset.quoteAtOrBefore(state.currentDate);
     if (quote == null || !quote.isExactDate) continue;
-    final previous = asset.previousCloseBefore(quote.date);
-    if (previous == null || previous <= 0) continue;
+    final rawPrevious = asset.unadjustedReferenceCloseFor(quote.date);
+    if (rawPrevious <= 0) continue;
+    final previous = asset.marketReferenceCloseOn(
+      DateTime.parse(quote.date),
+      previousClose: rawPrevious,
+    );
+    if (previous <= 0) continue;
     movers.add(
       DailyMarketMover(
         name: asset.name,
@@ -341,7 +354,7 @@ Future<DailyMarketNewspaper> buildDailyMarketNewspaper(
       .take(3)
       .toList();
   final headline =
-      dynamicArticle?.headline ??
+      combinatorialArticle?.headline ??
       brief.headline?.title ??
       (brief.marketClosed
           ? '가상 증시 휴장, 다음 거래일 일정 점검'
@@ -362,6 +375,6 @@ Future<DailyMarketNewspaper> buildDailyMarketNewspaper(
     topLosers: topLosers,
     headline: headline,
     summary: summary,
-    dynamicArticle: dynamicArticle,
+    combinatorialArticle: combinatorialArticle,
   );
 }

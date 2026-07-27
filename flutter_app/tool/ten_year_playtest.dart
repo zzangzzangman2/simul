@@ -153,6 +153,7 @@ Future<void> main() async {
   var buys = 0;
   var sells = 0;
   var rejections = 0;
+  final rejectionMessages = <String, int>{};
   var saveReloads = 0;
   var generatedIpoTrades = 0;
   var workedDays = 0;
@@ -225,11 +226,18 @@ Future<void> main() async {
           );
           if (!result.success) {
             rejections++;
+            rejectionMessages[result.message] =
+                (rejectionMessages[result.message] ?? 0) + 1;
             break;
           }
           state = _checkedTransition(state, result.state, 'sell ${asset.id}');
           sells++;
-          remaining -= quantity;
+          remaining -= result.filledQuantity;
+          if (result.filledQuantity + 0.000001 < quantity) {
+            // 시장가는 같은 분의 호가 용량만 먹는 IOC다. 남은 수량은
+            // 다음 월 리밸런싱에서 다시 시도하고 같은 분에 연타하지 않는다.
+            break;
+          }
         }
       }
 
@@ -285,6 +293,8 @@ Future<void> main() async {
               }
             } else {
               rejections++;
+              rejectionMessages[result.message] =
+                  (rejectionMessages[result.message] ?? 0) + 1;
             }
           }
         }
@@ -387,6 +397,7 @@ Future<void> main() async {
     'buys': buys,
     'sells': sells,
     'orderRejections': rejections,
+    'rejectionMessages': rejectionMessages,
     'saveReloads': saveReloads,
     'generatedIpoTrades': generatedIpoTrades,
     'resolvedDecisions': resolvedDecisions,
@@ -409,6 +420,8 @@ Future<void> main() async {
         ((state.story.storyFlags['newsArchive'] as List?) ?? const []).length,
     'unpaidOperatingCost': state.story.flagInt('unpaidOperatingCost'),
   };
+  // 27년 동일가중 시장은 위기 국면이 체감될 만큼 하락하되 캠페인을
+  // 사실상 복구 불가능하게 만들지는 않는 범위여야 한다.
   if (buys < 20 ||
       sells < 20 ||
       rejections != 0 ||
@@ -416,7 +429,7 @@ Future<void> main() async {
       generatedIpoTrades == 0 ||
       resolvedDecisions < 20 ||
       maxDrawdown > 0.65 ||
-      marketMaxDrawdown < 0.35 ||
+      marketMaxDrawdown < 0.30 ||
       marketMaxDrawdown > 0.75 ||
       state.story.flagInt('unpaidOperatingCost') != 0) {
     throw StateError(

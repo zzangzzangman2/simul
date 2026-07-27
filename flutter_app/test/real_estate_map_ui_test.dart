@@ -30,7 +30,11 @@ void main() {
     await tester.pumpAndSettle();
 
     final map = find.byKey(const Key('real-estate-metro-map'));
-    await tester.ensureVisible(map);
+    await tester.scrollUntilVisible(
+      map,
+      260,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.pumpAndSettle();
     expect(map, findsOneWidget);
 

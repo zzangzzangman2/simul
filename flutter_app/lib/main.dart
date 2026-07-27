@@ -5,35 +5,46 @@ import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 
-import 'game/dynamic_news.dart';
+import 'game/news_combinator.dart';
+import 'game/banking_state.dart';
 import 'game/game_engine.dart';
 import 'game/game_persistence.dart';
 import 'game/game_state.dart';
+import 'game/investor_flow.dart';
 
 import 'game/market_clock.dart';
 import 'game/market_data.dart';
+import 'game/market_technical_levels.dart';
 import 'game/market_tick.dart';
 import 'game/market_news.dart';
 import 'game/order_book.dart';
 import 'game/market_quote.dart';
 import 'game/mission_progression.dart';
 import 'game/organization_state.dart';
+import 'game/real_estate_analysis.dart';
 import 'game/real_estate_financing.dart';
 import 'game/real_estate_rental.dart';
 import 'game/real_estate_world.dart';
 import 'game/personal_finance_state.dart';
 import 'game/real_estate_market.dart';
 import 'game/seed_money_content.dart';
+import 'game/star_shop.dart';
 import 'game/story_state.dart';
+import 'game/world_bootstrapper.dart';
+
+export 'game/world_bootstrapper.dart'
+    show CampaignWorldPreparer, WorldLoadProgress, WorldLoadProgressCallback;
 
 part 'organization_screen.dart';
 part 'apartment_hub_screens.dart';
+part 'bank_screen.dart';
 part 'rider_mini_game.dart';
 part 'save_menu_screens.dart';
 part 'asset_spending_screen.dart';
 part 'room_screens.dart';
 part 'seed_money_screen.dart';
 part 'stock_market_screen.dart';
+part 'star_shop_screen.dart';
 part 'visual_novel_onboarding.dart';
 
 const _ink = Color(0xFF33405F);
@@ -62,10 +73,28 @@ void main() {
   runApp(const MillenniumCapitalApp());
 }
 
+GameState _firstPlayableMarketState(GameState state) {
+  var day = state.day;
+  var date = state.currentDate;
+  final campaignEnd = DateTime(fictionalCampaignEndYear, 12, 31);
+  while (!isMarketTradingDay(date) && date.isBefore(campaignEnd)) {
+    day += 1;
+    date = state.dateForDay(day);
+  }
+  return day == state.day
+      ? state
+      : state.copyWith(day: day, marketMinute: marketDayStartMinute);
+}
+
 class MillenniumCapitalApp extends StatefulWidget {
-  const MillenniumCapitalApp({super.key, this.persistence});
+  const MillenniumCapitalApp({
+    super.key,
+    this.persistence,
+    this.campaignWorldPreparer,
+  });
 
   final GamePersistence? persistence;
+  final CampaignWorldPreparer? campaignWorldPreparer;
 
   @override
   State<MillenniumCapitalApp> createState() => _MillenniumCapitalAppState();
@@ -81,10 +110,20 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
   _AppView _view = _AppView.title;
   int _activeSlot = 1;
   int? _newGameSlot;
+  String? _newGameWorldSeed;
   DateTime? _lastSavedAt;
+  int? _lastDurablySavedMarketDay;
+  int? _lastDurablySavedMarketMinute;
+  final Map<String, GamePendingOrderQuotePath> _pendingQuotePathCache =
+      <String, GamePendingOrderQuotePath>{};
+  final StockOrderBookSessionCache _stockOrderBookSessionCache =
+      StockOrderBookSessionCache();
   bool _isReady = false;
   bool _isRestoring = false;
+  bool _isContinuingSlot = false;
+  bool _isPreparingNewGame = false;
   bool _marketTutorialLaunchScheduled = false;
+  WorldLoadProgress? _worldLoadProgress;
   Object? _restoreError;
 
   @override
@@ -109,6 +148,8 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
       if (!mounted) return;
       setState(() {
         _state = null;
+        _lastDurablySavedMarketDay = null;
+        _lastDurablySavedMarketMinute = null;
         _slots = slots;
         _activeSlot = activeSlot;
         _lastSavedAt = slots
@@ -132,6 +173,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
   }
 
   void _startNewGame() {
+    if (_isPreparingNewGame || _isContinuingSlot) return;
     GameSaveSlot? freeSlot;
     for (final slot in _slots) {
       if (slot.isEmpty) {
@@ -148,13 +190,11 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
         );
       return;
     }
-    setState(() {
-      _newGameSlot = freeSlot!.slot;
-      _view = _AppView.onboarding;
-    });
+    unawaited(_prepareNewGameInSlot(freeSlot.slot));
   }
 
   void _startNewGameInSlot(int slot) {
+    if (_isPreparingNewGame || _isContinuingSlot) return;
     GameSaveSlot? target;
     for (final candidate in _slots) {
       if (candidate.slot == slot) {
@@ -163,35 +203,102 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
       }
     }
     if (target == null || !target.isEmpty) return;
+    unawaited(_prepareNewGameInSlot(slot));
+  }
+
+  Future<void> _prepareNewGameInSlot(int slot) async {
+    if (_isPreparingNewGame || _isContinuingSlot) return;
+    _isPreparingNewGame = true;
+    final draftState = _engine.createNewGame(
+      '새 투자연구소',
+      initialCash: initialCompanyCash,
+    );
     setState(() {
       _newGameSlot = slot;
-      _view = _AppView.onboarding;
+      _newGameWorldSeed = draftState.simulationSeed;
+      _worldLoadProgress = const WorldLoadProgress(
+        0.03,
+        '새 세계의 시드와 27년 시간축을 확정하는 중입니다…',
+      );
+      _isReady = false;
+    });
+    try {
+      await _prepareCampaignWorld(draftState, (progress) {
+        if (mounted) setState(() => _worldLoadProgress = progress);
+      });
+      if (!mounted) return;
+      setState(() {
+        _worldLoadProgress = null;
+        _view = _AppView.onboarding;
+        _isReady = true;
+      });
+    } catch (error, stackTrace) {
+      debugPrint('Failed to prepare a new campaign world: $error\n$stackTrace');
+      if (!mounted) return;
+      setState(() {
+        _newGameSlot = null;
+        _newGameWorldSeed = null;
+        _worldLoadProgress = null;
+        _view = _AppView.title;
+        _isReady = true;
+      });
+      _scaffoldMessengerKey.currentState
+        ?..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('새 세계를 구성하지 못했어요. 다시 시도해 주세요.')),
+        );
+    } finally {
+      _isPreparingNewGame = false;
+    }
+  }
+
+  void _showContinue() {
+    if (_isPreparingNewGame || _isContinuingSlot) return;
+    setState(() => _view = _AppView.continueGame);
+  }
+
+  void _showTitle() {
+    if (_isPreparingNewGame || _isContinuingSlot) return;
+    setState(() {
+      _state = null;
+      _lastDurablySavedMarketDay = null;
+      _lastDurablySavedMarketMinute = null;
+      _newGameSlot = null;
+      _newGameWorldSeed = null;
+      _view = _AppView.title;
     });
   }
 
-  void _showContinue() => setState(() => _view = _AppView.continueGame);
-
-  void _showTitle() => setState(() {
-    _state = null;
-    _newGameSlot = null;
-    _view = _AppView.title;
-  });
-
   Future<void> _continueSlot(int slot) async {
-    setState(() => _isReady = false);
+    if (_isPreparingNewGame || _isContinuingSlot) return;
+    _isContinuingSlot = true;
+    setState(() {
+      _isReady = false;
+      _worldLoadProgress = const WorldLoadProgress(
+        0.03,
+        '저장 파일과 세계 시드를 읽는 중입니다…',
+      );
+    });
     try {
-      final state = await _persistence.loadSlot(slot);
+      final state = await _persistence.loadSlot(slot, activate: false);
       if (state == null) throw StateError('Save slot $slot is empty');
+      await _prepareCampaignWorld(state, (progress) {
+        if (mounted) setState(() => _worldLoadProgress = progress);
+      });
+      await _persistence.setActiveSlot(slot);
       final slots = await _persistence.listSlots();
       if (!mounted) return;
       setState(() {
         _state = state;
+        _lastDurablySavedMarketDay = state.day;
+        _lastDurablySavedMarketMinute = state.marketMinute;
         _slots = slots;
         _activeSlot = slot;
         _lastSavedAt = slots
             .where((item) => item.slot == slot)
             .firstOrNull
             ?.savedAt;
+        _worldLoadProgress = null;
         _view = _AppView.game;
         _isReady = true;
       });
@@ -201,6 +308,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
       if (!mounted) return;
       setState(() {
         _view = _AppView.continueGame;
+        _worldLoadProgress = null;
         _isReady = true;
       });
       _scaffoldMessengerKey.currentState
@@ -208,10 +316,13 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
         ..showSnackBar(
           const SnackBar(content: Text('저장을 불러오지 못했어요. 삭제하거나 다시 시도해 주세요.')),
         );
+    } finally {
+      _isContinuingSlot = false;
     }
   }
 
   Future<void> _deleteSaveSlot(int slot) async {
+    if (_isPreparingNewGame || _isContinuingSlot) return;
     try {
       await _persistence.deleteSlot(slot);
       final slots = await _persistence.listSlots();
@@ -236,6 +347,8 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     final state = _state;
     if (state == null) return;
     await _persistence.saveToSlot(state, _activeSlot);
+    _lastDurablySavedMarketDay = state.day;
+    _lastDurablySavedMarketMinute = state.marketMinute;
     final slots = await _persistence.listSlots();
     if (!mounted) return;
     setState(() {
@@ -254,10 +367,16 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
 
   Future<void> _createCompany(
     NewGameSetup setup,
-    ValueChanged<String> onProgress,
+    WorldLoadProgressCallback onProgress,
   ) async {
-    onProgress('투자 세계의 첫날을 계산하는 중…');
+    onProgress(const WorldLoadProgress(0.08, '선택한 이름과 투자 성향을 세계에 반영하는 중입니다…'));
     await Future<void>.delayed(Duration.zero);
+    final slot = _newGameSlot;
+    final worldSeed = _newGameWorldSeed;
+    if (slot == null || worldSeed == null) {
+      _showTitle();
+      return;
+    }
     final story = StoryState.newPlayer(
       playerName: setup.playerName,
       introChoice: setup.introChoice,
@@ -268,13 +387,9 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
       setup.companyName,
       story: story,
       initialCash: initialCompanyCash,
+      worldSeed: worldSeed,
     );
-    onProgress('첫 저장 파일을 안전하게 만드는 중…');
-    final slot = _newGameSlot;
-    if (slot == null) {
-      _showTitle();
-      return;
-    }
+    onProgress(const WorldLoadProgress(0.84, '첫 저장 파일을 안전하게 만드는 중입니다…'));
     try {
       await _persistence.saveToSlot(state, slot);
       await _persistence.setActiveSlot(slot);
@@ -286,21 +401,33 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
       return;
     }
     if (!mounted) return;
-    onProgress('저장 슬롯을 확인하는 중…');
+    onProgress(const WorldLoadProgress(0.98, '저장 슬롯과 첫 화면을 확인하는 중입니다…'));
     final slots = await _persistence.listSlots();
     if (!mounted) return;
     setState(() {
       _state = state;
+      _lastDurablySavedMarketDay = state.day;
+      _lastDurablySavedMarketMinute = state.marketMinute;
       _slots = slots;
       _activeSlot = slot;
       _lastSavedAt = slots
           .where((item) => item.slot == slot)
           .firstOrNull
           ?.savedAt;
+      _newGameSlot = null;
+      _newGameWorldSeed = null;
       _view = _AppView.game;
     });
-    onProgress('첫 주식 수업 화면을 여는 중…');
+    onProgress(const WorldLoadProgress(1, '세계관 구성이 끝났습니다.'));
     _scheduleMarketTutorialLaunch();
+  }
+
+  Future<void> _prepareCampaignWorld(
+    GameState state,
+    WorldLoadProgressCallback onProgress,
+  ) {
+    final preparer = widget.campaignWorldPreparer ?? prepareCampaignWorld;
+    return preparer(state, onProgress);
   }
 
   void _scheduleMarketTutorialLaunch() {
@@ -331,7 +458,9 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
               _gameSceneRoute<void>(
                 StockMarketScreen(
                   key: const Key('academy-market-tutorial-screen'),
-                  state: current,
+                  // The academy uses the next trading day's paper market while
+                  // the persisted campaign remains on Sunday 2000-01-02.
+                  state: _firstPlayableMarketState(current),
                   onSetMarketMinute: _setMarketMinute,
                   onSaveMarketNotebook: _saveMarketNotebook,
                   onPurchaseReport: _purchaseDailyMarketReport,
@@ -339,6 +468,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
                   onExecuteTrade: _executeTrade,
                   onCancelPendingOrder: _cancelPendingOrder,
                   onTransferCash: _transferBrokerageCash,
+                  orderBookSessionCache: _stockOrderBookSessionCache,
                 ),
               ),
             )
@@ -351,11 +481,9 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     final current = _state;
     if (current == null) return;
     final resolved = _engine.resolveDecision(current, decisionId, optionId);
-    final next = resolved.copyWith(
-      marketMinute: advanceGameTime(
-        current.marketMinute,
-        decisionActionMinutes,
-      ),
+    final next = await _processStateThroughMarketMinute(
+      resolved,
+      advanceGameTime(current.marketMinute, decisionActionMinutes),
     );
     await _persistence.save(next);
     if (!mounted) return;
@@ -371,11 +499,21 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     return result;
   }
 
+  Future<StarShopPurchaseResult> _purchaseStarShopItem(String productId) async {
+    final current = _state!;
+    final result = _engine.purchaseStarShopItem(current, productId);
+    if (!result.success) return result;
+    await _persistence.save(result.state);
+    if (mounted) setState(() => _state = result.state);
+    return result;
+  }
+
   Future<GameState> _completeWork(WorkSessionResult result) async {
     final current = _state!;
     final completed = _engine.completeWorkSession(current, result);
-    final next = completed.copyWith(
-      marketMinute: advanceGameTime(current.marketMinute, workActionMinutes),
+    final next = await _processStateThroughMarketMinute(
+      completed,
+      advanceGameTime(current.marketMinute, workActionMinutes),
     );
     await _persistence.save(next);
     if (mounted) setState(() => _state = next);
@@ -385,11 +523,9 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
   Future<GameState> _requestFamilyHelp(String helperId) async {
     final current = _state!;
     final helped = _engine.requestFamilyHelp(current, helperId);
-    final next = helped.copyWith(
-      marketMinute: advanceGameTime(
-        current.marketMinute,
-        familyHelpActionMinutes,
-      ),
+    final next = await _processStateThroughMarketMinute(
+      helped,
+      advanceGameTime(current.marketMinute, familyHelpActionMinutes),
     );
     await _persistence.save(next);
     if (mounted) setState(() => _state = next);
@@ -415,7 +551,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
       story: current.story.copyWith(storyFlags: initialFlags),
     );
     var advanced = false;
-    final universe = await FictionalMarketUniverse.load(
+    final universeWindow = await FictionalMarketUniverse.load(
       seed: next.simulationSeed,
       throughDate: next.currentDate.add(Duration(days: requestedDays + 7)),
     );
@@ -426,7 +562,9 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
       String? stopReason;
       if (requestedDays > 1) {
         final events = marketNewsEventsForState(before);
-        final brief = buildDailyBrief(before);
+        final brief = buildDailyBrief(
+          before.copyWith(marketMinute: marketDayEndMinute),
+        );
         before = _engine.archiveNews(
           before,
           headline: brief.title,
@@ -457,21 +595,19 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
               '${marketDateKey(before.currentDate)} 보유·관심 종목 중요 뉴스가 공개되어 멈췄습니다.';
         }
       }
-      next = _engine.advanceOneDay(before);
+      final beforeUniverse = universeWindow.asOf(before.currentDate);
+      next = _engine.advanceOneDay(
+        before,
+        pendingOrderQuotePaths: _pendingOrderQuotePaths(before, beforeUniverse),
+      );
       if (next.day == before.day) break;
       advanced = true;
+      final nextUniverse = universeWindow.asOf(next.currentDate);
       next = _engine.applyCorporateActions(
         next,
-        universe.corporateActionsOn(next.currentDate),
+        nextUniverse.corporateActionsOn(next.currentDate),
       );
       next = next.copyWith(marketMinute: marketDayStartMinute);
-      await _persistence.save(next);
-      if (mounted) {
-        setState(() {
-          _state = next;
-          _lastSavedAt = DateTime.now();
-        });
-      }
       if (stopAfterClosing) {
         next = next.copyWith(
           story: next.story.copyWith(
@@ -481,11 +617,28 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
             },
           ),
         );
-        await _persistence.save(next);
-        if (mounted) setState(() => _state = next);
-        break;
       }
-      if (next.pendingDecisions.isNotEmpty) break;
+      final shouldStop =
+          stopAfterClosing ||
+          next.pendingDecisions.isNotEmpty ||
+          next.campaignComplete;
+      final shouldCheckpoint =
+          requestedDays == 1 ||
+          (i + 1) % 7 == 0 ||
+          i == requestedDays - 1 ||
+          shouldStop;
+      if (shouldCheckpoint) {
+        await _persistence.save(next);
+        _lastDurablySavedMarketDay = next.day;
+        _lastDurablySavedMarketMinute = next.marketMinute;
+      }
+      if (mounted) {
+        setState(() {
+          _state = next;
+          if (shouldCheckpoint) _lastSavedAt = DateTime.now();
+        });
+      }
+      if (shouldStop) break;
     }
     if (!advanced && mounted) setState(() => _state = next);
     return next;
@@ -536,8 +689,152 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     return result;
   }
 
+  Future<FinanceActionResult> _cancelRealEstateSaleListing(
+    String assetId,
+  ) async {
+    final result = _engine.cancelRealEstateSaleListing(_state!, assetId);
+    if (!result.success) return result;
+    await _persistence.save(result.state);
+    if (mounted) setState(() => _state = result.state);
+    return result;
+  }
+
+  Future<FinanceActionResult> _saveRealEstateInvestmentNote(
+    String assetId,
+    String note,
+  ) async {
+    final result = _engine.saveRealEstateInvestmentNote(_state!, assetId, note);
+    if (!result.success) return result;
+    await _persistence.save(result.state);
+    if (mounted) setState(() => _state = result.state);
+    return result;
+  }
+
+  Future<FinanceActionResult> _renovateRealEstate(String assetId) async {
+    final result = _engine.renovateRealEstate(_state!, assetId);
+    if (!result.success) return result;
+    await _persistence.save(result.state);
+    if (mounted) setState(() => _state = result.state);
+    return result;
+  }
+
+  Future<FinanceActionResult> _setRealEstateInsurance(
+    String assetId,
+    bool active,
+  ) async {
+    final result = _engine.setRealEstateInsurance(_state!, assetId, active);
+    if (!result.success) return result;
+    await _persistence.save(result.state);
+    if (mounted) setState(() => _state = result.state);
+    return result;
+  }
+
+  Future<FinanceActionResult> _renewRealEstateMonthlyLease(
+    String assetId,
+  ) async {
+    final result = _engine.renewRealEstateMonthlyLease(_state!, assetId);
+    if (!result.success) return result;
+    await _persistence.save(result.state);
+    if (mounted) setState(() => _state = result.state);
+    return result;
+  }
+
+  Future<FinanceActionResult> _terminateRealEstateMonthlyLeaseEarly(
+    String assetId,
+  ) async {
+    final result = _engine.terminateRealEstateMonthlyLeaseEarly(
+      _state!,
+      assetId,
+    );
+    if (!result.success) return result;
+    await _persistence.save(result.state);
+    if (mounted) setState(() => _state = result.state);
+    return result;
+  }
+
+  Future<FinanceActionResult> _prepayRealEstateMortgage(
+    String assetId,
+    int amount,
+  ) async {
+    final result = _engine.prepayRealEstateMortgage(_state!, assetId, amount);
+    if (!result.success) return result;
+    await _persistence.save(result.state);
+    if (mounted) setState(() => _state = result.state);
+    return result;
+  }
+
+  Future<FinanceActionResult> _refinanceRealEstateMortgage(
+    String assetId, {
+    required bool variableRate,
+    int? termMonths,
+  }) async {
+    final result = _engine.refinanceRealEstateMortgage(
+      _state!,
+      assetId,
+      variableRate: variableRate,
+      termMonths: termMonths,
+    );
+    if (!result.success) return result;
+    await _persistence.save(result.state);
+    if (mounted) setState(() => _state = result.state);
+    return result;
+  }
+
   Future<FinanceActionResult> _playAdultChanceGame(int stake) async {
     final result = _engine.playAdultChanceGame(_state!, stake);
+    if (!result.success) return result;
+    await _persistence.save(result.state);
+    if (mounted) setState(() => _state = result.state);
+    return result;
+  }
+
+  Future<FinanceActionResult> _openTimeDeposit(
+    int amount,
+    int termMonths,
+  ) async {
+    final result = _engine.openTimeDeposit(
+      _state!,
+      amount: amount,
+      termMonths: termMonths,
+    );
+    if (!result.success) return result;
+    await _persistence.save(result.state);
+    if (mounted) setState(() => _state = result.state);
+    return result;
+  }
+
+  Future<FinanceActionResult> _redeemTimeDeposit(String depositId) async {
+    final result = _engine.redeemTimeDeposit(_state!, depositId);
+    if (!result.success) return result;
+    await _persistence.save(result.state);
+    if (mounted) setState(() => _state = result.state);
+    return result;
+  }
+
+  Future<FinanceActionResult> _takeUnsecuredLoan(
+    int amount,
+    int termMonths,
+  ) async {
+    final result = _engine.takeUnsecuredLoan(
+      _state!,
+      amount: amount,
+      termMonths: termMonths,
+    );
+    if (!result.success) return result;
+    await _persistence.save(result.state);
+    if (mounted) setState(() => _state = result.state);
+    return result;
+  }
+
+  Future<FinanceActionResult> _repayUnsecuredLoan(
+    String loanId,
+    int amount,
+  ) async {
+    final result = _engine.repayUnsecuredLoan(
+      _state!,
+      loanId: loanId,
+      amount: amount,
+    );
     if (!result.success) return result;
     await _persistence.save(result.state);
     if (mounted) setState(() => _state = result.state);
@@ -575,78 +872,115 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     if (mounted) setState(() => _state = next);
   }
 
+  Map<String, GamePendingOrderQuotePath> _pendingOrderQuotePaths(
+    GameState state,
+    FictionalMarketUniverse universe,
+  ) {
+    final paths = <String, GamePendingOrderQuotePath>{};
+    for (final assetId
+        in state.pendingOrders.map((order) => order.assetId).toSet()) {
+      final cacheKey =
+          '${state.simulationSeed}|${marketDateKey(state.currentDate)}|$assetId';
+      final cached = _pendingQuotePathCache.remove(cacheKey);
+      if (cached != null) {
+        _pendingQuotePathCache[cacheKey] = cached;
+        paths[assetId] = cached;
+        continue;
+      }
+      final asset = universe.assets
+          .where((candidate) => candidate.id == assetId)
+          .firstOrNull;
+      if (asset == null) continue;
+      final quote = asset.quoteAtOrBefore(state.currentDate);
+      if (quote == null) continue;
+      final rawPreviousClose = asset.unadjustedReferenceCloseFor(quote.date);
+      final marketReferenceClose = asset.marketReferenceCloseOn(
+        DateTime.parse(quote.date),
+        previousClose: rawPreviousClose,
+      );
+      final path = GamePendingOrderQuotePath(
+        prices: quote.isExactDate
+            ? generatedMarketDayPathForAsset(
+                asset: asset,
+                simulationSeed: state.simulationSeed,
+                date: state.currentDate,
+                previousClose: rawPreviousClose,
+                officialClose: quote.close,
+              )
+            : <double>[quote.close],
+        previousClose: marketReferenceClose,
+        isTradingDay: quote.isExactDate,
+        isIpoFirstTradingDay: asset.isIpoFirstTradingDay(state.currentDate),
+        technicalLevels: marketTechnicalLevelsForAsset(
+          asset: asset,
+          sessionDate: state.currentDate,
+          referencePrice: marketReferenceClose,
+        ),
+      );
+      paths[assetId] = path;
+      _pendingQuotePathCache[cacheKey] = path;
+      while (_pendingQuotePathCache.length > 64) {
+        _pendingQuotePathCache.remove(_pendingQuotePathCache.keys.first);
+      }
+    }
+    return paths;
+  }
+
   Future<GameState> _setMarketMinute(int minute) async {
     final current = _state!;
     final target = minute.clamp(marketDayStartMinute, marketDayEndMinute);
-    var next = current;
+    final next = await _processStateThroughMarketMinute(current, target);
+    final lastSavedDay = _lastDurablySavedMarketDay;
+    final lastSavedMinute = _lastDurablySavedMarketMinute;
+    final explicitSync = target == current.marketMinute;
+    final orderStateChanged =
+        next.ledger.length != current.ledger.length ||
+        next.pendingOrders.length != current.pendingOrders.length ||
+        next.positions.length != current.positions.length ||
+        next.brokerageCash != current.brokerageCash;
+    final periodicCheckpoint =
+        lastSavedDay == null ||
+        lastSavedMinute == null ||
+        next.day != lastSavedDay ||
+        next.marketMinute - lastSavedMinute >= 30;
+    final shouldPersist =
+        explicitSync ||
+        orderStateChanged ||
+        periodicCheckpoint ||
+        target >= krxCloseMinute;
+    if (shouldPersist) {
+      await _persistence.save(next);
+      _lastDurablySavedMarketDay = next.day;
+      _lastDurablySavedMarketMinute = next.marketMinute;
+      _lastSavedAt = DateTime.now();
+    }
+    if (mounted) {
+      if (shouldPersist) {
+        setState(() => _state = next);
+      } else {
+        _state = next;
+      }
+    }
+    return next;
+  }
+
+  Future<GameState> _processStateThroughMarketMinute(
+    GameState current,
+    int targetMinute,
+  ) async {
+    final target = targetMinute.clamp(marketDayStartMinute, marketDayEndMinute);
     if (target > current.marketMinute && current.pendingOrders.isNotEmpty) {
       final universe = await FictionalMarketUniverse.load(
         seed: current.simulationSeed,
         throughDate: current.currentDate,
       );
-      final paths =
-          <String, ({FictionalMarketAsset asset, List<double> path})>{};
-      for (final assetId
-          in current.pendingOrders.map((order) => order.assetId).toSet()) {
-        FictionalMarketAsset? asset;
-        for (final candidate in universe.assets) {
-          if (candidate.id == assetId) {
-            asset = candidate;
-            break;
-          }
-        }
-        if (asset == null) continue;
-        final quote = asset.quoteAtOrBefore(current.currentDate);
-        if (quote == null) continue;
-        final previousClose =
-            asset.previousCloseBefore(quote.date) ?? quote.close;
-        paths[assetId] = (
-          asset: asset,
-          path: quote.isExactDate
-              ? generatedMarketDayPathForAsset(
-                  asset: asset,
-                  simulationSeed: current.simulationSeed,
-                  date: current.currentDate,
-                  previousClose: previousClose,
-                  officialClose: quote.close,
-                )
-              : <double>[quote.close],
-        );
-      }
-      for (var cursor = current.marketMinute + 1; cursor <= target; cursor++) {
-        next = next.copyWith(marketMinute: cursor);
-        final pendingAssetIds = next.pendingOrders
-            .map((order) => order.assetId)
-            .toSet();
-        for (final assetId in pendingAssetIds) {
-          final entry = paths[assetId];
-          if (entry == null) continue;
-          final pathIndex = marketTickForMinute(
-            cursor,
-          ).clamp(0, entry.path.length - 1);
-          next = _engine.processPendingOrdersAtQuote(
-            next,
-            assetId: assetId,
-            unitPrice: entry.path[pathIndex],
-            marketMinute: cursor,
-            isTradingDay: entry.path.length > 1,
-            previousClose:
-                entry.asset.previousCloseBefore(
-                  entry.asset.quoteAtOrBefore(current.currentDate)!.date,
-                ) ??
-                entry.path.first,
-          );
-        }
-      }
-    } else {
-      next = current.copyWith(marketMinute: target);
+      return _engine.processPendingOrdersThroughMarketMinute(
+        current,
+        targetMinute: target,
+        quotePaths: _pendingOrderQuotePaths(current, universe),
+      );
     }
-    if (target >= krxCloseMinute) {
-      next = _engine.expirePendingOrders(next.copyWith(marketMinute: target));
-    }
-    await _persistence.save(next);
-    if (mounted) setState(() => _state = next);
-    return next;
+    return current.copyWith(marketMinute: target);
   }
 
   Future<GameState> _saveMarketNotebook(
@@ -696,6 +1030,9 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
       );
     }
     final asset = quote?.asset;
+    final maximumPositionUnits = asset?.sharesOutstandingAtOrBefore(
+      current.currentDate,
+    );
     if (quote == null ||
         asset == null ||
         order.symbol != asset.code ||
@@ -705,7 +1042,10 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
         order.quoteDate != quote.quoteDate ||
         order.marketMinute != quote.marketMinute ||
         order.unitPrice != quote.unitPrice ||
-        order.isTradingDay != quote.isTradingDay) {
+        order.isTradingDay != quote.isTradingDay ||
+        order.maximumPositionUnits != maximumPositionUnits ||
+        order.isIpoFirstTradingDay !=
+            asset.isIpoFirstTradingDay(current.currentDate)) {
       return TradeExecutionResult(
         state: current,
         success: false,
@@ -777,7 +1117,12 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
         ),
       ),
       home: !_isReady
-          ? const _GameFrame(child: _LoadingScreen())
+          ? _GameFrame(
+              child: _LoadingScreen(
+                progress: _worldLoadProgress,
+                creatingWorld: _isPreparingNewGame,
+              ),
+            )
           : _restoreError != null
           ? _GameFrame(
               child: _RestoreFailureScreen(
@@ -805,6 +1150,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
                 _AppView.game when _state != null => OfficeScreen(
                   state: _state!,
                   engine: _engine,
+                  stockOrderBookSessionCache: _stockOrderBookSessionCache,
                   activeSaveSlot: _activeSlot,
                   lastSavedAt: _lastSavedAt,
                   onManualSave: _manualSave,
@@ -815,6 +1161,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
                   onSaveMarketNotebook: _saveMarketNotebook,
                   onResolveDecision: _resolveDecision,
                   onClaimMission: _claimMission,
+                  onPurchaseStarShopItem: _purchaseStarShopItem,
                   onRequestFamilyHelp: _requestFamilyHelp,
                   onRepayAcademyTuitionDebt: _repayAcademyTuitionDebt,
                   onHireEmployee: _hireEmployee,
@@ -822,7 +1169,20 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
                   onPurchaseSpendingOption: _purchaseSpendingOption,
                   onSellRealEstate: _sellRealEstate,
                   onConfigureRealEstateLease: _configureRealEstateLease,
+                  onCancelRealEstateSaleListing: _cancelRealEstateSaleListing,
+                  onSaveRealEstateInvestmentNote: _saveRealEstateInvestmentNote,
+                  onRenovateRealEstate: _renovateRealEstate,
+                  onSetRealEstateInsurance: _setRealEstateInsurance,
+                  onRenewRealEstateMonthlyLease: _renewRealEstateMonthlyLease,
+                  onTerminateRealEstateMonthlyLeaseEarly:
+                      _terminateRealEstateMonthlyLeaseEarly,
+                  onPrepayRealEstateMortgage: _prepayRealEstateMortgage,
+                  onRefinanceRealEstateMortgage: _refinanceRealEstateMortgage,
                   onPlayChanceGame: _playAdultChanceGame,
+                  onOpenTimeDeposit: _openTimeDeposit,
+                  onRedeemTimeDeposit: _redeemTimeDeposit,
+                  onTakeUnsecuredLoan: _takeUnsecuredLoan,
+                  onRepayUnsecuredLoan: _repayUnsecuredLoan,
                   onPurchaseMarketReport: _purchaseDailyMarketReport,
                   onCompleteHubTutorial: _completeHubTutorial,
                   onCompleteMarketTutorial: _completeMarketTutorial,
@@ -875,12 +1235,92 @@ class _GameFrame extends StatelessWidget {
 }
 
 class _LoadingScreen extends StatelessWidget {
-  const _LoadingScreen();
+  const _LoadingScreen({this.progress, this.creatingWorld = false});
+
+  final WorldLoadProgress? progress;
+  final bool creatingWorld;
 
   @override
-  Widget build(BuildContext context) => const Scaffold(
+  Widget build(BuildContext context) => Scaffold(
+    key: const Key('campaign-loading-screen'),
     backgroundColor: _sky,
-    body: Center(child: CircularProgressIndicator(color: _coral)),
+    body: Center(
+      child: Padding(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.public_rounded,
+              size: 56,
+              color: Color(0xFF536A96),
+            ),
+            const SizedBox(height: 18),
+            Text(
+              progress == null
+                  ? '게임 정보를 확인하고 있어요'
+                  : creatingWorld
+                  ? '새 캠페인 세계를 구성하고 있어요'
+                  : '캠페인 세계를 불러오고 있어요',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: _ink,
+                fontSize: 20,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              progress?.label ?? '저장 슬롯을 확인하는 중입니다…',
+              key: const Key('campaign-loading-status'),
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Color(0xFF66728A),
+                fontSize: 13,
+                height: 1.45,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 22),
+            SizedBox(
+              width: 280,
+              child: LinearProgressIndicator(
+                key: const Key('campaign-loading-progress'),
+                value: progress?.fraction,
+                minHeight: 9,
+                color: _coral,
+                backgroundColor: const Color(0x33FFFFFF),
+                borderRadius: BorderRadius.circular(99),
+              ),
+            ),
+            if (progress != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                '${(progress!.fraction * 100).round()}%',
+                key: const Key('campaign-loading-percent'),
+                style: const TextStyle(
+                  color: _ink,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                '저장된 시드에서 같은 세계를 재구성합니다.\n'
+                '기기에 따라 약 1분 걸릴 수 있어요.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Color(0xFF66728A),
+                  fontSize: 11,
+                  height: 1.4,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    ),
   );
 }
 
@@ -1497,6 +1937,7 @@ class OfficeScreen extends StatelessWidget {
     super.key,
     required this.state,
     required this.engine,
+    this.stockOrderBookSessionCache,
     required this.activeSaveSlot,
     required this.lastSavedAt,
     required this.onManualSave,
@@ -1507,6 +1948,7 @@ class OfficeScreen extends StatelessWidget {
     required this.onSaveMarketNotebook,
     required this.onResolveDecision,
     this.onClaimMission,
+    this.onPurchaseStarShopItem,
     required this.onRequestFamilyHelp,
     this.onRepayAcademyTuitionDebt,
     this.onHireEmployee,
@@ -1514,7 +1956,19 @@ class OfficeScreen extends StatelessWidget {
     this.onPurchaseSpendingOption,
     this.onSellRealEstate,
     this.onConfigureRealEstateLease,
+    this.onCancelRealEstateSaleListing,
+    this.onSaveRealEstateInvestmentNote,
+    this.onRenovateRealEstate,
+    this.onSetRealEstateInsurance,
+    this.onRenewRealEstateMonthlyLease,
+    this.onTerminateRealEstateMonthlyLeaseEarly,
+    this.onPrepayRealEstateMortgage,
+    this.onRefinanceRealEstateMortgage,
     this.onPlayChanceGame,
+    this.onOpenTimeDeposit,
+    this.onRedeemTimeDeposit,
+    this.onTakeUnsecuredLoan,
+    this.onRepayUnsecuredLoan,
     this.onPurchaseMarketReport,
     this.onCompleteHubTutorial,
     this.onCompleteMarketTutorial,
@@ -1528,6 +1982,7 @@ class OfficeScreen extends StatelessWidget {
 
   final GameState state;
   final GameEngine engine;
+  final StockOrderBookSessionCache? stockOrderBookSessionCache;
   final int activeSaveSlot;
   final DateTime? lastSavedAt;
   final Future<void> Function() onManualSave;
@@ -1539,6 +1994,8 @@ class OfficeScreen extends StatelessWidget {
   onSaveMarketNotebook;
   final Future<void> Function(String, String) onResolveDecision;
   final Future<MissionClaimResult> Function()? onClaimMission;
+  final Future<StarShopPurchaseResult> Function(String productId)?
+  onPurchaseStarShopItem;
   final Future<GameState> Function(String) onRequestFamilyHelp;
   final Future<FinanceActionResult> Function()? onRepayAcademyTuitionDebt;
   final Future<GameState> Function(String)? onHireEmployee;
@@ -1551,7 +2008,31 @@ class OfficeScreen extends StatelessWidget {
     RealEstateLeaseType leaseType,
   )?
   onConfigureRealEstateLease;
+  final Future<FinanceActionResult> Function(String assetId)?
+  onCancelRealEstateSaleListing;
+  final Future<FinanceActionResult> Function(String assetId, String note)?
+  onSaveRealEstateInvestmentNote;
+  final Future<FinanceActionResult> Function(String assetId)?
+  onRenovateRealEstate;
+  final Future<FinanceActionResult> Function(String assetId, bool active)?
+  onSetRealEstateInsurance;
+  final Future<FinanceActionResult> Function(String assetId)?
+  onRenewRealEstateMonthlyLease;
+  final Future<FinanceActionResult> Function(String assetId)?
+  onTerminateRealEstateMonthlyLeaseEarly;
+  final Future<FinanceActionResult> Function(String assetId, int amount)?
+  onPrepayRealEstateMortgage;
+  final Future<FinanceActionResult> Function(
+    String assetId, {
+    required bool variableRate,
+    int? termMonths,
+  })?
+  onRefinanceRealEstateMortgage;
   final Future<FinanceActionResult> Function(int stake)? onPlayChanceGame;
+  final BankOpenDepositCallback? onOpenTimeDeposit;
+  final BankRedeemDepositCallback? onRedeemTimeDeposit;
+  final BankTakeLoanCallback? onTakeUnsecuredLoan;
+  final BankRepayLoanCallback? onRepayUnsecuredLoan;
   final Future<FinanceActionResult> Function()? onPurchaseMarketReport;
   final Future<void> Function()? onCompleteHubTutorial;
   final Future<GameState> Function()? onCompleteMarketTutorial;
@@ -1577,6 +2058,7 @@ class OfficeScreen extends StatelessWidget {
           onExecuteTrade: onExecuteTrade,
           onCancelPendingOrder: onCancelPendingOrder,
           onTransferCash: onTransferBrokerageCash,
+          orderBookSessionCache: stockOrderBookSessionCache,
         ),
       ),
     );
@@ -1609,6 +2091,14 @@ class OfficeScreen extends StatelessWidget {
                 success: false,
                 message: '이 화면에서는 저장 기능을 사용할 수 없습니다.',
               ),
+          onCancelSaleListing: onCancelRealEstateSaleListing,
+          onSaveInvestmentNote: onSaveRealEstateInvestmentNote,
+          onRenovateRealEstate: onRenovateRealEstate,
+          onSetRealEstateInsurance: onSetRealEstateInsurance,
+          onRenewMonthlyLease: onRenewRealEstateMonthlyLease,
+          onTerminateMonthlyLeaseEarly: onTerminateRealEstateMonthlyLeaseEarly,
+          onPrepayMortgage: onPrepayRealEstateMortgage,
+          onRefinanceMortgage: onRefinanceRealEstateMortgage,
           onPlayChanceGame:
               onPlayChanceGame ??
               (stake) async => FinanceActionResult(
@@ -1621,6 +2111,33 @@ class OfficeScreen extends StatelessWidget {
     );
   }
 
+  void _openBank(BuildContext context) {
+    FinanceActionResult unavailableResult() => FinanceActionResult(
+      state: state,
+      success: false,
+      message: '이 화면에서는 은행 거래를 저장할 수 없습니다.',
+    );
+
+    Navigator.of(context).push<void>(
+      _gameSceneRoute<void>(
+        BankScreen(
+          state: state,
+          onOpenDeposit:
+              onOpenTimeDeposit ??
+              (amount, termMonths) async => unavailableResult(),
+          onRedeemDeposit:
+              onRedeemTimeDeposit ?? (depositId) async => unavailableResult(),
+          onTakeLoan:
+              onTakeUnsecuredLoan ??
+              (amount, termMonths) async => unavailableResult(),
+          onRepayLoan:
+              onRepayUnsecuredLoan ??
+              (loanId, amount) async => unavailableResult(),
+        ),
+      ),
+    );
+  }
+
   void _openHomeComputer(BuildContext context) {
     Navigator.of(context).push<void>(
       _gameSceneRoute<void>(
@@ -1628,9 +2145,34 @@ class OfficeScreen extends StatelessWidget {
           state: state,
           onOpenStockMarket: () => _openStockMarket(context),
           onOpenRealEstate: () => _openRealEstateMarket(context),
+          onOpenStarShop: () => _openStarShop(context),
         ),
       ),
     );
+  }
+
+  Future<GameState> _openStarShop(BuildContext context) async {
+    var latestState = state;
+    await Navigator.of(context).push<void>(
+      _gameSceneRoute<void>(
+        StarShopScreen(
+          state: latestState,
+          onPurchase: (productId) async {
+            final handler = onPurchaseStarShopItem;
+            final result = handler == null
+                ? StarShopPurchaseResult(
+                    state: latestState,
+                    success: false,
+                    message: '이 화면에서는 별빛 상점 구매를 저장할 수 없습니다.',
+                  )
+                : await handler(productId);
+            if (result.success) latestState = result.state;
+            return result;
+          },
+        ),
+      ),
+    );
+    return latestState;
   }
 
   @override
@@ -1641,6 +2183,7 @@ class OfficeScreen extends StatelessWidget {
         state: state,
         onOpenDecisions: () => _openDecision(context),
         onOpenMarket: () => _openHomeComputer(context),
+        onOpenBank: () => _openBank(context),
         onOpenLedger: () => _openLedger(context),
         onOpenOrganization: () => Navigator.of(context).push(
           _gameSceneRoute<void>(
@@ -1933,7 +2476,7 @@ class OfficeScreen extends StatelessWidget {
     );
     navigator.push<void>(loadingRoute);
     final stopwatch = Stopwatch()..start();
-    final client = DynamicNewsClient();
+    const newsCombinator = NewsCombinator();
     late DailyMarketNewspaper newspaper;
     final closingDay = state.day;
     try {
@@ -1946,14 +2489,14 @@ class OfficeScreen extends StatelessWidget {
       final baseNewspaper = onBuildDailyNewspaper == null
           ? await buildDailyMarketNewspaper(closingState)
           : await onBuildDailyNewspaper!(closingState);
-      final article = await client.generate(
-        dynamicNewsRequestForState(
+      final article = newsCombinator.generate(
+        newsCombinatorInputForState(
           closingState,
           baseNewspaper.brief,
           newspaper: baseNewspaper,
         ),
       );
-      newspaper = baseNewspaper.withDynamicArticle(article);
+      newspaper = baseNewspaper.withCombinatorialArticle(article);
       await onArchiveNews?.call(
         newspaper.headline,
         marketNewsEventsForState(
@@ -1978,7 +2521,6 @@ class OfficeScreen extends StatelessWidget {
         throw StateError('다음 날 시작 시각을 08:00으로 저장하지 못했습니다.');
       }
     } finally {
-      client.close();
       if (loadingRoute.isActive) navigator.removeRoute(loadingRoute);
     }
     if (!context.mounted) return;
@@ -2025,6 +2567,15 @@ class OfficeScreen extends StatelessWidget {
                 message: '이 화면에서는 저장 기능을 사용할 수 없습니다.',
               ),
           onConfigureRealEstateLease: onConfigureRealEstateLease,
+          onCancelRealEstateSaleListing: onCancelRealEstateSaleListing,
+          onSaveRealEstateInvestmentNote: onSaveRealEstateInvestmentNote,
+          onRenovateRealEstate: onRenovateRealEstate,
+          onSetRealEstateInsurance: onSetRealEstateInsurance,
+          onRenewRealEstateMonthlyLease: onRenewRealEstateMonthlyLease,
+          onTerminateRealEstateMonthlyLeaseEarly:
+              onTerminateRealEstateMonthlyLeaseEarly,
+          onPrepayRealEstateMortgage: onPrepayRealEstateMortgage,
+          onRefinanceRealEstateMortgage: onRefinanceRealEstateMortgage,
           onPlayChanceGame:
               onPlayChanceGame ??
               (stake) async => FinanceActionResult(
@@ -2221,7 +2772,7 @@ class _FamilyDecisionSceneState extends State<FamilyDecisionScene> {
         children: [
           Positioned.fill(
             child: Image.asset(
-              'assets/images/bg_living_room_1999.png',
+              'assets/images/bg_living_room_1999_portrait_cartoon_v2.png',
               fit: BoxFit.cover,
             ),
           ),
@@ -2317,7 +2868,7 @@ class NewsGeneratingScene extends StatelessWidget {
         children: [
           Positioned.fill(
             child: Image.asset(
-              'assets/images/bg_living_room_1999.png',
+              'assets/images/bg_living_room_1999_portrait_cartoon_v2.png',
               fit: BoxFit.cover,
             ),
           ),
@@ -2330,9 +2881,9 @@ class NewsGeneratingScene extends StatelessWidget {
                   children: [
                     const _SceneClockStrip(
                       location: '우리 집 거실 · 오전 08:00',
-                      caption: '전날 신문을 인쇄하고 오늘의 숨은 시장을 정하고 있다.',
+                      caption: '전날 공개된 시장 기록으로 조간신문을 조합하고 있다.',
                       minute: marketDayStartMinute,
-                      costLabel: 'AI 특별판',
+                      costLabel: '로컬 조합',
                     ),
                     Expanded(
                       child: Center(
@@ -2396,7 +2947,7 @@ class NewsGeneratingScene extends StatelessWidget {
                               ),
                               const SizedBox(height: 14),
                               const Text(
-                                '연결이 늦어지면 저장된 전날 시장 기록으로 신문을 완성합니다.',
+                                '외부 연결 없이 저장된 시장 기록만으로 신문을 완성합니다.',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   color: Color(0xFF777168),
@@ -2431,7 +2982,7 @@ class KoreaEconomicNewspaperScene extends StatelessWidget {
       children: [
         Positioned.fill(
           child: Image.asset(
-            'assets/images/bg_living_room_1999.png',
+            'assets/images/bg_living_room_1999_portrait_cartoon_v2.png',
             fit: BoxFit.cover,
           ),
         ),
@@ -2712,9 +3263,9 @@ class _OfficeStatusCard extends StatelessWidget {
       0 => '관찰 전용',
       1 => '10만원',
       2 => '25만원',
-      3 => '자산 25%',
-      4 => '500만원',
-      _ => '제한 없음',
+      3 => '자산 25% · 최소 25만원',
+      4 => '자산 25% · 최소 500만원',
+      _ => '20억원',
     };
     return _OutlinedCard(
       color: const Color(0xF7FFFEF8),
@@ -3274,7 +3825,7 @@ class KoreaEconomicNewspaperSheet extends StatelessWidget {
             ),
             const SizedBox(height: 9),
             Text(
-              newspaper.dynamicArticle?.content ?? newspaper.brief.body,
+              newspaper.combinatorialArticle?.content ?? newspaper.brief.body,
               style: const TextStyle(
                 color: Color(0xFF444039),
                 fontSize: 13,
@@ -3308,9 +3859,9 @@ class KoreaEconomicNewspaperSheet extends StatelessWidget {
                 ),
               ),
             ],
-            if (newspaper.dynamicArticle != null) ...[
+            if (newspaper.combinatorialArticle != null) ...[
               const SizedBox(height: 12),
-              _DynamicNewsImpact(article: newspaper.dynamicArticle!),
+              _CombinatorialNewsInfo(article: newspaper.combinatorialArticle!),
             ],
             const SizedBox(height: 15),
             Container(
@@ -3423,9 +3974,9 @@ class KoreaEconomicNewspaperSheet extends StatelessWidget {
   }
 }
 
-class _DynamicNewsImpact extends StatelessWidget {
-  const _DynamicNewsImpact({required this.article});
-  final DynamicNewsArticle article;
+class _CombinatorialNewsInfo extends StatelessWidget {
+  const _CombinatorialNewsInfo({required this.article});
+  final CombinatorialNewsArticle article;
 
   @override
   Widget build(BuildContext context) {
@@ -3441,9 +3992,8 @@ class _DynamicNewsImpact extends StatelessWidget {
         : negative
         ? const Color(0xFF2D6FD2)
         : const Color(0xFF6B6861);
-    final score = article.stockImpactScore;
     return Container(
-      key: const Key('dynamic-news-impact'),
+      key: const Key('combinatorial-news-info'),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: const Color(0xFFECE4D4),
@@ -3451,16 +4001,16 @@ class _DynamicNewsImpact extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(Icons.auto_awesome_rounded, size: 17, color: color),
+          Icon(Icons.newspaper_rounded, size: 17, color: color),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              'AI 기자 · 시장 심리 $label',
+              '문장 조합 · 시장 흐름 $label',
               style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900),
             ),
           ),
           Text(
-            '영향 ${score >= 0 ? '+' : ''}${score.toStringAsFixed(1)}',
+            '조합 #${article.variantId + 1}',
             style: TextStyle(
               color: color,
               fontSize: 11,
@@ -3544,7 +4094,7 @@ class CampaignEndingScreen extends StatelessWidget {
     );
     final fees = state.ledger.fold<int>(
       0,
-      (sum, entry) => sum + entry.tradingFee,
+      (sum, entry) => sum + entry.tradingFee + entry.transactionTax,
     );
     final resolved = state.decisions
         .where((decision) => decision.status == DecisionStatus.resolved)
@@ -3585,7 +4135,8 @@ class CampaignEndingScreen extends StatelessWidget {
           _EndingMetric(
             label: '부동산 추정가 / 월 순현금',
             value:
-                '${_money(state.personalFinance.estimatedPropertyValueAt(state.day))}원 / ${_money(state.personalFinance.monthlyPropertyIncome - state.personalFinance.monthlyPropertyCost)}원',
+                '${_money(state.personalFinance.estimatedPropertyValueAt(state.day))}원 / '
+                '${_money(state.personalFinance.monthlyPropertyIncomeAt(state.currentDate) - state.personalFinance.monthlyPropertyCostAt(state.currentDate) - state.personalFinance.monthlyPropertyHoldingTaxAt(state.day, state.currentDate) - state.personalFinance.monthlyMortgagePayment)}원',
           ),
           _EndingMetric(
             label: '선택지출 / 확률 오락 손익',
@@ -3635,10 +4186,9 @@ class _EndingMarketSummary extends StatelessWidget {
         }
         final portfolioValue = state.portfolioValue(prices);
         final unrealized = portfolioValue - state.portfolioCost;
-        final propertyValue = state.personalFinance.estimatedPropertyValueAt(
-          state.day,
-        );
-        final totalAssets = state.cash + portfolioValue + propertyValue;
+        final totalAssets = state.balanceSheetGrossAssets(prices: prices);
+        final totalLiabilities = state.totalKnownLiabilities;
+        final netWorth = state.balanceSheetNetWorth(prices: prices);
         final benchmarkReturns = <double>[];
         for (final asset in universe.assets.where(
           (asset) => asset.isDomestic && asset.listedOn == null,
@@ -3671,6 +4221,11 @@ class _EndingMarketSummary extends StatelessWidget {
               value: '${unrealized >= 0 ? '+' : ''}${_money(unrealized)}원',
             ),
             _EndingMetric(label: '최종 총자산', value: '${_money(totalAssets)}원'),
+            _EndingMetric(
+              label: '최종 총부채',
+              value: '${_money(totalLiabilities)}원',
+            ),
+            _EndingMetric(label: '최종 순자산', value: '${_money(netWorth)}원'),
             _EndingMetric(
               label: '가상시장 동일가중 기준',
               value:
@@ -4183,7 +4738,7 @@ double? _portfolioPriceAtCurrentTime(
   final quote = asset.quoteAtOrBefore(state.currentDate);
   if (quote == null) return null;
   if (!quote.isExactDate) return quote.close;
-  final previousClose = asset.previousCloseBefore(quote.date) ?? quote.close;
+  final previousClose = asset.unadjustedReferenceCloseFor(quote.date);
   final path = generatedMarketDayPathForAsset(
     asset: asset,
     simulationSeed: state.simulationSeed,

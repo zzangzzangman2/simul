@@ -3,6 +3,7 @@ import 'package:millennium_capital/game/game_engine.dart';
 import 'package:millennium_capital/game/game_state.dart';
 import 'package:millennium_capital/game/mission_progression.dart';
 import 'package:millennium_capital/game/seed_money_content.dart';
+import 'package:millennium_capital/game/star_shop.dart';
 
 void main() {
   const engine = GameEngine();
@@ -37,12 +38,23 @@ void main() {
       expect(progress.complete, isTrue);
       expect(resolved.progression.experience, 25);
       expect(claim.success, isTrue);
-      expect(claim.cashReward, 500);
-      expect(claim.state.cash, initialCompanyCash + 500);
+      expect(claim.starReward, 1);
+      expect(claim.state.cash, initialCompanyCash);
+      expect(claim.state.brokerageCash, initialCompanyCash);
       expect(claim.state.progression.experience, 105);
+      expect(claim.state.progression.starBalance, 1);
+      expect(claim.state.progression.totalStarsEarned, 1);
       expect(claim.state.progression.activeMission?.id, 'first_work');
       expect(claim.state.progression.claimedMissionIds, contains('first_note'));
-      expect(claim.state.ledger.last.counterAccount, 'mission_reward');
+      expect(
+        claim.state.ledger.where(
+          (entry) => entry.counterAccount == 'mission_reward',
+        ),
+        isEmpty,
+      );
+      expect(claim.message, contains('⭐ +1'));
+      expect(claim.message, contains('+80 XP'));
+      expect(claim.message, contains('가족 신뢰 +1'));
     },
   );
 
@@ -148,5 +160,65 @@ void main() {
     expect(migrated.cash, initialCompanyCash);
     expect(migrated.progression.experience, 0);
     expect(migrated.progression.activeMission?.id, 'first_note');
+  });
+
+  test('legacy claimed missions migrate to the same number of stars', () {
+    final legacy = engine.createNewGame('스타 마이그레이션').toJson();
+    (legacy['progression'] as Map<String, dynamic>)
+      ..remove('starBalance')
+      ..remove('totalStarsEarned')
+      ..remove('starPurchaseIds')
+      ..remove('starHints')
+      ..['claimedMissionIds'] = <String>['first_note', 'first_work'];
+
+    final migrated = engine.migrate(legacy);
+
+    expect(migrated.progression.starBalance, 2);
+    expect(migrated.progression.totalStarsEarned, 2);
+    expect(migrated.progression.starPurchaseIds, isEmpty);
+    expect(migrated.progression.starHints, isEmpty);
+  });
+
+  test('ten stars exchange into company bank cash, not brokerage cash', () {
+    final base = engine
+        .createNewGame('스타 현금 교환')
+        .copyWith(
+          progression: engine
+              .createNewGame('스타 현금 교환 상태')
+              .progression
+              .copyWith(starBalance: 10, totalStarsEarned: 10),
+        );
+
+    final result = engine.purchaseStarShopItem(base, starCashExchangeId);
+
+    expect(result.success, isTrue);
+    expect(result.state.progression.starBalance, 0);
+    expect(result.state.cash, base.cash + 10000);
+    expect(result.state.brokerageCash, base.brokerageCash);
+    expect(result.state.bankCash, 10000);
+    expect(result.state.ledger.last.counterAccount, 'star_exchange');
+  });
+
+  test('next trading-day hint is saved and cannot be bought twice', () {
+    final base = engine
+        .createNewGame('스타 힌트')
+        .copyWith(
+          progression: engine
+              .createNewGame('스타 힌트 상태')
+              .progression
+              .copyWith(starBalance: 10, totalStarsEarned: 10),
+        );
+
+    final first = engine.purchaseStarShopItem(base, starStockHintId);
+    final second = engine.purchaseStarShopItem(first.state, starStockHintId);
+
+    expect(first.success, isTrue);
+    expect(first.hint, isNotEmpty);
+    expect(first.state.progression.starBalance, 7);
+    expect(first.purchaseKey, isNotNull);
+    expect(first.state.progression.starHints[first.purchaseKey], first.hint);
+    expect(second.success, isFalse);
+    expect(second.state.progression.starBalance, 7);
+    expect(second.hint, first.hint);
   });
 }

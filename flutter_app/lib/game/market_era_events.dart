@@ -1799,10 +1799,14 @@ const _technologyAgreementModes = <String>[
   '공공 실증·민간 상용화 협약',
 ];
 
-final _technologyPlanCache = <String, List<_TechnologyOpportunityPlan>>{};
+final Map<String, List<_TechnologyOpportunityPlan>> _technologyPlanCache =
+    <String, List<_TechnologyOpportunityPlan>>{};
+final Map<String, Map<String, List<FictionalMarketEvent>>>
+_technologyEventScheduleCache =
+    <String, Map<String, List<FictionalMarketEvent>>>{};
 
 List<_TechnologyOpportunityPlan> _technologyOpportunityPlans(String seed) {
-  final cached = _technologyPlanCache[seed];
+  final cached = _readFictionalMarketCache(_technologyPlanCache, seed);
   if (cached != null) return cached;
   final plans = <_TechnologyOpportunityPlan>[];
   for (final technology in fictionalEraTechnologies) {
@@ -1861,23 +1865,26 @@ List<_TechnologyOpportunityPlan> _technologyOpportunityPlans(String seed) {
     );
   }
   final result = List<_TechnologyOpportunityPlan>.unmodifiable(plans);
-  _technologyPlanCache[seed] = result;
+  _writeFictionalMarketCache(
+    _technologyPlanCache,
+    seed,
+    result,
+    maximumEntries: _maxFictionalMarketSeedCacheEntries,
+  );
   return result;
 }
 
-List<FictionalMarketEvent> _eraTechnologyEventsForDate(
-  String seed,
-  DateTime date,
-) {
-  final dateKey = marketDateKey(date);
-  final events = <FictionalMarketEvent>[];
+Map<String, List<FictionalMarketEvent>> _technologyEventSchedule(String seed) {
+  final cached = _readFictionalMarketCache(_technologyEventScheduleCache, seed);
+  if (cached != null) return cached;
+  final schedule = <String, List<FictionalMarketEvent>>{};
   const stageOffsets = <int>[0, 24, 58, 86];
   for (final plan in _technologyOpportunityPlans(seed)) {
     for (var stage = 0; stage < stageOffsets.length; stage++) {
       final stageDate = _nextFictionalTradingDay(
         plan.startDate.add(Duration(days: stageOffsets[stage])),
       );
-      if (marketDateKey(stageDate) != dateKey) continue;
+      final dateKey = marketDateKey(stageDate);
       final technology = plan.technology;
       final company = plan.company;
       final direction = stage == 0
@@ -1923,80 +1930,123 @@ List<FictionalMarketEvent> _eraTechnologyEventsForDate(
               ? '초기 고객 주문과 반복 매출이 확인됐다. 회사는 생산능력과 후속 생태계 투자를 확대한다.'
               : '협약 사업을 축소하고 관련 자산의 손상차손을 반영했다. 재무 부담과 기술인력 이탈이 남았다.',
       };
-      events.add(
-        FictionalMarketEvent(
-          id: 'technology-${technology.id}-${company.id}-$stage',
-          date: dateKey,
-          companyId: company.id,
-          companyName: company.name,
-          sector: company.sector,
-          stage: stage,
-          eyebrow: '시대 기술 협약',
-          title: title,
-          body: body,
-          signal: stage < 2
-              ? '협약 발표보다 실제 시제품·수율·고객 인증의 순서를 확인해야 합니다.'
-              : '성공은 새 시장의 현금흐름으로, 실패는 손상차손과 추가 자금조달로 이어지는지 봐야 합니다.',
-          reportHint:
-              '${technology.name} 전담인력과 시험설비 지출이 늘고 있으나 공개된 최종 성능과 고객 확정 물량은 제한적이다.',
-          revealMinute:
-              9 * 60 +
-              5 +
-              _fictionalHash(
-                    '$seed:technology-reveal:${technology.id}:$stage',
-                  ) %
-                  365,
-          impactPct: impact,
-          tone: !direction && stage >= 1
-              ? NewsTone.shock
-              : stage >= 2
-              ? NewsTone.milestone
-              : NewsTone.launch,
-        ),
-      );
+      schedule
+          .putIfAbsent(dateKey, () => <FictionalMarketEvent>[])
+          .add(
+            FictionalMarketEvent(
+              id: 'technology-${technology.id}-${company.id}-$stage',
+              date: dateKey,
+              companyId: company.id,
+              companyName: company.name,
+              sector: company.sector,
+              stage: stage,
+              eyebrow: '시대 기술 협약',
+              title: title,
+              body: body,
+              signal: stage < 2
+                  ? '협약 발표보다 실제 시제품·수율·고객 인증의 순서를 확인해야 합니다.'
+                  : '성공은 새 시장의 현금흐름으로, 실패는 손상차손과 추가 자금조달로 이어지는지 봐야 합니다.',
+              reportHint:
+                  '${technology.name} 전담인력과 시험설비 지출이 늘고 있으나 공개된 최종 성능과 고객 확정 물량은 제한적이다.',
+              revealMinute:
+                  9 * 60 +
+                  5 +
+                  _fictionalHash(
+                        '$seed:technology-reveal:${technology.id}:$stage',
+                      ) %
+                      345,
+              impactPct: impact,
+              tone: !direction && stage >= 1
+                  ? NewsTone.shock
+                  : stage >= 2
+                  ? NewsTone.milestone
+                  : NewsTone.launch,
+            ),
+          );
     }
   }
-  return events;
+  final result = <String, List<FictionalMarketEvent>>{
+    for (final entry in schedule.entries)
+      entry.key: List<FictionalMarketEvent>.unmodifiable(entry.value),
+  };
+  _writeFictionalMarketCache(
+    _technologyEventScheduleCache,
+    seed,
+    result,
+    maximumEntries: _maxFictionalMarketSeedCacheEntries,
+  );
+  return result;
+}
+
+List<FictionalMarketEvent> _eraTechnologyEventsForDate(
+  String seed,
+  DateTime date,
+) => _technologyEventSchedule(seed)[marketDateKey(date)] ?? const [];
+
+final Map<String, Map<String, List<FictionalMarketEvent>>>
+_historicalCatalystEventScheduleCache =
+    <String, Map<String, List<FictionalMarketEvent>>>{};
+
+Map<String, List<FictionalMarketEvent>> _historicalCatalystEventSchedule(
+  String seed,
+) {
+  final cached = _readFictionalMarketCache(
+    _historicalCatalystEventScheduleCache,
+    seed,
+  );
+  if (cached != null) return cached;
+  final schedule = <String, List<FictionalMarketEvent>>{};
+  for (final catalyst in fictionalHistoricalMarketCatalysts) {
+    final catalystDate = _nextFictionalTradingDay(
+      DateTime(catalyst.year, catalyst.month, catalyst.day),
+    );
+    final dateKey = marketDateKey(catalystDate);
+    final strength =
+        0.82 + _fictionalUnit(seed, 'historical:${catalyst.id}') * 0.36;
+    schedule
+        .putIfAbsent(dateKey, () => <FictionalMarketEvent>[])
+        .add(
+          FictionalMarketEvent(
+            id: 'historical-${catalyst.id}',
+            date: dateKey,
+            companyId: fictionalWholeMarketCompanyId,
+            companyName: '시장 전체',
+            sector: '전체시장',
+            stage: 0,
+            eyebrow: catalyst.category,
+            title: catalyst.title,
+            body: catalyst.body,
+            signal: catalyst.signal,
+            reportHint: '공개된 거시 지표와 업종별 비용·수요 경로를 함께 대조해야 한다.',
+            revealMinute:
+                8 * 60 +
+                20 +
+                _fictionalHash('$seed:historical-reveal:${catalyst.id}') % 389,
+            impactPct: catalyst.marketImpact * strength,
+            sectorImpactPcts: {
+              for (final entry in catalyst.sectorImpacts.entries)
+                entry.key: entry.value * strength,
+            },
+            tone: catalyst.marketImpact < 0
+                ? NewsTone.shock
+                : NewsTone.breaking,
+          ),
+        );
+  }
+  final result = <String, List<FictionalMarketEvent>>{
+    for (final entry in schedule.entries)
+      entry.key: List<FictionalMarketEvent>.unmodifiable(entry.value),
+  };
+  _writeFictionalMarketCache(
+    _historicalCatalystEventScheduleCache,
+    seed,
+    result,
+    maximumEntries: _maxFictionalMarketSeedCacheEntries,
+  );
+  return result;
 }
 
 List<FictionalMarketEvent> _historicalCatalystEventsForDate(
   String seed,
   DateTime date,
-) {
-  final dateKey = marketDateKey(date);
-  final events = <FictionalMarketEvent>[];
-  for (final catalyst in fictionalHistoricalMarketCatalysts) {
-    final catalystDate = _nextFictionalTradingDay(
-      DateTime(catalyst.year, catalyst.month, catalyst.day),
-    );
-    if (marketDateKey(catalystDate) != dateKey) continue;
-    final strength =
-        0.82 + _fictionalUnit(seed, 'historical:${catalyst.id}') * 0.36;
-    events.add(
-      FictionalMarketEvent(
-        id: 'historical-${catalyst.id}',
-        date: dateKey,
-        companyId: fictionalWholeMarketCompanyId,
-        companyName: '시장 전체',
-        sector: '전체시장',
-        stage: 0,
-        eyebrow: catalyst.category,
-        title: catalyst.title,
-        body: catalyst.body,
-        signal: catalyst.signal,
-        reportHint: '공개된 거시 지표와 업종별 비용·수요 경로를 함께 대조해야 한다.',
-        revealMinute:
-            8 * 60 +
-            20 +
-            _fictionalHash('$seed:historical-reveal:${catalyst.id}') % 420,
-        impactPct: catalyst.marketImpact * strength,
-        sectorImpactPcts: {
-          for (final entry in catalyst.sectorImpacts.entries)
-            entry.key: entry.value * strength,
-        },
-        tone: catalyst.marketImpact < 0 ? NewsTone.shock : NewsTone.breaking,
-      ),
-    );
-  }
-  return events;
-}
+) => _historicalCatalystEventSchedule(seed)[marketDateKey(date)] ?? const [];

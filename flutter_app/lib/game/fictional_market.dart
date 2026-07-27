@@ -820,6 +820,24 @@ class FictionalMarketEvent {
   final NewsTone tone;
   final Map<String, double> sectorImpactPcts;
 
+  FictionalMarketEvent copyWith({int? revealMinute}) => FictionalMarketEvent(
+    id: id,
+    date: date,
+    companyId: companyId,
+    companyName: companyName,
+    sector: sector,
+    stage: stage,
+    eyebrow: eyebrow,
+    title: title,
+    body: body,
+    signal: signal,
+    reportHint: reportHint,
+    revealMinute: revealMinute ?? this.revealMinute,
+    impactPct: impactPct,
+    tone: tone,
+    sectorImpactPcts: sectorImpactPcts,
+  );
+
   Map<String, dynamic> toJson({bool includeHidden = true}) => {
     'id': id,
     'date': date,
@@ -914,12 +932,56 @@ String _listingSuffix(String sector) => switch (sector) {
   _ => '테크',
 };
 
-final _listingPlanCache = <String, List<_GeneratedListingPlan>>{};
-final _spinoffPlanCache = <String, List<_SpinoffPlan>>{};
-final _dailyEventCache = <String, List<FictionalMarketEvent>>{};
+const _maxFictionalMarketSeedCacheEntries = 3;
+const _maxFictionalMarketDailyEventCacheEntries = 12000;
+
+final Map<String, List<_GeneratedListingPlan>> _listingPlanCache =
+    <String, List<_GeneratedListingPlan>>{};
+final Map<String, List<_SpinoffPlan>> _spinoffPlanCache =
+    <String, List<_SpinoffPlan>>{};
+final Map<String, Map<String, DateTime>> _listingDateByAssetCache =
+    <String, Map<String, DateTime>>{};
+final Map<String, List<FictionalMarketEvent>> _dailyEventCache =
+    <String, List<FictionalMarketEvent>>{};
+final Map<String, Map<String, List<_ScheduledArcEvent>>>
+_arcEventScheduleCache = <String, Map<String, List<_ScheduledArcEvent>>>{};
+final Map<String, Map<String, List<FictionalMarketEvent>>>
+_lifecycleEventScheduleCache =
+    <String, Map<String, List<FictionalMarketEvent>>>{};
+
+class _ScheduledArcEvent {
+  const _ScheduledArcEvent({
+    required this.company,
+    required this.arc,
+    required this.stage,
+  });
+
+  final FictionalCompanyDefinition company;
+  final int arc;
+  final int stage;
+}
+
+V? _readFictionalMarketCache<V>(Map<String, V> cache, String key) {
+  final value = cache.remove(key);
+  if (value != null) cache[key] = value;
+  return value;
+}
+
+void _writeFictionalMarketCache<V>(
+  Map<String, V> cache,
+  String key,
+  V value, {
+  required int maximumEntries,
+}) {
+  cache.remove(key);
+  cache[key] = value;
+  while (cache.length > maximumEntries) {
+    cache.remove(cache.keys.first);
+  }
+}
 
 List<_GeneratedListingPlan> _generatedListingPlans(String seed) {
-  final cached = _listingPlanCache[seed];
+  final cached = _readFictionalMarketCache(_listingPlanCache, seed);
   if (cached != null) return cached;
   final plans = <_GeneratedListingPlan>[];
   var serial = 0;
@@ -984,7 +1046,12 @@ List<_GeneratedListingPlan> _generatedListingPlans(String seed) {
     }
   }
   final result = List<_GeneratedListingPlan>.unmodifiable(plans);
-  _listingPlanCache[seed] = result;
+  _writeFictionalMarketCache(
+    _listingPlanCache,
+    seed,
+    result,
+    maximumEntries: _maxFictionalMarketSeedCacheEntries,
+  );
   return result;
 }
 
@@ -1003,6 +1070,14 @@ double _fictionalUnit(String seed, String key) =>
 double _fictionalSigned(String seed, String key) =>
     _fictionalUnit(seed, key) * 2 - 1;
 
+double _fictionalFastSigned(int baseSeed, int salt) {
+  var value = (baseSeed ^ ((salt * 0x45d9f3b) & 0x7fffffff)) & 0x7fffffff;
+  value = (value * 1103515245 + 12345) & 0x7fffffff;
+  value ^= value >> 11;
+  value = (value * 1103515245 + 12345) & 0x7fffffff;
+  return value / 0x7fffffff * 2 - 1;
+}
+
 DateTime _nextFictionalTradingDay(DateTime date) {
   var next = DateTime(date.year, date.month, date.day);
   while (!isMarketTradingDay(next)) {
@@ -1011,8 +1086,142 @@ DateTime _nextFictionalTradingDay(DateTime date) {
   return next;
 }
 
+DateTime? _fictionalRightsIssueDate(
+  String seed,
+  FictionalCompanyDefinition company,
+  int year,
+) {
+  if (_fictionalHash('$seed:rights-select:${company.id}:$year') % 100 >= 24) {
+    return null;
+  }
+  final dayOffset =
+      18 + _fictionalHash('$seed:rights-day:${company.id}:$year') % 320;
+  return _nextFictionalTradingDay(
+    DateTime(year, 1, 1).add(Duration(days: dayOffset)),
+  );
+}
+
+int _fictionalRightsIssueDiscountPct(
+  String seed,
+  FictionalCompanyDefinition company,
+  int year,
+) => 12 + _fictionalHash('$seed:rights-discount:${company.id}:$year') % 29;
+
+double _fictionalDividendYieldRate(
+  String seed,
+  FictionalCompanyDefinition company,
+  int year,
+) =>
+    0.005 +
+    _fictionalUnit(seed, 'dividend-yield:${company.id}:$year') *
+        (company.market == fictionalMainMarket ? 0.025 : 0.012);
+
+/// Converts an announced rights discount into an executable subscription price.
+///
+/// Subscription prices are cash issue terms rather than exchange quotes, so
+/// the fictional market's 120-won quote-generation floor must not erase the
+/// announced discount. The result is rounded down to the applicable tick.
+double fictionalRightsIssueSubscriptionPrice({
+  required double referencePrice,
+  required double announcedDiscountPct,
+  required String market,
+}) {
+  if (!referencePrice.isFinite ||
+      referencePrice <= 0 ||
+      !announcedDiscountPct.isFinite ||
+      announcedDiscountPct < 0 ||
+      announcedDiscountPct >= 100) {
+    return 0;
+  }
+  final target = math.max(
+    1.0,
+    referencePrice * (1 - announcedDiscountPct / 100),
+  );
+  return math.max(
+    1.0,
+    marketSnapPrice(target, market: market, roundDown: true),
+  );
+}
+
+/// Rounds a target dividend yield to one tradable price tick.
+///
+/// Using a fixed 10-won minimum made a 120-won stock pay at least 8.33%.
+/// Price-band ticks retain whole-won cash amounts without that low-price bias.
+double fictionalDividendPerShare({
+  required double referencePrice,
+  required double targetYieldRate,
+  required String market,
+}) {
+  if (!referencePrice.isFinite ||
+      referencePrice <= 0 ||
+      !targetYieldRate.isFinite ||
+      targetYieldRate <= 0) {
+    return 0;
+  }
+  final tick = marketTickSize(referencePrice, market: market);
+  final rounded = (referencePrice * targetYieldRate / tick).round() * tick;
+  final minimum = math.min(tick, referencePrice);
+  final maximum = referencePrice > tick
+      ? referencePrice - tick
+      : referencePrice;
+  return math.min(maximum, math.max(minimum, rounded)).toDouble();
+}
+
+bool _fictionalRightsIssueIsThirdParty(
+  String seed,
+  FictionalCompanyDefinition company,
+  int year,
+) => _fictionalHash('$seed:rights-method:${company.id}:$year') % 3 == 0;
+
+int _fictionalStandaloneInitialShares(
+  String seed,
+  FictionalCompanyDefinition company,
+) => 3000000 + _fictionalHash('$seed:shares:${company.id}') % 27000001;
+
+int _fictionalInitialShares(String seed, FictionalCompanyDefinition company) {
+  final parentId = company.parentAssetId;
+  if (parentId == null) {
+    return _fictionalStandaloneInitialShares(seed, company);
+  }
+  FictionalCompanyDefinition? parent;
+  for (final candidate in fixedFictionalCompanies) {
+    if (candidate.id == parentId) {
+      parent = candidate;
+      break;
+    }
+  }
+  if (parent == null) return _fictionalStandaloneInitialShares(seed, company);
+  final parentShares = _fictionalStandaloneInitialShares(seed, parent);
+  final distributionRatio =
+      0.08 + _fictionalUnit(seed, 'spinoff-shares:${company.id}') * 0.12;
+  return math.max(1, (parentShares * distributionRatio).round());
+}
+
+Map<String, DateTime> _fictionalListingDatesByAsset(String seed) {
+  final cached = _readFictionalMarketCache(_listingDateByAssetCache, seed);
+  if (cached != null) return cached;
+  final result = <String, DateTime>{
+    for (final plan in _spinoffPlans(seed)) plan.definition.id: plan.date,
+    for (final plan in _generatedListingPlans(seed))
+      plan.definition.id: plan.listingDate,
+  };
+  final immutable = Map<String, DateTime>.unmodifiable(result);
+  _writeFictionalMarketCache(
+    _listingDateByAssetCache,
+    seed,
+    immutable,
+    maximumEntries: _maxFictionalMarketSeedCacheEntries,
+  );
+  return immutable;
+}
+
+bool _isFictionalCompanySeasonedForAction(
+  DateTime? listingDate,
+  DateTime actionDate,
+) => listingDate == null || actionDate.difference(listingDate).inDays >= 90;
+
 List<_SpinoffPlan> _spinoffPlans(String seed) {
-  final cached = _spinoffPlanCache[seed];
+  final cached = _readFictionalMarketCache(_spinoffPlanCache, seed);
   if (cached != null) return cached;
   final plans = <_SpinoffPlan>[];
   for (var index = 0; index < _spinoffBlueprints.length; index++) {
@@ -1036,7 +1245,12 @@ List<_SpinoffPlan> _spinoffPlans(String seed) {
   }
   plans.sort((left, right) => left.date.compareTo(right.date));
   final result = List<_SpinoffPlan>.unmodifiable(plans);
-  _spinoffPlanCache[seed] = result;
+  _writeFictionalMarketCache(
+    _spinoffPlanCache,
+    seed,
+    result,
+    maximumEntries: _maxFictionalMarketSeedCacheEntries,
+  );
   return result;
 }
 
@@ -1267,7 +1481,69 @@ List<FictionalCompanyDefinition> _activeFictionalCompanies(
   return active;
 }
 
-List<FictionalMarketEvent> _lifecycleEventsForDate(String seed, DateTime date) {
+Map<String, List<_ScheduledArcEvent>> _fictionalArcEventSchedule(String seed) {
+  final cached = _readFictionalMarketCache(_arcEventScheduleCache, seed);
+  if (cached != null) return cached;
+  final spinoffs = _spinoffPlans(seed);
+  final listings = _generatedListingPlans(seed);
+  final definitions = <FictionalCompanyDefinition>[
+    ...fixedFictionalCompanies,
+    ...spinoffs.map((plan) => plan.definition),
+    ...listings.map((plan) => plan.definition),
+  ];
+  final listingDates = <String, DateTime>{
+    for (final plan in spinoffs) plan.definition.id: plan.date,
+    for (final plan in listings) plan.definition.id: plan.listingDate,
+  };
+  final delistingDates = <String, DateTime>{
+    for (final plan in listings)
+      if (plan.delistingDate != null) plan.definition.id: plan.delistingDate!,
+  };
+  final schedule = <String, List<_ScheduledArcEvent>>{};
+  final campaignStart = DateTime(fictionalCampaignStartYear, 1, 1);
+  final campaignEnd = DateTime(fictionalCampaignEndYear, 12, 31);
+  final lastDay = campaignEnd.difference(campaignStart).inDays;
+  const arcLength = 120;
+  for (final company in definitions) {
+    final listed = listingDates[company.id];
+    final delisted = delistingDates[company.id];
+    for (var arc = 0; arc * arcLength <= lastDay; arc += 1) {
+      final offset = _fictionalHash('$seed:${company.id}:arc-offset:$arc') % 19;
+      final stageDays = <int>[
+        7 + offset,
+        34 + offset,
+        66 + offset,
+        96 + offset,
+      ];
+      for (var stage = 0; stage < stageDays.length; stage += 1) {
+        final day = arc * arcLength + stageDays[stage];
+        if (day > lastDay) continue;
+        final date = campaignStart.add(Duration(days: day));
+        if (listed != null && date.isBefore(listed)) continue;
+        if (delisted != null && !date.isBefore(delisted)) continue;
+        schedule
+            .putIfAbsent(marketDateKey(date), () => <_ScheduledArcEvent>[])
+            .add(_ScheduledArcEvent(company: company, arc: arc, stage: stage));
+      }
+    }
+  }
+  final result = <String, List<_ScheduledArcEvent>>{
+    for (final entry in schedule.entries)
+      entry.key: List<_ScheduledArcEvent>.unmodifiable(entry.value),
+  };
+  _writeFictionalMarketCache(
+    _arcEventScheduleCache,
+    seed,
+    result,
+    maximumEntries: _maxFictionalMarketSeedCacheEntries,
+  );
+  return result;
+}
+
+List<FictionalMarketEvent> _uncachedLifecycleEventsForDate(
+  String seed,
+  DateTime date,
+) {
   final dateKey = marketDateKey(date);
   final events = <FictionalMarketEvent>[];
   for (final plan in _generatedListingPlans(seed)) {
@@ -1309,29 +1585,30 @@ List<FictionalMarketEvent> _lifecycleEventsForDate(String seed, DateTime date) {
               '감사의견과 계속기업 요건을 회복하지 못해 정규 거래가 끝났다. 남은 자산의 처분가치는 장부가보다 크게 낮을 수 있다.',
           signal: '매매정지 전에 현금흐름·자본잠식·감사의견 경고가 누적됐는지 복기해야 합니다.',
           reportHint: '감사 일정 지연과 자금조달 실패가 겹쳐 계속기업 불확실성이 커지고 있다.',
-          revealMinute: 8 * 60 + 30,
-          impactPct: -0.65,
+          revealMinute: marketDayStartMinute,
+          // 상폐 종목 자체는 이 날 거래되지 않고 별도 잔여가치로 정산된다.
+          // -65%를 가격 충격으로도 두면 동종업계 전체에 -7.8%가 전염된다.
+          impactPct: -0.08,
           tone: NewsTone.shock,
         ),
       );
     }
   }
 
+  final listingDates = _fictionalListingDatesByAsset(seed);
   for (final company in _activeFictionalCompanies(seed, date)) {
     final year = date.year;
-    if (_fictionalHash('$seed:rights-select:${company.id}:$year') % 100 >= 24) {
+    final actionDate = _fictionalRightsIssueDate(seed, company, year);
+    if (actionDate == null) continue;
+    if (marketDateKey(actionDate) != dateKey) continue;
+    if (!_isFictionalCompanySeasonedForAction(
+      listingDates[company.id],
+      actionDate,
+    )) {
       continue;
     }
-    final dayOffset =
-        18 + _fictionalHash('$seed:rights-day:${company.id}:$year') % 320;
-    final actionDate = _nextFictionalTradingDay(
-      DateTime(year, 1, 1).add(Duration(days: dayOffset)),
-    );
-    if (marketDateKey(actionDate) != dateKey) continue;
-    final thirdParty =
-        _fictionalHash('$seed:rights-method:${company.id}:$year') % 3 == 0;
-    final discount =
-        12 + _fictionalHash('$seed:rights-discount:${company.id}:$year') % 29;
+    final thirdParty = _fictionalRightsIssueIsThirdParty(seed, company, year);
+    final discount = _fictionalRightsIssueDiscountPct(seed, company, year);
     events.add(
       FictionalMarketEvent(
         id: 'rights-${company.id}-$year',
@@ -1343,12 +1620,13 @@ List<FictionalMarketEvent> _lifecycleEventsForDate(String seed, DateTime date) {
         eyebrow: '자금 조달',
         title: '${company.name}, ${thirdParty ? '제3자배정' : '주주배정'} 유상증자 결정',
         body:
-            '회사는 ${company.products.first} 투자와 차입금 상환을 위해 기준가격보다 약 $discount% 낮은 조건의 신주 발행을 결정했다.',
+            '회사는 ${company.products.first} 투자와 차입금 상환을 위해 기준가격 대비 목표 할인율 약 $discount%를 적용하고 원 단위 호가로 절사한 조건으로 기존 발행주식의 8%에 해당하는 신주를 발행한다. '
+            '${thirdParty ? '기존 주주에게 신주가 배정되지 않으며' : '기존 주주가 청약하지 않으면'} 보유 주식 수는 그대로이고 상대 지분율은 약 7.41% 낮아진다.',
         signal: '들어오는 현금의 용도와 늘어나는 주식 수를 함께 계산해야 합니다.',
         reportHint: '단기차입과 투자지출이 동시에 늘어 외부자금 조달 가능성이 높아졌다.',
-        revealMinute:
-            13 * 60 +
-            _fictionalHash('$seed:rights-reveal:${company.id}:$year') % 120,
+        // 권리락 기준가는 개장 전에 적용된다. 같은 날 오후까지 공시를
+        // 숨기면 플레이어에게 원인 없는 손실로 보이므로 08:00에 공개한다.
+        revealMinute: marketDayStartMinute,
         impactPct: -(0.018 + discount / 1000),
         tone: NewsTone.shock,
       ),
@@ -1356,6 +1634,71 @@ List<FictionalMarketEvent> _lifecycleEventsForDate(String seed, DateTime date) {
   }
   return events;
 }
+
+Map<String, List<FictionalMarketEvent>> _lifecycleEventSchedule(String seed) {
+  final cached = _readFictionalMarketCache(_lifecycleEventScheduleCache, seed);
+  if (cached != null) return cached;
+  final spinoffs = _spinoffPlans(seed);
+  final listings = _generatedListingPlans(seed);
+  final definitions = <FictionalCompanyDefinition>[
+    ...fixedFictionalCompanies,
+    ...spinoffs.map((plan) => plan.definition),
+    ...listings.map((plan) => plan.definition),
+  ];
+  final listingDates = <String, DateTime>{
+    for (final plan in spinoffs) plan.definition.id: plan.date,
+    for (final plan in listings) plan.definition.id: plan.listingDate,
+  };
+  final delistingDates = <String, DateTime>{
+    for (final plan in listings)
+      if (plan.delistingDate != null) plan.definition.id: plan.delistingDate!,
+  };
+  final relevantDates = <String, DateTime>{};
+  for (final plan in listings) {
+    relevantDates[marketDateKey(plan.listingDate)] = plan.listingDate;
+    final delistingDate = plan.delistingDate;
+    if (delistingDate != null) {
+      relevantDates[marketDateKey(delistingDate)] = delistingDate;
+    }
+  }
+  for (final company in definitions) {
+    final listed = listingDates[company.id];
+    final delisted = delistingDates[company.id];
+    for (
+      var year = fictionalCampaignStartYear;
+      year <= fictionalCampaignEndYear;
+      year += 1
+    ) {
+      final actionDate = _fictionalRightsIssueDate(seed, company, year);
+      if (actionDate == null ||
+          (listed != null && actionDate.isBefore(listed)) ||
+          (delisted != null && !actionDate.isBefore(delisted)) ||
+          !_isFictionalCompanySeasonedForAction(listed, actionDate)) {
+        continue;
+      }
+      relevantDates[marketDateKey(actionDate)] = actionDate;
+    }
+  }
+  final result = <String, List<FictionalMarketEvent>>{};
+  for (final entry in relevantDates.entries) {
+    final events = _uncachedLifecycleEventsForDate(seed, entry.value);
+    if (events.isNotEmpty) {
+      result[entry.key] = List<FictionalMarketEvent>.unmodifiable(events);
+    }
+  }
+  _writeFictionalMarketCache(
+    _lifecycleEventScheduleCache,
+    seed,
+    result,
+    maximumEntries: _maxFictionalMarketSeedCacheEntries,
+  );
+  return result;
+}
+
+List<FictionalMarketEvent> _lifecycleEventsForDate(
+  String seed,
+  DateTime date,
+) => _lifecycleEventSchedule(seed)[marketDateKey(date)] ?? const [];
 
 List<FictionalMarketEvent> fictionalMarketEventsForDate(
   String seed,
@@ -1365,7 +1708,7 @@ List<FictionalMarketEvent> fictionalMarketEventsForDate(
   if (day < 0) return const [];
   final dateKey = marketDateKey(date);
   final cacheKey = '$seed:$dateKey';
-  final cached = _dailyEventCache[cacheKey];
+  final cached = _readFictionalMarketCache(_dailyEventCache, cacheKey);
   if (cached != null) return cached;
   final events = <FictionalMarketEvent>[
     ..._lifecycleEventsForDate(seed, date),
@@ -1373,7 +1716,6 @@ List<FictionalMarketEvent> fictionalMarketEventsForDate(
     ..._corpusScenarioEventsForDate(seed, date),
     ..._eraTechnologyEventsForDate(seed, date),
   ];
-  final active = _activeFictionalCompanies(seed, date);
   final spinoffs = _spinoffPlans(seed);
   for (var index = 0; index < spinoffs.length; index++) {
     final plan = spinoffs[index];
@@ -1397,7 +1739,7 @@ List<FictionalMarketEvent> fictionalMarketEventsForDate(
               ? '물적분할 뒤 자회사 상장은 성장자금과 모회사 주주가치 희석을 함께 봐야 합니다.'
               : '인적분할은 두 회사의 사업가치와 배정비율을 각각 계산해야 합니다.',
           reportHint: '${parent.name} 내부에서 핵심 조직의 독립 회계와 인력 이동이 늘고 있다.',
-          revealMinute: 9 * 60 + 5,
+          revealMinute: marketDayStartMinute,
           impactPct: 0.045,
           tone: NewsTone.milestone,
         ),
@@ -1405,14 +1747,12 @@ List<FictionalMarketEvent> fictionalMarketEventsForDate(
     }
   }
 
-  for (final company in active) {
-    final arcLength = 120;
-    final arc = day ~/ arcLength;
-    final localDay = day % arcLength;
-    final offset = _fictionalHash('$seed:${company.id}:arc-offset:$arc') % 19;
-    final stageDays = <int>[7 + offset, 34 + offset, 66 + offset, 96 + offset];
-    final stage = stageDays.indexOf(localDay);
-    if (stage < 0) continue;
+  for (final scheduled
+      in _fictionalArcEventSchedule(seed)[dateKey] ??
+          const <_ScheduledArcEvent>[]) {
+    final company = scheduled.company;
+    final arc = scheduled.arc;
+    final stage = scheduled.stage;
     final scenario = _arcScenarioForCompany(seed, company, arc);
     final availableProducts = fictionalProductsAvailableInYear(
       company,
@@ -1441,10 +1781,37 @@ List<FictionalMarketEvent> fictionalMarketEventsForDate(
       ),
     );
   }
+  for (var index = 0; index < events.length; index += 1) {
+    final event = events[index];
+    final normalizedRevealMinute = normalizeFictionalMarketRevealMinute(
+      event.revealMinute,
+    );
+    if (normalizedRevealMinute != event.revealMinute) {
+      events[index] = event.copyWith(revealMinute: normalizedRevealMinute);
+    }
+  }
   events.sort((left, right) => left.revealMinute.compareTo(right.revealMinute));
   final result = List<FictionalMarketEvent>.unmodifiable(events);
-  _dailyEventCache[cacheKey] = result;
+  _writeFictionalMarketCache(
+    _dailyEventCache,
+    cacheKey,
+    result,
+    maximumEntries: _maxFictionalMarketDailyEventCacheEntries,
+  );
   return result;
+}
+
+/// 개장 전 공시는 원래 시각을 보존하고, 장중 공시는 종가 동시호가 전에
+/// 반드시 공개되도록 제한한다.
+int normalizeFictionalMarketRevealMinute(int revealMinute) {
+  if (revealMinute < krxOpenMinute) {
+    return revealMinute < marketDayStartMinute
+        ? marketDayStartMinute
+        : revealMinute;
+  }
+  return revealMinute >= krxContinuousEndMinute
+      ? krxContinuousEndMinute - 1
+      : revealMinute;
 }
 
 FictionalMarketEvent _buildArcEvent({
@@ -1904,22 +2271,117 @@ Map<String, List<FictionalCompanyRelation>> _buildCompanyRelations(
   };
 }
 
+typedef FictionalFinancialBalances = ({
+  int cash,
+  int debt,
+  int equity,
+  int sharesOutstanding,
+});
+
+/// Applies balance-sheet effects in the same deterministic order used by
+/// market reference-price adjustments.
+///
+/// Cash dividends are paid against the shares outstanding immediately before
+/// the action. Therefore, when a dividend and a rights issue share a date, the
+/// dividend uses the pre-issue share count and the rights proceeds are applied
+/// afterwards.
+FictionalFinancialBalances applyFictionalCorporateActionFinancialEffects({
+  required int cash,
+  required int debt,
+  required int equity,
+  required int sharesOutstanding,
+  required Iterable<MarketCorporateAction> actions,
+}) {
+  var nextCash = cash;
+  var nextDebt = debt;
+  var nextEquity = equity;
+  var nextSharesOutstanding = sharesOutstanding;
+  final orderedActions = actions.toList(growable: false)
+    ..sort((left, right) {
+      final dateOrder = left.date.compareTo(right.date);
+      if (dateOrder != 0) return dateOrder;
+      final typeOrder = marketCorporateActionOrder(
+        left.type,
+      ).compareTo(marketCorporateActionOrder(right.type));
+      if (typeOrder != 0) return typeOrder;
+      return left.id.compareTo(right.id);
+    });
+
+  for (final action in orderedActions) {
+    switch (action.type) {
+      case MarketCorporateActionType.dividend:
+        if (!action.amount.isFinite ||
+            action.amount <= 0 ||
+            nextSharesOutstanding <= 0) {
+          break;
+        }
+        final grossPayout = (action.amount * nextSharesOutstanding).round();
+        nextCash = math.max(0, nextCash - grossPayout);
+        nextEquity = math.max(1000000, nextEquity - grossPayout);
+        break;
+      case MarketCorporateActionType.rightsIssue:
+        final issuedShares =
+            action.sharesIssued ??
+            math.max(
+              1,
+              (nextSharesOutstanding * action.rightsIssueRate).round(),
+            );
+        if (issuedShares <= 0) break;
+        nextSharesOutstanding += issuedShares;
+        if (!action.amount.isFinite || action.amount <= 0) break;
+        final grossProceeds = (issuedShares * action.amount).round();
+        final debtRepayment = math.min(
+          nextDebt,
+          (grossProceeds * 0.35).round(),
+        );
+        nextCash += grossProceeds - debtRepayment;
+        nextDebt -= debtRepayment;
+        nextEquity += grossProceeds;
+        break;
+      case MarketCorporateActionType.split:
+        if (!action.unitFactor.isFinite || action.unitFactor <= 0) break;
+        nextSharesOutstanding = math.max(
+          1,
+          (nextSharesOutstanding * action.unitFactor).round(),
+        );
+        break;
+      case MarketCorporateActionType.spinoff:
+      case MarketCorporateActionType.materialSpinoff:
+      case MarketCorporateActionType.delisting:
+        break;
+    }
+  }
+
+  return (
+    cash: nextCash,
+    debt: nextDebt,
+    equity: nextEquity,
+    sharesOutstanding: nextSharesOutstanding,
+  );
+}
+
 List<FictionalFinancialSnapshot> _buildCompanyFinancials({
   required String seed,
   required FictionalCompanyDefinition company,
   required Map<String, double> prices,
   required Map<String, double> businessImpacts,
   required Map<String, double> backlogImpacts,
+  required List<MarketCorporateAction> corporateActions,
+  required DateTime asOfDate,
 }) {
   if (prices.isEmpty) return const <FictionalFinancialSnapshot>[];
   final quarterEnds = <String, String>{};
   for (final date in prices.keys) {
     final parsed = DateTime.parse(date);
-    final key = '${parsed.year}-Q${(parsed.month - 1) ~/ 3 + 1}';
+    final quarter = (parsed.month - 1) ~/ 3 + 1;
+    final quarterEnd = DateTime(parsed.year, quarter * 3 + 1, 0);
+    // 진행 중 분기의 오늘 값을 확정 실적으로 노출하지 않는다. 분기 마지막
+    // 날에도 장 마감 전이므로 해당 분기는 다음 날짜부터 공개한다.
+    if (!quarterEnd.isBefore(asOfDate)) continue;
+    final key = '${parsed.year}-Q$quarter';
     quarterEnds[key] = date;
   }
-  final shares =
-      3000000 + _fictionalHash('$seed:shares:${company.id}') % 27000001;
+  final shares = _fictionalInitialShares(seed, company);
   final firstPrice = prices.values.first;
   final salesMultiple =
       0.8 + _fictionalUnit(seed, 'sales-multiple:${company.id}') * 2.7;
@@ -1943,7 +2405,26 @@ List<FictionalFinancialSnapshot> _buildCompanyFinancials({
       company.sector.contains('방산');
   var backlog = (revenue * (backlogHeavy ? 4.2 : 0.55)).round();
   var outstanding = shares;
-  var previousYear = 0;
+  final financialActions =
+      corporateActions
+          .where(
+            (action) =>
+                action.assetId == company.id &&
+                (action.type == MarketCorporateActionType.dividend ||
+                    action.type == MarketCorporateActionType.rightsIssue ||
+                    action.type == MarketCorporateActionType.split),
+          )
+          .toList(growable: false)
+        ..sort((left, right) {
+          final dateOrder = left.date.compareTo(right.date);
+          if (dateOrder != 0) return dateOrder;
+          final typeOrder = marketCorporateActionOrder(
+            left.type,
+          ).compareTo(marketCorporateActionOrder(right.type));
+          if (typeOrder != 0) return typeOrder;
+          return left.id.compareTo(right.id);
+        });
+  var financialActionCursor = 0;
   final snapshots = <FictionalFinancialSnapshot>[];
 
   for (final entry in quarterEnds.entries) {
@@ -2000,12 +2481,28 @@ List<FictionalFinancialSnapshot> _buildCompanyFinancials({
                   (1 + backlogImpact * 4).clamp(0.15, 2.8))
           .round(),
     );
-    final year = int.parse(entry.key.substring(0, 4));
-    if (year != previousYear &&
-        _fictionalHash('$seed:rights-select:${company.id}:$year') % 100 < 24) {
-      outstanding = (outstanding * 1.08).round();
+    final firstUnappliedAction = financialActionCursor;
+    while (financialActionCursor < financialActions.length &&
+        financialActions[financialActionCursor].date.compareTo(entry.value) <=
+            0) {
+      financialActionCursor += 1;
     }
-    previousYear = year;
+    if (financialActionCursor > firstUnappliedAction) {
+      final balances = applyFictionalCorporateActionFinancialEffects(
+        cash: cash,
+        debt: debt,
+        equity: equity,
+        sharesOutstanding: outstanding,
+        actions: financialActions.sublist(
+          firstUnappliedAction,
+          financialActionCursor,
+        ),
+      );
+      cash = balances.cash;
+      debt = balances.debt;
+      equity = balances.equity;
+      outstanding = balances.sharesOutstanding;
+    }
     snapshots.add(
       FictionalFinancialSnapshot(
         period: entry.value,
@@ -2023,6 +2520,155 @@ List<FictionalFinancialSnapshot> _buildCompanyFinancials({
     );
   }
   return List<FictionalFinancialSnapshot>.unmodifiable(snapshots);
+}
+
+double _fictionalReferenceCloseBefore(
+  Map<String, double> prices,
+  String dateKey, {
+  required double fallback,
+}) {
+  var reference = fallback;
+  for (final entry in prices.entries) {
+    if (entry.key.compareTo(dateKey) >= 0) break;
+    reference = entry.value;
+  }
+  return reference;
+}
+
+double _fictionalListingReferencePrice(
+  String seed,
+  FictionalCompanyDefinition company,
+) => marketSnapPrice(
+  company.initialPrice *
+      (0.82 + _fictionalUnit(seed, 'initial:${company.id}') * 0.36),
+  market: company.market,
+);
+
+double _fictionalModernIpoDiscoveryReturn(
+  String seed,
+  FictionalCompanyDefinition company,
+) {
+  final demand = _fictionalUnit(seed, 'ipo-first-day:${company.id}');
+  return -0.40 + math.pow(demand, 2.15) * 3.40;
+}
+
+void _applyFictionalPriceFactor({
+  required Map<String, double> prices,
+  required String fromDateKey,
+  required double factor,
+  required String market,
+}) {
+  if (!factor.isFinite || factor <= 0) return;
+  for (final entry in prices.entries.toList(growable: false)) {
+    if (entry.key.compareTo(fromDateKey) < 0) continue;
+    prices[entry.key] = marketSnapPrice(
+      (entry.value * factor).clamp(1.0, 2500000.0).toDouble(),
+      market: market,
+    );
+  }
+}
+
+void _repriceFutureFictionalActions({
+  required List<MarketCorporateAction> actions,
+  required String afterDateKey,
+  required double factor,
+  required String seed,
+  required FictionalCompanyDefinition company,
+  required String market,
+}) {
+  if (!factor.isFinite || factor <= 0) return;
+  for (var index = 0; index < actions.length; index += 1) {
+    final action = actions[index];
+    if (action.date.compareTo(afterDateKey) <= 0) continue;
+    final priorReference = action.referencePrice;
+    final scaledReference = priorReference == null
+        ? null
+        : marketSnapPrice(
+            (priorReference * factor).clamp(1.0, 2500000.0).toDouble(),
+            market: market,
+          );
+    if (action.type == MarketCorporateActionType.dividend) {
+      final scaledDividend = scaledReference == null
+          ? math.max(
+              1.0,
+              marketSnapPrice(action.amount * factor, market: market),
+            )
+          : fictionalDividendPerShare(
+              referencePrice: scaledReference,
+              targetYieldRate: _fictionalDividendYieldRate(
+                seed,
+                company,
+                DateTime.parse(action.date).year,
+              ),
+              market: market,
+            );
+      actions[index] = action.copyWith(
+        amount: scaledDividend,
+        referencePrice: scaledReference,
+      );
+      continue;
+    }
+    if (action.type != MarketCorporateActionType.rightsIssue) continue;
+    final scaledSubscription = scaledReference == null
+        ? math.max(
+            1.0,
+            marketSnapPrice(
+              action.amount * factor,
+              market: market,
+              roundDown: true,
+            ),
+          )
+        : fictionalRightsIssueSubscriptionPrice(
+            referencePrice: scaledReference,
+            announcedDiscountPct: _fictionalRightsIssueDiscountPct(
+              seed,
+              company,
+              DateTime.parse(action.date).year,
+            ).toDouble(),
+            market: market,
+          );
+    actions[index] = action.copyWith(
+      amount: scaledSubscription,
+      referencePrice: scaledReference,
+    );
+  }
+}
+
+int _fictionalSharesOutstandingThrough({
+  required int initialSharesOutstanding,
+  required Iterable<MarketCorporateAction> actions,
+  required String dateKey,
+}) {
+  var outstanding = initialSharesOutstanding;
+  final orderedActions =
+      actions
+          .where(
+            (action) =>
+                action.date.compareTo(dateKey) <= 0 &&
+                (action.type == MarketCorporateActionType.rightsIssue ||
+                    action.type == MarketCorporateActionType.split),
+          )
+          .toList(growable: false)
+        ..sort((left, right) {
+          final dateOrder = left.date.compareTo(right.date);
+          if (dateOrder != 0) return dateOrder;
+          final typeOrder = marketCorporateActionOrder(
+            left.type,
+          ).compareTo(marketCorporateActionOrder(right.type));
+          if (typeOrder != 0) return typeOrder;
+          return left.id.compareTo(right.id);
+        });
+  for (final action in orderedActions) {
+    if (action.type == MarketCorporateActionType.rightsIssue) {
+      final issued = action.sharesIssued;
+      outstanding += issued != null && issued > 0
+          ? issued
+          : (outstanding * action.rightsIssueRate).round();
+    } else if (action.type == MarketCorporateActionType.split) {
+      outstanding = math.max(1, (outstanding * action.unitFactor).round());
+    }
+  }
+  return outstanding;
 }
 
 FictionalMarketUniverse buildFictionalMarketUniverse(
@@ -2043,15 +2689,58 @@ FictionalMarketUniverse buildFictionalMarketUniverse(
   final quarterlyBacklogImpacts = <String, Map<String, double>>{
     for (final company in definitions) company.id: <String, double>{},
   };
+  final cumulativeBusinessSignals = <String, double>{
+    for (final company in definitions) company.id: 0,
+  };
+  final listingReferencePrices = <String, double>{
+    for (final company in definitions)
+      company.id: _fictionalListingReferencePrice(seed, company),
+  };
+  final initialValuationAnchors = Map<String, double>.from(
+    listingReferencePrices,
+  );
+  final companyDailyNoiseSeeds = <String, int>{
+    for (final company in definitions)
+      company.id: _fictionalHash('$seed:company:${company.id}'),
+  };
+  final sectorDailyNoiseSeeds = <String, int>{
+    for (final company in definitions)
+      company.sector: _fictionalHash('$seed:sector:${company.sector}'),
+  };
+  final annualGrowthByAsset = <String, double>{
+    for (final company in definitions)
+      company.id:
+          -0.015 + _fictionalUnit(seed, 'long-growth:${company.id}') * 0.09,
+  };
+  final valuationGrowthFactorsByAsset = <String, List<double>>{
+    for (final company in definitions)
+      company.id: List<double>.generate(
+        16,
+        (gap) => math.exp(annualGrowthByAsset[company.id]! * gap / 365.25),
+        growable: false,
+      ),
+  };
+  final currentValuationAnchors = <String, double>{};
+  final lastValuationOrdinals = <String, int>{};
+  final lastValuationBusinessSignals = <String, double>{};
+  final macroNoiseSeed = _fictionalHash('$seed:macro');
+  final regimeNoiseSeed = _fictionalHash('$seed:regime');
   final listingDates = <String, DateTime>{
     for (final plan in spinoffs) plan.definition.id: plan.date,
     for (final plan in listings) plan.definition.id: plan.listingDate,
+  };
+  final listingDateKeys = <String, String>{
+    for (final entry in listingDates.entries)
+      entry.key: marketDateKey(entry.value),
   };
   final delistingDates = <String, DateTime>{
     for (final plan in listings)
       if (plan.delistingDate != null) plan.definition.id: plan.delistingDate!,
   };
   final prices = <String, Map<String, double>>{
+    for (final definition in definitions) definition.id: <String, double>{},
+  };
+  final appliedEventScales = <String, Map<String, double>>{
     for (final definition in definitions) definition.id: <String, double>{},
   };
   final current = <String, double>{};
@@ -2072,22 +2761,64 @@ FictionalMarketUniverse buildFictionalMarketUniverse(
   while (!date.isAfter(end)) {
     if (isMarketTradingDay(date)) {
       final dateKey = marketDateKey(date);
+      final dayOrdinal = date.difference(DateTime(2000, 1, 1)).inDays;
       final events = fictionalMarketEventsForDate(seed, date);
       final corpusSample = _fictionalCorpusDailySampleForDate(seed, date);
       final corpusLargeReturn = corpusSample.largeReturn * 0.34;
       final macro =
           corpusLargeReturn.clamp(-0.026, 0.026) +
-          _fictionalSigned(seed, 'macro:$dateKey') * 0.0045 +
-          _fictionalSigned(
-                seed,
-                'regime:${date.difference(DateTime(2000, 1, 1)).inDays ~/ 90}',
-              ) *
-              0.0014;
+          _fictionalFastSigned(macroNoiseSeed, dayOrdinal) * 0.0045 +
+          _fictionalFastSigned(regimeNoiseSeed, dayOrdinal ~/ 90) * 0.0014;
+      var wholeMarketEventImpact = 0.0;
+      final wholeMarketSectorImpacts = <String, double>{};
+      final companyEventImpacts = <String, double>{};
+      final sectorEventImpacts = <String, double>{};
+      final resolvedCompanyEventImpacts = <String, double>{};
+      final backlogCompanyEventImpacts = <String, double>{};
+      for (final event in events) {
+        if (event.companyId == fictionalWholeMarketCompanyId) {
+          wholeMarketEventImpact += event.impactPct;
+          for (final entry in event.sectorImpactPcts.entries) {
+            wholeMarketSectorImpacts[entry.key] =
+                (wholeMarketSectorImpacts[entry.key] ?? 0) + entry.value;
+          }
+          continue;
+        }
+        companyEventImpacts[event.companyId] =
+            (companyEventImpacts[event.companyId] ?? 0) + event.impactPct;
+        sectorEventImpacts[event.sector] =
+            (sectorEventImpacts[event.sector] ?? 0) + event.impactPct;
+        if (event.stage >= 2) {
+          resolvedCompanyEventImpacts[event.companyId] =
+              (resolvedCompanyEventImpacts[event.companyId] ?? 0) +
+              event.impactPct;
+          final text = '${event.eyebrow} ${event.title}';
+          if (text.contains('수주') ||
+              text.contains('계약') ||
+              text.contains('공급') ||
+              text.contains('주문')) {
+            backlogCompanyEventImpacts[event.companyId] =
+                (backlogCompanyEventImpacts[event.companyId] ?? 0) +
+                event.impactPct;
+          }
+        }
+      }
+      final quarterKey = '${date.year}-Q${(date.month - 1) ~/ 3 + 1}';
+      final dailyLimit = marketDailyPriceLimitRate(date);
       for (final company in definitions) {
         final listed = listingDates[company.id];
         final delisted = delistingDates[company.id];
         if (listed != null && date.isBefore(listed)) continue;
         if (delisted != null && !date.isBefore(delisted)) continue;
+        final isIpoFirstTradingDay =
+            company.generation > 0 &&
+            company.parentAssetId == null &&
+            listed != null &&
+            listingDateKeys[company.id] == dateKey;
+        final usesModernIpoRange = marketUsesModernIpoFirstDayPriceRange(
+          date: date,
+          isIpoFirstTradingDay: isIpoFirstTradingDay,
+        );
         final corpusMarketReturn =
             (company.market == fictionalGrowthMarket
                 ? corpusSample.growthReturn
@@ -2111,28 +2842,27 @@ FictionalMarketUniverse buildFictionalMarketUniverse(
                 .toDouble();
         final previous = current.putIfAbsent(
           company.id,
-          () =>
-              company.initialPrice *
-              (0.82 + _fictionalUnit(seed, 'initial:${company.id}') * 0.36),
+          () => initialValuationAnchors[company.id]!,
         );
         final sector =
-            _fictionalSigned(seed, 'sector:${company.sector}:$dateKey') * 0.006;
+            _fictionalFastSigned(
+              sectorDailyNoiseSeeds[company.sector]!,
+              dayOrdinal,
+            ) *
+            0.006;
         final companyNoise =
-            _fictionalSigned(seed, 'company:${company.id}:$dateKey') *
+            _fictionalFastSigned(
+              companyDailyNoiseSeeds[company.id]!,
+              dayOrdinal,
+            ) *
             company.volatility *
             volatilityScale;
-        final directEventImpact = events.fold<double>(0, (sum, event) {
-          if (event.companyId == fictionalWholeMarketCompanyId) {
-            return sum +
-                event.impactPct +
-                (event.sectorImpactPcts[company.sector] ?? 0);
-          }
-          if (event.companyId == company.id) return sum + event.impactPct;
-          if (event.sector == company.sector) {
-            return sum + event.impactPct * 0.12;
-          }
-          return sum;
-        });
+        final ownEventImpact = companyEventImpacts[company.id] ?? 0;
+        final directEventImpact =
+            wholeMarketEventImpact +
+            (wholeMarketSectorImpacts[company.sector] ?? 0) +
+            ownEventImpact +
+            ((sectorEventImpacts[company.sector] ?? 0) - ownEventImpact) * 0.12;
         var relationImpact = 0.0;
         var resolvedRelationImpact = 0.0;
         for (final relation
@@ -2145,76 +2875,89 @@ FictionalMarketUniverse buildFictionalMarketUniverse(
                     relation.type == FictionalCompanyRelationType.subsidiary
               ? relation.strength * 0.7
               : relation.strength * 0.42;
-          for (final event in events) {
-            if (event.companyId != relation.relatedAssetId) continue;
-            relationImpact += event.impactPct * factor;
-            if (event.stage >= 2) {
-              resolvedRelationImpact += event.impactPct * factor;
-            }
-          }
+          relationImpact +=
+              (companyEventImpacts[relation.relatedAssetId] ?? 0) * factor;
+          resolvedRelationImpact +=
+              (resolvedCompanyEventImpacts[relation.relatedAssetId] ?? 0) *
+              factor;
         }
         final eventImpact = directEventImpact + relationImpact;
-        final quarterKey = '${date.year}-Q${(date.month - 1) ~/ 3 + 1}';
-        final resolvedDirectImpact = events.fold<double>(0, (sum, event) {
-          if (event.stage < 2) return sum;
-          if (event.companyId == company.id) return sum + event.impactPct;
-          return sum;
-        });
-        quarterlyBusinessImpacts[company.id]![quarterKey] =
-            (quarterlyBusinessImpacts[company.id]![quarterKey] ?? 0) +
-            resolvedDirectImpact +
-            resolvedRelationImpact * 0.55;
-        final backlogEventImpact = events.fold<double>(0, (sum, event) {
-          if (event.stage < 2 || event.companyId != company.id) return sum;
-          final text = '${event.eyebrow} ${event.title}';
-          final isOrderEvent =
-              text.contains('수주') ||
-              text.contains('계약') ||
-              text.contains('공급') ||
-              text.contains('주문');
-          return isOrderEvent ? sum + event.impactPct : sum;
-        });
-        quarterlyBacklogImpacts[company.id]![quarterKey] =
-            (quarterlyBacklogImpacts[company.id]![quarterKey] ?? 0) +
-            backlogEventImpact;
-        final initialValuationAnchor =
-            company.initialPrice *
-            (0.82 + _fictionalUnit(seed, 'initial:${company.id}') * 0.36);
-        final daysSinceListing = math
-            .max(0, date.difference(listed ?? DateTime(1999, 12, 30)).inDays)
-            .toDouble();
-        final annualGrowth =
-            -0.015 + _fictionalUnit(seed, 'long-growth:${company.id}') * 0.09;
-        final cumulativeBusinessSignal = quarterlyBusinessImpacts[company.id]!
-            .values
-            .fold<double>(0, (sum, value) => sum + value)
-            .clamp(-1.25, 1.25)
-            .toDouble();
-        final valuationAnchor =
-            (initialValuationAnchor *
-                    math.exp(
-                      annualGrowth * daysSinceListing / 365.25 +
-                          cumulativeBusinessSignal * 0.28,
-                    ))
-                .clamp(400.0, 1000000.0)
+        final resolvedDirectImpact =
+            resolvedCompanyEventImpacts[company.id] ?? 0;
+        final resolvedBusinessImpact =
+            resolvedDirectImpact + resolvedRelationImpact * 0.55;
+        if (resolvedBusinessImpact != 0) {
+          quarterlyBusinessImpacts[company.id]![quarterKey] =
+              (quarterlyBusinessImpacts[company.id]![quarterKey] ?? 0) +
+              resolvedBusinessImpact;
+          cumulativeBusinessSignals[company.id] =
+              (cumulativeBusinessSignals[company.id] ?? 0) +
+              resolvedBusinessImpact;
+        }
+        final backlogEventImpact = backlogCompanyEventImpacts[company.id] ?? 0;
+        if (backlogEventImpact != 0) {
+          quarterlyBacklogImpacts[company.id]![quarterKey] =
+              (quarterlyBacklogImpacts[company.id]![quarterKey] ?? 0) +
+              backlogEventImpact;
+        }
+        final initialValuationAnchor = initialValuationAnchors[company.id]!;
+        final cumulativeBusinessSignal =
+            (cumulativeBusinessSignals[company.id] ?? 0)
+                .clamp(-1.25, 1.25)
                 .toDouble();
-        final valuationGap = math
-            .log(valuationAnchor / previous)
-            .clamp(-1.6, 1.6)
+        var valuationAnchor =
+            currentValuationAnchors[company.id] ?? initialValuationAnchor;
+        final lastOrdinal = lastValuationOrdinals[company.id];
+        if (lastOrdinal != null) {
+          final gap = math.max(0, dayOrdinal - lastOrdinal);
+          final factors = valuationGrowthFactorsByAsset[company.id]!;
+          valuationAnchor *= gap < factors.length
+              ? factors[gap]
+              : math.exp(annualGrowthByAsset[company.id]! * gap / 365.25);
+        }
+        final priorBusinessSignal =
+            lastValuationBusinessSignals[company.id] ?? 0;
+        if (cumulativeBusinessSignal != priorBusinessSignal) {
+          valuationAnchor *= math.exp(
+            (cumulativeBusinessSignal - priorBusinessSignal) * 0.28,
+          );
+        }
+        valuationAnchor = valuationAnchor.clamp(400.0, 1000000.0).toDouble();
+        currentValuationAnchors[company.id] = valuationAnchor;
+        lastValuationOrdinals[company.id] = dayOrdinal;
+        lastValuationBusinessSignals[company.id] = cumulativeBusinessSignal;
+        final valuationGap = (valuationAnchor / previous - 1)
+            .clamp(-0.75, 1.35)
             .toDouble();
         final valuationPull = (valuationGap * 0.0045)
             .clamp(-0.006, 0.006)
             .toDouble();
-        final dailyLimit = marketDailyPriceLimitRate(date);
-        final dailyReturn =
-            (macro +
-                    corpusMarketReturn +
-                    sector +
-                    companyNoise +
-                    eventImpact +
-                    valuationPull)
-                .clamp(-dailyLimit, dailyLimit)
-                .toDouble();
+        final nonEventReturn =
+            macro + corpusMarketReturn + sector + companyNoise + valuationPull;
+        final ipoDiscoveryReturn = usesModernIpoRange
+            ? _fictionalModernIpoDiscoveryReturn(seed, company)
+            : 0.0;
+        final dailyReturn = (ipoDiscoveryReturn + nonEventReturn + eventImpact)
+            .clamp(
+              usesModernIpoRange ? -0.40 : -dailyLimit,
+              usesModernIpoRange ? 3.00 : dailyLimit,
+            )
+            .toDouble();
+        final baselineReturn = (ipoDiscoveryReturn + nonEventReturn)
+            .clamp(
+              usesModernIpoRange ? -0.40 : -dailyLimit,
+              usesModernIpoRange ? 3.00 : dailyLimit,
+            )
+            .toDouble();
+        final appliedEventImpact = dailyReturn - baselineReturn;
+        if (eventImpact.abs() >= 0.0000001) {
+          final appliedScale = (appliedEventImpact / eventImpact)
+              .clamp(0.0, 1.0)
+              .toDouble();
+          if ((appliedScale - 1).abs() >= 0.0000001) {
+            appliedEventScales[company.id]![dateKey] = appliedScale;
+          }
+        }
         final raw = (previous * (1 + dailyReturn))
             .clamp(120, 2500000)
             .toDouble();
@@ -2222,6 +2965,7 @@ FictionalMarketUniverse buildFictionalMarketUniverse(
           previousClose: previous,
           date: date,
           market: company.market,
+          isIpoFirstTradingDay: isIpoFirstTradingDay,
         );
         final rounded = marketSnapPrice(
           raw.clamp(range.lower, range.upper).toDouble(),
@@ -2235,35 +2979,340 @@ FictionalMarketUniverse buildFictionalMarketUniverse(
   }
 
   final actionsByAsset = <String, List<MarketCorporateAction>>{};
-  for (var index = 0; index < spinoffs.length; index++) {
-    final plan = spinoffs[index];
-    final parentId = plan.definition.parentAssetId!;
-    final material = index.isEven;
-    actionsByAsset
-        .putIfAbsent(parentId, () => [])
-        .add(
-          MarketCorporateAction(
-            id: '${material ? 'material' : 'personnel'}-spinoff-${plan.definition.id}-${marketDateKey(plan.date)}',
-            assetId: parentId,
-            type: material
-                ? MarketCorporateActionType.materialSpinoff
-                : MarketCorporateActionType.spinoff,
-            date: marketDateKey(plan.date),
-            numerator: 1,
-            denominator: 5,
-            amount: 0,
-            currency: 'KRW',
-            source: 'fictional-world-engine',
-            relatedAssetId: plan.definition.id,
-            relatedSymbol: plan.definition.symbol,
-            relatedName: plan.definition.name,
-            relatedMarket: plan.definition.market,
-          ),
+  for (final company in definitions) {
+    final listed = listingDates[company.id];
+    final delisted = delistingDates[company.id];
+    final plannedActions =
+        <({DateTime date, MarketCorporateActionType type, int year})>[];
+    for (
+      var year = fictionalCampaignStartYear;
+      year <= fictionalCampaignEndYear;
+      year++
+    ) {
+      final dividendThreshold = company.market == fictionalMainMarket ? 72 : 34;
+      if (_fictionalHash('$seed:dividend-select:${company.id}:$year') % 100 <
+          dividendThreshold) {
+        final dividendOffset =
+            _fictionalHash('$seed:dividend-day:${company.id}:$year') % 55;
+        final dividendDate = _nextFictionalTradingDay(
+          DateTime(year, 4, 1).add(Duration(days: dividendOffset)),
         );
+        if (!dividendDate.isAfter(end) &&
+            (listed == null || !dividendDate.isBefore(listed)) &&
+            _isFictionalCompanySeasonedForAction(listed, dividendDate) &&
+            (delisted == null || dividendDate.isBefore(delisted))) {
+          plannedActions.add((
+            date: dividendDate,
+            type: MarketCorporateActionType.dividend,
+            year: year,
+          ));
+        }
+      }
+      final rightsDate = _fictionalRightsIssueDate(seed, company, year);
+      if (rightsDate != null &&
+          !rightsDate.isAfter(end) &&
+          (listed == null || !rightsDate.isBefore(listed)) &&
+          _isFictionalCompanySeasonedForAction(listed, rightsDate) &&
+          (delisted == null || rightsDate.isBefore(delisted))) {
+        plannedActions.add((
+          date: rightsDate,
+          type: MarketCorporateActionType.rightsIssue,
+          year: year,
+        ));
+      }
+    }
+    plannedActions.sort((left, right) {
+      final dateOrder = left.date.compareTo(right.date);
+      if (dateOrder != 0) return dateOrder;
+      return marketCorporateActionOrder(
+        left.type,
+      ).compareTo(marketCorporateActionOrder(right.type));
+    });
+
+    final companyPrices = prices[company.id]!;
+    final priceEntries = companyPrices.entries.toList(growable: false);
+    final factorChanges = <({String date, double factor})>[];
+    var rightsOutstanding = _fictionalInitialShares(seed, company);
+    var cumulativeFactor = 1.0;
+    var priceCursor = 0;
+    var rawReferenceClose = company.initialPrice.toDouble();
+    for (final planned in plannedActions) {
+      final actionDateKey = marketDateKey(planned.date);
+      while (priceCursor < priceEntries.length &&
+          priceEntries[priceCursor].key.compareTo(actionDateKey) < 0) {
+        rawReferenceClose = priceEntries[priceCursor].value;
+        priceCursor += 1;
+      }
+      final referenceClose = marketSnapPrice(
+        (rawReferenceClose * cumulativeFactor).clamp(1.0, 2500000.0).toDouble(),
+        market: company.market,
+      );
+      if (planned.type == MarketCorporateActionType.dividend) {
+        final yieldRate = _fictionalDividendYieldRate(
+          seed,
+          company,
+          planned.year,
+        );
+        final dividendPerShare = fictionalDividendPerShare(
+          referencePrice: referenceClose,
+          targetYieldRate: yieldRate,
+          market: company.market,
+        );
+        actionsByAsset
+            .putIfAbsent(company.id, () => [])
+            .add(
+              MarketCorporateAction(
+                id: 'dividend-${company.id}-${planned.year}',
+                assetId: company.id,
+                type: MarketCorporateActionType.dividend,
+                date: actionDateKey,
+                numerator: 1,
+                denominator: 1,
+                amount: dividendPerShare,
+                currency: 'KRW',
+                source: 'fictional-world-engine',
+                referencePrice: referenceClose,
+              ),
+            );
+        final factor = math.max(
+          0.01,
+          (referenceClose - dividendPerShare) / referenceClose,
+        );
+        cumulativeFactor *= factor;
+        factorChanges.add((date: actionDateKey, factor: factor));
+        continue;
+      }
+
+      final discount = _fictionalRightsIssueDiscountPct(
+        seed,
+        company,
+        planned.year,
+      );
+      final subscriptionPrice = fictionalRightsIssueSubscriptionPrice(
+        referencePrice: referenceClose,
+        announcedDiscountPct: discount.toDouble(),
+        market: company.market,
+      );
+      final sharesAfter = (rightsOutstanding * 1.08).round();
+      final sharesIssued = math.max(1, sharesAfter - rightsOutstanding);
+      final thirdParty = _fictionalRightsIssueIsThirdParty(
+        seed,
+        company,
+        planned.year,
+      );
+      final action = MarketCorporateAction(
+        id: 'rights-${company.id}-${planned.year}',
+        assetId: company.id,
+        type: MarketCorporateActionType.rightsIssue,
+        date: actionDateKey,
+        numerator: 8,
+        denominator: 100,
+        amount: subscriptionPrice,
+        currency: 'KRW',
+        source: 'fictional-world-engine',
+        referencePrice: referenceClose,
+        sharesOutstandingBefore: rightsOutstanding,
+        sharesIssued: sharesIssued,
+        allocationMethod: thirdParty
+            ? MarketRightsIssueAllocationMethod.thirdParty
+            : MarketRightsIssueAllocationMethod.shareholder,
+      );
+      actionsByAsset.putIfAbsent(company.id, () => []).add(action);
+      final factor = action.theoreticalExRightsFactor;
+      if (factor != null) {
+        cumulativeFactor *= factor;
+        factorChanges.add((date: actionDateKey, factor: factor));
+      }
+      rightsOutstanding = sharesAfter;
+    }
+
+    var factorCursor = 0;
+    var appliedFactor = 1.0;
+    for (final entry in priceEntries) {
+      while (factorCursor < factorChanges.length &&
+          factorChanges[factorCursor].date.compareTo(entry.key) <= 0) {
+        appliedFactor *= factorChanges[factorCursor].factor;
+        factorCursor += 1;
+      }
+      if ((appliedFactor - 1).abs() < 0.0000001) continue;
+      companyPrices[entry.key] = marketSnapPrice(
+        (entry.value * appliedFactor).clamp(1.0, 2500000.0).toDouble(),
+        market: company.market,
+      );
+    }
   }
 
+  // 인적분할은 새 주식을 공짜 자산으로 더하지 않는다. 모회사 기준가에서
+  // 배정받는 자회사 주식의 가치를 빼 총 보유가치를 보존한다.
+  for (var index = 0; index < spinoffs.length; index++) {
+    final plan = spinoffs[index];
+    if (plan.date.isAfter(end)) continue;
+    final parentId = plan.definition.parentAssetId!;
+    final parent = definitions.singleWhere(
+      (definition) => definition.id == parentId,
+    );
+    final material = index.isEven;
+    final actionDateKey = marketDateKey(plan.date);
+    final parentPrices = prices[parentId]!;
+    final childPrices = prices[plan.definition.id]!;
+    if (parentPrices.isEmpty || childPrices[actionDateKey] == null) continue;
+    final previousParentClose = _fictionalReferenceCloseBefore(
+      parentPrices,
+      actionDateKey,
+      fallback: parent.initialPrice,
+    );
+    final parentActions = actionsByAsset[parentId] ?? <MarketCorporateAction>[];
+    final sameDayActions = parentActions
+        .where((action) => action.date == actionDateKey)
+        .toList(growable: false);
+    final parentReferenceClose = _marketReferenceCloseForActions(
+      previousClose: previousParentClose,
+      actions: sameDayActions,
+      currency: 'KRW',
+      market: parent.market,
+    );
+    final parentSharesOutstanding = _fictionalSharesOutstandingThrough(
+      initialSharesOutstanding: _fictionalInitialShares(seed, parent),
+      actions: parentActions,
+      dateKey: actionDateKey,
+    );
+    final childInitialShares = _fictionalInitialShares(seed, plan.definition);
+    final spinoffUnitFactor = childInitialShares / parentSharesOutstanding;
+    final detachedValueRatio =
+        0.18 +
+        _fictionalUnit(seed, 'spinoff-value-ratio:${plan.definition.id}') *
+            0.17;
+    final unscaledChildReferencePrice = childPrices[actionDateKey]!;
+    final targetChildReferencePrice = marketSnapPrice(
+      (parentReferenceClose * detachedValueRatio / spinoffUnitFactor)
+          .clamp(1.0, 2500000.0)
+          .toDouble(),
+      market: plan.definition.market,
+    );
+    final childPriceFactor =
+        targetChildReferencePrice / unscaledChildReferencePrice;
+    _applyFictionalPriceFactor(
+      prices: childPrices,
+      fromDateKey: actionDateKey,
+      factor: childPriceFactor,
+      market: plan.definition.market,
+    );
+    final childActions = actionsByAsset[plan.definition.id];
+    if (childActions != null) {
+      _repriceFutureFictionalActions(
+        actions: childActions,
+        afterDateKey: actionDateKey,
+        factor: childPriceFactor,
+        seed: seed,
+        company: plan.definition,
+        market: plan.definition.market,
+      );
+    }
+    final originalListingReference =
+        listingReferencePrices[plan.definition.id]!;
+    listingReferencePrices[plan.definition.id] = marketSnapPrice(
+      (originalListingReference * childPriceFactor)
+          .clamp(1.0, 2500000.0)
+          .toDouble(),
+      market: plan.definition.market,
+    );
+    final childReferencePrice = childPrices[actionDateKey]!;
+    final action = MarketCorporateAction(
+      id: '${material ? 'material' : 'personnel'}-spinoff-${plan.definition.id}-$actionDateKey',
+      assetId: parentId,
+      type: material
+          ? MarketCorporateActionType.materialSpinoff
+          : MarketCorporateActionType.spinoff,
+      date: actionDateKey,
+      numerator: childInitialShares.toDouble(),
+      denominator: parentSharesOutstanding.toDouble(),
+      amount: childReferencePrice,
+      currency: 'KRW',
+      source: 'fictional-world-engine',
+      relatedAssetId: plan.definition.id,
+      relatedSymbol: plan.definition.symbol,
+      relatedName: plan.definition.name,
+      relatedMarket: plan.definition.market,
+      referencePrice: parentReferenceClose,
+    );
+    actionsByAsset.putIfAbsent(parentId, () => []).add(action);
+    if (!material) {
+      final exSpinoffFactor = action.theoreticalExSpinoffFactor;
+      if (exSpinoffFactor != null) {
+        _applyFictionalPriceFactor(
+          prices: parentPrices,
+          fromDateKey: actionDateKey,
+          factor: exSpinoffFactor,
+          market: parent.market,
+        );
+        _repriceFutureFictionalActions(
+          actions: actionsByAsset[parentId]!,
+          afterDateKey: actionDateKey,
+          factor: exSpinoffFactor,
+          seed: seed,
+          company: parent,
+          market: parent.market,
+        );
+      }
+    }
+  }
+
+  // 배당·유증·분사 가격계수를 사후 적용하면 두 번의 호가단위 반올림 때문에
+  // 조정 기준가의 일일 가격제한폭을 한 틱 벗어날 수 있다. 최종 기업행동
+  // 목록과 최종 전일 종가를 기준으로 전 구간을 다시 순차 검증한다.
+  for (final company in definitions) {
+    final companyPrices = prices[company.id]!;
+    if (companyPrices.isEmpty) continue;
+    final companyActions =
+        actionsByAsset[company.id] ?? const <MarketCorporateAction>[];
+    final actionsByDate = <String, List<MarketCorporateAction>>{};
+    for (final action in companyActions) {
+      actionsByDate.putIfAbsent(action.date, () => []).add(action);
+    }
+    for (final sameDayActions in actionsByDate.values) {
+      sameDayActions.sort((left, right) {
+        final typeOrder = marketCorporateActionOrder(
+          left.type,
+        ).compareTo(marketCorporateActionOrder(right.type));
+        return typeOrder != 0 ? typeOrder : left.id.compareTo(right.id);
+      });
+    }
+    var previousClose =
+        listingReferencePrices[company.id] ?? company.initialPrice.toDouble();
+    for (final entry in companyPrices.entries) {
+      final date = DateTime.parse(entry.key);
+      final sameDayActions =
+          actionsByDate[entry.key] ?? const <MarketCorporateAction>[];
+      final referenceClose = _marketReferenceCloseForActions(
+        previousClose: previousClose,
+        actions: sameDayActions,
+        currency: 'KRW',
+        market: company.market,
+      );
+      final isIpoFirstTradingDay =
+          company.generation > 0 &&
+          company.parentAssetId == null &&
+          listingDateKeys[company.id] == entry.key;
+      final range = marketDailyPriceRange(
+        previousClose: referenceClose,
+        date: date,
+        market: company.market,
+        isIpoFirstTradingDay: isIpoFirstTradingDay,
+      );
+      final bounded = marketSnapPrice(
+        entry.value.clamp(range.lower, range.upper).toDouble(),
+        market: company.market,
+      ).clamp(range.lower, range.upper).toDouble();
+      companyPrices[entry.key] = bounded;
+      previousClose = bounded;
+    }
+  }
+
+  // 정리매매 정산가는 배당·권리락·인적분할을 모두 반영한 마지막 종가에서 계산한다.
+  // 조정 전 종가를 쓰면 보유자에게 근거 없는 초과 회수금을 지급하게 된다.
   for (final plan in listings) {
-    if (plan.delistingDate == null) continue;
+    final delistingDate = plan.delistingDate;
+    if (delistingDate == null || delistingDate.isAfter(end)) continue;
     final companyPrices = prices[plan.definition.id]!;
     if (companyPrices.isEmpty) continue;
     final lastClose = companyPrices.values.last;
@@ -2274,59 +3323,23 @@ FictionalMarketUniverse buildFictionalMarketUniverse(
         .putIfAbsent(plan.definition.id, () => [])
         .add(
           MarketCorporateAction(
-            id: 'delisting-${plan.definition.id}-${marketDateKey(plan.delistingDate!)}',
+            id: 'delisting-${plan.definition.id}-${marketDateKey(delistingDate)}',
             assetId: plan.definition.id,
             type: MarketCorporateActionType.delisting,
-            date: marketDateKey(plan.delistingDate!),
+            date: marketDateKey(delistingDate),
             numerator: 1,
             denominator: 1,
             amount: lastClose * recoveryRate,
             currency: 'KRW',
             source: 'fictional-world-engine',
+            referencePrice: lastClose,
           ),
         );
   }
 
-  for (final company in definitions) {
-    for (
-      var year = fictionalCampaignStartYear;
-      year <= fictionalCampaignEndYear;
-      year++
-    ) {
-      if (_fictionalHash('$seed:rights-select:${company.id}:$year') % 100 >=
-          24) {
-        continue;
-      }
-      final dayOffset =
-          18 + _fictionalHash('$seed:rights-day:${company.id}:$year') % 320;
-      final actionDate = _nextFictionalTradingDay(
-        DateTime(year, 1, 1).add(Duration(days: dayOffset)),
-      );
-      final listed = listingDates[company.id];
-      final delisted = delistingDates[company.id];
-      if (listed != null && actionDate.isBefore(listed)) continue;
-      if (delisted != null && !actionDate.isBefore(delisted)) continue;
-      actionsByAsset
-          .putIfAbsent(company.id, () => [])
-          .add(
-            MarketCorporateAction(
-              id: 'rights-${company.id}-$year',
-              assetId: company.id,
-              type: MarketCorporateActionType.rightsIssue,
-              date: marketDateKey(actionDate),
-              numerator: 1,
-              denominator: 1,
-              amount: 0,
-              currency: 'KRW',
-              source: 'fictional-world-engine',
-            ),
-          );
-    }
-  }
-
-  return FictionalMarketUniverse(
-    schemaVersion: 9,
-    sourceName: 'seeded-fictional-market-v6-2000-2026',
+  final universe = FictionalMarketUniverse(
+    schemaVersion: 14,
+    sourceName: 'seeded-fictional-market-v10-2000-2026',
     assets: definitions
         .map((company) {
           final listed = listingDates[company.id];
@@ -2340,20 +3353,26 @@ FictionalMarketUniverse buildFictionalMarketUniverse(
             sector: company.sector,
             colorHex: company.colorHex,
             currency: 'KRW',
+            initialSharesOutstanding: _fictionalInitialShares(seed, company),
             prices: prices[company.id]!,
+            appliedEventScales: appliedEventScales[company.id]!,
             corporateActions: actionsByAsset[company.id] ?? const [],
             summary: company.summary,
             question: company.question,
+            products: company.products,
             generation: company.generation,
             parentAssetId: company.parentAssetId,
             listedOn: listed == null ? null : marketDateKey(listed),
             delistedOn: delisted == null ? null : marketDateKey(delisted),
+            listingReferencePrice: listingReferencePrices[company.id],
             financials: _buildCompanyFinancials(
               seed: seed,
               company: company,
               prices: prices[company.id]!,
               businessImpacts: quarterlyBusinessImpacts[company.id] ?? const {},
               backlogImpacts: quarterlyBacklogImpacts[company.id] ?? const {},
+              corporateActions: actionsByAsset[company.id] ?? const [],
+              asOfDate: end,
             ),
             relations:
                 relationsByAsset[company.id] ??
@@ -2362,4 +3381,5 @@ FictionalMarketUniverse buildFictionalMarketUniverse(
         })
         .toList(growable: false),
   );
+  return throughDate == null ? universe : universe.asOf(end);
 }

@@ -1,12 +1,15 @@
 part of 'main.dart';
 
-const _onboardingBeatCount = 31;
+const _onboardingBeatCount = 39;
 const _storyCharacterBottomInset = 122.0;
 const _storyCharacterHeightFactor = 0.78;
 const _storyCharacterAspectRatio = 2 / 3;
 
 typedef NewGameCreator =
-    Future<void> Function(NewGameSetup setup, ValueChanged<String> onProgress);
+    Future<void> Function(
+      NewGameSetup setup,
+      WorldLoadProgressCallback onProgress,
+    );
 
 class VisualNovelOnboardingScreen extends StatefulWidget {
   const VisualNovelOnboardingScreen({super.key, required this.onCreate});
@@ -27,7 +30,12 @@ class _VisualNovelOnboardingScreenState
   StoryTrait? _trait;
   FamilyRule? _familyRule;
   bool _isCreating = false;
-  String _creationStatus = '투자연구소 정보를 정리하는 중…';
+  bool _isTraveling = false;
+  bool _tuitionPaid = false;
+  WorldLoadProgress _creationProgress = const WorldLoadProgress(
+    0.02,
+    '투자연구소 정보를 정리하는 중…',
+  );
 
   @override
   void dispose() {
@@ -37,21 +45,29 @@ class _VisualNovelOnboardingScreenState
   }
 
   String get _background => switch (_beat) {
-    <= 7 => 'assets/images/bg_living_room_1999.png',
-    <= 13 => 'assets/images/bg_kitchen_1999.png',
-    _ => 'assets/images/bg_stock_academy_2000_v3.png',
+    <= 7 => 'assets/images/bg_living_room_1999_portrait_cartoon_v2.png',
+    <= 13 => 'assets/images/bg_kitchen_2000_morning_portrait_cartoon_v2.png',
+    <= 18 => 'assets/images/bg_living_room_1999_portrait_cartoon_v2.png',
+    <= 23 =>
+      'assets/images/bg_stock_academy_entrance_2000_portrait_cartoon_v1.png',
+    _ => 'assets/images/bg_stock_academy_2000_portrait_cartoon_v4.png',
   };
 
   String get _location => switch (_beat) {
     <= 7 => '거실 · TV 앞',
     <= 13 => '부엌 식탁',
+    <= 15 => '우리 집 · 거실',
+    <= 18 => '우리 집 · 현관 앞',
+    <= 20 => '새천년 청소년 투자학교 · 정문',
+    <= 23 => '새천년 청소년 투자학교 · 접수대',
     _ => '새천년 청소년 투자학교 · 10대 입문반',
   };
 
   String get _dateLabel => switch (_beat) {
     <= 7 => '1999.12.31  ·  21:40',
     <= 13 => '2000.01.02  ·  일요일',
-    <= 16 => '2000년 1월  ·  첫 등교',
+    <= 15 => '2000년 1월  ·  초대장 도착',
+    <= 24 => '2000년 1월  ·  첫 등교',
     _ => '2000년 1월  ·  첫 수업',
   };
 
@@ -60,10 +76,12 @@ class _VisualNovelOnboardingScreenState
     5 ||
     7 ||
     10 ||
-    15 ||
-    23 ||
-    25 => 'assets/images/character_hero_title_style_v2.png',
-    4 || 6 || 12 => 'assets/images/character_father_title_style_v2.png',
+    15 => 'assets/images/character_hero_title_style_v2.png',
+    18 => 'assets/images/character_hero_determined_v1.png',
+    20 || 27 => 'assets/images/character_hero_questioning_v1.png',
+    29 => 'assets/images/character_hero_thoughtful_v1.png',
+    31 || 33 => 'assets/images/character_hero_determined_v1.png',
+    4 || 6 || 12 || 17 => 'assets/images/character_father_title_style_v2.png',
     2 => 'assets/images/character_sister_title_style_v2.png',
     9 || 11 => 'assets/images/character_grandfather.png',
     3 || 13 => 'assets/images/character_mother_title_style_v2.png',
@@ -71,41 +89,55 @@ class _VisualNovelOnboardingScreenState
   };
 
   Alignment get _characterAlignment => switch (_beat) {
-    4 || 6 || 9 || 11 || 12 => Alignment.bottomLeft,
+    4 || 6 || 9 || 11 || 12 || 17 => Alignment.bottomLeft,
     2 || 3 || 13 => Alignment.bottomRight,
     _ => Alignment.bottomCenter,
   };
 
   bool get _isAcademyTeacherBeat =>
-      _beat >= 17 && _beat <= 22 || _beat == 24 || _beat >= 27;
+      _beat == 25 ||
+      _beat == 26 ||
+      _beat == 28 ||
+      _beat == 30 ||
+      _beat == 32 ||
+      _beat >= 35;
+
+  bool get _isAcademyReceptionistBeat =>
+      _beat == 21 || _beat == 22 || _beat == 23;
 
   String get _teacherPoseAsset => switch (_beat) {
-    17 => 'assets/images/주식선생님/24_포즈3_주인공그림체_공통슬롯_투명.png',
-    18 || 28 => 'assets/images/주식선생님/22_포즈1_주인공그림체_공통슬롯_투명.png',
-    19 || 21 => 'assets/images/주식선생님/26_포즈5_주인공그림체_공통슬롯_투명.png',
-    20 || 29 => 'assets/images/주식선생님/23_포즈2_주인공그림체_공통슬롯_투명.png',
-    22 => 'assets/images/주식선생님/27_포즈6_주인공그림체_공통슬롯_투명.png',
-    24 || 27 => 'assets/images/주식선생님/25_포즈4_주인공그림체_공통슬롯_투명.png',
-    30 => 'assets/images/주식선생님/24_포즈3_주인공그림체_공통슬롯_투명.png',
+    25 => 'assets/images/주식선생님/24_포즈3_주인공그림체_공통슬롯_투명.png',
+    26 || 36 => 'assets/images/주식선생님/22_포즈1_주인공그림체_공통슬롯_투명.png',
+    28 || 37 => 'assets/images/주식선생님/23_포즈2_주인공그림체_공통슬롯_투명.png',
+    30 => 'assets/images/주식선생님/27_포즈6_주인공그림체_공통슬롯_투명.png',
+    32 || 35 => 'assets/images/주식선생님/25_포즈4_주인공그림체_공통슬롯_투명.png',
+    38 => 'assets/images/주식선생님/24_포즈3_주인공그림체_공통슬롯_투명.png',
     _ => 'assets/images/주식선생님/26_포즈5_주인공그림체_공통슬롯_투명.png',
   };
 
   bool get _isNarration =>
-      _beat == 0 || _beat == 8 || _beat == 14 || _beat == 16 || _beat == 26;
+      _beat == 0 ||
+      _beat == 8 ||
+      _beat == 14 ||
+      _beat == 16 ||
+      _beat == 19 ||
+      _beat == 24 ||
+      _beat == 34;
 
   String get _speaker => switch (_beat) {
-    0 || 8 || 14 || 16 || 26 => '이야기',
-    1 || 5 || 7 || 10 || 15 || 23 || 25 =>
+    0 || 8 || 14 || 16 || 19 || 24 || 34 => '이야기',
+    1 || 5 || 7 || 10 || 15 || 18 || 20 || 31 || 33 =>
       _playerController.text.trim().isEmpty
           ? '나'
           : _playerController.text.trim(),
     2 => '누나',
     3 || 13 => '엄마',
-    4 || 6 || 12 => '아빠',
+    4 || 6 || 12 || 17 => '아빠',
     9 || 11 => '외할아버지',
-    17 || 18 || 20 || 22 || 24 => '한서윤 선생님',
-    27 || 28 || 29 || 30 => '한서윤 선생님',
-    19 || 21 =>
+    21 || 22 || 23 => '투자학교 접수원',
+    25 || 26 || 28 || 30 || 32 => '한서윤 선생님',
+    35 || 36 || 37 || 38 => '한서윤 선생님',
+    27 || 29 =>
       _playerController.text.trim().isEmpty
           ? '나'
           : _playerController.text.trim(),
@@ -132,25 +164,39 @@ class _VisualNovelOnboardingScreenState
       '며칠 뒤, 집으로 ‘새천년 청소년 투자학교’의 남색 초대장이 왔다. 만 10세부터 19세까지만 다니며, 첫 주문은 보호자와 함께 돌아보는 학교였다.',
     15 => '진짜 10대만 오는 곳이네! 무슨 종목을 사라고 외우는 곳이 아니라, 제가 고른 이유를 말하는 곳이래요.',
     16 =>
-      '첫 등교 날. 나는 교탁과 주식 단말이 놓인 조용한 교실에 먼저 들어갔다. 잠시 뒤 문이 열리고 담임 선생님이 교탁 옆에 섰다.',
+      '첫 등교 날 아침. 나는 초대장, 외할아버지의 투자 장부, 연필 세 자루를 가방에 넣었다. 현관에는 아빠가 수업료 봉투와 등록 서류를 들고 기다리고 있었다.',
     17 =>
-      '안녕하세요! 10대 입문반을 맡은 한서윤이에요. 여기서는 “이 종목 사세요”라고 답을 주지 않아요. 회사와 숫자를 보고 스스로 고르는 법을 연습할 거예요.',
-    18 =>
-      '주식 한 주는 회사의 아주 작은 조각이에요. 주식을 사면 가격표뿐 아니라 그 회사가 잘될 가능성과 어려워질 위험도 함께 갖게 돼요.',
-    19 => '그럼 가격이 제일 많이 오른 회사가 제일 좋은 회사예요?',
+      '초대장과 장부는 챙겼지? 접수할 때 아빠가 수업료 100만 원을 먼저 낼 거야. 네 투자금 만 원과는 다른 돈이고, 나중에 장부에 갚을 돈으로 적는 거야.',
+    18 => '네! 투자 장부도 챙겼어요. 이제 정말 출발하는 거죠? 어떤 친구들이 와 있을지 궁금해요.',
+    19 =>
+      '버스에서 내려 골목을 돌자 남색 문양이 붙은 건물이 보였다. 초등학생부터 고등학생까지, 나보다 훨씬 커 보이는 학생들이 노트와 서류철을 들고 정문으로 모여들고 있었다.',
     20 =>
-      '꼭 그렇지는 않아요. 가격은 사람들의 주문 때문에 먼저 움직일 수도 있거든요. 회사, 매수와 매도, 주문 가격을 하나씩 볼까요?',
-    21 => '시장가랑 지정가는 이름이 어려워요. 빨리 사고 싶을 때는 그냥 시장가를 누르면 돼요?',
+      '우와… 정말 학생이 이렇게 많아? 형, 누나들만 있는 줄 알았는데 저만 한 친구도 있네. 다들 벌써 주식을 잘 아는 걸까?',
+    21 =>
+      '처음 오셨죠? 초대장과 보호자 등록 서류를 확인할게요. 입문반은 나이보다 투자 경험을 먼저 묻지 않으니 긴장하지 않아도 돼요.',
     22 =>
+      '등록 서류가 확인됐습니다. 수업료 1,000,000원은 보호자 통장에서 결제되고, 학생의 교육용 투자금 10,000원은 그대로 남습니다.',
+    23 => '결제가 완료됐어요. 여기 영수증과 학원비 상환 메모가 있습니다. 오른쪽 복도를 따라가면 10대 입문반 교실이에요.',
+    24 =>
+      '영수증을 장부 사이에 끼우고 교실 문을 열었다. 교탁과 주식 단말이 놓인 조용한 교실에 먼저 앉자, 잠시 뒤 담임 선생님이 교탁 옆에 섰다.',
+    25 =>
+      '안녕하세요! 10대 입문반을 맡은 한서윤이에요. 여기서는 “이 종목 사세요”라고 답을 주지 않아요. 회사와 숫자를 보고 스스로 고르는 법을 연습할 거예요.',
+    26 =>
+      '주식 한 주는 회사의 아주 작은 조각이에요. 주식을 사면 가격표뿐 아니라 그 회사가 잘될 가능성과 어려워질 위험도 함께 갖게 돼요.',
+    27 => '그럼 가격이 제일 많이 오른 회사가 제일 좋은 회사예요?',
+    28 =>
+      '꼭 그렇지는 않아요. 가격은 사람들의 주문 때문에 먼저 움직일 수도 있거든요. 회사, 매수와 매도, 주문 가격을 하나씩 볼까요?',
+    29 => '시장가랑 지정가는 이름이 어려워요. 빨리 사고 싶을 때는 그냥 시장가를 누르면 돼요?',
+    30 =>
       '시장가는 빨리 사고팔 때, 지정가는 원하는 가격을 정할 때 써요. 둘 다 장단점이 있으니 수수료까지 보고 고르면 돼요. 먼저 이름을 알려 줄래요?',
-    23 =>
+    31 =>
       '저는 ${_playerController.text.trim()}예요. 멋져 보이는 것보다, 제가 왜 샀는지 제 말로 설명해 보고 싶어요.',
-    24 => '좋아요. 첫 번째로 어떤 걸 연습해 보고 싶어요?',
-    25 => _traitResponse,
-    26 => '선생님은 컴퓨터 옆에 작은 주문표를 놓았다. 이제 직접 매수와 매도를 해 볼 시간이었다.',
-    27 => '주문 버튼을 누르기 전에, 오늘부터 지킬 약속 하나만 골라 볼까요?',
-    28 => _lessonRuleResponse,
-    29 => '좋아요. 이제 교실 컴퓨터로 실제 주문 화면을 연습할 거예요. 그 전에 투자노트 표지에 붙일 이름도 하나 정해 볼까요?',
+    32 => '좋아요. 첫 번째로 어떤 걸 연습해 보고 싶어요?',
+    33 => _traitResponse,
+    34 => '선생님은 컴퓨터 옆에 작은 주문표를 놓았다. 이제 직접 매수와 매도를 해 볼 시간이었다.',
+    35 => '주문 버튼을 누르기 전에, 오늘부터 지킬 약속 하나만 골라 볼까요?',
+    36 => _lessonRuleResponse,
+    37 => '좋아요. 이제 교실 컴퓨터로 실제 주문 화면을 연습할 거예요. 그 전에 투자노트 표지에 붙일 이름도 하나 정해 볼까요?',
     _ => '어렵게 짓지 않아도 돼요. 마음에 드는 이름이면 충분해요. 이름을 적으면 같이 주식 화면을 열어 봐요!',
   };
 
@@ -182,7 +228,22 @@ class _VisualNovelOnboardingScreenState
 
   void _next() {
     FocusManager.instance.primaryFocus?.unfocus();
+    if (_beat == 18) {
+      unawaited(_travelToAcademy());
+      return;
+    }
     setState(() => _beat += 1);
+  }
+
+  Future<void> _travelToAcademy() async {
+    if (_isTraveling) return;
+    setState(() => _isTraveling = true);
+    await Future<void>.delayed(const Duration(milliseconds: 2600));
+    if (!mounted) return;
+    setState(() {
+      _isTraveling = false;
+      _beat = 19;
+    });
   }
 
   Future<void> _finish() async {
@@ -202,7 +263,7 @@ class _VisualNovelOnboardingScreenState
     FocusManager.instance.primaryFocus?.unfocus();
     setState(() {
       _isCreating = true;
-      _creationStatus = '투자연구소 정보를 정리하는 중…';
+      _creationProgress = const WorldLoadProgress(0.02, '투자연구소 정보를 정리하는 중…');
     });
     await WidgetsBinding.instance.endOfFrame;
     try {
@@ -214,8 +275,8 @@ class _VisualNovelOnboardingScreenState
           startingTrait: _trait!,
           familyRule: _familyRule!,
         ),
-        (status) {
-          if (mounted) setState(() => _creationStatus = status);
+        (progress) {
+          if (mounted) setState(() => _creationProgress = progress);
         },
       );
     } finally {
@@ -227,7 +288,7 @@ class _VisualNovelOnboardingScreenState
   Widget build(BuildContext context) {
     final viewInsets = MediaQuery.viewInsetsOf(context);
     final isKeyboardOpen = viewInsets.bottom > 0;
-    final isNameEntry = _beat == 22 || _beat == 30;
+    final isNameEntry = _beat == 30 || _beat == 38;
     final keyboardLift = isKeyboardOpen && isNameEntry
         ? viewInsets.bottom
         : 0.0;
@@ -238,6 +299,8 @@ class _VisualNovelOnboardingScreenState
         builder: (context, constraints) {
           final sceneCharacterAsset = _isAcademyTeacherBeat
               ? _teacherPoseAsset
+              : _isAcademyReceptionistBeat
+              ? 'assets/images/character_academy_receptionist_v1.png'
               : _character;
           return Stack(
             key: const Key('onboarding-stage'),
@@ -281,11 +344,14 @@ class _VisualNovelOnboardingScreenState
                   child: _OnboardingCharacterSlot(
                     key: const Key('story-character-stage-slot'),
                     asset: sceneCharacterAsset,
-                    alignment: _isAcademyTeacherBeat
+                    alignment:
+                        _isAcademyTeacherBeat || _isAcademyReceptionistBeat
                         ? Alignment.bottomCenter
                         : _characterAlignment,
                     characterKey: _isAcademyTeacherBeat
                         ? const Key('academy-teacher-character')
+                        : _isAcademyReceptionistBeat
+                        ? const Key('academy-receptionist-character')
                         : const Key('story-character-character'),
                   ),
                 ),
@@ -312,8 +378,12 @@ class _VisualNovelOnboardingScreenState
               ),
               if (_isCreating)
                 Positioned.fill(
-                  child: _NewGamePreparationOverlay(status: _creationStatus),
+                  child: _NewGamePreparationOverlay(
+                    progress: _creationProgress,
+                  ),
                 ),
+              if (_isTraveling)
+                const Positioned.fill(child: _AcademyTravelOverlay()),
             ],
           );
         },
@@ -323,11 +393,12 @@ class _VisualNovelOnboardingScreenState
 
   Widget _buildDialogue(BuildContext context) {
     if (_beat == 10) return _introChoices();
-    if (_beat == 20) return _academyTutorial();
-    if (_beat == 22) return _nameEntry();
-    if (_beat == 24) return _traitChoices();
-    if (_beat == 27) return _familyChoices();
-    if (_beat == 30) return _researchDeskName();
+    if (_beat == 22) return _academyRegistration();
+    if (_beat == 28) return _academyTutorial();
+    if (_beat == 30) return _nameEntry();
+    if (_beat == 32) return _traitChoices();
+    if (_beat == 35) return _familyChoices();
+    if (_beat == 38) return _researchDeskName();
 
     return _NovelDialogue(
       key: ValueKey(_beat),
@@ -404,6 +475,17 @@ class _VisualNovelOnboardingScreenState
     ),
   );
 
+  Widget _academyRegistration() => _NovelDialogue(
+    key: const ValueKey('academy-registration'),
+    speaker: _speaker,
+    line: _line,
+    child: _AcademyTuitionPaymentPanel(
+      paid: _tuitionPaid,
+      onPay: () => setState(() => _tuitionPaid = true),
+      onContinue: _next,
+    ),
+  );
+
   Widget _nameEntry() => _NovelDialogue(
     key: const ValueKey('name-entry'),
     speaker: _speaker,
@@ -423,6 +505,7 @@ class _VisualNovelOnboardingScreenState
           onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
           decoration: _fieldDecoration('예: 민준'),
         ),
+        const SizedBox(height: 16),
         _NovelNextButton(
           key: const Key('story-next-name'),
           label: '이 이름으로 시작하기',
@@ -463,7 +546,7 @@ class _VisualNovelOnboardingScreenState
 
   void _chooseTrait(StoryTrait trait) => setState(() {
     _trait = trait;
-    _beat = 25;
+    _beat = 33;
   });
 
   Widget _familyChoices() => _NovelDialogue(
@@ -491,7 +574,7 @@ class _VisualNovelOnboardingScreenState
 
   void _chooseFamilyRule(FamilyRule rule) => setState(() {
     _familyRule = rule;
-    _beat = 28;
+    _beat = 36;
   });
 
   Widget _researchDeskName() => _NovelDialogue(
@@ -510,6 +593,7 @@ class _VisualNovelOnboardingScreenState
           onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
           decoration: _fieldDecoration('예: 별빛 투자'),
         ),
+        const SizedBox(height: 16),
         _NovelNextButton(
           key: const Key('create-company-button'),
           label: '투자노트 이름을 적고 주문 연습 시작',
@@ -537,10 +621,239 @@ class _VisualNovelOnboardingScreenState
   );
 }
 
-class _NewGamePreparationOverlay extends StatelessWidget {
-  const _NewGamePreparationOverlay({required this.status});
+class _AcademyTravelOverlay extends StatelessWidget {
+  const _AcademyTravelOverlay();
 
-  final String status;
+  @override
+  Widget build(BuildContext context) => ColoredBox(
+    key: const Key('academy-travel-loading'),
+    color: const Color(0xF2171B2A),
+    child: SafeArea(
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox.square(
+                dimension: 64,
+                child: CircularProgressIndicator(
+                  strokeWidth: 7,
+                  color: _yellow,
+                  backgroundColor: Color(0x33536A96),
+                ),
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                '학원으로 이동 중…',
+                key: Key('academy-travel-title'),
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 23,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -0.7,
+                ),
+              ),
+              const SizedBox(height: 11),
+              const Text(
+                '우리 집  ·  버스 정류장  ·  투자학교',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Color(0xFFCCD4E6),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 18),
+              Container(
+                width: 250,
+                height: 6,
+                clipBehavior: Clip.antiAlias,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF394259),
+                  borderRadius: BorderRadius.circular(99),
+                ),
+                child: const LinearProgressIndicator(
+                  color: _coral,
+                  backgroundColor: Colors.transparent,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+class _AcademyTuitionPaymentPanel extends StatelessWidget {
+  const _AcademyTuitionPaymentPanel({
+    required this.paid,
+    required this.onPay,
+    required this.onContinue,
+  });
+
+  final bool paid;
+  final VoidCallback onPay;
+  final VoidCallback onContinue;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    children: [
+      AnimatedContainer(
+        key: const Key('academy-tuition-payment-card'),
+        duration: const Duration(milliseconds: 320),
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: paid ? const Color(0xFFE9F8EF) : const Color(0xFFFFF4D8),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: paid ? const Color(0xFF78BE91) : const Color(0xFFE5C98E),
+          ),
+        ),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Icon(
+                  paid ? Icons.receipt_long_rounded : Icons.account_balance,
+                  color: paid
+                      ? const Color(0xFF258257)
+                      : const Color(0xFF536A96),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    paid ? '등록비 결제 완료' : '아빠 통장 · 등록비 결제',
+                    style: const TextStyle(
+                      color: _ink,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                if (paid)
+                  const Text(
+                    '-1,000,000원',
+                    key: Key('academy-tuition-debit'),
+                    style: TextStyle(
+                      color: Color(0xFFC53F4B),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                      fontFeatures: _marketNumberFeatures,
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 9),
+            Row(
+              children: [
+                const Text(
+                  '아빠 통장',
+                  style: TextStyle(
+                    color: Color(0xFF697386),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const Spacer(),
+                if (paid)
+                  TweenAnimationBuilder<double>(
+                    key: const Key('academy-father-balance-animation'),
+                    tween: Tween(begin: 1000000, end: 0),
+                    duration: const Duration(milliseconds: 850),
+                    curve: Curves.easeOutCubic,
+                    builder: (context, value, _) => Text(
+                      '${_money(value.round())}원',
+                      style: const TextStyle(
+                        color: Color(0xFFC53F4B),
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                        fontFeatures: _marketNumberFeatures,
+                      ),
+                    ),
+                  )
+                else
+                  const Text(
+                    '1,000,000원',
+                    style: TextStyle(
+                      color: _ink,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w900,
+                      fontFeatures: _marketNumberFeatures,
+                    ),
+                  ),
+              ],
+            ),
+            const Divider(height: 17),
+            const Row(
+              children: [
+                Text(
+                  '내 교육용 투자금',
+                  style: TextStyle(
+                    color: Color(0xFF697386),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Spacer(),
+                Text(
+                  '10,000원 그대로',
+                  key: Key('academy-investment-cash-preserved'),
+                  style: TextStyle(
+                    color: Color(0xFF258257),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+            if (paid) ...[
+              const SizedBox(height: 8),
+              const Row(
+                children: [
+                  Text(
+                    '나중에 갚을 학원비',
+                    style: TextStyle(
+                      color: Color(0xFF697386),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  Spacer(),
+                  Text(
+                    '+1,000,000원 채무',
+                    key: Key('academy-tuition-debt-created'),
+                    style: TextStyle(
+                      color: Color(0xFF8F5B25),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+      const SizedBox(height: 10),
+      _NovelNextButton(
+        key: Key(
+          paid ? 'academy-registration-continue' : 'academy-tuition-pay-button',
+        ),
+        label: paid ? '영수증 받고 접수 마치기' : '등록비 1,000,000원 결제',
+        enabled: true,
+        onTap: paid ? onContinue : onPay,
+      ),
+    ],
+  );
+}
+
+class _NewGamePreparationOverlay extends StatelessWidget {
+  const _NewGamePreparationOverlay({required this.progress});
+
+  final WorldLoadProgress progress;
 
   @override
   Widget build(BuildContext context) => ColoredBox(
@@ -589,7 +902,7 @@ class _NewGamePreparationOverlay extends StatelessWidget {
                 Semantics(
                   liveRegion: true,
                   child: Text(
-                    status,
+                    progress.label,
                     key: const Key('new-game-preparation-status'),
                     textAlign: TextAlign.center,
                     style: const TextStyle(
@@ -601,13 +914,27 @@ class _NewGamePreparationOverlay extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 22),
-                const LinearProgressIndicator(
+                LinearProgressIndicator(
+                  key: const Key('new-game-preparation-progress'),
+                  value: progress.fraction,
                   minHeight: 9,
-                  backgroundColor: Color(0xFFE8E1D1),
-                  color: Color(0xFFFFA45F),
+                  backgroundColor: const Color(0xFFE8E1D1),
+                  color: const Color(0xFFFFA45F),
+                  borderRadius: BorderRadius.circular(99),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 10),
+                Text(
+                  '${(progress.fraction * 100).round()}%',
+                  key: const Key('new-game-preparation-percent'),
+                  style: const TextStyle(
+                    color: Color(0xFF536A96),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 12),
                 const Text(
+                  '2000~2026 전체 세계를 만들며 기기에 따라 약 1분 걸릴 수 있어요.\n'
                   '준비가 끝나면 자동으로 주식 화면으로 넘어갑니다.',
                   textAlign: TextAlign.center,
                   style: TextStyle(

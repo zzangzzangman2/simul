@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 
+import 'banking_state.dart';
 import 'market_clock.dart';
+import 'market_cost_rules.dart';
 import 'mission_progression.dart';
 import 'organization_state.dart';
 import 'personal_finance_state.dart';
@@ -28,6 +30,8 @@ class PendingTradeOrder {
     required this.placedMinute,
     required this.placedSequence,
     this.queueAheadQuantity = 0,
+    this.maximumPositionUnits,
+    this.isIpoFirstTradingDay = false,
   });
 
   final String id;
@@ -44,6 +48,8 @@ class PendingTradeOrder {
   final int placedMinute;
   final int placedSequence;
   final double queueAheadQuantity;
+  final int? maximumPositionUnits;
+  final bool isIpoFirstTradingDay;
 
   double get filledQuantity => originalQuantity - remainingQuantity;
 
@@ -65,6 +71,8 @@ class PendingTradeOrder {
     placedMinute: placedMinute,
     placedSequence: placedSequence,
     queueAheadQuantity: queueAheadQuantity ?? this.queueAheadQuantity,
+    maximumPositionUnits: maximumPositionUnits,
+    isIpoFirstTradingDay: isIpoFirstTradingDay,
   );
 
   Map<String, dynamic> toJson() => {
@@ -82,12 +90,20 @@ class PendingTradeOrder {
     'placedMinute': placedMinute,
     'placedSequence': placedSequence,
     'queueAheadQuantity': queueAheadQuantity,
+    if (maximumPositionUnits != null)
+      'maximumPositionUnits': maximumPositionUnits,
+    if (isIpoFirstTradingDay) 'isIpoFirstTradingDay': isIpoFirstTradingDay,
   };
 
   factory PendingTradeOrder.fromJson(Map<String, dynamic> json) {
     final original = (json['originalQuantity'] as num?)?.toDouble() ?? 0;
     final remaining =
         (json['remainingQuantity'] as num?)?.toDouble() ?? original;
+    final rawMaximumPositionUnits = json['maximumPositionUnits'];
+    final parsedMaximumPositionUnits =
+        rawMaximumPositionUnits is num && rawMaximumPositionUnits.isFinite
+        ? rawMaximumPositionUnits.toInt()
+        : null;
     return PendingTradeOrder(
       id: json['id'] as String? ?? '',
       side: PendingOrderSide.values.firstWhere(
@@ -106,6 +122,11 @@ class PendingTradeOrder {
       placedMinute: (json['placedMinute'] as num?)?.toInt() ?? 0,
       placedSequence: (json['placedSequence'] as num?)?.toInt() ?? 0,
       queueAheadQuantity: (json['queueAheadQuantity'] as num?)?.toDouble() ?? 0,
+      maximumPositionUnits:
+          parsedMaximumPositionUnits != null && parsedMaximumPositionUnits > 0
+          ? parsedMaximumPositionUnits
+          : null,
+      isIpoFirstTradingDay: json['isIpoFirstTradingDay'] == true,
     );
   }
 
@@ -122,6 +143,7 @@ class PendingTradeOrder {
       remainingQuantity <= originalQuantity &&
       queueAheadQuantity.isFinite &&
       queueAheadQuantity >= 0 &&
+      (maximumPositionUnits == null || maximumPositionUnits! > 0) &&
       placedDate.length == 10 &&
       placedSequence >= 0;
 }
@@ -146,6 +168,7 @@ class GameState {
     required this.brokerageCash,
     required this.positions,
     required this.pendingOrders,
+    required this.banking,
     required this.organization,
     required this.personalFinance,
     required this.progression,
@@ -158,7 +181,7 @@ class GameState {
     required this.processedEventIds,
   });
 
-  static const schemaVersion = 15;
+  static const schemaVersion = 18;
   static const maxCampaignDay = 9862;
 
   final int version;
@@ -170,6 +193,7 @@ class GameState {
   final int brokerageCash;
   final List<PortfolioPosition> positions;
   final List<PendingTradeOrder> pendingOrders;
+  final BankingState banking;
   final OrganizationState organization;
   final PersonalFinanceState personalFinance;
   final MissionProgressionState progression;
@@ -189,13 +213,34 @@ class GameState {
 
   int get bankCash => math.max(0, cash - brokerageCash);
 
-  int get pendingBuyReservedCash => pendingOrders
-      .where((order) => order.side == PendingOrderSide.buy)
-      .fold<int>(
-        0,
-        (sum, order) =>
-            sum + (order.limitPrice * order.remainingQuantity * 1.003).ceil(),
-      );
+  double get pendingOrderFeeMultiplier {
+    final helperDiscount =
+        story.storyFlags['activeResearchHelper'] == 'mother' &&
+        story.flagInt('activeResearchHelperDay', -1) == day;
+    final skillDiscount = progression.hasSkill('fee_sense') ? 0.9 : 1.0;
+    return (helperDiscount ? 0.9 : 1.0) * skillDiscount;
+  }
+
+  int get pendingBuyReservedCash {
+    final reservationCeiling = math.max(0, brokerageCash);
+    var reserved = 0;
+    for (final order in pendingOrders.where(
+      (order) => order.side == PendingOrderSide.buy,
+    )) {
+      final reservation =
+          order.limitPrice *
+          order.remainingQuantity *
+          (1 + marketTradingFeeRate(currentDate) * pendingOrderFeeMultiplier);
+      if (!reservation.isFinite) return reservationCeiling;
+      if (reservation <= 0) continue;
+      final remainingCash = reservationCeiling - reserved;
+      if (remainingCash <= 0 || reservation >= remainingCash) {
+        return reservationCeiling;
+      }
+      reserved += reservation.ceil();
+    }
+    return reserved;
+  }
 
   int get availableBrokerageCash =>
       math.max(0, brokerageCash - pendingBuyReservedCash);
@@ -207,6 +252,13 @@ class GameState {
       )
       .fold<double>(0, (sum, order) => sum + order.remainingQuantity);
 
+  double pendingBuyReservedUnits(String assetId) => pendingOrders
+      .where(
+        (order) =>
+            order.assetId == assetId && order.side == PendingOrderSide.buy,
+      )
+      .fold<double>(0, (sum, order) => sum + order.remainingQuantity);
+
   int portfolioValue(Map<String, double> prices) => positions.fold<int>(
     0,
     (sum, position) =>
@@ -214,6 +266,24 @@ class GameState {
   );
 
   int totalAum(Map<String, double> prices) => cash + portfolioValue(prices);
+
+  int get totalKnownLiabilities =>
+      banking.totalUnsecuredLoanBalance +
+      personalFinance.totalMortgageBalance +
+      personalFinance.totalTenantDepositLiability +
+      story.academyTuitionDebt +
+      story.flagInt('mortgageDeficiencyDebt') +
+      story.flagInt('tenantDepositDebt') +
+      story.flagInt('unpaidOperatingCost');
+
+  int balanceSheetGrossAssets({Map<String, double>? prices}) =>
+      cash +
+      banking.termDepositAssetValueAt(day) +
+      (prices == null ? portfolioCost : portfolioValue(prices)) +
+      personalFinance.estimatedPropertyValueAt(day);
+
+  int balanceSheetNetWorth({Map<String, double>? prices}) =>
+      balanceSheetGrossAssets(prices: prices) - totalKnownLiabilities;
 
   DateTime get campaignStartDate =>
       story.storyFlags['campaignStartDate'] == '2000-01-02'
@@ -241,6 +311,7 @@ class GameState {
     int? cash,
     List<PortfolioPosition>? positions,
     List<PendingTradeOrder>? pendingOrders,
+    BankingState? banking,
     OrganizationState? organization,
     PersonalFinanceState? personalFinance,
     MissionProgressionState? progression,
@@ -266,6 +337,7 @@ class GameState {
       cash: cash ?? this.cash,
       positions: positions ?? this.positions,
       pendingOrders: pendingOrders ?? this.pendingOrders,
+      banking: banking ?? this.banking,
       organization: organization ?? this.organization,
       personalFinance: personalFinance ?? this.personalFinance,
       progression: progression ?? this.progression,
@@ -290,6 +362,7 @@ class GameState {
     'cash': cash,
     'positions': positions.map((position) => position.toJson()).toList(),
     'pendingOrders': pendingOrders.map((order) => order.toJson()).toList(),
+    'banking': banking.toJson(),
     'organization': organization.toJson(),
     'personalFinance': personalFinance.toJson(),
     'progression': progression.toJson(),
@@ -326,6 +399,9 @@ class GameState {
           )
           .where((order) => order.isValid)
           .toList(growable: false),
+      banking: BankingState.fromJson(
+        (json['banking'] as Map?)?.cast<String, dynamic>() ?? const {},
+      ),
       organization: OrganizationState.fromJson(
         (json['organization'] as Map?)?.cast<String, dynamic>() ?? const {},
         legacyTeamCount: (json['team'] as num?)?.toInt() ?? 1,
@@ -791,6 +867,21 @@ class ScheduledGameEvent {
       );
 }
 
+class LedgerOrderBookFill {
+  const LedgerOrderBookFill({required this.price, required this.quantity});
+
+  final double price;
+  final double quantity;
+
+  Map<String, dynamic> toJson() => {'price': price, 'quantity': quantity};
+
+  factory LedgerOrderBookFill.fromJson(Map<String, dynamic> json) =>
+      LedgerOrderBookFill(
+        price: (json['price'] as num?)?.toDouble() ?? 0,
+        quantity: (json['quantity'] as num?)?.toDouble() ?? 0,
+      );
+}
+
 class LedgerEntry {
   const LedgerEntry({
     required this.id,
@@ -802,6 +893,7 @@ class LedgerEntry {
     required this.sourceId,
     this.notional = 0,
     this.tradingFee = 0,
+    this.transactionTax = 0,
     this.disposedCost = 0,
     this.realizedPnl = 0,
     this.assetId = '',
@@ -810,6 +902,9 @@ class LedgerEntry {
     this.tradeUnitPrice = 0,
     this.marketMinute = -1,
     this.orderType = '',
+    this.orderBookSide = '',
+    this.orderBookFills = const <LedgerOrderBookFill>[],
+    this.orderBookCapacityUnits = 0,
   });
 
   final String id;
@@ -821,6 +916,7 @@ class LedgerEntry {
   final String sourceId;
   final int notional;
   final int tradingFee;
+  final int transactionTax;
   final int disposedCost;
   final int realizedPnl;
   final String assetId;
@@ -829,6 +925,9 @@ class LedgerEntry {
   final double tradeUnitPrice;
   final int marketMinute;
   final String orderType;
+  final String orderBookSide;
+  final List<LedgerOrderBookFill> orderBookFills;
+  final int orderBookCapacityUnits;
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -840,6 +939,7 @@ class LedgerEntry {
     'sourceId': sourceId,
     'notional': notional,
     'tradingFee': tradingFee,
+    if (transactionTax > 0) 'transactionTax': transactionTax,
     'disposedCost': disposedCost,
     'realizedPnl': realizedPnl,
     if (assetId.isNotEmpty) 'assetId': assetId,
@@ -848,25 +948,59 @@ class LedgerEntry {
     if (tradeUnitPrice > 0) 'tradeUnitPrice': tradeUnitPrice,
     if (marketMinute >= 0) 'marketMinute': marketMinute,
     if (orderType.isNotEmpty) 'orderType': orderType,
+    if (orderBookSide.isNotEmpty) 'orderBookSide': orderBookSide,
+    if (orderBookFills.isNotEmpty)
+      'orderBookFills': orderBookFills.map((fill) => fill.toJson()).toList(),
+    if (orderBookCapacityUnits > 0)
+      'orderBookCapacityUnits': orderBookCapacityUnits,
   };
 
-  factory LedgerEntry.fromJson(Map<String, dynamic> json) => LedgerEntry(
-    id: json['id'] as String,
-    day: (json['day'] as num).toInt(),
-    amount: (json['amount'] as num).toInt(),
-    account: json['account'] as String? ?? 'cash',
-    counterAccount: json['counterAccount'] as String? ?? 'expense',
-    description: json['description'] as String? ?? '',
-    sourceId: json['sourceId'] as String? ?? '',
-    notional: (json['notional'] as num?)?.toInt() ?? 0,
-    tradingFee: (json['tradingFee'] as num?)?.toInt() ?? 0,
-    disposedCost: (json['disposedCost'] as num?)?.toInt() ?? 0,
-    realizedPnl: (json['realizedPnl'] as num?)?.toInt() ?? 0,
-    assetId: json['assetId'] as String? ?? '',
-    tradeSide: json['tradeSide'] as String? ?? '',
-    tradeQuantity: (json['tradeQuantity'] as num?)?.toDouble() ?? 0,
-    tradeUnitPrice: (json['tradeUnitPrice'] as num?)?.toDouble() ?? 0,
-    marketMinute: (json['marketMinute'] as num?)?.toInt() ?? -1,
-    orderType: json['orderType'] as String? ?? '',
-  );
+  factory LedgerEntry.fromJson(Map<String, dynamic> json) {
+    final rawOrderBookSide = json['orderBookSide'] as String? ?? '';
+    final orderBookSide = rawOrderBookSide == 'ask' || rawOrderBookSide == 'bid'
+        ? rawOrderBookSide
+        : '';
+    final orderBookFills =
+        <LedgerOrderBookFill>[
+              for (final rawFill
+                  in (json['orderBookFills'] as List?) ?? const [])
+                if (rawFill is Map)
+                  LedgerOrderBookFill.fromJson(
+                    Map<String, dynamic>.from(rawFill),
+                  ),
+            ]
+            .where((fill) {
+              return fill.price.isFinite &&
+                  fill.price > 0 &&
+                  fill.quantity.isFinite &&
+                  fill.quantity > 0;
+            })
+            .toList(growable: false);
+    return LedgerEntry(
+      id: json['id'] as String,
+      day: (json['day'] as num).toInt(),
+      amount: (json['amount'] as num).toInt(),
+      account: json['account'] as String? ?? 'cash',
+      counterAccount: json['counterAccount'] as String? ?? 'expense',
+      description: json['description'] as String? ?? '',
+      sourceId: json['sourceId'] as String? ?? '',
+      notional: (json['notional'] as num?)?.toInt() ?? 0,
+      tradingFee: (json['tradingFee'] as num?)?.toInt() ?? 0,
+      transactionTax: (json['transactionTax'] as num?)?.toInt() ?? 0,
+      disposedCost: (json['disposedCost'] as num?)?.toInt() ?? 0,
+      realizedPnl: (json['realizedPnl'] as num?)?.toInt() ?? 0,
+      assetId: json['assetId'] as String? ?? '',
+      tradeSide: json['tradeSide'] as String? ?? '',
+      tradeQuantity: (json['tradeQuantity'] as num?)?.toDouble() ?? 0,
+      tradeUnitPrice: (json['tradeUnitPrice'] as num?)?.toDouble() ?? 0,
+      marketMinute: (json['marketMinute'] as num?)?.toInt() ?? -1,
+      orderType: json['orderType'] as String? ?? '',
+      orderBookSide: orderBookSide,
+      orderBookFills: orderBookFills,
+      orderBookCapacityUnits: math.max(
+        0,
+        (json['orderBookCapacityUnits'] as num?)?.toInt() ?? 0,
+      ),
+    );
+  }
 }

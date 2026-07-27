@@ -1,4 +1,5 @@
 import 'market_corpus_calendar.dart';
+import 'market_price_rules.dart';
 import 'market_tick.dart';
 
 const fictionalCampaignStartYear = 2000;
@@ -12,6 +13,19 @@ const krxCloseMinute = 15 * 60;
 const marketDayEndMinute = 20 * 60;
 const marketTickMinutes = 1;
 const krxCloseTick = 420;
+
+/// Converts a calendar date to the canonical deterministic liquidity day key.
+///
+/// This deliberately does not use `GameState.day`: new and migrated campaigns
+/// can have different start dates, while the same calendar session must always
+/// produce the same candle, flow, turnover, and order-book seed.
+int marketLiquidityDayKey(DateTime date) =>
+    DateTime(
+      date.year,
+      date.month,
+      date.day,
+    ).difference(DateTime(2000, 1, 1)).inDays +
+    1;
 
 /// 주식시장 화면의 기본 배속은 현실 1초마다 게임 시각 1분이다.
 /// 화면 배속은 이 주기를 유지한 채 한 번에 1·3·10분을 순차 처리한다.
@@ -49,8 +63,6 @@ class MarketClockInfo {
   final bool tradable;
 }
 
-const _krxClosedWeekdays = <String>{'2000-01-03'};
-
 String marketDateKey(DateTime date) =>
     '${date.year.toString().padLeft(4, '0')}-'
     '${date.month.toString().padLeft(2, '0')}-'
@@ -63,7 +75,10 @@ bool isMarketTradingDay(DateTime date) {
       dateKey.compareTo(fictionalCorpusLastTradingDate) <= 0) {
     return fictionalCorpusTradingDateKeys.contains(dateKey);
   }
+  if (_postCorpusCampaignHolidayKeys.contains(dateKey)) return false;
 
+  // 코퍼스 시작 전인 첫 월요일(2000-01-03)은 가상 거래소의 정상
+  // 거래일이다. 실제 거래소의 당시 임시 휴장일은 캠페인에 적용하지 않는다.
   final fixedHoliday = switch ((date.month, date.day)) {
     (1, 1) ||
     (3, 1) ||
@@ -73,11 +88,24 @@ bool isMarketTradingDay(DateTime date) {
     (7, 17) ||
     (8, 15) ||
     (10, 3) ||
+    (10, 9) ||
+    (12, 31) ||
     (12, 25) => true,
     _ => false,
   };
-  return !fixedHoliday && !_krxClosedWeekdays.contains(dateKey);
+  return !fixedHoliday;
 }
+
+/// Official 2026 public holidays after the bundled KRX corpus ends.
+///
+/// The campaign ends in 2026, so keeping this small explicit tail prevents
+/// lunar and substitute holidays from silently becoming trading days.
+const _postCorpusCampaignHolidayKeys = <String>{
+  '2026-08-17', // Liberation Day substitute holiday.
+  '2026-09-24', // Chuseok holiday.
+  '2026-09-25', // Chuseok.
+  '2026-10-05', // National Foundation Day substitute holiday.
+};
 
 MarketClockInfo marketClockAt(int minute, {bool tradingDay = true}) {
   if (!tradingDay) {
@@ -154,15 +182,19 @@ double marketDailyPriceLimitRate(DateTime date) {
   return 0.30;
 }
 
+const String modernIpoPriceRangeEffectiveDateKey = '2023-06-26';
+const double modernIpoFirstDayLowerPriceMultiple = 0.60;
+const double modernIpoFirstDayUpperPriceMultiple = 4.00;
+
+bool marketUsesModernIpoFirstDayPriceRange({
+  required DateTime date,
+  required bool isIpoFirstTradingDay,
+}) =>
+    isIpoFirstTradingDay &&
+    marketDateKey(date).compareTo(modernIpoPriceRangeEffectiveDateKey) >= 0;
+
 double marketTickSize(double price, {String market = '미래시장'}) {
-  if (!price.isFinite || price <= 0) return 1;
-  if (price < 1000) return 1;
-  if (price < 5000) return 5;
-  if (price < 10000) return 10;
-  if (price < 50000) return 50;
-  if (price < 100000) return 100;
-  if (price < 500000) return market == '도전시장' ? 100 : 500;
-  return market == '도전시장' ? 100 : 1000;
+  return sharedMarketTickSize(price, market: market);
 }
 
 double marketSnapPrice(
@@ -180,19 +212,25 @@ double marketSnapPrice(
   required double previousClose,
   required DateTime date,
   String market = '미래시장',
+  bool isIpoFirstTradingDay = false,
 }) {
   if (!previousClose.isFinite || previousClose <= 0) {
     return (lower: 0, upper: 0);
   }
+  final usesModernIpoRange = marketUsesModernIpoFirstDayPriceRange(
+    date: date,
+    isIpoFirstTradingDay: isIpoFirstTradingDay,
+  );
   final rate = marketDailyPriceLimitRate(date);
-  final rawLower = previousClose * (1 - rate);
+  final rawLower =
+      previousClose *
+      (usesModernIpoRange ? modernIpoFirstDayLowerPriceMultiple : 1 - rate);
+  final rawUpper =
+      previousClose *
+      (usesModernIpoRange ? modernIpoFirstDayUpperPriceMultiple : 1 + rate);
   final lowerTick = marketTickSize(rawLower, market: market);
   final lower = (rawLower / lowerTick).ceil() * lowerTick;
-  final upper = marketSnapPrice(
-    previousClose * (1 + rate),
-    market: market,
-    roundDown: true,
-  );
+  final upper = marketSnapPrice(rawUpper, market: market, roundDown: true);
   return (lower: lower, upper: upper);
 }
 

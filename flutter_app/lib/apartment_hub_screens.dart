@@ -19,6 +19,7 @@ class ApartmentHubScreen extends StatefulWidget {
     super.key,
     required this.state,
     required this.onOpenMarket,
+    required this.onOpenBank,
     required this.onOpenDecisions,
     required this.onOpenLedger,
     required this.onOpenOrganization,
@@ -36,6 +37,7 @@ class ApartmentHubScreen extends StatefulWidget {
 
   final GameState state;
   final VoidCallback onOpenMarket;
+  final VoidCallback onOpenBank;
   final VoidCallback onOpenDecisions;
   final VoidCallback onOpenLedger;
   final VoidCallback onOpenOrganization;
@@ -104,6 +106,7 @@ class _ApartmentHubScreenState extends State<ApartmentHubScreen> {
               place: _place,
               state: widget.state,
               onOpenMarket: widget.onOpenMarket,
+              onOpenBank: widget.onOpenBank,
               onOpenDecisions: widget.onOpenDecisions,
               onOpenLedger: widget.onOpenLedger,
               onOpenOrganization: widget.onOpenOrganization,
@@ -130,7 +133,7 @@ class _ApartmentHubScreenState extends State<ApartmentHubScreen> {
             bottom: 100,
             child: _ApartmentMissionCard(
               progress: missionProgress,
-              onOpen: widget.onOpenDecisions,
+              starBalance: widget.state.progression.starBalance,
               onClaim: widget.onClaimMission,
             ),
           ),
@@ -176,23 +179,37 @@ class _ApartmentHubScreenState extends State<ApartmentHubScreen> {
   }
 }
 
-class HomeComputerScreen extends StatelessWidget {
+class HomeComputerScreen extends StatefulWidget {
   const HomeComputerScreen({
     super.key,
     required this.state,
     required this.onOpenStockMarket,
     required this.onOpenRealEstate,
+    required this.onOpenStarShop,
   });
 
   final GameState state;
   final VoidCallback onOpenStockMarket;
   final VoidCallback onOpenRealEstate;
+  final Future<GameState> Function() onOpenStarShop;
+
+  @override
+  State<HomeComputerScreen> createState() => _HomeComputerScreenState();
+}
+
+class _HomeComputerScreenState extends State<HomeComputerScreen> {
+  late GameState _state = widget.state;
+
+  Future<void> _openStarShop() async {
+    final next = await widget.onOpenStarShop();
+    if (mounted) setState(() => _state = next);
+  }
 
   @override
   Widget build(BuildContext context) {
-    final date = state.currentDate;
-    final hour = state.marketMinute ~/ 60;
-    final minute = state.marketMinute % 60;
+    final date = _state.currentDate;
+    final hour = _state.marketMinute ~/ 60;
+    final minute = _state.marketMinute % 60;
     final clock =
         '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
     final dateLabel =
@@ -387,7 +404,7 @@ class HomeComputerScreen extends StatelessWidget {
                                   ),
                                   const SizedBox(height: 4),
                                   const Text(
-                                    '주식과 부동산 시장은 각각 별도 프로그램으로 열립니다.',
+                                    '투자 시장과 별빛 상점은 각각 별도 프로그램으로 열립니다.',
                                     maxLines: 2,
                                     style: TextStyle(
                                       fontFamily: _hubDisplayFont,
@@ -411,10 +428,10 @@ class HomeComputerScreen extends StatelessWidget {
                                             title: '미래 증권',
                                             subtitle: '주식시장',
                                             status: '시세 · 주문',
-                                            onTap: onOpenStockMarket,
+                                            onTap: widget.onOpenStockMarket,
                                           ),
                                         ),
-                                        const SizedBox(width: 12),
+                                        const SizedBox(width: 8),
                                         Expanded(
                                           child: _ComputerAppTile(
                                             interactionKey: const Key(
@@ -425,7 +442,22 @@ class HomeComputerScreen extends StatelessWidget {
                                             title: '한마음 부동산',
                                             subtitle: '서울·경기 매물',
                                             status: '지도 · 계약',
-                                            onTap: onOpenRealEstate,
+                                            onTap: widget.onOpenRealEstate,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: _ComputerAppTile(
+                                            interactionKey: const Key(
+                                              'computer-star-shop-app',
+                                            ),
+                                            icon: Icons.auto_awesome_rounded,
+                                            iconColor: const Color(0xFFFFD75E),
+                                            title: '별빛 상점',
+                                            subtitle: '미션 스타',
+                                            status:
+                                                '⭐ ${_state.progression.starBalance}',
+                                            onTap: _openStarShop,
                                           ),
                                         ),
                                       ],
@@ -555,89 +587,103 @@ class _ComputerAppTile extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => Material(
-    color: Colors.transparent,
-    child: InkWell(
-      key: interactionKey,
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(7),
-      child: Ink(
-        decoration: BoxDecoration(
-          color: const Color(0xFFF9FAF4),
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final dense = constraints.maxWidth < 112;
+      final iconSize = dense ? 46.0 : 58.0;
+      return Material(
+        color: Colors.transparent,
+        child: InkWell(
+          key: interactionKey,
+          onTap: onTap,
           borderRadius: BorderRadius.circular(7),
-          border: Border.all(color: const Color(0xFF94A4B7), width: 1.5),
-          boxShadow: const [
-            BoxShadow(color: Colors.white, offset: Offset(-2, -2)),
-            BoxShadow(color: Color(0xFF9AA7AF), offset: Offset(2, 2)),
-          ],
-        ),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(9, 12, 9, 9),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 58,
-                height: 58,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF172C4A),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFF6E89AC)),
-                ),
-                child: Icon(icon, color: iconColor, size: 34),
+          child: Ink(
+            decoration: BoxDecoration(
+              color: const Color(0xFFF9FAF4),
+              borderRadius: BorderRadius.circular(7),
+              border: Border.all(color: const Color(0xFF94A4B7), width: 1.5),
+              boxShadow: const [
+                BoxShadow(color: Colors.white, offset: Offset(-2, -2)),
+                BoxShadow(color: Color(0xFF9AA7AF), offset: Offset(2, 2)),
+              ],
+            ),
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                dense ? 5 : 9,
+                dense ? 8 : 12,
+                dense ? 5 : 9,
+                dense ? 7 : 9,
               ),
-              const SizedBox(height: 10),
-              Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontFamily: _hubDisplayFont,
-                  color: _ink,
-                  fontSize: 12,
-                  height: 1,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: -0.25,
-                ),
-              ),
-              const SizedBox(height: 5),
-              Text(
-                subtitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontFamily: _hubDisplayFont,
-                  color: Color(0xFF586476),
-                  fontSize: 9,
-                  height: 1,
-                ),
-              ),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE5E9E4),
-                  borderRadius: BorderRadius.circular(99),
-                ),
-                child: Text(
-                  status,
-                  maxLines: 1,
-                  style: const TextStyle(
-                    fontFamily: _hubDisplayFont,
-                    color: Color(0xFF486070),
-                    fontSize: 8,
-                    height: 1,
-                    fontWeight: FontWeight.w700,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: iconSize,
+                    height: iconSize,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF172C4A),
+                      borderRadius: BorderRadius.circular(dense ? 10 : 12),
+                      border: Border.all(color: const Color(0xFF6E89AC)),
+                    ),
+                    child: Icon(icon, color: iconColor, size: dense ? 28 : 34),
                   ),
-                ),
+                  SizedBox(height: dense ? 7 : 10),
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontFamily: _hubDisplayFont,
+                      color: _ink,
+                      fontSize: dense ? 10 : 12,
+                      height: 1,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.25,
+                    ),
+                  ),
+                  SizedBox(height: dense ? 4 : 5),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontFamily: _hubDisplayFont,
+                      color: Color(0xFF586476),
+                      fontSize: dense ? 8 : 9,
+                      height: 1,
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: dense ? 5 : 7,
+                      vertical: dense ? 3 : 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE5E9E4),
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                    child: Text(
+                      status,
+                      maxLines: 1,
+                      style: TextStyle(
+                        fontFamily: _hubDisplayFont,
+                        color: Color(0xFF486070),
+                        fontSize: dense ? 7.2 : 8,
+                        height: 1,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
-      ),
-    ),
+      );
+    },
   );
 }
 
@@ -723,6 +769,7 @@ class _ApartmentPlaceScene extends StatelessWidget {
     required this.place,
     required this.state,
     required this.onOpenMarket,
+    required this.onOpenBank,
     required this.onOpenDecisions,
     required this.onOpenLedger,
     required this.onOpenOrganization,
@@ -732,6 +779,7 @@ class _ApartmentPlaceScene extends StatelessWidget {
   final _ApartmentPlace place;
   final GameState state;
   final VoidCallback onOpenMarket;
+  final VoidCallback onOpenBank;
   final VoidCallback onOpenDecisions;
   final VoidCallback onOpenLedger;
   final VoidCallback onOpenOrganization;
@@ -772,6 +820,14 @@ class _ApartmentPlaceScene extends StatelessWidget {
           ),
         ],
         if (place == _ApartmentPlace.livingRoom) ...[
+          _ApartmentObjectHotspot(
+            interactionKey: const Key('open-bank-button'),
+            alignment: const Alignment(-0.20, -0.43),
+            eyebrow: '현관으로 외출',
+            label: '새천년은행',
+            accent: const Color(0xFF86CBEA),
+            onTap: onOpenBank,
+          ),
           _ApartmentObjectHotspot(
             interactionKey: const Key('open-organization-button'),
             alignment: const Alignment(-0.72, -0.25),
@@ -1175,12 +1231,12 @@ class _ApartmentWeather {
 class _ApartmentMissionCard extends StatefulWidget {
   const _ApartmentMissionCard({
     required this.progress,
-    required this.onOpen,
+    required this.starBalance,
     required this.onClaim,
   });
 
   final MissionProgressView? progress;
-  final VoidCallback onOpen;
+  final int starBalance;
   final Future<MissionClaimResult> Function()? onClaim;
 
   @override
@@ -1220,9 +1276,11 @@ class _ApartmentMissionCardState extends State<_ApartmentMissionCard> {
         : progress.current.clamp(0, progress.mission.target);
     return Semantics(
       container: true,
-      button: true,
+      button: complete,
       label: progress == null
           ? '모든 미션 완료'
+          : complete
+          ? '완료한 미션 ${progress.mission.title}, 눌러서 보상 받기'
           : '현재 미션 ${progress.mission.title}, ${progress.current}/${progress.mission.target}',
       child: Material(
         key: const Key('hub-mission-card'),
@@ -1244,7 +1302,7 @@ class _ApartmentMissionCardState extends State<_ApartmentMissionCard> {
           ),
           child: InkWell(
             borderRadius: BorderRadius.circular(12),
-            onTap: widget.onOpen,
+            onTap: complete && !_claiming ? _claim : null,
             child: Padding(
               padding: const EdgeInsets.fromLTRB(8, 7, 7, 7),
               child: Row(
@@ -1259,7 +1317,11 @@ class _ApartmentMissionCardState extends State<_ApartmentMissionCard> {
                         Row(
                           children: [
                             Text(
-                              progress == null ? '미션 완료' : '현재 미션',
+                              progress == null
+                                  ? '미션 완료'
+                                  : complete
+                                  ? '보상 받기'
+                                  : '현재 미션 $current/${progress.mission.target}',
                               style: const TextStyle(
                                 fontFamily: _hubDisplayFont,
                                 color: Color(0xFF9B681C),
@@ -1270,9 +1332,7 @@ class _ApartmentMissionCardState extends State<_ApartmentMissionCard> {
                             ),
                             const Spacer(),
                             Text(
-                              progress == null
-                                  ? '기록 보기'
-                                  : '$current/${progress.mission.target}',
+                              '⭐ ${widget.starBalance}',
                               style: const TextStyle(
                                 fontFamily: _hubDisplayFont,
                                 color: Color(0xFF6B7485),
@@ -1297,57 +1357,40 @@ class _ApartmentMissionCardState extends State<_ApartmentMissionCard> {
                             letterSpacing: -0.25,
                           ),
                         ),
-                        if (progress != null) ...[
-                          const SizedBox(height: 6),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(99),
-                            child: LinearProgressIndicator(
-                              value: progress.ratio,
-                              minHeight: 4,
-                              backgroundColor: const Color(0xFFD9CDB5),
-                              valueColor: const AlwaysStoppedAnimation(
-                                Color(0xFF4EBA8E),
-                              ),
-                            ),
-                          ),
-                        ],
                       ],
                     ),
                   ),
                   const SizedBox(width: 7),
                   if (complete)
-                    SizedBox(
+                    Container(
+                      key: const Key('hub-claim-mission-reward'),
                       width: 30,
                       height: 30,
-                      child: FilledButton(
-                        key: const Key('hub-claim-mission-reward'),
-                        onPressed: _claiming ? null : _claim,
-                        style: FilledButton.styleFrom(
-                          padding: EdgeInsets.zero,
-                          minimumSize: Size.zero,
-                          backgroundColor: const Color(0xFF243451),
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(9),
-                          ),
-                        ),
-                        child: _claiming
-                            ? const SizedBox(
-                                width: 12,
-                                height: 12,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Icon(Icons.card_giftcard_rounded, size: 17),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF243451),
+                        borderRadius: BorderRadius.circular(9),
                       ),
+                      alignment: Alignment.center,
+                      child: _claiming
+                          ? const SizedBox(
+                              width: 12,
+                              height: 12,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(
+                              Icons.card_giftcard_rounded,
+                              size: 17,
+                              color: Colors.white,
+                            ),
                     )
                   else
                     const Icon(
-                      Icons.chevron_right_rounded,
-                      color: Color(0xFF243451),
-                      size: 22,
+                      Icons.flag_rounded,
+                      color: Color(0xFF9B681C),
+                      size: 18,
                     ),
                 ],
               ),

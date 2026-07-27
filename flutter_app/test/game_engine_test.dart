@@ -1,9 +1,13 @@
+import 'dart:math' as math;
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:millennium_capital/game/game_engine.dart';
 import 'package:millennium_capital/game/game_state.dart';
 import 'package:millennium_capital/game/market_clock.dart';
 import 'package:millennium_capital/game/market_data.dart';
+import 'package:millennium_capital/game/market_tick.dart';
 import 'package:millennium_capital/game/order_book.dart';
+import 'package:millennium_capital/game/real_estate_rental.dart';
 import 'package:millennium_capital/game/seed_money_content.dart';
 import 'package:millennium_capital/game/story_state.dart';
 
@@ -16,6 +20,20 @@ void main() {
       state.pendingDecisions.first.id,
       optionId,
     );
+  }
+
+  int dayWithFutureMarketSignal(String seed) {
+    for (var day = 3; day <= 370; day += 1) {
+      final date = DateTime(2000, 1, 1).add(Duration(days: day - 1));
+      if (isMarketTradingDay(date) &&
+          fictionalMarketEventsForDate(
+            seed,
+            date,
+          ).any((event) => event.revealMinute > marketDayStartMinute)) {
+        return day;
+      }
+    }
+    throw StateError('No reportable market signal found for $seed');
   }
 
   test('new game starts as a guardian-approved family research desk', () {
@@ -157,9 +175,11 @@ void main() {
     final second = engine.createNewGame('같은 연구소', worldSeed: 'same-world-seed');
     final firstUniverse = await FictionalMarketUniverse.load(
       seed: first.simulationSeed,
+      throughDate: DateTime(2001, 12, 31),
     );
     final secondUniverse = await FictionalMarketUniverse.load(
       seed: second.simulationSeed,
+      throughDate: DateTime(2001, 12, 31),
     );
     final firstHanbit = firstUniverse.assets.firstWhere(
       (asset) => asset.id == 'hanbit_telecom',
@@ -189,7 +209,11 @@ void main() {
           initialCash: 5000,
           worldSeed: 'report-world-seed',
         )
-        .copyWith(brokerageCash: 0);
+        .copyWith(
+          day: dayWithFutureMarketSignal('report-world-seed'),
+          brokerageCash: 0,
+          marketMinute: marketDayStartMinute,
+        );
     final purchased = engine.purchaseDailyMarketReport(state);
     final repeated = engine.purchaseDailyMarketReport(purchased.state);
     final reports =
@@ -204,6 +228,41 @@ void main() {
     expect(repeated.success, isFalse);
     expect(repeated.state.toJson(), purchased.state.toJson());
   });
+
+  test(
+    'daily reports reject holidays, the close, and empty future signals',
+    () {
+      const seed = 'report-availability-world';
+      final holiday = engine.createNewGame(
+        '보고서 구매 시각',
+        initialCash: 5000,
+        worldSeed: seed,
+      );
+      final holidayResult = engine.purchaseDailyMarketReport(holiday);
+      expect(holidayResult.success, isFalse);
+      expect(holidayResult.message, contains('휴장일'));
+      expect(holidayResult.state.toJson(), holiday.toJson());
+
+      final reportDay = dayWithFutureMarketSignal(seed);
+      final atClose = holiday.copyWith(
+        day: reportDay,
+        marketMinute: krxCloseMinute,
+        brokerageCash: 0,
+      );
+      final closeResult = engine.purchaseDailyMarketReport(atClose);
+      expect(closeResult.success, isFalse);
+      expect(closeResult.message, contains('장이 끝나'));
+      expect(closeResult.state.toJson(), atClose.toJson());
+
+      final afterEveryReveal = atClose.copyWith(
+        marketMinute: krxContinuousEndMinute - 1,
+      );
+      final emptyResult = engine.purchaseDailyMarketReport(afterEveryReveal);
+      expect(emptyResult.success, isFalse);
+      expect(emptyResult.message, contains('미공개'));
+      expect(emptyResult.state.toJson(), afterEveryReveal.toJson());
+    },
+  );
 
   test('family helper fatigue, daily limit, and recovery are persisted', () {
     var state = engine.createNewGame('가족 연구소');
@@ -298,6 +357,11 @@ void main() {
     TradeOrderType type = TradeOrderType.market,
     double? limitPrice,
     double previousClose = 10000,
+    int marketMinute = krxOpenMinute,
+    int? maximumPositionUnits,
+    bool isIpoFirstTradingDay = false,
+    int microstructureFrame = 0,
+    GameOrderBookSnapshot? displayedSnapshot,
   }) => TradeOrder(
     side: side,
     assetId: 'hanbit_telecom',
@@ -308,67 +372,917 @@ void main() {
     quantity: quantity,
     unitPrice: unitPrice,
     quoteDate: quoteDate,
-    marketMinute: 9 * 60,
+    marketMinute: marketMinute,
     isTradingDay: true,
     type: type,
     limitPrice: limitPrice,
     previousClose: previousClose,
+    maximumPositionUnits: maximumPositionUnits,
+    isIpoFirstTradingDay: isIpoFirstTradingDay,
+    microstructureFrame: microstructureFrame,
+    displayedSnapshot: displayedSnapshot,
   );
 
+  GameOrderBookSnapshot snapshotWithDepth(
+    GameOrderBookSnapshot source, {
+    required List<int> askQuantities,
+    required List<int> bidQuantities,
+    required int executionCapacity,
+    int? liquidityPulse,
+  }) {
+    GameOrderBookLevel copyLevel(GameOrderBookLevel level, int quantity) =>
+        GameOrderBookLevel(
+          side: level.side,
+          price: level.price,
+          quantity: quantity,
+          isWall: level.isWall,
+          structuralKind: level.structuralKind,
+          structuralStrength: level.structuralStrength,
+          structuralHoldTicks: level.structuralHoldTicks,
+          isStructuralWall: level.isStructuralWall,
+          isStructuralBreached: level.isStructuralBreached,
+          structuralVacuumMultiplier: level.structuralVacuumMultiplier,
+          isPsychological: level.isPsychological,
+          technicalPeriods: level.technicalPeriods,
+          wasLiquidityPulseTouched: level.wasLiquidityPulseTouched,
+        );
+
+    final asks = <GameOrderBookLevel>[
+      for (var index = 0; index < source.asks.length; index += 1)
+        copyLevel(
+          source.asks[index],
+          index < askQuantities.length
+              ? askQuantities[index]
+              : source.asks[index].quantity,
+        ),
+    ];
+    final bids = <GameOrderBookLevel>[
+      for (var index = 0; index < source.bids.length; index += 1)
+        copyLevel(
+          source.bids[index],
+          index < bidQuantities.length
+              ? bidQuantities[index]
+              : source.bids[index].quantity,
+        ),
+    ];
+    return GameOrderBookSnapshot(
+      asks: List<GameOrderBookLevel>.unmodifiable(asks),
+      bids: List<GameOrderBookLevel>.unmodifiable(bids),
+      turnoverEok: source.turnoverEok,
+      executionCapacity: executionCapacity,
+      totalAskQuantity: asks.fold(0, (sum, level) => sum + level.quantity),
+      totalBidQuantity: bids.fold(0, (sum, level) => sum + level.quantity),
+      tradeStrength: source.tradeStrength,
+      liquidityPulse: liquidityPulse ?? source.liquidityPulse,
+      adaptiveLiquidityPulses: source.adaptiveLiquidityPulses,
+      rememberedLevels: source.rememberedLevels,
+      sourceAssetId: source.sourceAssetId,
+      sourceLiquidityDayKey: source.sourceLiquidityDayKey,
+      sourceDateKey: source.sourceDateKey,
+      sourceMarketMinute: source.sourceMarketMinute,
+      sourceLastTradePrice: source.sourceLastTradePrice,
+      sourceMarket: source.sourceMarket,
+      sourceSimulationSeed: source.sourceSimulationSeed,
+      appliedAskConsumptionByPrice: source.appliedAskConsumptionByPrice,
+      appliedBidConsumptionByPrice: source.appliedBidConsumptionByPrice,
+      appliedCapacityConsumptionUnits: source.appliedCapacityConsumptionUnits,
+    );
+  }
+
+  test('modern IPO limit orders use the 60 to 400 percent first-day range', () {
+    final base = engine.createNewGame('IPO 주문 가격제한 테스트', initialCash: 1000000);
+    final listingDate = DateTime(2023, 6, 26);
+    final listingDay =
+        listingDate.difference(base.campaignStartDate).inDays + 1;
+    final state = base.copyWith(day: listingDay, marketMinute: krxOpenMinute);
+    final rejectedAsOrdinary = engine.executeTrade(
+      state,
+      hanbitOrder(
+        side: TradeSide.buy,
+        quantity: 1,
+        quoteDate: marketDateKey(listingDate),
+        type: TradeOrderType.limit,
+        limitPrice: 30000,
+      ),
+    );
+    final acceptedAsIpo = engine.executeTrade(
+      state,
+      hanbitOrder(
+        side: TradeSide.buy,
+        quantity: 1,
+        quoteDate: marketDateKey(listingDate),
+        type: TradeOrderType.limit,
+        limitPrice: 30000,
+        isIpoFirstTradingDay: true,
+      ),
+    );
+
+    expect(rejectedAsOrdinary.success, isFalse);
+    expect(rejectedAsOrdinary.message, contains('가격제한폭'));
+    expect(acceptedAsIpo.success, isTrue);
+  });
+
   test(
-    'buy debits the quoted current price plus fee and persists a position',
+    'market buy consumes the displayed ask and persists its actual cost',
     () {
       final state = engine
           .createNewGame('거래 연구소', initialCash: 200000)
           .copyWith(day: 4, marketMinute: 9 * 60);
+      final snapshot = buildGameOrderBookSnapshot(
+        assetId: 'hanbit_telecom',
+        day: marketLiquidityDayKey(state.currentDate),
+        minute: state.marketMinute,
+        currentPrice: 10000,
+        previousClose: 10000,
+        date: state.currentDate,
+        market: fictionalMainMarket,
+        simulationSeed: state.simulationSeed,
+      );
       final result = engine.executeTrade(
         state,
-        hanbitOrder(side: TradeSide.buy, quantity: 10),
+        hanbitOrder(side: TradeSide.buy, quantity: 9),
       );
+      final expectedNotional = (snapshot.asks.first.price * 9).round();
+      final expectedFee = gameTradingFeeForState(state, expectedNotional);
 
       expect(result.success, isTrue);
-      expect(result.notional, 100000);
-      expect(result.fee, 250);
-      expect(result.state.cash, 99750);
-      expect(result.state.brokerageCash, 99750);
-      expect(result.state.positions.single.units, 10);
-      expect(result.state.positions.single.totalCost, 100250);
-      expect(result.state.ledger.last.amount, -100250);
+      expect(result.notional, expectedNotional);
+      expect(result.fee, expectedFee);
+      expect(result.state.cash, 200000 - expectedNotional - expectedFee);
+      expect(
+        result.state.brokerageCash,
+        200000 - expectedNotional - expectedFee,
+      );
+      expect(result.state.positions.single.units, 9);
+      expect(
+        result.state.positions.single.totalCost,
+        expectedNotional + expectedFee,
+      );
+      expect(result.state.ledger.last.amount, -expectedNotional - expectedFee);
       expect(result.state.ledger.last.counterAccount, 'market_security');
+      expect(result.state.ledger.last.orderType, TradeOrderType.market.name);
       expect(
         result.state.portfolioValue(const {'hanbit_telecom': 11000}),
-        110000,
+        99000,
       );
-      expect(result.state.totalAum(const {'hanbit_telecom': 11000}), 209750);
+      expect(
+        result.state.totalAum(const {'hanbit_telecom': 11000}),
+        299000 - expectedNotional - expectedFee,
+      );
       final restored = GameState.fromJson(result.state.toJson());
-      expect(restored.positions.single.units, 10);
-      expect(restored.positions.single.totalCost, 100250);
+      expect(restored.positions.single.units, 9);
+      expect(
+        restored.positions.single.totalCost,
+        expectedNotional + expectedFee,
+      );
     },
   );
 
+  test(
+    'consecutive market orders consume the remaining absolute ask depth',
+    () {
+      final base = engine.createNewGame(
+        'price depth ledger',
+        initialCash: 1000000000,
+      );
+      final state = base.copyWith(
+        day: 4,
+        marketMinute: krxOpenMinute,
+        story: base.story.copyWith(accountAuthorityLevel: 5),
+      );
+      final generated = buildGameOrderBookSnapshot(
+        assetId: 'hanbit_telecom',
+        day: marketLiquidityDayKey(state.currentDate),
+        minute: state.marketMinute,
+        currentPrice: 10000,
+        previousClose: 10000,
+        date: state.currentDate,
+        market: fictionalMainMarket,
+        simulationSeed: state.simulationSeed,
+      );
+      final rawDisplayed = snapshotWithDepth(
+        generated,
+        askQuantities: const [3, 7],
+        bidQuantities: const [8, 8],
+        executionCapacity: 20,
+      );
+
+      final first = engine.executeTrade(
+        state,
+        hanbitOrder(
+          side: TradeSide.buy,
+          quantity: 2,
+          displayedSnapshot: rawDisplayed,
+        ),
+      );
+      final consumedAfterFirst = gameConsumedOrderBookUnitsByPrice(
+        first.state,
+        assetId: 'hanbit_telecom',
+        marketMinute: krxOpenMinute,
+        bookSide: GameOrderBookSide.ask,
+      );
+      final staleReplay = engine.executeTrade(
+        first.state,
+        hanbitOrder(
+          side: TradeSide.buy,
+          quantity: 1,
+          displayedSnapshot: rawDisplayed,
+        ),
+      );
+      final secondDisplayed = gameOrderBookSnapshotAfterConsumption(
+        snapshot: rawDisplayed,
+        consumedAskByPrice: consumedAfterFirst,
+        consumedCapacityUnits: gameConsumedOrderBookFillUnits(
+          first.state,
+          assetId: 'hanbit_telecom',
+          marketMinute: krxOpenMinute,
+          side: TradeSide.buy,
+        ),
+      );
+      final second = engine.executeTrade(
+        first.state,
+        hanbitOrder(
+          side: TradeSide.buy,
+          quantity: 3,
+          displayedSnapshot: secondDisplayed,
+        ),
+      );
+
+      expect(first.success, isTrue);
+      expect(staleReplay.success, isFalse);
+      expect(staleReplay.state.toJson(), first.state.toJson());
+      expect(first.state.ledger.last.orderBookSide, 'ask');
+      expect(first.state.ledger.last.orderBookFills, hasLength(1));
+      expect(
+        first.state.ledger.last.orderBookFills.single.price,
+        generated.asks[0].price,
+      );
+      expect(first.state.ledger.last.orderBookFills.single.quantity, 2);
+      expect(second.success, isTrue);
+      expect(second.state.ledger.last.orderBookFills, hasLength(2));
+      expect(
+        second.state.ledger.last.orderBookFills.map((fill) => fill.price),
+        [generated.asks[0].price, generated.asks[1].price],
+      );
+      expect(
+        second.state.ledger.last.orderBookFills.map((fill) => fill.quantity),
+        [1, 2],
+      );
+      final consumed = gameConsumedOrderBookUnitsByPrice(
+        second.state,
+        assetId: 'hanbit_telecom',
+        marketMinute: krxOpenMinute,
+        bookSide: GameOrderBookSide.ask,
+      );
+      expect(consumed[generated.asks[0].price], 3);
+      expect(consumed[generated.asks[1].price], 2);
+
+      final restored = GameState.fromJson(second.state.toJson());
+      expect(restored.ledger.last.orderBookSide, 'ask');
+      expect(restored.ledger.last.orderBookFills, hasLength(2));
+      expect(
+        restored.ledger.last.orderBookFills[1].price,
+        generated.asks[1].price,
+      );
+      expect(restored.ledger.last.orderBookFills[1].quantity, 2);
+      expect(restored.ledger.last.orderBookCapacityUnits, 3);
+    },
+  );
+
+  test('displayed book is stale after shared minute capacity advances', () {
+    final base = engine.createNewGame(
+      'capacity watermark',
+      initialCash: 100000000,
+    );
+    final state = base.copyWith(day: 4, marketMinute: krxOpenMinute);
+    final snapshot = buildGameOrderBookSnapshot(
+      assetId: 'hanbit_telecom',
+      day: marketLiquidityDayKey(state.currentDate),
+      minute: state.marketMinute,
+      currentPrice: 10000,
+      previousClose: 10000,
+      date: state.currentDate,
+      market: fictionalMainMarket,
+      simulationSeed: state.simulationSeed,
+    );
+    final marker = LedgerEntry(
+      id: 'opposite-side-capacity-marker',
+      day: state.day,
+      amount: 0,
+      account: 'brokerage_order',
+      counterAccount: 'external_order_book_queue',
+      description: 'shared capacity advanced',
+      sourceId: 'opposite-side-capacity-marker',
+      assetId: 'hanbit_telecom',
+      marketMinute: state.marketMinute,
+      orderBookCapacityUnits: 1,
+    );
+    final advanced = state.copyWith(ledger: [...state.ledger, marker]);
+
+    final result = engine.executeTrade(
+      advanced,
+      hanbitOrder(
+        side: TradeSide.buy,
+        quantity: 1,
+        displayedSnapshot: snapshot,
+      ),
+    );
+
+    expect(result.success, isFalse);
+    expect(result.state.toJson(), advanced.toJson());
+  });
+
+  test(
+    'buy ask consumption leaves bid depth intact while sharing capacity',
+    () {
+      final base = engine.createNewGame(
+        'two sided depth ledger',
+        initialCash: 1000000000,
+      );
+      final state = base.copyWith(
+        day: 4,
+        marketMinute: krxOpenMinute,
+        story: base.story.copyWith(accountAuthorityLevel: 5),
+        positions: const [
+          PortfolioPosition(
+            assetId: 'hanbit_telecom',
+            symbol: '1001',
+            name: 'Hanbit Telecom',
+            market: fictionalMainMarket,
+            currency: 'KRW',
+            units: 10,
+            totalCost: 100000,
+          ),
+        ],
+      );
+      final generated = buildGameOrderBookSnapshot(
+        assetId: 'hanbit_telecom',
+        day: marketLiquidityDayKey(state.currentDate),
+        minute: state.marketMinute,
+        currentPrice: 10000,
+        previousClose: 10000,
+        date: state.currentDate,
+        market: fictionalMainMarket,
+        simulationSeed: state.simulationSeed,
+      );
+      final displayed = snapshotWithDepth(
+        generated,
+        askQuantities: const [10, 10],
+        bidQuantities: const [10, 10],
+        executionCapacity: 3,
+      );
+      final buy = engine.executeTrade(
+        state,
+        hanbitOrder(
+          side: TradeSide.buy,
+          quantity: 1,
+          displayedSnapshot: displayed,
+        ),
+      );
+      final bidConsumptionAfterBuy = gameConsumedOrderBookUnitsByPrice(
+        buy.state,
+        assetId: 'hanbit_telecom',
+        marketMinute: krxOpenMinute,
+        bookSide: GameOrderBookSide.bid,
+      );
+      final sellDisplayed = gameOrderBookSnapshotAfterConsumption(
+        snapshot: displayed,
+        consumedAskByPrice: gameConsumedOrderBookUnitsByPrice(
+          buy.state,
+          assetId: 'hanbit_telecom',
+          marketMinute: krxOpenMinute,
+          bookSide: GameOrderBookSide.ask,
+        ),
+        consumedBidByPrice: bidConsumptionAfterBuy,
+        consumedCapacityUnits: gameConsumedOrderBookFillUnits(
+          buy.state,
+          assetId: 'hanbit_telecom',
+          marketMinute: krxOpenMinute,
+          side: TradeSide.sell,
+        ),
+      );
+      final sell = engine.executeTrade(
+        buy.state,
+        hanbitOrder(
+          side: TradeSide.sell,
+          quantity: 5,
+          displayedSnapshot: sellDisplayed,
+        ),
+      );
+
+      expect(bidConsumptionAfterBuy, isEmpty);
+      expect(sell.success, isTrue);
+      expect(sell.filledQuantity, 2);
+      expect(sell.state.ledger.last.orderBookSide, 'bid');
+      expect(
+        sell.state.ledger.last.orderBookFills.single.price,
+        generated.bids[0].price,
+      );
+      expect(sell.state.ledger.last.orderBookFills.single.quantity, 2);
+      expect(
+        gameConsumedOrderBookFillUnits(
+          sell.state,
+          assetId: 'hanbit_telecom',
+          marketMinute: krxOpenMinute,
+          side: TradeSide.buy,
+        ),
+        3,
+      );
+    },
+  );
+
+  test('adaptive snapshot pulses do not revive consumed absolute prices', () {
+    final base = engine.createNewGame(
+      'adaptive depth ledger',
+      initialCash: 1000000000,
+    );
+    final state = base.copyWith(
+      day: 4,
+      marketMinute: krxOpenMinute,
+      story: base.story.copyWith(accountAuthorityLevel: 5),
+    );
+    final generated = buildGameOrderBookSnapshot(
+      assetId: 'hanbit_telecom',
+      day: marketLiquidityDayKey(state.currentDate),
+      minute: state.marketMinute,
+      currentPrice: 10000,
+      previousClose: 10000,
+      date: state.currentDate,
+      market: fictionalMainMarket,
+      simulationSeed: state.simulationSeed,
+    );
+    final pulseOne = snapshotWithDepth(
+      generated,
+      askQuantities: const [3, 7],
+      bidQuantities: const [8, 8],
+      executionCapacity: 20,
+      liquidityPulse: 1,
+    );
+    final first = engine.executeTrade(
+      state,
+      hanbitOrder(
+        side: TradeSide.buy,
+        quantity: 3,
+        microstructureFrame: 1,
+        displayedSnapshot: pulseOne,
+      ),
+    );
+    final pulseTwoRaw = snapshotWithDepth(
+      generated,
+      askQuantities: const [3, 9],
+      bidQuantities: const [8, 8],
+      executionCapacity: 20,
+      liquidityPulse: 2,
+    );
+    final pulseTwoDisplayed = gameOrderBookSnapshotAfterConsumption(
+      snapshot: pulseTwoRaw,
+      consumedAskByPrice: gameConsumedOrderBookUnitsByPrice(
+        first.state,
+        assetId: 'hanbit_telecom',
+        marketMinute: krxOpenMinute,
+        bookSide: GameOrderBookSide.ask,
+      ),
+      consumedCapacityUnits: gameConsumedOrderBookFillUnits(
+        first.state,
+        assetId: 'hanbit_telecom',
+        marketMinute: krxOpenMinute,
+        side: TradeSide.buy,
+      ),
+    );
+    final second = engine.executeTrade(
+      first.state,
+      hanbitOrder(
+        side: TradeSide.buy,
+        quantity: 1,
+        microstructureFrame: 2,
+        displayedSnapshot: pulseTwoDisplayed,
+      ),
+    );
+
+    expect(first.success, isTrue);
+    expect(second.success, isTrue);
+    expect(
+      second.state.ledger.last.orderBookFills.single.price,
+      generated.asks[1].price,
+    );
+  });
+
+  test('market orders share finite per-minute order-book capacity', () {
+    final base = engine.createNewGame('시장가 용량 연구소', initialCash: 100000000);
+    final state = base.copyWith(
+      day: 4,
+      marketMinute: 9 * 60,
+      story: base.story.copyWith(accountAuthorityLevel: 5),
+    );
+    final snapshot = buildGameOrderBookSnapshot(
+      assetId: 'hanbit_telecom',
+      day: marketLiquidityDayKey(state.currentDate),
+      minute: state.marketMinute,
+      currentPrice: 10000,
+      previousClose: 10000,
+      date: state.currentDate,
+      market: fictionalMainMarket,
+      simulationSeed: state.simulationSeed,
+    );
+    final liquidityLimit = gameMarketOrderNotionalLimit(
+      10000,
+      turnoverEok: snapshot.turnoverEok,
+    );
+    final expectedFirst = gameOrderBookLimitFillPlan(
+      snapshot: snapshot,
+      isBuy: true,
+      requestedQuantity: snapshot.executionCapacity + 1.0,
+      limitPrice: marketDailyPriceRange(
+        previousClose: 10000,
+        date: state.currentDate,
+        market: fictionalMainMarket,
+      ).upper,
+      availableCapacity: snapshot.executionCapacity,
+      maximumNotional: gameBuyNotionalBudget(
+        state,
+        maximumNotional: math.min(
+          liquidityLimit,
+          gameOrderAuthorityLimit(state),
+        ),
+      ),
+    );
+    final first = engine.executeTrade(
+      state,
+      hanbitOrder(
+        side: TradeSide.buy,
+        quantity: snapshot.executionCapacity + 1,
+      ),
+    );
+    final second = engine.executeTrade(
+      first.state,
+      hanbitOrder(side: TradeSide.buy, quantity: 1),
+    );
+
+    expect(first.success, isTrue);
+    expect(first.filledQuantity, expectedFirst.filledQuantity);
+    expect(first.pendingQuantity, 0);
+    expect(first.message, contains('즉시 취소'));
+    expect(
+      second.success,
+      expectedFirst.filledQuantity < snapshot.executionCapacity,
+    );
+    expect(
+      gameConsumedOrderBookFillUnits(
+        second.state,
+        assetId: 'hanbit_telecom',
+        marketMinute: state.marketMinute,
+        side: TradeSide.buy,
+      ),
+      lessThanOrEqualTo(snapshot.executionCapacity),
+    );
+  });
+
+  test('buy and sell fills share one per-minute execution capacity', () {
+    final base = engine.createNewGame('양방향 용량 연구소', initialCash: 100000000);
+    final state = base.copyWith(
+      day: 4,
+      marketMinute: krxOpenMinute,
+      positions: const [
+        PortfolioPosition(
+          assetId: 'hanbit_telecom',
+          symbol: '1001',
+          name: '한빛통신',
+          market: fictionalMainMarket,
+          currency: 'KRW',
+          units: 1,
+          totalCost: 10000,
+        ),
+      ],
+    );
+    final snapshot = buildGameOrderBookSnapshot(
+      assetId: 'hanbit_telecom',
+      day: marketLiquidityDayKey(state.currentDate),
+      minute: state.marketMinute,
+      currentPrice: 10000,
+      previousClose: 10000,
+      date: state.currentDate,
+      market: fictionalMainMarket,
+      simulationSeed: state.simulationSeed,
+    );
+    final buyCapacityConsumed = state.copyWith(
+      ledger: [
+        ...state.ledger,
+        LedgerEntry(
+          id: 'capacity-buy',
+          day: state.day,
+          amount: 0,
+          account: 'brokerage_cash',
+          counterAccount: 'market_security',
+          description: 'capacity fixture',
+          sourceId: 'capacity-buy',
+          assetId: 'hanbit_telecom',
+          tradeSide: TradeSide.buy.name,
+          tradeQuantity: snapshot.executionCapacity.toDouble(),
+          tradeUnitPrice: 10000,
+          marketMinute: state.marketMinute,
+          orderType: TradeOrderType.market.name,
+        ),
+      ],
+    );
+
+    expect(
+      gameConsumedOrderBookFillUnits(
+        buyCapacityConsumed,
+        assetId: 'hanbit_telecom',
+        marketMinute: state.marketMinute,
+        side: TradeSide.sell,
+      ),
+      snapshot.executionCapacity,
+    );
+    final sell = engine.executeTrade(
+      buyCapacityConsumed,
+      hanbitOrder(side: TradeSide.sell, quantity: 1),
+    );
+    expect(sell.success, isFalse);
+    expect(sell.state.toJson(), buyCapacityConsumed.toJson());
+  });
+
   test('sell credits proceeds after fee and reduces units and cost basis', () {
-    var state = engine
-        .createNewGame('매도 연구소', initialCash: 200000)
-        .copyWith(day: 4, marketMinute: 9 * 60);
+    final base = engine.createNewGame('매도 연구소', initialCash: 200000);
+    var state = base.copyWith(
+      day: 4,
+      marketMinute: 9 * 60,
+      story: base.story.copyWith(accountAuthorityLevel: 2),
+    );
     state = engine
         .executeTrade(state, hanbitOrder(side: TradeSide.buy, quantity: 10))
         .state;
+    final costBeforeSale = state.positions.single.totalCost;
+    final cashBeforeSale = state.cash;
     final result = engine.executeTrade(
       state,
       hanbitOrder(side: TradeSide.sell, quantity: 4, unitPrice: 11000),
     );
+    final disposedCost = (costBeforeSale * 4 / 10).round();
+    final transactionTax = gameSecuritiesTransactionTax(
+      state.currentDate,
+      44000,
+    );
+    final tradingFee = gameTradingFeeForState(state, 44000);
+    final proceeds = 44000 - tradingFee - transactionTax;
 
     expect(result.success, isTrue);
-    expect(result.fee, 110);
-    expect(result.state.cash, 143640);
-    expect(result.state.brokerageCash, 143640);
+    expect(result.fee, tradingFee);
+    expect(result.transactionTax, transactionTax);
+    expect(result.state.cash, cashBeforeSale + proceeds);
+    expect(result.state.brokerageCash, cashBeforeSale + proceeds);
     expect(result.state.positions.single.units, 6);
-    expect(result.state.positions.single.totalCost, 60150);
-    expect(result.state.ledger.last.amount, 43890);
-    expect(result.realizedPnl, 3790);
-    expect(result.state.ledger.last.disposedCost, 40100);
-    expect(result.state.ledger.last.realizedPnl, 3790);
+    expect(
+      result.state.positions.single.totalCost,
+      costBeforeSale - disposedCost,
+    );
+    expect(result.state.ledger.last.amount, proceeds);
+    expect(result.state.ledger.last.transactionTax, transactionTax);
+    expect(result.realizedPnl, proceeds - disposedCost);
+    expect(result.state.ledger.last.disposedCost, disposedCost);
+    expect(result.state.ledger.last.realizedPnl, proceeds - disposedCost);
   });
+
+  test('fractional market sell follows IOC partial-fill semantics', () {
+    final base = engine.createNewGame('소수점 매도 연구소', initialCash: 100000);
+    final marketState = base.copyWith(day: 4, marketMinute: krxOpenMinute);
+    final snapshot = buildGameOrderBookSnapshot(
+      assetId: 'hanbit_telecom',
+      day: marketLiquidityDayKey(marketState.currentDate),
+      minute: marketState.marketMinute,
+      currentPrice: 10000,
+      previousClose: 10000,
+      date: marketState.currentDate,
+      market: fictionalMainMarket,
+      simulationSeed: marketState.simulationSeed,
+    );
+    final requestedQuantity = snapshot.executionCapacity + 0.5;
+    final state = marketState.copyWith(
+      positions: [
+        PortfolioPosition(
+          assetId: 'hanbit_telecom',
+          symbol: '1001',
+          name: '한빛통신',
+          market: fictionalMainMarket,
+          currency: 'KRW',
+          units: requestedQuantity,
+          totalCost: (requestedQuantity * 10000).round(),
+        ),
+      ],
+    );
+
+    final result = engine.executeTrade(
+      state,
+      hanbitOrder(side: TradeSide.sell, quantity: requestedQuantity),
+    );
+
+    expect(result.success, isTrue);
+    expect(result.filledQuantity, greaterThan(0));
+    expect(result.filledQuantity, lessThan(requestedQuantity));
+    expect(result.pendingQuantity, 0);
+    expect(
+      result.state.positions.single.units,
+      closeTo(requestedQuantity - result.filledQuantity, 0.000001),
+    );
+    expect(result.message, contains('즉시 취소'));
+  });
+
+  test('trading fees and sell taxes follow the campaign era', () {
+    expect(
+      gameTradingFeeForState(engine.createNewGame('2000 비용'), 100000),
+      500,
+    );
+    expect(gameSecuritiesTransactionTax(DateTime(2000), 100000), 300);
+    expect(gameSecuritiesTransactionTax(DateTime(2026), 100000), 150);
+  });
+
+  test('positive trades always charge at least one won of fee and tax', () {
+    final state = engine.createNewGame('최소 거래비용');
+
+    expect(gameTradingFeeForState(state, 1), 1);
+    expect(gameSecuritiesTransactionTax(DateTime(2026), 120), 1);
+    expect(gameTradingFeeForState(state, 0), 0);
+    expect(gameSecuritiesTransactionTax(DateTime(2026), 0), 0);
+  });
+
+  test('buys cannot exceed issued shares, including pending reservations', () {
+    final base = engine.createNewGame(
+      '발행주식 상한',
+      initialCash: 1000000,
+      worldSeed: 'issued-share-cap',
+    );
+    final state = base.copyWith(
+      day: 4,
+      marketMinute: krxOpenMinute,
+      story: base.story.copyWith(accountAuthorityLevel: 5),
+      positions: const [
+        PortfolioPosition(
+          assetId: 'hanbit_telecom',
+          symbol: '1001',
+          name: '한빛통신',
+          market: fictionalMainMarket,
+          currency: 'KRW',
+          units: 9,
+          totalCost: 90000,
+        ),
+      ],
+    );
+    final excess = engine.executeTrade(
+      state,
+      hanbitOrder(side: TradeSide.buy, quantity: 2, maximumPositionUnits: 10),
+    );
+
+    expect(excess.success, isFalse);
+    expect(excess.message, contains('발행주식'));
+    expect(excess.state.toJson(), state.toJson());
+
+    final reserved = engine.executeTrade(
+      state,
+      hanbitOrder(
+        side: TradeSide.buy,
+        quantity: 1,
+        type: TradeOrderType.limit,
+        limitPrice: 9000,
+        maximumPositionUnits: 10,
+      ),
+    );
+    expect(reserved.success, isTrue);
+    expect(reserved.pendingQuantity, 1);
+    expect(reserved.state.pendingOrders.single.maximumPositionUnits, 10);
+    expect(
+      PendingTradeOrder.fromJson(
+        reserved.state.pendingOrders.single.toJson(),
+      ).maximumPositionUnits,
+      10,
+    );
+
+    final overReserved = engine.executeTrade(
+      reserved.state,
+      hanbitOrder(
+        side: TradeSide.buy,
+        quantity: 1,
+        type: TradeOrderType.limit,
+        limitPrice: 8950,
+        maximumPositionUnits: 10,
+      ),
+    );
+    expect(overReserved.success, isFalse);
+    expect(overReserved.message, contains('발행주식'));
+  });
+
+  test(
+    'trade trust and profitable-sale reputation are awarded once per day',
+    () {
+      final base = engine.createNewGame(
+        '보상 파밍 방지',
+        initialCash: 100000,
+        worldSeed: 'daily-trade-reward',
+      );
+      final state = base.copyWith(
+        day: 4,
+        marketMinute: krxOpenMinute,
+        story: base.story.copyWith(
+          accountAuthorityLevel: 5,
+          storyFlags: {...base.story.storyFlags, 'reputation': 10},
+        ),
+        positions: const [
+          PortfolioPosition(
+            assetId: 'hanbit_telecom',
+            symbol: '1001',
+            name: '한빛통신',
+            market: fictionalMainMarket,
+            currency: 'KRW',
+            units: 4,
+            totalCost: 4000,
+          ),
+        ],
+      );
+      final first = engine.executeTrade(
+        state,
+        hanbitOrder(side: TradeSide.sell, quantity: 1),
+      );
+      final secondState = first.state.copyWith(marketMinute: krxOpenMinute + 1);
+      final second = engine.executeTrade(
+        secondState,
+        hanbitOrder(
+          side: TradeSide.sell,
+          quantity: 1,
+          marketMinute: krxOpenMinute + 1,
+        ),
+      );
+
+      expect(first.success, isTrue);
+      expect(second.success, isTrue);
+      expect(first.state.story.familyTrust, state.story.familyTrust + 1);
+      expect(second.state.story.familyTrust, first.state.story.familyTrust);
+      expect(first.state.story.reputation, 13);
+      expect(second.state.story.reputation, first.state.story.reputation);
+    },
+  );
+
+  test(
+    'authority limits are monotonic and levels three and five are reachable',
+    () {
+      final wealthy = engine.createNewGame(
+        '권한 단조성',
+        initialCash: 100000000,
+        worldSeed: 'authority-monotonic',
+      );
+      final level3 = wealthy.copyWith(
+        story: wealthy.story.copyWith(accountAuthorityLevel: 3),
+      );
+      final level4 = wealthy.copyWith(
+        story: wealthy.story.copyWith(accountAuthorityLevel: 4),
+      );
+      expect(
+        gameOrderAuthorityLimit(level4),
+        greaterThanOrEqualTo(gameOrderAuthorityLimit(level3)),
+      );
+
+      final almostLevel3 = wealthy.copyWith(
+        day: 4,
+        marketMinute: krxOpenMinute,
+        story: wealthy.story.copyWith(accountAuthorityLevel: 2),
+        progression: wealthy.progression.record('trade_volume', 1995000),
+      );
+      final unlocked3 = engine.executeTrade(
+        almostLevel3,
+        hanbitOrder(side: TradeSide.buy, quantity: 1),
+      );
+      expect(unlocked3.success, isTrue);
+      expect(unlocked3.state.story.accountAuthorityLevel, 3);
+
+      final fundState = wealthy.copyWith(
+        day: 4,
+        marketMinute: krxOpenMinute,
+        story: wealthy.story.copyWith(
+          accountAuthorityLevel: 4,
+          storyFlags: {
+            ...wealthy.story.storyFlags,
+            'fundLaunched': true,
+            'reputation': 59,
+          },
+        ),
+        positions: const [
+          PortfolioPosition(
+            assetId: 'hanbit_telecom',
+            symbol: '1001',
+            name: '한빛통신',
+            market: fictionalMainMarket,
+            currency: 'KRW',
+            units: 1,
+            totalCost: 1000,
+          ),
+        ],
+      );
+      final unlocked5 = engine.executeTrade(
+        fundState,
+        hanbitOrder(side: TradeSide.sell, quantity: 1),
+      );
+      expect(unlocked5.success, isTrue);
+      expect(unlocked5.state.story.accountAuthorityLevel, 5);
+    },
+  );
 
   test(
     'non-marketable limit order reserves cash, persists, fills, and cancels',
@@ -415,6 +1329,11 @@ void main() {
         collisionSafe.state.pendingOrders.map((order) => order.id).toSet(),
         hasLength(2),
       );
+      expect(
+        collisionSafe.state.pendingOrders.last.queueAheadQuantity,
+        collisionSafe.state.pendingOrders.first.queueAheadQuantity +
+            collisionSafe.state.pendingOrders.first.remainingQuantity,
+      );
 
       final filled = engine.processPendingOrdersAtQuote(
         restored,
@@ -425,6 +1344,8 @@ void main() {
       );
       expect(filled.pendingOrders, isEmpty);
       expect(filled.positions.single.units, 10);
+      expect(filled.ledger.last.orderBookSide, 'ask');
+      expect(filled.ledger.last.orderBookFills, isNotEmpty);
 
       final second = engine.executeTrade(
         state,
@@ -458,64 +1379,129 @@ void main() {
 
   test('pending buys use price priority before placement sequence', () {
     final state = engine
-        .createNewGame('가격 우선 연구소', initialCash: 100000000)
+        .createNewGame(
+          '가격 우선 연구소',
+          initialCash: 1000000000,
+          worldSeed: 'pending-price-priority',
+        )
         .copyWith(day: 4, marketMinute: 9 * 60);
+    final nextMinuteSnapshot = buildGameOrderBookSnapshot(
+      assetId: 'hanbit_telecom',
+      day: marketLiquidityDayKey(state.currentDate),
+      minute: 9 * 60 + 1,
+      currentPrice: 900,
+      previousClose: 1000,
+      date: state.currentDate,
+      market: fictionalMainMarket,
+      simulationSeed: state.simulationSeed,
+    );
+    final quantity = nextMinuteSnapshot.executionCapacity + 1.0;
     final lower = engine.executeTrade(
       state,
       hanbitOrder(
         side: TradeSide.buy,
-        quantity: 5000,
+        quantity: quantity,
+        unitPrice: 1000,
+        previousClose: 1000,
         type: TradeOrderType.limit,
-        limitPrice: 9000,
+        limitPrice: 900,
       ),
     );
     final higher = engine.executeTrade(
       lower.state,
       hanbitOrder(
         side: TradeSide.buy,
-        quantity: 5000,
+        quantity: quantity,
+        unitPrice: 1000,
+        previousClose: 1000,
         type: TradeOrderType.limit,
-        limitPrice: 9500,
+        limitPrice: 950,
       ),
+    );
+    final placedLowOrder = higher.state.pendingOrders.singleWhere(
+      (order) => order.limitPrice == 900,
+    );
+    final placedHighOrder = higher.state.pendingOrders.singleWhere(
+      (order) => order.limitPrice == 950,
     );
 
     final filled = engine.processPendingOrdersAtQuote(
       higher.state,
       assetId: 'hanbit_telecom',
-      unitPrice: 9000,
+      unitPrice: 900,
       marketMinute: 9 * 60 + 1,
       isTradingDay: true,
+      previousClose: 1000,
     );
-    final lowOrder = filled.pendingOrders.singleWhere(
-      (order) => order.limitPrice == 9000,
+    expect(
+      placedHighOrder.placedSequence,
+      greaterThan(placedLowOrder.placedSequence),
     );
-    final highOrder = filled.pendingOrders.singleWhere(
-      (order) => order.limitPrice == 9500,
-    );
-
-    expect(lowOrder.remainingQuantity, 5000);
-    expect(highOrder.remainingQuantity, lessThan(5000));
-    expect(highOrder.placedSequence, greaterThan(lowOrder.placedSequence));
+    final fills = filled.ledger
+        .where(
+          (entry) =>
+              entry.assetId == 'hanbit_telecom' &&
+              entry.marketMinute == 9 * 60 + 1 &&
+              entry.tradeSide == TradeSide.buy.name,
+        )
+        .toList(growable: false);
+    expect(fills, isNotEmpty);
+    expect(fills.first.tradeUnitPrice, greaterThan(900));
+    if (fills.length > 1) {
+      expect(
+        fills.first.tradeUnitPrice,
+        greaterThanOrEqualTo(fills.last.tradeUnitPrice),
+        reason: '더 높은 매수 지정가가 먼저 체결되어야 한다.',
+      );
+    }
   });
 
   test('marketable limit order can partially fill and leave a reservation', () {
-    final state = engine
-        .createNewGame('부분 체결 연구소', initialCash: 100000000)
-        .copyWith(day: 4, marketMinute: 9 * 60);
+    final base = engine.createNewGame(
+      '부분 체결 연구소',
+      initialCash: gameMaximumOrderLiquidity,
+    );
+    final state = base.copyWith(
+      day: 4,
+      marketMinute: 9 * 60,
+      story: base.story.copyWith(accountAuthorityLevel: 5),
+    );
+    final snapshot = buildGameOrderBookSnapshot(
+      assetId: 'hanbit_telecom',
+      day: marketLiquidityDayKey(state.currentDate),
+      minute: state.marketMinute,
+      currentPrice: 10000,
+      previousClose: 10000,
+      date: state.currentDate,
+      market: fictionalMainMarket,
+      simulationSeed: state.simulationSeed,
+    );
+    final requestedQuantity = snapshot.executionCapacity + 1.0;
     final result = engine.executeTrade(
       state,
       hanbitOrder(
         side: TradeSide.buy,
-        quantity: 5000,
+        quantity: requestedQuantity,
         type: TradeOrderType.limit,
         limitPrice: 10200,
+      ),
+    );
+    final perFillLimit = gameMarketOrderNotionalLimit(
+      10000,
+      turnoverEok: gameEstimatedTurnoverEok(
+        assetId: 'hanbit_telecom',
+        day: marketLiquidityDayKey(state.currentDate),
+        minute: state.marketMinute,
+        unitPrice: 10000,
+        previousClose: 10000,
+        simulationSeed: state.simulationSeed,
       ),
     );
 
     expect(result.success, isTrue);
     expect(result.filledQuantity, greaterThan(0));
-    expect(result.filledQuantity, lessThan(5000));
-    expect(result.pendingQuantity, 5000 - result.filledQuantity);
+    expect(result.filledQuantity, lessThan(requestedQuantity));
+    expect(result.pendingQuantity, requestedQuantity - result.filledQuantity);
     expect(result.state.pendingOrders, hasLength(1));
     expect(
       result.state.pendingOrders.single.remainingQuantity,
@@ -523,6 +1509,19 @@ void main() {
     );
     expect(result.state.positions.single.units, result.filledQuantity);
     expect(result.averageFillPrice, lessThanOrEqualTo(10200));
+    expect(result.notional, lessThanOrEqualTo(perFillLimit));
+    final fillEntry = result.state.ledger.lastWhere(
+      (entry) => entry.tradeQuantity > 0,
+    );
+    expect(fillEntry.orderBookSide, 'ask');
+    expect(fillEntry.orderBookFills, isNotEmpty);
+    expect(
+      fillEntry.orderBookFills.fold<double>(
+        0,
+        (sum, fill) => sum + fill.quantity,
+      ),
+      result.filledQuantity,
+    );
   });
 
   test('limit fills use displayed asks without market impact', () {
@@ -531,12 +1530,13 @@ void main() {
         .copyWith(day: 4, marketMinute: krxOpenMinute);
     final snapshot = buildGameOrderBookSnapshot(
       assetId: 'hanbit_telecom',
-      day: state.day,
+      day: marketLiquidityDayKey(state.currentDate),
       minute: state.marketMinute,
       currentPrice: 10000,
       previousClose: 10000,
       date: state.currentDate,
       market: '미래시장',
+      simulationSeed: state.simulationSeed,
     );
     final limitPrice = snapshot.asks.first.price;
     final result = engine.executeTrade(
@@ -572,12 +1572,13 @@ void main() {
         .copyWith(day: 4, marketMinute: krxOpenMinute);
     final snapshot = buildGameOrderBookSnapshot(
       assetId: 'hanbit_telecom',
-      day: state.day,
+      day: marketLiquidityDayKey(state.currentDate),
       minute: state.marketMinute,
       currentPrice: 10000,
       previousClose: 10000,
       date: state.currentDate,
       market: '미래시장',
+      simulationSeed: state.simulationSeed,
     );
     final wall = snapshot.bids.firstWhere((level) => level.isWall);
     final placed = engine.executeTrade(
@@ -604,6 +1605,142 @@ void main() {
     expect(waiting.remainingQuantity, 10);
     expect(waiting.queueAheadQuantity, lessThan(queued.queueAheadQuantity));
     expect(waiting.queueAheadQuantity, greaterThan(0));
+    final queueMarker = processed.ledger.last;
+    expect(queueMarker.counterAccount, 'external_order_book_queue');
+    expect(queueMarker.orderBookSide, isEmpty);
+    expect(queueMarker.orderBookFills, isEmpty);
+    expect(queueMarker.orderBookCapacityUnits, greaterThan(0));
+
+    final processedAgain = engine.processPendingOrdersAtQuote(
+      processed,
+      assetId: 'hanbit_telecom',
+      unitPrice: wall.price,
+      marketMinute: krxOpenMinute,
+      isTradingDay: true,
+      previousClose: 10000,
+    );
+    expect(
+      processedAgain.pendingOrders.single.queueAheadQuantity,
+      waiting.queueAheadQuantity,
+    );
+    expect(processedAgain.ledger, hasLength(processed.ledger.length));
+  });
+
+  test(
+    'empty aggressive depth cannot queue-fill an unrepresented limit price',
+    () {
+      final base = engine
+          .createNewGame('represented queue only', initialCash: 100000000)
+          .copyWith(day: 4, marketMinute: krxOpenMinute);
+      final snapshot = buildGameOrderBookSnapshot(
+        assetId: 'hanbit_telecom',
+        day: marketLiquidityDayKey(base.currentDate),
+        minute: base.marketMinute,
+        currentPrice: 10000,
+        previousClose: 10000,
+        date: base.currentDate,
+        market: fictionalMainMarket,
+        simulationSeed: base.simulationSeed,
+      );
+      final firstAsk = snapshot.asks.first;
+      expect(snapshot.executionCapacity, greaterThan(1));
+      expect(
+        snapshot.bids.any(
+          (level) => (level.price - firstAsk.price).abs() < 0.000001,
+        ),
+        isFalse,
+      );
+      final consumedAsk = LedgerEntry(
+        id: 'consumed-best-ask-fixture',
+        day: base.day,
+        amount: 0,
+        account: 'brokerage_cash',
+        counterAccount: 'market_security',
+        description: 'best ask already consumed',
+        sourceId: 'consumed-best-ask-fixture',
+        assetId: 'hanbit_telecom',
+        tradeSide: TradeSide.buy.name,
+        marketMinute: base.marketMinute,
+        orderType: TradeOrderType.limit.name,
+        orderBookSide: GameOrderBookSide.ask.name,
+        orderBookFills: [
+          LedgerOrderBookFill(
+            price: firstAsk.price,
+            quantity: firstAsk.quantity.toDouble(),
+          ),
+        ],
+        orderBookCapacityUnits: 1,
+      );
+      final state = base.copyWith(
+        ledger: [...base.ledger, consumedAsk],
+        pendingOrders: [
+          PendingTradeOrder(
+            id: 'unrepresented-marketable-buy',
+            side: PendingOrderSide.buy,
+            assetId: 'hanbit_telecom',
+            symbol: '1001',
+            name: 'Hanbit Telecom',
+            market: fictionalMainMarket,
+            currency: 'KRW',
+            limitPrice: firstAsk.price,
+            originalQuantity: 1,
+            remainingQuantity: 1,
+            placedDate: marketDateKey(base.currentDate),
+            placedMinute: base.marketMinute,
+            placedSequence: 1,
+          ),
+        ],
+      );
+
+      final processed = engine.processPendingOrdersAtQuote(
+        state,
+        assetId: 'hanbit_telecom',
+        unitPrice: 10000,
+        marketMinute: base.marketMinute,
+        isTradingDay: true,
+        previousClose: 10000,
+      );
+
+      expect(processed.pendingOrders, hasLength(1));
+      expect(processed.pendingOrders.single.remainingQuantity, 1);
+      expect(processed.positions, isEmpty);
+      expect(processed.ledger, hasLength(state.ledger.length));
+    },
+  );
+
+  test('a deep displayed bid keeps a resting order behind external queue', () {
+    final state = engine
+        .createNewGame('깊은 호가 대기 연구소', initialCash: 100000000)
+        .copyWith(day: 4, marketMinute: krxOpenMinute);
+    final snapshot = buildGameOrderBookSnapshot(
+      assetId: 'hanbit_telecom',
+      day: marketLiquidityDayKey(state.currentDate),
+      minute: state.marketMinute,
+      currentPrice: 10000,
+      previousClose: 10000,
+      date: state.currentDate,
+      market: fictionalMainMarket,
+      simulationSeed: state.simulationSeed,
+    );
+    final deepBid = snapshot.bids[7];
+
+    final placed = engine.executeTrade(
+      state,
+      hanbitOrder(
+        side: TradeSide.buy,
+        quantity: 10,
+        type: TradeOrderType.limit,
+        limitPrice: deepBid.price,
+      ),
+    );
+
+    expect(snapshot.bids, hasLength(gameOrderBookLevelCount));
+    expect(placed.success, isTrue);
+    expect(placed.filledQuantity, 0);
+    expect(
+      placed.state.pendingOrders.single.queueAheadQuantity,
+      deepBid.quantity,
+    );
   });
 
   test('a buy limit stays unfilled when the price runs away above it', () {
@@ -663,6 +1800,268 @@ void main() {
     expect(expired.ledger.last.tradeQuantity, 0);
   });
 
+  test('day advance replays pending orders before the close', () {
+    final state = engine
+        .createNewGame('하루 진행 주문 연구소', initialCash: 300000)
+        .copyWith(
+          day: 4,
+          marketMinute: krxOpenMinute,
+          decisions: const [],
+          pendingOrders: const [
+            PendingTradeOrder(
+              id: 'replay-buy',
+              side: PendingOrderSide.buy,
+              assetId: 'hanbit_telecom',
+              symbol: '1001',
+              name: '한빛통신',
+              market: fictionalMainMarket,
+              currency: 'KRW',
+              limitPrice: 9000,
+              originalQuantity: 1,
+              remainingQuantity: 1,
+              placedDate: '2000-01-04',
+              placedMinute: krxOpenMinute,
+              placedSequence: 1,
+            ),
+          ],
+        );
+    final path = List<double>.generate(
+      generatedSessionTicks + 1,
+      (index) => index <= marketTickForMinute(krxOpenMinute) ? 10000 : 8900,
+    );
+
+    final advanced = engine.advanceOneDay(
+      state,
+      pendingOrderQuotePaths: {
+        'hanbit_telecom': GamePendingOrderQuotePath(
+          prices: path,
+          previousClose: 10000,
+          isTradingDay: true,
+        ),
+      },
+    );
+
+    expect(advanced.day, state.day + 1);
+    expect(advanced.pendingOrders, isEmpty);
+    expect(advanced.positions.single.units, 1);
+    expect(
+      advanced.ledger.where((entry) => entry.sourceId == 'replay-buy'),
+      isEmpty,
+    );
+    expect(
+      advanced.ledger.any(
+        (entry) =>
+            entry.assetId == 'hanbit_telecom' &&
+            entry.tradeQuantity == 1 &&
+            entry.counterAccount == 'market_security',
+      ),
+      isTrue,
+    );
+  });
+
+  test('day advance rejects a partial pending-order quote map', () {
+    final state = engine
+        .createNewGame('누락 경로 연구소', initialCash: 300000)
+        .copyWith(
+          day: 4,
+          marketMinute: krxOpenMinute,
+          decisions: const [],
+          pendingOrders: const [
+            PendingTradeOrder(
+              id: 'path-a',
+              side: PendingOrderSide.buy,
+              assetId: 'asset-a',
+              symbol: '1001',
+              name: 'A',
+              market: fictionalMainMarket,
+              currency: 'KRW',
+              limitPrice: 9000,
+              originalQuantity: 1,
+              remainingQuantity: 1,
+              placedDate: '2000-01-04',
+              placedMinute: krxOpenMinute,
+              placedSequence: 1,
+            ),
+            PendingTradeOrder(
+              id: 'path-b',
+              side: PendingOrderSide.buy,
+              assetId: 'asset-b',
+              symbol: '1002',
+              name: 'B',
+              market: fictionalMainMarket,
+              currency: 'KRW',
+              limitPrice: 9000,
+              originalQuantity: 1,
+              remainingQuantity: 1,
+              placedDate: '2000-01-04',
+              placedMinute: krxOpenMinute,
+              placedSequence: 2,
+            ),
+          ],
+        );
+
+    expect(
+      () => engine.advanceOneDay(
+        state,
+        pendingOrderQuotePaths: {
+          'asset-a': GamePendingOrderQuotePath(
+            prices: List<double>.filled(generatedSessionTicks + 1, 10000),
+            previousClose: 10000,
+            isTradingDay: true,
+          ),
+        },
+      ),
+      throwsArgumentError,
+    );
+  });
+
+  test('pending replay rejects rewind and incomplete trading-day paths', () {
+    final base = engine.createNewGame('주문 재생 검증 연구소', initialCash: 300000);
+    final marketState = base.copyWith(day: 4, marketMinute: krxOpenMinute);
+    final state = marketState.copyWith(
+      pendingOrders: [
+        PendingTradeOrder(
+          id: 'future-buy',
+          side: PendingOrderSide.buy,
+          assetId: 'hanbit_telecom',
+          symbol: '1001',
+          name: '한빛통신',
+          market: fictionalMainMarket,
+          currency: 'KRW',
+          limitPrice: 9000,
+          originalQuantity: 1,
+          remainingQuantity: 1,
+          placedDate: marketDateKey(marketState.currentDate),
+          placedMinute: krxOpenMinute + 2,
+          placedSequence: 1,
+        ),
+      ],
+    );
+
+    expect(
+      () => engine.processPendingOrdersThroughMarketMinute(
+        state,
+        targetMinute: krxOpenMinute - 1,
+        quotePaths: const {},
+      ),
+      throwsArgumentError,
+    );
+    expect(
+      () => engine.processPendingOrdersThroughMarketMinute(
+        state,
+        targetMinute: krxOpenMinute + 1,
+        quotePaths: const {},
+      ),
+      throwsArgumentError,
+    );
+    expect(
+      () => engine.processPendingOrdersThroughMarketMinute(
+        state,
+        targetMinute: krxOpenMinute + 1,
+        quotePaths: const {
+          'hanbit_telecom': GamePendingOrderQuotePath(
+            prices: [8900],
+            previousClose: 10000,
+            isTradingDay: true,
+          ),
+        },
+      ),
+      throwsArgumentError,
+    );
+    expect(
+      () => engine.processPendingOrdersThroughMarketMinute(
+        state,
+        targetMinute: krxOpenMinute + 1,
+        quotePaths: const {
+          'hanbit_telecom': GamePendingOrderQuotePath(
+            prices: [8900],
+            previousClose: 10000,
+            isTradingDay: false,
+          ),
+        },
+      ),
+      throwsArgumentError,
+    );
+
+    final beforePlacement = engine.processPendingOrdersThroughMarketMinute(
+      state,
+      targetMinute: krxOpenMinute + 1,
+      quotePaths: {
+        'hanbit_telecom': GamePendingOrderQuotePath(
+          prices: List<double>.filled(generatedSessionTicks + 1, 8900),
+          previousClose: 10000,
+          isTradingDay: true,
+        ),
+      },
+    );
+    expect(beforePlacement.marketMinute, krxOpenMinute + 1);
+    expect(beforePlacement.pendingOrders, hasLength(1));
+    expect(beforePlacement.positions, isEmpty);
+  });
+
+  test('legacy non-positive issued-share caps normalize to unknown', () {
+    final base = engine.createNewGame('구세이브 주문 연구소', initialCash: 300000);
+    final state = base.copyWith(
+      day: 4,
+      pendingOrders: const [
+        PendingTradeOrder(
+          id: 'legacy-cap',
+          side: PendingOrderSide.buy,
+          assetId: 'hanbit_telecom',
+          symbol: '1001',
+          name: '한빛통신',
+          market: fictionalMainMarket,
+          currency: 'KRW',
+          limitPrice: 9000,
+          originalQuantity: 1,
+          remainingQuantity: 1,
+          placedDate: '2000-01-04',
+          placedMinute: krxOpenMinute,
+          placedSequence: 1,
+          maximumPositionUnits: 10,
+        ),
+      ],
+    );
+
+    for (final legacyMaximum in const [0, -1]) {
+      final json = state.toJson();
+      final pending =
+          (json['pendingOrders'] as List).single as Map<String, dynamic>;
+      pending['maximumPositionUnits'] = legacyMaximum;
+      final restored = GameState.fromJson(json);
+      expect(restored.pendingOrders, hasLength(1));
+      expect(restored.pendingOrders.single.maximumPositionUnits, isNull);
+    }
+  });
+
+  test('pending buy reservation handles multiplicative overflow safely', () {
+    final base = engine.createNewGame('예약금 오버플로 연구소', initialCash: 1000);
+    final state = base.copyWith(
+      day: 4,
+      brokerageCash: 123,
+      pendingOrders: const [
+        PendingTradeOrder(
+          id: 'overflow-buy',
+          side: PendingOrderSide.buy,
+          assetId: 'hanbit_telecom',
+          symbol: '1001',
+          name: '한빛통신',
+          market: fictionalMainMarket,
+          currency: 'KRW',
+          limitPrice: double.maxFinite,
+          originalQuantity: 2,
+          remainingQuantity: 2,
+          placedDate: '2000-01-04',
+          placedMinute: krxOpenMinute,
+          placedSequence: 1,
+        ),
+      ],
+    );
+
+    expect(state.pendingBuyReservedCash, 123);
+    expect(state.availableBrokerageCash, 0);
+  });
+
   test('pre-v15 saves migrate with an empty pending-order book', () {
     final legacy = engine.createNewGame('주문 마이그레이션').toJson()
       ..remove('pendingOrders')
@@ -715,8 +2114,9 @@ void main() {
       state,
       hanbitOrder(side: TradeSide.buy, quantity: 3),
     );
-    expect(buyWithoutEnoughDeposit.success, isFalse);
-    expect(buyWithoutEnoughDeposit.message, contains('예수금'));
+    expect(buyWithoutEnoughDeposit.success, isTrue);
+    expect(buyWithoutEnoughDeposit.filledQuantity, 1);
+    expect(buyWithoutEnoughDeposit.message, contains('즉시 취소'));
   });
 
   test('insufficient cash rejects a buy without mutating state', () {
@@ -741,6 +2141,20 @@ void main() {
       state,
       hanbitOrder(side: TradeSide.buy, quantity: 0),
     );
+    final nanQuantity = engine.executeTrade(
+      state,
+      hanbitOrder(side: TradeSide.buy, quantity: double.nan),
+    );
+    final invalidLimitQuote = engine.executeTrade(
+      state,
+      hanbitOrder(
+        side: TradeSide.buy,
+        quantity: 1,
+        unitPrice: -1,
+        type: TradeOrderType.limit,
+        limitPrice: 10000,
+      ),
+    );
     final closed = engine.executeTrade(
       state.copyWith(marketMinute: 20 * 60),
       TradeOrder(
@@ -757,20 +2171,65 @@ void main() {
         isTradingDay: true,
       ),
     );
+    final spoofedClosingFill = engine.executeTrade(
+      state.copyWith(marketMinute: 20 * 60),
+      TradeOrder(
+        side: TradeSide.buy,
+        assetId: 'hanbit_telecom',
+        symbol: '1001',
+        name: '한빛통신',
+        market: fictionalMainMarket,
+        currency: 'KRW',
+        quantity: 1,
+        unitPrice: 10000,
+        quoteDate: '2000-01-04',
+        marketMinute: 20 * 60,
+        isTradingDay: true,
+        type: TradeOrderType.limit,
+        limitPrice: 10000,
+        isLimitFill: true,
+        isClosingAuctionFill: true,
+      ),
+    );
+    final spoofedInternalFill = engine.executeTrade(
+      state,
+      TradeOrder(
+        side: TradeSide.buy,
+        assetId: 'hanbit_telecom',
+        symbol: '1001',
+        name: '한빛통신',
+        market: fictionalMainMarket,
+        currency: 'KRW',
+        quantity: 1,
+        unitPrice: 1,
+        quoteDate: '2000-01-04',
+        marketMinute: krxOpenMinute,
+        isTradingDay: true,
+        type: TradeOrderType.limit,
+        limitPrice: 1,
+        previousClose: 10000,
+        isLimitFill: true,
+      ),
+    );
     final excessSell = engine.executeTrade(
       state,
       hanbitOrder(side: TradeSide.sell, quantity: 1),
     );
 
     expect(invalidQuantity.success, isFalse);
+    expect(nanQuantity.success, isFalse);
+    expect(invalidLimitQuote.success, isFalse);
     expect(closed.success, isFalse);
+    expect(spoofedClosingFill.success, isFalse);
+    expect(spoofedInternalFill.success, isFalse);
+    expect(spoofedInternalFill.state.toJson(), state.toJson());
     expect(excessSell.success, isFalse);
     expect(excessSell.message, contains('보유'));
     expect(state.positions, isEmpty);
   });
 
   test(
-    'React v3 date, fractional positions, cash, and team migrate to v15',
+    'React v3 date, fractional positions, cash, and team migrate to v18',
     () {
       final state = engine.migrate({
         'version': 3,
@@ -784,7 +2243,7 @@ void main() {
       });
 
       expect(state.version, GameState.schemaVersion);
-      expect(GameState.schemaVersion, 15);
+      expect(GameState.schemaVersion, 18);
       expect(state.day, 5);
       expect(state.cash, 765432);
       expect(state.brokerageCash, 765432);
@@ -836,12 +2295,31 @@ void main() {
       ),
     );
 
+    const expectedNotional = 21250;
+    final expectedFee = gameTradingFeeForState(migrated, expectedNotional);
+    final expectedTax = gameSecuritiesTransactionTax(
+      migrated.currentDate,
+      expectedNotional,
+    );
     expect(result.success, isTrue);
-    expect(result.notional, 20000);
-    expect(result.fee, 50);
-    expect(result.state.cash, 20950);
+    expect(result.notional, expectedNotional);
+    expect(result.fee, expectedFee);
+    expect(result.transactionTax, expectedTax);
+    expect(
+      result.state.cash,
+      1000 + expectedNotional - expectedFee - expectedTax,
+    );
     expect(result.state.positions, isEmpty);
     expect(result.state.ledger.last.description, contains('2.5주 매도'));
+    expect(result.state.ledger.last.orderBookSide, 'bid');
+    expect(result.state.ledger.last.orderBookFills, isNotEmpty);
+    expect(
+      result.state.ledger.last.orderBookFills.fold<double>(
+        0,
+        (sum, fill) => sum + fill.quantity,
+      ),
+      closeTo(2.5, 0.000001),
+    );
   });
 
   test('fractional buy orders are rejected without mutating state', () {
@@ -955,16 +2433,264 @@ void main() {
     state = engine.applyCorporateActions(state, const [split, dividend]);
     expect(state.positions.single.units, 20);
     expect(state.positions.single.totalCost, 50000);
-    expect(state.cash, 101000);
-    expect(state.brokerageCash, 21000);
+    expect(state.cash, 100846);
+    expect(state.brokerageCash, 20846);
     expect(state.bankCash, 80000);
     expect(state.ledger.first.account, 'brokerage_cash');
-    expect(state.ledger, hasLength(2));
+    expect(state.ledger, hasLength(3));
+    expect(
+      state.ledger.any(
+        (entry) => entry.counterAccount == 'dividend_withholding_tax',
+      ),
+      isTrue,
+    );
     expect(state.processedEventIds, hasLength(2));
     expect(
       engine.applyCorporateActions(state, const [split, dividend]).toJson(),
       state.toJson(),
     );
+  });
+
+  test('closing-auction market conversion preserves issued-share cap', () {
+    final base = engine.createNewGame('동시호가 상한 연구소', initialCash: 1000000);
+    final state = base.copyWith(
+      day: 4,
+      marketMinute: krxContinuousEndMinute,
+      story: base.story.copyWith(accountAuthorityLevel: 5),
+    );
+
+    final queued = engine.executeTrade(
+      state,
+      hanbitOrder(
+        side: TradeSide.buy,
+        quantity: 1,
+        marketMinute: krxContinuousEndMinute,
+        maximumPositionUnits: 10,
+      ),
+    );
+
+    expect(queued.success, isTrue);
+    expect(queued.filledQuantity, 0);
+    expect(queued.state.pendingOrders, hasLength(1));
+    expect(queued.state.pendingOrders.single.maximumPositionUnits, 10);
+  });
+
+  test(
+    'closing auction queues orders and clears once at the official close',
+    () {
+      final base = engine.createNewGame('동시호가 연구소', initialCash: 2000000000);
+      final state = base.copyWith(
+        day: 4,
+        marketMinute: krxContinuousEndMinute,
+        story: base.story.copyWith(accountAuthorityLevel: 5),
+      );
+      final placed = engine.executeTrade(
+        state,
+        hanbitOrder(
+          side: TradeSide.buy,
+          quantity: 100000,
+          type: TradeOrderType.limit,
+          limitPrice: 10000,
+          marketMinute: krxContinuousEndMinute,
+        ),
+      );
+      final closePath = List<double>.filled(generatedSessionTicks + 1, 10000)
+        ..[marketTickForMinute(krxCloseMinute)] = 9900;
+      final settled = engine.advanceOneDay(
+        placed.state.copyWith(decisions: const []),
+        pendingOrderQuotePaths: {
+          'hanbit_telecom': GamePendingOrderQuotePath(
+            prices: closePath,
+            previousClose: 10000,
+            isTradingDay: true,
+          ),
+        },
+      );
+
+      expect(placed.success, isTrue);
+      expect(placed.filledQuantity, 0);
+      expect(placed.pendingQuantity, 100000);
+      expect(settled.pendingOrders, isEmpty);
+      expect(settled.positions.single.units, greaterThan(0));
+      expect(settled.positions.single.units, lessThan(100000));
+      expect(
+        settled.ledger.where(
+          (entry) => entry.counterAccount == 'market_security',
+        ),
+        hasLength(1),
+      );
+      expect(
+        settled.ledger.where(
+          (entry) => entry.counterAccount == 'day_order_expiry',
+        ),
+        hasLength(1),
+      );
+    },
+  );
+
+  test('spinoff allocates cost and cancels affected pending orders', () {
+    final base = engine.createNewGame('분할 정산 테스트', initialCash: 100000);
+    final state = base.copyWith(
+      day: 5,
+      marketMinute: krxOpenMinute,
+      positions: const [
+        PortfolioPosition(
+          assetId: 'sample',
+          symbol: '000001',
+          name: '샘플',
+          market: fictionalMainMarket,
+          currency: 'KRW',
+          units: 10,
+          totalCost: 50000,
+        ),
+      ],
+      pendingOrders: const [
+        PendingTradeOrder(
+          id: 'sample-pending-buy',
+          side: PendingOrderSide.buy,
+          assetId: 'sample',
+          symbol: '000001',
+          name: '샘플',
+          market: fictionalMainMarket,
+          currency: 'KRW',
+          limitPrice: 9000,
+          originalQuantity: 2,
+          remainingQuantity: 2,
+          placedDate: '2000-01-05',
+          placedMinute: krxOpenMinute,
+          placedSequence: 1,
+        ),
+      ],
+    );
+    const spinoff = MarketCorporateAction(
+      id: 'sample-spinoff-2000-01-05',
+      assetId: 'sample',
+      type: MarketCorporateActionType.spinoff,
+      date: '2000-01-05',
+      numerator: 1,
+      denominator: 5,
+      amount: 5000,
+      currency: 'KRW',
+      source: 'test',
+      referencePrice: 10000,
+      relatedAssetId: 'sample_child',
+      relatedSymbol: '000002',
+      relatedName: '샘플자회사',
+      relatedMarket: fictionalMainMarket,
+    );
+
+    final next = engine.applyCorporateActions(state, const [spinoff]);
+    final parent = next.positions.singleWhere(
+      (position) => position.assetId == 'sample',
+    );
+    final child = next.positions.singleWhere(
+      (position) => position.assetId == 'sample_child',
+    );
+
+    expect(next.pendingOrders, isEmpty);
+    expect(
+      next.ledger.any(
+        (entry) => entry.counterAccount == 'corporate_action_cancel',
+      ),
+      isTrue,
+    );
+    expect(child.units, 2);
+    expect(parent.totalCost + child.totalCost, 50000);
+    expect(child.totalCost, 5000);
+  });
+
+  test('shareholder rights are sold once while units stay unchanged', () {
+    final base = engine.createNewGame('유상증자 테스트', initialCash: 100000);
+    final state = base.copyWith(
+      day: 5,
+      positions: const [
+        PortfolioPosition(
+          assetId: 'sample',
+          symbol: '000001',
+          name: '샘플',
+          market: fictionalMainMarket,
+          currency: 'KRW',
+          units: 10,
+          totalCost: 50000,
+        ),
+      ],
+    );
+    const rightsIssue = MarketCorporateAction(
+      id: 'sample-rights-2000-01-05',
+      assetId: 'sample',
+      type: MarketCorporateActionType.rightsIssue,
+      date: '2000-01-05',
+      numerator: 8,
+      denominator: 100,
+      amount: 8000,
+      currency: 'KRW',
+      source: 'test',
+      referencePrice: 10000,
+      sharesOutstandingBefore: 1000,
+      sharesIssued: 80,
+    );
+
+    final next = engine.applyCorporateActions(state, const [rightsIssue]);
+    final expectedRightsValue = (10 * (10000 - (10000 + 0.08 * 8000) / 1.08))
+        .round();
+
+    expect(next.positions.single.units, 10);
+    expect(next.positions.single.totalCost, 50000);
+    expect(next.cash, state.cash + expectedRightsValue);
+    expect(next.brokerageCash, state.brokerageCash + expectedRightsValue);
+    expect(next.ledger.last.amount, expectedRightsValue);
+    expect(next.ledger.last.counterAccount, 'corporate_rights_sale');
+    expect(next.ledger.last.description, contains('신주인수권 자동매각'));
+    expect(next.ledger.last.description, contains('보유주식수 유지'));
+    expect(next.ledger.last.description, contains('지분율 -7.41%'));
+    expect(
+      engine.applyCorporateActions(next, const [rightsIssue]).toJson(),
+      next.toJson(),
+    );
+  });
+
+  test('third-party rights issue dilutes without TERP or rights proceeds', () {
+    final base = engine.createNewGame('제3자배정 테스트', initialCash: 100000);
+    final state = base.copyWith(
+      day: 5,
+      positions: const [
+        PortfolioPosition(
+          assetId: 'sample',
+          symbol: '000001',
+          name: '샘플',
+          market: fictionalMainMarket,
+          currency: 'KRW',
+          units: 10,
+          totalCost: 50000,
+        ),
+      ],
+    );
+    const thirdPartyIssue = MarketCorporateAction(
+      id: 'sample-third-party-rights-2000-01-05',
+      assetId: 'sample',
+      type: MarketCorporateActionType.rightsIssue,
+      date: '2000-01-05',
+      numerator: 8,
+      denominator: 100,
+      amount: 8000,
+      currency: 'KRW',
+      source: 'test',
+      referencePrice: 10000,
+      sharesOutstandingBefore: 1000,
+      sharesIssued: 80,
+      allocationMethod: MarketRightsIssueAllocationMethod.thirdParty,
+    );
+
+    final next = engine.applyCorporateActions(state, const [thirdPartyIssue]);
+
+    expect(thirdPartyIssue.theoreticalExRightsPrice, isNull);
+    expect(next.positions.single.units, 10);
+    expect(next.cash, state.cash);
+    expect(next.brokerageCash, state.brokerageCash);
+    expect(next.ledger.last.amount, 0);
+    expect(next.ledger.last.counterAccount, 'corporate_rights_issue');
+    expect(next.ledger.last.description, contains('제3자배정'));
+    expect(next.ledger.last.description, contains('신주인수권 없음'));
   });
 
   test('earned seed money unlocks the first guardian order authority', () {
@@ -993,7 +2719,12 @@ void main() {
     );
     final result = engine.executeTrade(
       state,
-      hanbitOrder(side: TradeSide.buy, quantity: 15),
+      hanbitOrder(
+        side: TradeSide.buy,
+        quantity: 15,
+        type: TradeOrderType.limit,
+        limitPrice: 9000,
+      ),
     );
     expect(result.success, isFalse);
     expect(result.message, contains('100000'));
@@ -1114,14 +2845,30 @@ void main() {
       final purchase = engine.purchaseSpendingOption(legal, 'owner_office');
       final january = engine.advanceOneDay(purchase.state);
       final asset = january.personalFinance.realEstate.single;
+      final januaryEnd = january.copyWith(
+        day: DateTime(2007, 1, 31).difference(DateTime(2000, 1, 1)).inDays + 1,
+      );
+      final february = engine.advanceOneDay(januaryEnd);
       final earlySale = engine.sellRealEstate(january, asset.id);
       final eligible = january.copyWith(day: asset.acquiredDay + 30);
-      final sale = engine.sellRealEstate(eligible, asset.id);
+      final listed = engine.sellRealEstate(eligible, asset.id);
+      final listedAsset = listed.state.personalFinance.realEstate.single;
+      final offerState = listed.state.copyWith(
+        day: listedAsset.saleOfferReadyDay,
+      );
+      final sale = engine.sellRealEstate(offerState, listedAsset.id);
 
       expect(purchase.success, isTrue);
       expect(january.personalFinance.monthlyPropertyCost, 40000);
       expect(
         january.ledger.any(
+          (entry) => entry.counterAccount == 'property_maintenance',
+        ),
+        isFalse,
+        reason: '월말 매입 다음 날에는 유지비를 즉시 청구하지 않는다.',
+      );
+      expect(
+        february.ledger.any(
           (entry) => entry.counterAccount == 'property_maintenance',
         ),
         isTrue,
@@ -1131,13 +2878,15 @@ void main() {
         isFalse,
       );
       expect(earlySale.success, isFalse);
+      expect(listed.success, isTrue);
+      expect(listed.cashDelta, 0);
       expect(sale.success, isTrue);
       expect(sale.state.personalFinance.realEstate, isEmpty);
-      expect(sale.cashDelta, 2700000);
+      expect(sale.cashDelta, greaterThan(0));
     },
   );
 
-  test('commercial property income and costs settle separately each month', () {
+  test('new commercial property starts vacant and charges carrying costs', () {
     final december31 =
         DateTime(2008, 12, 31).difference(DateTime(2000, 1, 1)).inDays + 1;
     final base = engine
@@ -1150,23 +2899,34 @@ void main() {
     );
     final purchase = engine.purchaseSpendingOption(legal, 'commercial_unit');
     final january = engine.advanceOneDay(purchase.state);
+    final januaryEnd = january.copyWith(
+      day: DateTime(2009, 1, 31).difference(DateTime(2000, 1, 1)).inDays + 1,
+    );
+    final february = engine.advanceOneDay(januaryEnd);
 
     expect(purchase.success, isTrue);
     expect(
-      january.ledger
-          .where((entry) => entry.counterAccount == 'property_rent_income')
-          .single
-          .amount,
-      110000,
+      purchase.state.personalFinance.realEstate.single.leaseType,
+      RealEstateLeaseType.vacant,
     );
     expect(
-      january.ledger
-          .where((entry) => entry.counterAccount == 'property_maintenance')
+      january.ledger.any(
+        (entry) => entry.counterAccount == 'property_rent_income',
+      ),
+      isFalse,
+    );
+    expect(
+      february.ledger
+          .where(
+            (entry) =>
+                entry.counterAccount == 'property_maintenance' &&
+                entry.amount < 0,
+          )
           .single
           .amount,
       -25000,
     );
-    expect(january.personalFinance.totalPropertyIncome, 110000);
+    expect(february.personalFinance.totalPropertyIncome, 0);
   });
 
   test(
@@ -1220,16 +2980,22 @@ void main() {
 
       expect(monday.currentDate, DateTime(2000, 1, 3));
       expect(monday.currentDate.weekday, DateTime.monday);
+      expect(isMarketTradingDay(monday.currentDate), isTrue);
       expect(monday.marketMinute, marketDayStartMinute);
     },
   );
 
   test('market reports use bank cash and never drain brokerage cash', () {
-    final funded = engine.createNewGame(
-      '보고서 계정 분리 테스트',
-      initialCash: 100000,
-      worldSeed: 'report-account-world',
-    );
+    final funded = engine
+        .createNewGame(
+          '보고서 계정 분리 테스트',
+          initialCash: 100000,
+          worldSeed: 'report-account-world',
+        )
+        .copyWith(
+          day: dayWithFutureMarketSignal('report-account-world'),
+          marketMinute: marketDayStartMinute,
+        );
 
     final rejected = engine.purchaseDailyMarketReport(funded);
     expect(rejected.success, isFalse);
@@ -1401,30 +3167,140 @@ void main() {
     },
   );
 
-  test('large orders receive slippage and respect per-stock liquidity', () {
-    final state = engine
-        .createNewGame('대량 주문 테스트', initialCash: 1000000000)
-        .copyWith(day: 4, marketMinute: 9 * 60);
+  test(
+    'large market orders use finite depth and cancel the unfilled remainder',
+    () {
+      final state = engine
+          .createNewGame('대량 주문 테스트', initialCash: 1000000000)
+          .copyWith(day: 4, marketMinute: 9 * 60);
+      final snapshot = buildGameOrderBookSnapshot(
+        assetId: 'hanbit_telecom',
+        day: marketLiquidityDayKey(state.currentDate),
+        minute: state.marketMinute,
+        currentPrice: 10000,
+        previousClose: 10000,
+        date: state.currentDate,
+        market: fictionalMainMarket,
+        simulationSeed: state.simulationSeed,
+      );
+      final liquidityLimit = gameMarketOrderNotionalLimit(
+        10000,
+        turnoverEok: snapshot.turnoverEok,
+      );
+      final requested = snapshot.executionCapacity * 2 + 1000;
+      final expectedPlan = gameOrderBookLimitFillPlan(
+        snapshot: snapshot,
+        isBuy: true,
+        requestedQuantity: requested.toDouble(),
+        limitPrice: marketDailyPriceRange(
+          previousClose: 10000,
+          date: state.currentDate,
+          market: fictionalMainMarket,
+        ).upper,
+        availableCapacity: snapshot.executionCapacity,
+        maximumNotional: gameBuyNotionalBudget(
+          state,
+          maximumNotional: math.min(
+            liquidityLimit,
+            gameOrderAuthorityLimit(state),
+          ),
+        ),
+      );
 
-    final filled = engine.executeTrade(
-      state,
-      hanbitOrder(side: TradeSide.buy, quantity: 1000),
+      final filled = engine.executeTrade(
+        state,
+        hanbitOrder(side: TradeSide.buy, quantity: requested.toDouble()),
+      );
+
+      expect(filled.success, isTrue);
+      expect(filled.filledQuantity, expectedPlan.filledQuantity);
+      expect(filled.notional, greaterThan(0));
+      expect(filled.notional, lessThanOrEqualTo(liquidityLimit));
+      expect(filled.message, contains('즉시 취소'));
+      expect(gameMaxBuyQuantity(state, 10000), greaterThan(0));
+    },
+  );
+
+  test('market order average price comes from consumed ask levels', () {
+    final base = engine.createNewGame('시장가 호가 평균 테스트', initialCash: 1000000000);
+    final state = base.copyWith(
+      day: 4,
+      marketMinute: 9 * 60,
+      story: base.story.copyWith(accountAuthorityLevel: 5),
     );
-    final rejected = engine.executeTrade(
+    final snapshot = buildGameOrderBookSnapshot(
+      assetId: 'hanbit_telecom',
+      day: marketLiquidityDayKey(state.currentDate),
+      minute: state.marketMinute,
+      currentPrice: 252500,
+      previousClose: 252500,
+      date: state.currentDate,
+      market: fictionalMainMarket,
+      simulationSeed: state.simulationSeed,
+    );
+    final requested = math.min(1000, snapshot.executionCapacity);
+    final range = marketDailyPriceRange(
+      previousClose: 252500,
+      date: state.currentDate,
+      market: fictionalMainMarket,
+    );
+    final plan = gameOrderBookLimitFillPlan(
+      snapshot: snapshot,
+      isBuy: true,
+      requestedQuantity: requested.toDouble(),
+      limitPrice: range.upper,
+      availableCapacity: snapshot.executionCapacity,
+    );
+    final result = engine.executeTrade(
       state,
-      hanbitOrder(side: TradeSide.buy, quantity: 60000),
+      hanbitOrder(
+        side: TradeSide.buy,
+        quantity: requested.toDouble(),
+        unitPrice: 252500,
+        previousClose: 252500,
+      ),
     );
 
-    expect(filled.success, isTrue);
-    expect(filled.notional, greaterThan(10000000));
-    expect(rejected.success, isFalse);
-    expect(rejected.message, contains('체결 한도'));
-    expect(gameMaxBuyQuantity(state, 10000), 50000);
+    expect(result.success, isTrue);
+    expect(result.filledQuantity, plan.filledQuantity);
+    expect(result.averageFillPrice, plan.averagePrice);
+    expect(result.notional, plan.notional);
+    expect(
+      result.averageFillPrice,
+      greaterThanOrEqualTo(snapshot.asks.first.price),
+    );
+    expect(result.averageFillPrice, lessThanOrEqualTo(plan.worstPrice));
+  });
+
+  test('market IOC stays inside authority after walking to higher asks', () {
+    final base = engine.createNewGame('시장가 권한 예산 테스트', initialCash: 100000000);
+    final state = base.copyWith(
+      day: 4,
+      marketMinute: krxOpenMinute,
+      story: base.story.copyWith(accountAuthorityLevel: 2),
+    );
+    final requested = gameMaxBuyQuantity(state, 10000);
+    final result = engine.executeTrade(
+      state,
+      hanbitOrder(side: TradeSide.buy, quantity: requested.toDouble()),
+    );
+
+    expect(result.success, isTrue);
+    expect(result.filledQuantity, greaterThan(0));
+    expect(result.filledQuantity, lessThanOrEqualTo(requested));
+    expect(result.notional, lessThanOrEqualTo(gameOrderAuthorityLimit(state)));
+    expect(
+      result.notional + result.fee,
+      lessThanOrEqualTo(state.availableBrokerageCash),
+    );
   });
 
   test('generated IPO positions survive a save migration intact', () async {
     const worldSeed = 'generated-ipo-save-world';
-    final universe = await FictionalMarketUniverse.load(seed: worldSeed);
+    final universe = await FictionalMarketUniverse.load(
+      seed: worldSeed,
+      throughDate: DateTime(2000, 12, 31),
+    );
     final ipo = universe.assets.firstWhere(
       (asset) => asset.listedOn != null && asset.parentAssetId == null,
     );

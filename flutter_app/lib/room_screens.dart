@@ -648,11 +648,7 @@ class _MissionProgressCardState extends State<_MissionProgressCard> {
                 label: '+${mission.experienceReward} XP',
                 color: _blue,
               ),
-              if (mission.cashReward > 0)
-                _MissionRewardChip(
-                  label: '+${_money(mission.cashReward)}원',
-                  color: _yellow,
-                ),
+              const _MissionRewardChip(label: '⭐ +1', color: _yellow),
               if (mission.reputationReward > 0)
                 _MissionRewardChip(
                   label: '평판 +${mission.reputationReward}',
@@ -873,8 +869,17 @@ class PortfolioLedgerScreen extends StatefulWidget {
     this.onPurchaseSpendingOption,
     this.onSellRealEstate,
     this.onConfigureRealEstateLease,
+    this.onCancelRealEstateSaleListing,
+    this.onSaveRealEstateInvestmentNote,
+    this.onRenovateRealEstate,
+    this.onSetRealEstateInsurance,
+    this.onRenewRealEstateMonthlyLease,
+    this.onTerminateRealEstateMonthlyLeaseEarly,
+    this.onPrepayRealEstateMortgage,
+    this.onRefinanceRealEstateMortgage,
     this.onPlayChanceGame,
     this.universe,
+    this.universeLoader,
   });
 
   final GameState state;
@@ -886,8 +891,29 @@ class PortfolioLedgerScreen extends StatefulWidget {
     RealEstateLeaseType leaseType,
   )?
   onConfigureRealEstateLease;
+  final Future<FinanceActionResult> Function(String assetId)?
+  onCancelRealEstateSaleListing;
+  final Future<FinanceActionResult> Function(String assetId, String note)?
+  onSaveRealEstateInvestmentNote;
+  final Future<FinanceActionResult> Function(String assetId)?
+  onRenovateRealEstate;
+  final Future<FinanceActionResult> Function(String assetId, bool active)?
+  onSetRealEstateInsurance;
+  final Future<FinanceActionResult> Function(String assetId)?
+  onRenewRealEstateMonthlyLease;
+  final Future<FinanceActionResult> Function(String assetId)?
+  onTerminateRealEstateMonthlyLeaseEarly;
+  final Future<FinanceActionResult> Function(String assetId, int amount)?
+  onPrepayRealEstateMortgage;
+  final Future<FinanceActionResult> Function(
+    String assetId, {
+    required bool variableRate,
+    int? termMonths,
+  })?
+  onRefinanceRealEstateMortgage;
   final Future<FinanceActionResult> Function(int stake)? onPlayChanceGame;
   final FictionalMarketUniverse? universe;
+  final MarketUniverseLoader? universeLoader;
 
   @override
   State<PortfolioLedgerScreen> createState() => _PortfolioLedgerScreenState();
@@ -896,6 +922,7 @@ class PortfolioLedgerScreen extends StatefulWidget {
 class _PortfolioLedgerScreenState extends State<PortfolioLedgerScreen> {
   late Future<FictionalMarketUniverse> _universeFuture;
   late GameState _state;
+  bool _isRetryingMarketData = false;
 
   GameState get state => _state;
 
@@ -928,6 +955,83 @@ class _PortfolioLedgerScreenState extends State<PortfolioLedgerScreen> {
     return result;
   }
 
+  Future<FinanceActionResult> _applyRealEstateAction(
+    Future<FinanceActionResult> future,
+  ) async {
+    final result = await future;
+    if (mounted && result.success) setState(() => _state = result.state);
+    return result;
+  }
+
+  Future<FinanceActionResult> _cancelSaleListing(String assetId) {
+    final handler = widget.onCancelRealEstateSaleListing;
+    return handler == null
+        ? Future.value(_disabledFinanceResult())
+        : _applyRealEstateAction(handler(assetId));
+  }
+
+  Future<FinanceActionResult> _saveInvestmentNote(String assetId, String note) {
+    final handler = widget.onSaveRealEstateInvestmentNote;
+    return handler == null
+        ? Future.value(_disabledFinanceResult())
+        : _applyRealEstateAction(handler(assetId, note));
+  }
+
+  Future<FinanceActionResult> _renovateRealEstate(String assetId) {
+    final handler = widget.onRenovateRealEstate;
+    return handler == null
+        ? Future.value(_disabledFinanceResult())
+        : _applyRealEstateAction(handler(assetId));
+  }
+
+  Future<FinanceActionResult> _setRealEstateInsurance(
+    String assetId,
+    bool active,
+  ) {
+    final handler = widget.onSetRealEstateInsurance;
+    return handler == null
+        ? Future.value(_disabledFinanceResult())
+        : _applyRealEstateAction(handler(assetId, active));
+  }
+
+  Future<FinanceActionResult> _renewMonthlyLease(String assetId) {
+    final handler = widget.onRenewRealEstateMonthlyLease;
+    return handler == null
+        ? Future.value(_disabledFinanceResult())
+        : _applyRealEstateAction(handler(assetId));
+  }
+
+  Future<FinanceActionResult> _terminateMonthlyLeaseEarly(String assetId) {
+    final handler = widget.onTerminateRealEstateMonthlyLeaseEarly;
+    return handler == null
+        ? Future.value(_disabledFinanceResult())
+        : _applyRealEstateAction(handler(assetId));
+  }
+
+  Future<FinanceActionResult> _prepayMortgage(String assetId, int amount) {
+    final handler = widget.onPrepayRealEstateMortgage;
+    return handler == null
+        ? Future.value(_disabledFinanceResult())
+        : _applyRealEstateAction(handler(assetId, amount));
+  }
+
+  Future<FinanceActionResult> _refinanceMortgage(
+    String assetId, {
+    required bool variableRate,
+    int? termMonths,
+  }) {
+    final handler = widget.onRefinanceRealEstateMortgage;
+    return handler == null
+        ? Future.value(_disabledFinanceResult())
+        : _applyRealEstateAction(
+            handler(
+              assetId,
+              variableRate: variableRate,
+              termMonths: termMonths,
+            ),
+          );
+  }
+
   Future<FinanceActionResult> _playChance(int stake) async {
     final handler = widget.onPlayChanceGame;
     if (handler == null) return _disabledFinanceResult();
@@ -950,6 +1054,31 @@ class _PortfolioLedgerScreenState extends State<PortfolioLedgerScreen> {
           onPurchase: _purchase,
           onSellRealEstate: _sell,
           onConfigureLease: _configureLease,
+          onCancelSaleListing: widget.onCancelRealEstateSaleListing == null
+              ? null
+              : _cancelSaleListing,
+          onSaveInvestmentNote: widget.onSaveRealEstateInvestmentNote == null
+              ? null
+              : _saveInvestmentNote,
+          onRenovateRealEstate: widget.onRenovateRealEstate == null
+              ? null
+              : _renovateRealEstate,
+          onSetRealEstateInsurance: widget.onSetRealEstateInsurance == null
+              ? null
+              : _setRealEstateInsurance,
+          onRenewMonthlyLease: widget.onRenewRealEstateMonthlyLease == null
+              ? null
+              : _renewMonthlyLease,
+          onTerminateMonthlyLeaseEarly:
+              widget.onTerminateRealEstateMonthlyLeaseEarly == null
+              ? null
+              : _terminateMonthlyLeaseEarly,
+          onPrepayMortgage: widget.onPrepayRealEstateMortgage == null
+              ? null
+              : _prepayMortgage,
+          onRefinanceMortgage: widget.onRefinanceRealEstateMortgage == null
+              ? null
+              : _refinanceMortgage,
           onPlayChanceGame: _playChance,
         ),
       ),
@@ -960,22 +1089,43 @@ class _PortfolioLedgerScreenState extends State<PortfolioLedgerScreen> {
   void initState() {
     super.initState();
     _state = widget.state;
-    _universeFuture = widget.universe == null
-        ? FictionalMarketUniverse.load(
-            seed: state.simulationSeed,
-            throughDate: state.currentDate,
-          )
-        : Future.value(widget.universe!);
+    _universeFuture = _loadUniverse();
   }
 
-  void _retryMarketData() {
+  Future<FictionalMarketUniverse> _loadUniverse({bool forceRefresh = false}) =>
+      Future.sync(() {
+        final universe = widget.universe;
+        if (universe != null) return universe;
+        final loader = widget.universeLoader;
+        if (loader != null) {
+          return loader(
+            seed: state.simulationSeed,
+            throughDate: state.currentDate,
+            forceRefresh: forceRefresh,
+          );
+        }
+        return FictionalMarketUniverse.load(
+          seed: state.simulationSeed,
+          throughDate: state.currentDate,
+          forceRefresh: forceRefresh,
+        );
+      });
+
+  Future<void> _retryMarketData() async {
+    if (_isRetryingMarketData) return;
+    _isRetryingMarketData = true;
+    final nextLoad = _loadUniverse(forceRefresh: true);
     setState(() {
-      _universeFuture = FictionalMarketUniverse.load(
-        seed: state.simulationSeed,
-        throughDate: state.currentDate,
-        forceRefresh: true,
-      );
+      _universeFuture = nextLoad;
     });
+    try {
+      await nextLoad;
+    } catch (_) {
+      // FutureBuilder renders the error and keeps the cash ledger usable.
+    } finally {
+      _isRetryingMarketData = false;
+      if (mounted) setState(() {});
+    }
   }
 
   @override
@@ -1048,10 +1198,12 @@ class _PortfolioLedgerScreenState extends State<PortfolioLedgerScreen> {
                           }
                         }
                         final portfolioValue = state.portfolioValue(prices);
-                        final aum = state.totalAum(prices);
+                        final netWorth = state.balanceSheetNetWorth(
+                          prices: snapshot.hasData ? prices : null,
+                        );
                         final unrealizedPnl = portfolioValue - valuedCost;
                         final grade = _ledgerGradeFor(
-                          snapshot.hasData ? aum : state.cash,
+                          netWorth,
                           state.positions.length,
                         );
                         final positiveCashFlow = state.ledger.fold<int>(
@@ -1083,13 +1235,14 @@ class _PortfolioLedgerScreenState extends State<PortfolioLedgerScreen> {
                             ),
                             const SizedBox(height: 10),
                             if (snapshot.hasError) ...[
-                              _MarketDataLoadError(onRetry: _retryMarketData),
+                              _MarketDataLoadError(
+                                onRetry: () => unawaited(_retryMarketData()),
+                              ),
                               const SizedBox(height: 10),
                             ],
                             _LedgerHeroCard(
-                              cash: state.cash,
                               portfolioValue: portfolioValue,
-                              aum: aum,
+                              netWorth: netWorth,
                               unrealizedPnl: unrealizedPnl,
                               grade: grade,
                               marketReady: snapshot.hasData,
@@ -1390,18 +1543,16 @@ class _LeatherLedgerCover extends StatelessWidget {
 
 class _LedgerHeroCard extends StatelessWidget {
   const _LedgerHeroCard({
-    required this.cash,
     required this.portfolioValue,
-    required this.aum,
+    required this.netWorth,
     required this.unrealizedPnl,
     required this.grade,
     required this.marketReady,
     required this.marketFailed,
   });
 
-  final int cash;
   final int portfolioValue;
-  final int aum;
+  final int netWorth;
   final int unrealizedPnl;
   final _LedgerGrade grade;
   final bool marketReady;
@@ -1409,19 +1560,15 @@ class _LedgerHeroCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final valueLabel = marketReady
-        ? '${_money(aum)}원'
-        : marketFailed
-        ? '현금 ${_money(cash)}원'
-        : '계산 중';
+    final valueLabel = '${_money(netWorth)}원';
     final pnlColor = unrealizedPnl >= 0
         ? const Color(0xFFB64235)
         : const Color(0xFF315E9B);
     final marketCaption = marketReady
-        ? '현금과 평가 가능한 원화 주식을 합산한 장부가치'
+        ? '현금·예금·주식·부동산에서 모든 부채를 뺀 순자산'
         : marketFailed
-        ? '시세를 다시 연결하면 총자산이 완성됩니다.'
-        : '시장 장부를 펼치는 중입니다.';
+        ? '주식은 매입원가로 계산했습니다. 시세를 다시 연결해 주세요.'
+        : '시세 연결 전에는 주식을 매입원가로 계산합니다.';
     return Container(
       key: const Key('ledger-aum-hero'),
       padding: const EdgeInsets.fromLTRB(16, 15, 16, 16),
@@ -1437,7 +1584,7 @@ class _LedgerHeroCard extends StatelessWidget {
             children: [
               const Expanded(
                 child: Text(
-                  '총 운용자산 · 원화 장부',
+                  '순자산 · 원화 장부',
                   style: TextStyle(
                     color: Color(0xFF755B3B),
                     fontSize: 11,

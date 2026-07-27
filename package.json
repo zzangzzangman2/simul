@@ -18,7 +18,6 @@
     "dev:sites": "vinext dev"
   },
   "dependencies": {
-    "@google/genai": "^1.34.0",
     "drizzle-orm": "0.45.2",
     "next": "16.2.6",
     "react": "19.2.6",

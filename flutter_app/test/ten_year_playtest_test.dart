@@ -8,5 +8,6 @@ void main() {
     () async {
       await playtest.main();
     },
+    timeout: const Timeout(Duration(minutes: 10)),
   );
 }

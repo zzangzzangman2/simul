@@ -200,6 +200,7 @@ class OwnedRealEstate {
     this.purchaseDateIso = '',
     this.marketListingIndex,
     this.realEstateWorldSeed = '',
+    this.realEstateWorldVersion = 1,
     this.cashInvestedAtPurchase = 0,
     this.mortgageOriginalPrincipal = 0,
     this.mortgageBalance = 0,
@@ -207,15 +208,26 @@ class OwnedRealEstate {
     this.mortgageTermMonths = 0,
     this.mortgagePaymentsMade = 0,
     this.mortgageMissedPayments = 0,
-    this.leaseType = RealEstateLeaseType.automatic,
+    this.nextMortgagePaymentDay = 0,
+    this.mortgageIsVariableRate = false,
+    this.leaseType = RealEstateLeaseType.vacant,
     this.leaseDeposit = 0,
     this.leaseMonthlyRent = 0,
     this.leaseRemainingMonths = 0,
+    this.nextRentalSettlementDay = 0,
     this.tenantReliability = 0,
     this.rentArrearsMonths = 0,
     this.vacancyMonths = 0,
+    this.totalVacancyMonths = 0,
     this.lastRentalEvent = '',
     this.totalRepairCosts = 0,
+    this.saleListedDay = 0,
+    this.saleOfferAmount = 0,
+    this.saleOfferIssuedDay = 0,
+    this.saleOfferExpiresDay = 0,
+    this.investmentNote = '',
+    this.propertyCondition = 70,
+    this.insuranceActive = false,
   });
 
   final String id;
@@ -231,6 +243,7 @@ class OwnedRealEstate {
   final String purchaseDateIso;
   final int? marketListingIndex;
   final String realEstateWorldSeed;
+  final int realEstateWorldVersion;
   final int cashInvestedAtPurchase;
   final int mortgageOriginalPrincipal;
   final int mortgageBalance;
@@ -238,23 +251,55 @@ class OwnedRealEstate {
   final int mortgageTermMonths;
   final int mortgagePaymentsMade;
   final int mortgageMissedPayments;
+  final int nextMortgagePaymentDay;
+  final bool mortgageIsVariableRate;
   final RealEstateLeaseType leaseType;
   final int leaseDeposit;
   final int leaseMonthlyRent;
   final int leaseRemainingMonths;
+  final int nextRentalSettlementDay;
   final int tenantReliability;
   final int rentArrearsMonths;
   final int vacancyMonths;
+  final int totalVacancyMonths;
   final String lastRentalEvent;
   final int totalRepairCosts;
+  final int saleListedDay;
+  final int saleOfferAmount;
+  final int saleOfferIssuedDay;
+  final int saleOfferExpiresDay;
+  final String investmentNote;
+  final int propertyCondition;
+  final bool insuranceActive;
 
   bool get hasMortgage => mortgageBalance > 0;
+
+  bool mortgageDueAt(int day) =>
+      hasMortgage &&
+      (nextMortgagePaymentDay <= 0 || day >= nextMortgagePaymentDay);
 
   bool get hasManagedLease => leaseType != RealEstateLeaseType.automatic;
 
   bool get hasActiveLease =>
       leaseType == RealEstateLeaseType.monthlyRent ||
       leaseType == RealEstateLeaseType.jeonse;
+
+  bool get isDirectUse =>
+      optionId == 'owner_office' || optionId == 'family_home_trust';
+
+  bool get isLandmarkFund => assetType == RealEstateAssetType.landmarkFund;
+
+  double get conditionRentMultiplier =>
+      (1 + (propertyCondition - 70) * 0.003).clamp(0.85, 1.10).toDouble();
+
+  double get conditionRepairProbabilityMultiplier =>
+      ((115 - propertyCondition) / 45).clamp(0.50, 1.80).toDouble();
+
+  double get conditionRepairCostMultiplier =>
+      (1 + (70 - propertyCondition) * 0.008).clamp(0.70, 1.50).toDouble();
+
+  RealEstateAssetType get assetType =>
+      marketAsset?.type ?? RealEstateAssetType.commercialUnit;
 
   int get effectiveCashInvestedAtPurchase =>
       cashInvestedAtPurchase > 0 ? cashInvestedAtPurchase : purchasePrice;
@@ -278,7 +323,7 @@ class OwnedRealEstate {
   int get nextMortgageInterest =>
       mortgageMonthlyInterest(mortgageBalance, mortgageAnnualInterestRate);
 
-  OwnedRealEstate recordMortgagePayment() {
+  OwnedRealEstate recordMortgagePayment({int? nextPaymentDay}) {
     if (!hasMortgage) return this;
     final due = monthlyMortgagePayment;
     final interest = nextMortgageInterest;
@@ -287,30 +332,47 @@ class OwnedRealEstate {
       mortgageBalance: mortgageBalance - principalPaid,
       mortgagePaymentsMade: mortgagePaymentsMade + 1,
       mortgageMissedPayments: 0,
+      nextMortgagePaymentDay: nextPaymentDay ?? nextMortgagePaymentDay,
     );
   }
 
-  OwnedRealEstate recordMissedMortgagePayment() {
+  OwnedRealEstate recordMissedMortgagePayment({int? nextPaymentDay}) {
     if (!hasMortgage) return this;
     return copyWith(
       mortgageBalance: mortgageBalance + nextMortgageInterest,
       mortgageMissedPayments: mortgageMissedPayments + 1,
+      nextMortgagePaymentDay: nextPaymentDay ?? nextMortgagePaymentDay,
     );
   }
 
   OwnedRealEstate copyWith({
+    int? mortgageOriginalPrincipal,
     int? mortgageBalance,
+    double? mortgageAnnualInterestRate,
+    int? mortgageTermMonths,
     int? mortgagePaymentsMade,
     int? mortgageMissedPayments,
+    int? nextMortgagePaymentDay,
+    bool? mortgageIsVariableRate,
     RealEstateLeaseType? leaseType,
     int? leaseDeposit,
     int? leaseMonthlyRent,
     int? leaseRemainingMonths,
+    int? nextRentalSettlementDay,
     int? tenantReliability,
     int? rentArrearsMonths,
     int? vacancyMonths,
+    int? totalVacancyMonths,
     String? lastRentalEvent,
     int? totalRepairCosts,
+    int? saleListedDay,
+    int? saleOfferAmount,
+    int? saleOfferIssuedDay,
+    int? saleOfferExpiresDay,
+    int? realEstateWorldVersion,
+    String? investmentNote,
+    int? propertyCondition,
+    bool? insuranceActive,
   }) => OwnedRealEstate(
     id: id,
     optionId: optionId,
@@ -325,23 +387,41 @@ class OwnedRealEstate {
     purchaseDateIso: purchaseDateIso,
     marketListingIndex: marketListingIndex,
     realEstateWorldSeed: realEstateWorldSeed,
+    realEstateWorldVersion:
+        realEstateWorldVersion ?? this.realEstateWorldVersion,
     cashInvestedAtPurchase: cashInvestedAtPurchase,
-    mortgageOriginalPrincipal: mortgageOriginalPrincipal,
+    mortgageOriginalPrincipal:
+        mortgageOriginalPrincipal ?? this.mortgageOriginalPrincipal,
     mortgageBalance: mortgageBalance ?? this.mortgageBalance,
-    mortgageAnnualInterestRate: mortgageAnnualInterestRate,
-    mortgageTermMonths: mortgageTermMonths,
+    mortgageAnnualInterestRate:
+        mortgageAnnualInterestRate ?? this.mortgageAnnualInterestRate,
+    mortgageTermMonths: mortgageTermMonths ?? this.mortgageTermMonths,
     mortgagePaymentsMade: mortgagePaymentsMade ?? this.mortgagePaymentsMade,
     mortgageMissedPayments:
         mortgageMissedPayments ?? this.mortgageMissedPayments,
+    nextMortgagePaymentDay:
+        nextMortgagePaymentDay ?? this.nextMortgagePaymentDay,
+    mortgageIsVariableRate:
+        mortgageIsVariableRate ?? this.mortgageIsVariableRate,
     leaseType: leaseType ?? this.leaseType,
     leaseDeposit: leaseDeposit ?? this.leaseDeposit,
     leaseMonthlyRent: leaseMonthlyRent ?? this.leaseMonthlyRent,
     leaseRemainingMonths: leaseRemainingMonths ?? this.leaseRemainingMonths,
+    nextRentalSettlementDay:
+        nextRentalSettlementDay ?? this.nextRentalSettlementDay,
     tenantReliability: tenantReliability ?? this.tenantReliability,
     rentArrearsMonths: rentArrearsMonths ?? this.rentArrearsMonths,
     vacancyMonths: vacancyMonths ?? this.vacancyMonths,
+    totalVacancyMonths: totalVacancyMonths ?? this.totalVacancyMonths,
     lastRentalEvent: lastRentalEvent ?? this.lastRentalEvent,
     totalRepairCosts: totalRepairCosts ?? this.totalRepairCosts,
+    saleListedDay: saleListedDay ?? this.saleListedDay,
+    saleOfferAmount: saleOfferAmount ?? this.saleOfferAmount,
+    saleOfferIssuedDay: saleOfferIssuedDay ?? this.saleOfferIssuedDay,
+    saleOfferExpiresDay: saleOfferExpiresDay ?? this.saleOfferExpiresDay,
+    investmentNote: investmentNote ?? this.investmentNote,
+    propertyCondition: propertyCondition ?? this.propertyCondition,
+    insuranceActive: insuranceActive ?? this.insuranceActive,
   );
 
   RealEstateMarketAsset? get marketAsset =>
@@ -358,6 +438,7 @@ class OwnedRealEstate {
     return realEstateListingByRef(
       RealEstateListingRef(assetId: assetId, listingIndex: listingIndex),
       realEstateWorldSeed,
+      generatorVersion: realEstateWorldVersion,
     );
   }
 
@@ -397,12 +478,54 @@ class OwnedRealEstate {
         .toInt();
   }
 
-  int monthlyIncomeAt(DateTime date) => switch (leaseType) {
-    RealEstateLeaseType.automatic =>
-      generatedListing?.monthlyRentAt(date) ?? monthlyIncome,
-    RealEstateLeaseType.monthlyRent => leaseMonthlyRent,
-    RealEstateLeaseType.vacant || RealEstateLeaseType.jeonse => 0,
-  };
+  int estimatedSaleCostsForPrice(int currentDay, int grossPrice) {
+    final asset = marketAsset;
+    if (asset == null || grossPrice <= 0) return 0;
+    return asset.saleCostsForPrice(_dateAtDay(currentDay), grossPrice);
+  }
+
+  int get saleListingDays => realEstateSaleListingDays(
+    type: assetType,
+    worldSeed: realEstateWorldSeed,
+    assetId: id,
+    listedDay: saleListedDay,
+  );
+
+  int get saleOfferReadyDay =>
+      saleListedDay <= 0 ? 0 : saleListedDay + saleListingDays;
+
+  bool saleOfferActiveAt(int day) =>
+      saleOfferAmount > 0 &&
+      saleOfferIssuedDay > 0 &&
+      day >= saleOfferIssuedDay &&
+      (saleOfferExpiresDay <= 0 || day <= saleOfferExpiresDay);
+
+  int estimatedSaleOfferValue(int currentDay) {
+    if (saleOfferAmount > 0) return saleOfferAmount;
+    final base = estimatedSaleValue(currentDay);
+    if (saleListedDay <= 0) return base;
+    return (base *
+            realEstateSaleOfferRate(
+              worldSeed: realEstateWorldSeed,
+              assetId: id,
+              listedDay: saleListedDay,
+            ))
+        .round();
+  }
+
+  int monthlyIncomeAt(DateTime date) {
+    if (isLandmarkFund) {
+      return generatedListing?.monthlyRentAt(date) ??
+          marketAsset?.monthlyRentAt(date) ??
+          monthlyIncome;
+    }
+    return switch (leaseType) {
+      RealEstateLeaseType.automatic =>
+        generatedListing?.monthlyRentAt(date) ?? monthlyIncome,
+      RealEstateLeaseType.monthlyRent => leaseMonthlyRent,
+      RealEstateLeaseType.vacant || RealEstateLeaseType.jeonse => 0,
+    };
+  }
 
   int monthlyCostAt(DateTime date) =>
       generatedListing?.monthlyOperatingCostAt(date) ?? monthlyCost;
@@ -421,6 +544,7 @@ class OwnedRealEstate {
     'purchaseDateIso': purchaseDateIso,
     'marketListingIndex': marketListingIndex,
     'realEstateWorldSeed': realEstateWorldSeed,
+    'realEstateWorldVersion': realEstateWorldVersion,
     'cashInvestedAtPurchase': cashInvestedAtPurchase,
     'mortgageOriginalPrincipal': mortgageOriginalPrincipal,
     'mortgageBalance': mortgageBalance,
@@ -428,15 +552,26 @@ class OwnedRealEstate {
     'mortgageTermMonths': mortgageTermMonths,
     'mortgagePaymentsMade': mortgagePaymentsMade,
     'mortgageMissedPayments': mortgageMissedPayments,
+    'nextMortgagePaymentDay': nextMortgagePaymentDay,
+    'mortgageIsVariableRate': mortgageIsVariableRate,
     'leaseType': leaseType.name,
     'leaseDeposit': leaseDeposit,
     'leaseMonthlyRent': leaseMonthlyRent,
     'leaseRemainingMonths': leaseRemainingMonths,
+    'nextRentalSettlementDay': nextRentalSettlementDay,
     'tenantReliability': tenantReliability,
     'rentArrearsMonths': rentArrearsMonths,
     'vacancyMonths': vacancyMonths,
+    'totalVacancyMonths': totalVacancyMonths,
     'lastRentalEvent': lastRentalEvent,
     'totalRepairCosts': totalRepairCosts,
+    'saleListedDay': saleListedDay,
+    'saleOfferAmount': saleOfferAmount,
+    'saleOfferIssuedDay': saleOfferIssuedDay,
+    'saleOfferExpiresDay': saleOfferExpiresDay,
+    'investmentNote': investmentNote,
+    'propertyCondition': propertyCondition,
+    'insuranceActive': insuranceActive,
   };
 
   factory OwnedRealEstate.fromJson(
@@ -456,6 +591,8 @@ class OwnedRealEstate {
     purchaseDateIso: json['purchaseDateIso'] as String? ?? '',
     marketListingIndex: (json['marketListingIndex'] as num?)?.toInt(),
     realEstateWorldSeed: json['realEstateWorldSeed'] as String? ?? '',
+    realEstateWorldVersion:
+        (json['realEstateWorldVersion'] as num?)?.toInt() ?? 1,
     cashInvestedAtPurchase:
         (json['cashInvestedAtPurchase'] as num?)?.toInt() ?? 0,
     mortgageOriginalPrincipal:
@@ -467,6 +604,10 @@ class OwnedRealEstate {
     mortgagePaymentsMade: (json['mortgagePaymentsMade'] as num?)?.toInt() ?? 0,
     mortgageMissedPayments:
         (json['mortgageMissedPayments'] as num?)?.toInt() ?? 0,
+    nextMortgagePaymentDay:
+        (json['nextMortgagePaymentDay'] as num?)?.toInt() ??
+        ((json['acquiredDay'] as num?)?.toInt() ?? 1) + 30,
+    mortgageIsVariableRate: json['mortgageIsVariableRate'] as bool? ?? false,
     leaseType: RealEstateLeaseType.values.firstWhere(
       (value) => value.name == json['leaseType'],
       orElse: () => RealEstateLeaseType.automatic,
@@ -474,11 +615,27 @@ class OwnedRealEstate {
     leaseDeposit: (json['leaseDeposit'] as num?)?.toInt() ?? 0,
     leaseMonthlyRent: (json['leaseMonthlyRent'] as num?)?.toInt() ?? 0,
     leaseRemainingMonths: (json['leaseRemainingMonths'] as num?)?.toInt() ?? 0,
+    nextRentalSettlementDay:
+        (json['nextRentalSettlementDay'] as num?)?.toInt() ??
+        ((json['acquiredDay'] as num?)?.toInt() ?? 1) + 30,
     tenantReliability: (json['tenantReliability'] as num?)?.toInt() ?? 0,
     rentArrearsMonths: (json['rentArrearsMonths'] as num?)?.toInt() ?? 0,
     vacancyMonths: (json['vacancyMonths'] as num?)?.toInt() ?? 0,
+    totalVacancyMonths:
+        (json['totalVacancyMonths'] as num?)?.toInt() ??
+        (json['vacancyMonths'] as num?)?.toInt() ??
+        0,
     lastRentalEvent: json['lastRentalEvent'] as String? ?? '',
     totalRepairCosts: (json['totalRepairCosts'] as num?)?.toInt() ?? 0,
+    saleListedDay: (json['saleListedDay'] as num?)?.toInt() ?? 0,
+    saleOfferAmount: (json['saleOfferAmount'] as num?)?.toInt() ?? 0,
+    saleOfferIssuedDay: (json['saleOfferIssuedDay'] as num?)?.toInt() ?? 0,
+    saleOfferExpiresDay: (json['saleOfferExpiresDay'] as num?)?.toInt() ?? 0,
+    investmentNote: json['investmentNote'] as String? ?? '',
+    propertyCondition: ((json['propertyCondition'] as num?)?.toInt() ?? 70)
+        .clamp(0, 100)
+        .toInt(),
+    insuranceActive: json['insuranceActive'] as bool? ?? false,
   );
 }
 
@@ -534,6 +691,14 @@ class PersonalFinanceState {
     (sum, asset) => sum + (asset.hasActiveLease ? asset.leaseDeposit : 0),
   );
 
+  int get ownedHousingCount =>
+      realEstate.where((asset) => asset.assetType.isHousing).length;
+
+  int propertyEquityAt(int day) =>
+      estimatedPropertyValueAt(day) -
+      totalMortgageBalance -
+      totalTenantDepositLiability;
+
   int get monthlyMortgagePayment => realEstate.fold<int>(
     0,
     (sum, asset) => sum + asset.monthlyMortgagePayment,
@@ -557,6 +722,19 @@ class PersonalFinanceState {
 
   int monthlyPropertyCostAt(DateTime date) =>
       realEstate.fold<int>(0, (sum, asset) => sum + asset.monthlyCostAt(date));
+
+  int monthlyPropertyHoldingTaxAt(int day, DateTime date) =>
+      realEstate.fold<int>(
+        0,
+        (sum, asset) =>
+            sum +
+            realEstateMonthlyHoldingTax(
+              date: date,
+              type: asset.assetType,
+              marketValue: asset.estimatedMarketValue(day),
+              ownedHousingCount: ownedHousingCount,
+            ),
+      );
 
   int monthlyResearchBonusAt(int year, int employeeCount) {
     var total = 0;

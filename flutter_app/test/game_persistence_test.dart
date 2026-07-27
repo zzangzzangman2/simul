@@ -3,12 +3,19 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:millennium_capital/game/banking_state.dart';
 import 'package:millennium_capital/game/game_engine.dart';
 import 'package:millennium_capital/game/game_persistence.dart';
 import 'package:millennium_capital/game/game_state.dart';
 import 'package:millennium_capital/game/market_data.dart';
+import 'package:millennium_capital/game/story_state.dart';
 import 'package:millennium_capital/main.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+Future<void> _skipCampaignWorldPreparation(
+  GameState state,
+  WorldLoadProgressCallback onProgress,
+) async {}
 
 void main() {
   const engine = GameEngine();
@@ -21,6 +28,50 @@ void main() {
     ...state.toJson(),
     'version': 8,
   };
+
+  test(
+    'order-book fill breakdown round-trips and legacy entries stay empty',
+    () {
+      const entry = LedgerEntry(
+        id: 'trade-depth',
+        day: 4,
+        amount: -30000,
+        account: 'brokerage_cash',
+        counterAccount: 'market_security',
+        description: 'depth fill',
+        sourceId: 'trade-depth',
+        assetId: 'hanbit_telecom',
+        tradeSide: 'buy',
+        tradeQuantity: 3,
+        tradeUnitPrice: 10000,
+        marketMinute: 540,
+        orderType: 'market',
+        orderBookSide: 'ask',
+        orderBookFills: [
+          LedgerOrderBookFill(price: 10000, quantity: 2),
+          LedgerOrderBookFill(price: 10050, quantity: 1),
+        ],
+        orderBookCapacityUnits: 3,
+      );
+      final restored = LedgerEntry.fromJson(entry.toJson());
+
+      expect(restored.orderBookSide, 'ask');
+      expect(restored.orderBookFills, hasLength(2));
+      expect(restored.orderBookFills[0].price, 10000);
+      expect(restored.orderBookFills[0].quantity, 2);
+      expect(restored.orderBookFills[1].price, 10050);
+      expect(restored.orderBookCapacityUnits, 3);
+
+      final legacyJson = Map<String, dynamic>.from(entry.toJson())
+        ..remove('orderBookSide')
+        ..remove('orderBookFills')
+        ..remove('orderBookCapacityUnits');
+      final legacy = LedgerEntry.fromJson(legacyJson);
+      expect(legacy.orderBookSide, isEmpty);
+      expect(legacy.orderBookFills, isEmpty);
+      expect(legacy.orderBookCapacityUnits, 0);
+    },
+  );
 
   test(
     'a pristine zero-cash legacy start remains at zero after migration',
@@ -79,6 +130,31 @@ void main() {
     },
   );
 
+  test('v16 save migrates with a safe empty banking state', () async {
+    final original = engine.createNewGame('은행 마이그레이션 테스트', initialCash: 500000);
+    final legacy = original.toJson()
+      ..remove('banking')
+      ..['version'] = 16;
+    SharedPreferences.setMockInitialValues({
+      GamePersistence.saveKey: jsonEncode(legacy),
+    });
+    final preferences = await SharedPreferences.getInstance();
+    final persistence = GamePersistence(preferences: preferences);
+
+    final migrated = await persistence.load();
+
+    expect(migrated, isNotNull);
+    expect(migrated!.version, GameState.schemaVersion);
+    expect(migrated.banking.creditScore, bankInitialCreditScore);
+    expect(migrated.banking.termDeposits, isEmpty);
+    expect(migrated.banking.unsecuredLoans, isEmpty);
+    final stored =
+        jsonDecode(preferences.getString(GamePersistence.saveKey)!)
+            as Map<String, dynamic>;
+    expect(stored['version'], GameState.schemaVersion);
+    expect(stored['banking'], isA<Map<String, dynamic>>());
+  });
+
   test(
     'a financially progressed zero-cash legacy save preserves its balance',
     () async {
@@ -118,7 +194,10 @@ void main() {
 
   test('a generated IPO holding survives save and reload', () async {
     const seed = 'generated-ipo-persistence-test';
-    final universe = await FictionalMarketUniverse.load(seed: seed);
+    final universe = await FictionalMarketUniverse.load(
+      seed: seed,
+      throughDate: DateTime(2000, 12, 31),
+    );
     final ipo = universe.assets.firstWhere(
       (asset) => asset.generation == 1 && asset.id.startsWith('ipo_'),
     );
@@ -219,7 +298,12 @@ void main() {
       },
     );
 
-    await tester.pumpWidget(MillenniumCapitalApp(persistence: persistence));
+    await tester.pumpWidget(
+      MillenniumCapitalApp(
+        persistence: persistence,
+        campaignWorldPreparer: _skipCampaignWorldPreparation,
+      ),
+    );
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('game-title-screen')), findsOneWidget);
     await tester.tap(find.byKey(const Key('continue-game-button')));
@@ -248,6 +332,265 @@ void main() {
     expect(saveAttempts, 2);
     expect(stored['version'], GameState.schemaVersion);
     expect(stored['cash'], 0);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('이어하기는 세계 예열 Future가 끝나기 전 게임 화면을 열지 않고 진행률을 표시하며, 완료 후 연다', (
+    tester,
+  ) async {
+    final preferences = await SharedPreferences.getInstance();
+    final persistence = GamePersistence(preferences: preferences);
+    final savedState = engine.createNewGame('세계 예열 테스트');
+    await persistence.saveToSlot(savedState, 1);
+    await persistence.setActiveSlot(1);
+
+    final preparationStarted = Completer<void>();
+    final preparationGate = Completer<void>();
+    GameState? preparedState;
+
+    Future<void> delayedWorldPreparation(
+      GameState state,
+      WorldLoadProgressCallback onProgress,
+    ) async {
+      preparedState = state;
+      onProgress(const WorldLoadProgress(0.37, '주식시장과 부동산 세계를 구성 중입니다…'));
+      preparationStarted.complete();
+      await preparationGate.future;
+    }
+
+    await tester.pumpWidget(
+      MillenniumCapitalApp(
+        persistence: persistence,
+        campaignWorldPreparer: delayedWorldPreparation,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('continue-game-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('load-save-slot-1')));
+    await tester.pump();
+    await tester.runAsync(
+      () => preparationStarted.future.timeout(const Duration(seconds: 5)),
+    );
+    await tester.pump();
+
+    expect(find.byKey(const Key('campaign-loading-screen')), findsOneWidget);
+    expect(
+      tester
+          .widget<Text>(find.byKey(const Key('campaign-loading-status')))
+          .data,
+      '주식시장과 부동산 세계를 구성 중입니다…',
+    );
+    expect(find.text('37%'), findsOneWidget);
+    expect(
+      tester
+          .widget<LinearProgressIndicator>(
+            find.byKey(const Key('campaign-loading-progress')),
+          )
+          .value,
+      0.37,
+    );
+    expect(find.byKey(const Key('apartment-place-bedroom')), findsNothing);
+    expect(find.byKey(const Key('company-header-title')), findsNothing);
+
+    await tester.pump(const Duration(seconds: 5));
+    expect(find.byKey(const Key('campaign-loading-screen')), findsOneWidget);
+    expect(find.byKey(const Key('apartment-place-bedroom')), findsNothing);
+
+    preparationGate.complete();
+    await tester.pumpAndSettle();
+
+    expect(preparedState?.companyName, savedState.companyName);
+    expect(find.byKey(const Key('campaign-loading-screen')), findsNothing);
+    expect(find.byKey(const Key('apartment-place-bedroom')), findsOneWidget);
+    expect(
+      tester.widget<Text>(find.byKey(const Key('company-header-title'))).data,
+      '세계 예열 테스트',
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('처음하기는 프롤로그보다 먼저 세계를 구성하고 같은 시드를 새 저장에 사용한다', (tester) async {
+    final preferences = await SharedPreferences.getInstance();
+    final persistence = GamePersistence(preferences: preferences);
+    final preparationStarted = Completer<void>();
+    final preparationGate = Completer<void>();
+    String? preparedSeed;
+
+    Future<void> delayedWorldPreparation(
+      GameState state,
+      WorldLoadProgressCallback onProgress,
+    ) async {
+      preparedSeed = state.simulationSeed;
+      onProgress(const WorldLoadProgress(0.41, '27년 주식시장 세계를 구성 중입니다…'));
+      preparationStarted.complete();
+      await preparationGate.future;
+    }
+
+    await tester.pumpWidget(
+      MillenniumCapitalApp(
+        persistence: persistence,
+        campaignWorldPreparer: delayedWorldPreparation,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('new-game-button')));
+    await tester.pump();
+    await tester.runAsync(
+      () => preparationStarted.future.timeout(const Duration(seconds: 5)),
+    );
+    await tester.pump();
+
+    expect(find.byKey(const Key('campaign-loading-screen')), findsOneWidget);
+    expect(find.text('새 캠페인 세계를 구성하고 있어요'), findsOneWidget);
+    expect(find.text('27년 주식시장 세계를 구성 중입니다…'), findsOneWidget);
+    expect(find.text('41%'), findsOneWidget);
+    expect(find.byType(VisualNovelOnboardingScreen), findsNothing);
+    expect(preferences.getString(GamePersistence.saveKeyFor(1)), isNull);
+
+    preparationGate.complete();
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('campaign-loading-screen')), findsNothing);
+    expect(find.byType(VisualNovelOnboardingScreen), findsOneWidget);
+
+    final onboarding = tester.widget<VisualNovelOnboardingScreen>(
+      find.byType(VisualNovelOnboardingScreen),
+    );
+    await tester.runAsync(
+      () => onboarding.onCreate(
+        const NewGameSetup(
+          playerName: '민재',
+          companyName: '시드 유지 연구소',
+          introChoice: 'stocks',
+          startingTrait: StoryTrait.analysis,
+          familyRule: FamilyRule.reportLosses,
+        ),
+        (_) {},
+      ),
+    );
+    final saved = await persistence.loadSlot(1, activate: false);
+
+    expect(saved, isNotNull);
+    expect(saved!.simulationSeed, preparedSeed);
+    expect(saved.companyName, '시드 유지 연구소');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('이어하기 예열 중 다른 슬롯 탭은 무시하고 화면과 활성 저장을 같은 슬롯으로 유지한다', (
+    tester,
+  ) async {
+    final preferences = await SharedPreferences.getInstance();
+    final persistence = GamePersistence(preferences: preferences);
+    await persistence.saveToSlot(engine.createNewGame('먼저 누른 회사'), 1);
+    await persistence.saveToSlot(engine.createNewGame('나중에 누른 회사'), 2);
+    await persistence.setActiveSlot(2);
+
+    final preparationStarted = Completer<void>();
+    final preparationGate = Completer<void>();
+    final preparedCompanies = <String>[];
+
+    Future<void> delayedWorldPreparation(
+      GameState state,
+      WorldLoadProgressCallback onProgress,
+    ) async {
+      preparedCompanies.add(state.companyName);
+      if (!preparationStarted.isCompleted) preparationStarted.complete();
+      await preparationGate.future;
+    }
+
+    await tester.pumpWidget(
+      MillenniumCapitalApp(
+        persistence: persistence,
+        campaignWorldPreparer: delayedWorldPreparation,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('continue-game-button')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('load-save-slot-1')));
+    await tester.tap(find.byKey(const Key('load-save-slot-2')));
+    await tester.pump();
+    await tester.runAsync(
+      () => preparationStarted.future.timeout(const Duration(seconds: 5)),
+    );
+
+    expect(preparedCompanies, ['먼저 누른 회사']);
+    expect(await persistence.getActiveSlot(), 2);
+    expect(find.byKey(const Key('campaign-loading-screen')), findsOneWidget);
+
+    preparationGate.complete();
+    await tester.pumpAndSettle();
+
+    expect(await persistence.getActiveSlot(), 1);
+    expect(
+      tester.widget<Text>(find.byKey(const Key('company-header-title'))).data,
+      '먼저 누른 회사',
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('세계 예열 실패는 기존 활성 슬롯을 바꾸지 않는다', (tester) async {
+    final preferences = await SharedPreferences.getInstance();
+    final persistence = GamePersistence(preferences: preferences);
+    await persistence.saveToSlot(engine.createNewGame('실패할 회사'), 1);
+    await persistence.saveToSlot(engine.createNewGame('기존 활성 회사'), 2);
+    await persistence.setActiveSlot(2);
+
+    Future<void> failingWorldPreparation(
+      GameState state,
+      WorldLoadProgressCallback onProgress,
+    ) async {
+      throw StateError('world preparation failed');
+    }
+
+    await tester.pumpWidget(
+      MillenniumCapitalApp(
+        persistence: persistence,
+        campaignWorldPreparer: failingWorldPreparation,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('continue-game-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('load-save-slot-1')));
+    await tester.pumpAndSettle();
+
+    expect(await persistence.getActiveSlot(), 2);
+    expect(find.byKey(const Key('save-slot-screen')), findsOneWidget);
+    expect(find.textContaining('불러오지 못했어요'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('신규 세계 예열 실패는 프롤로그와 저장 생성 전에 제목 화면으로 복구한다', (tester) async {
+    final preferences = await SharedPreferences.getInstance();
+    final persistence = GamePersistence(preferences: preferences);
+    await persistence.saveToSlot(engine.createNewGame('기존 회사'), 2);
+    await persistence.setActiveSlot(2);
+
+    Future<void> failingWorldPreparation(
+      GameState state,
+      WorldLoadProgressCallback onProgress,
+    ) async {
+      throw StateError('new world preparation failed');
+    }
+
+    await tester.pumpWidget(
+      MillenniumCapitalApp(
+        persistence: persistence,
+        campaignWorldPreparer: failingWorldPreparation,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('new-game-button')));
+    await tester.pumpAndSettle();
+
+    expect(await persistence.getActiveSlot(), 2);
+    expect(find.byKey(const Key('game-title-screen')), findsOneWidget);
+    expect(find.byType(VisualNovelOnboardingScreen), findsNothing);
+    expect(preferences.getString(GamePersistence.saveKeyFor(1)), isNull);
+    expect(find.textContaining('새 세계를 구성하지 못했어요'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -352,7 +695,12 @@ void main() {
     await persistence.saveToSlot(engine.createNewGame('삭제할 회사'), 2);
     await persistence.setActiveSlot(1);
 
-    await tester.pumpWidget(MillenniumCapitalApp(persistence: persistence));
+    await tester.pumpWidget(
+      MillenniumCapitalApp(
+        persistence: persistence,
+        campaignWorldPreparer: _skipCampaignWorldPreparation,
+      ),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('continue-game-button')));
     await tester.pumpAndSettle();
@@ -380,7 +728,12 @@ void main() {
         await persistence.saveToSlot(engine.createNewGame('$slot번 회사'), slot);
       }
 
-      await tester.pumpWidget(MillenniumCapitalApp(persistence: persistence));
+      await tester.pumpWidget(
+        MillenniumCapitalApp(
+          persistence: persistence,
+          campaignWorldPreparer: _skipCampaignWorldPreparation,
+        ),
+      );
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('new-game-button')));
       await tester.pumpAndSettle();
@@ -416,7 +769,12 @@ void main() {
       now: () => savedAt,
     );
 
-    await tester.pumpWidget(MillenniumCapitalApp(persistence: persistence));
+    await tester.pumpWidget(
+      MillenniumCapitalApp(
+        persistence: persistence,
+        campaignWorldPreparer: _skipCampaignWorldPreparation,
+      ),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('continue-game-button')));
     await tester.pumpAndSettle();
@@ -465,7 +823,12 @@ void main() {
       },
     );
 
-    await tester.pumpWidget(MillenniumCapitalApp(persistence: persistence));
+    await tester.pumpWidget(
+      MillenniumCapitalApp(
+        persistence: persistence,
+        campaignWorldPreparer: _skipCampaignWorldPreparation,
+      ),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('continue-game-button')));
     await tester.pumpAndSettle();

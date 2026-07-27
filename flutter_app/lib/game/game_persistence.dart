@@ -128,7 +128,7 @@ class GamePersistence {
     return loadSlot(await getActiveSlot());
   }
 
-  Future<GameState?> loadSlot(int slot) async {
+  Future<GameState?> loadSlot(int slot, {bool activate = true}) async {
     _validateSlot(slot);
     final prefs = await _prefs;
     final raw = prefs.getString(saveKeyFor(slot));
@@ -139,7 +139,7 @@ class GamePersistence {
     } catch (error, stackTrace) {
       final recovered = await _recoverBackup(prefs, raw, slot);
       if (recovered != null) {
-        await setActiveSlot(slot);
+        if (activate) await setActiveSlot(slot);
         return recovered;
       }
       Error.throwWithStackTrace(
@@ -150,7 +150,7 @@ class GamePersistence {
     if (decoded.version != GameState.schemaVersion) {
       await saveToSlot(decoded.state, slot);
     }
-    await setActiveSlot(slot);
+    if (activate) await setActiveSlot(slot);
     return decoded.state;
   }
 

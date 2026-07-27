@@ -8,7 +8,6 @@ class MissionDefinition {
     required this.target,
     required this.objective,
     required this.experienceReward,
-    this.cashReward = 0,
     this.reputationReward = 0,
     this.trustReward = 0,
     this.relative = false,
@@ -24,7 +23,6 @@ class MissionDefinition {
   final int target;
   final String objective;
   final int experienceReward;
-  final int cashReward;
   final int reputationReward;
   final int trustReward;
   final bool relative;
@@ -41,7 +39,6 @@ MissionDefinition _mission(
   int target,
   String objective,
   int xp, {
-  int cash = 0,
   int reputation = 0,
   int trust = 0,
   bool relative = false,
@@ -56,7 +53,6 @@ MissionDefinition _mission(
   target: target,
   objective: objective,
   experienceReward: xp,
-  cashReward: cash,
   reputationReward: reputation,
   trustReward: trust,
   relative: relative,
@@ -74,7 +70,6 @@ final List<MissionDefinition> missionCatalog = <MissionDefinition>[
     1,
     '첫 기업 조사노트 안건 해결',
     80,
-    cash: 500,
     trust: 1,
   ),
   _mission(
@@ -86,7 +81,6 @@ final List<MissionDefinition> missionCatalog = <MissionDefinition>[
     1,
     '일거리 1회 완료',
     70,
-    cash: 300,
   ),
   _mission(
     'seed_10000',
@@ -97,7 +91,6 @@ final List<MissionDefinition> missionCatalog = <MissionDefinition>[
     10000,
     '종잣돈 10,000원 확인',
     130,
-    cash: 1000,
     reputation: 1,
     trust: 1,
   ),
@@ -110,7 +103,6 @@ final List<MissionDefinition> missionCatalog = <MissionDefinition>[
     1,
     '국내 주식 매수 1회',
     150,
-    cash: 1500,
     reputation: 1,
   ),
   _mission(
@@ -122,7 +114,6 @@ final List<MissionDefinition> missionCatalog = <MissionDefinition>[
     3,
     '누적 3주 매수',
     110,
-    cash: 1000,
   ),
   _mission(
     'two_companies',
@@ -133,7 +124,6 @@ final List<MissionDefinition> missionCatalog = <MissionDefinition>[
     2,
     '서로 다른 국내 종목 2개 보유',
     150,
-    cash: 2000,
     reputation: 1,
   ),
   _mission(
@@ -169,7 +159,6 @@ final List<MissionDefinition> missionCatalog = <MissionDefinition>[
     1,
     '주식 매도 1회',
     130,
-    cash: 1000,
   ),
   _mission(
     'first_profit',
@@ -180,7 +169,6 @@ final List<MissionDefinition> missionCatalog = <MissionDefinition>[
     1,
     '이익이 난 매도 1회',
     170,
-    cash: 2500,
     reputation: 2,
   ),
   _mission(
@@ -192,7 +180,6 @@ final List<MissionDefinition> missionCatalog = <MissionDefinition>[
     10000,
     '누적 양의 실현이익 10,000원',
     180,
-    cash: 3000,
     reputation: 2,
   ),
   _mission(
@@ -204,7 +191,6 @@ final List<MissionDefinition> missionCatalog = <MissionDefinition>[
     5,
     '누적 일거리 5회',
     120,
-    cash: 2500,
     trust: 1,
   ),
   _mission(
@@ -216,7 +202,6 @@ final List<MissionDefinition> missionCatalog = <MissionDefinition>[
     100000,
     '보유 현금 100,000원',
     180,
-    cash: 5000,
     reputation: 1,
   ),
   _mission(
@@ -228,7 +213,6 @@ final List<MissionDefinition> missionCatalog = <MissionDefinition>[
     5,
     '누적 매수 주문 5회',
     160,
-    cash: 3500,
   ),
   _mission(
     'twenty_shares',
@@ -239,7 +223,6 @@ final List<MissionDefinition> missionCatalog = <MissionDefinition>[
     20,
     '누적 20주 매수',
     170,
-    cash: 4000,
   ),
   _mission(
     'family_help_two',
@@ -261,7 +244,6 @@ final List<MissionDefinition> missionCatalog = <MissionDefinition>[
     3,
     '서로 다른 국내 종목 3개 보유',
     190,
-    cash: 5000,
     reputation: 1,
   ),
   _mission(
@@ -273,7 +255,6 @@ final List<MissionDefinition> missionCatalog = <MissionDefinition>[
     100000,
     '30일 안에 현금 +100,000원',
     260,
-    cash: 10000,
     reputation: 2,
     deadlineDays: 30,
   ),
@@ -286,7 +267,6 @@ final List<MissionDefinition> missionCatalog = <MissionDefinition>[
     30,
     '미션 시작 후 30일 진행',
     200,
-    cash: 7000,
     relative: true,
   ),
   _mission(
@@ -298,7 +278,6 @@ final List<MissionDefinition> missionCatalog = <MissionDefinition>[
     20,
     '평판 20 달성',
     220,
-    cash: 6000,
     trust: 2,
   ),
   _mission(
@@ -310,7 +289,6 @@ final List<MissionDefinition> missionCatalog = <MissionDefinition>[
     3,
     '누적 수익 매도 3회',
     230,
-    cash: 8000,
     reputation: 2,
   ),
   _mission(
@@ -322,7 +300,6 @@ final List<MissionDefinition> missionCatalog = <MissionDefinition>[
     50000,
     '누적 양의 실현이익 50,000원',
     240,
-    cash: 10000,
     reputation: 2,
   ),
   _mission(
@@ -334,7 +311,6 @@ final List<MissionDefinition> missionCatalog = <MissionDefinition>[
     500000,
     '보유 현금 500,000원',
     260,
-    cash: 15000,
     reputation: 2,
   ),
   _mission(
@@ -346,7 +322,6 @@ final List<MissionDefinition> missionCatalog = <MissionDefinition>[
     1,
     '흑자 월 결산 1회',
     230,
-    cash: 12000,
     reputation: 2,
   ),
   _mission(
@@ -369,7 +344,6 @@ final List<MissionDefinition> missionCatalog = <MissionDefinition>[
     1,
     '정식 직원 1명 채용',
     300,
-    cash: 20000,
     reputation: 3,
     year: 2003,
   ),
@@ -382,7 +356,6 @@ final List<MissionDefinition> missionCatalog = <MissionDefinition>[
     180000,
     '누적 월 리서치 수입 180,000원',
     280,
-    cash: 18000,
     reputation: 2,
     year: 2003,
   ),
@@ -395,7 +368,6 @@ final List<MissionDefinition> missionCatalog = <MissionDefinition>[
     1,
     '외부 펀드 출범',
     380,
-    cash: 30000,
     reputation: 4,
     year: 2004,
   ),
@@ -408,7 +380,6 @@ final List<MissionDefinition> missionCatalog = <MissionDefinition>[
     5000000,
     '외부 AUM 5,000,000원',
     320,
-    cash: 25000,
     reputation: 3,
     year: 2004,
   ),
@@ -421,7 +392,6 @@ final List<MissionDefinition> missionCatalog = <MissionDefinition>[
     1,
     '자산·소비 계획 1회 실행',
     240,
-    cash: 10000,
     trust: 1,
   ),
   _mission(
@@ -433,7 +403,6 @@ final List<MissionDefinition> missionCatalog = <MissionDefinition>[
     1,
     '법인 부동산 1개 보유',
     400,
-    cash: 40000,
     reputation: 3,
     year: 2006,
   ),
@@ -446,7 +415,6 @@ final List<MissionDefinition> missionCatalog = <MissionDefinition>[
     250000,
     '30일 안에 현금 +250,000원',
     420,
-    cash: 30000,
     reputation: 3,
     deadlineDays: 30,
     year: 2006,
@@ -460,7 +428,6 @@ final List<MissionDefinition> missionCatalog = <MissionDefinition>[
     3,
     '정식 직원 3명 채용',
     360,
-    cash: 30000,
     reputation: 3,
     year: 2005,
   ),
@@ -473,18 +440,16 @@ final List<MissionDefinition> missionCatalog = <MissionDefinition>[
     2000000,
     '누적 매수·매도 거래대금 2,000,000원',
     340,
-    cash: 25000,
   ),
   _mission(
     'networth_5m',
     '10장 · 중견 투자사',
-    '회사 자산 500만원',
-    '현금과 보유주식 원가, 부동산 장부가를 합쳐 첫 500만원 규모를 만든다.',
+    '회사 순자산 500만원',
+    '현금·보유주식·부동산 평가액에서 대출과 보증금 등 모든 부채를 뺀 순자산 500만원을 만든다.',
     'net_worth',
     5000000,
-    '장부 자산 5,000,000원',
+    '순자산 5,000,000원',
     450,
-    cash: 50000,
     reputation: 4,
   ),
   _mission(
@@ -496,7 +461,6 @@ final List<MissionDefinition> missionCatalog = <MissionDefinition>[
     60,
     '평판 60 달성',
     420,
-    cash: 35000,
     trust: 3,
   ),
   _mission(
@@ -508,7 +472,6 @@ final List<MissionDefinition> missionCatalog = <MissionDefinition>[
     6,
     '누적 흑자 월 결산 6회',
     480,
-    cash: 60000,
     reputation: 4,
   ),
   _mission(
@@ -520,7 +483,6 @@ final List<MissionDefinition> missionCatalog = <MissionDefinition>[
     500000,
     '누적 부동산 임대수입 500,000원',
     430,
-    cash: 45000,
     year: 2008,
   ),
   _mission(
@@ -532,7 +494,6 @@ final List<MissionDefinition> missionCatalog = <MissionDefinition>[
     1,
     '성인 게임머니 확률 오락 1회',
     250,
-    cash: 10000,
     year: 2010,
   ),
   _mission(
@@ -544,7 +505,6 @@ final List<MissionDefinition> missionCatalog = <MissionDefinition>[
     1000000,
     '30일 안에 현금 +1,000,000원',
     600,
-    cash: 100000,
     reputation: 5,
     deadlineDays: 30,
     year: 2010,
@@ -552,13 +512,12 @@ final List<MissionDefinition> missionCatalog = <MissionDefinition>[
   _mission(
     'networth_10m',
     '12장 · 투자 명가',
-    '회사 자산 1천만원',
-    '현금·증권·부동산을 합친 장부 자산 1천만원을 달성한다.',
+    '회사 순자산 1천만원',
+    '현금·증권·부동산 평가액에서 모든 부채를 뺀 순자산 1천만원을 달성한다.',
     'net_worth',
     10000000,
-    '장부 자산 10,000,000원',
+    '순자산 10,000,000원',
     650,
-    cash: 120000,
     reputation: 5,
   ),
   _mission(
@@ -570,7 +529,6 @@ final List<MissionDefinition> missionCatalog = <MissionDefinition>[
     20,
     '누적 안건 20건 해결',
     500,
-    cash: 70000,
     trust: 4,
   ),
   _mission(
@@ -582,7 +540,6 @@ final List<MissionDefinition> missionCatalog = <MissionDefinition>[
     10,
     '누적 수익 매도 10회',
     650,
-    cash: 100000,
     reputation: 6,
   ),
 ];
@@ -604,9 +561,14 @@ const List<SkillDefinition> skillCatalog = <SkillDefinition>[
   SkillDefinition('calm_exit', 5, '침착한 매도', '수익 매도 평판 보너스 +1'),
   SkillDefinition('family_briefing', 6, '가족 브리핑', '안건 해결 시 가족 신뢰 +1'),
   SkillDefinition('talent_network', 7, '인재 추천망', '신규 직원 계약금 10% 절감'),
-  SkillDefinition('cash_management', 8, '현금 관리', '월 예수금 이자율 0.10% → 0.15%'),
+  SkillDefinition(
+    'cash_management',
+    8,
+    '현금 관리',
+    '입출금·정기예금 우대금리 +0.15%p',
+  ),
   SkillDefinition('property_operation', 9, '임대 운영', '월 부동산 임대수입 +10%'),
-  SkillDefinition('legendary_house', 10, '투자 명가', '미션 현금 보상 +25%'),
+  SkillDefinition('legendary_house', 10, '투자 명가', '별빛 상점 정보 상품 ⭐1 할인'),
 ];
 
 const List<int> _levelThresholds = <int>[
@@ -643,6 +605,10 @@ class MissionProgressionState {
     required this.missionStartCounter,
     required this.counters,
     required this.claimedMissionIds,
+    required this.starBalance,
+    required this.totalStarsEarned,
+    required this.starPurchaseIds,
+    required this.starHints,
   });
 
   factory MissionProgressionState.initial({
@@ -656,6 +622,10 @@ class MissionProgressionState {
     missionStartCounter: 0,
     counters: const <String, int>{},
     claimedMissionIds: const <String>[],
+    starBalance: 0,
+    totalStarsEarned: 0,
+    starPurchaseIds: const <String>[],
+    starHints: const <String, String>{},
   );
 
   final int experience;
@@ -665,6 +635,10 @@ class MissionProgressionState {
   final int missionStartCounter;
   final Map<String, int> counters;
   final List<String> claimedMissionIds;
+  final int starBalance;
+  final int totalStarsEarned;
+  final List<String> starPurchaseIds;
+  final Map<String, String> starHints;
 
   int get level => progressionLevelForExperience(experience);
   bool get allMissionsComplete => currentMissionIndex >= missionCatalog.length;
@@ -682,6 +656,10 @@ class MissionProgressionState {
     int? missionStartCounter,
     Map<String, int>? counters,
     List<String>? claimedMissionIds,
+    int? starBalance,
+    int? totalStarsEarned,
+    List<String>? starPurchaseIds,
+    Map<String, String>? starHints,
   }) => MissionProgressionState(
     experience: experience ?? this.experience,
     currentMissionIndex: currentMissionIndex ?? this.currentMissionIndex,
@@ -690,6 +668,10 @@ class MissionProgressionState {
     missionStartCounter: missionStartCounter ?? this.missionStartCounter,
     counters: counters ?? this.counters,
     claimedMissionIds: claimedMissionIds ?? this.claimedMissionIds,
+    starBalance: starBalance ?? this.starBalance,
+    totalStarsEarned: totalStarsEarned ?? this.totalStarsEarned,
+    starPurchaseIds: starPurchaseIds ?? this.starPurchaseIds,
+    starHints: starHints ?? this.starHints,
   );
 
   MissionProgressionState record(String metric, [int amount = 1]) {
@@ -707,6 +689,10 @@ class MissionProgressionState {
     'missionStartCounter': missionStartCounter,
     'counters': counters,
     'claimedMissionIds': claimedMissionIds,
+    'starBalance': starBalance,
+    'totalStarsEarned': totalStarsEarned,
+    'starPurchaseIds': starPurchaseIds,
+    'starHints': starHints,
   };
 
   factory MissionProgressionState.fromJson(
@@ -720,6 +706,13 @@ class MissionProgressionState {
         cash: fallbackCash,
       );
     }
+    final claimedMissionIds =
+        ((json['claimedMissionIds'] as List?) ?? const <dynamic>[])
+            .whereType<String>()
+            .toSet()
+            .toList(growable: false);
+    final migratedStarBalance =
+        (json['starBalance'] as num?)?.toInt() ?? claimedMissionIds.length;
     return MissionProgressionState(
       experience: ((json['experience'] as num?)?.toInt() ?? 0).clamp(
         0,
@@ -738,11 +731,19 @@ class MissionProgressionState {
       counters: ((json['counters'] as Map?) ?? const <String, dynamic>{}).map(
         (key, value) => MapEntry(key.toString(), (value as num?)?.toInt() ?? 0),
       ),
-      claimedMissionIds:
-          ((json['claimedMissionIds'] as List?) ?? const <dynamic>[])
-              .whereType<String>()
-              .toSet()
-              .toList(growable: false),
+      claimedMissionIds: claimedMissionIds,
+      starBalance: migratedStarBalance.clamp(0, 1 << 30),
+      totalStarsEarned:
+          ((json['totalStarsEarned'] as num?)?.toInt() ??
+                  claimedMissionIds.length)
+              .clamp(0, 1 << 30),
+      starPurchaseIds: ((json['starPurchaseIds'] as List?) ?? const <dynamic>[])
+          .whereType<String>()
+          .toSet()
+          .toList(growable: false),
+      starHints: ((json['starHints'] as Map?) ?? const <String, dynamic>{}).map(
+        (key, value) => MapEntry(key.toString(), value.toString()),
+      ),
     );
   }
 }

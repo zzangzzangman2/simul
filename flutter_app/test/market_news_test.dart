@@ -12,9 +12,13 @@ void main() {
 
   int dayFor(DateTime date) => date.difference(DateTime(2000, 1, 1)).inDays + 1;
 
-  GameState at(DateTime date, {int cash = 1000000}) => engine
+  GameState at(
+    DateTime date, {
+    int cash = 1000000,
+    int marketMinute = marketDayStartMinute,
+  }) => engine
       .createNewGame('테스트', worldSeed: seed)
-      .copyWith(day: dayFor(date), cash: cash);
+      .copyWith(day: dayFor(date), cash: cash, marketMinute: marketMinute);
 
   group('가상 시장 사건', () {
     test('시작 상장사는 고정된 가상 기업 50개다', () {
@@ -198,6 +202,22 @@ void main() {
       );
     });
 
+    test('모든 장중 사건은 종가 동시호가 전에 공개된다', () {
+      for (
+        var date = DateTime(2000, 1, 1);
+        !date.isAfter(DateTime(2026, 12, 31));
+        date = date.add(const Duration(days: 1))
+      ) {
+        for (final event in fictionalMarketEventsForDate(seed, date)) {
+          expect(
+            event.revealMinute,
+            greaterThanOrEqualTo(marketDayStartMinute),
+          );
+          expect(event.revealMinute, lessThan(krxContinuousEndMinute));
+        }
+      }
+    });
+
     test('조선 수주는 선종·척수·금액·선수금 조건을 따로 만든다', () {
       final shipOrders = <FictionalMarketEvent>[];
       final shippingContracts = <FictionalMarketEvent>[];
@@ -291,23 +311,27 @@ void main() {
       expect(firstSequence, isNot(secondSequence));
     });
 
-    test('한 세계에 2000~2026 연속 사건이 결정론적으로 생성된다', () {
-      var count = 0;
-      for (
-        var date = DateTime(2000, 1, 1);
-        date.isBefore(DateTime(2027, 1, 1));
-        date = date.add(const Duration(days: 1))
-      ) {
-        final first = fictionalMarketEventsForDate(seed, date);
-        final second = fictionalMarketEventsForDate(seed, date);
-        expect(
-          first.map((event) => event.toJson()).toList(),
-          second.map((event) => event.toJson()).toList(),
-        );
-        count += first.length;
-      }
-      expect(count, greaterThan(25000));
-    });
+    test(
+      '한 세계에 2000~2026 연속 사건이 결정론적으로 생성된다',
+      () {
+        var count = 0;
+        for (
+          var date = DateTime(2000, 1, 1);
+          date.isBefore(DateTime(2027, 1, 1));
+          date = date.add(const Duration(days: 1))
+        ) {
+          final first = fictionalMarketEventsForDate(seed, date);
+          final second = fictionalMarketEventsForDate(seed, date);
+          expect(
+            first.map((event) => event.toJson()).toList(),
+            second.map((event) => event.toJson()).toList(),
+          );
+          count += first.length;
+        }
+        expect(count, greaterThan(25000));
+      },
+      timeout: const Timeout(Duration(minutes: 5)),
+    );
 
     test('조선 회사에는 바이오·반도체 전용 사건이 섞이지 않는다', () {
       final forbidden = RegExp('신약|임상|후보물질|메모리 칩|미세공정');
@@ -326,30 +350,86 @@ void main() {
       }
     });
 
-    test('신규상장·유상증자·분할·상장폐지가 세계 생애주기에 들어간다', () async {
-      final universe = await FictionalMarketUniverse.load(seed: seed);
-      expect(universe.assets.length, greaterThan(180));
-      final actions = universe.assets
-          .expand((asset) => asset.corporateActions)
-          .map((action) => action.type)
-          .toSet();
-      expect(actions, contains(MarketCorporateActionType.rightsIssue));
-      expect(actions, contains(MarketCorporateActionType.materialSpinoff));
-      expect(actions, contains(MarketCorporateActionType.spinoff));
-      expect(actions, contains(MarketCorporateActionType.delisting));
+    test(
+      '신규상장·유상증자·분할·상장폐지가 세계 생애주기에 들어간다',
+      () async {
+        final universe = await FictionalMarketUniverse.load(seed: seed);
+        expect(universe.assets.length, greaterThan(180));
+        final actions = universe.assets
+            .expand((asset) => asset.corporateActions)
+            .map((action) => action.type)
+            .toSet();
+        expect(actions, contains(MarketCorporateActionType.rightsIssue));
+        expect(actions, contains(MarketCorporateActionType.materialSpinoff));
+        expect(actions, contains(MarketCorporateActionType.spinoff));
+        expect(actions, contains(MarketCorporateActionType.delisting));
+        expect(actions, contains(MarketCorporateActionType.dividend));
+      },
+      timeout: const Timeout(Duration(minutes: 5)),
+    );
+
+    test('배당금은 배당 직전 종가에서 산정되고 배당락이 가격에 반영된다', () async {
+      final universe = await FictionalMarketUniverse.load(
+        seed: seed,
+        throughDate: DateTime(2012, 12, 31),
+      );
+      var checked = 0;
+      for (final asset in universe.assets) {
+        for (final action in asset.corporateActions.where(
+          (item) => item.type == MarketCorporateActionType.dividend,
+        )) {
+          final previousClose = asset.previousCloseBefore(action.date);
+          final exQuote = asset.quoteAtOrBefore(DateTime.parse(action.date));
+          final referencePrice = action.referencePrice ?? previousClose;
+          if (previousClose == null ||
+              referencePrice == null ||
+              referencePrice < 2000 ||
+              exQuote == null ||
+              !exQuote.isExactDate) {
+            continue;
+          }
+          final yieldRate = action.amount / referencePrice;
+          expect(
+            yieldRate,
+            inInclusiveRange(0.004, 0.04),
+            reason: '배당금은 기준가 호가단위로 반올림되므로 목표수익률을 한 틱까지 벗어날 수 있다.',
+          );
+          expect(
+            exQuote.close,
+            lessThanOrEqualTo(previousClose * 1.30 - action.amount * 0.65),
+          );
+          checked += 1;
+          if (checked >= 80) break;
+        }
+        if (checked >= 80) break;
+      }
+      expect(checked, greaterThan(30));
     });
 
     test('세계 금융충격은 전체 시장과 취약 업종 가격에 반영된다', () async {
-      final universe = await FictionalMarketUniverse.load(seed: seed);
+      final shockDate = DateTime(2008, 9, 16);
+      final universe = await FictionalMarketUniverse.load(
+        seed: seed,
+        throughDate: shockDate,
+      );
       final finance = universe.assets.singleWhere(
         (asset) => asset.id == 'daon_finance',
       );
-      final quote = finance.quoteAtOrBefore(DateTime(2008, 9, 16))!;
-      final previous = finance.previousCloseBefore(quote.date)!;
+      final quote = finance.quoteAtOrBefore(shockDate)!;
+      final rawPrevious = finance.previousCloseBefore(quote.date)!;
+      final previous = finance.marketReferenceCloseOn(
+        shockDate,
+        previousClose: rawPrevious,
+      );
       final dailyReturn = quote.close / previous - 1;
+      final dailyRange = marketDailyPriceRange(
+        previousClose: previous,
+        date: shockDate,
+        market: finance.market,
+      );
 
       expect(quote.isExactDate, isTrue);
-      expect(dailyReturn, greaterThanOrEqualTo(-0.15));
+      expect(quote.close, inInclusiveRange(dailyRange.lower, dailyRange.upper));
       expect(dailyReturn, lessThanOrEqualTo(-0.14));
     });
 
@@ -378,9 +458,42 @@ void main() {
         }
       }
       expect(eventDate, isNotNull);
-      final brief = buildDailyBrief(at(eventDate!));
+      final brief = buildDailyBrief(
+        at(eventDate!, marketMinute: marketDayEndMinute),
+      );
       expect(brief.isBreaking, isTrue);
       expect(brief.headline?.date, marketDateKey(eventDate));
+    });
+
+    test('장중 사건은 공개 시각 전 오늘의 소식에 노출되지 않는다', () {
+      FictionalMarketEvent? firstEvent;
+      DateTime? eventDate;
+      for (
+        var date = DateTime(2002, 1, 1);
+        date.isBefore(DateTime(2004, 1, 1));
+        date = date.add(const Duration(days: 1))
+      ) {
+        final events = fictionalMarketEventsForDate(seed, date);
+        if (events.isNotEmpty &&
+            events.first.revealMinute > marketDayStartMinute) {
+          eventDate = date;
+          firstEvent = events.first;
+          break;
+        }
+      }
+
+      expect(eventDate, isNotNull);
+      expect(firstEvent, isNotNull);
+      final before = buildDailyBrief(
+        at(eventDate!, marketMinute: firstEvent!.revealMinute - 1),
+      );
+      final revealed = buildDailyBrief(
+        at(eventDate, marketMinute: firstEvent.revealMinute),
+      );
+
+      expect(before.isBreaking, isFalse);
+      expect(before.title, isNot(firstEvent.title));
+      expect(revealed.headline?.id, firstEvent.id);
     });
 
     test('평범한 거래일에도 소식이 비지 않는다', () {

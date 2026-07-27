@@ -42,7 +42,10 @@ test("opens the Flutter family-story prologue from the default route", async () 
   assert.match(onboarding, /1999\.12\.31\s+·\s+21:40/);
   assert.match(onboarding, /TV 드라마에서 작은 회사의 가능성을 먼저 알아본 투자자/);
   assert.match(onboarding, /수업료는 100만 원이야\. 아빠가 먼저 내 줄게/);
-  assert.match(onboarding, /bg_stock_academy_2000_v3\.png/);
+  assert.match(onboarding, /bg_living_room_1999_portrait_cartoon_v2\.png/);
+  assert.match(onboarding, /bg_kitchen_2000_morning_portrait_cartoon_v2\.png/);
+  assert.match(onboarding, /bg_stock_academy_2000_portrait_cartoon_v4\.png/);
+  assert.match(onboarding, /academy-travel-loading/);
   assert.match(onboarding, /academy-tutorial-continue/);
   assert.match(onboarding, /주식선생님\/22_포즈1_주인공그림체_공통슬롯_투명\.png/);
   assert.match(onboarding, /주식선생님\/27_포즈6_주인공그림체_공통슬롯_투명\.png/);
@@ -54,8 +57,6 @@ test("opens the Flutter family-story prologue from the default route", async () 
   assert.match(stockMarket, /market-tutorial-teacher-upper-body/);
   assert.match(stockMarket, /stock-order-book/);
   assert.match(stockMarket, /order-book-active-trade/);
-  assert.match(stockMarket, /네모칸 이동 중/);
-  assert.match(stockMarket, /가격이 달아나면 주문이 체결되지 않을 수 있습니다/);
   assert.match(layout, /초딩부터 건물주/);
   assert.match(layout, /images: \[\{ url: `\$\{origin\}\/og\.png`, width: 1734, height: 907/);
   assert.match(layout, /themeColor: "#061F2A"/);
@@ -179,7 +180,7 @@ test("documents and preserves the portrait-mobile product contract", async () =>
   assert.match(rules, /390×844px/);
   assert.match(rules, /최소 360px/);
   assert.match(guide, /처음하기.*이어하기/);
-  assert.match(guide, /현재 상태 스키마는 `v15`/);
+  assert.match(guide, /현재 상태 스키마는 `v18`/);
   assert.match(guide, /최대 5슬롯/);
   assert.doesNotMatch(rules, /게임 화면보다 먼저 회사 이름/);
   assert.doesNotMatch(guide, /첫 방문 시 회사 이름 입력 화면/);
@@ -187,7 +188,7 @@ test("documents and preserves the portrait-mobile product contract", async () =>
   assert.match(css, /env\(safe-area-inset-bottom\)/);
   assert.match(css, /width: min\(100%, 430px\)/);
   assert.match(css, /\.asset-grid \{[\s\S]*?grid-template-columns: 1fr;/);
-  assert.match(state, /schemaVersion = 15/);
+  assert.match(state, /schemaVersion = 18/);
   assert.match(state, /simulationSeed/);
   assert.match(market, /daily-market-report-card/);
   assert.match(market, /purchase-market-report-button/);
@@ -201,80 +202,33 @@ test("documents and preserves the portrait-mobile product contract", async () =>
   assert.ok(roomImage.byteLength > 100_000);
 });
 
-test("validates the dynamic news API before invoking Gemini", async () => {
-  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
-  workerUrl.searchParams.set("news-test", `${process.pid}-${Date.now()}`);
-  const { default: worker } = await import(workerUrl.href);
-  const response = await worker.fetch(
-    new Request("http://localhost/api/news", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        year: 1999,
-        date: "1999-12-31",
-        marketSummary: "국내 증시는 정규 거래일을 마쳤다.",
-        megaTrend: "모바일 기기 확산",
-      }),
-    }),
-    { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
-    { waitUntil() {}, passThroughOnException() {} },
-  );
+test("uses the deterministic local news combinator without a remote API", async () => {
+  const [packageJson, flutterPubspec, combinator, marketNews, main] =
+    await Promise.all([
+      readFile(new URL("../package.json", import.meta.url), "utf8"),
+      readFile(new URL("../flutter_app/pubspec.yaml", import.meta.url), "utf8"),
+      readFile(
+        new URL("../flutter_app/lib/game/news_combinator.dart", import.meta.url),
+        "utf8",
+      ),
+      readFile(
+        new URL("../flutter_app/lib/game/market_news.dart", import.meta.url),
+        "utf8",
+      ),
+      readFile(new URL("../flutter_app/lib/main.dart", import.meta.url), "utf8"),
+    ]);
 
-  assert.equal(response.status, 400);
-  assert.match((await response.json()).error, /2000~2026/);
+  assert.doesNotMatch(packageJson, /@google\/genai/i);
+  assert.doesNotMatch(flutterPubspec, /^\s+http:/m);
+  assert.doesNotMatch(`${combinator}${marketNews}${main}`, /\/api\/news/);
+  assert.doesNotMatch(`${combinator}${marketNews}${main}`, /package:http/);
+  assert.match(combinator, /theoreticalCombinationCount/);
+  assert.match(combinator, /12 \* 10 \* 12 \* 10 \* 12 \* 10/);
+  assert.match(combinator, /simulationSeed/);
+  assert.match(combinator, /toSafeSnapshot/);
+  assert.match(main, /NewsCombinator\(\)/);
 });
 
-test("keeps Gemini credentials server-side and forces the news JSON schema", async () => {
-  const [route, generator] = await Promise.all([
-    readFile(new URL("../app/api/news/route.ts", import.meta.url), "utf8"),
-    readFile(new URL("../lib/dynamic-news.ts", import.meta.url), "utf8"),
-  ]);
-
-  assert.match(route, /export async function POST/);
-  assert.match(generator, /gemini-3\.6-flash/);
-  assert.match(generator, /ThinkingLevel\.MEDIUM/);
-  assert.doesNotMatch(generator, /temperature:/);
-  assert.match(generator, /maxOutputTokens: 2048/);
-  assert.match(generator, /vertexai: true/);
-  assert.match(generator, /responseMimeType: "application\/json"/);
-  assert.match(generator, /responseJsonSchema: articleSchema/);
-  assert.match(generator, /minimum: -30/);
-  assert.match(generator, /maximum: 50/);
-  assert.doesNotMatch(generator, /가격 엔진에 전달/);
-  assert.match(generator, /가격·거래·저장 상태에는 사용하지 않음/);
-  assert.doesNotMatch(generator, /body\.companyName/);
-  assert.doesNotMatch(generator, /body\.action/);
-  assert.doesNotMatch(generator, /NEXT_PUBLIC_[A-Z_]*(?:KEY|SECRET)/);
-});
-test("allows local Flutter Web preflight and rejects unknown origins", async () => {
-  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
-  workerUrl.searchParams.set("cors-test", `${process.pid}-${Date.now()}`);
-  const { default: worker } = await import(workerUrl.href);
-  const env = { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } };
-  const ctx = { waitUntil() {}, passThroughOnException() {} };
-
-  const preflight = await worker.fetch(
-    new Request("http://localhost/api/news", {
-      method: "OPTIONS",
-      headers: { origin: "http://localhost:3001" },
-    }),
-    env,
-    ctx,
-  );
-  assert.equal(preflight.status, 204);
-  assert.equal(preflight.headers.get("access-control-allow-origin"), "http://localhost:3001");
-
-  const rejected = await worker.fetch(
-    new Request("http://localhost/api/news", {
-      method: "POST",
-      headers: { origin: "https://attacker.example", "content-type": "application/json" },
-      body: "{}",
-    }),
-    env,
-    ctx,
-  );
-  assert.equal(rejected.status, 403);
-});
 test("tracks mobile browser chrome while keeping the Flutter host fixed for the keyboard", async () => {
   const [flutterTemplate, flutterBootstrap] = await Promise.all([
     readFile(new URL("../flutter_app/web/index.html", import.meta.url), "utf8"),

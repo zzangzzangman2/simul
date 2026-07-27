@@ -6,6 +6,8 @@
 
 거래 대상은 모두 게임 전용 가상기업입니다. 2000년부터 2026년 최종 결산까지 출발 기업 50개와 생성 기업이 움직이며, 새 게임의 월드시드에 따라 가격·사건·신규상장·분사·유상증자·상장폐지가 달라집니다.
 
+새 캠페인은 회사 이름을 확정한 뒤 2000~2026 주식시장 연표와 서울·경기 부동산 세계를 먼저 구성합니다. 첫 로딩은 환경에 따라 약 1분 걸릴 수 있으며 화면에 현재 생성 단계와 퍼센트를 표시합니다. 전체 연표를 예열해도 플레이 중에는 현재 날짜까지 공개된 정보만 보입니다.
+
 <p align="center">
   <img src="./public/og-apartment-v2.png" alt="2000년 세로형 3공간 아파트 허브" width="760" />
 </p>
@@ -24,7 +26,7 @@
 
 - 엔진이 오늘의 시나리오·가격·기업행동을 먼저 결정한다.
 - 사건은 저장된 공개시각 전에는 가격과 기사에 나타나지 않는다.
-- Gemini는 전날 공개 사실만 기사 문장으로 정리한다.
+- 로컬 결정론적 조합기가 전날 공개 사실만으로 172만 8천 가지 이상의 기사 문장을 만든다.
 - 보고서는 방향·성패·영향률·미래 종가 없이 징후만 제공한다.
 - 화면 호가 잔량과 실제 지정가 부분체결이 같은 유동성 계산을 사용한다.
 - 같은 시드와 같은 선택은 같은 세계를 만든다.
@@ -65,14 +67,17 @@ npm run build:release
 
 27년 월드 생성은 메모리 점유가 크므로 Flutter 테스트는 파일별로 실행합니다.
 
-기본 웹 경로 `/`는 `/play/index.html`로 이동하며 루트 Vinext 앱은 Flutter 정적 호스트와 뉴스 API를 제공합니다.
+기본 웹 경로 `/`는 `/play/index.html`로 이동하며 루트 Vinext 앱은 Flutter 정적 호스트만 제공합니다. 신문은 네트워크 없이 앱 내부에서 생성됩니다.
 
 ## 주요 구현
 
 - `flutter_app/lib/game/fictional_market.dart`: 고정 50개, 2026까지 가격·사건·기업 생애주기
 - `flutter_app/lib/game/order_book.dart`: 호가벽·거래대금·분당 소화량·실제 체결 계획
-- `flutter_app/lib/game/game_engine.dart`: 저장 v15, 거래·경제·부동산·마이그레이션
+- `flutter_app/lib/game/news_combinator.dart`: 외부 연결 없는 결정론적 신문 문장 조합기
+- `flutter_app/lib/game/game_engine.dart`: 저장 v16, 거래·경제·부동산·스타 상점·마이그레이션
+- `flutter_app/lib/game/star_shop.dart`: 미션 스타 상품과 다음 거래일 힌트
 - `flutter_app/lib/game/real_estate_world.dart`: 개별 매물·지역 사건·공간 영향
+- `flutter_app/lib/game/world_bootstrapper.dart`: 시작·이어하기 세계 예열과 진행률
 - `flutter_app/lib/game/real_estate_rental.dart`: 공실·월세·전세·세입자 사건
 - `flutter_app/lib/rider_mini_game.dart`: 3차선 회피·체크포인트·콤보·완주 점수
 - `flutter_app/lib/stock_market_screen.dart`: 호가·주문·차트·배속·보고서·속보

@@ -69,6 +69,8 @@ void main() {
     await tester.tap(find.byKey(const Key('stock-row-1001')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(find.byKey(const Key('stock-detail-tab-info')));
+    await tester.pump();
     await tester.scrollUntilVisible(
       find.text('오늘의 조사 질문'),
       220,
@@ -78,9 +80,53 @@ void main() {
 
     expect(find.text('오늘의 조사 질문'), findsOneWidget);
     expect(tester.takeException(), isNull);
+    await tester.tap(find.byKey(const Key('stock-detail-tab-order')));
+    await tester.pump();
     await tester.tap(find.byKey(const Key('buy-stock-button')));
     await tester.pumpAndSettle();
+    expect(find.byKey(const Key('inline-order-workspace')), findsOneWidget);
+    expect(find.byKey(const Key('inline-order-ticket')), findsOneWidget);
+    expect(find.byKey(const Key('inline-order-book')), findsOneWidget);
+    final inlineAskRows = find.byKey(
+      const ValueKey('inline-order-book-ask-row'),
+    );
+    final inlineBidRows = find.byKey(
+      const ValueKey('inline-order-book-bid-row'),
+    );
+    expect(inlineAskRows, findsNWidgets(6));
+    expect(inlineBidRows, findsNWidgets(6));
+    final bestAskY = tester.getCenter(inlineAskRows.last).dy;
+    final bestBidY = tester.getCenter(inlineBidRows.first).dy;
+    expect(bestAskY, lessThan(bestBidY));
+    final currentPriceBorderY = tester
+        .getCenter(
+          find.byKey(const Key('inline-order-book-current-price-border')),
+        )
+        .dy;
+    expect(
+      currentPriceBorderY,
+      anyOf(closeTo(bestAskY, 1), closeTo(bestBidY, 1)),
+    );
+    expect(find.byKey(const Key('detailed-order-screen')), findsNothing);
+    expect(find.text('현금'), findsNothing);
+    expect(find.text('신용'), findsNothing);
     expect(find.byKey(const Key('order-quantity-value')), findsOneWidget);
+    final ticketRect = tester.getRect(
+      find.byKey(const Key('inline-order-ticket')),
+    );
+    final railRect = tester.getRect(find.byKey(const Key('inline-order-book')));
+    final workspaceRect = tester.getRect(
+      find.byKey(const Key('inline-order-workspace')),
+    );
+    expect(ticketRect.left, greaterThanOrEqualTo(0));
+    expect(ticketRect.right, lessThanOrEqualTo(railRect.left));
+    expect(railRect.right, lessThanOrEqualTo(phoneSize.width));
+    expect(
+      workspaceRect.bottom,
+      lessThanOrEqualTo(
+        tester.getTopLeft(find.byKey(const Key('stock-detail-bottom-nav'))).dy,
+      ),
+    );
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });
@@ -198,10 +244,13 @@ void main() {
     expect(find.byType(StockMarketScreen), findsNothing);
     final stockApp = find.byKey(const Key('computer-stock-market-app'));
     final realEstateApp = find.byKey(const Key('computer-real-estate-app'));
+    final starShopApp = find.byKey(const Key('computer-star-shop-app'));
     expect(stockApp.hitTestable(), findsOneWidget);
     expect(realEstateApp.hitTestable(), findsOneWidget);
-    expect(tester.getSize(stockApp).width, greaterThanOrEqualTo(120));
+    expect(starShopApp.hitTestable(), findsOneWidget);
+    expect(tester.getSize(stockApp).width, greaterThanOrEqualTo(88));
     expect(tester.getSize(realEstateApp), tester.getSize(stockApp));
+    expect(tester.getSize(starShopApp), tester.getSize(stockApp));
     expect(
       find.byKey(const Key('hub-mission-card')).hitTestable(),
       findsNothing,
@@ -224,6 +273,15 @@ void main() {
     Navigator.of(tester.element(realEstateRoute)).pop();
     await tester.pumpAndSettle();
 
+    await tester.tap(starShopApp);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('star-shop-screen')), findsOneWidget);
+    expect(find.byKey(const Key('star-balance')), findsOneWidget);
+    Navigator.of(
+      tester.element(find.byKey(const Key('star-shop-screen'))),
+    ).pop();
+    await tester.pumpAndSettle();
+
     await tester.tap(find.byKey(const Key('home-computer-close')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('hub-mission-card')), findsOneWidget);
@@ -234,8 +292,32 @@ void main() {
       find.byKey(const Key('apartment-place-living-room')),
       findsOneWidget,
     );
-    expectRoomHotspots(['open-decisions-button', 'open-organization-button']);
+    expectRoomHotspots([
+      'open-bank-button',
+      'open-decisions-button',
+      'open-organization-button',
+    ]);
     expect(find.byKey(const Key('hub-mission-card')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('open-bank-button')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('bank-screen')), findsOneWidget);
+    expect(find.byKey(const Key('bank-clerk-welcome')), findsOneWidget);
+    expect(find.byKey(const Key('bank-intro-dialogue')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('bank-intro-continue')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('bank-intro-deposit')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('bank-consultation-panel')), findsOneWidget);
+    expect(find.byKey(const Key('bank-deposit-term-6')), findsOneWidget);
+    expect(find.byKey(const Key('bank-deposit-term-12')), findsOneWidget);
+    expect(find.byKey(const Key('bank-deposit-term-24')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    Navigator.of(tester.element(find.byKey(const Key('bank-screen')))).pop();
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('apartment-place-living-room')),
+      findsOneWidget,
+    );
     final leftArrow = find.byKey(const Key('apartment-go-bedroom'));
     final rightArrow = find.byKey(const Key('apartment-go-kitchen'));
     expect(leftArrow, findsOneWidget);
@@ -320,7 +402,10 @@ void main() {
       matching: find.byType(Scrollable),
     );
     await tester.scrollUntilVisible(appendix, 260, scrollable: ledgerScroll);
-    await tester.tap(appendix);
+    await tester.ensureVisible(appendix);
+    await tester.pumpAndSettle();
+    expect(appendix.hitTestable(), findsOneWidget);
+    await tester.tap(appendix.hitTestable());
     await tester.pumpAndSettle();
 
     expect(find.text('가족 계좌 상태와 오늘의 신문 스크랩'), findsOneWidget);
@@ -453,7 +538,7 @@ void main() {
         home: VisualNovelOnboardingScreen(
           onCreate: (_, onProgress) async {
             created = true;
-            onProgress('테스트 시장 준비 중…');
+            onProgress(const WorldLoadProgress(0.18, '테스트 시장 준비 중…'));
             await creationGate.future;
           },
         ),
@@ -497,7 +582,20 @@ void main() {
     await tester.pumpAndSettle();
     expectPortraitInside();
 
-    for (var index = 0; index < 9; index++) {
+    for (var index = 0; index < 11; index++) {
+      await tester.tap(find.byKey(const Key('story-continue')));
+      await tester.pumpAndSettle();
+      expectPortraitInside();
+    }
+    expect(
+      find.byKey(const Key('academy-receptionist-character')),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const Key('academy-tuition-pay-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('academy-registration-continue')));
+    await tester.pumpAndSettle();
+    for (var index = 0; index < 5; index++) {
       await tester.tap(find.byKey(const Key('story-continue')));
       await tester.pumpAndSettle();
       expectPortraitInside();
@@ -554,6 +652,7 @@ void main() {
     );
     await tester.pump();
     expect(find.text('테스트 시장 준비 중…'), findsOneWidget);
+    expect(find.text('18%'), findsOneWidget);
     creationGate.complete();
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
@@ -575,7 +674,15 @@ void main() {
     }
     await tester.tap(find.byKey(const Key('story-intro-computer')));
     await tester.pumpAndSettle();
-    for (var index = 0; index < 9; index++) {
+    for (var index = 0; index < 11; index++) {
+      await tester.tap(find.byKey(const Key('story-continue')));
+      await tester.pumpAndSettle();
+    }
+    await tester.tap(find.byKey(const Key('academy-tuition-pay-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('academy-registration-continue')));
+    await tester.pumpAndSettle();
+    for (var index = 0; index < 5; index++) {
       await tester.tap(find.byKey(const Key('story-continue')));
       await tester.pumpAndSettle();
     }
