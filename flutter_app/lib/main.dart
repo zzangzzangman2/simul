@@ -4847,12 +4847,16 @@ class _Sticker extends StatelessWidget {
           children: [
             Icon(icon, color: _coral, size: 15),
             const SizedBox(width: 5),
-            Text(
-              label,
-              style: const TextStyle(
-                color: _ink,
-                fontSize: 10,
-                fontWeight: FontWeight.w900,
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: _ink,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
             ),
           ],

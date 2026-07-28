@@ -7,7 +7,7 @@ enum _MarketSection { home, explore, account }
 enum _ChartPeriod { minute, day, week, month, year }
 
 const _visibleOrderBookSideRows = gameOrderBookLevelCount;
-const _orderBookMotionDuration = Duration(milliseconds: 72);
+const _orderBookMotionDuration = Duration(milliseconds: 144);
 const _orderBookTapeCapacity = 50;
 
 enum _QuoteQuantityPreset { one, ten, quarter, maximum }
@@ -114,6 +114,12 @@ double _tradeTapeExecutionStrength(Iterable<_OrderBookTapePrint> prints) {
     sellQuantity: sellQuantity,
   );
 }
+
+double _tradeTapeTurnoverEok(Iterable<_OrderBookTapePrint> prints) =>
+    prints.fold<double>(
+      0,
+      (sum, print) => sum + (print.price * print.quantity / 100000000),
+    );
 
 _PlayerTradeSignal? _playerTradeSignalForLedgerEntry(
   LedgerEntry entry, {
@@ -3163,11 +3169,19 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
       return _visibleOrderBookCacheValue!;
     }
     final consumption = _orderBookConsumptionAt(currentMinute);
+    final playerOrderBookPrint =
+        playerTrade != null &&
+            playerTrade.assetId == definition.id &&
+            playerTrade.marketMinute == currentMinute
+        ? playerTrade.orderBookPrint
+        : null;
     final visible = gameOrderBookSnapshotAfterConsumption(
       snapshot: rawSnapshot,
       consumedAskByPrice: consumption.asks,
       consumedBidByPrice: consumption.bids,
       consumedCapacityUnits: consumption.capacityUnits,
+      latestConsumedSide: playerOrderBookPrint?.levelSide,
+      latestConsumedPrice: playerOrderBookPrint?.price,
       retainSyntheticTombstone: false,
     );
     _visibleOrderBookCacheState = state;
@@ -3449,10 +3463,8 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
         previous != null &&
         currentMinute >= previous.minute &&
         microstructureFrame >= previous.microstructureFrame;
-    final carrySnapshot = canCarryForward && previous.minute < currentMinute
+    final carrySnapshot = canCarryForward
         ? _visibleOrderBookSnapshot(previous.snapshot, previous.minute)
-        : canCarryForward
-        ? previous.snapshot
         : null;
     final previousTradePrice = quote.sessionHistory.length >= 2
         ? quote.sessionHistory[quote.sessionHistory.length - 2]
@@ -3482,8 +3494,10 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
       technicalLevels: _technicalLevels,
       liquidityPulse: microstructureFrame,
       adaptiveLiquidityPulses: true,
+      holdSameMinuteBoundaryUntilExecution: true,
     );
-    var snapshot = generatedSnapshot;
+    final consumption = _orderBookConsumptionAt(currentMinute);
+    var snapshot = _visibleOrderBookSnapshot(generatedSnapshot, currentMinute);
     final clock = marketClockAt(
       currentMinute,
       tradingDay: quote.isTradingDay && isMarketTradingDay(state.currentDate),
@@ -3523,27 +3537,19 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
         liquidityPulse: microstructureFrame,
         pulsesPerMarketMinute: pulsesPerMarketMinute,
       );
-      final consumption = _orderBookConsumptionAt(currentMinute);
-      final availableSnapshot = gameOrderBookSnapshotAfterConsumption(
-        snapshot: generatedSnapshot,
-        consumedAskByPrice: consumption.asks,
-        consumedBidByPrice: consumption.bids,
-        consumedCapacityUnits: consumption.capacityUnits,
-        retainSyntheticTombstone: false,
-      );
       final targetLevel = pulse == null
           ? null
           : gameOrderBookFirstExecutableLevel(
-              snapshot: availableSnapshot,
+              snapshot: snapshot,
               side: pulse.levelSide,
             );
       if (pulse != null && targetLevel != null) {
         snapshot = gameOrderBookSnapshotAfterSyntheticTrade(
-          snapshot: generatedSnapshot,
+          snapshot: snapshot,
           pulse: pulse,
           absolutePrice: targetLevel.price,
           previousSnapshot: carrySnapshot,
-          availableSnapshot: availableSnapshot,
+          availableSnapshot: snapshot,
           perMinuteBudgetUnits: math.max(
             0,
             generatedSnapshot.executionCapacity - consumption.capacityUnits,
@@ -3631,13 +3637,18 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
         _state.currentDate,
       ),
     );
+    final recentTape = _tradeTape
+        .where((print) => print.marketMinute >= minute.value - 2)
+        .toList(growable: false);
     return gameOrderBookPulsesPerMarketMinute(
       fullDayTurnoverEok: fullDayTurnoverEok,
       currentPrice: quote.price,
       previousTradePrice: previousTradePrice,
       previousClose: quote.previousClose,
       market: definition.market,
-      executionStrength: _tradeTapeExecutionStrength(_tradeTape),
+      executionStrength: _tradeTapeExecutionStrength(recentTape),
+      executionSamplePrints: recentTape.length,
+      executionSampleTurnoverEok: _tradeTapeTurnoverEok(recentTape),
       tradingSessionActive: true,
       playbackActive: true,
     );
@@ -5678,44 +5689,29 @@ class _CompactOrderBookRailState extends State<_CompactOrderBookRail> {
     final snapshot = widget.snapshot;
     final levels = _symmetricVisibleOrderBookLevels(snapshot);
     final generatedTrade = snapshot.lastSyntheticTrade;
-    final generatedSideLevels =
-        generatedTrade?.levelSide == GameOrderBookSide.ask
-        ? snapshot.asks
-        : snapshot.bids;
     final hasCurrentGeneratedTrade =
         generatedTrade != null &&
         generatedTrade.quantity > 0 &&
         generatedTrade.marketMinute == widget.minute &&
         generatedTrade.liquidityPulse == snapshot.liquidityPulse &&
-        generatedSideLevels
-            .take(_visibleOrderBookSideRows)
-            .any((level) => _matches(level.price, generatedTrade.price));
+        levels.any((level) => _matches(level.price, generatedTrade.price));
     double? outlinePrice = hasCurrentGeneratedTrade
         ? generatedTrade.price
         : null;
     final playerTrade = widget.playerTrade;
     final playerPrint = playerTrade?.orderBookPrint;
-    final playerSideLevels = playerPrint?.levelSide == GameOrderBookSide.ask
-        ? snapshot.asks
-        : snapshot.bids;
     final hasCurrentPlayerTrade =
         playerTrade != null &&
         playerPrint != null &&
         playerTrade.assetId == widget.definition.id &&
         playerTrade.marketMinute == widget.minute &&
         playerTrade.microstructureFrame == snapshot.liquidityPulse &&
-        playerSideLevels
-            .take(_visibleOrderBookSideRows)
-            .any(
-              (level) =>
-                  level.side == playerPrint.levelSide &&
-                  _matches(level.price, playerPrint.price),
-            );
+        levels.any((level) => _matches(level.price, playerPrint.price));
     if (hasCurrentPlayerTrade) {
       outlinePrice = playerPrint.price;
     }
     outlinePrice ??=
-        snapshot.asks
+        levels
             .where((level) => _matches(level.price, currentPrice))
             .firstOrNull
             ?.price ??
@@ -8881,11 +8877,8 @@ class _OrderBookPanel extends StatelessWidget {
             upperPriceLimit: dailyRange.upper,
           )
         : quote.price;
+    final visibleOrderBookLevels = _symmetricVisibleOrderBookLevels(snapshot);
     final generatedTrade = snapshot.lastSyntheticTrade;
-    final generatedSideLevels =
-        generatedTrade?.levelSide == GameOrderBookSide.ask
-        ? snapshot.asks
-        : snapshot.bids;
     final hasCurrentGeneratedTrade =
         clock.phase == MarketSessionPhase.regular &&
         !viActive &&
@@ -8894,13 +8887,9 @@ class _OrderBookPanel extends StatelessWidget {
         generatedTrade.quantity > 0 &&
         generatedTrade.marketMinute == minute &&
         generatedTrade.liquidityPulse == snapshot.liquidityPulse &&
-        generatedSideLevels
-            .take(_visibleOrderBookSideRows)
-            .any(
-              (level) =>
-                  level.side == generatedTrade.levelSide &&
-                  (level.price - generatedTrade.price).abs() < 0.000001,
-            );
+        visibleOrderBookLevels.any(
+          (level) => (level.price - generatedTrade.price).abs() < 0.000001,
+        );
     final compactPanel = availableHeight < 560;
     final marketSummaryHeight = compactPanel ? 28.0 : 44.0;
     final tapeHeight = compactPanel ? 34.0 : 80.0;
@@ -8932,9 +8921,6 @@ class _OrderBookPanel extends StatelessWidget {
         : 0;
     final currentPlayerTrade = playerTrade;
     final playerPrint = currentPlayerTrade?.orderBookPrint;
-    final playerSideLevels = playerPrint?.levelSide == GameOrderBookSide.ask
-        ? snapshot.asks
-        : snapshot.bids;
     final hasCurrentPlayerTrade =
         clock.phase == MarketSessionPhase.regular &&
         currentPlayerTrade != null &&
@@ -8942,13 +8928,9 @@ class _OrderBookPanel extends StatelessWidget {
         currentPlayerTrade.assetId == definition.id &&
         currentPlayerTrade.marketMinute == minute &&
         currentPlayerTrade.microstructureFrame == snapshot.liquidityPulse &&
-        playerSideLevels
-            .take(_visibleOrderBookSideRows)
-            .any(
-              (level) =>
-                  level.side == playerPrint.levelSide &&
-                  (level.price - playerPrint.price).abs() < 0.000001,
-            );
+        visibleOrderBookLevels.any(
+          (level) => (level.price - playerPrint.price).abs() < 0.000001,
+        );
     if (hasCurrentPlayerTrade) {
       activeTradeSide = currentPlayerTrade.side;
       activeTradePrice = playerPrint.price;
@@ -9808,7 +9790,7 @@ class _OrderBookPriceLadderState extends State<_OrderBookPriceLadder> {
         : (widget.availableHeight / levels.length).clamp(11.5, 42.0).toDouble();
     final outlinePrice =
         widget.activeTradePrice ??
-        widget.snapshot.asks
+        levels
             .where((level) => _matchesPrice(level, widget.currentPrice))
             .firstOrNull
             ?.price ??
@@ -10242,23 +10224,25 @@ class _OrderBookQuantityCellState extends State<_OrderBookQuantityCell> {
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TweenAnimationBuilder<double>(
-                  duration: _orderBookMotionDuration,
-                  curve: Curves.easeOutCubic,
-                  tween: Tween<double>(
-                    begin: widget.quantity.toDouble(),
-                    end: widget.quantity.toDouble(),
-                  ),
-                  builder: (context, animatedQuantity, _) => Text(
-                    _money(animatedQuantity.round()),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: const Color(0xFF2C3440),
-                      fontSize: widget.showSecondary ? 13 : 10,
-                      height: 1,
-                      fontWeight: FontWeight.w700,
-                      fontFeatures: _marketNumberFeatures,
+                Flexible(
+                  child: TweenAnimationBuilder<double>(
+                    duration: _orderBookMotionDuration,
+                    curve: Curves.easeOutCubic,
+                    tween: Tween<double>(
+                      begin: widget.quantity.toDouble(),
+                      end: widget.quantity.toDouble(),
+                    ),
+                    builder: (context, animatedQuantity, _) => Text(
+                      _money(animatedQuantity.round()),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: const Color(0xFF2C3440),
+                        fontSize: widget.showSecondary ? 13 : 10,
+                        height: 1,
+                        fontWeight: FontWeight.w700,
+                        fontFeatures: _marketNumberFeatures,
+                      ),
                     ),
                   ),
                 ),
@@ -10268,6 +10252,7 @@ class _OrderBookQuantityCellState extends State<_OrderBookQuantityCell> {
                     '${_quantityDelta > 0 ? '+' : ''}${_money(_quantityDelta)}',
                     key: const Key('order-book-quantity-delta'),
                     maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: _quantityDelta > 0
                           ? const Color(0xFF16794E)

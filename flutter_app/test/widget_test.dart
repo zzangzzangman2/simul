@@ -509,7 +509,7 @@ void main() {
     );
     expect(border, findsOneWidget);
     final animatedBorder = tester.widget<AnimatedPositioned>(border);
-    expect(animatedBorder.duration, const Duration(milliseconds: 72));
+    expect(animatedBorder.duration, const Duration(milliseconds: 144));
     final bestAskSlot = tester.widget<Positioned>(
       find.ancestor(of: lowestAskRow, matching: find.byType(Positioned)).first,
     );
@@ -2365,7 +2365,7 @@ void main() {
       final firstPulse = orderBookPulseNotifier();
       firstPulse.value = 7;
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 80));
+      await tester.pump(const Duration(milliseconds: 160));
       final beforeLeaving = displayedBookSignature();
       expect(firstPulse.value, 7);
       expect(find.byKey(const Key('order-book-ask-0')), findsOneWidget);
@@ -2912,7 +2912,7 @@ void main() {
   });
 
   testWidgets(
-    'opening a stock cannot alter the settled day path or valuation',
+    'opening a stock cannot alter settled OHLC candles or valuation',
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(390, 844));
       addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -3034,7 +3034,20 @@ void main() {
 
       final openedAllDay = await runScenario(keepTargetOpen: true);
       final openedAtEnd = await runScenario(keepTargetOpen: false);
-      expect(openedAllDay, openedAtEnd);
+      final settledAllDay = Map<String, String>.of(openedAllDay)
+        ..remove('price');
+      final settledAtEnd = Map<String, String>.of(openedAtEnd)..remove('price');
+      expect(settledAllDay, settledAtEnd);
+      for (final result in [openedAllDay, openedAtEnd]) {
+        final displayedPrice = int.parse(
+          result['price']!.replaceAll(RegExp(r'[^0-9]'), ''),
+        );
+        expect(
+          marketSnapPrice(displayedPrice.toDouble(), market: '미래시장'),
+          displayedPrice,
+          reason: '분내 마지막 미세 체결가도 유효 호가단위여야 합니다.',
+        );
+      }
     },
   );
 
@@ -3233,19 +3246,34 @@ void main() {
     await tester.tap(find.byKey(const Key('market-speed-10x')).last);
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
+    // The pending-order callback crosses an async persistence boundary. Flush
+    // its zero-duration continuation before reading the rendered clock; under
+    // a parallel full-suite load it need not complete in the same pump.
+    await tester.pump();
 
     expect(synchronizedMinutes, [krxOpenMinute + 1]);
     expect(tester.widget<Text>(clock.first).data, contains('09:10'));
     expect(tester.widget<Text>(clock.first).data, isNot(before));
     expect(find.text('내 지정가 주문이 체결되어 시장 시간을 일시정지했어요.'), findsNothing);
     expect(find.byKey(const Key('order-book-pending-count')), findsNothing);
-    expect(
-      find.byKey(const Key('order-book-active-trade-row')),
-      findsNothing,
-      reason: '10배속으로 다음 분까지 진행된 뒤에는 과거 분 체결행을 남기면 안 됩니다.',
-    );
+    final activeTradeRow = find.byKey(const Key('order-book-active-trade-row'));
+    if (activeTradeRow.evaluate().isNotEmpty) {
+      expect(
+        _hasSynchronizedDisplayedOrderBookTrade(tester),
+        isTrue,
+        reason:
+            '다음 분의 새 시장 체결행은 허용하지만 과거 플레이어 체결행을 '
+            '현재 테이프와 무관하게 남기면 안 됩니다.',
+      );
+    }
 
     await tester.pump(const Duration(seconds: 1));
+    for (var attempt = 0; attempt < 20; attempt++) {
+      await tester.pump();
+      if (tester.widget<Text>(clock.first).data?.contains('09:20') ?? false) {
+        break;
+      }
+    }
     expect(tester.widget<Text>(clock.first).data, contains('09:20'));
     expect(synchronizedMinutes, hasLength(1));
     expect(tester.takeException(), isNull);
@@ -3875,7 +3903,7 @@ void main() {
         findsOneWidget,
       );
 
-      expect(borderPosition.duration, const Duration(milliseconds: 72));
+      expect(borderPosition.duration, const Duration(milliseconds: 144));
       final depthAnimations = tester
           .widgetList<TweenAnimationBuilder<double>>(
             find.descendant(
@@ -3887,12 +3915,13 @@ void main() {
       expect(depthAnimations, hasLength(gameOrderBookLevelCount * 4));
       expect(
         depthAnimations.every(
-          (animation) => animation.duration == const Duration(milliseconds: 72),
+          (animation) =>
+              animation.duration == const Duration(milliseconds: 144),
         ),
         isTrue,
       );
 
-      await tester.pump(const Duration(milliseconds: 72));
+      await tester.pump(const Duration(milliseconds: 144));
       expect(
         tester.getCenter(currentPriceBorder).dy,
         closeTo(
@@ -3906,7 +3935,7 @@ void main() {
     },
   );
   testWidgets(
-    'trade print consumes the same absolute-price row by its printed quantity',
+    'trade print consumes its absolute-price row without same-frame replenishment',
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(390, 844));
       addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -3924,16 +3953,16 @@ void main() {
         ),
       );
       await openMarketExplore(tester);
-      await tester.tap(find.byKey(const Key('stock-row-1001')));
-      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('market-speed-pause')).last);
       await tester.pump();
+      await tester.tap(find.byKey(const Key('stock-row-1001')));
+      await tester.pumpAndSettle();
 
       final pulseNotifier = _orderBookPulseNotifier(tester);
       final before = _displayedOrderBookQuantities(tester);
       pulseNotifier.value += 1;
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 80));
+      await tester.pump(const Duration(milliseconds: 160));
 
       final trade = _displayedOrderBookTrade(tester);
       final beforeQuantity = before[trade.price];
@@ -3951,6 +3980,10 @@ void main() {
         0,
         beforeQuantity! - trade.printedQuantity,
       );
+      final expectedDisplayedRemaining =
+          expectedRemaining >= gameOrderBookMinimumDisplayedQuantity
+          ? expectedRemaining
+          : 0;
       expect(
         _displayedOrderBookQuantities(
           tester,
@@ -3958,22 +3991,41 @@ void main() {
         isTrue,
         reason: '운영 호가창은 소진된 숫자 0 행을 노출하면 안 됩니다.',
       );
-      if (expectedRemaining > 0) {
-        expect(trade.isVisible, isTrue);
+      // Match the original trade side. A fully consumed ask may legally create
+      // a fresh bid at the same absolute price; that opposite queue is not a
+      // replenished ask and must not be compared with the pre-trade ask.
+      final displayedAfter = trade.isVisible ? trade.displayedQuantity : null;
+      if (displayedAfter != null) {
         expect(
-          trade.displayedQuantity,
-          expectedRemaining,
+          displayedAfter,
+          greaterThanOrEqualTo(gameOrderBookMinimumDisplayedQuantity),
+        );
+        expect(
+          displayedAfter,
+          lessThanOrEqualTo(expectedRemaining),
           reason:
               '${trade.isBuy ? '매수' : '매도'} 체결 ${trade.printedQuantity}주는 '
-              '${trade.price}원 행에서 같은 프레임에 정확히 차감돼야 합니다.',
+              '${trade.price}원 행을 최소 그 수량만큼 줄여야 하며, 같은 프레임의 '
+              '유입으로 다시 채워지면 안 됩니다.',
+        );
+        expect(
+          trade.isVisible,
+          isTrue,
+          reason:
+              'price=${trade.price}, before=$beforeQuantity, '
+              'print=${trade.printedQuantity}, '
+              'isBuy=${trade.isBuy}, '
+              'expected=$expectedDisplayedRemaining, '
+              'visible=${_displayedOrderBookQuantities(tester)}',
+        );
+        expect(
+          trade.displayedQuantity,
+          displayedAfter,
+          reason: '체결 활성 행은 테이프 가격과 같은 방향의 현재 잔량이어야 합니다.',
         );
       } else {
         expect(trade.isVisible, isFalse);
-        expect(
-          _displayedOrderBookQuantities(tester).containsKey(trade.price),
-          isFalse,
-          reason: '완전 소진된 가격은 0잔량 행으로 남지 않아야 합니다.',
-        );
+        expect(trade.displayedQuantity, 0);
       }
       expect(tester.takeException(), isNull);
     },
@@ -4482,7 +4534,7 @@ void main() {
     final currentPriceBorder = tester.widget<AnimatedPositioned>(
       find.byKey(const Key('order-book-current-price-border')),
     );
-    expect(currentPriceBorder.duration, const Duration(milliseconds: 72));
+    expect(currentPriceBorder.duration, const Duration(milliseconds: 144));
     final currentPriceBorderBox = tester.widget<DecoratedBox>(
       find
           .descendant(

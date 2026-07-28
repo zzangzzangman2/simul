@@ -79,9 +79,15 @@ void main() {
       )
       .join('|');
 
-  test('market-minute slots span low-liquidity two to active twenty-four', () {
+  test('market-minute slots span low-liquidity one to active twelve', () {
     final dormant = gameOrderBookPulsesPerMarketMinute(
       fullDayTurnoverEok: 1,
+      currentPrice: 10000,
+      previousTradePrice: 10000,
+      previousClose: 10000,
+    );
+    final thin = gameOrderBookPulsesPerMarketMinute(
+      fullDayTurnoverEok: 50,
       currentPrice: 10000,
       previousTradePrice: 10000,
       previousClose: 10000,
@@ -100,13 +106,14 @@ void main() {
     );
 
     expect(dormant, gameOrderBookMinimumPulsesPerMarketMinute);
-    expect(dormant, 2);
+    expect(dormant, 1);
+    expect(thin, 1);
     expect(ordinary, greaterThan(dormant));
     expect(active, greaterThan(ordinary));
     expect(active, gameOrderBookMaximumOrdinaryPulsesPerMarketMinute);
   });
 
-  test('fast and extreme moves use 32 and 40 slots without exceeding cap', () {
+  test('fast and extreme moves use 16 and 20 slots without exceeding cap', () {
     final fast = gameOrderBookPulsesPerMarketMinute(
       fullDayTurnoverEok: 1,
       currentPrice: 10150,
@@ -135,7 +142,7 @@ void main() {
     expect(extremeHighLiquidity, gameOrderBookMaximumPulsesPerMarketMinute);
   });
 
-  test('depth imbalance alone cannot accelerate balanced executions', () {
+  test('tiny or unsupported tape imbalance cannot accelerate the book', () {
     final balancedExecutions = gameOrderBookPulsesPerMarketMinute(
       fullDayTurnoverEok: 1,
       currentPrice: 10000,
@@ -159,8 +166,29 @@ void main() {
     );
 
     expect(balancedExecutions, gameOrderBookMinimumPulsesPerMarketMinute);
-    expect(buyOnlyExecutions, gameOrderBookMaximumPulsesPerMarketMinute);
-    expect(sellOnlyExecutions, gameOrderBookMaximumPulsesPerMarketMinute);
+    expect(buyOnlyExecutions, gameOrderBookMinimumPulsesPerMarketMinute);
+    expect(sellOnlyExecutions, gameOrderBookMinimumPulsesPerMarketMinute);
+
+    final insufficientLiquidSample = gameOrderBookPulsesPerMarketMinute(
+      fullDayTurnoverEok: gameOrderBookSparseFullDayTurnoverEok,
+      currentPrice: 10000,
+      previousTradePrice: 10000,
+      previousClose: 10000,
+      executionStrength: 500,
+    );
+    expect(insufficientLiquidSample, 2);
+
+    final liquidImbalance = gameOrderBookPulsesPerMarketMinute(
+      fullDayTurnoverEok: gameOrderBookSparseFullDayTurnoverEok,
+      currentPrice: 10000,
+      previousTradePrice: 10000,
+      previousClose: 10000,
+      executionStrength: 500,
+      executionSamplePrints: gameOrderBookMinimumImbalanceSamplePrints,
+      executionSampleTurnoverEok:
+          gameOrderBookMinimumImbalanceSampleTurnoverEok,
+    );
+    expect(liquidImbalance, gameOrderBookMaximumPulsesPerMarketMinute);
   });
 
   test('closed sessions and paused playback emit no slot', () {
@@ -225,7 +253,7 @@ void main() {
     );
   });
 
-  test('low-liquidity minute still exposes two deterministic slots', () {
+  test('low-liquidity minute exposes one deterministic slot', () {
     final startFrame = gameOrderBookLiquidityPulseFrame(
       marketMinute: minute,
       slotIndex: 0,
@@ -236,13 +264,12 @@ void main() {
       throughSlotIndex: gameOrderBookMinimumPulsesPerMarketMinute,
     );
 
-    expect(frames, hasLength(2));
-    expect(frames.toSet(), hasLength(2));
+    expect(frames, hasLength(1));
+    expect(frames.toSet(), hasLength(1));
     expect(
       frames,
       orderedEquals([
         gameOrderBookLiquidityPulseFrame(marketMinute: minute, slotIndex: 1),
-        gameOrderBookLiquidityPulseFrame(marketMinute: minute, slotIndex: 2),
       ]),
     );
   });
@@ -681,10 +708,15 @@ void main() {
       sessionLow: support.breachBoundary,
       previousSnapshot: exhaustedBreach,
     );
+    final heldLevel = heldBreach.rememberedLevels[support.price]!;
+    expect(heldLevel.quantity, greaterThanOrEqualTo(10));
+    expect(heldLevel.isWall, isFalse);
+    expect(heldLevel.isStructuralWall, isFalse);
+    expect(heldLevel.isStructuralBreached, isTrue);
     expect(
-      heldBreach.rememberedLevels[support.price]!.quantity,
-      0,
-      reason: '현재가 근처에서 무너진 구조벽은 다음 펄스에 재생성되면 안 됩니다.',
+      heldLevel.quantity,
+      lessThan(breachedLevel.quantity),
+      reason: '무너진 구조벽은 얇은 일반 큐만 허용하고 예전 벽 수량을 복원하면 안 됩니다.',
     );
 
     final oneTickBelowSupport = gameOrderBookPriceAfterTickImpact(
@@ -717,8 +749,8 @@ void main() {
     expect(flippedNearLevel.isWall, isFalse);
     expect(
       flippedNearLevel.quantity,
-      0,
-      reason: '붕괴 가격이 bid에서 ask로 바뀌어도 근접 구조 공백을 우회하면 안 됩니다.',
+      greaterThanOrEqualTo(gameOrderBookMinimumDisplayedQuantity),
+      reason: '붕괴 가격이 반대편으로 넘어가도 예전 벽이 아니라 얇은 일반 큐만 들어와야 합니다.',
     );
 
     final threeTicksBelowSupport = gameOrderBookPriceAfterTickImpact(
@@ -1069,9 +1101,13 @@ void main() {
   );
 
   test(
-    'synthetic trade token is idempotent and supports a diagnostic tombstone',
+    'synthetic trade token is idempotent and keeps a sparse diagnostic tombstone',
     () {
-      final raw = snapshot(pulse: 52);
+      final raw = snapshot(pulse: 52, sharesOutstanding: 100000);
+      expect(
+        raw.fullDayTurnoverEok,
+        lessThan(gameOrderBookSeverelySparseFullDayTurnoverEok),
+      );
       final target = raw.asks.first;
       final pulse = GameOrderBookTradePulse(
         levelSide: GameOrderBookSide.ask,

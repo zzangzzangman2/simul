@@ -540,116 +540,119 @@ void main() {
     },
   );
 
-  test(
-    'consecutive market orders consume the remaining absolute ask depth',
-    () {
-      final base = engine.createNewGame(
-        'price depth ledger',
-        initialCash: 1000000000,
-      );
-      final state = base.copyWith(
-        day: 4,
-        marketMinute: krxOpenMinute,
-        story: base.story.copyWith(accountAuthorityLevel: 5),
-      );
-      final generated = buildGameOrderBookSnapshot(
-        assetId: 'hanbit_telecom',
-        day: marketLiquidityDayKey(state.currentDate),
-        minute: state.marketMinute,
-        currentPrice: 10000,
-        previousClose: 10000,
-        date: state.currentDate,
-        market: fictionalMainMarket,
-        simulationSeed: state.simulationSeed,
-      );
-      final rawDisplayed = snapshotWithDepth(
-        generated,
-        askQuantities: const [3, 7],
-        bidQuantities: const [8, 8],
-        executionCapacity: 20,
-      );
+  test('consecutive market orders consume the remaining absolute ask depth', () {
+    final base = engine.createNewGame(
+      'price depth ledger',
+      initialCash: 1000000000,
+    );
+    final state = base.copyWith(
+      day: 4,
+      marketMinute: krxOpenMinute,
+      story: base.story.copyWith(accountAuthorityLevel: 5),
+    );
+    final generated = buildGameOrderBookSnapshot(
+      assetId: 'hanbit_telecom',
+      day: marketLiquidityDayKey(state.currentDate),
+      minute: state.marketMinute,
+      currentPrice: 10000,
+      previousClose: 10000,
+      date: state.currentDate,
+      market: fictionalMainMarket,
+      simulationSeed: state.simulationSeed,
+    );
+    final rawDisplayed = snapshotWithDepth(
+      generated,
+      askQuantities: const [3, 7],
+      bidQuantities: const [8, 8],
+      executionCapacity: 20,
+    );
 
-      final first = engine.executeTrade(
-        state,
-        hanbitOrder(
-          side: TradeSide.buy,
-          quantity: 2,
-          displayedSnapshot: rawDisplayed,
-        ),
-      );
-      final consumedAfterFirst = gameConsumedOrderBookUnitsByPrice(
+    final first = engine.executeTrade(
+      state,
+      hanbitOrder(
+        side: TradeSide.buy,
+        quantity: 2,
+        displayedSnapshot: rawDisplayed,
+      ),
+    );
+    final consumedAfterFirst = gameConsumedOrderBookUnitsByPrice(
+      first.state,
+      assetId: 'hanbit_telecom',
+      marketMinute: krxOpenMinute,
+      bookSide: GameOrderBookSide.ask,
+    );
+    final staleReplay = engine.executeTrade(
+      first.state,
+      hanbitOrder(
+        side: TradeSide.buy,
+        quantity: 1,
+        displayedSnapshot: rawDisplayed,
+      ),
+    );
+    final secondDisplayed = gameOrderBookSnapshotAfterConsumption(
+      snapshot: rawDisplayed,
+      consumedAskByPrice: consumedAfterFirst,
+      consumedCapacityUnits: gameConsumedOrderBookFillUnits(
         first.state,
         assetId: 'hanbit_telecom',
         marketMinute: krxOpenMinute,
-        bookSide: GameOrderBookSide.ask,
-      );
-      final staleReplay = engine.executeTrade(
-        first.state,
-        hanbitOrder(
-          side: TradeSide.buy,
-          quantity: 1,
-          displayedSnapshot: rawDisplayed,
-        ),
-      );
-      final secondDisplayed = gameOrderBookSnapshotAfterConsumption(
-        snapshot: rawDisplayed,
-        consumedAskByPrice: consumedAfterFirst,
-        consumedCapacityUnits: gameConsumedOrderBookFillUnits(
-          first.state,
-          assetId: 'hanbit_telecom',
-          marketMinute: krxOpenMinute,
-          side: TradeSide.buy,
-        ),
-      );
-      final second = engine.executeTrade(
-        first.state,
-        hanbitOrder(
-          side: TradeSide.buy,
-          quantity: 3,
-          displayedSnapshot: secondDisplayed,
-        ),
-      );
+        side: TradeSide.buy,
+      ),
+    );
+    expect(
+      secondDisplayed.asks.any(
+        (level) => level.price == generated.asks[0].price,
+      ),
+      isFalse,
+      reason:
+          'A synthetic 1-share remainder is cancelled instead of being shown as a new wall.',
+    );
+    expect(secondDisplayed.asks.first.price, generated.asks[1].price);
+    final second = engine.executeTrade(
+      first.state,
+      hanbitOrder(
+        side: TradeSide.buy,
+        quantity: 3,
+        displayedSnapshot: secondDisplayed,
+      ),
+    );
 
-      expect(first.success, isTrue);
-      expect(staleReplay.success, isFalse);
-      expect(staleReplay.state.toJson(), first.state.toJson());
-      expect(first.state.ledger.last.orderBookSide, 'ask');
-      expect(first.state.ledger.last.orderBookFills, hasLength(1));
-      expect(
-        first.state.ledger.last.orderBookFills.single.price,
-        generated.asks[0].price,
-      );
-      expect(first.state.ledger.last.orderBookFills.single.quantity, 2);
-      expect(second.success, isTrue);
-      expect(second.state.ledger.last.orderBookFills, hasLength(2));
-      expect(
-        second.state.ledger.last.orderBookFills.map((fill) => fill.price),
-        [generated.asks[0].price, generated.asks[1].price],
-      );
-      expect(
-        second.state.ledger.last.orderBookFills.map((fill) => fill.quantity),
-        [1, 2],
-      );
-      final consumed = gameConsumedOrderBookUnitsByPrice(
-        second.state,
-        assetId: 'hanbit_telecom',
-        marketMinute: krxOpenMinute,
-        bookSide: GameOrderBookSide.ask,
-      );
-      expect(consumed[generated.asks[0].price], 3);
-      expect(consumed[generated.asks[1].price], 2);
+    expect(first.success, isTrue);
+    expect(staleReplay.success, isFalse);
+    expect(staleReplay.state.toJson(), first.state.toJson());
+    expect(first.state.ledger.last.orderBookSide, 'ask');
+    expect(first.state.ledger.last.orderBookFills, hasLength(1));
+    expect(
+      first.state.ledger.last.orderBookFills.single.price,
+      generated.asks[0].price,
+    );
+    expect(first.state.ledger.last.orderBookFills.single.quantity, 2);
+    expect(second.success, isTrue);
+    expect(second.state.ledger.last.orderBookFills, hasLength(1));
+    expect(
+      second.state.ledger.last.orderBookFills.single.price,
+      generated.asks[1].price,
+    );
+    expect(second.state.ledger.last.orderBookFills.single.quantity, 3);
+    final consumed = gameConsumedOrderBookUnitsByPrice(
+      second.state,
+      assetId: 'hanbit_telecom',
+      marketMinute: krxOpenMinute,
+      bookSide: GameOrderBookSide.ask,
+    );
+    expect(consumed[generated.asks[0].price], 2);
+    expect(consumed[generated.asks[1].price], 3);
 
-      final restored = GameState.fromJson(second.state.toJson());
-      expect(restored.ledger.last.orderBookSide, 'ask');
-      expect(restored.ledger.last.orderBookFills, hasLength(2));
-      expect(
-        restored.ledger.last.orderBookFills[1].price,
-        generated.asks[1].price,
-      );
-      expect(restored.ledger.last.orderBookFills[1].quantity, 2);
-      expect(restored.ledger.last.orderBookCapacityUnits, 3);
-    },
-  );
+    final restored = GameState.fromJson(second.state.toJson());
+    expect(restored.ledger.last.orderBookSide, 'ask');
+    expect(restored.ledger.last.orderBookFills, hasLength(1));
+    expect(
+      restored.ledger.last.orderBookFills.single.price,
+      generated.asks[1].price,
+    );
+    expect(restored.ledger.last.orderBookFills.single.quantity, 3);
+    expect(restored.ledger.last.orderBookCapacityUnits, 3);
+  });
 
   test('displayed book is stale after shared minute capacity advances', () {
     final base = engine.createNewGame(
