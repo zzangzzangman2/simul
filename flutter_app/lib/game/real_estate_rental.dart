@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'real_estate_market.dart';
+import 'stable_hash.dart';
 
 enum RealEstateLeaseType { automatic, vacant, monthlyRent, jeonse }
 
@@ -275,7 +276,7 @@ int _stableHash(String value) {
   var hash = 2166136261;
   for (final unit in value.codeUnits) {
     hash ^= unit;
-    hash = (hash * 16777619) & 0x7fffffff;
+    hash = multiplyFnvPrime31Exact(hash);
   }
   return hash;
 }

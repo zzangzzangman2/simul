@@ -185,13 +185,15 @@ class HomeComputerScreen extends StatefulWidget {
     required this.state,
     required this.onOpenStockMarket,
     required this.onOpenRealEstate,
+    required this.onOpenBusiness,
     required this.onOpenStarShop,
   });
 
   final GameState state;
-  final VoidCallback onOpenStockMarket;
-  final VoidCallback onOpenRealEstate;
-  final Future<GameState> Function() onOpenStarShop;
+  final Future<GameState> Function(GameState state) onOpenStockMarket;
+  final Future<GameState> Function(GameState state) onOpenRealEstate;
+  final Future<GameState> Function(GameState state) onOpenBusiness;
+  final Future<GameState> Function(GameState state) onOpenStarShop;
 
   @override
   State<HomeComputerScreen> createState() => _HomeComputerScreenState();
@@ -200,8 +202,23 @@ class HomeComputerScreen extends StatefulWidget {
 class _HomeComputerScreenState extends State<HomeComputerScreen> {
   late GameState _state = widget.state;
 
+  Future<void> _openStockMarket() async {
+    final next = await widget.onOpenStockMarket(_state);
+    if (mounted) setState(() => _state = next);
+  }
+
+  Future<void> _openRealEstate() async {
+    final next = await widget.onOpenRealEstate(_state);
+    if (mounted) setState(() => _state = next);
+  }
+
+  Future<void> _openBusiness() async {
+    final next = await widget.onOpenBusiness(_state);
+    if (mounted) setState(() => _state = next);
+  }
+
   Future<void> _openStarShop() async {
-    final next = await widget.onOpenStarShop();
+    final next = await widget.onOpenStarShop(_state);
     if (mounted) setState(() => _state = next);
   }
 
@@ -415,52 +432,81 @@ class _HomeComputerScreenState extends State<HomeComputerScreen> {
                                   ),
                                   const SizedBox(height: 13),
                                   Expanded(
-                                    child: Row(
-                                      children: [
-                                        Expanded(
-                                          child: _ComputerAppTile(
-                                            interactionKey: const Key(
-                                              'computer-stock-market-app',
+                                    child: LayoutBuilder(
+                                      builder: (context, appConstraints) {
+                                        final tileWidth =
+                                            (appConstraints.maxWidth - 8) / 2;
+                                        final tileHeight =
+                                            (appConstraints.maxHeight - 8) / 2;
+                                        return GridView.count(
+                                          physics:
+                                              const NeverScrollableScrollPhysics(),
+                                          padding: EdgeInsets.zero,
+                                          crossAxisCount: 2,
+                                          crossAxisSpacing: 8,
+                                          mainAxisSpacing: 8,
+                                          childAspectRatio:
+                                              tileWidth / tileHeight,
+                                          children: [
+                                            _ComputerAppTile(
+                                              interactionKey: const Key(
+                                                'computer-stock-market-app',
+                                              ),
+                                              icon: Icons
+                                                  .candlestick_chart_rounded,
+                                              iconColor: const Color(
+                                                0xFF55C7A1,
+                                              ),
+                                              title: '미래 증권',
+                                              subtitle: '주식시장',
+                                              status: '시세 · 주문',
+                                              onTap: _openStockMarket,
                                             ),
-                                            icon:
-                                                Icons.candlestick_chart_rounded,
-                                            iconColor: const Color(0xFF55C7A1),
-                                            title: '미래 증권',
-                                            subtitle: '주식시장',
-                                            status: '시세 · 주문',
-                                            onTap: widget.onOpenStockMarket,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: _ComputerAppTile(
-                                            interactionKey: const Key(
-                                              'computer-real-estate-app',
+                                            _ComputerAppTile(
+                                              interactionKey: const Key(
+                                                'computer-real-estate-app',
+                                              ),
+                                              icon: Icons.apartment_rounded,
+                                              iconColor: const Color(
+                                                0xFFFFA45C,
+                                              ),
+                                              title: '한마음 부동산',
+                                              subtitle: '서울·경기 매물',
+                                              status: '지도 · 계약',
+                                              onTap: _openRealEstate,
                                             ),
-                                            icon: Icons.apartment_rounded,
-                                            iconColor: const Color(0xFFFFA45C),
-                                            title: '한마음 부동산',
-                                            subtitle: '서울·경기 매물',
-                                            status: '지도 · 계약',
-                                            onTap: widget.onOpenRealEstate,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: _ComputerAppTile(
-                                            interactionKey: const Key(
-                                              'computer-star-shop-app',
+                                            _ComputerAppTile(
+                                              interactionKey: const Key(
+                                                'computer-business-app',
+                                              ),
+                                              icon: Icons.storefront_rounded,
+                                              iconColor: const Color(
+                                                0xFFFF86A8,
+                                              ),
+                                              title: '동네상권넷',
+                                              subtitle: '창업 · 점포운영',
+                                              status:
+                                                  '점포 ${_state.businesses.activeBusinesses.length}'
+                                                  ' · 사건 ${_state.businesses.pendingEvents.length}',
+                                              onTap: _openBusiness,
                                             ),
-                                            icon: Icons.auto_awesome_rounded,
-                                            iconColor: const Color(0xFFFFD75E),
-                                            title: '별빛 상점',
-                                            subtitle: '미션 스타',
-                                            status:
-                                                '⭐ ${_state.progression.starBalance}',
-                                            onTap: _openStarShop,
-                                          ),
-                                        ),
-                                      ],
+                                            _ComputerAppTile(
+                                              interactionKey: const Key(
+                                                'computer-star-shop-app',
+                                              ),
+                                              icon: Icons.auto_awesome_rounded,
+                                              iconColor: const Color(
+                                                0xFFFFD75E,
+                                              ),
+                                              title: '별빛 상점',
+                                              subtitle: '미션 스타',
+                                              status:
+                                                  '⭐ ${_state.progression.starBalance}',
+                                              onTap: _openStarShop,
+                                            ),
+                                          ],
+                                        );
+                                      },
                                     ),
                                   ),
                                 ],
@@ -589,8 +635,8 @@ class _ComputerAppTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
-      final dense = constraints.maxWidth < 112;
-      final iconSize = dense ? 46.0 : 58.0;
+      final dense = constraints.maxWidth < 112 || constraints.maxHeight < 130;
+      final iconSize = dense ? 34.0 : 58.0;
       return Material(
         color: Colors.transparent,
         child: InkWell(
@@ -625,7 +671,7 @@ class _ComputerAppTile extends StatelessWidget {
                       borderRadius: BorderRadius.circular(dense ? 10 : 12),
                       border: Border.all(color: const Color(0xFF6E89AC)),
                     ),
-                    child: Icon(icon, color: iconColor, size: dense ? 28 : 34),
+                    child: Icon(icon, color: iconColor, size: dense ? 22 : 34),
                   ),
                   SizedBox(height: dense ? 7 : 10),
                   Text(

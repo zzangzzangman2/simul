@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:millennium_capital/game/game_engine.dart';
 import 'package:millennium_capital/game/game_state.dart';
 import 'package:millennium_capital/game/market_news.dart';
+import 'package:millennium_capital/game/order_book.dart';
 import 'package:millennium_capital/game/seed_money_content.dart';
 import 'package:millennium_capital/main.dart';
 
@@ -93,8 +94,8 @@ void main() {
     final inlineBidRows = find.byKey(
       const ValueKey('inline-order-book-bid-row'),
     );
-    expect(inlineAskRows, findsNWidgets(6));
-    expect(inlineBidRows, findsNWidgets(6));
+    expect(inlineAskRows, findsNWidgets(gameOrderBookLevelCount));
+    expect(inlineBidRows, findsNWidgets(gameOrderBookLevelCount));
     final bestAskY = tester.getCenter(inlineAskRows.last).dy;
     final bestBidY = tester.getCenter(inlineBidRows.first).dy;
     expect(bestAskY, lessThan(bestBidY));
@@ -169,7 +170,7 @@ void main() {
 
     for (final game in <Widget>[const RiderMiniGame()]) {
       await tester.pumpWidget(MaterialApp(home: game));
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 500));
       expect(tester.takeException(), isNull);
     }
   });
@@ -244,12 +245,15 @@ void main() {
     expect(find.byType(StockMarketScreen), findsNothing);
     final stockApp = find.byKey(const Key('computer-stock-market-app'));
     final realEstateApp = find.byKey(const Key('computer-real-estate-app'));
+    final businessApp = find.byKey(const Key('computer-business-app'));
     final starShopApp = find.byKey(const Key('computer-star-shop-app'));
     expect(stockApp.hitTestable(), findsOneWidget);
     expect(realEstateApp.hitTestable(), findsOneWidget);
+    expect(businessApp.hitTestable(), findsOneWidget);
     expect(starShopApp.hitTestable(), findsOneWidget);
     expect(tester.getSize(stockApp).width, greaterThanOrEqualTo(88));
     expect(tester.getSize(realEstateApp), tester.getSize(stockApp));
+    expect(tester.getSize(businessApp), tester.getSize(stockApp));
     expect(tester.getSize(starShopApp), tester.getSize(stockApp));
     expect(
       find.byKey(const Key('hub-mission-card')).hitTestable(),
@@ -271,6 +275,15 @@ void main() {
     expect(find.text('부동산 시장'), findsOneWidget);
     expect(find.byKey(const Key('real-estate-metro-map')), findsOneWidget);
     Navigator.of(tester.element(realEstateRoute)).pop();
+    await tester.pumpAndSettle();
+
+    await tester.tap(businessApp);
+    await tester.pumpAndSettle();
+    final businessRoute = find.byKey(const Key('business-management-screen'));
+    expect(businessRoute, findsOneWidget);
+    expect(find.byKey(const Key('business-tab-events')), findsOneWidget);
+    expect(find.byKey(const Key('business-tab-statements')), findsOneWidget);
+    Navigator.of(tester.element(businessRoute)).pop();
     await tester.pumpAndSettle();
 
     await tester.tap(starShopApp);

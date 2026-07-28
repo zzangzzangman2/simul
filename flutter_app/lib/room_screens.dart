@@ -1565,7 +1565,7 @@ class _LedgerHeroCard extends StatelessWidget {
         ? const Color(0xFFB64235)
         : const Color(0xFF315E9B);
     final marketCaption = marketReady
-        ? '현금·예금·주식·부동산에서 모든 부채를 뺀 순자산'
+        ? '현금·예금·주식·부동산·사업체에서 모든 부채를 뺀 순자산'
         : marketFailed
         ? '주식은 매입원가로 계산했습니다. 시세를 다시 연결해 주세요.'
         : '시세 연결 전에는 주식을 매입원가로 계산합니다.';

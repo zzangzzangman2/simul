@@ -110,7 +110,7 @@ void main() {
       expect(first.first.priceAt(date), isNot(other.first.priceAt(date)));
     });
 
-    test('v3는 v2 사건을 두 배로 확장하고 모든 매물에 고유 연표를 남긴다', () {
+    test('v3 이후는 v2 사건을 두 배로 확장하고 모든 매물에 고유 연표를 남긴다', () {
       final count = realEstateGeneratedEventCount(worldSeed);
       final version2Count = realEstateGeneratedEventCount(
         worldSeed,
@@ -156,7 +156,7 @@ void main() {
       final uniqueTitles = uniqueEvents.map((event) => event.title).toSet();
       final kinds = uniqueEvents.map((event) => event.kind).toSet();
 
-      expect(realEstateWorldGeneratorVersion, 3);
+      expect(realEstateWorldGeneratorVersion, 4);
       expect(realEstateEventNarrativeCombinationCapacity(), 15000);
       expect(kinds, containsAll(RealEstateWorldEventKind.values));
       expect(uniqueTitles.length, greaterThan(uniqueEvents.length * 0.90));
@@ -301,7 +301,7 @@ void main() {
       expect(decliningListings, greaterThanOrEqualTo(3));
     });
 
-    test('v1·v2 월드는 기존 산식을 보존하고 신규 월드만 v3를 사용한다', () {
+    test('v1~v3 월드는 기존 산식을 보존하고 신규 월드만 v4를 사용한다', () {
       final asset = realEstateMarketAssetById(
         'uijeongbu_station_officetel_20',
       )!;
@@ -330,7 +330,7 @@ void main() {
         1128,
       );
       expect(current.generatorVersion, realEstateWorldGeneratorVersion);
-      expect(current.generatorVersion, 3);
+      expect(current.generatorVersion, 4);
       expect(current.areaPriceFactor, closeTo(currentAreaFactor, 0.0000001));
       expect(
         legacy
@@ -651,7 +651,9 @@ void main() {
       final medianCagr = cagrValues[cagrValues.length ~/ 2];
       final medianDrawdown = drawdowns[drawdowns.length ~/ 2];
       expect(maximumMonthBoundaryJump, lessThan(0.012));
-      expect(maximumMonthlyJump, lessThan(0.16));
+      // v4 permits a deliberate high-volatility month when a canonical
+      // cross-asset crisis event reaches property on its actual event date.
+      expect(maximumMonthlyJump, lessThan(0.20));
       expect(maximumMaterialEventCount, lessThanOrEqualTo(30));
       expect(medianCagr, inInclusiveRange(-0.02, 0.13));
       expect(medianDrawdown, greaterThan(0.05));

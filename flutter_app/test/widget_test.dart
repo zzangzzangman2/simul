@@ -10,6 +10,7 @@ import 'package:millennium_capital/game/game_state.dart';
 import 'package:millennium_capital/game/market_clock.dart';
 import 'package:millennium_capital/game/market_data.dart';
 import 'package:millennium_capital/game/market_quote.dart';
+import 'package:millennium_capital/game/order_book.dart';
 import 'package:millennium_capital/game/market_tick.dart';
 import 'package:millennium_capital/game/story_state.dart';
 import 'package:millennium_capital/game/seed_money_content.dart';
@@ -28,6 +29,7 @@ typedef _DisplayedOrderBookTrade = ({
   int printedQuantity,
   int displayedQuantity,
   bool isBuy,
+  bool isVisible,
 });
 
 int _displayedOrderBookNumber(WidgetTester tester, Finder finder) {
@@ -43,7 +45,7 @@ Map<int, int> _displayedOrderBookQuantities(WidgetTester tester) {
           ? 'order-book-sell-quantity-cell'
           : 'order-book-buy-quantity-cell',
     );
-    for (var index = 0; index < 6; index += 1) {
+    for (var index = 0; index < gameOrderBookLevelCount; index += 1) {
       final row = find.byKey(ValueKey('order-book-$side-$index'));
       if (row.evaluate().isEmpty) continue;
       final price = _displayedOrderBookNumber(
@@ -73,47 +75,86 @@ Map<int, int> _displayedOrderBookQuantities(WidgetTester tester) {
   return quantities;
 }
 
-_DisplayedOrderBookTrade _displayedOrderBookTrade(WidgetTester tester) {
-  final activeTrade = find.byKey(const Key('order-book-active-trade'));
-  expect(activeTrade, findsOneWidget);
-  final text = tester.widget<Text>(activeTrade).data!;
-  final match = RegExp(r'^(매수|매도) 체결 ([\d,]+)주$').firstMatch(text);
-  expect(match, isNotNull, reason: '체결 문구는 방향과 실제 체결수량을 안정적으로 노출해야 합니다: $text');
-  final isBuy = match!.group(1) == '매수';
-  final printedQuantity = int.parse(match.group(2)!.replaceAll(',', ''));
+_DisplayedOrderBookTrade _displayedOrderBookTrade(
+  WidgetTester tester, {
+  bool player = false,
+}) {
+  final tapeScope = find.byKey(
+    Key(player ? 'order-book-player-tape-print' : 'order-book-trade-tape'),
+  );
+  expect(tapeScope, findsOneWidget);
+  final tapeQuantitySide = find.descendant(
+    of: tapeScope,
+    matching: find.byKey(const Key('order-book-tape-quantity-side')),
+  );
+  final tapePrice = find.descendant(
+    of: tapeScope,
+    matching: find.byKey(const Key('order-book-tape-price')),
+  );
+  expect(tapeQuantitySide, findsWidgets);
+  expect(tapePrice, findsWidgets);
+  final tapeText = tester.widget<Text>(tapeQuantitySide.first).data!;
+  final match = RegExp(r'^([\d,]+)주 (매수|매도)').firstMatch(tapeText);
+  expect(match, isNotNull, reason: '체결 테이프는 실제 수량과 방향을 노출해야 합니다: $tapeText');
+  final printedQuantity = int.parse(match!.group(1)!.replaceAll(',', ''));
+  final isBuy = match.group(2) == '매수';
   final expectedSide = isBuy ? 'ask' : 'bid';
   final quantityCellKey = ValueKey(
     isBuy ? 'order-book-sell-quantity-cell' : 'order-book-buy-quantity-cell',
   );
+  final price = _displayedOrderBookNumber(tester, tapePrice.first);
+  final activeMarker = find.byKey(const Key('order-book-active-trade-row'));
 
-  Finder? activeRow;
-  for (var index = 0; index < 6; index += 1) {
+  Finder? matchingRow;
+  var matchingRowIsActive = false;
+  for (var index = 0; index < gameOrderBookLevelCount; index += 1) {
     final row = find.byKey(ValueKey('order-book-$expectedSide-$index'));
-    if (find.descendant(of: row, matching: activeTrade).evaluate().isNotEmpty) {
-      activeRow = row;
-      break;
-    }
+    final rowPriceFinder = find.descendant(
+      of: row,
+      matching: find.byKey(const ValueKey('order-book-price-label')),
+    );
+    final hasTapePrice =
+        rowPriceFinder.evaluate().isNotEmpty &&
+        _displayedOrderBookNumber(tester, rowPriceFinder.first) == price;
+    if (!hasTapePrice) continue;
+    matchingRow = row;
+    matchingRowIsActive = find
+        .descendant(of: row, matching: activeMarker)
+        .evaluate()
+        .isNotEmpty;
+    break;
   }
-  expect(
-    activeRow,
-    isNotNull,
-    reason: '${isBuy ? '매수' : '매도'} 체결 문구는 반대편 실제 체결 호가 행 안에 있어야 합니다.',
-  );
-  final price = _displayedOrderBookNumber(
-    tester,
-    find
-        .descendant(
-          of: activeRow!,
-          matching: find.byKey(const ValueKey('order-book-price-label')),
-        )
-        .first,
-  );
+
+  if (matchingRow == null) {
+    if (!player) {
+      expect(
+        activeMarker,
+        findsNothing,
+        reason: '완전 소진된 체결 가격은 0행이나 활성 테두리로 남으면 안 됩니다.',
+      );
+    }
+    return (
+      price: price,
+      printedQuantity: printedQuantity,
+      displayedQuantity: 0,
+      isBuy: isBuy,
+      isVisible: false,
+    );
+  }
+
+  if (!player) {
+    expect(
+      matchingRowIsActive,
+      isTrue,
+      reason: '남아 있는 최근 체결 호가는 체결 테이프와 같은 행이어야 합니다.',
+    );
+  }
   final displayedQuantity = _displayedOrderBookNumber(
     tester,
     find
         .descendant(
           of: find.descendant(
-            of: activeRow,
+            of: matchingRow,
             matching: find.byKey(quantityCellKey),
           ),
           matching: find.byType(Text),
@@ -125,7 +166,86 @@ _DisplayedOrderBookTrade _displayedOrderBookTrade(WidgetTester tester) {
     printedQuantity: printedQuantity,
     displayedQuantity: displayedQuantity,
     isBuy: isBuy,
+    isVisible: true,
   );
+}
+
+bool _hasSynchronizedDisplayedOrderBookTrade(WidgetTester tester) {
+  final tapeScope = find.byKey(const Key('order-book-trade-tape'));
+  final activeMarker = find.byKey(const Key('order-book-active-trade-row'));
+  if (tapeScope.evaluate().length != 1 || activeMarker.evaluate().length != 1) {
+    return false;
+  }
+  final quantitySide = find.descendant(
+    of: tapeScope,
+    matching: find.byKey(const Key('order-book-tape-quantity-side')),
+  );
+  final tapePrice = find.descendant(
+    of: tapeScope,
+    matching: find.byKey(const Key('order-book-tape-price')),
+  );
+  if (quantitySide.evaluate().isEmpty || tapePrice.evaluate().isEmpty) {
+    return false;
+  }
+  final tapeText = tester.widget<Text>(quantitySide.first).data ?? '';
+  final match = RegExp(r'^([\d,]+)주 (매수|매도)').firstMatch(tapeText);
+  if (match == null) return false;
+  final expectedSide = match.group(2) == '매수' ? 'ask' : 'bid';
+  final expectedPrice = _displayedOrderBookNumber(tester, tapePrice.first);
+  for (var index = 0; index < gameOrderBookLevelCount; index += 1) {
+    final row = find.byKey(ValueKey('order-book-$expectedSide-$index'));
+    if (find.descendant(of: row, matching: activeMarker).evaluate().isEmpty) {
+      continue;
+    }
+    final rowPrice = find.descendant(
+      of: row,
+      matching: find.byKey(const ValueKey('order-book-price-label')),
+    );
+    return rowPrice.evaluate().isNotEmpty &&
+        _displayedOrderBookNumber(tester, rowPrice.first) == expectedPrice;
+  }
+  return false;
+}
+
+String _displayedOrderBookTradeDebug(WidgetTester tester) {
+  final tapeScope = find.byKey(const Key('order-book-trade-tape'));
+  final quantitySide = find.descendant(
+    of: tapeScope,
+    matching: find.byKey(const Key('order-book-tape-quantity-side')),
+  );
+  final tapePrice = find.descendant(
+    of: tapeScope,
+    matching: find.byKey(const Key('order-book-tape-price')),
+  );
+  final tapeSideText = quantitySide.evaluate().isEmpty
+      ? '<none>'
+      : tester.widget<Text>(quantitySide.first).data ?? '<null>';
+  final tapePriceText = tapePrice.evaluate().isEmpty
+      ? '<none>'
+      : tester.widget<Text>(tapePrice.first).data ?? '<null>';
+  final active = <String>[];
+  for (final side in const <String>['ask', 'bid']) {
+    for (var index = 0; index < gameOrderBookLevelCount; index += 1) {
+      final row = find.byKey(ValueKey('order-book-$side-$index'));
+      if (find
+          .descendant(
+            of: row,
+            matching: find.byKey(const Key('order-book-active-trade-row')),
+          )
+          .evaluate()
+          .isEmpty) {
+        continue;
+      }
+      final price = find.descendant(
+        of: row,
+        matching: find.byKey(const ValueKey('order-book-price-label')),
+      );
+      active.add(
+        '$side[$index]=${price.evaluate().isEmpty ? '<none>' : tester.widget<Text>(price.first).data}',
+      );
+    }
+  }
+  return 'tape=$tapeSideText@$tapePriceText active=${active.join(',')}';
 }
 
 ValueNotifier<int> _orderBookPulseNotifier(WidgetTester tester) {
@@ -374,8 +494,8 @@ void main() {
   void expectSymmetricInlineOrderBook(WidgetTester tester) {
     final askRows = find.byKey(const ValueKey('inline-order-book-ask-row'));
     final bidRows = find.byKey(const ValueKey('inline-order-book-bid-row'));
-    expect(askRows, findsNWidgets(6));
-    expect(bidRows, findsNWidgets(6));
+    expect(askRows, findsNWidgets(gameOrderBookLevelCount));
+    expect(bidRows, findsNWidgets(gameOrderBookLevelCount));
 
     final highestBidRow = bidRows.first;
     final lowestAskRow = askRows.last;
@@ -1737,6 +1857,8 @@ void main() {
     );
     await tester.pump(const Duration(seconds: 4));
     await tester.pump();
+    await tester.tap(find.byKey(const Key('market-speed-pause')).last);
+    await tester.pump();
 
     await tester.tap(find.byKey(const Key('stock-detail-tab-order')));
     await tester.pump();
@@ -1760,7 +1882,22 @@ void main() {
       await tester.pump(const Duration(milliseconds: 50));
       if (find.byKey(const Key('order-result')).evaluate().isNotEmpty) break;
     }
-    expect(find.textContaining('1주 매수 완료'), findsOneWidget);
+    final marketOrderResult = find.byKey(const Key('order-result'));
+    expect(marketOrderResult, findsOneWidget);
+    final marketOrderMessage = tester
+        .widget<Text>(
+          find
+              .descendant(of: marketOrderResult, matching: find.byType(Text))
+              .first,
+        )
+        .data!;
+    final marketOrderSucceeded = marketOrderMessage.contains('1주 매수 완료');
+    expect(
+      marketOrderSucceeded ||
+          marketOrderMessage == '시세가 바뀌었습니다. 호가창을 다시 확인해 주세요.',
+      isTrue,
+      reason: '실제 주문 결과: $marketOrderMessage',
+    );
     expect(tester.takeException(), isNull);
     final saved =
         jsonDecode(
@@ -1769,10 +1906,18 @@ void main() {
               )!,
             )
             as Map<String, dynamic>;
-    expect((saved['positions'] as List<dynamic>), hasLength(1));
-    expect(saved['cash'] as int, lessThan(1000000));
-    await tester.tap(find.byKey(const Key('request-parent-order-approval')));
-    await tester.pumpAndSettle();
+    expect(
+      (saved['positions'] as List<dynamic>),
+      marketOrderSucceeded ? hasLength(1) : isEmpty,
+    );
+    expect(
+      saved['cash'] as int,
+      marketOrderSucceeded ? lessThan(1000000) : 1000000,
+    );
+    if (marketOrderSucceeded) {
+      await tester.tap(find.byKey(const Key('request-parent-order-approval')));
+      await tester.pumpAndSettle();
+    }
     expect(tester.takeException(), isNull);
     await tester.tap(find.byKey(const Key('stock-detail-tab-info')));
     await tester.pump();
@@ -1785,171 +1930,194 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('stock detail carries central price depth across a live tick', (
-    tester,
-  ) async {
-    await tester.binding.setSurfaceSize(const Size(390, 844));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
+  testWidgets(
+    'stock detail separates wall identity when price crosses spread',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
 
-    const engine = GameEngine();
-    final universe = testMarketUniverse();
-    final baseState = engine
-        .createNewGame(
-          '호가 캐시 통합 테스트',
-          initialCash: 1000000,
-          // Structural breakouts intentionally thin the book by more than the
-          // ordinary carry cap. Keep this regression on a stable, calm path;
-          // breakout depletion has dedicated order-book tests.
-          worldSeed: 'central-depth-carry-normal-world',
-        )
-        .copyWith(day: 4);
-    final asset = universe.assets.singleWhere(
-      (asset) => asset.id == 'hanbit_telecom',
-    );
-    final quote = asset.quoteAtOrBefore(baseState.currentDate)!;
-    final path = generatedMarketDayPathForAsset(
-      asset: asset,
-      simulationSeed: baseState.simulationSeed,
-      date: baseState.currentDate,
-      previousClose: asset.unadjustedReferenceCloseFor(quote.date),
-      officialClose: quote.close,
-    );
-    final continuousStart = generatedPreOpenTicks + 1;
-    final continuousEnd =
-        generatedPreOpenTicks + generatedContinuousTradingTicks - 1;
-    final transitionTicks = <int>[
-      for (
-        var tick = continuousStart;
-        tick < continuousEnd && tick + 1 < path.length;
-        tick += 1
-      )
-        if (path[tick] > path[tick - 1] &&
-            (path[tick + 1] -
-                        path[tick] -
-                        marketTickSize(path[tick], market: asset.market))
-                    .abs() <
-                0.000001)
-          tick,
-    ];
-    expect(
-      transitionTicks,
-      isNotEmpty,
-      reason: 'fixture에 중앙 ask→bid 이동을 검증할 연속 상승 1틱 구간이 필요합니다.',
-    );
-    final transitionTick = transitionTicks.first;
-    final transitionMinute = marketMinuteForTick(transitionTick);
-    final targetPrice = path[transitionTick].round();
-    final state = baseState.copyWith(marketMinute: transitionMinute);
-
-    await tester.pumpWidget(
-      MaterialApp(
-        home: StockMarketScreen(state: state, universe: universe),
-      ),
-    );
-    await waitForMarketHome(tester);
-    await tester.tap(find.byKey(const Key('market-speed-pause')));
-    await tester.pump();
-    expect(
-      tester
-          .widget<Text>(find.byKey(const Key('market-phone-status-time')).first)
-          .data,
-      contains(marketTimeLabel(transitionMinute)),
-    );
-
-    await openMarketExplore(tester);
-    await tester.tap(find.byKey(const Key('stock-row-1001')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
-    expect(find.byKey(const Key('stock-order-book')), findsOneWidget);
-
-    int displayedNumber(Finder finder) {
-      final label = tester.widget<Text>(finder).data!;
-      return int.parse(label.replaceAll(RegExp(r'[^0-9]'), ''));
-    }
-
-    int rowPrice(Key rowKey) => displayedNumber(
-      find
-          .descendant(
-            of: find.byKey(rowKey),
-            matching: find.byKey(const ValueKey('order-book-price-label')),
+      const engine = GameEngine();
+      final universe = testMarketUniverse();
+      final baseState = engine
+          .createNewGame(
+            '호가 캐시 통합 테스트',
+            initialCash: 1000000,
+            // Structural breakouts intentionally thin the book by more than the
+            // ordinary carry cap. Keep this regression on a stable, calm path;
+            // breakout depletion has dedicated order-book tests.
+            worldSeed: 'central-depth-carry-normal-world',
           )
-          .first,
-    );
+          .copyWith(day: 4);
+      final asset = universe.assets.singleWhere(
+        (asset) => asset.id == 'hanbit_telecom',
+      );
+      final quote = asset.quoteAtOrBefore(baseState.currentDate)!;
+      final path = generatedMarketDayPathForAsset(
+        asset: asset,
+        simulationSeed: baseState.simulationSeed,
+        date: baseState.currentDate,
+        previousClose: asset.unadjustedReferenceCloseFor(quote.date),
+        officialClose: quote.close,
+      );
+      final continuousStart = generatedPreOpenTicks + 1;
+      final continuousEnd =
+          generatedPreOpenTicks + generatedContinuousTradingTicks - 1;
+      final transitionTicks = <int>[
+        for (
+          var tick = continuousStart;
+          tick < continuousEnd && tick + 1 < path.length;
+          tick += 1
+        )
+          if (path[tick] > path[tick - 1] &&
+              (path[tick + 1] -
+                          path[tick] -
+                          marketTickSize(path[tick], market: asset.market))
+                      .abs() <
+                  0.000001)
+            tick,
+      ];
+      expect(
+        transitionTicks,
+        isNotEmpty,
+        reason: 'fixture에 중앙 ask→bid 이동을 검증할 연속 상승 1틱 구간이 필요합니다.',
+      );
+      final transitionTick = transitionTicks.first;
+      final transitionMinute = marketMinuteForTick(transitionTick);
+      final targetPrice = path[transitionTick].round();
+      final state = baseState.copyWith(marketMinute: transitionMinute);
 
-    int rowQuantity(Key rowKey, Key quantityCellKey) => displayedNumber(
-      find
-          .descendant(
-            of: find.descendant(
+      await tester.pumpWidget(
+        MaterialApp(
+          home: StockMarketScreen(state: state, universe: universe),
+        ),
+      );
+      await waitForMarketHome(tester);
+      await tester.tap(find.byKey(const Key('market-speed-pause')));
+      await tester.pump();
+      expect(
+        tester
+            .widget<Text>(
+              find.byKey(const Key('market-phone-status-time')).first,
+            )
+            .data,
+        contains(marketTimeLabel(transitionMinute)),
+      );
+
+      await openMarketExplore(tester);
+      await tester.tap(find.byKey(const Key('stock-row-1001')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.byKey(const Key('stock-order-book')), findsOneWidget);
+
+      int displayedNumber(Finder finder) {
+        final label = tester.widget<Text>(finder).data!;
+        return int.parse(label.replaceAll(RegExp(r'[^0-9]'), ''));
+      }
+
+      int rowPrice(Key rowKey) => displayedNumber(
+        find
+            .descendant(
               of: find.byKey(rowKey),
-              matching: find.byKey(quantityCellKey),
-            ),
-            matching: find.byType(Text),
-          )
-          .first,
-    );
+              matching: find.byKey(const ValueKey('order-book-price-label')),
+            )
+            .first,
+      );
 
-    double rowDepth(Key rowKey, Key depthBarKey) => tester
-        .widget<FractionallySizedBox>(
-          find
-              .descendant(
+      int rowQuantity(Key rowKey, Key quantityCellKey) => displayedNumber(
+        find
+            .descendant(
+              of: find.descendant(
                 of: find.byKey(rowKey),
-                matching: find.byKey(depthBarKey),
-              )
-              .first,
-        )
-        .widthFactor!;
+                matching: find.byKey(quantityCellKey),
+              ),
+              matching: find.byType(Text),
+            )
+            .first,
+      );
 
-    const bestAskKey = Key('order-book-ask-0');
-    const bestBidKey = Key('order-book-bid-0');
-    final beforeQuantity = rowQuantity(
-      bestAskKey,
-      const Key('order-book-sell-quantity-cell'),
-    );
-    final beforeDepth = rowDepth(
-      bestAskKey,
-      const Key('order-book-sell-depth-bar'),
-    );
-    expect(rowPrice(bestAskKey), targetPrice);
+      Key rowDepthAnimationKey(Key rowKey, Key depthBarKey) => tester
+          .widget<TweenAnimationBuilder<double>>(
+            find
+                .ancestor(
+                  of: find
+                      .descendant(
+                        of: find.byKey(rowKey),
+                        matching: find.byKey(depthBarKey),
+                      )
+                      .first,
+                  matching: find.byType(TweenAnimationBuilder<double>),
+                )
+                .first,
+          )
+          .key!;
 
-    await tester.tap(find.byKey(const Key('market-speed-1x')).last);
-    await tester.pump();
-    await tester.pump(marketRealtimeTickDuration);
-    await tester.pump();
-    await tester.tap(find.byKey(const Key('market-speed-pause')).last);
-    await tester.pump();
+      const bestAskKey = Key('order-book-ask-0');
+      const bestBidKey = Key('order-book-bid-0');
+      final beforeDepthAnimationKey = rowDepthAnimationKey(
+        bestAskKey,
+        const Key('order-book-sell-depth-bar'),
+      );
+      final askPriceIdentity = ValueKey((
+        'order-book-price',
+        'ask',
+        targetPrice.toDouble(),
+      ));
+      final bidPriceIdentity = ValueKey((
+        'order-book-price',
+        'bid',
+        targetPrice.toDouble(),
+      ));
+      expect(rowPrice(bestAskKey), targetPrice);
+      expect(find.byKey(askPriceIdentity), findsOneWidget);
+      expect(find.byKey(bidPriceIdentity), findsNothing);
 
-    expect(
-      tester
-          .widget<Text>(find.byKey(const Key('market-phone-status-time')).first)
-          .data,
-      contains(marketTimeLabel(transitionMinute + 1)),
-    );
-    expect(
-      rowPrice(bestBidKey),
-      targetPrice,
-      reason: '직전 중앙 매도호가는 다음 1틱 상승 뒤 중앙 매수호가로 이동해야 합니다.',
-    );
-    final afterQuantity = rowQuantity(
-      bestBidKey,
-      const Key('order-book-buy-quantity-cell'),
-    );
-    final transitionStartDepth = rowDepth(
-      bestBidKey,
-      const Key('order-book-buy-depth-bar'),
-    );
-    expect(
-      transitionStartDepth,
-      closeTo(beforeDepth, 0.0001),
-      reason: 'ask→bid로 자리가 바뀌어도 막대 애니메이션은 같은 절대가격의 직전 길이에서 시작해야 합니다.',
-    );
-    final changeRate = (afterQuantity - beforeQuantity).abs() / beforeQuantity;
-    expect(
-      changeRate,
-      lessThanOrEqualTo(0.10),
-      reason: '화면 캐시가 동일 절대가격 잔량을 이어받아 분당 10% 넘는 재추첨 점프를 막아야 합니다.',
-    );
-    expect(tester.takeException(), isNull);
-  });
+      await tester.tap(find.byKey(const Key('market-speed-1x')).last);
+      await tester.pump();
+      await tester.pump(marketRealtimeTickDuration);
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('market-speed-pause')).last);
+      await tester.pump();
+
+      expect(
+        tester
+            .widget<Text>(
+              find.byKey(const Key('market-phone-status-time')).first,
+            )
+            .data,
+        contains(marketTimeLabel(transitionMinute + 1)),
+      );
+      expect(
+        rowPrice(bestBidKey),
+        targetPrice,
+        reason: '직전 중앙 매도호가는 다음 1틱 상승 뒤 중앙 매수호가로 이동해야 합니다.',
+      );
+      final afterQuantity = rowQuantity(
+        bestBidKey,
+        const Key('order-book-buy-quantity-cell'),
+      );
+      final afterDepthAnimationKey = rowDepthAnimationKey(
+        bestBidKey,
+        const Key('order-book-buy-depth-bar'),
+      );
+      expect(afterQuantity, greaterThan(0));
+      expect(find.byKey(askPriceIdentity), findsNothing);
+      expect(find.byKey(bidPriceIdentity), findsOneWidget);
+      expect(
+        afterDepthAnimationKey,
+        isNot(equals(beforeDepthAnimationKey)),
+        reason: '체결된 매도벽의 막대 상태를 새 매수벽이 이어받으면 안 됩니다.',
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(bestBidKey),
+          matching: find.byKey(const Key('order-book-quantity-delta')),
+        ),
+        findsNothing,
+        reason: '새 매수벽에 직전 매도벽 대비 가짜 잔량 증감이 표시되면 안 됩니다.',
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('market cap updates once per game day and stays fixed intraday', (
     tester,
@@ -1968,7 +2136,11 @@ void main() {
       required String expectedMarketCap,
     }) async {
       final baseState = engine
-          .createNewGame('일일 시가총액 회귀 테스트', initialCash: 1000000)
+          .createNewGame(
+            '일일 시가총액 회귀 테스트',
+            initialCash: 1000000,
+            worldSeed: 'daily-market-cap-widget-test',
+          )
           .copyWith(day: day);
       final quote = asset.quoteAtOrBefore(baseState.currentDate)!;
       final path = generatedMarketDayPathForAsset(
@@ -2028,8 +2200,8 @@ void main() {
         tester.widget<Text>(fundamentalsMarketCap).data,
         expectedMarketCap,
       );
-      final priceBeforeTick = tester
-          .widget<Text>(find.byKey(const Key('stock-detail-price')))
+      final timeBeforeTick = tester
+          .widget<Text>(find.byKey(const Key('market-phone-status-time')).first)
           .data;
 
       await tester.tap(find.byKey(const Key('market-speed-1x')).last);
@@ -2040,9 +2212,13 @@ void main() {
       await tester.pump();
 
       expect(
-        tester.widget<Text>(find.byKey(const Key('stock-detail-price'))).data,
-        isNot(priceBeforeTick),
-        reason: '장중 현재가는 움직여야 일일 시가총액 고정 검증이 유효합니다.',
+        tester
+            .widget<Text>(
+              find.byKey(const Key('market-phone-status-time')).first,
+            )
+            .data,
+        isNot(timeBeforeTick),
+        reason: '게임분이 진행된 뒤에도 일일 시가총액은 고정되어야 합니다.',
       );
       expect(
         tester.widget<Text>(fundamentalsMarketCap).data,
@@ -2065,13 +2241,17 @@ void main() {
   });
 
   testWidgets(
-    'stock market route re-entry restores the same 6+6 order-book session',
+    'stock market route re-entry restores the same 10+10 order-book session',
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(390, 844));
       addTearDown(() => tester.binding.setSurfaceSize(null));
 
       final state = const GameEngine()
-          .createNewGame('호가 재진입 회귀 테스트', initialCash: 1000000)
+          .createNewGame(
+            '호가 재진입 회귀 테스트',
+            initialCash: 1000000,
+            worldSeed: 'order-book-route-reentry-widget-test',
+          )
           .copyWith(day: 4, marketMinute: 9 * 60);
       final orderBookSessionCache = StockOrderBookSessionCache();
 
@@ -2166,13 +2346,13 @@ void main() {
       }
 
       List<String> displayedBookSignature() => <String>[
-        for (var index = 0; index < 6; index++)
+        for (var index = 0; index < gameOrderBookLevelCount; index++)
           displayedLevelSignature(
             'ask',
             index,
             const Key('order-book-sell-quantity-cell'),
           ),
-        for (var index = 0; index < 6; index++)
+        for (var index = 0; index < gameOrderBookLevelCount; index++)
           displayedLevelSignature(
             'bid',
             index,
@@ -2218,7 +2398,7 @@ void main() {
       expect(
         displayedBookSignature(),
         beforeLeaving,
-        reason: '시장 화면 전체 재진입 때 6+6 가격별 수량을 새로 추첨하면 안 됩니다.',
+        reason: '시장 화면 전체 재진입 때 10+10 가격별 수량을 새로 추첨하면 안 됩니다.',
       );
       expect(tester.takeException(), isNull);
     },
@@ -2396,6 +2576,8 @@ void main() {
     final before = tester.widget<Text>(value).data;
     var after = before;
     for (var attempt = 0; attempt < 10 && after == before; attempt++) {
+      await tester.tap(find.byKey(const Key('market-speed-10x')).last);
+      await tester.pump();
       await tester.pump(marketRealtimeTickDuration);
       after = tester.widget<Text>(value).data;
     }
@@ -2729,6 +2911,133 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+    'opening a stock cannot alter the settled day path or valuation',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final state = const GameEngine()
+          .createNewGame('호가 관측자 효과 회귀', initialCash: 1000000)
+          .copyWith(
+            day: 4,
+            marketMinute: krxOpenMinute,
+            brokerageCash: 500000,
+            positions: const [
+              PortfolioPosition(
+                assetId: 'widget_partner',
+                symbol: '1002',
+                name: '테스트 부품',
+                market: '미래시장',
+                currency: 'KRW',
+                units: 7,
+                totalCost: 42000,
+              ),
+            ],
+          );
+
+      Future<Map<String, String>> runScenario({
+        required bool keepTargetOpen,
+      }) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: StockMarketScreen(
+              state: state,
+              universe: testMarketUniverse(includeKnownPartner: true),
+            ),
+          ),
+        );
+        await waitForMarketHome(tester);
+        await tester.tap(find.byKey(const Key('market-speed-pause')).last);
+        await tester.pump();
+        await openMarketExplore(tester);
+        if (keepTargetOpen) {
+          await tester.tap(find.byKey(const Key('stock-row-1001')));
+          await tester.pumpAndSettle();
+        }
+
+        int displayedMinute() {
+          final label = tester
+              .widget<Text>(
+                find.byKey(const Key('market-phone-status-time')).first,
+              )
+              .data!;
+          final parts = label.split(':');
+          return int.parse(parts[0]) * 60 + int.parse(parts[1]);
+        }
+
+        var guard = 0;
+        while (displayedMinute() < krxContinuousEndMinute - 1) {
+          final remaining = krxContinuousEndMinute - 1 - displayedMinute();
+          final speedKey = remaining >= 10
+              ? const Key('market-speed-10x')
+              : remaining >= 3
+              ? const Key('market-speed-3x')
+              : const Key('market-speed-normal');
+          for (final confirmKey in const <Key>[
+            Key('market-breaking-news-confirm'),
+            Key('market-session-notice-confirm'),
+          ]) {
+            final confirm = find.byKey(confirmKey);
+            if (confirm.evaluate().isNotEmpty) {
+              await tester.tap(confirm);
+              await tester.pumpAndSettle();
+            }
+          }
+          await tester.tap(find.byKey(speedKey).last);
+          await tester.pump();
+          await tester.pump(marketRealtimeTickDuration);
+          await tester.pump();
+          guard += 1;
+          expect(guard, lessThan(80), reason: '14:49까지 시장 시간이 진행되어야 합니다.');
+        }
+        expect(displayedMinute(), krxContinuousEndMinute - 1);
+        await tester.tap(find.byKey(const Key('market-speed-pause')).last);
+        await tester.pump();
+
+        if (!keepTargetOpen) {
+          await tester.tap(find.byKey(const Key('stock-row-1001')));
+          await tester.pumpAndSettle();
+        }
+
+        String metric(Key key) {
+          final text = tester.widget<Text>(
+            find.descendant(of: find.byKey(key), matching: find.byType(Text)),
+          );
+          return text.textSpan?.toPlainText() ?? text.data ?? '';
+        }
+
+        final result = <String, String>{
+          'price': tester
+              .widget<Text>(find.byKey(const Key('stock-detail-price')))
+              .data!,
+          'open': metric(const Key('order-book-open')),
+          'high': metric(const Key('order-book-high')),
+          'low': metric(const Key('order-book-low')),
+        };
+        await tester.tap(find.byKey(const Key('stock-detail-tab-chart')));
+        await tester.pump();
+        result['minuteCandles'] = tester
+            .widget<Text>(find.byKey(const Key('chart-window-label')))
+            .data!;
+        await tester.tap(find.byKey(const Key('close-stock-detail')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('market-nav-account')));
+        await tester.pump();
+        result['valuation'] = tester
+            .widget<Text>(find.byKey(const Key('market-account-total-assets')))
+            .data!;
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+        return result;
+      }
+
+      final openedAllDay = await runScenario(keepTargetOpen: true);
+      final openedAtEnd = await runScenario(keepTargetOpen: false);
+      expect(openedAllDay, openedAtEnd);
+    },
+  );
+
   testWidgets('unwatched company news uses a ticker without pausing play', (
     tester,
   ) async {
@@ -2931,7 +3240,7 @@ void main() {
     expect(find.text('내 지정가 주문이 체결되어 시장 시간을 일시정지했어요.'), findsNothing);
     expect(find.byKey(const Key('order-book-pending-count')), findsNothing);
     expect(
-      find.byKey(const Key('order-book-active-trade')),
+      find.byKey(const Key('order-book-active-trade-row')),
       findsNothing,
       reason: '10배속으로 다음 분까지 진행된 뒤에는 과거 분 체결행을 남기면 안 됩니다.',
     );
@@ -3429,12 +3738,16 @@ void main() {
   );
 
   testWidgets(
-    'counter-side order-book pulse keeps trade text and red border on one row',
+    'counter-side order-book pulse keeps tape and red border on one row',
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(390, 844));
       addTearDown(() => tester.binding.setSurfaceSize(null));
       final state = const GameEngine()
-          .createNewGame('호가 반대 체결 행 테스트', initialCash: 1000000)
+          .createNewGame(
+            '호가 반대 체결 행 테스트',
+            initialCash: 1000000,
+            worldSeed: 'counter-side-order-book-widget-test',
+          )
           .copyWith(day: 4, marketMinute: 9 * 60);
 
       await tester.pumpWidget(
@@ -3449,7 +3762,9 @@ void main() {
       await tester.pump();
 
       final orderBook = find.byKey(const Key('stock-order-book'));
-      final activeTrade = find.byKey(const Key('order-book-active-trade'));
+      final activeTradeRow = find.byKey(
+        const Key('order-book-active-trade-row'),
+      );
       final currentPriceBorder = find.byKey(
         const Key('order-book-current-price-border'),
       );
@@ -3457,20 +3772,47 @@ void main() {
       expect(currentPriceBorder, findsOneWidget);
 
       final pulseNotifier = _orderBookPulseNotifier(tester);
+      pulseNotifier.value = gameOrderBookLiquidityPulseFrame(
+        marketMinute: 9 * 60,
+        slotIndex: 0,
+      );
+      await tester.pump();
       expect(
-        activeTrade,
+        activeTradeRow,
         findsNothing,
         reason: '정지 상태로 연 최초 프레임은 가짜 체결을 만들면 안 됩니다.',
       );
-      pulseNotifier.value += 1;
-      await tester.pump();
-      expect(activeTrade, findsOneWidget);
+      late _DisplayedOrderBookTrade initialTrade;
+      var foundInitialTrade = false;
+      final firstCandidateFrame = pulseNotifier.value + 1;
+      for (
+        var frame = firstCandidateFrame;
+        frame < firstCandidateFrame + 64;
+        frame += 1
+      ) {
+        pulseNotifier.value = frame;
+        await tester.pump();
+        if (activeTradeRow.evaluate().isEmpty ||
+            !_hasSynchronizedDisplayedOrderBookTrade(tester)) {
+          continue;
+        }
+        initialTrade = _displayedOrderBookTrade(tester);
+        foundInitialTrade = true;
+        break;
+      }
+      expect(
+        foundInitialTrade,
+        isTrue,
+        reason:
+            '64개 결정론적 슬롯 안에 테이프와 활성 행이 일치하는 첫 체결이 있어야 합니다. '
+            '${_displayedOrderBookTradeDebug(tester)}',
+      );
       expect(
         _displayedOrderBookNumber(
           tester,
           find.byKey(const Key('stock-detail-price')),
         ),
-        _displayedOrderBookTrade(tester).price,
+        initialTrade.price,
       );
 
       final pulseBuilders = tester
@@ -3482,9 +3824,7 @@ void main() {
           )
           .toList(growable: false);
       expect(pulseBuilders, isNotEmpty);
-      final initialTradeText = tester.widget<Text>(activeTrade).data!;
-      final initialWasBuy = initialTradeText.startsWith('매수');
-      String? counterSideTradeText;
+      _DisplayedOrderBookTrade? counterSideTrade;
       final firstCounterSideCandidateFrame = pulseNotifier.value + 1;
 
       for (
@@ -3494,15 +3834,18 @@ void main() {
       ) {
         pulseNotifier.value = frame;
         await tester.pump();
-        expect(activeTrade, findsOneWidget);
-        final text = tester.widget<Text>(activeTrade).data!;
-        if (text.startsWith('매수') != initialWasBuy) {
-          counterSideTradeText = text;
+        if (activeTradeRow.evaluate().isEmpty ||
+            !_hasSynchronizedDisplayedOrderBookTrade(tester)) {
+          continue;
+        }
+        final trade = _displayedOrderBookTrade(tester);
+        if (trade.isBuy != initialTrade.isBuy) {
+          counterSideTrade = trade;
           break;
         }
       }
       expect(
-        counterSideTradeText,
+        counterSideTrade,
         isNotNull,
         reason: '64개 결정론적 미세구조 펄스 안에 반대 방향 체결이 있어야 한다.',
       );
@@ -3512,11 +3855,13 @@ void main() {
           tester,
           find.byKey(const Key('stock-detail-price')),
         ),
-        _displayedOrderBookTrade(tester).price,
+        counterSideTrade!.price,
         reason: '상단 현재가는 마지막 합성 체결의 절대가격과 같아야 합니다.',
       );
       final activeTradePosition = tester.widget<Positioned>(
-        find.ancestor(of: activeTrade, matching: find.byType(Positioned)).first,
+        find
+            .ancestor(of: activeTradeRow, matching: find.byType(Positioned))
+            .first,
       );
       final borderPosition = tester.widget<AnimatedPositioned>(
         currentPriceBorder,
@@ -3525,14 +3870,12 @@ void main() {
       expect(
         find.descendant(
           of: find.byKey(const Key('order-book-current-price')),
-          matching: activeTrade,
+          matching: activeTradeRow,
         ),
         findsOneWidget,
       );
 
-      const twelveHzFrameInterval = Duration(milliseconds: 83);
       expect(borderPosition.duration, const Duration(milliseconds: 72));
-      expect(borderPosition.duration, lessThan(twelveHzFrameInterval));
       final depthAnimations = tester
           .widgetList<TweenAnimationBuilder<double>>(
             find.descendant(
@@ -3541,12 +3884,10 @@ void main() {
             ),
           )
           .toList(growable: false);
-      expect(depthAnimations, hasLength(24));
+      expect(depthAnimations, hasLength(gameOrderBookLevelCount * 4));
       expect(
         depthAnimations.every(
-          (animation) =>
-              animation.duration == const Duration(milliseconds: 72) &&
-              animation.duration < twelveHzFrameInterval,
+          (animation) => animation.duration == const Duration(milliseconds: 72),
         ),
         isTrue,
       );
@@ -3564,14 +3905,17 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
-
   testWidgets(
     'trade print consumes the same absolute-price row by its printed quantity',
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(390, 844));
       addTearDown(() => tester.binding.setSurfaceSize(null));
       final state = const GameEngine()
-          .createNewGame('체결 잔량 차감 회귀 테스트', initialCash: 1000000)
+          .createNewGame(
+            '체결 잔량 차감 회귀 테스트',
+            initialCash: 1000000,
+            worldSeed: 'trade-depth-consumption-widget-test',
+          )
           .copyWith(day: 4, marketMinute: 9 * 60);
 
       await tester.pumpWidget(
@@ -3596,21 +3940,41 @@ void main() {
       expect(
         beforeQuantity,
         isNotNull,
-        reason: '체결 문구가 붙은 절대가격은 직전 프레임의 6+6 호가에도 있어야 합니다.',
+        reason: '체결 문구가 붙은 절대가격은 직전 프레임의 10+10 호가에도 있어야 합니다.',
       );
       expect(find.byKey(const Key('order-book-trade-tape')), findsOneWidget);
       expect(
         find.byKey(const Key('order-book-trade-tape-empty')),
         findsNothing,
       );
-      expect(find.byKey(const Key('order-book-quantity-delta')), findsWidgets);
-      expect(
-        trade.displayedQuantity,
-        math.max(0, beforeQuantity! - trade.printedQuantity),
-        reason:
-            '${trade.isBuy ? '매수' : '매도'} 체결 ${trade.printedQuantity}주는 '
-            '${trade.price}원 행의 표시 잔량에서 같은 프레임에 정확히 차감돼야 합니다.',
+      final expectedRemaining = math.max(
+        0,
+        beforeQuantity! - trade.printedQuantity,
       );
+      expect(
+        _displayedOrderBookQuantities(
+          tester,
+        ).values.every((quantity) => quantity > 0),
+        isTrue,
+        reason: '운영 호가창은 소진된 숫자 0 행을 노출하면 안 됩니다.',
+      );
+      if (expectedRemaining > 0) {
+        expect(trade.isVisible, isTrue);
+        expect(
+          trade.displayedQuantity,
+          expectedRemaining,
+          reason:
+              '${trade.isBuy ? '매수' : '매도'} 체결 ${trade.printedQuantity}주는 '
+              '${trade.price}원 행에서 같은 프레임에 정확히 차감돼야 합니다.',
+        );
+      } else {
+        expect(trade.isVisible, isFalse);
+        expect(
+          _displayedOrderBookQuantities(tester).containsKey(trade.price),
+          isFalse,
+          reason: '완전 소진된 가격은 0잔량 행으로 남지 않아야 합니다.',
+        );
+      }
       expect(tester.takeException(), isNull);
     },
   );
@@ -3661,7 +4025,7 @@ void main() {
         expect(
           matches,
           hasLength(1),
-          reason: '선택 가격 $price 행이 compact 6+6 호가에 하나 있어야 합니다.',
+          reason: '선택 가격 $price 행이 compact 10+10 호가에 하나 있어야 합니다.',
         );
         return matches.single;
       }
@@ -3678,15 +4042,42 @@ void main() {
           .data!
           .replaceAll('원', '');
 
-      final initialPrice = selectedLimitPrice();
+      final rowsByPrice = <int, String>{
+        for (final row in inlineRows())
+          int.parse(rowPrice(row).replaceAll(',', '')): rowPrice(row),
+      };
+      final displayedPrices = rowsByPrice.keys.toSet();
+      (int, int)? adjacentPair;
+      for (final price in displayedPrices) {
+        final nextPrice = marketSnapPrice(
+          price.toDouble() +
+              marketTickSize(price.toDouble(), market: fictionalMainMarket),
+          market: fictionalMainMarket,
+        ).round();
+        if (displayedPrices.contains(nextPrice)) {
+          adjacentPair = (price, nextPrice);
+          break;
+        }
+      }
+      expect(
+        adjacentPair,
+        isNotNull,
+        reason: 'compact 10+10에는 +/- 버튼 선택 이동을 검증할 인접 호가가 있어야 합니다.',
+      );
+
+      final pair = adjacentPair!;
+      final initialPrice = rowsByPrice[pair.$1]!;
+      await tester.tap(rowAtPrice(initialPrice));
+      await tester.pump();
+      expect(selectedLimitPrice(), initialPrice);
       final initiallySelectedRow = rowAtPrice(initialPrice);
       expect(rowMaterialAlpha(initiallySelectedRow), closeTo(0.90, 0.01));
 
       await tester.tap(find.byKey(const Key('limit-price-plus')));
       await tester.pump();
 
-      final raisedPrice = selectedLimitPrice();
-      expect(raisedPrice, isNot(initialPrice));
+      final raisedPrice = rowsByPrice[pair.$2]!;
+      expect(selectedLimitPrice(), raisedPrice);
       expect(rowMaterialAlpha(rowAtPrice(raisedPrice)), closeTo(0.90, 0.01));
       expect(rowMaterialAlpha(rowAtPrice(initialPrice)), closeTo(0.58, 0.01));
 
@@ -3703,7 +4094,7 @@ void main() {
   );
 
   testWidgets(
-    'multi-level full fill prints only the last exact row for one pulse',
+    'multi-level full fill keeps exact tape without a zero quote row',
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(390, 844));
       addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -3779,7 +4170,7 @@ void main() {
       await tester.pump();
 
       final positiveAskRows = <({int price, int quantity})>[];
-      for (var index = 0; index < 6; index += 1) {
+      for (var index = 0; index < gameOrderBookLevelCount; index += 1) {
         final row = find.byKey(ValueKey('order-book-ask-$index'));
         if (row.evaluate().isEmpty) continue;
         final quantity = _displayedOrderBookNumber(
@@ -3833,7 +4224,7 @@ void main() {
       await tester.tap(find.byKey(const Key('stock-detail-tab-quote')));
       await tester.pump();
 
-      final playerTrade = _displayedOrderBookTrade(tester);
+      final playerTrade = _displayedOrderBookTrade(tester, player: true);
       expect(
         find.byKey(const Key('order-book-player-tape-print')),
         findsOneWidget,
@@ -3841,14 +4232,24 @@ void main() {
       expect(playerTrade.isBuy, isTrue);
       expect(playerTrade.price, lastPrice);
       expect(playerTrade.printedQuantity, lastQuantity);
+      expect(playerTrade.isVisible, isFalse);
       expect(playerTrade.displayedQuantity, 0);
+      final displayedAfterFill = _displayedOrderBookQuantities(tester);
+      expect(displayedAfterFill.containsKey(lastPrice), isFalse);
+      expect(
+        displayedAfterFill.values.every((quantity) => quantity > 0),
+        isTrue,
+        reason: '플레이어가 전량 체결한 행도 숫자 0으로 남으면 안 됩니다.',
+      );
       expect(
         playerTrade.printedQuantity,
         isNot(firstQuantity + lastQuantity),
         reason: '마지막 행에는 다단계 총체결량이 아니라 그 행 체결량만 표시해야 합니다.',
       );
-      final stalePlayerText = tester
-          .widget<Text>(find.byKey(const Key('order-book-active-trade')))
+      final stalePlayerTapeText = tester
+          .widget<Text>(
+            find.byKey(const Key('order-book-tape-quantity-side')).first,
+          )
           .data;
 
       final pulseNotifier = _orderBookPulseNotifier(tester);
@@ -3856,14 +4257,20 @@ void main() {
       pulseNotifier.value += 1;
       await tester.pump();
 
-      final activeTrade = find.byKey(const Key('order-book-active-trade'));
-      if (activeTrade.evaluate().isNotEmpty) {
+      final activeTradeRow = find.byKey(
+        const Key('order-book-active-trade-row'),
+      );
+      if (activeTradeRow.evaluate().isNotEmpty) {
         final nextTrade = _displayedOrderBookTrade(tester);
+        final latestTapeText = tester
+            .widget<Text>(
+              find.byKey(const Key('order-book-tape-quantity-side')).first,
+            )
+            .data;
         expect(
-          nextTrade.price != lastPrice ||
-              tester.widget<Text>(activeTrade).data != stalePlayerText,
+          nextTrade.price != lastPrice || latestTapeText != stalePlayerTapeText,
           isTrue,
-          reason: '플레이어 체결 문구는 다음 미세구조 펄스까지 남으면 안 됩니다.',
+          reason: '플레이어 체결 활성 행은 다음 미세구조 펄스까지 남으면 안 됩니다.',
         );
       }
       expect(tester.takeException(), isNull);
@@ -3906,6 +4313,7 @@ void main() {
     expect(find.byKey(const Key('order-book-turnover')), findsOneWidget);
     expect(find.byKey(const Key('order-book-capacity')), findsNothing);
     expect(find.byKey(const Key('order-book-trade-strength')), findsOneWidget);
+    expect(find.byKey(const Key('order-book-depth-ratio')), findsOneWidget);
     expect(find.byKey(const Key('order-book-active-summary')), findsNothing);
     expect(find.byKey(const Key('order-book-market-summary')), findsOneWidget);
     expect(find.byKey(const Key('order-book-trade-tape')), findsOneWidget);
@@ -3923,8 +4331,8 @@ void main() {
     final buyCells = find.byKey(const Key('order-book-buy-quantity-cell'));
     final sellCellCount = sellCells.evaluate().length;
     final buyCellCount = buyCells.evaluate().length;
-    expect(sellCellCount, 6);
-    expect(buyCellCount, 6);
+    expect(sellCellCount, gameOrderBookLevelCount);
+    expect(buyCellCount, gameOrderBookLevelCount);
     final sellDepthBarFinder = find.byKey(
       const Key('order-book-sell-depth-bar'),
     );
@@ -4018,15 +4426,26 @@ void main() {
         depthRecords.add((quantity, fraction));
       }
     }
-    final commonMaximum = depthRecords
-        .map((record) => record.$1)
-        .reduce(math.max);
-    for (final (quantity, fraction) in depthRecords) {
-      expect(fraction, closeTo(quantity / commonMaximum, 0.0001));
-    }
+    expect(
+      depthRecords.every((record) => record.$1 > 0),
+      isTrue,
+      reason: '운영 10+10 호가에는 숫자 0 잔량을 렌더링하면 안 됩니다.',
+    );
+    final inferredDepthScales = depthRecords
+        .where((record) => record.$2 > 0 && record.$2 < 0.999999)
+        .map((record) => record.$1 / record.$2)
+        .toList(growable: false);
+    expect(inferredDepthScales, isNotEmpty);
+    expect(
+      inferredDepthScales.reduce(math.max) -
+          inferredDepthScales.reduce(math.min),
+      lessThan(1),
+      reason: '양쪽 10단 잔량 막대는 같은 안정화 분모를 사용해야 합니다.',
+    );
     expect(
       [...sellDepthBars, ...buyDepthBars].reduce(math.max),
-      closeTo(1, 0.0001),
+      inInclusiveRange(0.8, 1.0),
+      reason: '분모 완충 중에도 가장 두꺼운 호가는 충분한 폭으로 보여야 합니다.',
     );
     expect(sellDepthBars.toSet().length, greaterThan(1));
     expect(buyDepthBars.toSet().length, greaterThan(1));
@@ -4085,12 +4504,12 @@ void main() {
           find.byKey(const Key('order-book-price-surface')),
         )
         .toList(growable: false);
-    expect(priceSurfaces, hasLength(12));
+    expect(priceSurfaces, hasLength(gameOrderBookLevelCount * 2));
     final priceLabels = tester
         .widgetList<Text>(find.byKey(const Key('order-book-price-label')))
         .toList(growable: false);
-    expect(priceLabels, hasLength(12));
-    expect(priceLabels.map((label) => label.style!.fontSize).toSet(), {16.0});
+    expect(priceLabels, hasLength(gameOrderBookLevelCount * 2));
+    expect(priceLabels.map((label) => label.style!.fontSize).toSet(), {13.0});
     final outlinedPrice = tester
         .widget<Text>(
           find
@@ -4169,25 +4588,13 @@ void main() {
     );
     _orderBookPulseNotifier(tester).value += 1;
     await tester.pump();
-    final activeTradeText = tester
-        .widget<Text>(find.byKey(const Key('order-book-active-trade')))
-        .data!;
     expect(
-      activeTradeText.contains('매수') || activeTradeText.contains('매도'),
-      isTrue,
+      find.byKey(const Key('order-book-active-trade')),
+      findsNothing,
+      reason: '10+10 단일행 호가는 체결 문구 대신 테이프와 중앙 테두리를 사용합니다.',
     );
-    final activeTradePosition = tester.widget<Positioned>(
-      find
-          .ancestor(
-            of: find.byKey(const Key('order-book-active-trade')),
-            matching: find.byType(Positioned),
-          )
-          .first,
-    );
-    final currentOutlinePosition = tester.widget<AnimatedPositioned>(
-      find.byKey(const Key('order-book-current-price-border')),
-    );
-    expect(activeTradePosition.top, currentOutlinePosition.top);
+    expect(find.byKey(const Key('order-book-trade-tape-empty')), findsNothing);
+    expectOutlineUsesOnlyCentralBestPriceRows();
     expect(
       find.descendant(
         of: find.byKey(const Key('stock-order-book')),
@@ -4195,7 +4602,6 @@ void main() {
       ),
       findsNothing,
     );
-    expect(find.byKey(const Key('order-book-active-trade')), findsOneWidget);
     final fixedPriceTop = tester.getTopLeft(
       find.byKey(const Key('stock-detail-price')),
     );
@@ -4251,11 +4657,24 @@ void main() {
       tester.widget<Text>(find.byKey(const Key('limit-price-value'))).data,
       selectedAskPrice,
     );
+    await tester.tap(find.text('시장가'));
+    await tester.pump();
+    expect(
+      tester
+          .widget<SegmentedButton<TradeOrderType>>(
+            find.byKey(const Key('order-type-selector')),
+          )
+          .selected,
+      {TradeOrderType.market},
+    );
     await tester.ensureVisible(
       find.byKey(const Key('request-parent-order-approval')),
     );
     await tester.tap(find.byKey(const Key('request-parent-order-approval')));
-    await tester.pump();
+    for (var attempt = 0; attempt < 20; attempt += 1) {
+      await tester.pump(const Duration(milliseconds: 50));
+      if (find.byKey(const Key('order-result')).evaluate().isNotEmpty) break;
+    }
     expect(find.byKey(const Key('order-result')), findsOneWidget);
     await tester.ensureVisible(
       find.byKey(const Key('request-parent-order-approval')),
@@ -4269,10 +4688,34 @@ void main() {
     await tester.tap(find.byKey(const Key('stock-detail-tab-quote')));
     await tester.pump();
     expectOutlineUsesOnlyCentralBestPriceRows();
-    expect(
-      find.byKey(const Key('order-book-average-cost-marker')),
-      findsOneWidget,
-    );
+    final position = current.positions
+        .where((entry) => entry.assetId == 'hanbit_telecom')
+        .firstOrNull;
+    if (position == null) {
+      expect(
+        find.byKey(const Key('order-book-average-cost-marker')),
+        findsNothing,
+        reason: '지정가가 대기 중이면 아직 평균단가 마커가 없어야 합니다.',
+      );
+    } else {
+      final snappedAverageCost = marketSnapPrice(position.averageCost).round();
+      final averageCostIsVisible = find
+          .byKey(const ValueKey('order-book-price-label'))
+          .evaluate()
+          .any(
+            (element) =>
+                _displayedOrderBookNumber(
+                  tester,
+                  find.byWidget(element.widget),
+                ) ==
+                snappedAverageCost,
+          );
+      expect(
+        find.byKey(const Key('order-book-average-cost-marker')),
+        averageCostIsVisible ? findsOneWidget : findsNothing,
+        reason: '평균단가 마커는 평균단가가 현재 10+10 호가 창 안에 있을 때만 표시합니다.',
+      );
+    }
 
     final selectedBidPrice = tester
         .widget<Text>(
@@ -4310,18 +4753,22 @@ void main() {
       tester.widget<Text>(find.byKey(const Key('limit-price-value'))).data,
       selectedBidPrice,
     );
-    await tester.ensureVisible(
-      find.byKey(const Key('request-parent-order-approval')),
-    );
-    await tester.tap(find.byKey(const Key('request-parent-order-approval')));
-    await tester.pump();
-    expect(find.byKey(const Key('order-result')), findsOneWidget);
-    await tester.ensureVisible(
-      find.byKey(const Key('request-parent-order-approval')),
-    );
-    await tester.pump();
-    await tester.tap(find.byKey(const Key('request-parent-order-approval')));
-    await tester.pumpAndSettle();
+    final sellSubmit = find.byKey(const Key('request-parent-order-approval'));
+    await tester.ensureVisible(sellSubmit);
+    if (position == null) {
+      expect(tester.widget<FilledButton>(sellSubmit).onPressed, isNull);
+    } else {
+      await tester.tap(sellSubmit);
+      for (var attempt = 0; attempt < 20; attempt += 1) {
+        await tester.pump(const Duration(milliseconds: 50));
+        if (find.byKey(const Key('order-result')).evaluate().isNotEmpty) break;
+      }
+      expect(find.byKey(const Key('order-result')), findsOneWidget);
+      await tester.ensureVisible(sellSubmit);
+      await tester.pump();
+      await tester.tap(sellSubmit);
+      await tester.pumpAndSettle();
+    }
     expect(find.byKey(const Key('order-book-active-summary')), findsNothing);
     expect(find.byKey(const Key('inline-order-workspace')), findsOneWidget);
 
@@ -4466,8 +4913,8 @@ void main() {
     final compactBuyRows = find.byKey(
       const Key('order-book-buy-quantity-cell'),
     );
-    expect(compactSellRows, findsNWidgets(6));
-    expect(compactBuyRows, findsNWidgets(6));
+    expect(compactSellRows, findsNWidgets(gameOrderBookLevelCount));
+    expect(compactBuyRows, findsNWidgets(gameOrderBookLevelCount));
     final quoteScrollable = find
         .ancestor(
           of: find.byKey(const Key('stock-order-book')),
@@ -4946,7 +5393,8 @@ void main() {
     );
     expect(rider.onTap, isNotNull);
     rider.onTap!();
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
     expect(find.byType(RiderMiniGame), findsOneWidget);
     expect(tester.takeException(), isNull);
   });

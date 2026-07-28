@@ -256,6 +256,7 @@ void main() {
     await _openDetailTab(tester, 'loan', 'loan');
     await _openDetailTab(tester, 'tax', 'tax');
     await _openDetailTab(tester, 'news', 'news');
+    expect(find.text('공통 경제 사건 · 주식·상권과 공유'), findsOneWidget);
     final visibleEvents = [...listing.visibleEventsAt(state.currentDate)]
       ..sort((left, right) => right.announcedAt.compareTo(left.announcedAt));
     if (visibleEvents.isEmpty) {
@@ -388,7 +389,11 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     const engine = GameEngine();
     final base = engine
-        .createNewGame('임대 운영 화면 테스트', initialCash: 1000000000)
+        .createNewGame(
+          '임대 운영 화면 테스트',
+          initialCash: 1000000000,
+          worldSeed: 'real-estate-owned-management-ui-test',
+        )
         .copyWith(brokerageCash: 0, decisions: const []);
     final targetDay =
         DateTime(2010, 6, 15).difference(base.campaignStartDate).inDays + 1;
@@ -409,8 +414,15 @@ void main() {
         realEstate: [
           owned.copyWith(
             vacancyMonths: realEstateTenantSearchMonths(
-              worldSeed: purchase.state.simulationSeed,
+              worldSeed: owned.realEstateWorldSeed.isEmpty
+                  ? purchase.state.simulationSeed
+                  : owned.realEstateWorldSeed,
               assetId: owned.id,
+              vacancyMultiplier:
+                  owned.generatedListing
+                      ?.riskFactorsAt(purchase.state.currentDate)
+                      .vacancyMultiplier ??
+                  1,
             ),
           ),
         ],

@@ -484,15 +484,34 @@ class OwnedRealEstate {
     return asset.saleCostsForPrice(_dateAtDay(currentDay), grossPrice);
   }
 
+  double get _saleListingLiquidity {
+    if (realEstateWorldVersion < 4 ||
+        realEstateWorldSeed.isEmpty ||
+        saleListedDay <= 0) {
+      return 0;
+    }
+    final asset = marketAsset;
+    if (asset == null) return 0;
+    return realEstateWorldLiquidityAt(
+      asset,
+      realEstateWorldSeed,
+      _dateAtDay(saleListedDay),
+      generatorVersion: realEstateWorldVersion,
+    );
+  }
+
   int get saleListingDays => realEstateSaleListingDays(
     type: assetType,
     worldSeed: realEstateWorldSeed,
     assetId: id,
     listedDay: saleListedDay,
+    liquidity: _saleListingLiquidity,
   );
 
-  int get saleOfferReadyDay =>
-      saleListedDay <= 0 ? 0 : saleListedDay + saleListingDays;
+  int get saleOfferReadyDay {
+    if (saleOfferIssuedDay > 0) return saleOfferIssuedDay;
+    return saleListedDay <= 0 ? 0 : saleListedDay + saleListingDays;
+  }
 
   bool saleOfferActiveAt(int day) =>
       saleOfferAmount > 0 &&

@@ -136,6 +136,39 @@ void main() {
     },
   );
 
+  test('14:49 to 14:50 has no hidden depth-gate jump across 20 seeds', () {
+    for (var seed = 0; seed < 20; seed += 1) {
+      final officialClose = 9000 + (seed % 11) * 100.0;
+      final path = generatedFullMarketDayPath(
+        previousClose: 10000,
+        officialClose: officialClose,
+        seed: 71000 + seed,
+        market: '미래시장',
+      );
+      final priorRates = <double>[
+        for (
+          var minute = krxContinuousEndMinute - 30;
+          minute < krxContinuousEndMinute;
+          minute += 1
+        )
+          ((path[marketTickForMinute(minute)] -
+                      path[marketTickForMinute(minute - 1)]) /
+                  path[marketTickForMinute(minute - 1)])
+              .abs(),
+      ];
+      final boundaryRate =
+          ((path[marketTickForMinute(krxContinuousEndMinute)] -
+                      path[marketTickForMinute(krxContinuousEndMinute - 1)]) /
+                  path[marketTickForMinute(krxContinuousEndMinute - 1)])
+              .abs();
+
+      expect(
+        boundaryRate,
+        lessThanOrEqualTo(priorRates.reduce(math.max) + 0.000000001),
+        reason: 'seed $seed produced a 14:50 jump',
+      );
+    }
+  });
   test('unknown assets cannot obtain an authoritative quote', () async {
     const engine = GameEngine();
     final universe = await FictionalMarketUniverse.load(

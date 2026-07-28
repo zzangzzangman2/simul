@@ -2050,3 +2050,89 @@ List<FictionalMarketEvent> _historicalCatalystEventsForDate(
   String seed,
   DateTime date,
 ) => _historicalCatalystEventSchedule(seed)[marketDateKey(date)] ?? const [];
+
+const Set<String> _stockOnlyHistoricalEconomyCategories = <String>{
+  '세계 증시',
+  '투자심리',
+  '회계 신뢰',
+  '시장 제도',
+  '시장 구조',
+};
+
+bool _isRealEconomySharedSource(FictionalMarketEvent event) {
+  if (event.id.startsWith('historical-')) {
+    return !_stockOnlyHistoricalEconomyCategories.contains(event.eyebrow);
+  }
+  if (event.id.startsWith('corpus-')) {
+    return !event.id.startsWith('corpus-short_sale_ban-') &&
+        !event.id.startsWith('corpus-short_sale_resume-') &&
+        !event.id.startsWith('corpus-leveraged_liquidation-');
+  }
+  return false;
+}
+
+/// Returns the stock market's canonical market-wide economy events through
+/// [through], inclusive.
+///
+/// The shared economy consumes real-economy historical catalysts and the
+/// initial (stage 0) corpus macro shock. Pure stock-market structure events
+/// such as flash liquidity accidents, short-sale rule changes, and leveraged
+/// liquidation remain stock-only. Company, lifecycle, technology, and
+/// follow-up corpus events also remain stock-only. The cutoff is intentionally
+/// calendar-day based, matching the other deterministic world snapshots.
+///
+/// Events are selected from the existing stock schedules and then resolved
+/// through [fictionalMarketEventsForDate]. This preserves the exact normalized
+/// event objects used by stock news and pricing without creating a second
+/// generator or changing the stock timeline.
+List<FictionalMarketEvent> fictionalSharedEconomyEventsThrough(
+  String seed,
+  DateTime through,
+) {
+  final cutoff = DateTime(through.year, through.month, through.day);
+  if (cutoff.isBefore(DateTime(fictionalCampaignStartYear, 1, 1))) {
+    return const [];
+  }
+
+  final eligibleIdsByDate = <String, Set<String>>{};
+
+  void includeEvent(FictionalMarketEvent event) {
+    final eventDate = DateTime.parse(event.date);
+    if (eventDate.isAfter(cutoff)) return;
+    eligibleIdsByDate.putIfAbsent(event.date, () => <String>{}).add(event.id);
+  }
+
+  for (final events in _historicalCatalystEventSchedule(seed).values) {
+    for (final event in events) {
+      if (_isRealEconomySharedSource(event)) includeEvent(event);
+    }
+  }
+  for (final events in _corpusScenarioEventSchedule(seed).values) {
+    for (final event in events) {
+      if (event.stage == 0 && _isRealEconomySharedSource(event)) {
+        includeEvent(event);
+      }
+    }
+  }
+
+  final dateKeys = eligibleIdsByDate.keys.toList()..sort();
+  final result = <FictionalMarketEvent>[];
+  for (final dateKey in dateKeys) {
+    final eligibleIds = eligibleIdsByDate[dateKey]!;
+    for (final event in fictionalMarketEventsForDate(
+      seed,
+      DateTime.parse(dateKey),
+    )) {
+      if (eligibleIds.contains(event.id)) result.add(event);
+    }
+  }
+
+  result.sort((left, right) {
+    final byDate = left.date.compareTo(right.date);
+    if (byDate != 0) return byDate;
+    final byRevealMinute = left.revealMinute.compareTo(right.revealMinute);
+    if (byRevealMinute != 0) return byRevealMinute;
+    return left.id.compareTo(right.id);
+  });
+  return List<FictionalMarketEvent>.unmodifiable(result);
+}

@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'stable_hash.dart';
 
 enum RealEstateInvestmentTier {
   starter,
@@ -208,6 +209,7 @@ int realEstateSaleListingDays({
   required String worldSeed,
   required String assetId,
   required int listedDay,
+  double liquidity = 0,
 }) {
   final spread = switch (type) {
     RealEstateAssetType.villa ||
@@ -222,9 +224,15 @@ int realEstateSaleListingDays({
     RealEstateAssetType.officeBuilding => 30,
     _ => 14,
   };
-  return minimum +
+  final baseDays =
+      minimum +
       _realEstateStableHash('$worldSeed:$assetId:$listedDay:sale-wait') %
           spread;
+  final boundedLiquidity = liquidity.clamp(-0.30, 0.30).toDouble();
+  return (baseDays * (1 - boundedLiquidity * 0.35))
+      .round()
+      .clamp(3, 120)
+      .toInt();
 }
 
 double realEstateSaleOfferRate({
@@ -241,7 +249,7 @@ int _realEstateStableHash(String value) {
   var hash = 2166136261;
   for (final unit in value.codeUnits) {
     hash ^= unit;
-    hash = (hash * 16777619) & 0x7fffffff;
+    hash = multiplyFnvPrime31Exact(hash);
   }
   return hash;
 }

@@ -1,6 +1,7 @@
 import 'game_state.dart';
 import 'market_data.dart';
 import 'real_estate_world.dart';
+import 'world_economy.dart';
 
 class WorldLoadProgress {
   const WorldLoadProgress(this.fraction, this.label)
@@ -39,7 +40,19 @@ Future<void> prepareCampaignWorld(
     throw StateError('The real-estate campaign world is empty');
   }
 
-  onProgress(const WorldLoadProgress(0.92, '현재 날짜의 공개 정보만 보이는지 확인 중입니다…'));
+  onProgress(const WorldLoadProgress(0.90, '주식·부동산·동네상권의 공통 경제 사건을 연결 중입니다…'));
+  await Future<void>.delayed(Duration.zero);
+  final economy = worldEconomySnapshot(
+    worldSeed: state.simulationSeed,
+    asOf: state.currentDate,
+  );
+  if (economy.revealedEvents.any(
+    (event) => event.revealedOn.isAfter(state.currentDate),
+  )) {
+    throw StateError('The shared economy view leaked a future event');
+  }
+
+  onProgress(const WorldLoadProgress(0.94, '현재 날짜의 공개 정보만 보이는지 확인 중입니다…'));
   await Future<void>.delayed(Duration.zero);
   final currentView = await FictionalMarketUniverse.load(
     seed: state.simulationSeed,

@@ -2327,12 +2327,54 @@ class _RealEstateDetailScreenState extends State<_RealEstateDetailScreen> {
   Widget _buildNewsTab() {
     final events = [..._listing.visibleEventsAt(_date)]
       ..sort((left, right) => right.announcedAt.compareTo(left.announcedAt));
+    final sharedEvents = [..._listing.visibleWorldEconomyEventsAt(_date)]
+      ..sort((left, right) => right.revealedOn.compareTo(left.revealedOn));
+    final activeSharedCount = sharedEvents
+        .where((event) => event.isActive)
+        .length;
     final unresolvedCount = events
         .where((event) => !event.isResolvedAt(_date))
         .length;
     return _detailList(
       key: const Key('real-estate-detail-news-panel'),
       children: [
+        if (_listing.generatorVersion >= 4) ...[
+          _RealEstateDetailSection(
+            title: '공통 경제 사건 · 주식·상권과 공유',
+            icon: Icons.public,
+            child: sharedEvents.isEmpty
+                ? const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 18),
+                    child: Center(
+                      child: Text(
+                        '현재 날짜까지 공개된 공통 경제 사건이 없습니다.',
+                        style: TextStyle(color: Color(0xFF756A60)),
+                      ),
+                    ),
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '같은 사건 ID·발생일·제목을 주식시장과 동네상권도 함께 사용합니다. '
+                        '장중 주식 공시는 선반영을 막기 위해 다음 날 실물경제에 전파됩니다. '
+                        '공개 ${sharedEvents.length}건 · '
+                        '영향 진행 중 $activeSharedCount건',
+                        style: const TextStyle(
+                          color: Color(0xFF796B60),
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w800,
+                          height: 1.4,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      for (final event in sharedEvents.take(12))
+                        _WorldEconomyEventTimelineItem(event: event),
+                    ],
+                  ),
+          ),
+          const SizedBox(height: 10),
+        ],
         _RealEstateDetailSection(
           title: '지역·매물 공개 이벤트',
           icon: Icons.newspaper_outlined,
@@ -2378,6 +2420,12 @@ class _RealEstateDetailScreenState extends State<_RealEstateDetailScreen> {
 
   Widget _buildManagementTab() {
     final owned = _owned!;
+    final linkedBusinesses = widget.state.businesses.activeBusinesses
+        .where((business) => business.linkedRealEstateId == owned.id)
+        .toList(growable: false);
+    final linkedBusiness = linkedBusinesses.isEmpty
+        ? null
+        : linkedBusinesses.first;
     final saleWaitFinished = widget.state.day - owned.acquiredDay >= 30;
     final saleListed = owned.saleListedDay > 0;
     final saleOfferReady =
@@ -2387,10 +2435,13 @@ class _RealEstateDetailScreenState extends State<_RealEstateDetailScreen> {
         owned.saleOfferExpiresDay > 0 &&
         widget.state.day > owned.saleOfferExpiresDay;
     final canSell =
+        linkedBusiness == null &&
         saleWaitFinished &&
         !owned.hasActiveLease &&
         (!saleListed || saleOfferReady);
-    final saleStatus = owned.hasActiveLease
+    final saleStatus = linkedBusiness != null
+        ? '${linkedBusiness.name} 이전·폐업 후 매각 가능'
+        : owned.hasActiveLease
         ? '임대계약 종료 후 매각 가능'
         : !saleWaitFinished
         ? '취득 30일 후 매각 가능'
@@ -2407,6 +2458,7 @@ class _RealEstateDetailScreenState extends State<_RealEstateDetailScreen> {
       assetId: owned.id,
     );
     final canManageLease =
+        linkedBusiness == null &&
         widget.onManageLease != null &&
         (!owned.hasActiveLease || owned.leaseRemainingMonths <= 0) &&
         owned.vacancyMonths >= tenantSearchMonths;
@@ -2428,6 +2480,7 @@ class _RealEstateDetailScreenState extends State<_RealEstateDetailScreen> {
         widget.onRenewMonthlyLease != null;
     final renovationCost = realEstateRenovationCost(_marketValue);
     final canRenovate =
+        linkedBusiness == null &&
         !owned.isLandmarkFund &&
         !owned.hasActiveLease &&
         owned.propertyCondition < 100 &&
@@ -2501,7 +2554,12 @@ class _RealEstateDetailScreenState extends State<_RealEstateDetailScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _DetailInfoRow(label: '운영 방식', value: owned.leaseType.label),
+              _DetailInfoRow(
+                label: '운영 방식',
+                value: linkedBusiness == null
+                    ? owned.leaseType.label
+                    : '직영점 사용',
+              ),
               _DetailInfoRow(
                 label: '월세·보증금',
                 value:
@@ -2525,7 +2583,9 @@ class _RealEstateDetailScreenState extends State<_RealEstateDetailScreen> {
                 key: const Key('real-estate-detail-lease'),
                 onPressed: canManageLease ? widget.onManageLease : null,
                 child: Text(
-                  owned.hasActiveLease
+                  linkedBusiness != null
+                      ? '${linkedBusiness.name} 직영점 사용 중'
+                      : owned.hasActiveLease
                       ? '계약 종료 후 변경'
                       : owned.vacancyMonths < tenantSearchMonths
                       ? '세입자 모집 ${owned.vacancyMonths}/$tenantSearchMonths개월'
@@ -2594,7 +2654,9 @@ class _RealEstateDetailScreenState extends State<_RealEstateDetailScreen> {
                 onPressed: canRenovate ? widget.onRenovate : null,
                 icon: const Icon(Icons.construction_rounded, size: 18),
                 label: Text(
-                  owned.isLandmarkFund
+                  linkedBusiness != null
+                      ? '직영점 운영 중에는 리모델링 불가'
+                      : owned.isLandmarkFund
                       ? '지분형 자산은 직접 공사 불가'
                       : owned.hasActiveLease
                       ? '임대 종료 후 리모델링'
@@ -2630,11 +2692,41 @@ class _RealEstateDetailScreenState extends State<_RealEstateDetailScreen> {
           ),
         ),
         const SizedBox(height: 10),
-        const _UnavailableActionCard(
-          title: '직접 사용',
-          body: '직접 사용 전환은 현재 공개 엔진 API가 없어 비활성 상태입니다.',
-          actionKey: Key('real-estate-detail-direct-use-disabled'),
-        ),
+        if (linkedBusiness == null)
+          const _UnavailableActionCard(
+            title: '직접 사용',
+            body: '동네상권넷에서 이 매물을 사업장으로 선택하면 직영점으로 사용할 수 있습니다.',
+            actionKey: Key('real-estate-detail-direct-use-disabled'),
+          )
+        else
+          KeyedSubtree(
+            key: const Key('real-estate-detail-business-use'),
+            child: _RealEstateDetailSection(
+              title: '직영 사업장',
+              icon: Icons.storefront_outlined,
+              tone: const Color(0xFFFFF8E7),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _DetailInfoRow(
+                    label: '상호·업종',
+                    value:
+                        '${linkedBusiness.name} · ${linkedBusiness.industry.label}',
+                  ),
+                  _DetailInfoRow(
+                    label: '상권',
+                    value: _businessLocationLabel(linkedBusiness.locationId),
+                    caption: '이 점포를 이전하거나 폐업하기 전에는 매각·임대·리모델링할 수 없습니다.',
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    '경영 조정과 사건 대응은 집 컴퓨터의 동네상권넷에서 진행합니다.',
+                    style: TextStyle(fontSize: 10, color: Color(0xFF75695F)),
+                  ),
+                ],
+              ),
+            ),
+          ),
         const SizedBox(height: 8),
         if (widget.onPrepayMortgage == null &&
             widget.onRefinanceMortgage == null)
@@ -3001,6 +3093,95 @@ class _ComparableListingRow extends StatelessWidget {
               style: const TextStyle(color: Color(0xFF786D64), fontSize: 8.5),
             ),
           ],
+        ),
+      ],
+    ),
+  );
+}
+
+class _WorldEconomyEventTimelineItem extends StatelessWidget {
+  const _WorldEconomyEventTimelineItem({required this.event});
+
+  final WorldEconomyEvent event;
+
+  @override
+  Widget build(BuildContext context) => IntrinsicHeight(
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SizedBox(
+          width: 18,
+          child: Column(
+            children: [
+              Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(
+                  color: event.sourceMarketImpact >= 0
+                      ? const Color(0xFF397A65)
+                      : const Color(0xFFB04F45),
+                  shape: BoxShape.circle,
+                ),
+              ),
+              Expanded(
+                child: Container(width: 2, color: const Color(0xFFD8C7A9)),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 7),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 13),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${_realEstateDate(event.revealedOn)} 실물 반영 · '
+                  '${event.kind.label} · '
+                  '${event.isActive ? '영향 진행 중' : '영향 종료'}',
+                  style: const TextStyle(
+                    color: Color(0xFF796B60),
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  event.title,
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  event.summary,
+                  style: const TextStyle(fontSize: 10, height: 1.4),
+                ),
+                if (event.revealedOn != event.occurredOn) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    '주식 공시 ${_realEstateDate(event.occurredOn)} · '
+                    '다음 날 안전 반영',
+                    style: const TextStyle(
+                      color: Color(0xFF796B60),
+                      fontSize: 8.5,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 2),
+                const Text(
+                  '주식·부동산·동네상권 공통 사건',
+                  style: TextStyle(
+                    color: Color(0xFF527064),
+                    fontSize: 8.5,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ],
     ),

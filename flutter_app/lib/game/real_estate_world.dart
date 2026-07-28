@@ -2,12 +2,14 @@ import 'dart:collection';
 import 'dart:math' as math;
 
 import 'real_estate_market.dart';
+import 'stable_hash.dart';
+import 'world_economy.dart';
 
 /// 저장 게임이 참조할 수 있는 부동산 생성 규칙 버전.
 ///
 /// 생성 공식이 바뀌면 같은 시드의 과거 가격·사건·매물 생애주기도 바뀌므로
 /// 반드시 이 값을 올리고 저장 마이그레이션에서 명시적으로 처리해야 한다.
-const realEstateWorldGeneratorVersion = 3;
+const realEstateWorldGeneratorVersion = 4;
 const _maximumCachedRealEstateWorlds = 2;
 const _realEstateListingLifecycleDays = 270;
 const _realEstateListingPhaseSpacingDays = 90;
@@ -21,6 +23,7 @@ class _FictionalRealEstateWorldCache {
   final Map<String, List<RealEstateWorldEvent>> nearbyEventsByAsset = {};
   final Map<String, List<RealEstateWorldEvent>> combinedEventsByListing = {};
   final Map<String, List<double>> localDeviationLevelsByListing = {};
+  final Map<String, double> listingLiquidityByCycle = {};
   bool prewarmed = false;
 }
 
@@ -391,6 +394,12 @@ const _legacyRealEstateWorldEventKinds = <RealEstateWorldEventKind>[
   RealEstateWorldEventKind.vacancyShock,
 ];
 
+const _worldEconomyReplacedRealEstateEventKinds = <RealEstateWorldEventKind>{
+  RealEstateWorldEventKind.interestRatePolicy,
+  RealEstateWorldEventKind.housingPolicy,
+  RealEstateWorldEventKind.tenantPolicy,
+};
+
 extension RealEstateWorldEventKindLabel on RealEstateWorldEventKind {
   String get label => switch (this) {
     RealEstateWorldEventKind.transitPlan => '교통 계획',
@@ -491,6 +500,10 @@ class RealEstateWorldEvent {
   final String unresolvedDetail;
   final int impactDurationDays;
 
+  bool get isObservationOnly =>
+      generatorVersion >= 4 &&
+      _worldEconomyReplacedRealEstateEventKinds.contains(kind);
+
   bool isVisibleAt(DateTime date) => !date.isBefore(announcedAt);
 
   bool isResolvedAt(DateTime date) => !date.isBefore(resolvedAt);
@@ -550,6 +563,9 @@ class RealEstateWorldEvent {
 
   String statusAt(DateTime date) {
     if (!isVisibleAt(date)) return '미공개';
+    if (isObservationOnly) {
+      return isResolvedAt(date) ? '관측용·결과 공개' : '관측용 경제 브리핑';
+    }
     if (!isResolvedAt(date)) {
       return isPotentialUpside ? '발표·검토 중' : '위험 신호';
     }
@@ -558,9 +574,14 @@ class RealEstateWorldEvent {
 
   String detailAt(DateTime date) {
     if (!isResolvedAt(date)) {
-      return unresolvedDetail;
+      return isObservationOnly
+          ? '$unresolvedDetail 공통 세계경제 지표에 통합되어 참고용으로만 표시됩니다.'
+          : unresolvedDetail;
     }
-    return _resolvedEventDetail(this);
+    final detail = _resolvedEventDetail(this);
+    return isObservationOnly
+        ? '$detail 공통 세계경제 지표에 통합되어 참고용으로만 표시됩니다.'
+        : detail;
   }
 }
 
@@ -588,6 +609,42 @@ RealEstateListingRef? parseRealEstateListingOptionId(String optionId) {
   final listingIndex = int.tryParse(optionId.substring(separator + 2));
   if (assetId.isEmpty || listingIndex == null || listingIndex < 0) return null;
   return RealEstateListingRef(assetId: assetId, listingIndex: listingIndex);
+}
+
+List<String> _realEstateWorldEconomyRegionKeys(RealEstateMarketAsset asset) {
+  final district = realEstateDistrictFor(asset);
+  final businessDistrictId =
+      worldEconomyBusinessDistrictIdForRealEstateDistrict(district.id);
+  return <String>{district.id, ?businessDistrictId}.toList(growable: false);
+}
+
+WorldEconomySnapshot _realEstateWorldEconomySnapshotAt(
+  RealEstateMarketAsset asset,
+  String worldSeed,
+  DateTime date,
+) => worldEconomySnapshot(
+  worldSeed: worldSeed,
+  asOf: date,
+  regionKeys: _realEstateWorldEconomyRegionKeys(asset),
+);
+
+/// Shared-economy liquidity for a property on [date].
+///
+/// Legacy v1-v3 assets intentionally remain neutral. A v4 owner can therefore
+/// fix this value when a sale is listed without changing old save fingerprints.
+double realEstateWorldLiquidityAt(
+  RealEstateMarketAsset asset,
+  String worldSeed,
+  DateTime date, {
+  int generatorVersion = realEstateWorldGeneratorVersion,
+}) {
+  _validateRealEstateWorldGeneratorVersion(generatorVersion);
+  if (generatorVersion < 4 || worldSeed.isEmpty) return 0;
+  return _realEstateWorldEconomySnapshotAt(
+    asset,
+    worldSeed,
+    date,
+  ).realEstateImpact.liquidity;
 }
 
 class GeneratedRealEstateListing {
@@ -644,6 +701,30 @@ class GeneratedRealEstateListing {
     index,
     generatorVersion: generatorVersion,
   );
+
+  WorldEconomySnapshot _worldEconomySnapshotAt(DateTime date) =>
+      _realEstateWorldEconomySnapshotAt(asset, worldSeed, date);
+
+  double _worldEconomyLiquidityAtListing(DateTime listedAt, int cycleNumber) {
+    final cache = _realEstateWorldCacheFor(
+      worldSeed,
+      generatorVersion: generatorVersion,
+    );
+    return cache.listingLiquidityByCycle.putIfAbsent(
+      '$id:$cycleNumber',
+      () => _worldEconomySnapshotAt(listedAt).realEstateImpact.liquidity,
+    );
+  }
+
+  bool _usesNumericLegacyEvent(RealEstateWorldEvent event) =>
+      generatorVersion < 4 ||
+      !_worldEconomyReplacedRealEstateEventKinds.contains(event.kind);
+
+  /// 공통 세계경제에서 이 날짜까지 플레이어가 알 수 있는 사건만 반환한다.
+  List<WorldEconomyEvent> visibleWorldEconomyEventsAt(DateTime date) {
+    if (generatorVersion < 4) return const <WorldEconomyEvent>[];
+    return _worldEconomySnapshotAt(date).revealedEvents;
+  }
 
   List<RealEstateWorldEvent> visibleEventsAt(DateTime date) {
     final visible = _events.where((event) => event.isVisibleAt(date)).toList()
@@ -754,6 +835,7 @@ class GeneratedRealEstateListing {
     }
     final contributions = <double>[];
     for (final event in _events) {
+      if (!_usesNumericLegacyEvent(event)) continue;
       final rawImpact = event.impactAt(date);
       if (rawImpact == 0) continue;
       final spatialFactor = realEstateSpatialSpilloverFactor(asset, event);
@@ -786,10 +868,12 @@ class GeneratedRealEstateListing {
       final upper = basePrice * priceFactor * 1.62;
       return raw.clamp(lower, upper).round();
     }
-    final combined = (localDeviationAt(date) + eventImpactAt(date)).clamp(
-      -0.42,
-      0.48,
-    );
+    final sharedPriceImpact = generatorVersion >= 4
+        ? _worldEconomySnapshotAt(date).realEstateImpact.price
+        : 0.0;
+    final combined =
+        (localDeviationAt(date) + eventImpactAt(date) + sharedPriceImpact)
+            .clamp(-0.42, 0.48);
     final effectivePriceFactor = priceFactor * areaPriceFactor;
     final raw = basePrice * effectivePriceFactor * (1 + combined);
     final lower = basePrice * effectivePriceFactor * 0.58;
@@ -810,6 +894,9 @@ class GeneratedRealEstateListing {
               12)
           .round();
     }
+    final sharedRentFactor = generatorVersion >= 4
+        ? 1 + _worldEconomySnapshotAt(date).realEstateImpact.rent
+        : 1.0;
     final eventRentFactor = 1 + rentEventImpactAt(date);
     final localRentPressure = math.pow(
       (1 + localDeviationAt(date)).clamp(0.72, 1.24),
@@ -819,6 +906,7 @@ class GeneratedRealEstateListing {
             areaPriceFactor *
             rentFactor *
             eventRentFactor *
+            sharedRentFactor *
             localRentPressure)
         .round();
   }
@@ -850,6 +938,7 @@ class GeneratedRealEstateListing {
     RealEstateWorldEvent event,
     DateTime date,
   ) {
+    if (!_usesNumericLegacyEvent(event)) return 0;
     if (!event.isVisibleAt(date) || !event.kind.affectsRentalDemand) {
       return 0;
     }
@@ -911,6 +1000,7 @@ RealEstateListingRiskFactors realEstateListingRiskFactorsAt(
     1.20,
   );
   for (final event in listing._events) {
+    if (!listing._usesNumericLegacyEvent(event)) continue;
     final rawImpact = event.impactAt(date);
     if (rawImpact == 0) continue;
     final spatial = realEstateSpatialSpilloverFactor(listing.asset, event);
@@ -934,6 +1024,12 @@ RealEstateListingRiskFactors realEstateListingRiskFactorsAt(
         rawImpact < 0) {
       repairCostMultiplier *= 1 + severity * 1.4;
     }
+  }
+  if (listing.generatorVersion >= 4) {
+    final impact = listing._worldEconomySnapshotAt(date).realEstateImpact;
+    vacancyMultiplier *= math.max(0.25, 1 + impact.vacancy);
+    repairProbabilityMultiplier *= math.max(0.25, 1 + impact.risk);
+    repairCostMultiplier *= math.max(0.25, 1 + impact.repairCost);
   }
   return RealEstateListingRiskFactors(
     vacancyMultiplier: vacancyMultiplier.clamp(0.65, 2.40),
@@ -1145,20 +1241,29 @@ RealEstateListingLifecycle _realEstateListingLifecycleAt(
   final cycleStart = listing.asset.availableFrom.add(
     Duration(days: cycleStartOffset),
   );
-  final activeDays =
+  final listedAt = cycleStart.isBefore(listing.asset.availableFrom)
+      ? listing.asset.availableFrom
+      : cycleStart;
+  final baseActiveDays =
       195 +
       _stableHash(
             '${listing.worldSeed}:${listing.asset.id}:'
             '${listing.index}:listing-active:$cycleNumber',
           ) %
           46;
+  final liquidity = listing.generatorVersion >= 4
+      ? listing._worldEconomyLiquidityAtListing(listedAt, cycleNumber)
+      : 0.0;
+  final activeDays = listing.generatorVersion >= 4
+      ? (baseActiveDays * (1 - liquidity * 0.35))
+            .round()
+            .clamp(180, 255)
+            .toInt()
+      : baseActiveDays;
   final expiresAt = cycleStart.add(Duration(days: activeDays));
   final relistsAt = cycleStart.add(
     const Duration(days: _realEstateListingLifecycleDays),
   );
-  final listedAt = cycleStart.isBefore(listing.asset.availableFrom)
-      ? listing.asset.availableFrom
-      : cycleStart;
   if (phase < activeDays) {
     return RealEstateListingLifecycle(
       listing: listing,
@@ -2258,7 +2363,7 @@ int _stableHash(String value) {
   var hash = 0x811c9dc5;
   for (final unit in value.codeUnits) {
     hash ^= unit;
-    hash = (hash * 0x01000193) & 0x7fffffff;
+    hash = multiplyFnvPrime31Exact(hash);
   }
   return hash;
 }

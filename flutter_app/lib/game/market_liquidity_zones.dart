@@ -1,5 +1,6 @@
 import 'market_price_rules.dart';
 import 'market_technical_levels.dart';
+import 'stable_hash.dart';
 
 /// The structural role an absolute price has at the start of a session.
 ///
@@ -197,7 +198,7 @@ int marketStructuralLiquiditySeed({
   var hash = 0x811c9dc5;
   for (final unit in '$worldSeed:$assetId'.codeUnits) {
     hash ^= unit;
-    hash = (hash * 0x01000193) & 0x7fffffff;
+    hash = multiplyFnvPrime31Exact(hash);
   }
   return hash;
 }

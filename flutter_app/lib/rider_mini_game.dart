@@ -530,7 +530,7 @@ class _RiderRoad extends StatelessWidget {
         return Stack(
           fit: StackFit.expand,
           children: [
-            const _RiderRoadPaint(),
+            _RiderRoadPaint(progress: progress),
             Positioned(
               top: 8,
               left: 10,
@@ -555,7 +555,7 @@ class _RiderRoad extends StatelessWidget {
             for (final obstacle in obstacles)
               Positioned(
                 key: ValueKey('rider-obstacle-${obstacle.id}'),
-                left: laneWidth * obstacle.lane + laneWidth / 2 - 25,
+                left: laneWidth * obstacle.lane + laneWidth / 2 - 28,
                 top: -45 + obstacle.y * 350,
                 child: _RiderObstacleView(obstacle: obstacle),
               ),
@@ -563,9 +563,9 @@ class _RiderRoad extends StatelessWidget {
               key: const Key('rider-player'),
               duration: const Duration(milliseconds: 105),
               curve: Curves.easeOutBack,
-              left: laneWidth * playerLane + laneWidth / 2 - 27,
-              bottom: 20,
-              child: const _RiderPlayer(),
+              left: laneWidth * playerLane + laneWidth / 2 - 40,
+              bottom: 8,
+              child: _RiderPlayer(lane: playerLane),
             ),
             Positioned(
               left: 10,
@@ -589,61 +589,114 @@ class _RiderRoad extends StatelessWidget {
 }
 
 class _RiderRoadPaint extends StatelessWidget {
-  const _RiderRoadPaint();
+  const _RiderRoadPaint({required this.progress});
+
+  final double progress;
 
   @override
-  Widget build(BuildContext context) => Stack(
-    fit: StackFit.expand,
-    children: [
-      const DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF586574), Color(0xFF343B47)],
-          ),
-        ),
-      ),
-      for (final alignment in const [-0.33, 0.33])
-        Align(
-          alignment: Alignment(alignment, 0),
-          child: LayoutBuilder(
-            builder: (context, constraints) => Column(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: List.generate(
-                7,
-                (_) => Container(
-                  width: 4,
-                  height: 27,
-                  decoration: BoxDecoration(
-                    color: const Color(0xBFFFFFFF),
-                    borderRadius: BorderRadius.circular(99),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      const Positioned(
-        left: 8,
-        top: 0,
-        bottom: 0,
-        child: DecoratedBox(
-          decoration: BoxDecoration(color: Color(0xFFEFC85F)),
-          child: SizedBox(width: 4),
-        ),
-      ),
-      const Positioned(
-        right: 8,
-        top: 0,
-        bottom: 0,
-        child: DecoratedBox(
-          decoration: BoxDecoration(color: Color(0xFFEFC85F)),
-          child: SizedBox(width: 4),
-        ),
-      ),
-    ],
-  );
+  Widget build(BuildContext context) =>
+      CustomPaint(painter: _PixelRoadPainter(progress: progress));
+}
+
+class _PixelRoadPainter extends CustomPainter {
+  const _PixelRoadPainter({required this.progress});
+
+  final double progress;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..isAntiAlias = false;
+    paint.shader = const LinearGradient(
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      colors: [Color(0xFF667280), Color(0xFF343B47)],
+    ).createShader(Offset.zero & size);
+    canvas.drawRect(Offset.zero & size, paint);
+    paint.shader = null;
+
+    _rect(canvas, paint, 0, 0, 15, size.height, const Color(0xFF276D43));
+    _rect(
+      canvas,
+      paint,
+      size.width - 15,
+      0,
+      15,
+      size.height,
+      const Color(0xFF276D43),
+    );
+
+    final tileOffset = (progress * 520) % 20;
+    for (var y = -20.0 + tileOffset; y < size.height; y += 20) {
+      final alternate = ((y / 20).round() & 1) == 0;
+      _rect(
+        canvas,
+        paint,
+        2,
+        y,
+        10,
+        10,
+        alternate ? const Color(0xFF43A05D) : const Color(0xFF33864E),
+      );
+      _rect(
+        canvas,
+        paint,
+        size.width - 12,
+        y + 8,
+        10,
+        10,
+        alternate ? const Color(0xFF33864E) : const Color(0xFF43A05D),
+      );
+    }
+
+    for (var y = -16.0 + tileOffset; y < size.height; y += 16) {
+      final red = ((y / 16).round() & 1) == 0;
+      final curb = red ? const Color(0xFFEE6B5F) : const Color(0xFFF8F1D9);
+      _rect(canvas, paint, 15, y, 7, 13, curb);
+      _rect(canvas, paint, size.width - 22, y, 7, 13, curb);
+    }
+
+    final dashOffset = (progress * 900) % 44;
+    for (final x in [size.width / 3, size.width * 2 / 3]) {
+      for (var y = -42.0 + dashOffset; y < size.height; y += 44) {
+        _rect(canvas, paint, x - 2, y, 4, 24, const Color(0xFFE9E7D8));
+        _rect(canvas, paint, x - 1, y, 2, 24, const Color(0xFFFFFFFF));
+      }
+    }
+
+    _rect(canvas, paint, 22, 0, size.width - 44, 7, const Color(0xFFFFD65F));
+    _rect(canvas, paint, 22, 7, size.width - 44, 3, const Color(0xFFBE7D2B));
+
+    const crackSeeds = <(double, double)>[
+      (0.23, 0.17),
+      (0.75, 0.31),
+      (0.48, 0.54),
+      (0.81, 0.74),
+      (0.18, 0.88),
+    ];
+    for (final (dx, dy) in crackSeeds) {
+      final y = (dy * size.height + progress * 680) % size.height;
+      final x = 22 + dx * (size.width - 44);
+      _rect(canvas, paint, x, y, 8, 2, const Color(0xFF2B313A));
+      _rect(canvas, paint, x + 5, y + 2, 2, 5, const Color(0xFF2B313A));
+    }
+  }
+
+  void _rect(
+    Canvas canvas,
+    Paint paint,
+    double x,
+    double y,
+    double width,
+    double height,
+    Color color,
+  ) {
+    paint.color = color;
+    canvas.drawRect(Rect.fromLTWH(x, y, width, height), paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _PixelRoadPainter oldDelegate) =>
+      oldDelegate.progress != progress;
 }
 
 class _RiderObstacleView extends StatelessWidget {
@@ -653,98 +706,220 @@ class _RiderObstacleView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (icon, color, label) = switch (obstacle.kind) {
-      _RiderObstacleKind.cone => (
-        Icons.change_history_rounded,
-        const Color(0xFFFF8B4F),
-        '고깔',
-      ),
-      _RiderObstacleKind.box => (
-        Icons.inventory_2_rounded,
-        const Color(0xFFCC9B65),
-        '상자',
-      ),
-      _RiderObstacleKind.puddle => (
-        Icons.water_rounded,
-        const Color(0xFF71C9EF),
-        '물웅덩이',
-      ),
-      _RiderObstacleKind.cart => (
-        Icons.shopping_cart_rounded,
-        const Color(0xFFEF6D73),
-        '손수레',
-      ),
-      _RiderObstacleKind.checkpoint => (
-        Icons.takeout_dining_rounded,
-        const Color(0xFF5BD494),
-        '배달 지점',
-      ),
+    final label = switch (obstacle.kind) {
+      _RiderObstacleKind.cone => 'traffic cone',
+      _RiderObstacleKind.box => 'wooden crate',
+      _RiderObstacleKind.puddle => 'water puddle',
+      _RiderObstacleKind.cart => 'hand cart',
+      _RiderObstacleKind.checkpoint => 'delivery checkpoint',
     };
     return Semantics(
       label: label,
-      child: Container(
-        width: 50,
-        height: 50,
-        decoration: BoxDecoration(
-          color: color,
-          shape: obstacle.isCheckpoint ? BoxShape.circle : BoxShape.rectangle,
-          borderRadius: obstacle.isCheckpoint
-              ? null
-              : BorderRadius.circular(14),
-          border: Border.all(color: Colors.white, width: 2),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x66000000),
-              blurRadius: 7,
-              offset: Offset(0, 4),
-            ),
-          ],
+      child: RepaintBoundary(
+        child: Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            boxShadow: [
+              BoxShadow(
+                color: obstacle.isCheckpoint
+                    ? const Color(0x995BFFAC)
+                    : const Color(0x55000000),
+                blurRadius: obstacle.isCheckpoint ? 12 : 5,
+                spreadRadius: obstacle.isCheckpoint ? 2 : 0,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: CustomPaint(
+            painter: _PixelObstaclePainter(kind: obstacle.kind),
+          ),
         ),
-        child: Icon(icon, color: Colors.white, size: 27),
       ),
     );
   }
 }
 
-class _RiderPlayer extends StatelessWidget {
-  const _RiderPlayer();
+class _PixelObstaclePainter extends CustomPainter {
+  const _PixelObstaclePainter({required this.kind});
+
+  final _RiderObstacleKind kind;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..isAntiAlias = false;
+    switch (kind) {
+      case _RiderObstacleKind.cone:
+        _cone(canvas, paint);
+      case _RiderObstacleKind.box:
+        _box(canvas, paint);
+      case _RiderObstacleKind.puddle:
+        _puddle(canvas, paint);
+      case _RiderObstacleKind.cart:
+        _cart(canvas, paint);
+      case _RiderObstacleKind.checkpoint:
+        _checkpoint(canvas, paint);
+    }
+  }
+
+  void _cone(Canvas canvas, Paint paint) {
+    _rect(canvas, paint, 8, 45, 40, 7, const Color(0xFF232A35));
+    _rect(canvas, paint, 12, 40, 32, 7, const Color(0xFFB8492E));
+    _rect(canvas, paint, 17, 31, 22, 10, const Color(0xFFFF7A3D));
+    _rect(canvas, paint, 20, 22, 16, 9, const Color(0xFFF4EEE1));
+    _rect(canvas, paint, 23, 11, 10, 12, const Color(0xFFFF8A42));
+    _rect(canvas, paint, 26, 7, 4, 5, const Color(0xFFFFB15A));
+  }
+
+  void _box(Canvas canvas, Paint paint) {
+    _rect(canvas, paint, 7, 12, 44, 41, const Color(0xFF4D2D23));
+    _rect(canvas, paint, 10, 9, 38, 41, const Color(0xFFC88642));
+    _rect(canvas, paint, 14, 13, 30, 33, const Color(0xFFE3A95C));
+    _rect(canvas, paint, 25, 10, 7, 39, const Color(0xFF8D522F));
+    _rect(canvas, paint, 10, 26, 38, 6, const Color(0xFF8D522F));
+    _rect(canvas, paint, 14, 15, 9, 4, const Color(0xFFF3C879));
+  }
+
+  void _puddle(Canvas canvas, Paint paint) {
+    _rect(canvas, paint, 6, 27, 44, 16, const Color(0xFF194E79));
+    _rect(canvas, paint, 12, 21, 32, 27, const Color(0xFF3B9ED0));
+    _rect(canvas, paint, 5, 32, 46, 8, const Color(0xFF3B9ED0));
+    _rect(canvas, paint, 16, 25, 22, 12, const Color(0xFF78D8F0));
+    _rect(canvas, paint, 20, 24, 12, 4, const Color(0xFFC8F5FF));
+    _rect(canvas, paint, 10, 45, 10, 4, const Color(0xFF194E79));
+    _rect(canvas, paint, 38, 19, 7, 5, const Color(0xFF78D8F0));
+  }
+
+  void _cart(Canvas canvas, Paint paint) {
+    _rect(canvas, paint, 7, 16, 38, 25, const Color(0xFF722F3A));
+    _rect(canvas, paint, 10, 12, 34, 25, const Color(0xFFE25B5B));
+    _rect(canvas, paint, 14, 16, 26, 6, const Color(0xFFFF8580));
+    _rect(canvas, paint, 13, 29, 28, 5, const Color(0xFFA33E48));
+    _rect(canvas, paint, 43, 8, 5, 31, const Color(0xFFE7C06A));
+    _rect(canvas, paint, 47, 6, 7, 5, const Color(0xFF5A3928));
+    _rect(canvas, paint, 11, 39, 11, 11, const Color(0xFF202733));
+    _rect(canvas, paint, 34, 39, 11, 11, const Color(0xFF202733));
+    _rect(canvas, paint, 14, 42, 5, 5, const Color(0xFF9EB1BA));
+    _rect(canvas, paint, 37, 42, 5, 5, const Color(0xFF9EB1BA));
+  }
+
+  void _checkpoint(Canvas canvas, Paint paint) {
+    _rect(canvas, paint, 4, 7, 48, 45, const Color(0xFF173B33));
+    _rect(canvas, paint, 7, 4, 42, 45, const Color(0xFF42D88B));
+    _rect(canvas, paint, 11, 8, 34, 37, const Color(0xFF1E8E61));
+    _rect(canvas, paint, 15, 12, 26, 29, const Color(0xFF76F2AE));
+    _rect(canvas, paint, 20, 17, 16, 18, const Color(0xFFFFF5CC));
+    _rect(canvas, paint, 23, 13, 10, 6, const Color(0xFFFFD765));
+    _rect(canvas, paint, 24, 21, 8, 3, const Color(0xFFE26955));
+    _rect(canvas, paint, 24, 27, 8, 3, const Color(0xFFE26955));
+    _rect(canvas, paint, 7, 45, 42, 5, const Color(0xFFFFD765));
+  }
+
+  void _rect(
+    Canvas canvas,
+    Paint paint,
+    double x,
+    double y,
+    double width,
+    double height,
+    Color color,
+  ) {
+    paint.color = color;
+    canvas.drawRect(Rect.fromLTWH(x, y, width, height), paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _PixelObstaclePainter oldDelegate) =>
+      oldDelegate.kind != kind;
+}
+
+class _RiderPlayer extends StatefulWidget {
+  const _RiderPlayer({required this.lane});
+
+  final int lane;
+
+  @override
+  State<_RiderPlayer> createState() => _RiderPlayerState();
+}
+
+class _RiderPlayerState extends State<_RiderPlayer>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _bounceController = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 420),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _bounceController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    label: 'pixel-art hero riding a yellow kick scooter',
+    child: TweenAnimationBuilder<double>(
+      tween: Tween(end: (widget.lane - 1) * 0.055),
+      duration: const Duration(milliseconds: 120),
+      curve: Curves.easeOutBack,
+      builder: (context, tilt, child) => Transform.rotate(
+        angle: tilt,
+        alignment: Alignment.bottomCenter,
+        child: child,
+      ),
+      child: AnimatedBuilder(
+        animation: _bounceController,
+        builder: (context, child) => Transform.translate(
+          offset: Offset(0, -1.5 * _bounceController.value),
+          child: child,
+        ),
+        child: SizedBox(
+          width: 80,
+          height: 128,
+          child: Stack(
+            alignment: Alignment.bottomCenter,
+            children: [
+              const Positioned(
+                left: 11,
+                bottom: 4,
+                child: _PixelDust(color: Color(0x99F4D28A), size: 7),
+              ),
+              const Positioned(
+                right: 10,
+                bottom: 10,
+                child: _PixelDust(color: Color(0x77FFFFFF), size: 5),
+              ),
+              Image.asset(
+                'assets/images/minigames/rider_hero_pixel_v1.png',
+                key: const Key('rider-player-sprite'),
+                width: 72,
+                height: 128,
+                fit: BoxFit.contain,
+                filterQuality: FilterQuality.none,
+                isAntiAlias: false,
+                gaplessPlayback: true,
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+class _PixelDust extends StatelessWidget {
+  const _PixelDust({required this.color, required this.size});
+
+  final Color color;
+  final double size;
 
   @override
   Widget build(BuildContext context) => Container(
-    width: 54,
-    height: 72,
+    width: size,
+    height: size,
     decoration: BoxDecoration(
-      color: const Color(0xFF16223B),
-      borderRadius: BorderRadius.circular(18),
-      border: Border.all(color: Colors.white, width: 2),
-      boxShadow: const [
-        BoxShadow(
-          color: Color(0x77000000),
-          blurRadius: 9,
-          offset: Offset(0, 5),
-        ),
-      ],
-    ),
-    child: const Stack(
-      alignment: Alignment.center,
-      children: [
-        Positioned(
-          top: 7,
-          child: Icon(Icons.face_rounded, color: Color(0xFFFFD4B2), size: 24),
-        ),
-        Positioned(
-          top: 29,
-          child: Icon(
-            Icons.directions_bike_rounded,
-            color: Color(0xFFFFD65F),
-            size: 31,
-          ),
-        ),
-        Positioned(
-          bottom: 2,
-          child: Icon(Icons.horizontal_rule_rounded, color: Colors.white),
-        ),
-      ],
+      color: color,
+      borderRadius: BorderRadius.circular(1),
     ),
   );
 }

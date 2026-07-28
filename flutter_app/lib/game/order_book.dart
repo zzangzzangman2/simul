@@ -8,31 +8,44 @@ enum GameOrderBookSide { ask, bid }
 
 /// 화면과 주문 엔진이 공통으로 생성하는 한쪽당 호가 깊이.
 const gameOrderBookLevelCount = 10;
+
+/// 최우선호가 한 단계가 담는 평균 시장분 거래량 배수.
+///
+/// 분당 체결능력(평온장 중앙값 약 0.30분치)과 1~2 시장분 안에 만나는
+/// 두께를 만들며, 체결능력의 0.48 계수와는 독립적으로 유지한다.
+const gameOrderBookStandingDepthMinutes = 0.45;
+
 const gameOrderBookWallPricePeriod = 5;
 const gameOrderBookMinuteTurnoverShare = 0.25;
 const gameOrderBookOrderTurnoverShare = 0.02;
-const gameOrderBookMinimumAdaptivePulseHz = 0.1;
-const gameOrderBookMaximumAdaptivePulseHz = 12.0;
+const gameOrderBookMinimumPulsesPerMarketMinute = 2;
+const gameOrderBookMaximumOrdinaryPulsesPerMarketMinute = 24;
+const gameOrderBookFastPulsesPerMarketMinute = 32;
+const gameOrderBookMaximumPulsesPerMarketMinute = 40;
+const gameOrderBookPulseFrameStride = 64;
+const gameOrderBookSparseFullDayTurnoverEok = 75.0;
+const gameOrderBookSeverelySparseFullDayTurnoverEok = 20.0;
 const _gameOrderBookFlatAggressorHoldMinutes = 6;
-const _gameOrderBookRegularSessionMinutes =
-    krxContinuousEndMinute - krxOpenMinute;
+
+/// Full-day volume includes the 15:00 closing-auction print, so standing depth
+/// uses the same 09:00~15:00 denominator as turnover progress.
+const _gameOrderBookFullSessionMinutes = krxCloseMinute - krxOpenMinute;
 const _gameOrderBookFastMoveTicks = 3;
 const _gameOrderBookTrendActivationRate = 0.04;
 const gamePlayerMarketImpactDurationMinutes = 6;
 
-/// Returns the visible order-book event rate for the currently opened asset.
+/// Returns deterministic microstructure slots assigned to one market minute.
 ///
-/// The base rate follows expected *full-day* turnover, not cumulative turnover,
-/// so an otherwise identical stock does not speed up merely because the clock
-/// is later in the session. A fast price move or extreme imbalance can lift
-/// any stock into the 10-12 Hz band temporarily.
-double gameOrderBookAdaptivePulseHz({
+/// The result follows expected full-day turnover rather than wall-clock frame
+/// rate. Fast price movement or an extreme execution-strength imbalance can
+/// temporarily lift a stock from the ordinary 2-24 slots into 32 or 40 slots.
+int gameOrderBookPulsesPerMarketMinute({
   required double fullDayTurnoverEok,
   required double currentPrice,
   required double previousTradePrice,
   required double previousClose,
   String market = 'main',
-  double tradeStrength = 100,
+  double executionStrength = 100,
   bool tradingSessionActive = true,
   bool playbackActive = true,
 }) {
@@ -40,16 +53,16 @@ double gameOrderBookAdaptivePulseHz({
   final turnover = fullDayTurnoverEok.isFinite
       ? math.max(0.0, fullDayTurnoverEok)
       : 0.0;
-  var rate = switch (turnover) {
-    < 20 => 0.1,
-    < 75 => 0.2,
-    < 200 => 0.3,
-    < 1000 => 1.0,
-    < 3000 => 2.0,
-    < 7000 => 3.0,
-    < 12000 => 5.0,
-    < 20000 => 7.0,
-    _ => 8.0,
+  var slots = switch (turnover) {
+    < 20 => 2,
+    < 75 => 3,
+    < 200 => 4,
+    < 1000 => 6,
+    < 3000 => 10,
+    < 7000 => 14,
+    < 12000 => 18,
+    < 20000 => 22,
+    _ => gameOrderBookMaximumOrdinaryPulsesPerMarketMinute,
   };
 
   final hasPrices =
@@ -76,28 +89,90 @@ double gameOrderBookAdaptivePulseHz({
           previousClose > 0
       ? ((currentPrice - previousClose) / previousClose).abs()
       : 0.0;
-  final imbalance = tradeStrength.isFinite && tradeStrength > 0
-      ? math.max(tradeStrength / 100, 100 / tradeStrength)
-      : 1.0;
+  final executionImbalance = !executionStrength.isFinite
+      ? 1.0
+      : executionStrength <= 0
+      ? double.infinity
+      : math.max(executionStrength / 100, 100 / executionStrength);
   final fast =
       crossedTicks >= _gameOrderBookFastMoveTicks ||
       sessionMoveRate >= 0.04 ||
-      imbalance >= 1.65;
+      executionImbalance >= 1.65;
   final extreme =
       crossedTicks >= _gameOrderBookFastMoveTicks * 2 ||
       sessionMoveRate >= 0.08 ||
-      imbalance >= 2.1;
+      executionImbalance >= 2.1;
   if (extreme) {
-    rate = math.max(rate, gameOrderBookMaximumAdaptivePulseHz);
+    slots = gameOrderBookMaximumPulsesPerMarketMinute;
   } else if (fast) {
-    rate = math.max(rate, 10.0);
+    slots = math.max(slots, gameOrderBookFastPulsesPerMarketMinute);
   }
-  return rate
-      .clamp(
-        gameOrderBookMinimumAdaptivePulseHz,
-        gameOrderBookMaximumAdaptivePulseHz,
-      )
-      .toDouble();
+  return slots.clamp(
+    gameOrderBookMinimumPulsesPerMarketMinute,
+    gameOrderBookMaximumPulsesPerMarketMinute,
+  );
+}
+
+/// Stable identity for one `(marketMinute, slotIndex)` microstructure state.
+int gameOrderBookLiquidityPulseFrame({
+  required int marketMinute,
+  required int slotIndex,
+}) {
+  final minuteOffset = math.max(0, marketMinute - krxOpenMinute);
+  final safeSlot = slotIndex.clamp(
+    0,
+    gameOrderBookMaximumPulsesPerMarketMinute,
+  );
+  return minuteOffset * gameOrderBookPulseFrameStride + safeSlot;
+}
+
+int gameOrderBookPulseSlotForFrame({
+  required int marketMinute,
+  required int liquidityPulse,
+}) {
+  final base = gameOrderBookLiquidityPulseFrame(
+    marketMinute: marketMinute,
+    slotIndex: 0,
+  );
+  return (liquidityPulse - base).clamp(
+    0,
+    gameOrderBookMaximumPulsesPerMarketMinute,
+  );
+}
+
+List<int> gameOrderBookPendingPulseFrames({
+  required int marketMinute,
+  required int afterLiquidityPulse,
+  required int throughSlotIndex,
+}) {
+  final afterSlot = gameOrderBookPulseSlotForFrame(
+    marketMinute: marketMinute,
+    liquidityPulse: afterLiquidityPulse,
+  );
+  final targetSlot = throughSlotIndex.clamp(
+    0,
+    gameOrderBookMaximumPulsesPerMarketMinute,
+  );
+  if (targetSlot <= afterSlot) return const <int>[];
+  return List<int>.unmodifiable([
+    for (var slot = afterSlot + 1; slot <= targetSlot; slot += 1)
+      gameOrderBookLiquidityPulseFrame(
+        marketMinute: marketMinute,
+        slotIndex: slot,
+      ),
+  ]);
+}
+
+double gameOrderBookExecutionStrength({
+  required num buyQuantity,
+  required num sellQuantity,
+}) {
+  final buys = buyQuantity.toDouble();
+  final sells = sellQuantity.toDouble();
+  final safeBuys = buys.isFinite ? math.max(0.0, buys) : 0.0;
+  final safeSells = sells.isFinite ? math.max(0.0, sells) : 0.0;
+  if (safeSells <= 0) return safeBuys > 0 ? 999.0 : 100.0;
+  return safeBuys / safeSells * 100;
 }
 
 int gameEstimatedFullDayVolumeUnits({
@@ -262,6 +337,7 @@ class GameOrderBookLevel {
     this.isPsychological = false,
     this.technicalPeriods = const <int>[],
     this.wasLiquidityPulseTouched = false,
+    this.queueRecoveryTargetQuantity = 0,
   });
 
   final GameOrderBookSide side;
@@ -277,6 +353,10 @@ class GameOrderBookLevel {
   final bool isPsychological;
   final List<int> technicalPeriods;
   final bool wasLiquidityPulseTouched;
+
+  /// Original ordinary-queue depth still being rebuilt after real consumption.
+  /// Intentionally empty price levels and untouched queues keep this at zero.
+  final int queueRecoveryTargetQuantity;
 
   int get confluenceCount =>
       (isPsychological ? 1 : 0) + technicalPeriods.length;
@@ -402,6 +482,113 @@ class GameOrderBookSyntheticTrade {
 
   /// Actual quantity removed after row availability and minute-budget caps.
   final int quantity;
+}
+
+class GameOrderBookPriceTransition {
+  const GameOrderBookPriceTransition({
+    required this.price,
+    required this.consumedAskByPrice,
+    required this.consumedBidByPrice,
+    required this.consumedUnits,
+    required this.targetReached,
+    this.lastFillSide,
+    this.lastFillPrice,
+    this.lastFillQuantity = 0,
+  });
+
+  final double price;
+  final Map<double, int> consumedAskByPrice;
+  final Map<double, int> consumedBidByPrice;
+  final int consumedUnits;
+  final bool targetReached;
+  final GameOrderBookSide? lastFillSide;
+  final double? lastFillPrice;
+  final int lastFillQuantity;
+}
+
+/// Moves a last-trade price only through standing depth that was actually
+/// executed. A partial fill may move the print onto the current best quote,
+/// but the next price level remains unreachable until that quote is empty.
+GameOrderBookPriceTransition gameOrderBookPriceTransitionTowardTarget({
+  required GameOrderBookSnapshot snapshot,
+  required double previousPrice,
+  required double targetPrice,
+  required int availableUnits,
+  required String market,
+}) {
+  final safePrevious = marketSnapPrice(previousPrice, market: market);
+  final safeTarget = marketSnapPrice(targetPrice, market: market);
+  if (!safePrevious.isFinite ||
+      safePrevious <= 0 ||
+      !safeTarget.isFinite ||
+      safeTarget <= 0 ||
+      (safeTarget - safePrevious).abs() < 0.000001) {
+    return GameOrderBookPriceTransition(
+      price: safeTarget.isFinite && safeTarget > 0 ? safeTarget : safePrevious,
+      consumedAskByPrice: const <double, int>{},
+      consumedBidByPrice: const <double, int>{},
+      consumedUnits: 0,
+      targetReached: (safeTarget - safePrevious).abs() < 0.000001,
+    );
+  }
+
+  final asks = <double, int>{};
+  final bids = <double, int>{};
+  var remaining = math.max(0, availableUnits);
+  var reachedPrice = safePrevious;
+  GameOrderBookSide? lastFillSide;
+  double? lastFillPrice;
+  var lastFillQuantity = 0;
+
+  if (safeTarget > safePrevious) {
+    for (final level in snapshot.asks) {
+      if (level.price > safeTarget + 0.000001) break;
+      if (level.price < safePrevious - 0.000001 || level.quantity <= 0) {
+        continue;
+      }
+      if (remaining <= 0) break;
+      final fill = math.min(remaining, level.quantity);
+      if (fill <= 0) continue;
+      asks[level.price] = fill;
+      remaining -= fill;
+      reachedPrice = level.price;
+      lastFillSide = GameOrderBookSide.ask;
+      lastFillPrice = level.price;
+      lastFillQuantity = fill;
+      if (fill < level.quantity) break;
+      if ((level.price - safeTarget).abs() < 0.000001) break;
+    }
+  } else {
+    for (final level in snapshot.bids) {
+      if (level.price < safeTarget - 0.000001) break;
+      if (level.price > safePrevious + 0.000001 || level.quantity <= 0) {
+        continue;
+      }
+      if (remaining <= 0) break;
+      final fill = math.min(remaining, level.quantity);
+      if (fill <= 0) continue;
+      bids[level.price] = fill;
+      remaining -= fill;
+      reachedPrice = level.price;
+      lastFillSide = GameOrderBookSide.bid;
+      lastFillPrice = level.price;
+      lastFillQuantity = fill;
+      if (fill < level.quantity) break;
+      if ((level.price - safeTarget).abs() < 0.000001) break;
+    }
+  }
+
+  final consumedUnits = math.max(0, availableUnits - remaining);
+  return GameOrderBookPriceTransition(
+    price: reachedPrice,
+    consumedAskByPrice: Map<double, int>.unmodifiable(asks),
+    consumedBidByPrice: Map<double, int>.unmodifiable(bids),
+    consumedUnits: consumedUnits,
+    targetReached: (reachedPrice - safeTarget).abs() < 0.000001,
+    lastFillSide: lastFillSide,
+    lastFillPrice: lastFillPrice,
+    lastFillQuantity: lastFillQuantity,
+  );
 }
 
 class _GameOrderBookRegime {
@@ -583,18 +770,19 @@ int gameOrderBookExecutionCapacity({
   );
   if (maximum <= 0) return 0;
   var cappedMaximum = maximum;
-  if (sharesOutstanding != null && sharesOutstanding > 0) {
-    final actualMinuteVolume = gameEstimatedContinuousMinuteVolumeUnits(
-      assetId: assetId,
-      day: day,
-      minute: minute,
-      referencePrice: stableReference,
-      simulationSeed: simulationSeed,
-      sharesOutstanding: sharesOutstanding,
-    );
-    if (actualMinuteVolume > 0) {
-      cappedMaximum = math.min(cappedMaximum, actualMinuteVolume);
-    }
+  // Listed assets always carry a positive share count. Keep the deterministic
+  // fallback capped too so legacy/null fixtures cannot exceed that minute's
+  // generated tape volume.
+  final actualMinuteVolume = gameEstimatedContinuousMinuteVolumeUnits(
+    assetId: assetId,
+    day: day,
+    minute: minute,
+    referencePrice: stableReference,
+    simulationSeed: simulationSeed,
+    sharesOutstanding: sharesOutstanding,
+  );
+  if (actualMinuteVolume > 0) {
+    cappedMaximum = math.min(cappedMaximum, actualMinuteVolume);
   }
   return math.min(rawUnits.round(), cappedMaximum);
 }
@@ -778,7 +966,7 @@ GameOrderBookTradePulse? gameOrderBookTradePulse({
   String simulationSeed = '',
   int levelCount = gameOrderBookLevelCount,
   int liquidityPulse = 0,
-  double pulseHz = 0,
+  int pulsesPerMarketMinute = 0,
 }) {
   if (assetId.isEmpty ||
       levelCount <= 0 ||
@@ -851,12 +1039,12 @@ GameOrderBookTradePulse? gameOrderBookTradePulse({
                             0.24))
             .clamp(0.08, 0.92)
             .toDouble()
-      : pulseHz.isFinite && pulseHz > 0
+      : pulsesPerMarketMinute > 0
       ? (() {
-          // Spread the minute-wide flow across the actual scheduled event
-          // count. Without this pacing, a 10-12 Hz stock can spend its entire
-          // minute budget in the first few seconds and then appear frozen.
-          final expectedPulses = math.max(1.0, pulseHz * 60);
+          // Spread the finite minute-wide flow over deterministic logical
+          // slots. Rendering may skip frames, but catch-up reaches the same
+          // slot state without spending the budget early.
+          final expectedPulses = math.max(1, pulsesPerMarketMinute);
           final jitter =
               0.72 +
               _orderBookUnit(
@@ -909,8 +1097,9 @@ GameOrderBookLevel? gameOrderBookFirstExecutableLevel({
 
 GameOrderBookLevel _gameOrderBookLevelWithQuantity(
   GameOrderBookLevel level,
-  int quantity,
-) {
+  int quantity, {
+  int? queueRecoveryTargetQuantity,
+}) {
   return GameOrderBookLevel(
     side: level.side,
     price: level.price,
@@ -925,6 +1114,8 @@ GameOrderBookLevel _gameOrderBookLevelWithQuantity(
     isPsychological: level.isPsychological,
     technicalPeriods: level.technicalPeriods,
     wasLiquidityPulseTouched: level.wasLiquidityPulseTouched,
+    queueRecoveryTargetQuantity:
+        queueRecoveryTargetQuantity ?? level.queueRecoveryTargetQuantity,
   );
 }
 
@@ -1031,6 +1222,9 @@ GameOrderBookSnapshot gameOrderBookSnapshotAfterSyntheticTrade({
   final updatedTarget = _gameOrderBookLevelWithQuantity(
     target,
     rawQuantity - actualQuantity,
+    queueRecoveryTargetQuantity: actualQuantity <= 0
+        ? target.queueRecoveryTargetQuantity
+        : math.max(target.queueRecoveryTargetQuantity, rawQuantity),
   );
 
   final asks = pulse.levelSide == GameOrderBookSide.ask
@@ -1189,8 +1383,9 @@ GameOrderBookFillPlan gameOrderBookLimitFillPlan({
   );
 }
 
-/// Returns a presentation/execution view with previously consumed absolute
-/// prices removed from the visible standing depth.
+/// Returns an execution/presentation view after applying absolute-price fills.
+/// Depleted rows are omitted unless one exact active trade tombstone is
+/// explicitly retained for a non-live diagnostic caller.
 ///
 /// Within one market minute, keep the raw generative snapshot cached and derive
 /// panel/execution views from it. At the minute boundary, callers may promote
@@ -1202,9 +1397,7 @@ GameOrderBookSnapshot gameOrderBookSnapshotAfterConsumption({
   Map<double, double> consumedAskByPrice = const <double, double>{},
   Map<double, double> consumedBidByPrice = const <double, double>{},
   int consumedCapacityUnits = 0,
-  GameOrderBookSide? retainedZeroLevelSide,
-  double? retainedZeroPrice,
-  bool retainSyntheticTombstone = true,
+  bool retainSyntheticTombstone = false,
 }) {
   double quantityAtPrice(Map<double, double> quantities, double price) {
     final exact = quantities[price];
@@ -1248,6 +1441,9 @@ GameOrderBookSnapshot gameOrderBookSnapshotAfterConsumption({
         .floor();
     final used = math.max(0, cumulativeWholeUnits - alreadyAppliedWholeUnits);
     final remaining = level.quantity - used;
+    final queueRecoveryTargetQuantity = used <= 0
+        ? level.queueRecoveryTargetQuantity
+        : math.max(level.queueRecoveryTargetQuantity, level.quantity);
     return GameOrderBookLevel(
       side: level.side,
       price: level.price,
@@ -1262,6 +1458,7 @@ GameOrderBookSnapshot gameOrderBookSnapshotAfterConsumption({
       isPsychological: level.isPsychological,
       technicalPeriods: level.technicalPeriods,
       wasLiquidityPulseTouched: level.wasLiquidityPulseTouched,
+      queueRecoveryTargetQuantity: queueRecoveryTargetQuantity,
     );
   }
 
@@ -1277,13 +1474,6 @@ GameOrderBookSnapshot gameOrderBookSnapshotAfterConsumption({
         (trade.price - level.price).abs() < 0.000001;
   }
 
-  bool keepsRequestedTombstone(GameOrderBookLevel level) =>
-      level.quantity <= 0 &&
-      retainedZeroLevelSide == level.side &&
-      retainedZeroPrice != null &&
-      retainedZeroPrice.isFinite &&
-      (retainedZeroPrice - level.price).abs() < 0.000001;
-
   final asks = snapshot.asks
       .map(
         (level) => netLevel(
@@ -1293,10 +1483,7 @@ GameOrderBookSnapshot gameOrderBookSnapshotAfterConsumption({
         ),
       )
       .where(
-        (level) =>
-            level.quantity > 0 ||
-            keepsRequestedTombstone(level) ||
-            keepsActiveSyntheticTombstone(level),
+        (level) => level.quantity > 0 || keepsActiveSyntheticTombstone(level),
       )
       .toList(growable: false);
   final bids = snapshot.bids
@@ -1308,10 +1495,7 @@ GameOrderBookSnapshot gameOrderBookSnapshotAfterConsumption({
         ),
       )
       .where(
-        (level) =>
-            level.quantity > 0 ||
-            keepsRequestedTombstone(level) ||
-            keepsActiveSyntheticTombstone(level),
+        (level) => level.quantity > 0 || keepsActiveSyntheticTombstone(level),
       )
       .toList(growable: false);
   final rememberedLevels = <double, GameOrderBookLevel>{
@@ -1483,6 +1667,13 @@ GameOrderBookSnapshot buildGameOrderBookSnapshot({
   }
   final tradable =
       tradingDay && marketClockAt(minute, tradingDay: true).tradable;
+  final fullDayTurnoverEok = gameEstimatedFullDayTurnoverEok(
+    assetId: assetId,
+    day: day,
+    referencePrice: safePreviousClose,
+    simulationSeed: simulationSeed,
+    sharesOutstanding: sharesOutstanding,
+  );
   final turnoverEok = gameEstimatedTurnoverEok(
     assetId: assetId,
     day: day,
@@ -1553,7 +1744,7 @@ GameOrderBookSnapshot buildGameOrderBookSnapshot({
   const wallPeriod = gameOrderBookWallPricePeriod;
   final wallOffset = _orderBookHash(seededAssetId, day, 701) % wallPeriod;
   final minimumLevelCount = math.max(0, levelCount);
-  final reserveLevelCount = math.min(6, minimumLevelCount);
+  final reserveLevelCount = minimumLevelCount;
   final elapsedMinutes = previousSnapshotMinute == null
       ? null
       : minute - previousSnapshotMinute;
@@ -1566,21 +1757,57 @@ GameOrderBookSnapshot buildGameOrderBookSnapshot({
           fastMarket: regime.isFast,
           liquidityPulse: safeLiquidityPulse,
           adaptiveLiquidityPulses: adaptiveLiquidityPulses,
+          seededAssetId: seededAssetId,
+          day: day,
+          minute: minute,
+          turnoverEok: turnoverEok,
+          executionCapacity: executionCapacity,
+          standingBaseDepth: baseDepth,
+          moveIntensity: regime.intensity,
+        )
+      : null;
+  final minuteTransition =
+      carriesPreviousBook && elapsedMinutes > 0 && executionCapacity > 0
+      ? gameOrderBookPriceTransitionTowardTarget(
+          snapshot: previousSnapshot,
+          previousPrice: previousForRegime,
+          targetPrice: lastTradePrice,
+          availableUnits: executionCapacity,
+          market: market,
         )
       : null;
   final asks = <GameOrderBookLevel>[];
   final bids = <GameOrderBookLevel>[];
 
-  GameOrderBookLevel carryLevel(GameOrderBookLevel level) {
-    return carryContext?.carry(level) ?? level;
+  GameOrderBookLevel carryLevel(
+    GameOrderBookLevel level, {
+    required int ticksFromTouch,
+  }) {
+    final carried =
+        carryContext?.carry(level, ticksFromTouch: ticksFromTouch) ?? level;
+    final consumed = level.side == GameOrderBookSide.ask
+        ? minuteTransition?.consumedAskByPrice[level.price] ?? 0
+        : minuteTransition?.consumedBidByPrice[level.price] ?? 0;
+    if (consumed <= 0) return carried;
+    return _gameOrderBookLevelWithQuantity(
+      carried,
+      math.max(0, carried.quantity - consumed),
+      queueRecoveryTargetQuantity: math.max(
+        carried.queueRecoveryTargetQuantity,
+        carried.quantity,
+      ),
+    );
   }
 
   bool hasExecutableDepthReserve(List<GameOrderBookLevel> levels) {
-    if (levels.length < minimumLevelCount) return false;
+    final positiveLevels = levels
+        .where((level) => level.quantity > 0)
+        .toList(growable: false);
+    if (positiveLevels.length < minimumLevelCount) return false;
     if (minimumLevelCount < 6 || executionCapacity <= 0) return true;
-    if (levels.length <= reserveLevelCount) return false;
-    final executableDepth = levels
-        .take(levels.length - reserveLevelCount)
+    if (positiveLevels.length <= reserveLevelCount) return false;
+    final executableDepth = positiveLevels
+        .take(positiveLevels.length - reserveLevelCount)
         .fold<int>(0, (sum, level) => sum + level.quantity);
     return executableDepth >= executionCapacity;
   }
@@ -1609,7 +1836,10 @@ GameOrderBookSnapshot buildGameOrderBookSnapshot({
           structuralLiquidity: structuralLiquidity,
           liquidityPulse: safeLiquidityPulse,
           adaptiveLiquidityPulses: adaptiveLiquidityPulses,
+          ticksFromTouch: asks.length,
+          fullDayTurnoverEok: fullDayTurnoverEok,
         ),
+        ticksFromTouch: asks.length,
       ),
     );
     final tick = marketTickSize(askPrice, market: market);
@@ -1639,7 +1869,10 @@ GameOrderBookSnapshot buildGameOrderBookSnapshot({
           structuralLiquidity: structuralLiquidity,
           liquidityPulse: safeLiquidityPulse,
           adaptiveLiquidityPulses: adaptiveLiquidityPulses,
+          ticksFromTouch: bids.length,
+          fullDayTurnoverEok: fullDayTurnoverEok,
         ),
+        ticksFromTouch: bids.length,
       ),
     );
     final tick = marketTickSize(
@@ -1651,8 +1884,15 @@ GameOrderBookSnapshot buildGameOrderBookSnapshot({
     bidPrice = next;
   }
 
-  final displayedAsks = asks;
-  final displayedBids = bids;
+  // Empty prices stay in rememberedLevels as stable internal gaps. Production
+  // snapshots expose only executable rows, so the user sees a wider price gap
+  // instead of the old numeric `0주` bug.
+  final displayedAsks = asks
+      .where((level) => level.quantity > 0)
+      .toList(growable: false);
+  final displayedBids = bids
+      .where((level) => level.quantity > 0)
+      .toList(growable: false);
   final totalAsk = displayedAsks.fold<int>(
     0,
     (sum, level) => sum + level.quantity,
@@ -1671,8 +1911,7 @@ GameOrderBookSnapshot buildGameOrderBookSnapshot({
     if (carriesPreviousBook)
       for (final level in [...previousSnapshot.asks, ...previousSnapshot.bids])
         level.price: level,
-    for (final level in [...displayedAsks, ...displayedBids])
-      level.price: level,
+    for (final level in [...asks, ...bids]) level.price: level,
   };
   return GameOrderBookSnapshot(
     asks: List.unmodifiable(displayedAsks),
@@ -1703,10 +1942,178 @@ GameOrderBookSnapshot buildGameOrderBookSnapshot({
         : 0,
     lastSyntheticTrade: carriesPreviousBook && elapsedMinutes == 0
         ? previousSnapshot.lastSyntheticTrade
+        : minuteTransition?.lastFillSide != null &&
+              minuteTransition?.lastFillPrice != null &&
+              (minuteTransition?.lastFillQuantity ?? 0) > 0
+        ? GameOrderBookSyntheticTrade(
+            marketMinute: minute,
+            liquidityPulse: safeLiquidityPulse,
+            levelSide: minuteTransition!.lastFillSide!,
+            price: minuteTransition.lastFillPrice!,
+            quantity: minuteTransition.lastFillQuantity,
+          )
         : null,
     syntheticTradeBudgetUsed: carriesPreviousBook && elapsedMinutes == 0
         ? previousSnapshot.syntheticTradeBudgetUsed
-        : 0,
+        : minuteTransition?.consumedUnits ?? 0,
+  );
+}
+
+double gameOrderBookQueueArrivalProximity(int ticksFromTouch) =>
+    (1 / (1 + math.max(0, ticksFromTouch) * 0.55)).clamp(0.12, 1.0).toDouble();
+
+class _GameOrderBookQueueArrivalProfile {
+  const _GameOrderBookQueueArrivalProfile({
+    required this.executionCapacity,
+    required this.turnoverEok,
+    required this.flowLoad,
+    required this.fastMarket,
+    required this.moveIntensity,
+    required this.institutionalSide,
+    required this.institutionalIntensity,
+    required this.pensionSide,
+    required this.pensionIntensity,
+  });
+
+  final int executionCapacity;
+  final double turnoverEok;
+  final double flowLoad;
+  final bool fastMarket;
+  final double moveIntensity;
+  final GameOrderBookSide institutionalSide;
+  final double institutionalIntensity;
+  final GameOrderBookSide pensionSide;
+  final double pensionIntensity;
+
+  int replenishmentFor(
+    GameOrderBookLevel level, {
+    required int ticksFromTouch,
+  }) {
+    if (executionCapacity <= 0 || turnoverEok <= 0 || level.quantity <= 0) {
+      return 0;
+    }
+
+    // The absolute trickle ceiling comes from the same turnover-derived minute
+    // capacity used by the tape and order engine. Queue arrivals are not prints,
+    // but a quiet stock still cannot rebuild every price as if it were active.
+    final activityMultiplier =
+        (0.82 + math.sqrt(flowLoad.clamp(0.20, 3.0)) * 0.18)
+            .clamp(0.84, 1.25)
+            .toDouble();
+    var targetShare = fastMarket ? 0.070 : 0.032;
+    var capacityShare = fastMarket ? 0.055 : 0.022;
+    if (fastMarket) {
+      targetShare += moveIntensity * 0.035;
+      capacityShare += moveIntensity * 0.025;
+    }
+    if (level.wasLiquidityPulseTouched) {
+      targetShare += fastMarket ? 0.018 : 0.010;
+      capacityShare += fastMarket ? 0.012 : 0.006;
+    }
+    if (level.side == institutionalSide) {
+      targetShare += institutionalIntensity * 0.045;
+      capacityShare += institutionalIntensity * 0.035;
+    }
+    if (level.side == pensionSide) {
+      targetShare += pensionIntensity * 0.035;
+      capacityShare += pensionIntensity * 0.025;
+    }
+
+    // Clamp the activity shares before applying distance. Clamping afterwards
+    // would erase most of the intended near/far attenuation at outer quotes.
+    targetShare = (targetShare * activityMultiplier).clamp(0.020, 0.180);
+    capacityShare = (capacityShare * activityMultiplier).clamp(0.012, 0.120);
+    final proximity = gameOrderBookQueueArrivalProximity(ticksFromTouch);
+    final targetBound = math.max(
+      1,
+      (level.quantity * targetShare * proximity).round(),
+    );
+    final turnoverBound = math.max(
+      1,
+      (executionCapacity * capacityShare * proximity).round(),
+    );
+    final trickle = math.min(targetBound, turnoverBound);
+
+    // A normal quote needs a usable starting queue after it is swept. Walls keep
+    // only the turnover-bounded trickle so a large level cannot reappear whole.
+    var ordinaryFlowMultiplier = activityMultiplier;
+    if (fastMarket) {
+      ordinaryFlowMultiplier *= 1 + moveIntensity * 0.22;
+    }
+    if (level.wasLiquidityPulseTouched) {
+      ordinaryFlowMultiplier *= 1.04;
+    }
+    if (level.side == institutionalSide) {
+      ordinaryFlowMultiplier *= 1 + institutionalIntensity * 0.18;
+    }
+    if (level.side == pensionSide) {
+      ordinaryFlowMultiplier *= 1 + pensionIntensity * 0.14;
+    }
+    final seedFloorShare = level.isWall ? 0.0 : 0.28;
+    final seedFloor =
+        (level.quantity *
+                seedFloorShare *
+                proximity *
+                ordinaryFlowMultiplier.clamp(0.75, 1.45))
+            .round();
+    return math.min(level.quantity, math.max(seedFloor, trickle));
+  }
+}
+
+_GameOrderBookQueueArrivalProfile _gameOrderBookQueueArrivalProfile({
+  required String seededAssetId,
+  required int day,
+  required int minute,
+  required double turnoverEok,
+  required int executionCapacity,
+  required int standingBaseDepth,
+  required bool fastMarket,
+  required double moveIntensity,
+}) {
+  double concentrated(double signedFlow, double threshold) =>
+      ((signedFlow.abs() - threshold) / (1 - threshold))
+          .clamp(0.0, 1.0)
+          .toDouble();
+
+  // Institution-like demand changes over several minutes; pension-like demand
+  // is rarer and slower. Both are independent of the price regime, so a calm
+  // stock can still receive a genuine one-sided liquidity wave.
+  final institutionalFlow =
+      _smoothOrderBookUnit(
+            seededAssetId,
+            day,
+            minute,
+            10037,
+            windowMinutes: 8,
+          ) *
+          2 -
+      1;
+  final pensionFlow =
+      _smoothOrderBookUnit(
+            seededAssetId,
+            day,
+            minute,
+            12011,
+            windowMinutes: 24,
+          ) *
+          2 -
+      1;
+  return _GameOrderBookQueueArrivalProfile(
+    executionCapacity: executionCapacity,
+    turnoverEok: turnoverEok,
+    flowLoad: standingBaseDepth <= 0
+        ? 1
+        : executionCapacity / standingBaseDepth,
+    fastMarket: fastMarket,
+    moveIntensity: moveIntensity.clamp(0.0, 1.0).toDouble(),
+    institutionalSide: institutionalFlow >= 0
+        ? GameOrderBookSide.bid
+        : GameOrderBookSide.ask,
+    institutionalIntensity: concentrated(institutionalFlow, 0.48),
+    pensionSide: pensionFlow >= 0
+        ? GameOrderBookSide.bid
+        : GameOrderBookSide.ask,
+    pensionIntensity: concentrated(pensionFlow, 0.62),
   );
 }
 
@@ -1717,6 +2124,13 @@ class _GameOrderBookCarryContext {
     required this.fastMarket,
     required int liquidityPulse,
     required bool adaptiveLiquidityPulses,
+    required String seededAssetId,
+    required int day,
+    required int minute,
+    required double turnoverEok,
+    required int executionCapacity,
+    required int standingBaseDepth,
+    required double moveIntensity,
   }) : previousByPrice = <double, GameOrderBookLevel>{
          ...previousSnapshot.rememberedLevels,
          for (final level in [
@@ -1728,9 +2142,22 @@ class _GameOrderBookCarryContext {
        pulseAdvanced =
            adaptiveLiquidityPulses &&
            liquidityPulse > previousSnapshot.liquidityPulse,
+       minuteAdvanced = elapsedMinutes > 0,
        noNewAdaptivePulse =
            adaptiveLiquidityPulses &&
            liquidityPulse <= previousSnapshot.liquidityPulse,
+       latestSyntheticTrade = previousSnapshot.lastSyntheticTrade,
+       currentLiquidityPulse = liquidityPulse,
+       queueArrivalProfile = _gameOrderBookQueueArrivalProfile(
+         seededAssetId: seededAssetId,
+         day: day,
+         minute: minute,
+         turnoverEok: turnoverEok,
+         executionCapacity: executionCapacity,
+         standingBaseDepth: standingBaseDepth,
+         fastMarket: fastMarket,
+         moveIntensity: moveIntensity,
+       ),
        effectiveLimit =
            adaptiveLiquidityPulses &&
                liquidityPulse > previousSnapshot.liquidityPulse
@@ -1748,42 +2175,183 @@ class _GameOrderBookCarryContext {
   final Map<double, GameOrderBookLevel> previousByPrice;
   final bool fastMarket;
   final bool pulseAdvanced;
+  final bool minuteAdvanced;
   final bool noNewAdaptivePulse;
+  final GameOrderBookSyntheticTrade? latestSyntheticTrade;
+  final int currentLiquidityPulse;
+  final _GameOrderBookQueueArrivalProfile queueArrivalProfile;
   final double effectiveLimit;
 
-  int _carriedQuantity(GameOrderBookLevel level, GameOrderBookLevel previous) {
+  bool _isImmediateLatestDepletion(GameOrderBookLevel level) {
+    final trade = latestSyntheticTrade;
+    return trade != null &&
+        !minuteAdvanced &&
+        currentLiquidityPulse == trade.liquidityPulse + 1 &&
+        trade.levelSide == level.side &&
+        (trade.price - level.price).abs() < 0.000001;
+  }
+
+  ({int quantity, int queueRecoveryTargetQuantity}) _carriedQueue(
+    GameOrderBookLevel level,
+    GameOrderBookLevel previous, {
+    required int ticksFromTouch,
+  }) {
+    final previousRecoveryTarget = math.max(
+      0,
+      previous.queueRecoveryTargetQuantity,
+    );
+    if (previous.quantity <= 0) {
+      if (level.quantity <= 0) {
+        return (
+          quantity: 0,
+          queueRecoveryTargetQuantity: previousRecoveryTarget,
+        );
+      }
+      if ((!pulseAdvanced && !minuteAdvanced) ||
+          _isImmediateLatestDepletion(level)) {
+        return (
+          quantity: 0,
+          queueRecoveryTargetQuantity: previousRecoveryTarget,
+        );
+      }
+      final isStructuralVacuum =
+          level.isStructuralBreached ||
+          level.structuralVacuumMultiplier < 0.999999;
+      // A just-breached wall leaves a real gap around the touch. Once price is
+      // at least two rows away, only a heavily suppressed ordinary queue may
+      // enter; the structural-wall flag itself never returns.
+      if (isStructuralVacuum && ticksFromTouch < 2) {
+        return (quantity: 0, queueRecoveryTargetQuantity: 0);
+      }
+      var arrival = queueArrivalProfile.replenishmentFor(
+        level,
+        ticksFromTouch: ticksFromTouch,
+      );
+      if (isStructuralVacuum && arrival > 0) {
+        arrival = math.max(1, (arrival * 0.20).round());
+      }
+      final quantity = math.min(level.quantity, arrival);
+      final recoveryTarget = math.max(previousRecoveryTarget, level.quantity);
+      return (
+        quantity: quantity,
+        queueRecoveryTargetQuantity:
+            isStructuralVacuum || quantity >= recoveryTarget
+            ? 0
+            : recoveryTarget,
+      );
+    }
     if (level.isStructuralBreached ||
         level.structuralVacuumMultiplier < 0.999999) {
-      return math.min(previous.quantity, level.quantity);
-    }
-    if (previous.quantity <= 0) {
-      if (!pulseAdvanced || !level.wasLiquidityPulseTouched) return 0;
-      final replenished = math.max(
-        1,
-        (level.quantity * (fastMarket ? 0.12 : 0.06)).round(),
+      return (
+        quantity: math.min(previous.quantity, level.quantity),
+        queueRecoveryTargetQuantity: 0,
       );
-      return math.min(level.quantity, replenished);
     }
-    if (noNewAdaptivePulse ||
-        (pulseAdvanced && !level.wasLiquidityPulseTouched)) {
-      return previous.quantity;
+    if (noNewAdaptivePulse) {
+      return (
+        quantity: previous.quantity,
+        queueRecoveryTargetQuantity: previousRecoveryTarget,
+      );
     }
-    final adjustment = (previous.quantity * effectiveLimit).floor();
-    return level.quantity
+    final isRecoveringOrdinaryQueue =
+        previousRecoveryTarget > previous.quantity && !level.isWall;
+    if (pulseAdvanced &&
+        !minuteAdvanced &&
+        !level.wasLiquidityPulseTouched &&
+        !isRecoveringOrdinaryQueue) {
+      return (
+        quantity: previous.quantity,
+        queueRecoveryTargetQuantity: previousRecoveryTarget,
+      );
+    }
+
+    // Close every price to its deterministic path at a minute boundary. Within
+    // the minute, near-touch rows move more visibly while outer rows stay calm.
+    final proximity = gameOrderBookQueueArrivalProximity(ticksFromTouch);
+    final adjustment = (previous.quantity * effectiveLimit * proximity).floor();
+    var quantity = level.quantity
         .clamp(
           math.max(1, previous.quantity - adjustment),
           previous.quantity + adjustment,
         )
         .toInt();
+    if (isRecoveringOrdinaryQueue && level.quantity > previous.quantity) {
+      final arrival = queueArrivalProfile.replenishmentFor(
+        level,
+        ticksFromTouch: ticksFromTouch,
+      );
+      quantity = math.min(
+        level.quantity,
+        math.max(quantity, previous.quantity + arrival),
+      );
+    }
+    final recoveryGoal = math.min(previousRecoveryTarget, level.quantity);
+    return (
+      quantity: quantity,
+      queueRecoveryTargetQuantity: recoveryGoal <= 0 || quantity >= recoveryGoal
+          ? 0
+          : previousRecoveryTarget,
+    );
   }
 
-  GameOrderBookLevel carry(GameOrderBookLevel level) {
+  GameOrderBookLevel carry(
+    GameOrderBookLevel level, {
+    required int ticksFromTouch,
+  }) {
     final previous = previousByPrice[level.price];
-    if (previous == null) return level;
+    if (previous == null || previous.side != level.side) {
+      final isStructuralVacuum =
+          level.isStructuralBreached ||
+          level.structuralVacuumMultiplier < 0.999999;
+      if (!isStructuralVacuum) return level;
+      if (ticksFromTouch >= gameOrderBookLevelCount) {
+        // Reserve-only rows must not drain remembered depth or force the raw
+        // builder to scan the whole daily range. The gate is applied once the
+        // price can enter the operational 10-row side.
+        return level;
+      }
+
+      // Never inherit the old opposite-side queue when price crosses it, but
+      // still enforce the breached-zone gap before admitting a new-side queue.
+      var quantity = 0;
+      if (ticksFromTouch >= 2) {
+        final arrival = queueArrivalProfile.replenishmentFor(
+          level,
+          ticksFromTouch: ticksFromTouch,
+        );
+        if (arrival > 0) {
+          quantity = math.min(
+            level.quantity,
+            math.max(1, (arrival * 0.20).round()),
+          );
+        }
+      }
+      return GameOrderBookLevel(
+        side: level.side,
+        price: level.price,
+        quantity: quantity,
+        isWall: false,
+        structuralKind: level.structuralKind,
+        structuralStrength: level.structuralStrength,
+        structuralHoldTicks: level.structuralHoldTicks,
+        isStructuralWall: level.isStructuralWall,
+        isStructuralBreached: level.isStructuralBreached,
+        structuralVacuumMultiplier: level.structuralVacuumMultiplier,
+        isPsychological: level.isPsychological,
+        technicalPeriods: level.technicalPeriods,
+        wasLiquidityPulseTouched: level.wasLiquidityPulseTouched,
+        queueRecoveryTargetQuantity: 0,
+      );
+    }
+    final carried = _carriedQueue(
+      level,
+      previous,
+      ticksFromTouch: ticksFromTouch,
+    );
     return GameOrderBookLevel(
       side: level.side,
       price: level.price,
-      quantity: _carriedQuantity(level, previous),
+      quantity: carried.quantity,
       isWall:
           (level.isStructuralBreached ||
               level.structuralVacuumMultiplier < 0.999999)
@@ -1800,6 +2368,7 @@ class _GameOrderBookCarryContext {
       isPsychological: level.isPsychological,
       technicalPeriods: level.technicalPeriods,
       wasLiquidityPulseTouched: level.wasLiquidityPulseTouched,
+      queueRecoveryTargetQuantity: carried.queueRecoveryTargetQuantity,
     );
   }
 }
@@ -1820,8 +2389,12 @@ GameOrderBookLevel _buildLevel({
   required MarketStructuralLiquidityMap structuralLiquidity,
   required int liquidityPulse,
   required bool adaptiveLiquidityPulses,
+  required int ticksFromTouch,
+  required double fullDayTurnoverEok,
 }) {
   final ladderIndex = _marketPriceLadderIndex(price, market: market);
+  final safeTicksFromTouch = math.max(0, ticksFromTouch);
+  final proximityDecay = gameOrderBookQueueArrivalProximity(safeTicksFromTouch);
   final structuralZone = structuralLiquidity.zoneAtPrice(price);
   final isStructuralBreached =
       structuralZone != null &&
@@ -1856,9 +2429,9 @@ GameOrderBookLevel _buildLevel({
       );
   // 가격별 기준 잔량은 하루 동안 유지하고, 주문 유입·취소는 완만한
   // 보간값만 더한다. 화면 행 번호나 매분 독립 난수에 수량을 묶지 않는다.
-  // Standing liquidity belongs to an absolute price, not to its current row
-  // or side of the spread. When a price crosses the center, carry its baseline
-  // depth and wall identity forward instead of drawing a brand-new book.
+  // Standing orders belong to an absolute price and one side of the spread.
+  // Row movement may preserve the same-side queue, but an ask must never turn
+  // into a bid (or vice versa) merely because the last trade crossed it.
   final priceSalt = ladderIndex * 131 + 1301;
   final stableVariation = 0.76 + _orderBookUnit(assetId, day, priceSalt) * 0.48;
   final temporalVariation =
@@ -1923,6 +2496,9 @@ GameOrderBookLevel _buildLevel({
     if (regime.consumes(side)) {
       // 상승 때는 매도호가, 하락 때는 매수호가가 먼저 소진된다.
       // 벽은 일반 잔량보다 버티지만 강한 국면에서는 빠르게 얇아질 수 있다.
+      // 이 감소는 접근한 대기 주문의 취소·정정까지 포함한 목표 큐 변화다.
+      // 합성 체결이나 원장 watermark를 만들지 않으므로 체결 테이프와
+      // 체결강도에는 절대 더하지 않는다.
       final wallResistance = isWall ? 0.82 : 1.0;
       final ordinaryDepletion =
           regime.intensity * proximity * wallResistance * (0.28 + wave * 0.70);
@@ -1947,11 +2523,7 @@ GameOrderBookLevel _buildLevel({
       regimeMultiplier = 1 + replenishment;
     }
   }
-  return GameOrderBookLevel(
-    side: side,
-    price: price,
-    quantity: math.max(
-      1,
+  final rawQuantity =
       (baseDepth *
               stableVariation *
               temporalVariation *
@@ -1959,8 +2531,35 @@ GameOrderBookLevel _buildLevel({
               pulseMultiplier *
               structuralVacuum *
               regimeMultiplier)
-          .round(),
-    ),
+          .round();
+  final sparseFullDay =
+      fullDayTurnoverEok > 0 &&
+      fullDayTurnoverEok < gameOrderBookSparseFullDayTurnoverEok;
+  final severelySparse =
+      sparseFullDay &&
+      fullDayTurnoverEok < gameOrderBookSeverelySparseFullDayTurnoverEok;
+  final protectsNearTouch = !severelySparse && safeTicksFromTouch < 2;
+  final mayBeIntentionallyEmpty =
+      sparseFullDay && !protectsNearTouch && !isWall && structuralZone == null;
+  final scarcity = sparseFullDay
+      ? ((gameOrderBookSparseFullDayTurnoverEok - fullDayTurnoverEok) /
+                gameOrderBookSparseFullDayTurnoverEok)
+            .clamp(0.0, 1.0)
+            .toDouble()
+      : 0.0;
+  final emptyProbability = !mayBeIntentionallyEmpty
+      ? 0.0
+      : severelySparse && safeTicksFromTouch == 0
+      ? 0.03 * scarcity
+      : (0.35 * (1 - proximityDecay) * (0.65 + scarcity * 0.35))
+            .clamp(0.0, 0.45)
+            .toDouble();
+  final emptyDraw = _orderBookUnit(assetId, day, priceSalt + 8837);
+  final isIntentionallyEmpty = emptyDraw < emptyProbability;
+  return GameOrderBookLevel(
+    side: side,
+    price: price,
+    quantity: isIntentionallyEmpty ? 0 : math.max(1, rawQuantity),
     isWall: isWall,
     structuralKind: structuralZone?.kind,
     structuralStrength: structuralZone?.strength ?? 1,
@@ -2025,8 +2624,12 @@ int _gameOrderBookStandingBaseDepth({
       _smoothOrderBookUnit(assetId, day, minute, 7213, windowMinutes: 24) *
           0.12;
   final averageMinuteUnits =
-      fullDayUnits / math.max(1, _gameOrderBookRegularSessionMinutes);
-  final raw = averageMinuteUnits * 1.45 * dailyDepthFactor * sessionFlow;
+      fullDayUnits / math.max(1, _gameOrderBookFullSessionMinutes);
+  final raw =
+      averageMinuteUnits *
+      gameOrderBookStandingDepthMinutes *
+      dailyDepthFactor *
+      sessionFlow;
   if (!raw.isFinite || raw <= 0) return 20;
   return raw.round().clamp(20, 0x7fffffff).toInt();
 }

@@ -180,7 +180,7 @@ test("documents and preserves the portrait-mobile product contract", async () =>
   assert.match(rules, /390×844px/);
   assert.match(rules, /최소 360px/);
   assert.match(guide, /처음하기.*이어하기/);
-  assert.match(guide, /현재 상태 스키마는 `v18`/);
+  assert.match(guide, /현재 상태 스키마는 `v20`/);
   assert.match(guide, /최대 5슬롯/);
   assert.doesNotMatch(rules, /게임 화면보다 먼저 회사 이름/);
   assert.doesNotMatch(guide, /첫 방문 시 회사 이름 입력 화면/);
@@ -188,7 +188,7 @@ test("documents and preserves the portrait-mobile product contract", async () =>
   assert.match(css, /env\(safe-area-inset-bottom\)/);
   assert.match(css, /width: min\(100%, 430px\)/);
   assert.match(css, /\.asset-grid \{[\s\S]*?grid-template-columns: 1fr;/);
-  assert.match(state, /schemaVersion = 18/);
+  assert.match(state, /schemaVersion = 20/);
   assert.match(state, /simulationSeed/);
   assert.match(market, /daily-market-report-card/);
   assert.match(market, /purchase-market-report-button/);
@@ -229,7 +229,7 @@ test("uses the deterministic local news combinator without a remote API", async 
   assert.match(main, /NewsCombinator\(\)/);
 });
 
-test("tracks mobile browser chrome while keeping the Flutter host fixed for the keyboard", async () => {
+test("tracks mobile browser chrome and provides an exact desktop phone preview", async () => {
   const [flutterTemplate, flutterBootstrap] = await Promise.all([
     readFile(new URL("../flutter_app/web/index.html", import.meta.url), "utf8"),
     readFile(new URL("../flutter_app/web/flutter_bootstrap.js", import.meta.url), "utf8"),
@@ -241,6 +241,14 @@ test("tracks mobile browser chrome while keeping the Flutter host fixed for the 
   assert.ok(script, "mobile viewport lock should be present");
   assert.match(flutterTemplate, /id="flutter_host"/);
   assert.match(flutterTemplate, /position:\s*fixed/);
+  assert.match(flutterTemplate, /width:\s*390px/);
+  assert.match(flutterTemplate, /height:\s*844px/);
+  assert.match(flutterTemplate, /--desktop-preview-scale/);
+  assert.match(flutterTemplate, /@media \(hover: hover\)/);
+  assert.doesNotMatch(
+    flutterTemplate,
+    /@media \(min-width:\s*700px\) and \(hover:\s*hover\)/,
+  );
   assert.match(
     flutterBootstrap,
     /hostElement:\s*document\.getElementById\('flutter_host'\)/,
@@ -249,6 +257,8 @@ test("tracks mobile browser chrome while keeping the Flutter host fixed for the 
   const cssProperties = new Map();
   const viewportListeners = new Map();
   const windowListeners = new Map();
+  const mediaListeners = new Map();
+  let desktopPreviewQuery;
   const host = { style: {} };
   const body = { scrollTop: 24 };
   const root = {
@@ -265,13 +275,24 @@ test("tracks mobile browser chrome while keeping the Flutter host fixed for the 
       viewportListeners.set(type, listener);
     },
   };
+  const desktopPreviewMedia = {
+    matches: false,
+    addEventListener(type, listener) {
+      mediaListeners.set(type, listener);
+    },
+  };
   const fakeWindow = {
+    innerWidth: 390,
     innerHeight: 1024,
     visualViewport: viewport,
     scrollX: 0,
     scrollY: 24,
     addEventListener(type, listener) {
       windowListeners.set(type, listener);
+    },
+    matchMedia(query) {
+      desktopPreviewQuery = query;
+      return desktopPreviewMedia;
     },
     requestAnimationFrame(callback) {
       callback();
@@ -295,6 +316,7 @@ test("tracks mobile browser chrome while keeping the Flutter host fixed for the 
 
   vm.runInNewContext(script, { document, window: fakeWindow });
   assert.equal(cssProperties.get("--app-height"), "860px");
+  assert.equal(desktopPreviewQuery, "(hover: hover)");
   assert.equal(host.style.height, "860px");
 
   fakeWindow.innerHeight = 940;
@@ -322,4 +344,54 @@ test("tracks mobile browser chrome while keeping the Flutter host fixed for the 
   viewportListeners.get("scroll")();
   assert.equal(fakeWindow.scrollY, 0);
   assert.equal(body.scrollTop, 0);
+
+  desktopPreviewMedia.matches = true;
+  fakeWindow.innerWidth = 640;
+  fakeWindow.innerHeight = 1000;
+  mediaListeners.get("change")();
+  assert.equal(cssProperties.get("--app-height"), "844px");
+  assert.equal(cssProperties.get("--desktop-preview-scale"), "1.0000");
+  assert.equal(host.style.height, "844px");
+
+  fakeWindow.innerWidth = 380;
+  windowListeners.get("resize")();
+  assert.equal(cssProperties.get("--desktop-preview-scale"), "0.8488");
+  assert.equal(host.style.height, "844px");
+
+  fakeWindow.innerWidth = 1440;
+  fakeWindow.innerHeight = 700;
+  windowListeners.get("resize")();
+  assert.equal(cssProperties.get("--desktop-preview-scale"), "0.7731");
+  assert.equal(host.style.height, "844px");
+
+  fakeWindow.innerHeight = 400;
+  windowListeners.get("resize")();
+  assert.equal(cssProperties.get("--desktop-preview-scale"), "0.4259");
+  assert.ok(
+    864 * Number(cssProperties.get("--desktop-preview-scale")) <= 368.1,
+    "the complete desktop frame should fit inside the viewport margin",
+  );
+
+  desktopPreviewMedia.matches = false;
+  fakeWindow.innerWidth = 390;
+  fakeWindow.innerHeight = 600;
+  viewport.height = 600;
+  mediaListeners.get("change")();
+  assert.equal(cssProperties.get("--desktop-preview-scale"), "1");
+  assert.equal(cssProperties.get("--app-height"), "600px");
+  assert.equal(host.style.height, "600px");
+});
+
+test("offers a disposable stock-only test entry", async () => {
+  const [shortcut, main] = await Promise.all([
+    readFile(new URL("../flutter_app/web/stock-test.html", import.meta.url), "utf8"),
+    readFile(new URL("../flutter_app/lib/main.dart", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(shortcut, /index\.html\?stockTest=1/);
+  assert.match(main, /Uri\.base\.queryParameters\['stockTest'\] == '1'/);
+  assert.match(main, /key: const Key\('stock-test-market-screen'\)/);
+  assert.match(main, /initialCash: 1000000/);
+  assert.match(main, /worldSeed: 'stock-market-test-v1'/);
+  assert.match(main, /if \(widget\.stockTestMode\) return;/);
 });

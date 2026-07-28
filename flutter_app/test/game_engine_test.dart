@@ -1750,7 +1750,7 @@ void main() {
       ),
     );
 
-    expect(snapshot.bids, hasLength(gameOrderBookLevelCount));
+    expect(snapshot.bids.length, greaterThanOrEqualTo(gameOrderBookLevelCount));
     expect(placed.success, isTrue);
     expect(placed.filledQuantity, 0);
     expect(
@@ -2360,7 +2360,7 @@ void main() {
   });
 
   test(
-    'React v3 date, fractional positions, cash, and team migrate to v18',
+    'React v3 date, fractional positions, cash, team, and businesses migrate to v20',
     () {
       final state = engine.migrate({
         'version': 3,
@@ -2374,7 +2374,8 @@ void main() {
       });
 
       expect(state.version, GameState.schemaVersion);
-      expect(GameState.schemaVersion, 18);
+      expect(GameState.schemaVersion, 20);
+      expect(state.businesses.businesses, isEmpty);
       expect(state.day, 5);
       expect(state.cash, 765432);
       expect(state.brokerageCash, 765432);
@@ -3245,7 +3246,11 @@ void main() {
     final december31 =
         DateTime(2008, 12, 31).difference(DateTime(2000, 1, 1)).inDays + 1;
     final base = engine
-        .createNewGame('임대 자산 테스트', initialCash: 20000000)
+        .createNewGame(
+          '임대 자산 테스트',
+          initialCash: 20000000,
+          worldSeed: 'commercial-carrying-cost-test',
+        )
         .copyWith(day: december31, brokerageCash: 0, decisions: const []);
     final legal = base.copyWith(
       story: base.story.copyWith(

@@ -7,6 +7,10 @@ import 'package:flutter/material.dart';
 
 import 'game/news_combinator.dart';
 import 'game/banking_state.dart';
+import 'game/business_districts.dart';
+import 'game/business_engine.dart';
+import 'game/business_simulation.dart';
+import 'game/business_state.dart';
 import 'game/game_engine.dart';
 import 'game/game_persistence.dart';
 import 'game/game_state.dart';
@@ -31,12 +35,14 @@ import 'game/seed_money_content.dart';
 import 'game/star_shop.dart';
 import 'game/story_state.dart';
 import 'game/world_bootstrapper.dart';
+import 'game/world_economy.dart';
 
 export 'game/world_bootstrapper.dart'
     show CampaignWorldPreparer, WorldLoadProgress, WorldLoadProgressCallback;
 
 part 'organization_screen.dart';
 part 'apartment_hub_screens.dart';
+part 'business_management_screen.dart';
 part 'bank_screen.dart';
 part 'rider_mini_game.dart';
 part 'save_menu_screens.dart';
@@ -70,7 +76,11 @@ Route<T> _gameSceneRoute<T>(Widget page) => PageRouteBuilder<T>(
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const MillenniumCapitalApp());
+  runApp(
+    MillenniumCapitalApp(
+      stockTestMode: Uri.base.queryParameters['stockTest'] == '1',
+    ),
+  );
 }
 
 GameState _firstPlayableMarketState(GameState state) {
@@ -91,10 +101,12 @@ class MillenniumCapitalApp extends StatefulWidget {
     super.key,
     this.persistence,
     this.campaignWorldPreparer,
+    this.stockTestMode = false,
   });
 
   final GamePersistence? persistence;
   final CampaignWorldPreparer? campaignWorldPreparer;
+  final bool stockTestMode;
 
   @override
   State<MillenniumCapitalApp> createState() => _MillenniumCapitalAppState();
@@ -102,6 +114,7 @@ class MillenniumCapitalApp extends StatefulWidget {
 
 class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
   static const _engine = GameEngine();
+  static const _businessEngine = LocalBusinessEngine();
   final _scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
   final _navigatorKey = GlobalKey<NavigatorState>();
   late final GamePersistence _persistence;
@@ -130,6 +143,18 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
   void initState() {
     super.initState();
     _persistence = widget.persistence ?? GamePersistence();
+    if (widget.stockTestMode) {
+      _state = _firstPlayableMarketState(
+        _engine.createNewGame(
+          '주식시장 테스트',
+          initialCash: 1000000,
+          worldSeed: 'stock-market-test-v1',
+        ),
+      ).copyWith(marketMinute: krxOpenMinute);
+      _view = _AppView.game;
+      _isReady = true;
+      return;
+    }
     _restoreGame();
   }
 
@@ -659,6 +684,66 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     return next;
   }
 
+  Future<FinanceActionResult> _persistBusinessAction(
+    BusinessActionResult action,
+  ) async {
+    final result = FinanceActionResult(
+      state: action.state,
+      success: action.success,
+      message: action.message,
+      cashDelta: action.cashDelta,
+    );
+    if (!action.success) return result;
+    await _persistence.save(action.state);
+    if (mounted) setState(() => _state = action.state);
+    return result;
+  }
+
+  Future<FinanceActionResult> _acquireBusiness({
+    required String listingId,
+    required String businessName,
+    required String locationId,
+    required BusinessPremiseMode premiseMode,
+    String? linkedRealEstateId,
+    required BusinessOperatingPolicy policy,
+  }) {
+    final action = _businessEngine.openOrAcquire(
+      _state!,
+      BusinessLaunchRequest(
+        listingId: listingId,
+        businessName: businessName,
+        locationId: locationId,
+        premiseMode: premiseMode,
+        linkedRealEstateId: linkedRealEstateId,
+        policy: policy,
+      ),
+    );
+    return _persistBusinessAction(action);
+  }
+
+  Future<FinanceActionResult> _updateBusinessPolicy(
+    String businessId,
+    BusinessOperatingPolicy policy,
+  ) => _persistBusinessAction(
+    _businessEngine.updatePolicy(_state!, businessId, policy),
+  );
+
+  Future<FinanceActionResult> _investInBusiness(
+    String businessId,
+    BusinessInvestmentKind kind,
+  ) =>
+      _persistBusinessAction(_businessEngine.invest(_state!, businessId, kind));
+
+  Future<FinanceActionResult> _closeBusiness(String businessId) =>
+      _persistBusinessAction(_businessEngine.closeOrSell(_state!, businessId));
+
+  Future<FinanceActionResult> _chooseBusinessEvent(
+    String eventId,
+    String choiceId,
+  ) => _persistBusinessAction(
+    _businessEngine.chooseEvent(_state!, eventId, choiceId),
+  );
+
   Future<FinanceActionResult> _purchaseSpendingOption(String optionId) async {
     final result = _engine.purchaseSpendingOption(_state!, optionId);
     if (!result.success) return result;
@@ -845,7 +930,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
   Future<FinanceActionResult> _purchaseDailyMarketReport() async {
     final result = _engine.purchaseDailyMarketReport(_state!);
     if (!result.success) return result;
-    await _persistence.save(result.state);
+    await _persistMarketState(result.state);
     if (mounted) setState(() => _state = result.state);
     return result;
   }
@@ -858,7 +943,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
 
   Future<GameState> _completeMarketTutorial() async {
     final next = _engine.markMarketTutorialSeen(_state!);
-    await _persistence.save(next);
+    await _persistMarketState(next);
     if (mounted) setState(() => _state = next);
     return next;
   }
@@ -927,6 +1012,11 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     return paths;
   }
 
+  Future<void> _persistMarketState(GameState state) async {
+    if (widget.stockTestMode) return;
+    await _persistence.save(state);
+  }
+
   Future<GameState> _setMarketMinute(int minute) async {
     final current = _state!;
     final target = minute.clamp(marketDayStartMinute, marketDayEndMinute);
@@ -945,10 +1035,11 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
         next.day != lastSavedDay ||
         next.marketMinute - lastSavedMinute >= 30;
     final shouldPersist =
-        explicitSync ||
-        orderStateChanged ||
-        periodicCheckpoint ||
-        target >= krxCloseMinute;
+        !widget.stockTestMode &&
+        (explicitSync ||
+            orderStateChanged ||
+            periodicCheckpoint ||
+            target >= krxCloseMinute);
     if (shouldPersist) {
       await _persistence.save(next);
       _lastDurablySavedMarketDay = next.day;
@@ -1006,7 +1097,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     final next = current.copyWith(
       story: current.story.copyWith(storyFlags: flags),
     );
-    await _persistence.save(next);
+    await _persistMarketState(next);
     if (mounted) setState(() => _state = next);
     return next;
   }
@@ -1023,7 +1114,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
         },
       ),
     );
-    await _persistence.save(next);
+    await _persistMarketState(next);
     if (mounted) {
       setState(() => _state = next);
     }
@@ -1074,7 +1165,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     }
     final result = _engine.executeTrade(current, order);
     if (!result.success) return result;
-    await _persistence.save(result.state);
+    await _persistMarketState(result.state);
     if (mounted) setState(() => _state = result.state);
     return result;
   }
@@ -1082,7 +1173,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
   Future<FinanceActionResult> _cancelPendingOrder(String orderId) async {
     final result = _engine.cancelPendingOrder(_state!, orderId);
     if (!result.success) return result;
-    await _persistence.save(result.state);
+    await _persistMarketState(result.state);
     if (mounted) setState(() => _state = result.state);
     return result;
   }
@@ -1097,9 +1188,26 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
       deposit: deposit,
     );
     if (!result.success) return result;
-    await _persistence.save(result.state);
+    await _persistMarketState(result.state);
     if (mounted) setState(() => _state = result.state);
     return result;
+  }
+
+  Widget _buildStockTestHome() {
+    return _GameFrame(
+      child: StockMarketScreen(
+        key: const Key('stock-test-market-screen'),
+        state: _state!,
+        onSetMarketMinute: _setMarketMinute,
+        onSaveMarketNotebook: _saveMarketNotebook,
+        onSetRightsIssuePreference: _setMarketRightsIssuePreference,
+        onPurchaseReport: _purchaseDailyMarketReport,
+        onExecuteTrade: _executeTrade,
+        onCancelPendingOrder: _cancelPendingOrder,
+        onTransferCash: _transferBrokerageCash,
+        orderBookSessionCache: _stockOrderBookSessionCache,
+      ),
+    );
   }
 
   @override
@@ -1136,7 +1244,9 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
           ),
         ),
       ),
-      home: !_isReady
+      home: widget.stockTestMode && _state != null
+          ? _buildStockTestHome()
+          : !_isReady
           ? _GameFrame(
               child: _LoadingScreen(
                 progress: _worldLoadProgress,
@@ -1169,6 +1279,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
                 ),
                 _AppView.game when _state != null => OfficeScreen(
                   state: _state!,
+                  stateReader: () => _state!,
                   engine: _engine,
                   stockOrderBookSessionCache: _stockOrderBookSessionCache,
                   activeSaveSlot: _activeSlot,
@@ -1189,6 +1300,11 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
                   onHireEmployee: _hireEmployee,
                   onLaunchFund: _launchFund,
                   onPurchaseSpendingOption: _purchaseSpendingOption,
+                  onAcquireBusiness: _acquireBusiness,
+                  onUpdateBusinessPolicy: _updateBusinessPolicy,
+                  onInvestInBusiness: _investInBusiness,
+                  onCloseBusiness: _closeBusiness,
+                  onChooseBusinessEvent: _chooseBusinessEvent,
                   onSellRealEstate: _sellRealEstate,
                   onConfigureRealEstateLease: _configureRealEstateLease,
                   onCancelRealEstateSaleListing: _cancelRealEstateSaleListing,
@@ -1958,6 +2074,7 @@ class OfficeScreen extends StatelessWidget {
   const OfficeScreen({
     super.key,
     required this.state,
+    this.stateReader,
     required this.engine,
     this.stockOrderBookSessionCache,
     required this.activeSaveSlot,
@@ -1977,6 +2094,11 @@ class OfficeScreen extends StatelessWidget {
     this.onHireEmployee,
     this.onLaunchFund,
     this.onPurchaseSpendingOption,
+    this.onAcquireBusiness,
+    this.onUpdateBusinessPolicy,
+    this.onInvestInBusiness,
+    this.onCloseBusiness,
+    this.onChooseBusinessEvent,
     this.onSellRealEstate,
     this.onConfigureRealEstateLease,
     this.onCancelRealEstateSaleListing,
@@ -2004,6 +2126,7 @@ class OfficeScreen extends StatelessWidget {
   });
 
   final GameState state;
+  final ValueGetter<GameState>? stateReader;
   final GameEngine engine;
   final StockOrderBookSessionCache? stockOrderBookSessionCache;
   final int activeSaveSlot;
@@ -2027,6 +2150,11 @@ class OfficeScreen extends StatelessWidget {
   final Future<GameState> Function()? onLaunchFund;
   final Future<FinanceActionResult> Function(String optionId)?
   onPurchaseSpendingOption;
+  final BusinessAcquireCallback? onAcquireBusiness;
+  final BusinessPolicyUpdateCallback? onUpdateBusinessPolicy;
+  final BusinessInvestmentCallback? onInvestInBusiness;
+  final BusinessCloseCallback? onCloseBusiness;
+  final BusinessEventChoiceCallback? onChooseBusinessEvent;
   final Future<FinanceActionResult> Function(String assetId)? onSellRealEstate;
   final Future<FinanceActionResult> Function(
     String assetId,
@@ -2071,11 +2199,16 @@ class OfficeScreen extends StatelessWidget {
   final Future<FinanceActionResult> Function(int amount, bool deposit)?
   onTransferBrokerageCash;
 
-  void _openStockMarket(BuildContext context) {
-    Navigator.of(context).push<void>(
+  GameState get _latestState => stateReader?.call() ?? state;
+
+  Future<void> _openStockMarket(
+    BuildContext context,
+    GameState currentState,
+  ) async {
+    await Navigator.of(context).push<void>(
       _gameSceneRoute<void>(
         StockMarketScreen(
-          state: state,
+          state: currentState,
           onSetMarketMinute: onSetMarketMinute,
           onSaveMarketNotebook: onSaveMarketNotebook,
           onSetRightsIssuePreference: onSetMarketRightsIssuePreference,
@@ -2090,30 +2223,33 @@ class OfficeScreen extends StatelessWidget {
     );
   }
 
-  void _openRealEstateMarket(BuildContext context) {
-    Navigator.of(context).push<void>(
+  Future<void> _openRealEstateMarket(
+    BuildContext context,
+    GameState currentState,
+  ) async {
+    await Navigator.of(context).push<void>(
       _gameSceneRoute<void>(
         AssetSpendingScreen(
-          state: state,
+          state: currentState,
           realEstateOnly: true,
           onPurchase:
               onPurchaseSpendingOption ??
               (optionId) async => FinanceActionResult(
-                state: state,
+                state: currentState,
                 success: false,
                 message: '이 화면에서는 저장 기능을 사용할 수 없습니다.',
               ),
           onSellRealEstate:
               onSellRealEstate ??
               (assetId) async => FinanceActionResult(
-                state: state,
+                state: currentState,
                 success: false,
                 message: '이 화면에서는 저장 기능을 사용할 수 없습니다.',
               ),
           onConfigureLease:
               onConfigureRealEstateLease ??
               (assetId, leaseType) async => FinanceActionResult(
-                state: state,
+                state: currentState,
                 success: false,
                 message: '이 화면에서는 저장 기능을 사용할 수 없습니다.',
               ),
@@ -2128,7 +2264,7 @@ class OfficeScreen extends StatelessWidget {
           onPlayChanceGame:
               onPlayChanceGame ??
               (stake) async => FinanceActionResult(
-                state: state,
+                state: currentState,
                 success: false,
                 message: '이 화면에서는 저장 기능을 사용할 수 없습니다.',
               ),
@@ -2164,21 +2300,111 @@ class OfficeScreen extends StatelessWidget {
     );
   }
 
+  Future<GameState> _openBusinessMarket(
+    BuildContext context, {
+    required GameState currentState,
+    String? initialLinkedRealEstateId,
+  }) async {
+    var latestState = currentState;
+    FinanceActionResult unavailableResult() => FinanceActionResult(
+      state: latestState,
+      success: false,
+      message: '이 화면에서는 사업 거래를 저장할 수 없습니다.',
+    );
+
+    await Navigator.of(context).push<void>(
+      _gameSceneRoute<void>(
+        BusinessManagementScreen(
+          state: latestState,
+          initialLinkedRealEstateId: initialLinkedRealEstateId,
+          onAcquire:
+              ({
+                required listingId,
+                required businessName,
+                required locationId,
+                required premiseMode,
+                linkedRealEstateId,
+                required policy,
+              }) async {
+                final handler = onAcquireBusiness;
+                final result = handler == null
+                    ? unavailableResult()
+                    : await handler(
+                        listingId: listingId,
+                        businessName: businessName,
+                        locationId: locationId,
+                        premiseMode: premiseMode,
+                        linkedRealEstateId: linkedRealEstateId,
+                        policy: policy,
+                      );
+                if (result.success) latestState = result.state;
+                return result;
+              },
+          onUpdatePolicy: (businessId, policy) async {
+            final handler = onUpdateBusinessPolicy;
+            final result = handler == null
+                ? unavailableResult()
+                : await handler(businessId, policy);
+            if (result.success) latestState = result.state;
+            return result;
+          },
+          onInvest: (businessId, kind) async {
+            final handler = onInvestInBusiness;
+            final result = handler == null
+                ? unavailableResult()
+                : await handler(businessId, kind);
+            if (result.success) latestState = result.state;
+            return result;
+          },
+          onClose: (businessId) async {
+            final handler = onCloseBusiness;
+            final result = handler == null
+                ? unavailableResult()
+                : await handler(businessId);
+            if (result.success) latestState = result.state;
+            return result;
+          },
+          onChooseEvent: (eventId, choiceId) async {
+            final handler = onChooseBusinessEvent;
+            final result = handler == null
+                ? unavailableResult()
+                : await handler(eventId, choiceId);
+            if (result.success) latestState = result.state;
+            return result;
+          },
+        ),
+      ),
+    );
+    return latestState;
+  }
+
   void _openHomeComputer(BuildContext context) {
     Navigator.of(context).push<void>(
       _gameSceneRoute<void>(
         HomeComputerScreen(
-          state: state,
-          onOpenStockMarket: () => _openStockMarket(context),
-          onOpenRealEstate: () => _openRealEstateMarket(context),
-          onOpenStarShop: () => _openStarShop(context),
+          state: _latestState,
+          onOpenStockMarket: (currentState) async {
+            await _openStockMarket(context, currentState);
+            return _latestState;
+          },
+          onOpenRealEstate: (currentState) async {
+            await _openRealEstateMarket(context, currentState);
+            return _latestState;
+          },
+          onOpenBusiness: (currentState) =>
+              _openBusinessMarket(context, currentState: currentState),
+          onOpenStarShop: (currentState) =>
+              _openStarShop(context, currentState),
         ),
       ),
     );
   }
 
-  Future<GameState> _openStarShop(BuildContext context) async {
-    var latestState = state;
+  Future<GameState> _openStarShop(
+    BuildContext context,
+    GameState currentState,
+  ) async {
+    var latestState = currentState;
     await Navigator.of(context).push<void>(
       _gameSceneRoute<void>(
         StarShopScreen(

@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'banking_state.dart';
+import 'business_engine.dart';
 import 'game_state.dart';
 import 'market_clock.dart';
 import 'market_cost_rules.dart';
@@ -16,6 +17,7 @@ import 'real_estate_rental.dart';
 import 'real_estate_world.dart';
 import 'personal_finance_state.dart';
 import 'seed_money_content.dart';
+import 'stable_hash.dart';
 import 'star_shop.dart';
 import 'story_state.dart';
 
@@ -3948,6 +3950,13 @@ class GameEngine {
       );
     }
     final asset = assets[index];
+    if (state.businesses.usesRealEstate(asset.id)) {
+      return FinanceActionResult(
+        state: state,
+        success: false,
+        message: '직영점이 영업 중입니다. 점포를 이전하거나 폐업한 뒤 매각할 수 있습니다.',
+      );
+    }
     if (asset.hasActiveLease) {
       return FinanceActionResult(
         state: state,
@@ -4203,6 +4212,13 @@ class GameEngine {
       );
     }
     final asset = assets[index];
+    if (state.businesses.usesRealEstate(asset.id)) {
+      return FinanceActionResult(
+        state: state,
+        success: false,
+        message: '직영점 영업 중에는 건물 리모델링을 진행할 수 없습니다.',
+      );
+    }
     if (asset.isLandmarkFund) {
       return FinanceActionResult(
         state: state,
@@ -4345,6 +4361,13 @@ class GameEngine {
       );
     }
     final asset = assets[index];
+    if (state.businesses.usesRealEstate(asset.id)) {
+      return FinanceActionResult(
+        state: state,
+        success: false,
+        message: '직영점이 사용하는 상가입니다. 점포를 이전하거나 폐업한 뒤 임대할 수 있습니다.',
+      );
+    }
     if (leaseType == RealEstateLeaseType.automatic) {
       return FinanceActionResult(
         state: state,
@@ -5635,6 +5658,7 @@ class GameEngine {
     );
     next = _refreshExpiredMissionWindow(next);
     next = _settleMatureBankDeposits(next);
+    next = const LocalBusinessEngine().advanceOneDay(next).state;
     if (next.company.worldMode == CompanyWorldMode.fictional) {
       final basePrice =
           next.company.simulatedPrice ??
@@ -5657,6 +5681,7 @@ class GameEngine {
       );
     }
     next = _applyMonthlyEconomy(next);
+    next = const LocalBusinessEngine().reconcilePremises(next).state;
     next = _applyCampaignMilestones(next);
     next = _applyControlOpportunity(next);
     next = _applyEraTechnologyDecisions(next);
@@ -5671,7 +5696,9 @@ class GameEngine {
       );
     }
     final processed = _processDueEvents(next);
-    return prepareHiddenMarketScenario(processed);
+    final payableRepayment = const LocalBusinessEngine()
+        .repayDisposedBusinessPayablesForDay(processed);
+    return prepareHiddenMarketScenario(payableRepayment.state);
   }
 
   _RentalMonthPreparation _prepareRentalMonth(
@@ -5710,11 +5737,16 @@ class GameEngine {
           ),
         );
       }
-      if (asset.isDirectUse) {
+      final linkedBusiness = state.businesses.activeBusinesses.where(
+        (business) => business.linkedRealEstateId == asset.id,
+      );
+      if (asset.isDirectUse || linkedBusiness.isNotEmpty) {
         assets.add(
           asset.copyWith(
             nextRentalSettlementDay: followingSettlementDay,
-            lastRentalEvent: '직접 사용 중 · 공실 위험 없음',
+            lastRentalEvent: linkedBusiness.isNotEmpty
+                ? '${linkedBusiness.first.name} 직영점 사용 중 · 공실 위험 없음'
+                : '직접 사용 중 · 공실 위험 없음',
             propertyCondition:
                 (asset.propertyCondition -
                         (state.currentDate.month == 1 ? 1 : 0))
@@ -7431,7 +7463,7 @@ class GameEngine {
     var hash = 2166136261;
     for (final unit in input.codeUnits) {
       hash ^= unit;
-      hash = (hash * 16777619) & 0x7fffffff;
+      hash = multiplyFnvPrime31Exact(hash);
     }
     return hash;
   }

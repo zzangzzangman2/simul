@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'banking_state.dart';
+import 'business_state.dart';
 import 'market_clock.dart';
 import 'market_cost_rules.dart';
 import 'mission_progression.dart';
@@ -179,9 +180,10 @@ class GameState {
     required this.scheduledEvents,
     required this.ledger,
     required this.processedEventIds,
-  });
+    BusinessPortfolioState? businesses,
+  }) : businesses = businesses ?? const BusinessPortfolioState.initial();
 
-  static const schemaVersion = 18;
+  static const schemaVersion = 20;
   static const maxCampaignDay = 9862;
 
   final int version;
@@ -196,6 +198,7 @@ class GameState {
   final BankingState banking;
   final OrganizationState organization;
   final PersonalFinanceState personalFinance;
+  final BusinessPortfolioState businesses;
   final MissionProgressionState progression;
   final StoryState story;
   final CompanyState company;
@@ -305,6 +308,7 @@ class GameState {
       banking.totalUnsecuredLoanBalance +
       personalFinance.totalMortgageBalance +
       personalFinance.totalTenantDepositLiability +
+      businesses.totalAccountsPayable +
       story.academyTuitionDebt +
       story.flagInt('mortgageDeficiencyDebt') +
       story.flagInt('tenantDepositDebt') +
@@ -312,6 +316,7 @@ class GameState {
 
   int balanceSheetGrossAssets({Map<String, double>? prices}) =>
       cash +
+      businesses.totalBookValue +
       banking.termDepositAssetValueAt(day) +
       (prices == null ? portfolioCost : portfolioValue(prices)) +
       personalFinance.estimatedPropertyValueAt(day);
@@ -348,6 +353,7 @@ class GameState {
     BankingState? banking,
     OrganizationState? organization,
     PersonalFinanceState? personalFinance,
+    BusinessPortfolioState? businesses,
     MissionProgressionState? progression,
     StoryState? story,
     CompanyState? company,
@@ -374,6 +380,7 @@ class GameState {
       banking: banking ?? this.banking,
       organization: organization ?? this.organization,
       personalFinance: personalFinance ?? this.personalFinance,
+      businesses: businesses ?? this.businesses,
       progression: progression ?? this.progression,
       story: story ?? this.story,
       company: company ?? this.company,
@@ -399,6 +406,7 @@ class GameState {
     'banking': banking.toJson(),
     'organization': organization.toJson(),
     'personalFinance': personalFinance.toJson(),
+    'businesses': businesses.toJson(),
     'progression': progression.toJson(),
     'story': story.toJson(),
     'company': company.toJson(),
@@ -447,6 +455,9 @@ class GameState {
       ),
       personalFinance: PersonalFinanceState.fromJson(
         (json['personalFinance'] as Map?)?.cast<String, dynamic>() ?? const {},
+      ),
+      businesses: BusinessPortfolioState.fromJson(
+        (json['businesses'] as Map?)?.cast<String, dynamic>() ?? const {},
       ),
       progression: MissionProgressionState.fromJson(
         (json['progression'] as Map?)?.cast<String, dynamic>() ?? const {},

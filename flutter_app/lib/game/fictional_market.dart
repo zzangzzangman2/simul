@@ -1059,7 +1059,7 @@ int _fictionalHash(String input) {
   var hash = 2166136261;
   for (final unit in input.codeUnits) {
     hash ^= unit;
-    hash = (hash * 16777619) & 0x7fffffff;
+    hash = multiplyFnvPrime31Exact(hash);
   }
   return hash;
 }
