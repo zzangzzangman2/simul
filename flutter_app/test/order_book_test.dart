@@ -530,6 +530,50 @@ void main() {
     expect(gameMarketOrderNotionalLimit(120, turnoverEok: 0), 0);
   });
 
+  test('large player fills create bounded temporary tick impact', () {
+    expect(
+      gamePlayerMarketImpactInitialTicks(
+        filledQuantity: 79,
+        executionCapacity: 1000,
+      ),
+      0,
+    );
+    final initialTicks = gamePlayerMarketImpactInitialTicks(
+      filledQuantity: 500,
+      executionCapacity: 1000,
+    );
+    expect(initialTicks, inInclusiveRange(1, 6));
+    expect(
+      gamePlayerMarketImpactTicksAtAge(
+        initialTicks: initialTicks,
+        ageMinutes: 1,
+      ),
+      initialTicks,
+    );
+    expect(
+      gamePlayerMarketImpactTicksAtAge(
+        initialTicks: initialTicks,
+        ageMinutes: gamePlayerMarketImpactDurationMinutes + 1,
+      ),
+      0,
+    );
+
+    final raised = gameOrderBookPriceAfterTickImpact(
+      basePrice: 10000,
+      signedTicks: initialTicks,
+      market: '미래시장',
+    );
+    final lowered = gameOrderBookPriceAfterTickImpact(
+      basePrice: 10000,
+      signedTicks: -initialTicks,
+      market: '미래시장',
+    );
+    expect(raised, greaterThan(10000));
+    expect(lowered, lessThan(10000));
+    expect(isValidMarketOrderPrice(raised, market: '미래시장'), isTrue);
+    expect(isValidMarketOrderPrice(lowered, market: '미래시장'), isTrue);
+  });
+
   test('wall identity is attached to price instead of the visible row', () {
     final first = buildGameOrderBookSnapshot(
       assetId: 'hanbit_telecom',

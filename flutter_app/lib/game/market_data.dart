@@ -11,12 +11,88 @@ part 'market_corpus_events.dart';
 part 'market_arc_scenarios.dart';
 part 'market_era_events.dart';
 
+const marketMaterialNewsHaltMinutes = 5;
+const marketCorporateActionAnnouncementTradingDays = 14;
+const marketRightsIssuePreferenceFlag = 'marketRightsIssuePreference';
+const marketRightsIssueSubscribePreference = 'subscribe';
+const marketRightsIssueAutoSellPreference = 'autoSell';
+const marketMaterialNewsHaltImpactRate = 0.06;
+
+/// Returns the first day on which an upcoming corporate action is public.
+///
+/// The deterministic campaign timeline contains future actions internally,
+/// but an as-of view exposes them only after this announcement date. This
+/// lets the UI show a useful schedule without leaking the full future.
+DateTime marketCorporateActionAnnouncementDate(MarketCorporateAction action) {
+  var cursor = DateTime.parse(action.date);
+  var remaining = marketCorporateActionAnnouncementTradingDays;
+  while (remaining > 0) {
+    cursor = cursor.subtract(const Duration(days: 1));
+    if (isMarketTradingDay(cursor)) remaining -= 1;
+  }
+  return cursor;
+}
+
+bool marketCorporateActionIsAnnouncedBy(
+  MarketCorporateAction action,
+  DateTime date,
+) {
+  final through = DateTime(date.year, date.month, date.day);
+  return !marketCorporateActionAnnouncementDate(action).isAfter(through);
+}
+
+/// A short, deterministic halt for a material negative disclosure.
+///
+/// The event schedule is already seed/date deterministic, so no extra mutable
+/// timer or migration field is needed. The reveal minute and following four
+/// minutes reject immediate orders, keep pending orders queued, and stop book
+/// prints.
+FictionalMarketEvent? marketMaterialNewsTradingHaltAt({
+  required String simulationSeed,
+  required DateTime date,
+  required String assetId,
+  required int minute,
+}) {
+  FictionalMarketEvent? latest;
+  for (final event in fictionalMarketEventsForDate(simulationSeed, date)) {
+    if (event.companyId != assetId ||
+        event.tone != NewsTone.shock ||
+        event.impactPct > -marketMaterialNewsHaltImpactRate ||
+        minute < event.revealMinute ||
+        minute >= event.revealMinute + marketMaterialNewsHaltMinutes) {
+      continue;
+    }
+    if (latest == null || event.revealMinute > latest.revealMinute) {
+      latest = event;
+    }
+  }
+  return latest;
+}
+
+/// Publicly known financial distress that warrants a management-risk badge.
+///
+/// Management-risk stocks remain tradable. Only a separate VI or material
+/// disclosure halt stops orders.
+bool marketFinancialSnapshotIsManagementRisk(
+  FictionalFinancialSnapshot? snapshot,
+) {
+  if (snapshot == null) return false;
+  if (snapshot.equity <= 0) return true;
+  final weakCashGeneration =
+      snapshot.netIncome < 0 && snapshot.operatingCashFlow < 0;
+  final leverageBase = math.max(1, snapshot.cash + snapshot.equity);
+  return weakCashGeneration && snapshot.debt >= leverageBase * 2;
+}
+
 enum MarketCorporateActionType {
   split,
   dividend,
   rightsIssue,
   materialSpinoff,
   spinoff,
+  merger,
+  shareExchange,
+  tenderOffer,
   delisting,
 }
 
@@ -216,9 +292,21 @@ class MarketCorporateAction {
       json['relatedName'] as String?,
       json['relatedMarket'] as String?,
     ];
-    if (type == MarketCorporateActionType.spinoff &&
+    final needsRelatedSecurity =
+        type == MarketCorporateActionType.spinoff ||
+        type == MarketCorporateActionType.merger ||
+        type == MarketCorporateActionType.shareExchange;
+    if (needsRelatedSecurity &&
         relatedFields.any((value) => value == null || value.trim().isEmpty)) {
-      throw FormatException('Invalid spinoff destination for $assetId');
+      throw FormatException(
+        'Invalid corporate-action destination for $assetId',
+      );
+    }
+    if (needsRelatedSecurity && relatedFields.first == assetId) {
+      throw FormatException('Corporate-action destination must differ');
+    }
+    if (type == MarketCorporateActionType.tenderOffer && amount <= 0) {
+      throw FormatException('Invalid tender-offer price for $assetId');
     }
     final id = json['id'] as String? ?? '';
     final date = json['date'] as String? ?? '';
@@ -502,7 +590,10 @@ class FictionalMarketAsset {
        initialSharesOutstanding = source.initialSharesOutstanding,
        corporateActions = List<MarketCorporateAction>.unmodifiable(
          source.corporateActions.where(
-           (action) => action.date.compareTo(throughDateKey) <= 0,
+           (action) => marketCorporateActionIsAnnouncedBy(
+             action,
+             DateTime.parse(throughDateKey),
+           ),
          ),
        ),
        summary = source.summary,
@@ -831,6 +922,22 @@ class FictionalMarketAsset {
         .where((action) => action.date == key)
         .toList(growable: false);
     return actions..sort((left, right) {
+      final typeOrder = marketCorporateActionOrder(
+        left.type,
+      ).compareTo(marketCorporateActionOrder(right.type));
+      if (typeOrder != 0) return typeOrder;
+      return left.id.compareTo(right.id);
+    });
+  }
+
+  List<MarketCorporateAction> announcedCorporateActionsFrom(DateTime date) {
+    final key = _dateKey(date);
+    final actions = corporateActions
+        .where((action) => action.date.compareTo(key) >= 0)
+        .toList(growable: false);
+    return actions..sort((left, right) {
+      final dateOrder = left.date.compareTo(right.date);
+      if (dateOrder != 0) return dateOrder;
       final typeOrder = marketCorporateActionOrder(
         left.type,
       ).compareTo(marketCorporateActionOrder(right.type));
@@ -1264,7 +1371,10 @@ int marketCorporateActionOrder(MarketCorporateActionType type) =>
       MarketCorporateActionType.split => 2,
       MarketCorporateActionType.spinoff => 3,
       MarketCorporateActionType.materialSpinoff => 4,
-      MarketCorporateActionType.delisting => 5,
+      MarketCorporateActionType.merger => 5,
+      MarketCorporateActionType.shareExchange => 6,
+      MarketCorporateActionType.tenderOffer => 7,
+      MarketCorporateActionType.delisting => 8,
     };
 
 double _marketReferenceCloseForActions({
@@ -1308,6 +1418,9 @@ double _marketReferenceCloseForActions({
         }
         break;
       case MarketCorporateActionType.materialSpinoff:
+      case MarketCorporateActionType.merger:
+      case MarketCorporateActionType.shareExchange:
+      case MarketCorporateActionType.tenderOffer:
       case MarketCorporateActionType.delisting:
         break;
     }

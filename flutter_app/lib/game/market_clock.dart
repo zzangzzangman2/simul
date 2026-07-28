@@ -13,6 +13,7 @@ const krxCloseMinute = 15 * 60;
 const marketDayEndMinute = 20 * 60;
 const marketTickMinutes = 1;
 const krxCloseTick = 420;
+const marketDynamicVolatilityInterruptionRate = 0.03;
 
 /// Converts a calendar date to the canonical deterministic liquidity day key.
 ///
@@ -175,6 +176,30 @@ int marketMinuteForTick(int tick) =>
     (marketDayStartMinute +
             tick.clamp(0, generatedSessionTicks) * marketTickMinutes)
         .clamp(marketDayStartMinute, marketDayEndMinute);
+
+/// One-minute dynamic volatility interruption after an abrupt 3% quote move.
+///
+/// The deterministic path supplies one quote per game minute. Treating the
+/// triggering minute as a call-auction pause gives pending and immediate
+/// orders the same state-free, save-safe result; normal trading resumes on the
+/// following minute unless that quote independently triggers another VI.
+bool marketDynamicVolatilityInterruptionActive({
+  required int minute,
+  required double previousTradePrice,
+  required double currentPrice,
+  bool tradingDay = true,
+}) {
+  final clock = marketClockAt(minute, tradingDay: tradingDay);
+  if (clock.phase != MarketSessionPhase.regular ||
+      !previousTradePrice.isFinite ||
+      previousTradePrice <= 0 ||
+      !currentPrice.isFinite ||
+      currentPrice <= 0) {
+    return false;
+  }
+  return ((currentPrice - previousTradePrice) / previousTradePrice).abs() >=
+      marketDynamicVolatilityInterruptionRate;
+}
 
 double marketDailyPriceLimitRate(DateTime date) {
   // 가격제한폭 확대 시점만 반영하고, 장 운영 시간은 가상시장 규칙을 따른다.

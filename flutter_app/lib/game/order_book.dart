@@ -18,6 +18,7 @@ const _gameOrderBookRegularSessionMinutes =
     krxContinuousEndMinute - krxOpenMinute;
 const _gameOrderBookFastMoveTicks = 3;
 const _gameOrderBookTrendActivationRate = 0.04;
+const gamePlayerMarketImpactDurationMinutes = 6;
 
 /// Returns the visible order-book event rate for the currently opened asset.
 ///
@@ -204,6 +205,46 @@ int gameClosingAuctionVolume({required int fullDayVolume}) {
           .round()
           .clamp(0, fullDayVolume);
   return fullDayVolume - continuousVolume;
+}
+
+/// Deterministic market-wide prints assigned to one continuous-session minute.
+///
+/// The 09:01 bucket intentionally includes the opening accumulation, matching
+/// [gameContinuousMinuteVolumes]. Later minutes are true one-minute deltas.
+int gameEstimatedContinuousMinuteVolumeUnits({
+  required String assetId,
+  required int day,
+  required int minute,
+  required double referencePrice,
+  String simulationSeed = '',
+  int? sharesOutstanding,
+}) {
+  if (minute < krxOpenMinute ||
+      minute >= krxContinuousEndMinute ||
+      assetId.isEmpty ||
+      !referencePrice.isFinite ||
+      referencePrice <= 0) {
+    return 0;
+  }
+  final fullDayVolume = gameEstimatedFullDayVolumeUnits(
+    assetId: assetId,
+    day: day,
+    referencePrice: referencePrice,
+    simulationSeed: simulationSeed,
+    sharesOutstanding: sharesOutstanding,
+  );
+  if (fullDayVolume <= 0) return 0;
+  if (minute == krxOpenMinute) {
+    return (fullDayVolume * gameTurnoverProgressAtMinute(minute)).round().clamp(
+      0,
+      fullDayVolume,
+    );
+  }
+  final volumes = gameContinuousMinuteVolumes(
+    fullDayVolume: fullDayVolume,
+    visibleThroughMinute: minute,
+  );
+  return volumes.lastOrNull ?? 0;
 }
 
 class GameOrderBookLevel {
@@ -496,6 +537,9 @@ int gameOrderBookExecutionCapacity({
       !marketClockAt(minute, tradingDay: true).tradable) {
     return 0;
   }
+  final stableReference = previousClose.isFinite && previousClose > 0
+      ? previousClose
+      : unitPrice;
   final turnoverEok =
       cumulativeTurnoverEok ??
       gameEstimatedTurnoverEok(
@@ -538,7 +582,80 @@ int gameOrderBookExecutionCapacity({
     unitPrice: unitPrice,
   );
   if (maximum <= 0) return 0;
-  return math.min(rawUnits.round(), maximum);
+  var cappedMaximum = maximum;
+  if (sharesOutstanding != null && sharesOutstanding > 0) {
+    final actualMinuteVolume = gameEstimatedContinuousMinuteVolumeUnits(
+      assetId: assetId,
+      day: day,
+      minute: minute,
+      referencePrice: stableReference,
+      simulationSeed: simulationSeed,
+      sharesOutstanding: sharesOutstanding,
+    );
+    if (actualMinuteVolume > 0) {
+      cappedMaximum = math.min(cappedMaximum, actualMinuteVolume);
+    }
+  }
+  return math.min(rawUnits.round(), cappedMaximum);
+}
+
+/// Temporary price pressure caused by a player's unusually large fill.
+///
+/// Small retail-sized prints do not rewrite the deterministic path. A fill
+/// that consumes at least 8% of the minute capacity moves the following quote
+/// by 1-6 ticks, depending on participation.
+int gamePlayerMarketImpactInitialTicks({
+  required double filledQuantity,
+  required int executionCapacity,
+}) {
+  if (!filledQuantity.isFinite ||
+      filledQuantity <= 0 ||
+      executionCapacity <= 0) {
+    return 0;
+  }
+  final participation = (filledQuantity / executionCapacity)
+      .clamp(0.0, 1.0)
+      .toDouble();
+  if (participation < 0.08) return 0;
+  final scaled = ((participation - 0.08) / 0.92).clamp(0.0, 1.0).toDouble();
+  return (1 + (scaled * 5).round()).clamp(1, 6);
+}
+
+int gamePlayerMarketImpactTicksAtAge({
+  required int initialTicks,
+  required int ageMinutes,
+}) {
+  if (initialTicks <= 0 ||
+      ageMinutes <= 0 ||
+      ageMinutes > gamePlayerMarketImpactDurationMinutes) {
+    return 0;
+  }
+  final remaining = gamePlayerMarketImpactDurationMinutes - ageMinutes + 1;
+  return math.max(
+    1,
+    (initialTicks * remaining / gamePlayerMarketImpactDurationMinutes).ceil(),
+  );
+}
+
+double gameOrderBookPriceAfterTickImpact({
+  required double basePrice,
+  required int signedTicks,
+  String market = '미래시장',
+}) {
+  if (!basePrice.isFinite || basePrice <= 0 || signedTicks == 0) {
+    return basePrice;
+  }
+  var price = marketSnapPrice(basePrice, market: market);
+  final direction = signedTicks.isNegative ? -1 : 1;
+  for (var index = 0; index < signedTicks.abs(); index += 1) {
+    final tick = direction > 0
+        ? marketTickSize(price, market: market)
+        : marketTickSize(math.max(0.000001, price - 0.000001), market: market);
+    final next = marketSnapPrice(price + direction * tick, market: market);
+    if (next <= 0 || (next - price).abs() < 0.000001) break;
+    price = next;
+  }
+  return price;
 }
 
 /// 최근 체결이 어느 호가를 소화했는지 표시할 이동 네모를 만든다.
@@ -661,6 +778,7 @@ GameOrderBookTradePulse? gameOrderBookTradePulse({
   String simulationSeed = '',
   int levelCount = gameOrderBookLevelCount,
   int liquidityPulse = 0,
+  double pulseHz = 0,
 }) {
   if (assetId.isEmpty ||
       levelCount <= 0 ||
@@ -733,6 +851,24 @@ GameOrderBookTradePulse? gameOrderBookTradePulse({
                             0.24))
             .clamp(0.08, 0.92)
             .toDouble()
+      : pulseHz.isFinite && pulseHz > 0
+      ? (() {
+          // Spread the minute-wide flow across the actual scheduled event
+          // count. Without this pacing, a 10-12 Hz stock can spend its entire
+          // minute budget in the first few seconds and then appear frozen.
+          final expectedPulses = math.max(1.0, pulseHz * 60);
+          final jitter =
+              0.72 +
+              _orderBookUnit(
+                    seededAssetId,
+                    day,
+                    minute * 89 + liquidityPulse * 313 + 4099,
+                  ) *
+                  0.56;
+          return ((1 / expectedPulses) * jitter * (1 + moveIntensity * 0.28))
+              .clamp(0.0001, 0.24)
+              .toDouble();
+        })()
       : (0.015 +
                 (hash % 36) / 1000 +
                 moveIntensity *

@@ -2347,6 +2347,9 @@ FictionalFinancialBalances applyFictionalCorporateActionFinancialEffects({
         break;
       case MarketCorporateActionType.spinoff:
       case MarketCorporateActionType.materialSpinoff:
+      case MarketCorporateActionType.merger:
+      case MarketCorporateActionType.shareExchange:
+      case MarketCorporateActionType.tenderOffer:
       case MarketCorporateActionType.delisting:
         break;
     }

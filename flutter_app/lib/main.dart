@@ -463,6 +463,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
                   state: _firstPlayableMarketState(current),
                   onSetMarketMinute: _setMarketMinute,
                   onSaveMarketNotebook: _saveMarketNotebook,
+                  onSetRightsIssuePreference: _setMarketRightsIssuePreference,
                   onPurchaseReport: _purchaseDailyMarketReport,
                   onCompleteTutorial: _completeMarketTutorial,
                   onExecuteTrade: _executeTrade,
@@ -1010,6 +1011,25 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     return next;
   }
 
+  Future<GameState> _setMarketRightsIssuePreference(bool subscribe) async {
+    final current = _state!;
+    final next = current.copyWith(
+      story: current.story.copyWith(
+        storyFlags: <String, dynamic>{
+          ...current.story.storyFlags,
+          marketRightsIssuePreferenceFlag: subscribe
+              ? marketRightsIssueSubscribePreference
+              : marketRightsIssueAutoSellPreference,
+        },
+      ),
+    );
+    await _persistence.save(next);
+    if (mounted) {
+      setState(() => _state = next);
+    }
+    return next;
+  }
+
   Future<TradeExecutionResult> _executeTrade(TradeOrder order) async {
     final current = _state!;
     MarketTradeQuote? quote;
@@ -1159,6 +1179,8 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
                   onAdvanceDays: _advanceDays,
                   onSetMarketMinute: _setMarketMinute,
                   onSaveMarketNotebook: _saveMarketNotebook,
+                  onSetMarketRightsIssuePreference:
+                      _setMarketRightsIssuePreference,
                   onResolveDecision: _resolveDecision,
                   onClaimMission: _claimMission,
                   onPurchaseStarShopItem: _purchaseStarShopItem,
@@ -1946,6 +1968,7 @@ class OfficeScreen extends StatelessWidget {
     this.onAdvanceDays,
     required this.onSetMarketMinute,
     required this.onSaveMarketNotebook,
+    this.onSetMarketRightsIssuePreference,
     required this.onResolveDecision,
     this.onClaimMission,
     this.onPurchaseStarShopItem,
@@ -1992,6 +2015,8 @@ class OfficeScreen extends StatelessWidget {
   final Future<GameState> Function(int) onSetMarketMinute;
   final Future<GameState> Function(Set<String>, Map<String, String>)
   onSaveMarketNotebook;
+  final Future<GameState> Function(bool subscribe)?
+  onSetMarketRightsIssuePreference;
   final Future<void> Function(String, String) onResolveDecision;
   final Future<MissionClaimResult> Function()? onClaimMission;
   final Future<StarShopPurchaseResult> Function(String productId)?
@@ -2053,6 +2078,7 @@ class OfficeScreen extends StatelessWidget {
           state: state,
           onSetMarketMinute: onSetMarketMinute,
           onSaveMarketNotebook: onSaveMarketNotebook,
+          onSetRightsIssuePreference: onSetMarketRightsIssuePreference,
           onPurchaseReport: onPurchaseMarketReport,
           onCompleteTutorial: onCompleteMarketTutorial,
           onExecuteTrade: onExecuteTrade,

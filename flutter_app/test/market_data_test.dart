@@ -144,7 +144,7 @@ void main() {
           );
           expect(
             asset.corporateActions.every(
-              (action) => action.date.compareTo(earlyDateKey) <= 0,
+              (action) => marketCorporateActionIsAnnouncedBy(action, earlyDate),
             ),
             isTrue,
           );
@@ -316,6 +316,50 @@ void main() {
     expect(serializedPrices.keys, ['2000-01-03', '2000-01-10']);
     expect(identical(view.asOf(DateTime(2001, 1, 1)), view), isTrue);
   });
+
+  test(
+    'as-of view exposes a future corporate action only after disclosure',
+    () {
+      const action = MarketCorporateAction(
+        id: 'sample-dividend-2000-02-01',
+        assetId: 'sample',
+        type: MarketCorporateActionType.dividend,
+        date: '2000-02-01',
+        amount: 100,
+        numerator: 0,
+        denominator: 1,
+        currency: 'KRW',
+        source: 'test',
+      );
+      final asset = FictionalMarketAsset(
+        id: 'sample',
+        symbol: '1000',
+        name: '샘플',
+        market: fictionalMainMarket,
+        country: 'KR',
+        sector: 'Test',
+        colorHex: '#FFFFFF',
+        currency: 'KRW',
+        initialSharesOutstanding: 1000,
+        prices: const {'2000-01-03': 10000, '2000-02-01': 9900},
+        corporateActions: const [action],
+      );
+      final universe = FictionalMarketUniverse(
+        schemaVersion: 14,
+        sourceName: 'announcement-test',
+        assets: [asset],
+      );
+      final announcementDate = marketCorporateActionAnnouncementDate(action);
+      final before = announcementDate.subtract(const Duration(days: 1));
+
+      expect(universe.asOf(before).assets.single.corporateActions, isEmpty);
+      final visible = universe.asOf(announcementDate).assets.single;
+      expect(visible.corporateActions, const [action]);
+      expect(visible.announcedCorporateActionsFrom(announcementDate), const [
+        action,
+      ]);
+    },
+  );
 
   test(
     'market universe contains 50 fixed fictional firms and later generations',

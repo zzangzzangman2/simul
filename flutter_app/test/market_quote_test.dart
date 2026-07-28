@@ -12,6 +12,108 @@ import 'package:millennium_capital/game/order_book.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  test('material shock halt is deterministic and lasts five minutes', () {
+    const seed = 'material-halt-audit';
+    FictionalMarketEvent? target;
+    DateTime? targetDate;
+    for (var offset = 0; offset < 3650 && target == null; offset += 1) {
+      final date = DateTime(2000, 1, 1).add(Duration(days: offset));
+      for (final event in fictionalMarketEventsForDate(seed, date)) {
+        if (event.tone == NewsTone.shock &&
+            event.impactPct <= -marketMaterialNewsHaltImpactRate &&
+            event.revealMinute >= krxOpenMinute &&
+            event.revealMinute < krxContinuousEndMinute) {
+          target = event;
+          targetDate = date;
+          break;
+        }
+      }
+    }
+    expect(target, isNotNull);
+    expect(targetDate, isNotNull);
+    final event = target!;
+    expect(
+      marketMaterialNewsTradingHaltAt(
+        simulationSeed: seed,
+        date: targetDate!,
+        assetId: event.companyId,
+        minute: event.revealMinute,
+      )?.id,
+      event.id,
+    );
+    expect(
+      marketMaterialNewsTradingHaltAt(
+        simulationSeed: seed,
+        date: targetDate,
+        assetId: event.companyId,
+        minute: event.revealMinute + marketMaterialNewsHaltMinutes - 1,
+      ),
+      isNotNull,
+    );
+    expect(
+      marketMaterialNewsTradingHaltAt(
+        simulationSeed: seed,
+        date: targetDate,
+        assetId: event.companyId,
+        minute: event.revealMinute + marketMaterialNewsHaltMinutes,
+      ),
+      isNull,
+    );
+  });
+
+  test('management risk requires insolvency or combined cash-flow stress', () {
+    const healthy = FictionalFinancialSnapshot(
+      period: '2000-03-31',
+      revenue: 1000,
+      operatingProfit: 100,
+      consensusOperatingProfit: 90,
+      netIncome: 80,
+      operatingCashFlow: 90,
+      cash: 300,
+      debt: 200,
+      equity: 500,
+      sharesOutstanding: 100,
+      orderBacklog: 0,
+    );
+    expect(marketFinancialSnapshotIsManagementRisk(healthy), isFalse);
+    expect(
+      marketFinancialSnapshotIsManagementRisk(
+        FictionalFinancialSnapshot(
+          period: healthy.period,
+          revenue: healthy.revenue,
+          operatingProfit: -100,
+          consensusOperatingProfit: healthy.consensusOperatingProfit,
+          netIncome: -120,
+          operatingCashFlow: -150,
+          cash: 10,
+          debt: 1200,
+          equity: 100,
+          sharesOutstanding: healthy.sharesOutstanding,
+          orderBacklog: healthy.orderBacklog,
+        ),
+      ),
+      isTrue,
+    );
+    expect(
+      marketFinancialSnapshotIsManagementRisk(
+        FictionalFinancialSnapshot(
+          period: healthy.period,
+          revenue: healthy.revenue,
+          operatingProfit: -100,
+          consensusOperatingProfit: healthy.consensusOperatingProfit,
+          netIncome: -120,
+          operatingCashFlow: -150,
+          cash: 0,
+          debt: 100,
+          equity: 0,
+          sharesOutstanding: healthy.sharesOutstanding,
+          orderBacklog: healthy.orderBacklog,
+        ),
+      ),
+      isTrue,
+    );
+  });
+
   test(
     'authoritative quote resolves the exact asset, date, minute, and price',
     () async {

@@ -245,6 +245,40 @@ class GameState {
   int get availableBrokerageCash =>
       math.max(0, brokerageCash - pendingBuyReservedCash);
 
+  DateTime _brokerageSettlementDateFor(LedgerEntry entry) {
+    var date = dateForDay(entry.day);
+    var remainingTradingDays = 2;
+    while (remainingTradingDays > 0) {
+      date = date.add(const Duration(days: 1));
+      if (isMarketTradingDay(date)) remainingTradingDays -= 1;
+    }
+    return date;
+  }
+
+  /// Net sell proceeds that are usable for another order but not yet
+  /// transferable to the company bank account under the market's T+2 rule.
+  int get unsettledBrokerageSellProceeds => ledger
+      .where(
+        (entry) =>
+            entry.tradeSide == 'sell' &&
+            entry.amount > 0 &&
+            entry.day <= day &&
+            currentDate.isBefore(_brokerageSettlementDateFor(entry)),
+      )
+      .fold<int>(0, (sum, entry) {
+        final remaining = 0x7fffffff - sum;
+        return entry.amount >= remaining ? 0x7fffffff : sum + entry.amount;
+      });
+
+  /// Cash that may leave the brokerage account now.
+  ///
+  /// Pending buy reservations and unsettled sell proceeds remain part of
+  /// buying power, but cannot be withdrawn.
+  int get withdrawableBrokerageCash => math.max(
+    0,
+    brokerageCash - pendingBuyReservedCash - unsettledBrokerageSellProceeds,
+  );
+
   double pendingSellReservedUnits(String assetId) => pendingOrders
       .where(
         (order) =>

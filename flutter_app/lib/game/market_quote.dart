@@ -376,6 +376,9 @@ List<MarketTechnicalLevel> marketTechnicalLevelsForAsset({
           action.theoreticalExSpinoffFactor ?? 1.0,
         MarketCorporateActionType.dividend ||
         MarketCorporateActionType.materialSpinoff ||
+        MarketCorporateActionType.merger ||
+        MarketCorporateActionType.shareExchange ||
+        MarketCorporateActionType.tenderOffer ||
         MarketCorporateActionType.delisting => 1.0,
       };
       if (factor.isFinite && factor > 0) close *= factor;

@@ -277,9 +277,9 @@ int gameConsumedOrderBookFillUnits(
 /// Continuous-session depth already consumed at each absolute price.
 ///
 /// Buy aggressors consume asks and sell aggressors consume bids. Entries
-/// without a book side (resting queue fills and auctions) deliberately do not
-/// reduce either visible side, while their capacity units still count toward
-/// the minute-wide shared execution budget.
+/// without a book side (auctions and legacy saves) do not reduce either
+/// visible side, while their capacity units still count toward the
+/// minute-wide shared execution budget.
 Map<double, double> gameConsumedOrderBookUnitsByPrice(
   GameState state, {
   required String assetId,
@@ -1328,7 +1328,9 @@ class GameEngine {
     FinanceActionResult reject(String message) =>
         FinanceActionResult(state: state, success: false, message: message);
     if (amount <= 0) return reject('이체 금액은 0원보다 커야 합니다.');
-    final available = deposit ? state.bankCash : state.availableBrokerageCash;
+    final available = deposit
+        ? state.bankCash
+        : state.withdrawableBrokerageCash;
     if (amount > available) {
       return reject(deposit ? '회사 통장 잔액이 부족합니다.' : '출금 가능한 예수금이 부족합니다.');
     }
@@ -1544,6 +1546,23 @@ class GameEngine {
       tradingDay: order.isTradingDay && isMarketTradingDay(state.currentDate),
     );
     if (!clock.tradable) return reject('현재는 주문 가능한 거래 시간이 아닙니다.');
+    if (marketDynamicVolatilityInterruptionActive(
+      minute: order.marketMinute,
+      previousTradePrice: order.previousTradePrice ?? order.unitPrice,
+      currentPrice: order.unitPrice,
+      tradingDay: order.isTradingDay && isMarketTradingDay(state.currentDate),
+    )) {
+      return reject('변동성완화장치(VI) 발동 중입니다. 다음 분 단일가 해제 후 주문해 주세요.');
+    }
+    if (marketMaterialNewsTradingHaltAt(
+          simulationSeed: state.simulationSeed,
+          date: state.currentDate,
+          assetId: order.assetId,
+          minute: order.marketMinute,
+        ) !=
+        null) {
+      return reject('중대 공시로 거래정지 중입니다. 공시 후 5분 뒤 재개됩니다.');
+    }
 
     final reference = order.previousClose > 0
         ? order.previousClose
@@ -1858,6 +1877,23 @@ class GameEngine {
     if (!clock.tradable || clock.phase == MarketSessionPhase.closingAuction) {
       return state;
     }
+    if (marketDynamicVolatilityInterruptionActive(
+      minute: marketMinute,
+      previousTradePrice: previousTradePrice ?? unitPrice,
+      currentPrice: unitPrice,
+      tradingDay: isTradingDay && isMarketTradingDay(state.currentDate),
+    )) {
+      return state;
+    }
+    if (marketMaterialNewsTradingHaltAt(
+          simulationSeed: state.simulationSeed,
+          date: state.currentDate,
+          assetId: assetId,
+          minute: marketMinute,
+        ) !=
+        null) {
+      return state;
+    }
     final representativeOrder = eligibleOrders.first;
     final maximumPositionUnits = eligibleOrders
         .map((order) => order.maximumPositionUnits)
@@ -1979,6 +2015,15 @@ class GameEngine {
                 marketMinute: marketMinute,
                 orderType: TradeOrderType.limit.name,
                 orderBookCapacityUnits: consumedQueue,
+                orderBookSide: isBuy
+                    ? GameOrderBookSide.bid.name
+                    : GameOrderBookSide.ask.name,
+                orderBookFills: <LedgerOrderBookFill>[
+                  LedgerOrderBookFill(
+                    price: current.limitPrice,
+                    quantity: consumedQueue.toDouble(),
+                  ),
+                ],
               ),
             ],
           );
@@ -2400,6 +2445,23 @@ class GameEngine {
     final clock = marketClockAt(order.marketMinute, tradingDay: tradingDay);
     if (!clock.tradable) {
       return reject('현재는 주문 가능한 거래 시간이 아닙니다.');
+    }
+    if (marketDynamicVolatilityInterruptionActive(
+      minute: order.marketMinute,
+      previousTradePrice: order.previousTradePrice ?? order.unitPrice,
+      currentPrice: order.unitPrice,
+      tradingDay: tradingDay,
+    )) {
+      return reject('변동성완화장치(VI) 발동 중입니다. 다음 분 단일가 해제 후 주문해 주세요.');
+    }
+    if (marketMaterialNewsTradingHaltAt(
+          simulationSeed: state.simulationSeed,
+          date: state.currentDate,
+          assetId: order.assetId,
+          minute: order.marketMinute,
+        ) !=
+        null) {
+      return reject('중대 공시로 거래정지 중입니다. 공시 후 5분 뒤 재개됩니다.');
     }
 
     final requestedNotional = order.unitPrice * order.quantity;
@@ -3133,45 +3195,173 @@ class GameEngine {
       } else if (position != null &&
           action.type == MarketCorporateActionType.rightsIssue) {
         final dilutionPct = action.ownershipDilutionRate * 100;
-        final theoreticalExRightsPrice = action.theoreticalExRightsPrice;
-        final rightsValuePerShare =
+        final isShareholderAllocation =
             action.allocationMethod ==
-                    MarketRightsIssueAllocationMethod.shareholder &&
-                action.referencePrice != null &&
-                theoreticalExRightsPrice != null
-            ? math.max(0, action.referencePrice! - theoreticalExRightsPrice)
-            : 0.0;
-        final rightsSaleProceeds = (position.units * rightsValuePerShare)
-            .round();
-        if (rightsSaleProceeds > 0) {
-          cash += rightsSaleProceeds;
-          brokerageCash += rightsSaleProceeds;
+            MarketRightsIssueAllocationMethod.shareholder;
+        final prefersSubscription =
+            state.story.storyFlags[marketRightsIssuePreferenceFlag] ==
+            marketRightsIssueSubscribePreference;
+        final subscriptionUnits = position.units * action.rightsIssueRate;
+        final subscriptionCost = (subscriptionUnits * action.amount).round();
+        final availableForSubscription = state
+            .copyWith(
+              brokerageCash: brokerageCash,
+              pendingOrders: pendingOrders,
+            )
+            .availableBrokerageCash;
+        final hasExecutableSubscription =
+            isShareholderAllocation &&
+            prefersSubscription &&
+            action.currency == position.currency &&
+            subscriptionUnits.isFinite &&
+            subscriptionUnits > 0 &&
+            subscriptionCost > 0;
+
+        if (hasExecutableSubscription &&
+            subscriptionCost <= availableForSubscription) {
+          cash -= subscriptionCost;
+          brokerageCash -= subscriptionCost;
+          positions[index] = position.copyWith(
+            units: position.units + subscriptionUnits,
+            totalCost: position.totalCost + subscriptionCost,
+          );
+          ledger.add(
+            LedgerEntry(
+              id: eventId,
+              day: state.day,
+              amount: -subscriptionCost,
+              account: 'brokerage_cash',
+              counterAccount: 'corporate_rights_subscription',
+              description:
+                  '${position.name} 주주배정 유상증자 청약 · '
+                  '${_tradeUnits(subscriptionUnits)}주 배정 · '
+                  '청약대금 $subscriptionCost원',
+              sourceId: eventId,
+              notional: subscriptionCost,
+              assetId: action.assetId,
+            ),
+          );
+          changed = true;
+        } else {
+          final theoreticalExRightsPrice = action.theoreticalExRightsPrice;
+          final rightsValuePerShare =
+              isShareholderAllocation &&
+                  action.referencePrice != null &&
+                  theoreticalExRightsPrice != null
+              ? math.max(0, action.referencePrice! - theoreticalExRightsPrice)
+              : 0.0;
+          final rightsSaleProceeds = (position.units * rightsValuePerShare)
+              .round();
+          if (rightsSaleProceeds > 0) {
+            cash += rightsSaleProceeds;
+            brokerageCash += rightsSaleProceeds;
+          }
+          final subscriptionFallback =
+              hasExecutableSubscription &&
+              subscriptionCost > availableForSubscription;
+          ledger.add(
+            LedgerEntry(
+              id: eventId,
+              day: state.day,
+              amount: rightsSaleProceeds,
+              account: rightsSaleProceeds > 0
+                  ? 'brokerage_cash'
+                  : 'market_security',
+              counterAccount: isShareholderAllocation
+                  ? 'corporate_rights_sale'
+                  : 'corporate_rights_issue',
+              description: isShareholderAllocation
+                  ? '${position.name} 주주배정 유상증자 · '
+                        '${subscriptionFallback ? '청약대금 부족으로 ' : ''}'
+                        '신주인수권 자동매각 $rightsSaleProceeds원 · '
+                        '보유주식수 유지 · '
+                        '지분율 -${dilutionPct.toStringAsFixed(2)}%'
+                  : '${position.name} 제3자배정 유상증자 · 신주인수권 없음 · '
+                        '보유주식수 유지 · 지분율 '
+                        '-${dilutionPct.toStringAsFixed(2)}%',
+              sourceId: eventId,
+              notional: rightsSaleProceeds,
+              assetId: action.assetId,
+            ),
+          );
+          changed = true;
         }
+      } else if (position != null &&
+          (action.type == MarketCorporateActionType.merger ||
+              action.type == MarketCorporateActionType.shareExchange) &&
+          action.relatedAssetId != null &&
+          action.relatedSymbol != null &&
+          action.relatedName != null &&
+          action.relatedMarket != null) {
+        final receivedUnits = position.units * action.unitFactor;
+        if (receivedUnits.isFinite && receivedUnits > 0) {
+          positions.removeAt(index);
+          final destinationIndex = positions.indexWhere(
+            (item) => item.assetId == action.relatedAssetId,
+          );
+          if (destinationIndex >= 0) {
+            final destination = positions[destinationIndex];
+            positions[destinationIndex] = destination.copyWith(
+              units: destination.units + receivedUnits,
+              totalCost: destination.totalCost + position.totalCost,
+            );
+          } else {
+            positions.add(
+              PortfolioPosition(
+                assetId: action.relatedAssetId!,
+                symbol: action.relatedSymbol!,
+                name: action.relatedName!,
+                market: action.relatedMarket!,
+                currency: action.currency,
+                units: receivedUnits,
+                totalCost: position.totalCost,
+              ),
+            );
+          }
+          final actionLabel = action.type == MarketCorporateActionType.merger
+              ? '합병'
+              : '포괄적 주식교환';
+          ledger.add(
+            LedgerEntry(
+              id: eventId,
+              day: state.day,
+              amount: 0,
+              account: 'market_security',
+              counterAccount: action.type == MarketCorporateActionType.merger
+                  ? 'corporate_merger'
+                  : 'corporate_share_exchange',
+              description:
+                  '${position.name} $actionLabel · '
+                  '${action.relatedName} ${_tradeUnits(receivedUnits)}주 수령 · '
+                  '원가 ${position.totalCost}원 승계',
+              sourceId: eventId,
+              assetId: action.relatedAssetId!,
+            ),
+          );
+          changed = true;
+        }
+      } else if (position != null &&
+          action.type == MarketCorporateActionType.tenderOffer &&
+          action.amount > 0) {
+        final payout = (position.units * action.amount).round();
+        cash += payout;
+        brokerageCash += payout;
+        positions.removeAt(index);
         ledger.add(
           LedgerEntry(
             id: eventId,
             day: state.day,
-            amount: rightsSaleProceeds,
-            account: rightsSaleProceeds > 0
-                ? 'brokerage_cash'
-                : 'market_security',
-            counterAccount:
-                action.allocationMethod ==
-                    MarketRightsIssueAllocationMethod.shareholder
-                ? 'corporate_rights_sale'
-                : 'corporate_rights_issue',
+            amount: payout,
+            account: 'brokerage_cash',
+            counterAccount: 'corporate_tender_offer',
             description:
-                action.allocationMethod ==
-                    MarketRightsIssueAllocationMethod.shareholder
-                ? '${position.name} 주주배정 유상증자 · 신주인수권 자동매각 '
-                      '$rightsSaleProceeds원 · 보유주식수 유지 · '
-                      '지분율 -${dilutionPct.toStringAsFixed(2)}%'
-                : '${position.name} 제3자배정 유상증자 · 신주인수권 없음 · '
-                      '보유주식수 유지 · 지분율 '
-                      '-${dilutionPct.toStringAsFixed(2)}%',
+                '${position.name} 공개매수 참여 · '
+                '${_tradeUnits(position.units)}주 ${action.amount.round()}원 정산',
             sourceId: eventId,
-            notional: rightsSaleProceeds,
+            notional: payout,
             assetId: action.assetId,
+            disposedCost: position.totalCost,
+            realizedPnl: payout - position.totalCost,
           ),
         );
         changed = true;

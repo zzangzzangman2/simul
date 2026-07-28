@@ -357,6 +357,7 @@ void main() {
     TradeOrderType type = TradeOrderType.market,
     double? limitPrice,
     double previousClose = 10000,
+    double? previousTradePrice,
     int marketMinute = krxOpenMinute,
     int? maximumPositionUnits,
     bool isIpoFirstTradingDay = false,
@@ -377,6 +378,7 @@ void main() {
     type: type,
     limitPrice: limitPrice,
     previousClose: previousClose,
+    previousTradePrice: previousTradePrice,
     maximumPositionUnits: maximumPositionUnits,
     isIpoFirstTradingDay: isIpoFirstTradingDay,
     microstructureFrame: microstructureFrame,
@@ -1607,9 +1609,23 @@ void main() {
     expect(waiting.queueAheadQuantity, greaterThan(0));
     final queueMarker = processed.ledger.last;
     expect(queueMarker.counterAccount, 'external_order_book_queue');
-    expect(queueMarker.orderBookSide, isEmpty);
-    expect(queueMarker.orderBookFills, isEmpty);
+    expect(queueMarker.orderBookSide, GameOrderBookSide.bid.name);
+    expect(queueMarker.orderBookFills, hasLength(1));
+    expect(queueMarker.orderBookFills.single.price, wall.price);
+    expect(
+      queueMarker.orderBookFills.single.quantity,
+      queueMarker.orderBookCapacityUnits,
+    );
     expect(queueMarker.orderBookCapacityUnits, greaterThan(0));
+    expect(
+      gameConsumedOrderBookUnitsByPrice(
+        processed,
+        assetId: 'hanbit_telecom',
+        marketMinute: krxOpenMinute,
+        bookSide: GameOrderBookSide.bid,
+      )[wall.price],
+      queueMarker.orderBookFills.single.quantity,
+    );
 
     final processedAgain = engine.processPendingOrdersAtQuote(
       processed,
@@ -2119,6 +2135,121 @@ void main() {
     expect(buyWithoutEnoughDeposit.message, contains('즉시 취소'));
   });
 
+  test('T+2 sell proceeds remain buying power but are not withdrawable', () {
+    final base = engine
+        .createNewGame('결제예정 예수금 연구소', initialCash: 100000)
+        .copyWith(day: 4, marketMinute: krxOpenMinute, brokerageCash: 100000);
+    final sold = base.copyWith(
+      brokerageCash: 160000,
+      cash: 160000,
+      ledger: [
+        ...base.ledger,
+        LedgerEntry(
+          id: 'trade-sell-settlement-test',
+          day: base.day,
+          amount: 60000,
+          account: 'brokerage_cash',
+          counterAccount: 'market_security',
+          description: '테스트 매도',
+          sourceId: 'trade-sell-settlement-test',
+          notional: 60500,
+          tradingFee: 100,
+          transactionTax: 400,
+          assetId: 'hanbit_telecom',
+          tradeSide: TradeSide.sell.name,
+          tradeQuantity: 10,
+          tradeUnitPrice: 6050,
+          marketMinute: krxOpenMinute,
+          orderType: TradeOrderType.market.name,
+        ),
+      ],
+    );
+
+    expect(sold.availableBrokerageCash, 160000);
+    expect(sold.unsettledBrokerageSellProceeds, 60000);
+    expect(sold.withdrawableBrokerageCash, 100000);
+    final rejected = engine.transferBrokerageCash(
+      sold,
+      amount: 100001,
+      deposit: false,
+    );
+    expect(rejected.success, isFalse);
+
+    final withdrawn = engine.transferBrokerageCash(
+      sold,
+      amount: 100000,
+      deposit: false,
+    );
+    expect(withdrawn.success, isTrue);
+    expect(withdrawn.state.brokerageCash, 60000);
+    expect(withdrawn.state.withdrawableBrokerageCash, 0);
+
+    var settlementDate = sold.currentDate;
+    var tradingDays = 0;
+    while (tradingDays < 2) {
+      settlementDate = settlementDate.add(const Duration(days: 1));
+      if (isMarketTradingDay(settlementDate)) tradingDays += 1;
+    }
+    final settled = sold.copyWith(
+      day: settlementDate.difference(sold.campaignStartDate).inDays + 1,
+    );
+    expect(settled.unsettledBrokerageSellProceeds, 0);
+    expect(settled.withdrawableBrokerageCash, 160000);
+  });
+
+  test(
+    'dynamic VI blocks immediate and pending fills for the trigger minute',
+    () {
+      final state = engine
+          .createNewGame('VI 주문 차단 연구소', initialCash: 1000000)
+          .copyWith(day: 4, marketMinute: krxOpenMinute + 1);
+      final immediate = engine.executeTrade(
+        state,
+        hanbitOrder(
+          side: TradeSide.buy,
+          quantity: 1,
+          unitPrice: 10300,
+          previousClose: 10000,
+          previousTradePrice: 10000,
+          marketMinute: krxOpenMinute + 1,
+        ),
+      );
+      expect(immediate.success, isFalse);
+      expect(immediate.message, contains('VI'));
+
+      final pendingState = state.copyWith(
+        pendingOrders: <PendingTradeOrder>[
+          PendingTradeOrder(
+            id: 'vi-pending',
+            side: PendingOrderSide.buy,
+            assetId: 'hanbit_telecom',
+            symbol: '1001',
+            name: '한빛통신',
+            market: fictionalMainMarket,
+            currency: 'KRW',
+            limitPrice: 10300,
+            originalQuantity: 1,
+            remainingQuantity: 1,
+            placedDate: marketDateKey(state.currentDate),
+            placedMinute: krxOpenMinute,
+            placedSequence: 1,
+          ),
+        ],
+      );
+      final processed = engine.processPendingOrdersAtQuote(
+        pendingState,
+        assetId: 'hanbit_telecom',
+        unitPrice: 10300,
+        marketMinute: krxOpenMinute + 1,
+        isTradingDay: true,
+        previousClose: 10000,
+        previousTradePrice: 10000,
+      );
+      expect(processed.pendingOrders, hasLength(1));
+      expect(processed.ledger, hasLength(pendingState.ledger.length));
+    },
+  );
+
   test('insufficient cash rejects a buy without mutating state', () {
     final state = engine
         .createNewGame('현금 부족 연구소', initialCash: 10000)
@@ -2599,6 +2730,113 @@ void main() {
     expect(child.totalCost, 5000);
   });
 
+  test(
+    'merger and share exchange carry cost while tender offer settles cash',
+    () {
+      final base = engine.createNewGame('기업결합 정산 테스트', initialCash: 100000);
+      final sourceState = base.copyWith(
+        day: 5,
+        positions: const <PortfolioPosition>[
+          PortfolioPosition(
+            assetId: 'target',
+            symbol: '000010',
+            name: '피합병회사',
+            market: fictionalMainMarket,
+            currency: 'KRW',
+            units: 10,
+            totalCost: 50000,
+          ),
+        ],
+        pendingOrders: const <PendingTradeOrder>[
+          PendingTradeOrder(
+            id: 'target-pending',
+            side: PendingOrderSide.sell,
+            assetId: 'target',
+            symbol: '000010',
+            name: '피합병회사',
+            market: fictionalMainMarket,
+            currency: 'KRW',
+            limitPrice: 7000,
+            originalQuantity: 2,
+            remainingQuantity: 2,
+            placedDate: '2000-01-05',
+            placedMinute: krxOpenMinute,
+            placedSequence: 1,
+          ),
+        ],
+      );
+      const merger = MarketCorporateAction(
+        id: 'target-merger-2000-01-05',
+        assetId: 'target',
+        type: MarketCorporateActionType.merger,
+        date: '2000-01-05',
+        numerator: 1,
+        denominator: 2,
+        amount: 0,
+        currency: 'KRW',
+        source: 'test',
+        relatedAssetId: 'buyer',
+        relatedSymbol: '000020',
+        relatedName: '존속회사',
+        relatedMarket: fictionalMainMarket,
+      );
+
+      final merged = engine.applyCorporateActions(sourceState, const [merger]);
+      expect(merged.pendingOrders, isEmpty);
+      expect(merged.positions, hasLength(1));
+      expect(merged.positions.single.assetId, 'buyer');
+      expect(merged.positions.single.units, 5);
+      expect(merged.positions.single.totalCost, 50000);
+      expect(merged.ledger.last.counterAccount, 'corporate_merger');
+      expect(
+        engine.applyCorporateActions(merged, const [merger]).toJson(),
+        merged.toJson(),
+      );
+
+      const tender = MarketCorporateAction(
+        id: 'buyer-tender-2000-01-05',
+        assetId: 'buyer',
+        type: MarketCorporateActionType.tenderOffer,
+        date: '2000-01-05',
+        numerator: 1,
+        denominator: 1,
+        amount: 12000,
+        currency: 'KRW',
+        source: 'test',
+      );
+      final tendered = engine.applyCorporateActions(merged, const [tender]);
+      expect(tendered.positions, isEmpty);
+      expect(tendered.cash, merged.cash + 60000);
+      expect(tendered.brokerageCash, merged.brokerageCash + 60000);
+      expect(tendered.ledger.last.counterAccount, 'corporate_tender_offer');
+      expect(tendered.ledger.last.realizedPnl, 10000);
+
+      const exchange = MarketCorporateAction(
+        id: 'target-exchange-2000-01-05',
+        assetId: 'target',
+        type: MarketCorporateActionType.shareExchange,
+        date: '2000-01-05',
+        numerator: 3,
+        denominator: 2,
+        amount: 0,
+        currency: 'KRW',
+        source: 'test',
+        relatedAssetId: 'buyer',
+        relatedSymbol: '000020',
+        relatedName: '완전모회사',
+        relatedMarket: fictionalMainMarket,
+      );
+      final exchanged = engine.applyCorporateActions(
+        sourceState.copyWith(pendingOrders: const <PendingTradeOrder>[]),
+        const [exchange],
+      );
+      expect(exchanged.positions.single.assetId, 'buyer');
+      expect(exchanged.positions.single.units, 15);
+      expect(exchanged.positions.single.totalCost, 50000);
+      expect(exchanged.ledger.last.counterAccount, 'corporate_share_exchange');
+    },
+  );
+
   test('shareholder rights are sold once while units stay unchanged', () {
     final base = engine.createNewGame('유상증자 테스트', initialCash: 100000);
     final state = base.copyWith(
@@ -2647,6 +2885,123 @@ void main() {
       engine.applyCorporateActions(next, const [rightsIssue]).toJson(),
       next.toJson(),
     );
+  });
+
+  test(
+    'shareholder rights can be subscribed with available brokerage cash',
+    () {
+      final base = engine.createNewGame('유상증자 청약 테스트', initialCash: 100000);
+      final state = base.copyWith(
+        day: 5,
+        cash: 100000,
+        brokerageCash: 100000,
+        story: base.story.copyWith(
+          storyFlags: {
+            ...base.story.storyFlags,
+            marketRightsIssuePreferenceFlag:
+                marketRightsIssueSubscribePreference,
+          },
+        ),
+        positions: const [
+          PortfolioPosition(
+            assetId: 'sample',
+            symbol: '000001',
+            name: '샘플',
+            market: fictionalMainMarket,
+            currency: 'KRW',
+            units: 10,
+            totalCost: 50000,
+          ),
+        ],
+      );
+      const rightsIssue = MarketCorporateAction(
+        id: 'sample-rights-subscription-2000-01-05',
+        assetId: 'sample',
+        type: MarketCorporateActionType.rightsIssue,
+        date: '2000-01-05',
+        numerator: 8,
+        denominator: 100,
+        amount: 8000,
+        currency: 'KRW',
+        source: 'test',
+        referencePrice: 10000,
+        sharesOutstandingBefore: 1000,
+        sharesIssued: 80,
+      );
+
+      final next = engine.applyCorporateActions(state, const [rightsIssue]);
+
+      expect(next.positions.single.units, closeTo(10.8, 0.000001));
+      expect(next.positions.single.totalCost, 56400);
+      expect(next.cash, 93600);
+      expect(next.brokerageCash, 93600);
+      expect(next.ledger.last.amount, -6400);
+      expect(next.ledger.last.counterAccount, 'corporate_rights_subscription');
+      expect(next.ledger.last.description, contains('0.8주 배정'));
+    },
+  );
+
+  test('rights subscription falls back to sale when cash is reserved', () {
+    final base = engine.createNewGame('유상증자 예약금 테스트', initialCash: 100000);
+    final state = base.copyWith(
+      day: 5,
+      cash: 100000,
+      brokerageCash: 6500,
+      story: base.story.copyWith(
+        storyFlags: {
+          ...base.story.storyFlags,
+          marketRightsIssuePreferenceFlag: marketRightsIssueSubscribePreference,
+        },
+      ),
+      positions: const [
+        PortfolioPosition(
+          assetId: 'sample',
+          symbol: '000001',
+          name: '샘플',
+          market: fictionalMainMarket,
+          currency: 'KRW',
+          units: 10,
+          totalCost: 50000,
+        ),
+      ],
+      pendingOrders: const [
+        PendingTradeOrder(
+          id: 'reserved-buy',
+          side: PendingOrderSide.buy,
+          assetId: 'other',
+          symbol: '000002',
+          name: '다른 종목',
+          market: fictionalMainMarket,
+          currency: 'KRW',
+          limitPrice: 1000,
+          originalQuantity: 1,
+          remainingQuantity: 1,
+          placedDate: '2000-01-05',
+          placedMinute: krxOpenMinute,
+          placedSequence: 1,
+        ),
+      ],
+    );
+    const rightsIssue = MarketCorporateAction(
+      id: 'sample-rights-reserved-2000-01-05',
+      assetId: 'sample',
+      type: MarketCorporateActionType.rightsIssue,
+      date: '2000-01-05',
+      numerator: 8,
+      denominator: 100,
+      amount: 8000,
+      currency: 'KRW',
+      source: 'test',
+      referencePrice: 10000,
+      sharesOutstandingBefore: 1000,
+      sharesIssued: 80,
+    );
+
+    final next = engine.applyCorporateActions(state, const [rightsIssue]);
+
+    expect(next.positions.single.units, 10);
+    expect(next.ledger.last.counterAccount, 'corporate_rights_sale');
+    expect(next.ledger.last.description, contains('청약대금 부족'));
   });
 
   test('third-party rights issue dilutes without TERP or rights proceeds', () {
