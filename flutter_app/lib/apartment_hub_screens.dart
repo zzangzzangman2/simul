@@ -1,6 +1,6 @@
 part of 'main.dart';
 
-enum _ApartmentPlace { bedroom, livingRoom, kitchen }
+enum _ApartmentPlace { bedroom, livingRoom, kitchen, corridor, neighborhood }
 
 const _hubDisplayFont = 'Maplestory';
 
@@ -23,6 +23,7 @@ class ApartmentHubScreen extends StatefulWidget {
     required this.onOpenDecisions,
     required this.onOpenLedger,
     required this.onOpenOrganization,
+    required this.onOpenHomeImprovements,
     required this.onOpenWork,
     required this.activeSaveSlot,
     required this.lastSavedAt,
@@ -41,6 +42,7 @@ class ApartmentHubScreen extends StatefulWidget {
   final VoidCallback onOpenDecisions;
   final VoidCallback onOpenLedger;
   final VoidCallback onOpenOrganization;
+  final VoidCallback onOpenHomeImprovements;
   final VoidCallback onOpenWork;
   final int activeSaveSlot;
   final DateTime? lastSavedAt;
@@ -110,6 +112,7 @@ class _ApartmentHubScreenState extends State<ApartmentHubScreen> {
               onOpenDecisions: widget.onOpenDecisions,
               onOpenLedger: widget.onOpenLedger,
               onOpenOrganization: widget.onOpenOrganization,
+              onOpenHomeImprovements: widget.onOpenHomeImprovements,
               onOpenWork: widget.onOpenWork,
             ),
           ),
@@ -779,7 +782,7 @@ class _HubTutorialOverlay extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               const Text(
-                '• 침실 CRT: 주식시장과 1분봉\n• 침실 서류함: 장부·성과\n• 거실 편지: 필수 결정\n• 거실 소파: 가족·채용·펀드\n• 부엌 전화: 일거리 수입',
+                '• 작은방 CRT: 홈 PC와 시장 앱\n• 작은방 서류함: 장부·성과\n• 거실 소파: 가족·채용·펀드\n• 거실 밥상 장부: 살림 꾸미기\n• 집 앞 복도 우편함: 새 안건 편지\n• 동네 게시판: 일거리·미니게임\n• 동네 은행 출입구: 예금·대출',
                 style: TextStyle(
                   fontSize: 13,
                   height: 1.65,
@@ -819,6 +822,7 @@ class _ApartmentPlaceScene extends StatelessWidget {
     required this.onOpenDecisions,
     required this.onOpenLedger,
     required this.onOpenOrganization,
+    required this.onOpenHomeImprovements,
     required this.onOpenWork,
   });
 
@@ -829,17 +833,38 @@ class _ApartmentPlaceScene extends StatelessWidget {
   final VoidCallback onOpenDecisions;
   final VoidCallback onOpenLedger;
   final VoidCallback onOpenOrganization;
+  final VoidCallback onOpenHomeImprovements;
   final VoidCallback onOpenWork;
 
   @override
   Widget build(BuildContext context) {
     final details = _ApartmentPlaceDetails.forPlace(place);
+    final backgroundAsset = switch (place) {
+      _ApartmentPlace.bedroom => _homeImprovementBackgroundAsset(
+        HomeImprovementRoom.bedroom,
+        state.homeImprovements.roomTier(HomeImprovementRoom.bedroom),
+      ),
+      _ApartmentPlace.livingRoom => _homeImprovementBackgroundAsset(
+        HomeImprovementRoom.livingRoom,
+        state.homeImprovements.roomTier(HomeImprovementRoom.livingRoom),
+      ),
+      _ApartmentPlace.kitchen => _homeImprovementBackgroundAsset(
+        HomeImprovementRoom.kitchen,
+        state.homeImprovements.roomTier(HomeImprovementRoom.kitchen),
+      ),
+      _ApartmentPlace.corridor => _gameplayCorridorBackgroundAsset(
+        state.homeImprovements,
+      ),
+      _ApartmentPlace.neighborhood => _gameplayNeighborhoodBackgroundAsset(
+        state,
+      ),
+    };
     return Stack(
       key: Key('apartment-place-${details.id}'),
       fit: StackFit.expand,
       children: [
         Image.asset(
-          details.assetPath,
+          backgroundAsset,
           key: Key('apartment-background-${details.id}'),
           fit: BoxFit.cover,
           alignment: Alignment.center,
@@ -847,64 +872,100 @@ class _ApartmentPlaceScene extends StatelessWidget {
           errorBuilder: (context, error, stackTrace) =>
               _ApartmentFallbackBackground(details: details),
         ),
+        Positioned.fill(
+          child: IgnorePointer(
+            child: _ApartmentAmbientLayer(place: place, state: state),
+          ),
+        ),
         if (place == _ApartmentPlace.bedroom) ...[
           _ApartmentObjectHotspot(
             interactionKey: const Key('open-market-button'),
-            alignment: const Alignment(-0.63, -0.22),
+            alignment: const Alignment(-0.66, -0.20),
+            width: 118,
+            height: 112,
             eyebrow: '컴퓨터 켜기',
             label: '홈 PC',
+            icon: Icons.computer_rounded,
             accent: const Color(0xFF80D8FF),
             onTap: onOpenMarket,
           ),
           _ApartmentObjectHotspot(
             interactionKey: const Key('open-ledger-button'),
-            alignment: const Alignment(0.56, -0.02),
-            eyebrow: '장부 펼치기',
-            label: '서류함',
+            alignment: const Alignment(0.62, -0.08),
+            width: 94,
+            height: 126,
+            eyebrow: '서랍 열기',
+            label: '장부 서류함',
+            icon: Icons.inventory_2_rounded,
             accent: const Color(0xFFFFC78E),
             onTap: onOpenLedger,
           ),
         ],
         if (place == _ApartmentPlace.livingRoom) ...[
           _ApartmentObjectHotspot(
-            interactionKey: const Key('open-bank-button'),
-            alignment: const Alignment(-0.20, -0.43),
-            eyebrow: '현관으로 외출',
-            label: '새천년은행',
-            accent: const Color(0xFF86CBEA),
-            onTap: onOpenBank,
-          ),
-          _ApartmentObjectHotspot(
             interactionKey: const Key('open-organization-button'),
-            alignment: const Alignment(-0.72, -0.25),
-            eyebrow: '함께 이야기',
+            alignment: const Alignment(-0.68, -0.08),
+            width: 124,
+            height: 148,
+            eyebrow: '소파에서 이야기',
             label: '가족·조직',
+            icon: Icons.family_restroom_rounded,
             accent: const Color(0xFFFFD27A),
             onTap: onOpenOrganization,
           ),
           _ApartmentObjectHotspot(
+            interactionKey: const Key('open-home-improvements-button'),
+            alignment: const Alignment(0.68, 0.04),
+            width: 122,
+            height: 112,
+            eyebrow: '밥상 위 장부',
+            label: '살림 꾸미기',
+            icon: Icons.home_work_rounded,
+            accent: const Color(0xFFFFA97A),
+            onTap: onOpenHomeImprovements,
+          ),
+        ],
+        if (place == _ApartmentPlace.corridor)
+          _ApartmentObjectHotspot(
             interactionKey: const Key('open-decisions-button'),
-            alignment: const Alignment(0.22, 0.10),
-            eyebrow: '새 편지 확인',
+            alignment: const Alignment(0.08, -0.20),
+            width: 106,
+            height: 126,
+            eyebrow: '집 앞 우편함 열기',
             label: state.pendingDecisions.isEmpty
-                ? '안건 편지'
-                : '안건 ${state.pendingDecisions.length}건',
+                ? '우편함'
+                : '새 편지 ${state.pendingDecisions.length}건',
+            icon: Icons.markunread_mailbox_rounded,
             accent: state.pendingDecisions.isEmpty
-                ? const Color(0xFFFFE9BA)
+                ? const Color(0xFF9ED9EF)
                 : _yellow,
             attention: state.pendingDecisions.isNotEmpty,
             onTap: onOpenDecisions,
           ),
-        ],
-        if (place == _ApartmentPlace.kitchen)
+        if (place == _ApartmentPlace.neighborhood) ...[
+          _ApartmentObjectHotspot(
+            interactionKey: const Key('open-bank-button'),
+            alignment: const Alignment(-0.74, -0.34),
+            width: 118,
+            height: 144,
+            eyebrow: '출입구로 들어가기',
+            label: '새천년은행',
+            icon: Icons.account_balance_rounded,
+            accent: const Color(0xFF86CBEA),
+            onTap: onOpenBank,
+          ),
           _ApartmentObjectHotspot(
             interactionKey: const Key('open-work-button'),
-            alignment: const Alignment(-0.65, -0.08),
-            eyebrow: '일거리 찾기',
-            label: '일거리 전화',
+            alignment: const Alignment(0.76, -0.24),
+            width: 122,
+            height: 148,
+            eyebrow: '동네 일거리 확인',
+            label: '일거리 게시판',
+            icon: Icons.sports_esports_rounded,
             accent: const Color(0xFF98E5C1),
             onTap: onOpenWork,
           ),
+        ],
       ],
     );
   }
@@ -1265,12 +1326,18 @@ class _ApartmentWeather {
   final String label;
 
   static _ApartmentWeather forState(GameState state) {
+    if (state.marketMinute >= 17 * 60) {
+      return const _ApartmentWeather('해질녘');
+    }
     final seed = state.simulationSeed.codeUnits.fold<int>(
       state.day * 17,
       (value, unit) => (value * 31 + unit) & 0x7fffffff,
     );
-    const labels = <String>['맑음', '구름', '포근', '찬바람'];
-    return _ApartmentWeather(labels[seed % labels.length]);
+    return switch (seed % 5) {
+      1 || 3 => const _ApartmentWeather('구름'),
+      4 => const _ApartmentWeather('비'),
+      _ => const _ApartmentWeather('맑음'),
+    };
   }
 }
 
@@ -1470,8 +1537,11 @@ class _ApartmentObjectHotspot extends StatelessWidget {
     required this.alignment,
     required this.eyebrow,
     required this.label,
+    required this.icon,
     required this.accent,
     required this.onTap,
+    this.width = 84,
+    this.height = 84,
     this.attention = false,
   });
 
@@ -1479,8 +1549,11 @@ class _ApartmentObjectHotspot extends StatelessWidget {
   final Alignment alignment;
   final String eyebrow;
   final String label;
+  final IconData icon;
   final Color accent;
   final VoidCallback onTap;
+  final double width;
+  final double height;
   final bool attention;
 
   @override
@@ -1499,63 +1572,92 @@ class _ApartmentObjectHotspot extends StatelessWidget {
           button: true,
           label: '$label 열기',
           child: SizedBox(
-            width: 48,
-            height: 48,
+            width: width,
+            height: height,
             child: Material(
               color: Colors.transparent,
               child: InkWell(
                 key: interactionKey,
                 onTap: onTap,
-                customBorder: const CircleBorder(),
-                child: Center(
-                  child: AnimatedContainer(
-                    key: ValueKey(attention),
-                    duration: const Duration(milliseconds: 180),
-                    curve: Curves.easeOutCubic,
-                    width: attention ? 42 : 36,
-                    height: attention ? 42 : 36,
-                    decoration: BoxDecoration(
-                      color: attention
-                          ? const Color(0xBFE24B5B)
-                          : const Color(0x9975D6F4),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: const Color(0xF2FFFFFF),
-                        width: 2,
-                      ),
-                      boxShadow: [
-                        const BoxShadow(
-                          color: Color(0x3D0B1423),
-                          blurRadius: 8,
-                          offset: Offset(0, 4),
-                        ),
-                        BoxShadow(
-                          color: (attention ? _coral : accent).withValues(
-                            alpha: attention ? 0.62 : 0.42,
-                          ),
-                          blurRadius: attention ? 18 : 12,
-                          spreadRadius: attention ? 2 : 0,
-                        ),
-                      ],
+                borderRadius: BorderRadius.circular(16),
+                child: AnimatedContainer(
+                  key: ValueKey(attention),
+                  duration: const Duration(milliseconds: 180),
+                  curve: Curves.easeOutCubic,
+                  decoration: BoxDecoration(
+                    color: (attention ? _coral : accent).withValues(
+                      alpha: attention ? 0.20 : 0.08,
                     ),
-                    child: Center(
-                      child: attention
-                          ? const Text(
-                              '!',
-                              style: TextStyle(
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: Colors.white.withValues(
+                        alpha: attention ? 0.98 : 0.86,
+                      ),
+                      width: attention ? 2.6 : 2,
+                    ),
+                    boxShadow: [
+                      const BoxShadow(
+                        color: Color(0x450B1423),
+                        blurRadius: 10,
+                        offset: Offset(0, 4),
+                      ),
+                      BoxShadow(
+                        color: (attention ? _coral : accent).withValues(
+                          alpha: attention ? 0.64 : 0.34,
+                        ),
+                        blurRadius: attention ? 22 : 14,
+                        spreadRadius: attention ? 2 : 0,
+                      ),
+                    ],
+                  ),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Icon(
+                        attention ? Icons.priority_high_rounded : icon,
+                        color: Colors.white.withValues(
+                          alpha: attention ? 1 : 0.82,
+                        ),
+                        size: attention ? 34 : 28,
+                        shadows: const [
+                          Shadow(
+                            color: Color(0xA0121A27),
+                            blurRadius: 5,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      Align(
+                        alignment: Alignment.bottomCenter,
+                        child: Container(
+                          margin: const EdgeInsets.fromLTRB(4, 0, 4, 5),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xD91B2537),
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.72),
+                            ),
+                          ),
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              label,
+                              maxLines: 1,
+                              style: const TextStyle(
                                 fontFamily: _hubDisplayFont,
                                 color: Colors.white,
-                                fontSize: 26,
-                                height: 1,
+                                fontSize: 9,
                                 fontWeight: FontWeight.w700,
                               ),
-                            )
-                          : const Icon(
-                              Icons.auto_awesome_rounded,
-                              color: Colors.white,
-                              size: 19,
                             ),
-                    ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -1820,34 +1922,58 @@ class _ApartmentPlaceDetails {
   final IconData icon;
   final Color accent;
 
-  static _ApartmentPlaceDetails forPlace(_ApartmentPlace place) =>
-      switch (place) {
-        _ApartmentPlace.bedroom => const _ApartmentPlaceDetails(
-          id: 'bedroom',
-          title: '가족 아파트 · 작은방',
-          shortTitle: '작은방',
-          hint: '주식 보기 · 장부 정리',
-          assetPath: 'assets/images/bg_bedroom_cartoon_2000.png',
-          icon: Icons.bedroom_parent_rounded,
-          accent: Color(0xFF82D7FF),
-        ),
-        _ApartmentPlace.livingRoom => const _ApartmentPlaceDetails(
-          id: 'living-room',
-          title: '가족 아파트 · 거실',
-          shortTitle: '거실',
-          hint: '안건 확인 · 가족 이야기',
-          assetPath: 'assets/images/bg_living_room_cartoon_2000.png',
-          icon: Icons.weekend_rounded,
-          accent: Color(0xFFFFCB78),
-        ),
-        _ApartmentPlace.kitchen => const _ApartmentPlaceDetails(
-          id: 'kitchen',
-          title: '가족 아파트 · 부엌',
-          shortTitle: '부엌',
-          hint: '일거리 찾기 · 종잣돈 벌기',
-          assetPath: 'assets/images/bg_kitchen_cartoon_2000.png',
-          icon: Icons.kitchen_rounded,
-          accent: Color(0xFF8CE3BE),
-        ),
-      };
+  static _ApartmentPlaceDetails forPlace(
+    _ApartmentPlace place,
+  ) => switch (place) {
+    _ApartmentPlace.bedroom => const _ApartmentPlaceDetails(
+      id: 'bedroom',
+      title: '가족 아파트 · 작은방',
+      shortTitle: '작은방',
+      hint: '홈 PC · 장부 서류함',
+      assetPath:
+          'assets/images/gameplay_map/bg_gameplay_bedroom_tier0_2000_portrait_cartoon_v1.png',
+      icon: Icons.bedroom_parent_rounded,
+      accent: Color(0xFF82D7FF),
+    ),
+    _ApartmentPlace.livingRoom => const _ApartmentPlaceDetails(
+      id: 'living-room',
+      title: '가족 아파트 · 거실',
+      shortTitle: '거실',
+      hint: '가족 이야기 · 살림 꾸미기',
+      assetPath:
+          'assets/images/gameplay_map/bg_gameplay_living_room_tier0_2000_portrait_cartoon_v1.png',
+      icon: Icons.weekend_rounded,
+      accent: Color(0xFFFFCB78),
+    ),
+    _ApartmentPlace.kitchen => const _ApartmentPlaceDetails(
+      id: 'kitchen',
+      title: '가족 아파트 · 부엌',
+      shortTitle: '부엌',
+      hint: '가족 살림 · 집 안 이동',
+      assetPath:
+          'assets/images/gameplay_map/bg_gameplay_kitchen_tier0_2000_portrait_cartoon_v1.png',
+      icon: Icons.kitchen_rounded,
+      accent: Color(0xFF8CE3BE),
+    ),
+    _ApartmentPlace.corridor => const _ApartmentPlaceDetails(
+      id: 'corridor',
+      title: '가족 아파트 · 우리 집 앞',
+      shortTitle: '집 앞',
+      hint: '우편함 · 새 안건',
+      assetPath:
+          'assets/images/gameplay_map/bg_gameplay_corridor_tier0_2000_portrait_cartoon_v1.png',
+      icon: Icons.meeting_room_rounded,
+      accent: Color(0xFF9ED9EF),
+    ),
+    _ApartmentPlace.neighborhood => const _ApartmentPlaceDetails(
+      id: 'neighborhood',
+      title: '우리 동네 · 골목',
+      shortTitle: '동네',
+      hint: '은행 · 일거리 · 미니게임',
+      assetPath:
+          'assets/images/gameplay_map/bg_gameplay_neighborhood_clear_2000_portrait_cartoon_v1.png',
+      icon: Icons.location_city_rounded,
+      accent: Color(0xFF98E5C1),
+    ),
+  };
 }

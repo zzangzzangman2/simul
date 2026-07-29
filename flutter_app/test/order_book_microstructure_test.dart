@@ -79,41 +79,23 @@ void main() {
       )
       .join('|');
 
-  test('market-minute slots span low-liquidity one to active twelve', () {
-    final dormant = gameOrderBookPulsesPerMarketMinute(
-      fullDayTurnoverEok: 1,
-      currentPrice: 10000,
-      previousTradePrice: 10000,
-      previousClose: 10000,
-    );
-    final thin = gameOrderBookPulsesPerMarketMinute(
-      fullDayTurnoverEok: 50,
-      currentPrice: 10000,
-      previousTradePrice: 10000,
-      previousClose: 10000,
-    );
-    final ordinary = gameOrderBookPulsesPerMarketMinute(
-      fullDayTurnoverEok: 100,
-      currentPrice: 10000,
-      previousTradePrice: 10000,
-      previousClose: 10000,
-    );
-    final active = gameOrderBookPulsesPerMarketMinute(
-      fullDayTurnoverEok: 60000,
-      currentPrice: 10000,
-      previousTradePrice: 10000,
-      previousClose: 10000,
-    );
+  test('market-minute visual cadence is one third from one to four slots', () {
+    final slots = <double>[1, 50, 100, 500, 2000, 5000, 10000, 15000, 60000]
+        .map(
+          (turnover) => gameOrderBookPulsesPerMarketMinute(
+            fullDayTurnoverEok: turnover,
+            currentPrice: 10000,
+            previousTradePrice: 10000,
+            previousClose: 10000,
+          ),
+        )
+        .toList(growable: false);
 
-    expect(dormant, gameOrderBookMinimumPulsesPerMarketMinute);
-    expect(dormant, 1);
-    expect(thin, 1);
-    expect(ordinary, greaterThan(dormant));
-    expect(active, greaterThan(ordinary));
-    expect(active, gameOrderBookMaximumOrdinaryPulsesPerMarketMinute);
+    expect(slots, orderedEquals(<int>[1, 1, 1, 1, 2, 2, 3, 4, 4]));
+    expect(slots.last, gameOrderBookMaximumOrdinaryPulsesPerMarketMinute);
   });
 
-  test('fast and extreme moves use 16 and 20 slots without exceeding cap', () {
+  test('fast and extreme moves use five and seven reduced slots', () {
     final fast = gameOrderBookPulsesPerMarketMinute(
       fullDayTurnoverEok: 1,
       currentPrice: 10150,
@@ -142,6 +124,25 @@ void main() {
     expect(extremeHighLiquidity, gameOrderBookMaximumPulsesPerMarketMinute);
   });
 
+  test('five percent session move alone does not force fast cadence', () {
+    final fivePercent = gameOrderBookPulsesPerMarketMinute(
+      fullDayTurnoverEok: 100,
+      currentPrice: 10500,
+      previousTradePrice: 10500,
+      previousClose: 10000,
+      market: 'main',
+    );
+    final aboveSixPercent = gameOrderBookPulsesPerMarketMinute(
+      fullDayTurnoverEok: 100,
+      currentPrice: 10610,
+      previousTradePrice: 10610,
+      previousClose: 10000,
+      market: 'main',
+    );
+
+    expect(fivePercent, 1);
+    expect(aboveSixPercent, gameOrderBookFastPulsesPerMarketMinute);
+  });
   test('tiny or unsupported tape imbalance cannot accelerate the book', () {
     final balancedExecutions = gameOrderBookPulsesPerMarketMinute(
       fullDayTurnoverEok: 1,
@@ -176,7 +177,7 @@ void main() {
       previousClose: 10000,
       executionStrength: 500,
     );
-    expect(insufficientLiquidSample, 2);
+    expect(insufficientLiquidSample, 1);
 
     final liquidImbalance = gameOrderBookPulsesPerMarketMinute(
       fullDayTurnoverEok: gameOrderBookSparseFullDayTurnoverEok,
@@ -231,10 +232,15 @@ void main() {
     }
 
     final everySlot = runTargets([
-      for (var slot = 1; slot <= 24; slot += 1) slot,
+      for (
+        var slot = 1;
+        slot <= gameOrderBookMaximumPulsesPerMarketMinute;
+        slot += 1
+      )
+        slot,
     ]);
-    final halfDropped = runTargets(const [4, 8, 12, 16, 20, 24]);
-    expect(signature(halfDropped), signature(everySlot));
+    final dropped = runTargets([2, gameOrderBookMaximumPulsesPerMarketMinute]);
+    expect(signature(dropped), signature(everySlot));
 
     GameOrderBookFillPlan fill(GameOrderBookSnapshot value) =>
         gameOrderBookLimitFillPlan(
@@ -244,7 +250,7 @@ void main() {
           limitPrice: value.asks[2].price,
         );
     final fullFill = fill(everySlot);
-    final droppedFill = fill(halfDropped);
+    final droppedFill = fill(dropped);
     expect(droppedFill.filledQuantity, fullFill.filledQuantity);
     expect(droppedFill.averagePrice, fullFill.averagePrice);
     expect(
@@ -272,6 +278,29 @@ void main() {
         gameOrderBookLiquidityPulseFrame(marketMinute: minute, slotIndex: 1),
       ]),
     );
+  });
+  test('reduced cadence triples slot flow and keeps full minute capacity', () {
+    const capacity = 1200;
+    final pulses = gameOrderBookMaximumOrdinaryPulsesPerMarketMinute;
+    final formerPulses = pulses * gameOrderBookVisualCadenceDivisor;
+
+    final reduced = [
+      for (var slot = 1; slot <= pulses; slot += 1)
+        gameOrderBookCumulativeSlotCapacity(
+          executionCapacity: capacity,
+          slotIndex: slot,
+          pulsesPerMarketMinute: pulses,
+        ),
+    ];
+    final formerFirst = gameOrderBookCumulativeSlotCapacity(
+      executionCapacity: capacity,
+      slotIndex: 1,
+      pulsesPerMarketMinute: formerPulses,
+    );
+
+    expect(reduced, orderedEquals(<int>[300, 600, 900, 1200]));
+    expect(reduced.first, formerFirst * gameOrderBookVisualCadenceDivisor);
+    expect(reduced.last, capacity);
   });
   test(
     'multiple render frames can reuse one low-liquidity pulse unchanged',
@@ -784,6 +813,30 @@ void main() {
     expect(flippedFarLevel.isWall, isFalse);
     expect(flippedFarLevel.queueRecoveryTargetQuantity, 0);
 
+    final ninetyPercentQuantity = (intactLevel.quantity * 0.90).ceil();
+    final ninetyPercentConsumed = gameOrderBookSnapshotAfterConsumption(
+      snapshot: intact,
+      consumedAskByPrice: intactLevel.side == GameOrderBookSide.ask
+          ? {intactLevel.price: ninetyPercentQuantity.toDouble()}
+          : const <double, double>{},
+      consumedBidByPrice: intactLevel.side == GameOrderBookSide.bid
+          ? {intactLevel.price: ninetyPercentQuantity.toDouble()}
+          : const <double, double>{},
+    );
+    final ninetyPercentLevel =
+        ninetyPercentConsumed.rememberedLevels[support.price]!;
+    final ordinaryRecoveryCeiling = math.max(
+      gameOrderBookMinimumDisplayedQuantity,
+      (intactLevel.quantity / math.max(1.0, intactLevel.structuralStrength))
+          .round(),
+    );
+    expect(ninetyPercentLevel.isStructuralBreached, isTrue);
+    expect(ninetyPercentLevel.isStructuralWall, isFalse);
+    expect(ninetyPercentLevel.isWall, isFalse);
+    expect(
+      ninetyPercentLevel.queueRecoveryTargetQuantity,
+      lessThanOrEqualTo(ordinaryRecoveryCeiling),
+    );
     var recoveringWall = gameOrderBookSnapshotAfterConsumption(
       snapshot: intact,
       consumedAskByPrice: intactLevel.side == GameOrderBookSide.ask
@@ -792,6 +845,15 @@ void main() {
       consumedBidByPrice: intactLevel.side == GameOrderBookSide.bid
           ? {intactLevel.price: intactLevel.quantity.toDouble()}
           : const <double, double>{},
+    );
+    final exhaustedIntactLevel =
+        recoveringWall.rememberedLevels[support.price]!;
+    expect(exhaustedIntactLevel.isStructuralBreached, isTrue);
+    expect(exhaustedIntactLevel.isStructuralWall, isFalse);
+    expect(exhaustedIntactLevel.isWall, isFalse);
+    expect(
+      exhaustedIntactLevel.queueRecoveryTargetQuantity,
+      lessThanOrEqualTo(ordinaryRecoveryCeiling),
     );
     for (var nextPulse = 20; nextPulse < 40; nextPulse += 1) {
       recoveringWall = breachedSnapshot(
@@ -803,7 +865,15 @@ void main() {
     expect(
       recoveringWall.rememberedLevels[support.price]!.quantity,
       lessThan((intactLevel.quantity * 0.70).floor()),
-      reason: '구조벽은 일반 호가처럼 20슬롯 안에 통째로 복구되면 안 됩니다.',
+      reason: '소진된 구조벽은 이후 펄스에서도 원래 벽 크기로 복구되면 안 됩니다.',
+    );
+    final recoveredLevel = recoveringWall.rememberedLevels[support.price]!;
+    expect(recoveredLevel.isStructuralBreached, isTrue);
+    expect(recoveredLevel.isStructuralWall, isFalse);
+    expect(recoveredLevel.isWall, isFalse);
+    expect(
+      recoveredLevel.queueRecoveryTargetQuantity,
+      lessThanOrEqualTo(ordinaryRecoveryCeiling),
     );
   });
 
@@ -945,12 +1015,12 @@ void main() {
             liquidityPulse: pulse,
           )!,
       ];
-      final stickyRatio =
+      final balancedRatio =
           flatPulses
               .where((pulse) => pulse.levelSide == flatBaseline.levelSide)
               .length /
           flatPulses.length;
-      expect(stickyRatio, inInclusiveRange(0.65, 0.80));
+      expect(balancedRatio, inInclusiveRange(0.45, 0.55));
       expect(
         flatPulses.any((pulse) => pulse.levelSide != flatBaseline.levelSide),
         isTrue,
@@ -988,12 +1058,111 @@ void main() {
     },
   );
 
-  test('adaptive pulses 1 through 12 stay within one execution capacity', () {
+  test('logical-slot executions split into deterministic fat-tail prints', () {
+    final prints = <int>[];
+    for (var pulse = 1; pulse <= 30; pulse += 1) {
+      final split = gameOrderBookSplitTradeQuantity(
+        assetId: '$simulationSeed:$assetId',
+        day: day,
+        minute: minute + pulse,
+        liquidityPulse: pulse,
+        quantity: 1200,
+      );
+      expect(split.fold<int>(0, (sum, value) => sum + value), 1200);
+      expect(
+        gameOrderBookSplitTradeQuantity(
+          assetId: '$simulationSeed:$assetId',
+          day: day,
+          minute: minute + pulse,
+          liquidityPulse: pulse,
+          quantity: 1200,
+        ),
+        orderedEquals(split),
+      );
+      prints.addAll(split);
+    }
+
+    final sorted = [...prints]..sort();
+    final median = sorted[sorted.length ~/ 2];
+    final percentile99 = sorted[(sorted.length * 0.99).floor()];
+    final smallShare =
+        prints.where((quantity) => quantity < 10).length / prints.length;
+
+    expect(prints.length, greaterThan(200));
+    expect(smallShare, greaterThanOrEqualTo(0.60));
+    expect(percentile99, greaterThanOrEqualTo(median * 20));
+    expect(prints.any((quantity) => quantity >= 100), isTrue);
+    expect(
+      prints.any((quantity) => quantity % 10 != 0),
+      isTrue,
+      reason: 'aggregate queue depth must not be rounded onto 10-share lots',
+    );
+  });
+
+  test('near-touch rows are selected far more often than row ten', () {
+    final counts = List<int>.filled(gameOrderBookLevelCount, 0);
+    for (var pulse = 1; pulse <= 5000; pulse += 1) {
+      final target = gameOrderBookPulseTarget(
+        assetId: '$simulationSeed:$assetId',
+        day: day,
+        liquidityPulse: pulse,
+        slot: pulse % 3,
+        levelCount: gameOrderBookLevelCount,
+      );
+      counts[target.distance] += 1;
+      expect(
+        gameOrderBookPulseTarget(
+          assetId: '$simulationSeed:$assetId',
+          day: day,
+          liquidityPulse: pulse,
+          slot: pulse % 3,
+          levelCount: gameOrderBookLevelCount,
+        ),
+        target,
+      );
+    }
+
+    expect(counts.first, greaterThan(counts.last * 5));
+  });
+
+  test(
+    'micro walls are sparse absolute prices instead of a five-tick comb',
+    () {
+      final wallOffsets = <int>[];
+      for (var offset = 0; offset < 200; offset += 1) {
+        if (gameOrderBookIsMicroWallPrice(
+          assetId: '$simulationSeed:$assetId',
+          day: day,
+          price: 10000 + offset * 50,
+          market: 'main',
+          psychologicalGridStep: 1000,
+        )) {
+          wallOffsets.add(offset);
+        }
+      }
+
+      expect(wallOffsets.length, greaterThanOrEqualTo(5));
+      final gaps = <int>[
+        for (var index = 1; index < wallOffsets.length; index += 1)
+          wallOffsets[index] - wallOffsets[index - 1],
+      ];
+      expect(gaps.toSet().length, greaterThan(1));
+      expect(
+        wallOffsets.map((offset) => offset % 5).toSet().length,
+        greaterThan(1),
+      );
+    },
+  );
+  test('scheduled pulses stay within one execution capacity', () {
     const executionCapacity = 100000;
 
     for (final currentPrice in [10000.0, 11000.0]) {
       var totalRequested = 0;
-      for (var pulse = 1; pulse <= 12; pulse += 1) {
+      for (
+        var pulse = 1;
+        pulse <= gameOrderBookMaximumPulsesPerMarketMinute;
+        pulse += 1
+      ) {
         final tradePulse = gameOrderBookTradePulse(
           assetId: assetId,
           day: day,
@@ -1007,7 +1176,7 @@ void main() {
         )!;
         totalRequested += tradePulse.quantity;
 
-        if (pulse < 12) {
+        if (pulse < gameOrderBookMaximumPulsesPerMarketMinute) {
           expect(
             totalRequested,
             lessThan(executionCapacity),
@@ -1062,6 +1231,22 @@ void main() {
       expect(applied.lastSyntheticTrade!.levelSide, GameOrderBookSide.ask);
       expect(applied.lastSyntheticTrade!.price, target.price);
       expect(applied.lastSyntheticTrade!.quantity, requestedQuantity);
+      expect(
+        applied.syntheticTradePrints.fold<int>(
+          0,
+          (sum, print) => sum + print.quantity,
+        ),
+        requestedQuantity,
+      );
+      expect(
+        applied.syntheticTradePrints.map((print) => print.sequence),
+        orderedEquals(
+          List<int>.generate(
+            applied.syntheticTradePrints.length,
+            (index) => index,
+          ),
+        ),
+      );
       expect(applied.syntheticTradeBudgetUsed, requestedQuantity);
       expect(applied.appliedAskConsumptionByPrice, isEmpty);
       expect(applied.appliedBidConsumptionByPrice, isEmpty);

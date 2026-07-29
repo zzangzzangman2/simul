@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'banking_state.dart';
 import 'business_state.dart';
+import 'home_improvement_state.dart';
 import 'market_clock.dart';
 import 'market_cost_rules.dart';
 import 'mission_progression.dart';
@@ -181,7 +182,10 @@ class GameState {
     required this.ledger,
     required this.processedEventIds,
     BusinessPortfolioState? businesses,
-  }) : businesses = businesses ?? const BusinessPortfolioState.initial();
+    HomeImprovementState? homeImprovements,
+  }) : businesses = businesses ?? const BusinessPortfolioState.initial(),
+       homeImprovements =
+           homeImprovements ?? const HomeImprovementState.initial();
 
   static const schemaVersion = 20;
   static const maxCampaignDay = 9862;
@@ -201,6 +205,7 @@ class GameState {
   final BusinessPortfolioState businesses;
   final MissionProgressionState progression;
   final StoryState story;
+  final HomeImprovementState homeImprovements;
   final CompanyState company;
   final ProjectState? project;
   final List<DecisionCardData> decisions;
@@ -356,6 +361,7 @@ class GameState {
     BusinessPortfolioState? businesses,
     MissionProgressionState? progression,
     StoryState? story,
+    HomeImprovementState? homeImprovements,
     CompanyState? company,
     ProjectState? project,
     bool clearProject = false,
@@ -383,6 +389,7 @@ class GameState {
       businesses: businesses ?? this.businesses,
       progression: progression ?? this.progression,
       story: story ?? this.story,
+      homeImprovements: homeImprovements ?? this.homeImprovements,
       company: company ?? this.company,
       project: clearProject ? null : project ?? this.project,
       decisions: decisions ?? this.decisions,
@@ -409,6 +416,7 @@ class GameState {
     'businesses': businesses.toJson(),
     'progression': progression.toJson(),
     'story': story.toJson(),
+    'homeImprovements': homeImprovements.toJson(),
     'company': company.toJson(),
     'project': project?.toJson(),
     'decisions': decisions.map((item) => item.toJson()).toList(),
@@ -470,6 +478,9 @@ class GameState {
       story: StoryState.fromJson(
         (json['story'] as Map?)?.cast<String, dynamic>() ?? const {},
         companyName: json['companyName'] as String? ?? '',
+      ),
+      homeImprovements: HomeImprovementState.fromJson(
+        (json['homeImprovements'] as Map?)?.cast<String, dynamic>() ?? const {},
       ),
       company: CompanyState.fromJson(
         (json['company'] as Map?)?.cast<String, dynamic>() ?? const {},

@@ -8,7 +8,371 @@ enum _ChartPeriod { minute, day, week, month, year }
 
 const _visibleOrderBookSideRows = gameOrderBookLevelCount;
 const _orderBookMotionDuration = Duration(milliseconds: 144);
+const _orderBookSweepTotalDuration = Duration(milliseconds: 480);
+const _orderBookSweepMinimumStepDuration = Duration(milliseconds: 56);
+const _orderBookSweepMaximumStepDuration = Duration(milliseconds: 96);
+const _orderBookSweepFinalHoldDuration = Duration(milliseconds: 112);
+const _orderBookCancellationHoldDuration = Duration(milliseconds: 520);
 const _orderBookTapeCapacity = 50;
+
+class OrderBookSweepIdentityLedger {
+  OrderBookSweepIdentityLedger({required this.completedHistoryCapacity})
+    : assert(completedHistoryCapacity > 0);
+
+  final int completedHistoryCapacity;
+  final Set<String> _inFlight = <String>{};
+  final Set<String> _completed = <String>{};
+  final List<String> _completedOrder = <String>[];
+
+  bool admit(String identity) {
+    if (identity.isEmpty ||
+        _inFlight.contains(identity) ||
+        _completed.contains(identity)) {
+      return false;
+    }
+    _inFlight.add(identity);
+    return true;
+  }
+
+  void complete(String identity) {
+    if (!_inFlight.remove(identity) || !_completed.add(identity)) return;
+    _completedOrder.add(identity);
+    while (_completedOrder.length > completedHistoryCapacity) {
+      _completed.remove(_completedOrder.removeAt(0));
+    }
+  }
+
+  void clearInFlight() => _inFlight.clear();
+
+  void clear() {
+    _inFlight.clear();
+    _completed.clear();
+    _completedOrder.clear();
+  }
+}
+
+({double before, double after}) orderBookSweepDepthTransition({
+  required GameOrderBookSweepStep step,
+  required int maxDepth,
+}) {
+  final safeMaxDepth = math.max(1, maxDepth);
+  double depthFor(int quantity) =>
+      (math.max(0, quantity) / safeMaxDepth).clamp(0.0, 1.0).toDouble();
+
+  return (
+    before: depthFor(step.consumedQuantity + step.remainingQuantity),
+    after: depthFor(step.remainingQuantity),
+  );
+}
+
+List<GameOrderBookLevel> orderBookSweepPresentationLevels({
+  required GameOrderBookSnapshot snapshot,
+  required List<GameOrderBookSweepStep> steps,
+  required int activeStepIndex,
+  required bool activeStepArrived,
+  GameOrderBookSnapshot? previousSnapshot,
+  Iterable<OrderBookCancellationNotice> cancellationNotices =
+      const <OrderBookCancellationNotice>[],
+  int sideRowCount = _visibleOrderBookSideRows,
+}) {
+  if (steps.isEmpty || activeStepIndex < 0 || activeStepIndex >= steps.length) {
+    return _symmetricVisibleOrderBookLevels(snapshot);
+  }
+
+  final presentationBase = previousSnapshot ?? snapshot;
+  final asks = <double, GameOrderBookLevel>{
+    for (final level in presentationBase.asks) level.price: level,
+  };
+  final bids = <double, GameOrderBookLevel>{
+    for (final level in presentationBase.bids) level.price: level,
+  };
+  final cancellationByLevel = <(GameOrderBookSide, double), int>{};
+  for (final notice in cancellationNotices) {
+    cancellationByLevel.update(
+      (notice.side, notice.price),
+      (quantity) => quantity + notice.quantity,
+      ifAbsent: () => notice.quantity,
+    );
+  }
+
+  GameOrderBookLevel levelFor(
+    GameOrderBookSweepStep step,
+    Map<double, GameOrderBookLevel> sameSideLevels,
+  ) {
+    final visible = sameSideLevels[step.price];
+    if (visible != null) return visible;
+    final remembered = snapshot.rememberedLevels[step.price];
+    if (remembered != null && remembered.side == step.side) return remembered;
+    return GameOrderBookLevel(
+      side: step.side,
+      price: step.price,
+      quantity: 0,
+      isWall: false,
+      isStructuralBreached: step.structuralBreach,
+    );
+  }
+
+  final groupedSteps =
+      <
+        (GameOrderBookSide, double),
+        List<MapEntry<int, GameOrderBookSweepStep>>
+      >{};
+  for (final entry in steps.asMap().entries) {
+    groupedSteps
+        .putIfAbsent((
+          entry.value.side,
+          entry.value.price,
+        ), () => <MapEntry<int, GameOrderBookSweepStep>>[])
+        .add(entry);
+  }
+
+  for (final grouped in groupedSteps.values) {
+    final step = grouped.first.value;
+    final sameSideLevels = step.side == GameOrderBookSide.ask ? asks : bids;
+    final oppositeSideLevels = step.side == GameOrderBookSide.ask ? bids : asks;
+
+    // A crossed price can already have been promoted to the opposite side in
+    // the canonical after-snapshot. Keep only the actually executed side until
+    // the replay finishes so the border cannot appear to consume the new queue.
+    oppositeSideLevels.remove(step.price);
+
+    final activeEntry = grouped
+        .where((entry) => entry.key == activeStepIndex)
+        .firstOrNull;
+    final firstFutureEntry = grouped
+        .where((entry) => entry.key > activeStepIndex)
+        .firstOrNull;
+    final lastCompletedEntry = grouped
+        .where((entry) => entry.key < activeStepIndex)
+        .lastOrNull;
+    final reportedQuantity = activeEntry != null
+        ? activeStepArrived
+              ? activeEntry.value.remainingQuantity
+              : activeEntry.value.consumedQuantity +
+                    activeEntry.value.remainingQuantity
+        : firstFutureEntry != null
+        ? firstFutureEntry.value.consumedQuantity +
+              firstFutureEntry.value.remainingQuantity
+        : lastCompletedEntry?.value.remainingQuantity ?? 0;
+    final cancellationQuantity =
+        cancellationByLevel[(step.side, step.price)] ?? 0;
+    final baseLevel = levelFor(step, sameSideLevels);
+    final initialQuantity = baseLevel.quantity > 0
+        ? baseLevel.quantity
+        : grouped.first.value.consumedQuantity +
+              grouped.first.value.remainingQuantity +
+              cancellationQuantity;
+    final consumedQuantity = grouped
+        .where(
+          (entry) =>
+              entry.key < activeStepIndex ||
+              (entry.key == activeStepIndex && activeStepArrived),
+        )
+        .fold<int>(
+          0,
+          (quantity, entry) => quantity + entry.value.consumedQuantity,
+        );
+    final quantity = math.max(
+      reportedQuantity + cancellationQuantity,
+      math.max(0, initialQuantity - consumedQuantity),
+    );
+    final keepsActiveZeroGhost =
+        activeEntry != null && activeStepArrived && quantity <= 0;
+    if (quantity <= 0 && !keepsActiveZeroGhost) {
+      // A completed zero row must not occupy one of the fixed 10 visible slots
+      // and hide a deeper current step. The active row alone remains as a
+      // tombstone until its own drain phase ends.
+      sameSideLevels.remove(step.price);
+      continue;
+    }
+
+    final source = levelFor(step, sameSideLevels);
+    sameSideLevels[step.price] = GameOrderBookLevel(
+      side: source.side,
+      price: source.price,
+      quantity: math.max(0, quantity),
+      isWall: source.isWall,
+      structuralKind: source.structuralKind,
+      structuralStrength: source.structuralStrength,
+      structuralHoldTicks: source.structuralHoldTicks,
+      isStructuralWall: source.isStructuralWall,
+      isStructuralBreached: source.isStructuralBreached,
+      structuralVacuumMultiplier: source.structuralVacuumMultiplier,
+      isPsychological: source.isPsychological,
+      technicalPeriods: source.technicalPeriods,
+      wasLiquidityPulseTouched: source.wasLiquidityPulseTouched,
+      queueRecoveryTargetQuantity: source.queueRecoveryTargetQuantity,
+    );
+  }
+
+  final orderedAsks = asks.values.toList(growable: false)
+    ..sort((left, right) => left.price.compareTo(right.price));
+  final orderedBids = bids.values.toList(growable: false)
+    ..sort((left, right) => right.price.compareTo(left.price));
+  final safeSideRowCount = math.max(1, sideRowCount);
+  return <GameOrderBookLevel>[
+    ...orderedAsks.take(safeSideRowCount).toList(growable: false).reversed,
+    ...orderedBids.take(safeSideRowCount),
+  ];
+}
+
+String orderBookQuantityDeltaLabel(int delta, {required bool isTrade}) {
+  if (delta < 0 && !isTrade) return '취소 ${_money(-delta)}';
+  return '${delta > 0 ? '+' : ''}${_money(delta)}';
+}
+
+typedef OrderBookCancellationNotice = ({
+  GameOrderBookSide side,
+  double price,
+  int quantity,
+});
+
+List<OrderBookCancellationNotice> orderBookCancellationNotices({
+  required GameOrderBookSnapshot previous,
+  required GameOrderBookSnapshot next,
+  Iterable<GameOrderBookSweepStep> tradeSteps =
+      const <GameOrderBookSweepStep>[],
+  int? transitionMarketMinute,
+  int? transitionLiquidityPulse,
+}) {
+  if (previous.sourceAssetId != null &&
+      next.sourceAssetId != null &&
+      previous.sourceAssetId != next.sourceAssetId) {
+    return const <OrderBookCancellationNotice>[];
+  }
+  if (previous.sourceDateKey != null &&
+      next.sourceDateKey != null &&
+      previous.sourceDateKey != next.sourceDateKey) {
+    return const <OrderBookCancellationNotice>[];
+  }
+
+  GameOrderBookLevel? matchingLevel(
+    Iterable<GameOrderBookLevel> levels,
+    GameOrderBookLevel target,
+  ) {
+    for (final level in levels) {
+      if (level.side == target.side &&
+          (level.price - target.price).abs() < 0.000001) {
+        return level;
+      }
+    }
+    return null;
+  }
+
+  final consumedByLevel = <(GameOrderBookSide, double), int>{};
+  for (final step in tradeSteps) {
+    if (step.consumedQuantity <= 0 ||
+        (transitionMarketMinute != null &&
+            step.marketMinute != transitionMarketMinute) ||
+        (transitionLiquidityPulse != null &&
+            step.liquidityPulse != transitionLiquidityPulse)) {
+      continue;
+    }
+    consumedByLevel.update(
+      (step.side, step.price),
+      (quantity) => quantity + step.consumedQuantity,
+      ifAbsent: () => step.consumedQuantity,
+    );
+  }
+
+  final visibleNext = <GameOrderBookLevel>[...next.asks, ...next.bids];
+  final rememberedNext = next.rememberedLevels.values;
+  final allNext = <GameOrderBookLevel>[...visibleNext, ...rememberedNext];
+  final notices = <OrderBookCancellationNotice>[];
+  for (final previousLevel in <GameOrderBookLevel>[
+    ...previous.asks,
+    ...previous.bids,
+  ]) {
+    if (previousLevel.quantity <= 0) continue;
+    final consumedQuantity =
+        consumedByLevel[(previousLevel.side, previousLevel.price)] ?? 0;
+    var current =
+        matchingLevel(visibleNext, previousLevel) ??
+        matchingLevel(rememberedNext, previousLevel);
+    if (current == null) {
+      final promotedToOppositeSide =
+          consumedQuantity > 0 &&
+          allNext.any(
+            (level) =>
+                level.side != previousLevel.side &&
+                (level.price - previousLevel.price).abs() < 0.000001,
+          );
+      if (!promotedToOppositeSide) {
+        // An absent level can simply have moved outside the visible window.
+        continue;
+      }
+    }
+    final currentQuantity = math.max(0, current?.quantity ?? 0);
+    final totalDecrease = math.max(0, previousLevel.quantity - currentQuantity);
+    final cancelledQuantity = math.max(0, totalDecrease - consumedQuantity);
+    if (cancelledQuantity <= 0) continue;
+    notices.add((
+      side: previousLevel.side,
+      price: previousLevel.price,
+      quantity: cancelledQuantity,
+    ));
+  }
+  return List<OrderBookCancellationNotice>.unmodifiable(notices);
+}
+
+int _orderBookCancellationRowIndex(
+  OrderBookCancellationNotice notice,
+  List<GameOrderBookLevel> levels,
+) {
+  final asks = levels
+      .where((level) => level.side == GameOrderBookSide.ask)
+      .toList(growable: false);
+  final bids = levels
+      .where((level) => level.side == GameOrderBookSide.bid)
+      .toList(growable: false);
+  final sameSide = notice.side == GameOrderBookSide.ask ? asks : bids;
+  if (sameSide.isEmpty) return -1;
+  final insertionIndex = sameSide
+      .where((level) => level.price > notice.price)
+      .length
+      .clamp(0, sameSide.length - 1);
+  return notice.side == GameOrderBookSide.ask
+      ? insertionIndex
+      : asks.length + insertionIndex;
+}
+
+List<int> playerOwnedOrderBookRemainingQuantities(
+  Iterable<GameOrderBookSweepStep> sourceSteps,
+) {
+  final steps = sourceSteps.toList(growable: false);
+  final remainingPlayerQuantity =
+      <(GameOrderBookSide side, double price), int>{};
+  for (final step in steps) {
+    remainingPlayerQuantity.update(
+      (step.side, step.price),
+      (quantity) => quantity + step.consumedQuantity,
+      ifAbsent: () => step.consumedQuantity,
+    );
+  }
+  return List<int>.unmodifiable([
+    for (final step in steps)
+      step.remainingQuantity +
+          remainingPlayerQuantity.update((
+            step.side,
+            step.price,
+          ), (quantity) => math.max(0, quantity - step.consumedQuantity)),
+  ]);
+}
+
+double _orderBookPriceChangeRate(double price, double previousClose) =>
+    gameOrderBookPriceChangePercent(price: price, previousClose: previousClose);
+
+String _orderBookPriceRateLabel(double price, double previousClose) {
+  final rate = _orderBookPriceChangeRate(price, previousClose);
+  return '${rate.abs() < 0.005 ? '0.00' : rate.toStringAsFixed(2)}%';
+}
+
+Color _orderBookPriceRateColor(double price, double previousClose) {
+  final rate = _orderBookPriceChangeRate(price, previousClose);
+  if (rate > 0.004999) return const Color(0xFFF04452);
+  if (rate < -0.004999) return _marketAccent;
+  return const Color(0xFF8A919E);
+}
 
 enum _QuoteQuantityPreset { one, ten, quarter, maximum }
 
@@ -62,6 +426,10 @@ class _PlayerTradeSignal {
     required this.marketMinute,
     required this.microstructureFrame,
     this.orderBookPrint,
+    this.orderBookSweepSteps = const <GameOrderBookSweepStep>[],
+    this.orderBookReplaySnapshot,
+    this.replayIdentity = '',
+    this.playerOwnedDepthOnly = false,
   });
 
   final String assetId;
@@ -71,6 +439,10 @@ class _PlayerTradeSignal {
   final int marketMinute;
   final int microstructureFrame;
   final _PlayerOrderBookPrint? orderBookPrint;
+  final List<GameOrderBookSweepStep> orderBookSweepSteps;
+  final GameOrderBookSnapshot? orderBookReplaySnapshot;
+  final String replayIdentity;
+  final bool playerOwnedDepthOnly;
 }
 
 class _OrderBookTapePrint {
@@ -83,6 +455,8 @@ class _OrderBookTapePrint {
     required this.quantity,
     required this.side,
     required this.isPlayer,
+    this.sequence = 0,
+    this.executionIdentity = '',
   });
 
   final String sessionKey;
@@ -93,10 +467,13 @@ class _OrderBookTapePrint {
   final int quantity;
   final TradeSide side;
   final bool isPlayer;
+  final int sequence;
+  final String executionIdentity;
 
   String get identity =>
-      '$sessionKey:$marketMinute:$microstructureFrame:${side.name}:'
-      '${price.toStringAsFixed(6)}:$quantity:${isPlayer ? 'player' : 'market'}';
+      '$sessionKey:$marketMinute:$microstructureFrame:$sequence:${side.name}:'
+      '${price.toStringAsFixed(6)}:$quantity:${isPlayer ? 'player' : 'market'}:'
+      '$executionIdentity';
 }
 
 double _tradeTapeExecutionStrength(Iterable<_OrderBookTapePrint> prints) {
@@ -124,6 +501,7 @@ double _tradeTapeTurnoverEok(Iterable<_OrderBookTapePrint> prints) =>
 _PlayerTradeSignal? _playerTradeSignalForLedgerEntry(
   LedgerEntry entry, {
   required int microstructureFrame,
+  GameOrderBookSnapshot? orderBookSnapshot,
 }) {
   if (entry.assetId.isEmpty ||
       !entry.tradeQuantity.isFinite ||
@@ -146,6 +524,7 @@ _PlayerTradeSignal? _playerTradeSignalForLedgerEntry(
   final side = entry.tradeSide == TradeSide.buy.name
       ? TradeSide.buy
       : TradeSide.sell;
+  var playerOwnedDepthOnly = false;
   GameOrderBookSide? levelSide;
   LedgerOrderBookFill? exactFill;
   if (validFills.isNotEmpty &&
@@ -159,6 +538,7 @@ _PlayerTradeSignal? _playerTradeSignalForLedgerEntry(
       entry.orderType == TradeOrderType.limit.name &&
       entry.marketMinute >= krxOpenMinute &&
       entry.marketMinute < krxContinuousEndMinute) {
+    playerOwnedDepthOnly = true;
     // A resting limit order is part of the player's own-side displayed depth.
     // When it fills, that same-side row loses the order quantity even though
     // the exchange ledger has no aggressive standing-book fill record.
@@ -174,6 +554,72 @@ _PlayerTradeSignal? _playerTradeSignalForLedgerEntry(
   final hasWholeSharePrint =
       exactQuantity != null &&
       (exactQuantity - exactQuantity.roundToDouble()).abs() < 0.000001;
+  GameOrderBookLevel? sourceLevelFor(double price) {
+    if (levelSide == null || orderBookSnapshot == null) return null;
+    final visibleLevels = levelSide == GameOrderBookSide.ask
+        ? orderBookSnapshot.asks
+        : orderBookSnapshot.bids;
+    final visible = visibleLevels
+        .where((level) => (level.price - price).abs() < 0.000001)
+        .firstOrNull;
+    if (visible != null) return visible;
+    final remembered = orderBookSnapshot.rememberedLevels[price];
+    return remembered?.side == levelSide ? remembered : null;
+  }
+
+  final sweepSteps = <GameOrderBookSweepStep>[];
+  final replayFills = validFills.isNotEmpty
+      ? validFills
+      : exactFill == null
+      ? const <LedgerOrderBookFill>[]
+      : <LedgerOrderBookFill>[exactFill];
+  if (levelSide != null && replayFills.isNotEmpty) {
+    final remainingByPrice = <double, int>{};
+    for (final fillEntry in replayFills.asMap().entries) {
+      final fill = fillEntry.value;
+      if ((fill.quantity - fill.quantity.roundToDouble()).abs() >= 0.000001) {
+        sweepSteps.clear();
+        break;
+      }
+      final consumedQuantity = fill.quantity.round();
+      final sourceLevel = sourceLevelFor(fill.price);
+      final sourceQuantity = sourceLevel?.quantity ?? 0;
+      final beforeQuantity = playerOwnedDepthOnly
+          ? sourceQuantity + consumedQuantity
+          : remainingByPrice[fill.price] ??
+                sourceQuantity.clamp(consumedQuantity, 1 << 31);
+      final remainingQuantity = playerOwnedDepthOnly
+          ? sourceQuantity
+          : math.max(0, beforeQuantity - consumedQuantity);
+      remainingByPrice[fill.price] = remainingQuantity;
+      final recoveryBaseline = sourceLevel == null
+          ? beforeQuantity
+          : math.max(
+              sourceLevel.quantity,
+              sourceLevel.queueRecoveryTargetQuantity,
+            );
+      final structuralBreach =
+          sourceLevel?.isStructuralBreached == true ||
+          (sourceLevel?.isStructuralWall == true &&
+              recoveryBaseline > 0 &&
+              remainingQuantity <= recoveryBaseline * 0.10);
+      sweepSteps.add(
+        GameOrderBookSweepStep(
+          marketMinute: entry.marketMinute,
+          liquidityPulse: math.max(0, microstructureFrame),
+          sequence: fillEntry.key,
+          side: levelSide,
+          price: fill.price,
+          consumedQuantity: consumedQuantity,
+          remainingQuantity: remainingQuantity,
+          structuralBreach: structuralBreach,
+          boundaryCrossed:
+              !playerOwnedDepthOnly &&
+              (remainingQuantity <= 0 || structuralBreach),
+        ),
+      );
+    }
+  }
   return _PlayerTradeSignal(
     assetId: entry.assetId,
     side: side,
@@ -189,6 +635,10 @@ _PlayerTradeSignal? _playerTradeSignalForLedgerEntry(
             price: exactFill.price,
             quantity: exactFill.quantity.round(),
           ),
+    orderBookSweepSteps: List<GameOrderBookSweepStep>.unmodifiable(sweepSteps),
+    orderBookReplaySnapshot: orderBookSnapshot,
+    replayIdentity: entry.id,
+    playerOwnedDepthOnly: playerOwnedDepthOnly,
   );
 }
 
@@ -199,6 +649,7 @@ _PlayerTradeSignal? _latestPlayerTradeSignalForOrder(
   required int marketMinute,
   required int microstructureFrame,
   int minimumLedgerIndex = 0,
+  GameOrderBookSnapshot? orderBookSnapshot,
 }) => state.ledger
     .skip(minimumLedgerIndex.clamp(0, state.ledger.length))
     .toList(growable: false)
@@ -207,6 +658,7 @@ _PlayerTradeSignal? _latestPlayerTradeSignalForOrder(
       (entry) => _playerTradeSignalForLedgerEntry(
         entry,
         microstructureFrame: microstructureFrame,
+        orderBookSnapshot: orderBookSnapshot,
       ),
     )
     .whereType<_PlayerTradeSignal>()
@@ -802,6 +1254,8 @@ typedef _OrderBookConsumptionView = ({
   Map<double, double> asks,
   Map<double, double> bids,
   int capacityUnits,
+  GameOrderBookSide? latestSide,
+  double? latestPrice,
 });
 
 /// Keeps deterministic order-book continuity while stock-market routes are
@@ -815,6 +1269,8 @@ class StockOrderBookSessionCache {
       <String, _OrderBookSessionSnapshot>{};
   final Map<String, List<_OrderBookTapePrint>> _tradeTapes =
       <String, List<_OrderBookTapePrint>>{};
+  final Map<String, _OrderBookSweepJournal> _sweepJournals =
+      <String, _OrderBookSweepJournal>{};
 
   _OrderBookSessionSnapshot? _snapshotFor(String assetId) =>
       _snapshots[assetId];
@@ -828,6 +1284,18 @@ class StockOrderBookSessionCache {
 
   void _rememberTradeTape(String assetId, List<_OrderBookTapePrint> tradeTape) {
     _tradeTapes[assetId] = List<_OrderBookTapePrint>.unmodifiable(tradeTape);
+  }
+
+  _OrderBookSweepJournal _sweepJournalFor(
+    String assetId,
+    String sessionKey,
+  ) {
+    final journal = _sweepJournals.putIfAbsent(
+      assetId,
+      () => _OrderBookSweepJournal(sessionKey),
+    );
+    journal.ensureSession(sessionKey);
+    return journal;
   }
 }
 
@@ -884,6 +1352,8 @@ class _StockMarketScreenState extends State<StockMarketScreen>
       ValueNotifier(_MarketPlaybackSpeed.normal);
   final ValueNotifier<Map<String, _PlayerTradeSignal>> _playerTradeNotifier =
       ValueNotifier(const <String, _PlayerTradeSignal>{});
+  final Map<String, int> _playerSweepRemainingByLevel = <String, int>{};
+  int _playerTradeReplaySequence = 0;
   Future<void> _marketMutationTail = Future<void>.value();
   bool _isRealtimeBatchUpdating = false;
   bool _isLifecyclePaused = false;
@@ -981,42 +1451,141 @@ class _StockMarketScreenState extends State<StockMarketScreen>
     return operation;
   }
 
+  GameOrderBookSnapshot? _playerReplaySnapshotFor({
+    required GameState state,
+    required String assetId,
+    required int marketMinute,
+    required _OrderBookSessionSnapshot? cached,
+  }) {
+    final expectedSessionKey =
+        '${state.simulationSeed}:${marketDateKey(state.currentDate)}';
+    if (cached == null ||
+        cached.sessionKey != expectedSessionKey ||
+        cached.minute > marketMinute) {
+      return null;
+    }
+    // A resting order can fill on the next clock tick before the detail cache
+    // publishes that minute. Preserve the last book the player actually saw
+    // instead of animating the player-owned depth against an empty 0-row.
+    return gameOrderBookSnapshotAfterConsumption(
+      snapshot: cached.snapshot,
+      consumedAskByPrice: gameConsumedOrderBookUnitsByPrice(
+        state,
+        assetId: assetId,
+        marketMinute: marketMinute,
+        bookSide: GameOrderBookSide.ask,
+      ),
+      consumedBidByPrice: gameConsumedOrderBookUnitsByPrice(
+        state,
+        assetId: assetId,
+        marketMinute: marketMinute,
+        bookSide: GameOrderBookSide.bid,
+      ),
+      consumedCapacityUnits: gameConsumedOrderBookFillUnits(
+        state,
+        assetId: assetId,
+        marketMinute: marketMinute,
+        side: TradeSide.buy,
+      ),
+      retainSyntheticTombstone: false,
+    );
+  }
+
   List<_PlayerTradeSignal> _newTradeSignals(GameState before, GameState after) {
-    final rawSignals = after.ledger
-        .skip(before.ledger.length)
-        .map((entry) {
-          final cached = _orderBookSessionCache._snapshotFor(entry.assetId);
-          final expectedSessionKey =
-              '${after.simulationSeed}:${marketDateKey(after.currentDate)}';
-          final frame =
-              cached != null &&
-                  cached.sessionKey == expectedSessionKey &&
-                  entry.marketMinute >= cached.minute
-              ? cached.microstructureFrame
-              : 0;
-          return _playerTradeSignalForLedgerEntry(
-            entry,
-            microstructureFrame: frame,
-          );
-        })
-        .whereType<_PlayerTradeSignal>()
-        .toList(growable: false);
-    return rawSignals;
+    final signals = <_PlayerTradeSignal>[];
+    for (final entry in after.ledger.skip(before.ledger.length)) {
+      final cached = _orderBookSessionCache._snapshotFor(entry.assetId);
+      final hasMatchingFrame =
+          cached != null &&
+          cached.sessionKey ==
+              '${after.simulationSeed}:${marketDateKey(after.currentDate)}' &&
+          entry.marketMinute == cached.minute;
+      final signal = _playerTradeSignalForLedgerEntry(
+        entry,
+        microstructureFrame: hasMatchingFrame
+            ? cached.microstructureFrame
+            : gameOrderBookLiquidityPulseFrame(
+                marketMinute: entry.marketMinute,
+                slotIndex: 0,
+              ),
+        orderBookSnapshot: _playerReplaySnapshotFor(
+          state: before,
+          assetId: entry.assetId,
+          marketMinute: entry.marketMinute,
+          cached: cached,
+        ),
+      );
+      if (signal != null) signals.add(signal);
+    }
+    return List<_PlayerTradeSignal>.unmodifiable(signals);
   }
 
   void _publishPlayerTradeSignals(Iterable<_PlayerTradeSignal> signals) {
     final batch = signals.toList(growable: false);
-    final latestByAsset = <String, _PlayerTradeSignal>{};
+    final grouped =
+        <
+          (String assetId, int marketMinute, int frame),
+          List<_PlayerTradeSignal>
+        >{};
     for (final signal in batch) {
-      latestByAsset[signal.assetId] = signal;
+      grouped
+          .putIfAbsent((
+            signal.assetId,
+            signal.marketMinute,
+            signal.microstructureFrame,
+          ), () => <_PlayerTradeSignal>[])
+          .add(signal);
     }
     final next = <String, _PlayerTradeSignal>{..._playerTradeNotifier.value};
-    for (final latest in latestByAsset.values) {
+    for (final matchingSignals in grouped.values) {
+      final latest = matchingSignals.last;
       final latestPrint = latest.orderBookPrint;
-      if (latestPrint == null) {
-        next[latest.assetId] = latest;
-        continue;
+      final combinedSweepSteps = <GameOrderBookSweepStep>[];
+      final passiveRemainingQuantities =
+          playerOwnedOrderBookRemainingQuantities([
+            for (final signal in matchingSignals)
+              if (signal.playerOwnedDepthOnly) ...signal.orderBookSweepSteps,
+          ]);
+      var passiveStepIndex = 0;
+      for (final signal in matchingSignals) {
+        for (final step in signal.orderBookSweepSteps) {
+          final levelIdentity =
+              '${signal.assetId}:${signal.marketMinute}:'
+              '${signal.microstructureFrame}:${step.side.name}:'
+              '${step.price.toStringAsFixed(6)}';
+          final beforeQuantity =
+              _playerSweepRemainingByLevel[levelIdentity] ??
+              step.consumedQuantity + step.remainingQuantity;
+          final remainingQuantity = signal.playerOwnedDepthOnly
+              ? passiveRemainingQuantities[passiveStepIndex++]
+              : math.max(0, beforeQuantity - step.consumedQuantity);
+          _playerSweepRemainingByLevel[levelIdentity] = remainingQuantity;
+          combinedSweepSteps.add(
+            GameOrderBookSweepStep(
+              marketMinute: step.marketMinute,
+              liquidityPulse: step.liquidityPulse,
+              sequence: combinedSweepSteps.length,
+              side: step.side,
+              price: step.price,
+              consumedQuantity: step.consumedQuantity,
+              remainingQuantity: remainingQuantity,
+              structuralBreach: step.structuralBreach,
+              boundaryCrossed:
+                  !signal.playerOwnedDepthOnly &&
+                  (remainingQuantity <= 0 || step.boundaryCrossed),
+            ),
+          );
+        }
       }
+      while (_playerSweepRemainingByLevel.length > 512) {
+        _playerSweepRemainingByLevel.remove(
+          _playerSweepRemainingByLevel.keys.first,
+        );
+      }
+      final replayIdentityParts = matchingSignals
+          .map((signal) => signal.replayIdentity)
+          .where((identity) => identity.isNotEmpty)
+          .toList(growable: false);
       next[latest.assetId] = _PlayerTradeSignal(
         assetId: latest.assetId,
         side: latest.side,
@@ -1024,27 +1593,40 @@ class _StockMarketScreenState extends State<StockMarketScreen>
         price: latest.price,
         marketMinute: latest.marketMinute,
         microstructureFrame: latest.microstructureFrame,
-        orderBookPrint: _PlayerOrderBookPrint(
-          levelSide: latestPrint.levelSide,
-          price: latestPrint.price,
-          quantity: batch
-              .where(
-                (signal) =>
-                    signal.assetId == latest.assetId &&
-                    signal.marketMinute == latest.marketMinute &&
-                    signal.microstructureFrame == latest.microstructureFrame &&
-                    signal.orderBookPrint?.levelSide == latestPrint.levelSide &&
-                    (signal.orderBookPrint!.price - latestPrint.price).abs() <
-                        0.000001,
-              )
-              .fold<int>(
-                0,
-                (sum, signal) => sum + (signal.orderBookPrint?.quantity ?? 0),
-              ),
+        orderBookReplaySnapshot: matchingSignals
+            .map((signal) => signal.orderBookReplaySnapshot)
+            .whereType<GameOrderBookSnapshot>()
+            .firstOrNull,
+        replayIdentity: replayIdentityParts.isEmpty
+            ? 'player-${_playerTradeReplaySequence++}'
+            : replayIdentityParts.join('|'),
+        playerOwnedDepthOnly: matchingSignals.every(
+          (signal) => signal.playerOwnedDepthOnly,
         ),
+        orderBookSweepSteps: List<GameOrderBookSweepStep>.unmodifiable(
+          combinedSweepSteps,
+        ),
+        orderBookPrint: latestPrint == null
+            ? null
+            : _PlayerOrderBookPrint(
+                levelSide: latestPrint.levelSide,
+                price: latestPrint.price,
+                quantity: matchingSignals
+                    .where(
+                      (signal) =>
+                          signal.orderBookPrint?.levelSide ==
+                              latestPrint.levelSide &&
+                          (signal.orderBookPrint!.price - latestPrint.price)
+                                  .abs() <
+                              0.000001,
+                    )
+                    .fold<int>(
+                      0,
+                      (sum, signal) =>
+                          sum + (signal.orderBookPrint?.quantity ?? 0),
+                    ),
+              ),
       );
-    }
-    if (latestByAsset.isNotEmpty) {
       _playerTradeNotifier.value = Map<String, _PlayerTradeSignal>.unmodifiable(
         next,
       );
@@ -1922,12 +2504,24 @@ class _StockMarketScreenState extends State<StockMarketScreen>
     _timer?.cancel();
     _timer = null;
     if (mounted) setState(() {});
+    final cachedOrderBookBeforeTrade = _orderBookSessionCache._snapshotFor(
+      order.assetId,
+    );
     try {
+      GameOrderBookSnapshot? orderBookReplaySnapshot;
       var ledgerLengthBeforeTrade = _state.ledger.length;
       final result = await _runMarketMutation(() async {
         final synced = await widget.onSetMarketMinute?.call(order.marketMinute);
         if (synced != null) _state = synced;
         ledgerLengthBeforeTrade = _state.ledger.length;
+        orderBookReplaySnapshot =
+            order.displayedSnapshot ??
+            _playerReplaySnapshotFor(
+              state: _state,
+              assetId: order.assetId,
+              marketMinute: order.marketMinute,
+              cached: cachedOrderBookBeforeTrade,
+            );
         return callback(order);
       });
       if (result.success && result.filledQuantity > 0) {
@@ -1938,6 +2532,7 @@ class _StockMarketScreenState extends State<StockMarketScreen>
           marketMinute: order.marketMinute,
           microstructureFrame: order.microstructureFrame,
           minimumLedgerIndex: ledgerLengthBeforeTrade,
+          orderBookSnapshot: orderBookReplaySnapshot,
         );
         if (signal != null) {
           _publishPlayerTradeSignals(<_PlayerTradeSignal>[signal]);
@@ -2425,6 +3020,10 @@ class _StockMarketScreenState extends State<StockMarketScreen>
             marketCapRanking: _marketCapRankingFor(stock),
             initialOrderBookSnapshot: _orderBookSessionCache._snapshotFor(
               stock.id,
+            ),
+            orderBookSweepJournal: _orderBookSessionCache._sweepJournalFor(
+              stock.id,
+              '${_state.simulationSeed}:${marketDateKey(_state.currentDate)}',
             ),
             onOrderBookSnapshotChanged: (snapshot) {
               _orderBookSessionCache._remember(stock.id, snapshot);
@@ -3053,6 +3652,7 @@ class _StockDetailScreen extends StatefulWidget {
     required this.dailyMarketCap,
     required this.marketCapRanking,
     required this.initialOrderBookSnapshot,
+    required this.orderBookSweepJournal,
     required this.onOrderBookSnapshotChanged,
     required this.initialTradeTape,
     required this.onTradeTapeChanged,
@@ -3076,6 +3676,7 @@ class _StockDetailScreen extends StatefulWidget {
   final int dailyMarketCap;
   final _MarketCapRanking marketCapRanking;
   final _OrderBookSessionSnapshot? initialOrderBookSnapshot;
+  final _OrderBookSweepJournal orderBookSweepJournal;
   final ValueChanged<_OrderBookSessionSnapshot> onOrderBookSnapshotChanged;
   final List<_OrderBookTapePrint> initialTradeTape;
   final ValueChanged<List<_OrderBookTapePrint>> onTradeTapeChanged;
@@ -3103,6 +3704,7 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
   int? _orderBookConsumptionCacheMinute;
   _OrderBookConsumptionView? _orderBookConsumptionCacheValue;
   late final ValueNotifier<int> _orderBookPulseFrame;
+  late final ValueNotifier<_OrderBookSweepTapeCursor?> _orderBookTapeCursor;
   Timer? _orderBookPulseTimer;
   DateTime? _orderBookPulseDueAt;
   late int _orderBookLogicalMinute;
@@ -3139,6 +3741,69 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
   String get _orderBookSessionKey =>
       '${state.simulationSeed}:${marketDateKey(state.currentDate)}';
 
+  List<_OrderBookSweepReplayPacket> _orderBookSweepPackets() =>
+      widget.orderBookSweepJournal.pendingPackets;
+
+  void _queueOrderBookSweepPacket(
+    GameOrderBookSnapshot snapshot,
+    Iterable<GameOrderBookSweepStep> sourceSteps, {
+    required String source,
+    String? uniqueToken,
+    GameOrderBookSnapshot? previousSnapshot,
+  }) {
+    final steps =
+        sourceSteps
+            .where((step) => step.consumedQuantity > 0)
+            .toList(growable: false)
+          ..sort((left, right) => left.sequence.compareTo(right.sequence));
+    final cancellations = source == 'market' && previousSnapshot != null
+        ? orderBookCancellationNotices(
+            previous: previousSnapshot,
+            next: snapshot,
+            tradeSteps: steps,
+            transitionMarketMinute: snapshot.sourceMarketMinute,
+            transitionLiquidityPulse: snapshot.liquidityPulse,
+          )
+        : const <OrderBookCancellationNotice>[];
+    if (steps.isEmpty && cancellations.isEmpty) return;
+    final identity = _orderBookSweepReplayIdentity(
+      snapshot,
+      steps,
+      source,
+      uniqueToken: uniqueToken,
+      cancellations: cancellations,
+    );
+    widget.orderBookSweepJournal.enqueue(
+      _OrderBookSweepReplayPacket(
+        snapshot: snapshot,
+        previousSnapshot: previousSnapshot ?? snapshot,
+        steps: List<GameOrderBookSweepStep>.unmodifiable(steps),
+        cancellations: List<OrderBookCancellationNotice>.unmodifiable(
+          cancellations,
+        ),
+        source: source,
+        identity: identity,
+      ),
+    );
+  }
+
+  void _acceptOrderBookSweepPackets(Iterable<String> identities) {
+    widget.orderBookSweepJournal.accept(identities);
+  }
+
+  void _queuePlayerTradeSweep(_PlayerTradeSignal? signal) {
+    if (signal == null || signal.orderBookSweepSteps.isEmpty) return;
+    final snapshot =
+        signal.orderBookReplaySnapshot ?? _latestOrderBookSnapshot?.snapshot;
+    if (snapshot == null) return;
+    _queueOrderBookSweepPacket(
+      snapshot,
+      signal.orderBookSweepSteps,
+      source: 'player',
+      uniqueToken: signal.replayIdentity.isEmpty ? null : signal.replayIdentity,
+    );
+  }
+
   void _refreshTechnicalLevels(_LiveStock quote) {
     final dateKey = marketDateKey(_state.currentDate);
     if (_technicalLevelsDate == dateKey &&
@@ -3154,6 +3819,7 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
     _technicalLevelsReference = quote.previousClose;
     _orderBookSnapshotCache.clear();
     _latestOrderBookSnapshot = null;
+    widget.orderBookSweepJournal.ensureSession(_orderBookSessionKey);
   }
 
   GameOrderBookSnapshot _visibleOrderBookSnapshot(
@@ -3169,19 +3835,13 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
       return _visibleOrderBookCacheValue!;
     }
     final consumption = _orderBookConsumptionAt(currentMinute);
-    final playerOrderBookPrint =
-        playerTrade != null &&
-            playerTrade.assetId == definition.id &&
-            playerTrade.marketMinute == currentMinute
-        ? playerTrade.orderBookPrint
-        : null;
     final visible = gameOrderBookSnapshotAfterConsumption(
       snapshot: rawSnapshot,
       consumedAskByPrice: consumption.asks,
       consumedBidByPrice: consumption.bids,
       consumedCapacityUnits: consumption.capacityUnits,
-      latestConsumedSide: playerOrderBookPrint?.levelSide,
-      latestConsumedPrice: playerOrderBookPrint?.price,
+      latestConsumedSide: consumption.latestSide,
+      latestConsumedPrice: consumption.latestPrice,
       retainSyntheticTombstone: false,
     );
     _visibleOrderBookCacheState = state;
@@ -3197,6 +3857,31 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
         _orderBookConsumptionCacheMinute == currentMinute &&
         _orderBookConsumptionCacheValue != null) {
       return _orderBookConsumptionCacheValue!;
+    }
+    GameOrderBookSide? latestSide;
+    double? latestPrice;
+    for (final entry in state.ledger.reversed) {
+      if (entry.assetId != definition.id ||
+          entry.marketMinute != currentMinute ||
+          (entry.orderBookSide != GameOrderBookSide.ask.name &&
+              entry.orderBookSide != GameOrderBookSide.bid.name)) {
+        continue;
+      }
+      final fill = entry.orderBookFills.reversed
+          .where(
+            (candidate) =>
+                candidate.price.isFinite &&
+                candidate.price > 0 &&
+                candidate.quantity.isFinite &&
+                candidate.quantity > 0,
+          )
+          .firstOrNull;
+      if (fill == null) continue;
+      latestSide = entry.orderBookSide == GameOrderBookSide.ask.name
+          ? GameOrderBookSide.ask
+          : GameOrderBookSide.bid;
+      latestPrice = fill.price;
+      break;
     }
     final consumption = (
       asks: gameConsumedOrderBookUnitsByPrice(
@@ -3217,6 +3902,8 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
         marketMinute: currentMinute,
         side: TradeSide.buy,
       ),
+      latestSide: latestSide,
+      latestPrice: latestPrice,
     );
     _orderBookConsumptionCacheState = state;
     _orderBookConsumptionCacheMinute = currentMinute;
@@ -3224,7 +3911,7 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
     return consumption;
   }
 
-  void _recordTradeTapePrint({
+  bool _recordTradeTapePrint({
     required int marketMinute,
     required int microstructureFrame,
     required double price,
@@ -3232,8 +3919,11 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
     required TradeSide side,
     required bool isPlayer,
     required double fallbackPreviousPrice,
+    int sequence = 0,
+    String executionIdentity = '',
+    bool notify = true,
   }) {
-    if (!price.isFinite || price <= 0 || quantity <= 0) return;
+    if (!price.isFinite || price <= 0 || quantity <= 0) return false;
     if (_tradeTape.isNotEmpty &&
         _tradeTape.first.sessionKey != _orderBookSessionKey) {
       _tradeTape = const <_OrderBookTapePrint>[];
@@ -3248,15 +3938,18 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
       quantity: quantity,
       side: side,
       isPlayer: isPlayer,
+      sequence: sequence,
+      executionIdentity: executionIdentity,
     );
-    if (!_tradeTapeIdentities.add(print.identity)) return;
+    if (!_tradeTapeIdentities.add(print.identity)) return false;
     final next = <_OrderBookTapePrint>[print, ..._tradeTape];
     if (next.length > _orderBookTapeCapacity) {
       final removed = next.removeLast();
       _tradeTapeIdentities.remove(removed.identity);
     }
     _tradeTape = List<_OrderBookTapePrint>.unmodifiable(next);
-    widget.onTradeTapeChanged(_tradeTape);
+    if (notify) widget.onTradeTapeChanged(_tradeTape);
+    return true;
   }
 
   GameOrderBookSnapshot _captureOrderBookTape(
@@ -3265,7 +3958,35 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
     int currentMinute,
   ) {
     final generatedTrade = snapshot.lastSyntheticTrade;
-    if (generatedTrade != null &&
+    final generatedPrints = snapshot.syntheticTradePrints
+        .where(
+          (print) =>
+              print.quantity > 0 &&
+              print.marketMinute == currentMinute &&
+              print.liquidityPulse == snapshot.liquidityPulse,
+        )
+        .toList(growable: false);
+    if (generatedPrints.isNotEmpty) {
+      var changed = false;
+      for (final print in generatedPrints) {
+        changed =
+            _recordTradeTapePrint(
+              marketMinute: print.marketMinute,
+              microstructureFrame: print.liquidityPulse,
+              price: print.price,
+              quantity: print.quantity,
+              side: print.levelSide == GameOrderBookSide.ask
+                  ? TradeSide.buy
+                  : TradeSide.sell,
+              isPlayer: false,
+              fallbackPreviousPrice: quote.previousClose,
+              sequence: print.sequence,
+              notify: false,
+            ) ||
+            changed;
+      }
+      if (changed) widget.onTradeTapeChanged(_tradeTape);
+    } else if (generatedTrade != null &&
         generatedTrade.quantity > 0 &&
         generatedTrade.marketMinute == currentMinute &&
         generatedTrade.liquidityPulse == snapshot.liquidityPulse) {
@@ -3296,6 +4017,7 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
         side: playerTrade.side,
         isPlayer: true,
         fallbackPreviousPrice: quote.previousClose,
+        executionIdentity: playerTrade.replayIdentity,
       );
     }
     return snapshot;
@@ -3387,7 +4109,11 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
         state.currentDate,
       ),
     );
-    final allocatedUnits = (capacity * slot / pulsesPerMarketMinute).round();
+    final allocatedUnits = gameOrderBookCumulativeSlotCapacity(
+      executionCapacity: capacity,
+      slotIndex: slot,
+      pulsesPerMarketMinute: pulsesPerMarketMinute,
+    );
     final availableUnits = math.max(
       0,
       allocatedUnits - consumption.capacityUnits,
@@ -3498,6 +4224,13 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
     );
     final consumption = _orderBookConsumptionAt(currentMinute);
     var snapshot = _visibleOrderBookSnapshot(generatedSnapshot, currentMinute);
+    _queueOrderBookSweepPacket(
+      snapshot,
+      snapshot.sweepSteps,
+      source: 'market',
+      previousSnapshot: carrySnapshot,
+    );
+    final snapshotBeforeSyntheticTrade = snapshot;
     final clock = marketClockAt(
       currentMinute,
       tradingDay: quote.isTradingDay && isMarketTradingDay(state.currentDate),
@@ -3557,6 +4290,12 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
         );
       }
     }
+    _queueOrderBookSweepPacket(
+      snapshot,
+      snapshot.sweepSteps,
+      source: 'market',
+      previousSnapshot: snapshotBeforeSyntheticTrade,
+    );
     final entry = (
       snapshot: snapshot,
       minute: currentMinute,
@@ -3640,6 +4379,10 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
     final recentTape = _tradeTape
         .where((print) => print.marketMinute >= minute.value - 2)
         .toList(growable: false);
+    final recentExecutionFrames = recentTape
+        .map((print) => (print.marketMinute, print.microstructureFrame))
+        .toSet()
+        .length;
     return gameOrderBookPulsesPerMarketMinute(
       fullDayTurnoverEok: fullDayTurnoverEok,
       currentPrice: quote.price,
@@ -3647,7 +4390,7 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
       previousClose: quote.previousClose,
       market: definition.market,
       executionStrength: _tradeTapeExecutionStrength(recentTape),
-      executionSamplePrints: recentTape.length,
+      executionSamplePrints: recentExecutionFrames,
       executionSampleTurnoverEok: _tradeTapeTurnoverEok(recentTape),
       tradingSessionActive: true,
       playbackActive: true,
@@ -3825,6 +4568,7 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _state = widget.marketState.value;
+    _orderBookTapeCursor = ValueNotifier<_OrderBookSweepTapeCursor?>(null);
     _refreshTechnicalLevels(live.value);
     _tradeTape = List<_OrderBookTapePrint>.unmodifiable(
       widget.initialTradeTape
@@ -3898,7 +4642,10 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
   void _synchronizePlayerTrade() {
     final signal = widget.playerTrade.value[definition.id];
     if (identical(signal, _lastPlayerTradeSignal)) return;
-    void synchronize() => _lastPlayerTradeSignal = signal;
+    void synchronize() {
+      _lastPlayerTradeSignal = signal;
+      _queuePlayerTradeSweep(signal);
+    }
 
     if (mounted) {
       setState(synchronize);
@@ -3932,6 +4679,7 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
     widget.minute.removeListener(_handleOrderBookMarketMinuteChanged);
     live.removeListener(_handleOrderBookPulseInput);
     _orderBookPulseFrame.dispose();
+    _orderBookTapeCursor.dispose();
     _detailScrollController.dispose();
     super.dispose();
   }
@@ -3939,12 +4687,21 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
   Future<TradeExecutionResult> onExecuteTrade(TradeOrder order) async {
     _isDetailTradeInFlight = true;
     _cancelOrderBookPulse();
+    final orderBookBeforeTrade = _latestOrderBookSnapshot;
     final ledgerLengthBeforeTrade = _state.ledger.length;
     try {
       final result = await widget.onExecuteTrade(order);
       if (result.success && mounted) {
+        final publishedSignal = widget.playerTrade.value[order.assetId];
+        final hasPublishedSignal =
+            publishedSignal != null &&
+            publishedSignal.side == order.side &&
+            publishedSignal.marketMinute == order.marketMinute &&
+            publishedSignal.microstructureFrame == order.microstructureFrame;
         final signal = result.filledQuantity <= 0
             ? null
+            : hasPublishedSignal
+            ? publishedSignal
             : _latestPlayerTradeSignalForOrder(
                 result.state,
                 assetId: order.assetId,
@@ -3952,6 +4709,11 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
                 marketMinute: order.marketMinute,
                 microstructureFrame: order.microstructureFrame,
                 minimumLedgerIndex: ledgerLengthBeforeTrade,
+                orderBookSnapshot:
+                    order.displayedSnapshot ??
+                    (orderBookBeforeTrade?.minute == order.marketMinute
+                        ? orderBookBeforeTrade?.snapshot
+                        : null),
               );
         setState(() {
           _state = result.state;
@@ -4161,6 +4923,9 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
 
   void _selectDetailTab(_StockDetailTab tab) {
     if (_detailTab == tab) return;
+    if (_detailTab == _StockDetailTab.quote) {
+      _orderBookTapeCursor.value = null;
+    }
     setState(() {
       _detailTab = tab;
       if (tab == _StockDetailTab.order) {
@@ -4553,10 +5318,16 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
                                         state: state,
                                         minute: currentMinute,
                                         snapshot: snapshot,
+                                        sweepPackets: _orderBookSweepPackets(),
+                                        sweepPacketsReader:
+                                            _orderBookSweepPackets,
+                                        onSweepPacketsAccepted:
+                                            _acceptOrderBookSweepPackets,
                                         availableHeight:
                                             detailConstraints.maxHeight,
                                         playerTrade: _lastPlayerTradeSignal,
                                         tradeTape: _tradeTape,
+                                        tapeCursor: _orderBookTapeCursor,
                                         selectedPrice: _quoteSelectedPrice,
                                         quantityPreset: _quoteQuantityPreset,
                                         onQuantityPresetChanged: (preset) {
@@ -4602,6 +5373,9 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
                                           minute.value,
                                           _orderBookPulseFrame.value,
                                         ),
+                                    sweepPacketsReader: _orderBookSweepPackets,
+                                    onSweepPacketsAccepted:
+                                        _acceptOrderBookSweepPackets,
                                     playerTrade: _lastPlayerTradeSignal,
                                     availableHeight:
                                         detailConstraints.maxHeight,
@@ -4784,6 +5558,18 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
       child: Stack(
         children: [
           Positioned.fill(child: scene),
+          ValueListenableBuilder<_OrderBookSweepTapeCursor?>(
+            valueListenable: _orderBookTapeCursor,
+            builder: (context, cursor, _) => Offstage(
+              child: SizedBox(
+                key: Key(
+                  cursor == null
+                      ? 'order-book-tape-cursor-clear'
+                      : 'order-book-tape-cursor-active',
+                ),
+              ),
+            ),
+          ),
           if (_tutorialStep != null)
             Positioned.fill(
               child: _MarketDetailTutorialOverlay(
@@ -5145,6 +5931,8 @@ class _InlineOrderWorkspace extends StatelessWidget {
     required this.minute,
     required this.liquidityPulseListenable,
     required this.marketSnapshotReader,
+    required this.sweepPacketsReader,
+    required this.onSweepPacketsAccepted,
     required this.playerTrade,
     required this.availableHeight,
     required this.section,
@@ -5170,6 +5958,8 @@ class _InlineOrderWorkspace extends StatelessWidget {
   final ValueNotifier<int> minute;
   final ValueListenable<int> liquidityPulseListenable;
   final ValueGetter<GameOrderBookSnapshot> marketSnapshotReader;
+  final ValueGetter<List<_OrderBookSweepReplayPacket>> sweepPacketsReader;
+  final ValueChanged<Iterable<String>> onSweepPacketsAccepted;
   final _PlayerTradeSignal? playerTrade;
   final double availableHeight;
   final _DetailedOrderSection section;
@@ -5308,16 +6098,21 @@ class _InlineOrderWorkspace extends StatelessWidget {
                   width: railWidth,
                   child: ValueListenableBuilder<int>(
                     valueListenable: liquidityPulseListenable,
-                    builder: (context, _, _) => _CompactOrderBookRail(
-                      definition: definition,
-                      quote: live.value,
-                      state: state,
-                      minute: minute.value,
-                      snapshot: marketSnapshotReader(),
-                      playerTrade: playerTrade,
-                      selectedPrice: isOrderForm ? selectedLimitPrice : null,
-                      onSelectPrice: onSelectPrice,
-                    ),
+                    builder: (context, _, _) {
+                      final snapshot = marketSnapshotReader();
+                      return _CompactOrderBookRail(
+                        definition: definition,
+                        quote: live.value,
+                        state: state,
+                        minute: minute.value,
+                        snapshot: snapshot,
+                        sweepPackets: sweepPacketsReader(),
+                        onSweepPacketsAccepted: onSweepPacketsAccepted,
+                        playerTrade: playerTrade,
+                        selectedPrice: isOrderForm ? selectedLimitPrice : null,
+                        onSelectPrice: onSelectPrice,
+                      );
+                    },
                   ),
                 ),
               ],
@@ -5621,6 +6416,693 @@ class _InlineBalanceRow extends StatelessWidget {
   );
 }
 
+enum _OrderBookSweepPhase { idle, arriving, draining, cancelling }
+
+class _OrderBookSweepBatch {
+  const _OrderBookSweepBatch({
+    required this.snapshot,
+    required this.previousSnapshot,
+    required this.steps,
+    required this.cancellations,
+    required this.identity,
+    required this.source,
+    required this.progress,
+  });
+
+  final GameOrderBookSnapshot snapshot;
+  final GameOrderBookSnapshot previousSnapshot;
+  final List<GameOrderBookSweepStep> steps;
+  final List<OrderBookCancellationNotice> cancellations;
+  final String identity;
+  final String source;
+  final _OrderBookSweepReplayProgress progress;
+}
+
+class _OrderBookSweepReplayProgress {
+  _OrderBookSweepReplayProgress();
+
+  int stepIndex = 0;
+  bool arrived = false;
+}
+
+class _OrderBookSweepReplayPacket {
+  _OrderBookSweepReplayPacket({
+    required this.snapshot,
+    required this.previousSnapshot,
+    required this.steps,
+    required this.cancellations,
+    required this.source,
+    required this.identity,
+  }) : progress = _OrderBookSweepReplayProgress();
+
+  final GameOrderBookSnapshot snapshot;
+  final GameOrderBookSnapshot previousSnapshot;
+  final List<GameOrderBookSweepStep> steps;
+  final List<OrderBookCancellationNotice> cancellations;
+  final String source;
+  final String identity;
+  final _OrderBookSweepReplayProgress progress;
+}
+
+class _OrderBookSweepJournal {
+  _OrderBookSweepJournal(this._sessionKey);
+
+  String _sessionKey;
+  final List<_OrderBookSweepReplayPacket> _pendingPackets =
+      <_OrderBookSweepReplayPacket>[];
+  final OrderBookSweepIdentityLedger _identityLedger =
+      OrderBookSweepIdentityLedger(completedHistoryCapacity: 512);
+
+  List<_OrderBookSweepReplayPacket> get pendingPackets =>
+      List<_OrderBookSweepReplayPacket>.unmodifiable(_pendingPackets);
+
+  void ensureSession(String sessionKey) {
+    if (_sessionKey == sessionKey) return;
+    _sessionKey = sessionKey;
+    _pendingPackets.clear();
+    _identityLedger.clear();
+  }
+
+  void enqueue(_OrderBookSweepReplayPacket packet) {
+    if (!_identityLedger.admit(packet.identity)) return;
+    _pendingPackets.add(packet);
+  }
+
+  void accept(Iterable<String> identities) {
+    final accepted = identities.toSet();
+    if (accepted.isEmpty) return;
+    _pendingPackets.removeWhere((packet) {
+      if (!accepted.contains(packet.identity)) return false;
+      _identityLedger.complete(packet.identity);
+      return true;
+    });
+  }
+}
+
+class _OrderBookSweepTapeCursor {
+  const _OrderBookSweepTapeCursor({
+    required this.snapshot,
+    required this.step,
+    required this.source,
+    required this.identity,
+    required this.arrived,
+  });
+
+  final GameOrderBookSnapshot snapshot;
+  final GameOrderBookSweepStep step;
+  final String source;
+  final String identity;
+  final bool arrived;
+}
+
+_OrderBookSweepTapeCursor? _orderBookTapeCursorForLivePackets(
+  _OrderBookSweepTapeCursor? cursor,
+  List<_OrderBookSweepReplayPacket> packets,
+) {
+  if (cursor != null &&
+      packets.any((packet) => packet.identity == cursor.identity)) {
+    return cursor;
+  }
+  final packet = packets.firstOrNull;
+  final step = packet?.steps.firstOrNull;
+  if (packet == null || step == null) return null;
+  // Packet generation and tape capture happen before the ladder child can
+  // publish its playback cursor. Treat that ingest frame as arrival so a
+  // canonical future print never flashes before its border starts moving.
+  return _OrderBookSweepTapeCursor(
+    snapshot: packet.snapshot,
+    step: step,
+    source: packet.source,
+    identity: packet.identity,
+    arrived: false,
+  );
+}
+
+List<_OrderBookTapePrint> _orderBookTradeTapeAtCursor(
+  List<_OrderBookTapePrint> latest,
+  _OrderBookSweepTapeCursor? cursor,
+) {
+  if (cursor == null) return latest;
+  if (!cursor.arrived) return const <_OrderBookTapePrint>[];
+  final step = cursor.step;
+  final side = step.side == GameOrderBookSide.ask
+      ? TradeSide.buy
+      : TradeSide.sell;
+  final isPlayer = cursor.source == 'player';
+  final matching = latest
+      .where(
+        (print) =>
+            print.marketMinute == step.marketMinute &&
+            print.microstructureFrame == step.liquidityPulse &&
+            print.sequence == step.sequence &&
+            print.side == side &&
+            (!isPlayer ||
+                (print.executionIdentity.isNotEmpty &&
+                    cursor.identity.endsWith(':${print.executionIdentity}'))) &&
+            print.isPlayer == isPlayer &&
+            (print.price - step.price).abs() < 0.000001 &&
+            print.quantity == step.consumedQuantity,
+      )
+      .firstOrNull;
+  final active =
+      matching ??
+      _OrderBookTapePrint(
+        sessionKey:
+            '${cursor.snapshot.sourceDateKey}:${cursor.snapshot.sourceAssetId}',
+        marketMinute: step.marketMinute,
+        microstructureFrame: step.liquidityPulse,
+        price: step.price,
+        previousPrice: cursor.snapshot.sourceLastTradePrice ?? step.price,
+        quantity: step.consumedQuantity,
+        side: side,
+        isPlayer: isPlayer,
+        sequence: step.sequence,
+        executionIdentity: cursor.identity,
+      );
+  // The canonical market can already be several packets ahead at 3x/10x.
+  // Expose only the packet currently receiving its border so a future print
+  // never appears before its own arrival -> drain playback.
+  return <_OrderBookTapePrint>[active];
+}
+
+String _orderBookSweepReplayIdentity(
+  GameOrderBookSnapshot snapshot,
+  List<GameOrderBookSweepStep> steps,
+  String source, {
+  String? uniqueToken,
+  Iterable<OrderBookCancellationNotice> cancellations =
+      const <OrderBookCancellationNotice>[],
+}) {
+  final stepIdentity = steps
+      .map(
+        (step) =>
+            '${step.sequence}:${step.side.name}:'
+            '${step.price.toStringAsFixed(6)}:'
+            '${step.consumedQuantity}:${step.remainingQuantity}',
+      )
+      .join('|');
+  final cancellationIdentity = cancellations
+      .map(
+        (notice) =>
+            '${notice.side.name}:${notice.price.toStringAsFixed(6)}:'
+            '${notice.quantity}',
+      )
+      .join('|');
+  final marketMinute =
+      steps.firstOrNull?.marketMinute ?? snapshot.sourceMarketMinute ?? -1;
+  final liquidityPulse =
+      steps.firstOrNull?.liquidityPulse ?? snapshot.liquidityPulse;
+  final transitionIdentity = stepIdentity.isNotEmpty
+      ? stepIdentity
+      : 'cancel=$cancellationIdentity';
+  return '$source:${snapshot.sourceAssetId}:${snapshot.sourceDateKey}:'
+      '$marketMinute:$liquidityPulse:'
+      '${uniqueToken ?? transitionIdentity}';
+}
+
+mixin _OrderBookSweepPlayback<T extends StatefulWidget> on State<T> {
+  Timer? _orderBookSweepTimer;
+  final List<_OrderBookSweepBatch> _pendingOrderBookSweeps = [];
+  final OrderBookSweepIdentityLedger _orderBookSweepIdentityLedger =
+      OrderBookSweepIdentityLedger(completedHistoryCapacity: 256);
+  final Map<(GameOrderBookSide, double), OrderBookCancellationNotice>
+  _orderBookCancellationFlashes =
+      <(GameOrderBookSide, double), OrderBookCancellationNotice>{};
+  _OrderBookSweepBatch? _activeOrderBookSweepBatch;
+  int _orderBookSweepIndex = -1;
+  Duration _orderBookSweepStepDuration = _orderBookSweepMaximumStepDuration;
+  _OrderBookSweepPhase _orderBookSweepPhase = _OrderBookSweepPhase.idle;
+  int _orderBookSweepScheduleGeneration = 0;
+
+  void onOrderBookSweepBatchCompleted(String identity);
+
+  void onOrderBookSweepPlaybackChanged({bool deferUntilAfterFrame = false}) {}
+
+  void _activateOrderBookCancellationFlashes(
+    Iterable<OrderBookCancellationNotice> notices,
+  ) {
+    _orderBookCancellationFlashes.clear();
+    for (final notice in notices) {
+      _orderBookCancellationFlashes[(notice.side, notice.price)] = notice;
+    }
+  }
+
+  GameOrderBookSweepStep? get _activeOrderBookSweepStep {
+    final batch = _activeOrderBookSweepBatch;
+    if (batch == null ||
+        _orderBookSweepIndex < 0 ||
+        _orderBookSweepIndex >= batch.steps.length) {
+      return null;
+    }
+    return batch.steps[_orderBookSweepIndex];
+  }
+
+  bool get _activeOrderBookSweepStepArrived =>
+      _orderBookSweepPhase == _OrderBookSweepPhase.draining;
+
+  int get _activeOrderBookSweepStepNumber => _orderBookSweepIndex + 1;
+
+  int get _activeOrderBookSweepStepCount =>
+      _activeOrderBookSweepBatch?.steps.length ?? 0;
+
+  GameOrderBookSnapshot _orderBookSweepPresentationSnapshot(
+    GameOrderBookSnapshot latest,
+  ) => _activeOrderBookSweepBatch?.snapshot ?? latest;
+
+  List<GameOrderBookLevel> _orderBookSweepPresentationLevels(
+    GameOrderBookSnapshot latest,
+  ) {
+    final batch = _activeOrderBookSweepBatch;
+    if (batch == null) return _symmetricVisibleOrderBookLevels(latest);
+    if (_orderBookSweepPhase == _OrderBookSweepPhase.cancelling ||
+        batch.steps.isEmpty) {
+      return _symmetricVisibleOrderBookLevels(batch.snapshot);
+    }
+    return orderBookSweepPresentationLevels(
+      snapshot: batch.snapshot,
+      previousSnapshot: batch.previousSnapshot,
+      steps: batch.steps,
+      cancellationNotices: batch.cancellations,
+      activeStepIndex: _orderBookSweepIndex,
+      activeStepArrived: _activeOrderBookSweepStepArrived,
+    );
+  }
+
+  String _orderBookSweepBatchId(
+    GameOrderBookSnapshot snapshot,
+    List<GameOrderBookSweepStep> steps,
+    List<OrderBookCancellationNotice> cancellations,
+    String source,
+    String? identityToken,
+  ) =>
+      identityToken ??
+      _orderBookSweepReplayIdentity(
+        snapshot,
+        steps,
+        source,
+        cancellations: cancellations,
+      );
+
+  void _syncOrderBookSweep(
+    GameOrderBookSnapshot snapshot, {
+    GameOrderBookSnapshot? previousSnapshot,
+    List<GameOrderBookSweepStep>? explicitSteps,
+    List<OrderBookCancellationNotice> cancellations =
+        const <OrderBookCancellationNotice>[],
+    String source = 'market',
+    String? identityToken,
+    _OrderBookSweepReplayProgress? replayProgress,
+  }) {
+    final sourceSteps = explicitSteps ?? snapshot.sweepSteps;
+    final steps =
+        sourceSteps
+            .where((step) => step.consumedQuantity > 0)
+            .toList(growable: false)
+          ..sort((left, right) => left.sequence.compareTo(right.sequence));
+    final replayCancellations = cancellations
+        .where((notice) => notice.quantity > 0)
+        .toList(growable: false);
+    if (steps.isEmpty && replayCancellations.isEmpty) return;
+    final batchId = _orderBookSweepBatchId(
+      snapshot,
+      steps,
+      replayCancellations,
+      source,
+      identityToken,
+    );
+    if (!_orderBookSweepIdentityLedger.admit(batchId)) return;
+    final batch = _OrderBookSweepBatch(
+      snapshot: snapshot,
+      previousSnapshot: previousSnapshot ?? snapshot,
+      steps: List<GameOrderBookSweepStep>.unmodifiable(steps),
+      cancellations: List<OrderBookCancellationNotice>.unmodifiable(
+        replayCancellations,
+      ),
+      identity: batchId,
+      source: source,
+      progress: replayProgress ?? _OrderBookSweepReplayProgress(),
+    );
+    // Never discard an actual fill or cancellation batch: each transition must
+    // reach its own FIFO presentation phase at high playback speed.
+    _pendingOrderBookSweeps.add(batch);
+    if (_activeOrderBookSweepBatch == null && _orderBookSweepTimer == null) {
+      _beginNextOrderBookSweep(deferPresentationUntilAfterFrame: true);
+    }
+  }
+
+  void _beginNextOrderBookSweep({
+    bool deferPresentationUntilAfterFrame = false,
+  }) {
+    if (_pendingOrderBookSweeps.isEmpty) return;
+    _activeOrderBookSweepBatch = _pendingOrderBookSweeps.removeAt(0);
+    final batch = _activeOrderBookSweepBatch!;
+    if (batch.steps.isEmpty) {
+      _orderBookSweepIndex = -1;
+      _orderBookSweepPhase = _OrderBookSweepPhase.cancelling;
+      _activateOrderBookCancellationFlashes(batch.cancellations);
+      onOrderBookSweepPlaybackChanged(
+        deferUntilAfterFrame: deferPresentationUntilAfterFrame,
+      );
+      _scheduleOrderBookSweepTimerAfterFrame(
+        _orderBookCancellationHoldDuration,
+        _completeActiveOrderBookSweep,
+      );
+      return;
+    }
+    final progress = _activeOrderBookSweepBatch!.progress;
+    _orderBookSweepIndex = progress.stepIndex
+        .clamp(0, _activeOrderBookSweepBatch!.steps.length - 1)
+        .toInt();
+    progress.stepIndex = _orderBookSweepIndex;
+    _orderBookSweepPhase = progress.arrived
+        ? _OrderBookSweepPhase.draining
+        : _OrderBookSweepPhase.arriving;
+    onOrderBookSweepPlaybackChanged(
+      deferUntilAfterFrame: deferPresentationUntilAfterFrame,
+    );
+    final durationMs =
+        (_orderBookSweepTotalDuration.inMilliseconds /
+                math.max(1, batch.steps.length))
+            .round()
+            .clamp(
+              _orderBookSweepMinimumStepDuration.inMilliseconds,
+              _orderBookSweepMaximumStepDuration.inMilliseconds,
+            )
+            .toInt();
+    _orderBookSweepStepDuration = Duration(milliseconds: durationMs);
+    if (_orderBookSweepPhase == _OrderBookSweepPhase.draining) {
+      _scheduleOrderBookSweepDrain();
+    } else {
+      _scheduleOrderBookSweepArrival();
+    }
+  }
+
+  void _scheduleOrderBookSweepTimerAfterFrame(
+    Duration duration,
+    VoidCallback callback,
+  ) {
+    _orderBookSweepTimer?.cancel();
+    _orderBookSweepTimer = null;
+    final generation = ++_orderBookSweepScheduleGeneration;
+    final batchIdentity = _activeOrderBookSweepBatch?.identity;
+    final stepIndex = _orderBookSweepIndex;
+    final phase = _orderBookSweepPhase;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted ||
+          generation != _orderBookSweepScheduleGeneration ||
+          _activeOrderBookSweepBatch?.identity != batchIdentity ||
+          _orderBookSweepIndex != stepIndex ||
+          _orderBookSweepPhase != phase) {
+        return;
+      }
+      _orderBookSweepTimer = Timer(duration, () {
+        if (!mounted ||
+            generation != _orderBookSweepScheduleGeneration ||
+            _activeOrderBookSweepBatch?.identity != batchIdentity ||
+            _orderBookSweepIndex != stepIndex ||
+            _orderBookSweepPhase != phase) {
+          return;
+        }
+        callback();
+      });
+    });
+  }
+
+  void _scheduleOrderBookSweepArrival() {
+    _scheduleOrderBookSweepTimerAfterFrame(_orderBookMotionDuration, () {
+      setState(() {
+        _orderBookSweepPhase = _OrderBookSweepPhase.draining;
+        _activeOrderBookSweepBatch?.progress.arrived = true;
+      });
+      onOrderBookSweepPlaybackChanged();
+      _scheduleOrderBookSweepDrain();
+    });
+  }
+
+  void _completeActiveOrderBookSweep() {
+    final completedIdentity = _activeOrderBookSweepBatch?.identity;
+    if (completedIdentity != null) {
+      _orderBookSweepIdentityLedger.complete(completedIdentity);
+    }
+    setState(() {
+      _orderBookCancellationFlashes.clear();
+      _activeOrderBookSweepBatch = null;
+      _orderBookSweepIndex = -1;
+      _orderBookSweepPhase = _OrderBookSweepPhase.idle;
+    });
+    if (_pendingOrderBookSweeps.isNotEmpty) {
+      _beginNextOrderBookSweep();
+    } else {
+      _orderBookSweepTimer = null;
+    }
+    onOrderBookSweepPlaybackChanged();
+    if (completedIdentity != null) {
+      onOrderBookSweepBatchCompleted(completedIdentity);
+    }
+  }
+
+  void _scheduleOrderBookSweepDrain() {
+    _scheduleOrderBookSweepTimerAfterFrame(_orderBookSweepStepDuration, () {
+      final batch = _activeOrderBookSweepBatch;
+      final nextIndex = _orderBookSweepIndex + 1;
+      if (batch != null && nextIndex < batch.steps.length) {
+        setState(() {
+          _orderBookSweepIndex = nextIndex;
+          _orderBookSweepPhase = _OrderBookSweepPhase.arriving;
+          batch.progress
+            ..stepIndex = nextIndex
+            ..arrived = false;
+        });
+        onOrderBookSweepPlaybackChanged();
+        _scheduleOrderBookSweepArrival();
+        return;
+      }
+      if (batch != null && batch.cancellations.isNotEmpty) {
+        setState(() {
+          _orderBookSweepIndex = -1;
+          _orderBookSweepPhase = _OrderBookSweepPhase.cancelling;
+          _activateOrderBookCancellationFlashes(batch.cancellations);
+        });
+        onOrderBookSweepPlaybackChanged();
+        _scheduleOrderBookSweepTimerAfterFrame(
+          _orderBookCancellationHoldDuration,
+          _completeActiveOrderBookSweep,
+        );
+        return;
+      }
+      _scheduleOrderBookSweepTimerAfterFrame(
+        _orderBookSweepFinalHoldDuration,
+        _completeActiveOrderBookSweep,
+      );
+    });
+  }
+
+  void _resetOrderBookSweepPlayback({bool clearHistory = false}) {
+    _orderBookSweepScheduleGeneration += 1;
+    _orderBookSweepTimer?.cancel();
+    _orderBookSweepTimer = null;
+    _orderBookCancellationFlashes.clear();
+    _pendingOrderBookSweeps.clear();
+    _activeOrderBookSweepBatch = null;
+    _orderBookSweepIdentityLedger.clearInFlight();
+    _orderBookSweepIndex = -1;
+    _orderBookSweepPhase = _OrderBookSweepPhase.idle;
+    onOrderBookSweepPlaybackChanged(deferUntilAfterFrame: true);
+    if (clearHistory) _orderBookSweepIdentityLedger.clear();
+  }
+
+  void _disposeOrderBookSweepPlayback() => _resetOrderBookSweepPlayback();
+}
+
+class _OrderBookSweepRowOverlay extends StatelessWidget {
+  const _OrderBookSweepRowOverlay({
+    required this.step,
+    required this.stepDuration,
+    required this.stepNumber,
+    required this.stepCount,
+    required this.maxDepth,
+    this.compact = false,
+  });
+
+  final GameOrderBookSweepStep step;
+  final Duration stepDuration;
+  final int stepNumber;
+  final int stepCount;
+  final int maxDepth;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final isAskQueue = step.side == GameOrderBookSide.ask;
+    final color = isAskQueue ? _marketAccent : const Color(0xFFF04452);
+    final depthTransition = orderBookSweepDepthTransition(
+      step: step,
+      maxDepth: maxDepth,
+    );
+    final queueLabel = isAskQueue ? '매도잔량' : '매수잔량';
+    final aggressorLabel = isAskQueue ? '매수 체결' : '매도 체결';
+    final quantityLabel = step.remainingQuantity <= 0
+        ? '$queueLabel ${_money(step.consumedQuantity)}주 소진'
+        : '$queueLabel ${_money(step.consumedQuantity)}주 체결 · '
+              '잔 ${_money(step.remainingQuantity)}주';
+    final eventLabel = step.structuralBreach
+        ? '$quantityLabel · 구조 경계 돌파'
+        : step.boundaryCrossed
+        ? '$quantityLabel · 경계 통과'
+        : quantityLabel;
+
+    final priceLabel = '${_money(step.price.round())}원';
+    final actionLabel = isAskQueue ? '매수' : '매도';
+    final fillLabel = step.remainingQuantity <= 0 ? '소진' : '체결';
+    final boundaryLabel = step.structuralBreach
+        ? '구조돌파'
+        : step.boundaryCrossed
+        ? '통과'
+        : '';
+    final statusLabel =
+        '$actionLabel ${_money(step.consumedQuantity)}주 $fillLabel'
+        '${boundaryLabel.isEmpty ? '' : '·$boundaryLabel'} '
+        '$stepNumber/$stepCount';
+
+    Widget drainBar(Alignment alignment) => TweenAnimationBuilder<double>(
+      key: ValueKey((
+        'order-book-sweep-drain',
+        step.marketMinute,
+        step.liquidityPulse,
+        step.sequence,
+        compact,
+      )),
+      duration: stepDuration,
+      curve: Curves.easeOutCubic,
+      tween: Tween<double>(
+        begin: depthTransition.before,
+        end: depthTransition.after,
+      ),
+      builder: (context, ratio, _) => Align(
+        alignment: alignment,
+        child: FractionallySizedBox(
+          widthFactor: ratio,
+          heightFactor: 1,
+          child: ColoredBox(
+            color: color.withValues(alpha: compact ? 0.20 : 0.28),
+          ),
+        ),
+      ),
+    );
+
+    Widget statusCell() => Container(
+      key: const Key('order-book-sweep-status-cell'),
+      alignment: Alignment.center,
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: Color(0xFFE9EDF2))),
+      ),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(
+          statusLabel,
+          maxLines: 1,
+          style: TextStyle(
+            color: color,
+            fontSize: 9,
+            fontWeight: FontWeight.w900,
+            fontFeatures: _marketNumberFeatures,
+          ),
+        ),
+      ),
+    );
+
+    return Semantics(
+      label:
+          '$aggressorLabel ${_money(step.consumedQuantity)}주, '
+          '$priceLabel, $eventLabel, $stepNumber/$stepCount',
+      child: IgnorePointer(
+        child: ClipRect(
+          child: Container(
+            key: Key(
+              compact
+                  ? 'inline-order-book-sweep-step'
+                  : 'order-book-sweep-step',
+            ),
+            color: Colors.transparent,
+            child: compact
+                ? Row(
+                    children: [
+                      const Expanded(flex: 6, child: SizedBox.shrink()),
+                      Expanded(flex: 5, child: drainBar(Alignment.centerRight)),
+                    ],
+                  )
+                : Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 124,
+                          child: isAskQueue
+                              ? drainBar(Alignment.centerRight)
+                              : statusCell(),
+                        ),
+                        const Expanded(child: SizedBox.shrink()),
+                        SizedBox(
+                          width: 124,
+                          child: isAskQueue
+                              ? statusCell()
+                              : drainBar(Alignment.centerLeft),
+                        ),
+                      ],
+                    ),
+                  ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _OrderBookCancellationFlashLabel extends StatelessWidget {
+  const _OrderBookCancellationFlashLabel({
+    required this.notice,
+    required this.compact,
+  });
+
+  final OrderBookCancellationNotice notice;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    key: ValueKey((
+      'order-book-cancellation-flash',
+      notice.side.name,
+      notice.price,
+      notice.quantity,
+      compact ? 'compact' : 'full',
+    )),
+    color: Colors.white,
+    padding: EdgeInsets.symmetric(horizontal: compact ? 4 : 7),
+    alignment: compact
+        ? Alignment.centerRight
+        : notice.side == GameOrderBookSide.ask
+        ? Alignment.centerRight
+        : Alignment.centerLeft,
+    child: FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Text(
+        '취소 ${_money(notice.quantity)}',
+        key: const Key('order-book-cancellation-label'),
+        maxLines: 1,
+        style: TextStyle(
+          color: const Color(0xFF7B5A00),
+          fontSize: compact ? 7 : 10,
+          height: 1,
+          fontWeight: FontWeight.w900,
+          fontFeatures: _marketNumberFeatures,
+        ),
+      ),
+    ),
+  );
+}
+
 class _CompactOrderBookRail extends StatefulWidget {
   const _CompactOrderBookRail({
     required this.definition,
@@ -5628,6 +7110,8 @@ class _CompactOrderBookRail extends StatefulWidget {
     required this.state,
     required this.minute,
     required this.snapshot,
+    required this.sweepPackets,
+    required this.onSweepPacketsAccepted,
     required this.playerTrade,
     required this.selectedPrice,
     required this.onSelectPrice,
@@ -5638,6 +7122,8 @@ class _CompactOrderBookRail extends StatefulWidget {
   final GameState state;
   final int minute;
   final GameOrderBookSnapshot snapshot;
+  final List<_OrderBookSweepReplayPacket> sweepPackets;
+  final ValueChanged<Iterable<String>> onSweepPacketsAccepted;
   final _PlayerTradeSignal? playerTrade;
   final double? selectedPrice;
   final ValueChanged<double> onSelectPrice;
@@ -5646,9 +7132,51 @@ class _CompactOrderBookRail extends StatefulWidget {
   State<_CompactOrderBookRail> createState() => _CompactOrderBookRailState();
 }
 
-class _CompactOrderBookRailState extends State<_CompactOrderBookRail> {
+class _CompactOrderBookRailState extends State<_CompactOrderBookRail>
+    with _OrderBookSweepPlayback<_CompactOrderBookRail> {
   String? _depthScaleAssetId;
   double _depthScale = 0;
+
+  void _syncCurrentOrderBookSweep() {
+    for (final packet in widget.sweepPackets) {
+      _syncOrderBookSweep(
+        packet.snapshot,
+        previousSnapshot: packet.previousSnapshot,
+        explicitSteps: packet.steps,
+        cancellations: packet.cancellations,
+        source: packet.source,
+        identityToken: packet.identity,
+        replayProgress: packet.progress,
+      );
+    }
+  }
+
+  @override
+  void onOrderBookSweepBatchCompleted(String identity) {
+    widget.onSweepPacketsAccepted(<String>[identity]);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _syncCurrentOrderBookSweep();
+  }
+
+  @override
+  void didUpdateWidget(covariant _CompactOrderBookRail oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.snapshot.sourceAssetId != widget.snapshot.sourceAssetId ||
+        oldWidget.snapshot.sourceDateKey != widget.snapshot.sourceDateKey) {
+      _resetOrderBookSweepPlayback(clearHistory: true);
+    }
+    _syncCurrentOrderBookSweep();
+  }
+
+  @override
+  void dispose() {
+    _disposeOrderBookSweepPlayback();
+    super.dispose();
+  }
 
   bool _matches(double left, double? right) =>
       right != null && (left - right).abs() < 0.000001;
@@ -5682,12 +7210,28 @@ class _CompactOrderBookRailState extends State<_CompactOrderBookRail> {
 
   @override
   Widget build(BuildContext context) {
+    final activeSweepStep = _activeOrderBookSweepStep;
+    final snapshot = _orderBookSweepPresentationSnapshot(widget.snapshot);
+    final levels = _orderBookSweepPresentationLevels(widget.snapshot);
+    final compactSweepHeaderLabel = activeSweepStep == null
+        ? '잔량'
+        : activeSweepStep.structuralBreach
+        ? '구조돌파 $_activeOrderBookSweepStepNumber/'
+              '$_activeOrderBookSweepStepCount'
+        : activeSweepStep.boundaryCrossed
+        ? '통과 $_activeOrderBookSweepStepNumber/'
+              '$_activeOrderBookSweepStepCount'
+        : '체결 $_activeOrderBookSweepStepNumber/'
+              '$_activeOrderBookSweepStepCount';
+    final compactSweepHeaderColor = activeSweepStep == null
+        ? _marketMuted
+        : activeSweepStep.side == GameOrderBookSide.ask
+        ? _marketAccent
+        : const Color(0xFFF04452);
     final currentPrice = marketSnapPrice(
-      widget.snapshot.sourceLastTradePrice ?? widget.quote.price,
+      snapshot.sourceLastTradePrice ?? widget.quote.price,
       market: widget.definition.market,
     );
-    final snapshot = widget.snapshot;
-    final levels = _symmetricVisibleOrderBookLevels(snapshot);
     final generatedTrade = snapshot.lastSyntheticTrade;
     final hasCurrentGeneratedTrade =
         generatedTrade != null &&
@@ -5695,9 +7239,12 @@ class _CompactOrderBookRailState extends State<_CompactOrderBookRail> {
         generatedTrade.marketMinute == widget.minute &&
         generatedTrade.liquidityPulse == snapshot.liquidityPulse &&
         levels.any((level) => _matches(level.price, generatedTrade.price));
-    double? outlinePrice = hasCurrentGeneratedTrade
-        ? generatedTrade.price
-        : null;
+    double? outlinePrice = activeSweepStep?.price;
+    GameOrderBookSide? outlineSide = activeSweepStep?.side;
+    if (activeSweepStep == null && hasCurrentGeneratedTrade) {
+      outlinePrice = generatedTrade.price;
+      outlineSide = generatedTrade.levelSide;
+    }
     final playerTrade = widget.playerTrade;
     final playerPrint = playerTrade?.orderBookPrint;
     final hasCurrentPlayerTrade =
@@ -5707,8 +7254,9 @@ class _CompactOrderBookRailState extends State<_CompactOrderBookRail> {
         playerTrade.marketMinute == widget.minute &&
         playerTrade.microstructureFrame == snapshot.liquidityPulse &&
         levels.any((level) => _matches(level.price, playerPrint.price));
-    if (hasCurrentPlayerTrade) {
+    if (activeSweepStep == null && hasCurrentPlayerTrade) {
       outlinePrice = playerPrint.price;
+      outlineSide = playerPrint.levelSide;
     }
     outlinePrice ??=
         levels
@@ -5721,6 +7269,14 @@ class _CompactOrderBookRailState extends State<_CompactOrderBookRail> {
       (maximum, level) => math.max(maximum, _displayQuantity(level)),
     );
     final maxDepth = _stableDepthScale(observedMaxDepth);
+    final cancellationRows =
+        <({OrderBookCancellationNotice notice, int index})>[
+          for (final notice in _orderBookCancellationFlashes.values)
+            (
+              notice: notice,
+              index: _orderBookCancellationRowIndex(notice, levels),
+            ),
+        ].where((entry) => entry.index >= 0).toList(growable: false);
 
     return Container(
       key: const Key('inline-order-book'),
@@ -5734,9 +7290,9 @@ class _CompactOrderBookRailState extends State<_CompactOrderBookRail> {
               color: Color(0xFFF4F6F8),
               border: Border(bottom: BorderSide(color: Color(0xFFDDE2E8))),
             ),
-            child: const Row(
+            child: Row(
               children: [
-                Expanded(
+                const Expanded(
                   flex: 6,
                   child: Text(
                     '가격',
@@ -5749,13 +7305,22 @@ class _CompactOrderBookRailState extends State<_CompactOrderBookRail> {
                 ),
                 Expanded(
                   flex: 5,
-                  child: Text(
-                    '잔량',
-                    textAlign: TextAlign.right,
-                    style: TextStyle(
-                      color: _marketMuted,
-                      fontSize: 9,
-                      fontWeight: FontWeight.w800,
+                  child: AnimatedSwitcher(
+                    key: const Key('inline-order-book-sweep-status-header'),
+                    duration: _orderBookSweepMinimumStepDuration,
+                    child: Text(
+                      compactSweepHeaderLabel,
+                      key: ValueKey((
+                        'inline-order-book-sweep-status-header',
+                        compactSweepHeaderLabel,
+                      )),
+                      textAlign: TextAlign.right,
+                      maxLines: 1,
+                      style: TextStyle(
+                        color: compactSweepHeaderColor,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                   ),
                 ),
@@ -5768,11 +7333,33 @@ class _CompactOrderBookRailState extends State<_CompactOrderBookRail> {
                 if (levels.isEmpty) return const SizedBox.shrink();
                 final rowHeight = constraints.maxHeight / levels.length;
                 final outlineIndex = levels.indexWhere(
-                  (level) => _matches(level.price, outlinePrice),
+                  (level) =>
+                      _matches(level.price, outlinePrice) &&
+                      (outlineSide == null || level.side == outlineSide),
                 );
+                final sweepIndex = activeSweepStep == null
+                    ? -1
+                    : levels.indexWhere(
+                        (level) =>
+                            level.side == activeSweepStep.side &&
+                            (level.price - activeSweepStep.price).abs() <
+                                0.000001,
+                      );
                 return Stack(
                   clipBehavior: Clip.hardEdge,
                   children: [
+                    if (activeSweepStep != null)
+                      Offstage(
+                        child: SizedBox(
+                          key: ValueKey((
+                            'order-book-sweep-active',
+                            _activeOrderBookSweepBatch?.identity,
+                            activeSweepStep.sequence,
+                            _orderBookSweepPhase.name,
+                            'compact',
+                          )),
+                        ),
+                      ),
                     for (final entry in levels.asMap().entries)
                       Positioned(
                         key: ValueKey((
@@ -5786,14 +7373,65 @@ class _CompactOrderBookRailState extends State<_CompactOrderBookRail> {
                         height: rowHeight,
                         child: _CompactOrderBookRow(
                           level: entry.value,
+                          depthAnimationDuration:
+                              activeSweepStep != null &&
+                                  _activeOrderBookSweepStepArrived &&
+                                  entry.value.side == activeSweepStep.side &&
+                                  (entry.value.price - activeSweepStep.price)
+                                          .abs() <
+                                      0.000001
+                              ? _orderBookSweepStepDuration
+                              : _orderBookMotionDuration,
+                          isTradeDrain:
+                              activeSweepStep != null &&
+                              _activeOrderBookSweepStepArrived &&
+                              entry.value.side == activeSweepStep.side &&
+                              (entry.value.price - activeSweepStep.price)
+                                      .abs() <
+                                  0.000001,
                           quantity: _displayQuantity(entry.value),
                           maxDepth: maxDepth,
-                          isCurrent: _matches(entry.value.price, outlinePrice),
+                          previousClose: widget.quote.previousClose,
+                          isCurrent:
+                              _matches(entry.value.price, outlinePrice) &&
+                              (outlineSide == null ||
+                                  entry.value.side == outlineSide),
                           isSelected: _matches(
                             entry.value.price,
                             widget.selectedPrice,
                           ),
                           onTap: () => widget.onSelectPrice(entry.value.price),
+                        ),
+                      ),
+                    for (final flash in cancellationRows)
+                      Positioned(
+                        top: flash.index * rowHeight,
+                        right: 0,
+                        width: constraints.maxWidth * 5 / 11,
+                        height: rowHeight,
+                        child: IgnorePointer(
+                          child: _OrderBookCancellationFlashLabel(
+                            notice: flash.notice,
+                            compact: true,
+                          ),
+                        ),
+                      ),
+                    if (sweepIndex >= 0 &&
+                        activeSweepStep != null &&
+                        _activeOrderBookSweepStepArrived)
+                      Positioned(
+                        key: const Key('inline-order-book-sweep-position'),
+                        top: sweepIndex * rowHeight,
+                        left: 0,
+                        right: 0,
+                        height: rowHeight,
+                        child: _OrderBookSweepRowOverlay(
+                          step: activeSweepStep,
+                          stepDuration: _orderBookSweepStepDuration,
+                          stepNumber: _activeOrderBookSweepStepNumber,
+                          stepCount: _activeOrderBookSweepStepCount,
+                          maxDepth: maxDepth,
+                          compact: true,
                         ),
                       ),
                     if (outlineIndex >= 0)
@@ -5832,16 +7470,22 @@ class _CompactOrderBookRailState extends State<_CompactOrderBookRail> {
 class _CompactOrderBookRow extends StatelessWidget {
   const _CompactOrderBookRow({
     required this.level,
+    required this.depthAnimationDuration,
     required this.quantity,
+    required this.isTradeDrain,
     required this.maxDepth,
+    required this.previousClose,
     required this.isCurrent,
     required this.isSelected,
     required this.onTap,
   });
 
   final GameOrderBookLevel level;
+  final Duration depthAnimationDuration;
   final int quantity;
+  final bool isTradeDrain;
   final int maxDepth;
+  final double previousClose;
   final bool isCurrent;
   final bool isSelected;
   final VoidCallback onTap;
@@ -5872,16 +7516,40 @@ class _CompactOrderBookRow extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.only(left: 4),
                   alignment: Alignment.centerLeft,
-                  child: Text(
-                    _money(level.price.round()),
-                    maxLines: 1,
-                    style: TextStyle(
-                      color: color,
-                      fontSize: 10,
-                      fontWeight: isCurrent || isSelected
-                          ? FontWeight.w900
-                          : FontWeight.w800,
-                      fontFeatures: _marketNumberFeatures,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _money(level.price.round()),
+                          maxLines: 1,
+                          style: TextStyle(
+                            color: color,
+                            fontSize: 10,
+                            fontWeight: isCurrent || isSelected
+                                ? FontWeight.w900
+                                : FontWeight.w800,
+                            fontFeatures: _marketNumberFeatures,
+                          ),
+                        ),
+                        const SizedBox(width: 2),
+                        Text(
+                          _orderBookPriceRateLabel(level.price, previousClose),
+                          key: const Key('inline-order-book-price-rate'),
+                          maxLines: 1,
+                          style: TextStyle(
+                            color: _orderBookPriceRateColor(
+                              level.price,
+                              previousClose,
+                            ),
+                            fontSize: 7,
+                            fontWeight: FontWeight.w800,
+                            fontFeatures: _marketNumberFeatures,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -5894,7 +7562,7 @@ class _CompactOrderBookRow extends StatelessWidget {
                     Align(
                       alignment: Alignment.centerRight,
                       child: TweenAnimationBuilder<double>(
-                        duration: _orderBookMotionDuration,
+                        duration: depthAnimationDuration,
                         curve: Curves.easeOutCubic,
                         tween: Tween<double>(begin: depth, end: depth),
                         builder: (context, animatedDepth, child) =>
@@ -5910,22 +7578,12 @@ class _CompactOrderBookRow extends StatelessWidget {
                       alignment: Alignment.centerRight,
                       child: Padding(
                         padding: const EdgeInsets.only(right: 4),
-                        child: TweenAnimationBuilder<double>(
-                          duration: _orderBookMotionDuration,
-                          curve: Curves.easeOutCubic,
-                          tween: Tween<double>(
-                            begin: quantity.toDouble(),
-                            end: quantity.toDouble(),
-                          ),
-                          builder: (context, animatedQuantity, _) => Text(
-                            _money(animatedQuantity.round()),
-                            maxLines: 1,
-                            style: const TextStyle(
-                              color: Color(0xFF343A45),
-                              fontSize: 9,
-                              fontWeight: FontWeight.w800,
-                              fontFeatures: _marketNumberFeatures,
-                            ),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerRight,
+                          child: _CompactOrderBookQuantityLabel(
+                            quantity: quantity,
+                            isTradeDrain: isTradeDrain,
                           ),
                         ),
                       ),
@@ -5939,6 +7597,89 @@ class _CompactOrderBookRow extends StatelessWidget {
       ),
     );
   }
+}
+
+class _CompactOrderBookQuantityLabel extends StatefulWidget {
+  const _CompactOrderBookQuantityLabel({
+    required this.quantity,
+    required this.isTradeDrain,
+  });
+
+  final int quantity;
+  final bool isTradeDrain;
+
+  @override
+  State<_CompactOrderBookQuantityLabel> createState() =>
+      _CompactOrderBookQuantityLabelState();
+}
+
+class _CompactOrderBookQuantityLabelState
+    extends State<_CompactOrderBookQuantityLabel> {
+  int _quantityDelta = 0;
+  bool _quantityDeltaIsTrade = false;
+  Timer? _deltaTimer;
+
+  @override
+  void didUpdateWidget(covariant _CompactOrderBookQuantityLabel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final delta = widget.quantity - oldWidget.quantity;
+    if (delta == 0) return;
+    _quantityDelta = delta;
+    _quantityDeltaIsTrade = delta < 0 && widget.isTradeDrain;
+    _deltaTimer?.cancel();
+    _deltaTimer = Timer(const Duration(milliseconds: 520), () {
+      if (!mounted) return;
+      setState(() {
+        _quantityDelta = 0;
+        _quantityDeltaIsTrade = false;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _deltaTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Text(
+        _money(widget.quantity),
+        maxLines: 1,
+        style: const TextStyle(
+          color: Color(0xFF343A45),
+          fontSize: 9,
+          fontWeight: FontWeight.w800,
+          fontFeatures: _marketNumberFeatures,
+        ),
+      ),
+      if (_quantityDelta != 0) ...[
+        const SizedBox(width: 2),
+        Text(
+          orderBookQuantityDeltaLabel(
+            _quantityDelta,
+            isTrade: _quantityDeltaIsTrade,
+          ),
+          key: const Key('inline-order-book-quantity-delta'),
+          maxLines: 1,
+          style: TextStyle(
+            color: _quantityDelta < 0 && !_quantityDeltaIsTrade
+                ? const Color(0xFF7B5A00)
+                : _quantityDelta > 0
+                ? const Color(0xFF16794E)
+                : const Color(0xFFB42332),
+            fontSize: 6,
+            height: 1,
+            fontWeight: FontWeight.w900,
+            fontFeatures: _marketNumberFeatures,
+          ),
+        ),
+      ],
+    ],
+  );
 }
 
 class _StockInfoUnavailable extends StatelessWidget {
@@ -7944,7 +9685,7 @@ class _PracticalTradeTutorialSheetState
                   ? '한 주 사 볼까요? 노란 테두리의 매수 버튼만 눌러 보세요.'
                   : '호가창에서 고른 ${_money(widget.initialBuyLimitPrice!.round())}원이 '
                         '입력됐어요. 노란 테두리의 매수 버튼으로 한 주 사 볼까요?'
-            : '어맛, 많이 올랐네요! 노란 테두리의 매도 버튼으로 한 주를 팔아 보세요.',
+            : '가격이 움직였네요. 같은 한 주를 팔아 손익을 확정해 봅시다.',
       ),
       Expanded(
         child: _OrderSheet(
@@ -8159,7 +9900,7 @@ class _PracticalTradeTutorialSheetState
                   ? const _TutorialDialogueCard(
                       key: Key('tutorial-price-rise-teacher'),
                       speaker: '한서윤 선생님',
-                      message: '어맛, 많이 올랐네요! 이제 한 번 팔아 볼까요?',
+                      message: '화면의 이익은 아직 평가액이에요. 한 주를 팔아 결과를 확정해 볼까요?',
                       teacher: true,
                     )
                   : _TutorialDialogueCard(
@@ -8205,7 +9946,7 @@ class _PracticalTradeTutorialSheetState
                   ),
                 ),
                 child: Text(
-                  _priceMoveComplete ? '선생님 말대로 한 주 팔러 가기' : '가격 움직임 지켜보는 중…',
+                  _priceMoveComplete ? '한 주 팔고 결과 확정하기' : '가격 움직임 지켜보는 중…',
                   style: const TextStyle(fontWeight: FontWeight.w900),
                 ),
               ),
@@ -8322,19 +10063,19 @@ class _PracticalTradeTutorialSheetState
     final studentName = widget.sourceState.story.playerName.trim().isEmpty
         ? '나'
         : widget.sourceState.story.playerName.trim();
-    final isStudentBeat = _reviewBeat == 1;
+    final isStudentBeat = _reviewBeat == 1 || _reviewBeat == 3;
     final speaker = isStudentBeat ? studentName : '한서윤 선생님';
     final characterAsset = switch (_reviewBeat) {
       0 => 'assets/images/주식선생님/26_포즈5_주인공그림체_공통슬롯_투명.png',
       1 => 'assets/images/character_hero_thoughtful_v1.png',
       2 => 'assets/images/주식선생님/23_포즈2_주인공그림체_공통슬롯_투명.png',
-      _ => 'assets/images/주식선생님/27_포즈6_주인공그림체_공통슬롯_투명.png',
+      _ => 'assets/images/character_hero_determined_v1.png',
     };
     final message = switch (_reviewBeat) {
-      0 => '첫 거래, 같이 돌아볼까요?\n처음 직접 사고팔아 보니까 어땠어요?',
-      1 => '네! 사는 것보다 언제 팔지 정하는 게 더 어려웠어요.',
-      2 => '맞아요. 그래서 사기 전에 “왜 사는지”와\n“언제 다시 볼지”를 한 줄 적는 거예요.',
-      _ => '그리고 팔기 전 손익은 아직 화면 속 숫자예요.\n실제로 팔아야 결과가 확정된다는 것도 기억해요.',
+      0 => '첫 거래는 끝났어요.\n가장 먼저 눈에 들어온 건 뭐였어요?',
+      1 => '수익 숫자요. 오르니까 제가 잘한 줄 알았어요.',
+      2 => '기분은 빠르고 판단은 느려야 해요.\n장부에는 산 이유와 다시 볼 조건을 적어요.',
+      _ => '팔기 전 숫자는 아직 내 돈이 아니고요.\n팔고 나서야 결과가 되는 거죠?',
     };
     return Stack(
       key: const Key('tutorial-post-trade-review'),
@@ -8503,7 +10244,7 @@ class _PracticalTradeTutorialSheetState
                           ),
                         ),
                         child: Text(
-                          _reviewBeat == 3 ? '마지막 인사 듣기' : '다음 이야기',
+                          _reviewBeat == 3 ? '수업 마치기' : '다음 이야기',
                           style: const TextStyle(fontWeight: FontWeight.w900),
                         ),
                       ),
@@ -8551,13 +10292,13 @@ class _PracticalTradeTutorialSheetState
                   const _TutorialDialogueCard(
                     speaker: '한서윤 선생님',
                     message:
-                        '오늘은 여기까지! 다음에는 네가 궁금한 회사를 하나 골라 와요. 가격만 보지 말고 무엇을 파는 회사인지도 같이 찾아보는 거예요.',
+                        '오늘은 여기까지. 다음에는 네가 궁금한 회사 하나를 골라 와요. 가격표보다 먼저, 무엇을 팔아 돈 버는지부터 보는 거예요.',
                     teacher: true,
                   ),
                   const SizedBox(height: 10),
                   _TutorialDialogueCard(
                     speaker: studentName,
-                    message: '네! 다음에는 제가 고른 회사로 주문표도 써 볼래요.',
+                    message: '네. 다음에는 제가 고른 회사로, 산 이유부터 쓰고 주문할게요.',
                   ),
                   const SizedBox(height: 14),
                   Container(
@@ -8568,7 +10309,7 @@ class _PracticalTradeTutorialSheetState
                       border: Border.all(color: const Color(0xFFEACB7B)),
                     ),
                     child: const Text(
-                      '종이 울렸다. 나는 첫 투자노트를 가방에 넣고 선생님께 인사한 뒤 교문을 나섰다. 이제 집에서 내 첫 회사를 찾아볼 차례다.',
+                      '종이 울렸다. 첫 투자노트를 가방에 넣고 교문을 나서자 겨울 공기가 볼을 찔렀다. 이제 내가 고른 회사를 집의 CRT로 다시 볼 차례였다.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: Color(0xFF5D4B21),
@@ -8605,7 +10346,7 @@ class _PracticalTradeTutorialSheetState
                       )
                     : const Icon(Icons.directions_walk_rounded),
                 label: Text(
-                  _finishing ? '하교 준비 중…' : '인사하고 집으로 돌아가기',
+                  _finishing ? '하교 준비 중…' : '수업을 마치고 작은방으로 돌아가기',
                   style: const TextStyle(fontWeight: FontWeight.w800),
                 ),
               ),
@@ -8739,9 +10480,13 @@ class _OrderBookPanel extends StatelessWidget {
     required this.state,
     required this.minute,
     required this.snapshot,
+    required this.sweepPackets,
+    required this.sweepPacketsReader,
+    required this.onSweepPacketsAccepted,
     required this.availableHeight,
     required this.playerTrade,
     required this.tradeTape,
+    required this.tapeCursor,
     required this.selectedPrice,
     required this.quantityPreset,
     required this.onQuantityPresetChanged,
@@ -8758,9 +10503,13 @@ class _OrderBookPanel extends StatelessWidget {
   final GameState state;
   final int minute;
   final GameOrderBookSnapshot snapshot;
+  final List<_OrderBookSweepReplayPacket> sweepPackets;
+  final List<_OrderBookSweepReplayPacket> Function() sweepPacketsReader;
+  final ValueChanged<Iterable<String>> onSweepPacketsAccepted;
   final double availableHeight;
   final _PlayerTradeSignal? playerTrade;
   final List<_OrderBookTapePrint> tradeTape;
+  final ValueNotifier<_OrderBookSweepTapeCursor?> tapeCursor;
   final double? selectedPrice;
   final _QuoteQuantityPreset quantityPreset;
   final ValueChanged<_QuoteQuantityPreset> onQuantityPresetChanged;
@@ -8919,6 +10668,9 @@ class _OrderBookPanel extends StatelessWidget {
     var activeTradeQuantity = hasCurrentGeneratedTrade
         ? generatedTrade.quantity
         : 0;
+    var activeTradeLevelSide = hasCurrentGeneratedTrade
+        ? generatedTrade.levelSide
+        : null;
     final currentPlayerTrade = playerTrade;
     final playerPrint = currentPlayerTrade?.orderBookPrint;
     final hasCurrentPlayerTrade =
@@ -8935,6 +10687,7 @@ class _OrderBookPanel extends StatelessWidget {
       activeTradeSide = currentPlayerTrade.side;
       activeTradePrice = playerPrint.price;
       activeTradeQuantity = playerPrint.quantity;
+      activeTradeLevelSide = playerPrint.levelSide;
     }
 
     return Container(
@@ -9094,8 +10847,12 @@ class _OrderBookPanel extends StatelessWidget {
               'order-book-price-ladder-${definition.id}-'
               '${marketLiquidityDayKey(state.currentDate)}',
             ),
+            sweepPackets: sweepPackets,
+            onSweepPacketsAccepted: onSweepPacketsAccepted,
+            tapeCursor: tapeCursor,
             snapshot: snapshot,
             currentPrice: currentDisplayPrice,
+            previousClose: quote.previousClose,
             availableHeight:
                 availableHeight -
                 fixedPanelHeight -
@@ -9109,6 +10866,7 @@ class _OrderBookPanel extends StatelessWidget {
             selectedPrice: selectedPrice,
             activeTradePrice: activeTradePrice,
             activeTradeSide: activeTradeSide,
+            activeTradeLevelSide: activeTradeLevelSide,
             activeTradeQuantity: activeTradeQuantity,
             onTapLevel: definition.currency == 'KRW' ? onTapLevel : null,
             tutorialBestAskKey: tutorialBestAskKey,
@@ -9144,11 +10902,28 @@ class _OrderBookPanel extends StatelessWidget {
             ),
           ),
           if (showTradeTape)
-            _OrderBookTradeTape(
-              height: tapeHeight,
-              compact: compactPanel,
-              prints: tradeTape,
-              currency: definition.currency,
+            ValueListenableBuilder<_OrderBookSweepTapeCursor?>(
+              valueListenable: tapeCursor,
+              builder: (context, cursor, _) {
+                final livePackets = sweepPacketsReader();
+                final presentationCursor = _orderBookTapeCursorForLivePackets(
+                  cursor,
+                  livePackets,
+                );
+                final presentationTape =
+                    livePackets.isNotEmpty && presentationCursor == null
+                    ? const <_OrderBookTapePrint>[]
+                    : _orderBookTradeTapeAtCursor(
+                        tradeTape,
+                        presentationCursor,
+                      );
+                return _OrderBookTradeTape(
+                  height: tapeHeight,
+                  compact: compactPanel,
+                  prints: presentationTape,
+                  currency: definition.currency,
+                );
+              },
             ),
           _QuoteOrderDock(
             height: orderDockHeight,
@@ -9715,7 +11490,11 @@ class _OrderBookPriceLadder extends StatefulWidget {
   const _OrderBookPriceLadder({
     super.key,
     required this.snapshot,
+    required this.sweepPackets,
+    required this.onSweepPacketsAccepted,
+    required this.tapeCursor,
     required this.currentPrice,
+    required this.previousClose,
     required this.availableHeight,
     required this.playerQuantityForLevel,
     required this.playerOrderLabelForLevel,
@@ -9723,13 +11502,18 @@ class _OrderBookPriceLadder extends StatefulWidget {
     required this.selectedPrice,
     required this.activeTradePrice,
     required this.activeTradeSide,
+    required this.activeTradeLevelSide,
     required this.activeTradeQuantity,
     required this.onTapLevel,
     required this.tutorialBestAskKey,
   });
 
   final GameOrderBookSnapshot snapshot;
+  final List<_OrderBookSweepReplayPacket> sweepPackets;
+  final ValueChanged<Iterable<String>> onSweepPacketsAccepted;
+  final ValueNotifier<_OrderBookSweepTapeCursor?> tapeCursor;
   final double currentPrice;
+  final double previousClose;
   final double availableHeight;
   final double Function(GameOrderBookLevel level) playerQuantityForLevel;
   final String? Function(GameOrderBookLevel level) playerOrderLabelForLevel;
@@ -9737,6 +11521,7 @@ class _OrderBookPriceLadder extends StatefulWidget {
   final double? selectedPrice;
   final double? activeTradePrice;
   final TradeSide? activeTradeSide;
+  final GameOrderBookSide? activeTradeLevelSide;
   final int activeTradeQuantity;
   final ValueChanged<GameOrderBookLevel>? onTapLevel;
   final GlobalKey? tutorialBestAskKey;
@@ -9745,11 +11530,79 @@ class _OrderBookPriceLadder extends StatefulWidget {
   State<_OrderBookPriceLadder> createState() => _OrderBookPriceLadderState();
 }
 
-class _OrderBookPriceLadderState extends State<_OrderBookPriceLadder> {
+class _OrderBookPriceLadderState extends State<_OrderBookPriceLadder>
+    with _OrderBookSweepPlayback<_OrderBookPriceLadder> {
   String? _depthScaleAssetId;
   double _depthScale = 0;
   final Map<(GameOrderBookSide, double), GlobalKey> _depthAnimationKeys =
       <(GameOrderBookSide, double), GlobalKey>{};
+  int _tapeCursorPublishGeneration = 0;
+
+  void _syncCurrentOrderBookSweep() {
+    for (final packet in widget.sweepPackets) {
+      _syncOrderBookSweep(
+        packet.snapshot,
+        previousSnapshot: packet.previousSnapshot,
+        explicitSteps: packet.steps,
+        cancellations: packet.cancellations,
+        source: packet.source,
+        identityToken: packet.identity,
+        replayProgress: packet.progress,
+      );
+    }
+  }
+
+  @override
+  void onOrderBookSweepBatchCompleted(String identity) {
+    widget.onSweepPacketsAccepted(<String>[identity]);
+  }
+
+  @override
+  void onOrderBookSweepPlaybackChanged({bool deferUntilAfterFrame = false}) {
+    final generation = ++_tapeCursorPublishGeneration;
+    final batch = _activeOrderBookSweepBatch;
+    final step = _activeOrderBookSweepStep;
+    final cursor = batch == null || step == null
+        ? null
+        : _OrderBookSweepTapeCursor(
+            snapshot: batch.snapshot,
+            step: step,
+            source: batch.source,
+            identity: batch.identity,
+            arrived: _activeOrderBookSweepStepArrived,
+          );
+    if (!deferUntilAfterFrame) {
+      widget.tapeCursor.value = cursor;
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || generation != _tapeCursorPublishGeneration) return;
+      widget.tapeCursor.value = cursor;
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _syncCurrentOrderBookSweep();
+  }
+
+  @override
+  void didUpdateWidget(covariant _OrderBookPriceLadder oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.snapshot.sourceAssetId != widget.snapshot.sourceAssetId ||
+        oldWidget.snapshot.sourceDateKey != widget.snapshot.sourceDateKey) {
+      _resetOrderBookSweepPlayback(clearHistory: true);
+    }
+    _syncCurrentOrderBookSweep();
+  }
+
+  @override
+  void dispose() {
+    _tapeCursorPublishGeneration += 1;
+    _disposeOrderBookSweepPlayback();
+    super.dispose();
+  }
 
   bool _matchesPrice(GameOrderBookLevel level, double? price) =>
       price != null && (level.price - price).abs() < 0.000001;
@@ -9770,7 +11623,23 @@ class _OrderBookPriceLadderState extends State<_OrderBookPriceLadder> {
 
   @override
   Widget build(BuildContext context) {
-    final levels = _symmetricVisibleOrderBookLevels(widget.snapshot);
+    final activeSweepStep = _activeOrderBookSweepStep;
+    final snapshot = _orderBookSweepPresentationSnapshot(widget.snapshot);
+    final levels = _orderBookSweepPresentationLevels(widget.snapshot);
+    final effectiveActiveTradePrice =
+        activeSweepStep?.price ?? widget.activeTradePrice;
+    final effectiveActiveTradeSide = activeSweepStep == null
+        ? widget.activeTradeSide
+        : activeSweepStep.side == GameOrderBookSide.ask
+        ? TradeSide.buy
+        : TradeSide.sell;
+    final effectiveActiveTradeLevelSide =
+        activeSweepStep?.side ?? widget.activeTradeLevelSide;
+    final effectiveActiveTradeQuantity = activeSweepStep == null
+        ? widget.activeTradeQuantity
+        : _activeOrderBookSweepStepArrived
+        ? activeSweepStep.consumedQuantity
+        : 0;
     final visibleLevels = levels
         .map((level) => (level.side, level.price))
         .toSet();
@@ -9789,29 +11658,67 @@ class _OrderBookPriceLadderState extends State<_OrderBookPriceLadder> {
         ? 39.0
         : (widget.availableHeight / levels.length).clamp(11.5, 42.0).toDouble();
     final outlinePrice =
-        widget.activeTradePrice ??
+        effectiveActiveTradePrice ??
         levels
             .where((level) => _matchesPrice(level, widget.currentPrice))
             .firstOrNull
             ?.price ??
-        widget.snapshot.bids.firstOrNull?.price;
+        snapshot.bids.firstOrNull?.price;
     final currentRowIndex = levels.indexWhere(
-      (level) => _matchesPrice(level, outlinePrice),
+      (level) =>
+          _matchesPrice(level, outlinePrice) &&
+          (effectiveActiveTradeLevelSide == null ||
+              level.side == effectiveActiveTradeLevelSide),
     );
+    final sweepRowIndex = activeSweepStep == null
+        ? -1
+        : levels.indexWhere(
+            (level) =>
+                level.side == activeSweepStep.side &&
+                _matchesPrice(level, activeSweepStep.price),
+          );
+    final presentationAsks = levels
+        .where((level) => level.side == GameOrderBookSide.ask)
+        .toList(growable: false)
+        .reversed
+        .toList(growable: false);
+    final presentationBids = levels
+        .where((level) => level.side == GameOrderBookSide.bid)
+        .toList(growable: false);
     final askIndexByPrice = <double, int>{
-      for (final entry in widget.snapshot.asks.asMap().entries)
+      for (final entry in presentationAsks.asMap().entries)
         entry.value.price: entry.key,
     };
     final bidIndexByPrice = <double, int>{
-      for (final entry in widget.snapshot.bids.asMap().entries)
+      for (final entry in presentationBids.asMap().entries)
         entry.value.price: entry.key,
     };
+    final cancellationRows =
+        <({OrderBookCancellationNotice notice, int index})>[
+          for (final notice in _orderBookCancellationFlashes.values)
+            (
+              notice: notice,
+              index: _orderBookCancellationRowIndex(notice, levels),
+            ),
+        ].where((entry) => entry.index >= 0).toList(growable: false);
 
     return SizedBox(
       height: rowHeight * levels.length,
       child: Stack(
         clipBehavior: Clip.hardEdge,
         children: [
+          if (activeSweepStep != null)
+            Offstage(
+              child: SizedBox(
+                key: ValueKey((
+                  'order-book-sweep-active',
+                  _activeOrderBookSweepBatch?.identity,
+                  activeSweepStep.sequence,
+                  _orderBookSweepPhase.name,
+                  'full',
+                )),
+              ),
+            ),
           for (final entry in levels.asMap().entries)
             Positioned(
               key: ValueKey((
@@ -9835,6 +11742,14 @@ class _OrderBookPriceLadderState extends State<_OrderBookPriceLadder> {
                   Widget row = _OrderBookLevelRow(
                     key: Key('order-book-${isAsk ? 'ask' : 'bid'}-$levelIndex'),
                     level: level,
+                    depthAnimationDuration:
+                        activeSweepStep != null &&
+                            _activeOrderBookSweepStepArrived &&
+                            level.side == activeSweepStep.side &&
+                            _matchesPrice(level, activeSweepStep.price)
+                        ? _orderBookSweepStepDuration
+                        : _orderBookMotionDuration,
+                    previousClose: widget.previousClose,
                     rowHeight: rowHeight,
                     maxDepth: maxVisibleDepth,
                     depthAnimationKey: _depthAnimationKeys.putIfAbsent(
@@ -9856,9 +11771,20 @@ class _OrderBookPriceLadderState extends State<_OrderBookPriceLadder> {
                             ),
                     ),
                     isSelected: _matchesPrice(level, widget.selectedPrice),
-                    isActive: _matchesPrice(level, widget.activeTradePrice),
-                    activeTradeSide: widget.activeTradeSide,
-                    activeQuantity: widget.activeTradeQuantity,
+                    isActive:
+                        (activeSweepStep == null
+                            ? _activeOrderBookSweepBatch == null
+                            : _activeOrderBookSweepStepArrived) &&
+                        _matchesPrice(level, effectiveActiveTradePrice) &&
+                        (effectiveActiveTradeLevelSide == null ||
+                            level.side == effectiveActiveTradeLevelSide),
+                    isTradeDrain:
+                        activeSweepStep != null &&
+                        _activeOrderBookSweepStepArrived &&
+                        level.side == activeSweepStep.side &&
+                        _matchesPrice(level, activeSweepStep.price),
+                    activeTradeSide: effectiveActiveTradeSide,
+                    activeQuantity: effectiveActiveTradeQuantity,
                     onTap: widget.onTapLevel == null
                         ? null
                         : () => widget.onTapLevel!(level),
@@ -9879,6 +11805,37 @@ class _OrderBookPriceLadderState extends State<_OrderBookPriceLadder> {
                     child: row,
                   );
                 },
+              ),
+            ),
+          for (final flash in cancellationRows)
+            Positioned(
+              top: flash.index * rowHeight,
+              left: flash.notice.side == GameOrderBookSide.ask ? 8 : null,
+              right: flash.notice.side == GameOrderBookSide.bid ? 8 : null,
+              width: 124,
+              height: rowHeight,
+              child: IgnorePointer(
+                child: _OrderBookCancellationFlashLabel(
+                  notice: flash.notice,
+                  compact: false,
+                ),
+              ),
+            ),
+          if (sweepRowIndex >= 0 &&
+              activeSweepStep != null &&
+              _activeOrderBookSweepStepArrived)
+            Positioned(
+              key: const Key('order-book-sweep-position'),
+              top: sweepRowIndex * rowHeight,
+              left: 0,
+              right: 0,
+              height: rowHeight,
+              child: _OrderBookSweepRowOverlay(
+                step: activeSweepStep,
+                stepDuration: _orderBookSweepStepDuration,
+                stepNumber: _activeOrderBookSweepStepNumber,
+                stepCount: _activeOrderBookSweepStepCount,
+                maxDepth: maxVisibleDepth,
               ),
             ),
           if (currentRowIndex >= 0)
@@ -9911,6 +11868,8 @@ class _OrderBookLevelRow extends StatelessWidget {
   const _OrderBookLevelRow({
     super.key,
     required this.level,
+    required this.depthAnimationDuration,
+    required this.previousClose,
     required this.rowHeight,
     required this.maxDepth,
     required this.depthAnimationKey,
@@ -9919,12 +11878,15 @@ class _OrderBookLevelRow extends StatelessWidget {
     required this.isAverageCost,
     required this.isSelected,
     required this.isActive,
+    required this.isTradeDrain,
     required this.activeTradeSide,
     required this.activeQuantity,
     required this.onTap,
   });
 
   final GameOrderBookLevel level;
+  final Duration depthAnimationDuration;
+  final double previousClose;
   final double rowHeight;
   final int maxDepth;
   final GlobalKey depthAnimationKey;
@@ -9933,6 +11895,7 @@ class _OrderBookLevelRow extends StatelessWidget {
   final bool isAverageCost;
   final bool isSelected;
   final bool isActive;
+  final bool isTradeDrain;
   final TradeSide? activeTradeSide;
   final int activeQuantity;
   final VoidCallback? onTap;
@@ -9984,7 +11947,9 @@ class _OrderBookLevelRow extends StatelessWidget {
                             quantity: totalQuantity,
                             depth: depth,
                             animationKey: depthAnimationKey,
+                            animationDuration: depthAnimationDuration,
                             isActive: isActive,
+                            isTradeDrain: isTradeDrain,
                             activeQuantity: activeQuantity,
                             activeTradeSide: activeTradeSide,
                             playerQuantity: playerQuantity,
@@ -10023,17 +11988,49 @@ class _OrderBookLevelRow extends StatelessWidget {
                         fit: StackFit.expand,
                         children: [
                           Center(
-                            child: Text(
-                              '${_money(level.price.round())}원',
-                              key: const ValueKey('order-book-price-label'),
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: levelColor,
-                                fontSize: rowHeight < 15
-                                    ? 10
-                                    : (rowHeight < 26 ? 13 : 16),
-                                fontWeight: FontWeight.w900,
-                                fontFeatures: _marketNumberFeatures,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 2,
+                              ),
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      '${_money(level.price.round())}원',
+                                      key: const ValueKey(
+                                        'order-book-price-label',
+                                      ),
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: levelColor,
+                                        fontSize: rowHeight < 15
+                                            ? 10
+                                            : (rowHeight < 26 ? 13 : 16),
+                                        fontWeight: FontWeight.w900,
+                                        fontFeatures: _marketNumberFeatures,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      _orderBookPriceRateLabel(
+                                        level.price,
+                                        previousClose,
+                                      ),
+                                      key: const Key('order-book-price-rate'),
+                                      style: TextStyle(
+                                        color: _orderBookPriceRateColor(
+                                          level.price,
+                                          previousClose,
+                                        ),
+                                        fontSize: rowHeight < 15 ? 6 : 8,
+                                        fontWeight: FontWeight.w800,
+                                        fontFeatures: _marketNumberFeatures,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
@@ -10094,7 +12091,9 @@ class _OrderBookLevelRow extends StatelessWidget {
                             quantity: totalQuantity,
                             depth: depth,
                             animationKey: depthAnimationKey,
+                            animationDuration: depthAnimationDuration,
                             isActive: isActive,
+                            isTradeDrain: isTradeDrain,
                             activeQuantity: activeQuantity,
                             activeTradeSide: activeTradeSide,
                             playerQuantity: playerQuantity,
@@ -10121,7 +12120,9 @@ class _OrderBookQuantityCell extends StatefulWidget {
     required this.quantity,
     required this.depth,
     required this.animationKey,
+    required this.animationDuration,
     required this.isActive,
+    required this.isTradeDrain,
     required this.activeQuantity,
     required this.activeTradeSide,
     required this.playerQuantity,
@@ -10135,7 +12136,9 @@ class _OrderBookQuantityCell extends StatefulWidget {
   final int quantity;
   final double depth;
   final GlobalKey animationKey;
+  final Duration animationDuration;
   final bool isActive;
+  final bool isTradeDrain;
   final int activeQuantity;
   final TradeSide? activeTradeSide;
   final double playerQuantity;
@@ -10150,6 +12153,7 @@ class _OrderBookQuantityCell extends StatefulWidget {
 
 class _OrderBookQuantityCellState extends State<_OrderBookQuantityCell> {
   int _quantityDelta = 0;
+  bool _quantityDeltaIsTrade = false;
   Timer? _deltaTimer;
 
   @override
@@ -10158,9 +12162,15 @@ class _OrderBookQuantityCellState extends State<_OrderBookQuantityCell> {
     final delta = widget.quantity - oldWidget.quantity;
     if (delta == 0) return;
     _quantityDelta = delta;
+    _quantityDeltaIsTrade = delta < 0 && widget.isTradeDrain;
     _deltaTimer?.cancel();
     _deltaTimer = Timer(const Duration(milliseconds: 520), () {
-      if (mounted) setState(() => _quantityDelta = 0);
+      if (mounted) {
+        setState(() {
+          _quantityDelta = 0;
+          _quantityDeltaIsTrade = false;
+        });
+      }
     });
   }
 
@@ -10183,7 +12193,7 @@ class _OrderBookQuantityCellState extends State<_OrderBookQuantityCell> {
         alignment: widget.isAsk ? Alignment.centerRight : Alignment.centerLeft,
         child: TweenAnimationBuilder<double>(
           key: widget.animationKey,
-          duration: _orderBookMotionDuration,
+          duration: widget.animationDuration,
           curve: Curves.easeOutCubic,
           // A newly visible side-and-price queue starts at its real depth.
           // Existing same-side prices keep keyed state while an ask that turns
@@ -10225,36 +12235,33 @@ class _OrderBookQuantityCellState extends State<_OrderBookQuantityCell> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Flexible(
-                  child: TweenAnimationBuilder<double>(
-                    duration: _orderBookMotionDuration,
-                    curve: Curves.easeOutCubic,
-                    tween: Tween<double>(
-                      begin: widget.quantity.toDouble(),
-                      end: widget.quantity.toDouble(),
-                    ),
-                    builder: (context, animatedQuantity, _) => Text(
-                      _money(animatedQuantity.round()),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: const Color(0xFF2C3440),
-                        fontSize: widget.showSecondary ? 13 : 10,
-                        height: 1,
-                        fontWeight: FontWeight.w700,
-                        fontFeatures: _marketNumberFeatures,
-                      ),
+                  child: Text(
+                    _money(widget.quantity),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: const Color(0xFF2C3440),
+                      fontSize: widget.showSecondary ? 13 : 10,
+                      height: 1,
+                      fontWeight: FontWeight.w700,
+                      fontFeatures: _marketNumberFeatures,
                     ),
                   ),
                 ),
                 if (_quantityDelta != 0) ...[
                   const SizedBox(width: 3),
                   Text(
-                    '${_quantityDelta > 0 ? '+' : ''}${_money(_quantityDelta)}',
+                    orderBookQuantityDeltaLabel(
+                      _quantityDelta,
+                      isTrade: _quantityDeltaIsTrade,
+                    ),
                     key: const Key('order-book-quantity-delta'),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: _quantityDelta > 0
+                      color: _quantityDelta < 0 && !_quantityDeltaIsTrade
+                          ? const Color(0xFF7B5A00)
+                          : _quantityDelta > 0
                           ? const Color(0xFF16794E)
                           : const Color(0xFFB42332),
                       fontSize: 7,
@@ -10266,7 +12273,9 @@ class _OrderBookQuantityCellState extends State<_OrderBookQuantityCell> {
                 ],
               ],
             ),
-            if (widget.showSecondary && widget.isActive)
+            if (widget.showSecondary &&
+                widget.isActive &&
+                widget.activeQuantity > 0)
               Text(
                 '${widget.activeTradeSide == TradeSide.buy ? '매수' : '매도'} '
                 '체결 ${_money(widget.activeQuantity)}주',
@@ -11767,16 +13776,30 @@ class _MarketTutorialOverlay extends StatelessWidget {
     targetActionKey: const Key('market-tutorial-target'),
     targetKey: targetKey,
     messageId: 'market-$step',
-    speaker: '한서윤 선생님',
+    speakers: switch (step) {
+      0 => const ['한서윤 선생님', '나'],
+      1 => const ['한서윤 선생님', '나'],
+      _ => const ['한서윤 선생님', '나'],
+    },
     messages: switch (step) {
       0 => const [
-        '학원에서 배운 주문표를 이제 실제 화면에서 연습해 볼게요.',
-        '지금부터 제가 가리키는 곳만 하나씩 눌러 보세요.',
+        '마지막은 실제 화면에서 해 볼게요. 연습 계좌라 잘못 눌러도 진짜 돈은 움직이지 않아요.',
+        '그럼 제가 먼저 눌러 볼게요. 아래 ‘주식’ 탭부터 맞죠?',
       ],
-      1 => const ['아래의 ‘주식’ 탭은 거래 가능한 회사를 모아 보는 곳이에요.', '노란 테두리 안을 직접 눌러 보세요.'],
-      _ => const ['종목은 회사 한 곳을 뜻해요.', '먼저 한빛통신을 눌러 가격과 회사 내용을 함께 살펴볼게요.'],
+      1 => const [
+        '‘주식’ 탭은 거래할 회사를 모아 보는 곳이에요. 지금은 노란 테두리만 따라가요.',
+        '회사가 많아도 오늘은 한 곳씩. 노란 테두리를 누를게요.',
+      ],
+      _ => const [
+        '종목은 회사 한 곳을 뜻해요. 오늘은 한빛통신의 가격과 회사 내용을 함께 봅시다.',
+        '가격만 보지 말랬죠. 한빛통신부터 열어 볼게요.',
+      ],
     },
-    actionLabel: '선생님과 화면 수업 시작',
+    actionLabel: switch (step) {
+      0 => '주식 탭 눌러 보기',
+      1 => '노란 테두리 확인하기',
+      _ => '한빛통신 열기',
+    },
     poseAlignment: Alignment.topCenter,
     onAction: onAction,
   );
@@ -11800,33 +13823,35 @@ class _MarketDetailTutorialOverlay extends StatelessWidget {
     targetActionKey: const Key('market-detail-tutorial-target'),
     targetKey: targetKey,
     messageId: 'market-detail-$step',
-    speaker: '한서윤 선생님',
+    speakers: switch (step) {
+      0 => const ['한서윤 선생님', '나'],
+      1 => const ['한서윤 선생님', '나'],
+      2 => const ['한서윤 선생님', '나'],
+      _ => const ['한서윤 선생님', '나'],
+    },
     messages: switch (step) {
       0 => const [
-        '가장 큰 숫자는 지금 한 주의 가격이에요.',
-        '바로 아래 등락률은 어제 종가와 비교한 값이에요.',
-        '노란 테두리를 눌러 두 숫자를 확인하세요.',
+        '큰 숫자는 지금 한 주 가격, 그 아래는 어제 종가와 비교한 등락률이에요.',
+        '빨간색이라고 무조건 좋은 건 아니고, 왜 올랐는지도 봐야 하는 거죠. 두 숫자부터 확인할게요.',
       ],
       1 => const [
-        '하단의 차트 탭을 누르면 가격 흐름만 따로 볼 수 있어요.',
-        '분봉과 일·주·월 종가 흐름을 바꿔 보되, 모양만 보고 서두르지는 마세요.',
+        '차트는 가격이 지나온 길이에요. 모양 하나만 보고 서두르지 말고 기간을 바꿔 보세요.',
+        '올라간 그림만 믿지 말고 분봉이랑 일봉을 바꿔 볼게요.',
       ],
       2 => const [
-        '파란색은 매도, 빨간색은 매수 대기 수량이에요.',
-        '수량 막대 길이와 가격을 보고 원하는 호가를 눌러보세요.',
+        '파란 줄은 팔 사람, 빨간 줄은 살 사람이 기다리는 가격과 수량이에요.',
+        '그럼 가장 가까운 파란 줄의 가격과 남은 수량부터 볼게요.',
       ],
       _ => const [
-        '매도호가를 누르면 그 가격이 매수 지정가에 들어가요.',
-        '반대로 매수호가를 누르면 매도 지정가가 입력돼요.',
-        '내 미체결 주문도 호가에 표시되고, 잔량이 부족하면 일부만 체결된 채 기다릴 수 있어요.',
-        '지금은 가장 가까운 파란 매도호가를 눌러 매수를 연습해 보세요.',
+        '매도호가를 누르면 그 가격이 매수 지정가에 들어가요. 잔량이 모자라면 일부만 체결될 수도 있어요.',
+        '제가 고른 가격에 주문이 줄 서는 거네요. 가장 가까운 매도호가를 눌러 볼게요.',
       ],
     },
     actionLabel: switch (step) {
-      0 => '현재가 확인했어요',
-      1 => '차트 확인했어요',
-      2 => '호가창 확인했어요',
-      _ => '이 가격으로 연습할게요',
+      0 => '현재가 확인하기',
+      1 => '차트 기간 바꿔 보기',
+      2 => '호가 가격과 수량 보기',
+      _ => '가장 가까운 매도호가 누르기',
     },
     poseAlignment: Alignment.topCenter,
     onAction: onAction,
@@ -11849,20 +13874,19 @@ class _OrderTicketTutorialOverlay extends StatelessWidget {
     targetActionKey: const Key('market-order-tutorial-target'),
     targetKey: null,
     messageId: 'market-order-${limitPrice?.round() ?? 'start'}',
-    speaker: '한서윤 선생님',
+    speakers: const ['한서윤 선생님', '나', '한서윤 선생님'],
     messages: limitPrice == null
         ? const [
-            '연습 화면에서만 쓰는 가짜 돈 100만 원을 준비했어요.',
-            '먼저 한 주를 사고, 가격이 바뀐 뒤 다시 팔아 볼 거예요.',
-            '실제 돈은 전혀 움직이지 않으니 천천히 해 봐요.',
+            '연습 화면에만 쓰는 가짜 돈 100만 원이에요. 실제 계좌의 돈은 움직이지 않아요.',
+            '한 주만 사고, 가격이 움직이면 다시 팔아 볼게요.',
+            '좋아요. 주문 전에 가격·수량·수수료 세 가지만 직접 확인하세요.',
           ]
         : [
-            '방금 누른 매도호가 ${_money(limitPrice!.round())}원이 매수 지정가에 들어왔어요.',
-            '주문은 가격과 시간 순서로 체결돼요. 한 번에 다 못 사면 일부만 체결될 수도 있어요.',
-            '가격이 멀어지면 주문이 기다리고, 취소하거나 15:00가 되면 예약된 돈이 풀려요.',
-            '이제 노란 테두리의 버튼으로 한 주를 직접 사 볼까요?',
+            '방금 누른 ${_money(limitPrice!.round())}원이 매수 지정가에 들어왔어요. 같은 가격이면 먼저 줄 선 주문부터 체결돼요.',
+            '제가 고른 가격에 한 주만 줄 세우고, 얼마나 체결되는지 볼게요.',
+            '잔량이 모자라면 일부만 체결돼요. 이제 가격·수량·수수료를 확인하고 주문해 봅시다.',
           ],
-    actionLabel: '가짜 돈으로 주문 연습 시작',
+    actionLabel: '가격·수량·수수료 확인하기',
     poseAlignment: Alignment.topCenter,
     onAction: () => unawaited(onDone()),
   );
@@ -11875,24 +13899,24 @@ class _StockTutorialGuideOverlay extends StatefulWidget {
     required this.targetActionKey,
     required this.targetKey,
     required this.messageId,
-    required this.speaker,
+    required this.speakers,
     required this.messages,
     required this.actionLabel,
     required this.poseAlignment,
     required this.onAction,
-  }) : assert(messages.length > 0);
+  }) : assert(messages.length > 0),
+       assert(speakers.length == messages.length);
 
   final Key overlayKey;
   final Key actionKey;
   final Key targetActionKey;
   final GlobalKey? targetKey;
   final Object messageId;
-  final String speaker;
+  final List<String> speakers;
   final List<String> messages;
   final String actionLabel;
   final Alignment poseAlignment;
   final VoidCallback onAction;
-
   @override
   State<_StockTutorialGuideOverlay> createState() =>
       _StockTutorialGuideOverlayState();
@@ -11979,6 +14003,8 @@ class _StockTutorialGuideOverlayState
   @override
   Widget build(BuildContext context) {
     final hasTarget = _activeTargetKey != null;
+    final activeSpeaker = widget.speakers[_messageIndex];
+    final isStudentPage = activeSpeaker != '한서윤 선생님';
     return LayoutBuilder(
       builder: (context, constraints) {
         final guideWidth = constraints.maxWidth;
@@ -12035,10 +14061,12 @@ class _StockTutorialGuideOverlayState
               Positioned(
                 right: -6,
                 bottom: 54,
-                child: _StockTutorialTeacher(
-                  poseAlignment: widget.poseAlignment,
-                  width: teacherWidth,
-                ),
+                child: isStudentPage
+                    ? _StockTutorialStudent(width: teacherWidth)
+                    : _StockTutorialTeacher(
+                        poseAlignment: widget.poseAlignment,
+                        width: teacherWidth,
+                      ),
               ),
               Positioned(
                 left: 12,
@@ -12046,12 +14074,16 @@ class _StockTutorialGuideOverlayState
                 top: speechAtTop ? 44 : null,
                 bottom: speechAtTop ? null : 185,
                 child: _StockTutorialSpeechBubble(
-                  speaker: widget.speaker,
+                  speaker: activeSpeaker,
                   message: widget.messages[_messageIndex],
                   page: _messageIndex + 1,
                   pageCount: widget.messages.length,
                   actionKey: widget.actionKey,
-                  actionLabel: _isLastMessage ? widget.actionLabel : '다음 설명',
+                  actionLabel: _isLastMessage
+                      ? widget.actionLabel
+                      : isStudentPage
+                      ? '선생님 답 듣기'
+                      : '내 말로 다시 보기',
                   showAction: !hasTarget,
                   waitingForTarget: hasTarget && _targetRect == null,
                   onAction: _handleAction,
@@ -12061,6 +14093,29 @@ class _StockTutorialGuideOverlayState
           ),
         );
       },
+    );
+  }
+}
+
+class _StockTutorialStudent extends StatelessWidget {
+  const _StockTutorialStudent({required this.width});
+
+  final double width;
+
+  @override
+  Widget build(BuildContext context) {
+    final height = width * 1.42;
+    return SizedBox(
+      key: const Key('market-tutorial-student'),
+      width: width,
+      height: height,
+      child: Image.asset(
+        'assets/images/character_hero_thoughtful_v1.png',
+        key: const Key('market-tutorial-student-upper-body'),
+        fit: BoxFit.contain,
+        alignment: Alignment.bottomCenter,
+        filterQuality: FilterQuality.high,
+      ),
     );
   }
 }

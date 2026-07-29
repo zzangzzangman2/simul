@@ -306,31 +306,14 @@ void main() {
       findsOneWidget,
     );
     expectRoomHotspots([
-      'open-bank-button',
-      'open-decisions-button',
       'open-organization-button',
+      'open-home-improvements-button',
     ]);
+    expect(find.byKey(const Key('open-bank-button')), findsNothing);
+    expect(find.byKey(const Key('open-decisions-button')), findsNothing);
+    expect(find.byKey(const Key('open-work-button')), findsNothing);
     expect(find.byKey(const Key('hub-mission-card')), findsOneWidget);
-    await tester.tap(find.byKey(const Key('open-bank-button')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('bank-screen')), findsOneWidget);
-    expect(find.byKey(const Key('bank-clerk-welcome')), findsOneWidget);
-    expect(find.byKey(const Key('bank-intro-dialogue')), findsOneWidget);
-    await tester.tap(find.byKey(const Key('bank-intro-continue')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('bank-intro-deposit')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('bank-consultation-panel')), findsOneWidget);
-    expect(find.byKey(const Key('bank-deposit-term-6')), findsOneWidget);
-    expect(find.byKey(const Key('bank-deposit-term-12')), findsOneWidget);
-    expect(find.byKey(const Key('bank-deposit-term-24')), findsOneWidget);
-    expect(tester.takeException(), isNull);
-    Navigator.of(tester.element(find.byKey(const Key('bank-screen')))).pop();
-    await tester.pumpAndSettle();
-    expect(
-      find.byKey(const Key('apartment-place-living-room')),
-      findsOneWidget,
-    );
+
     final leftArrow = find.byKey(const Key('apartment-go-bedroom'));
     final rightArrow = find.byKey(const Key('apartment-go-kitchen'));
     expect(leftArrow, findsOneWidget);
@@ -361,10 +344,49 @@ void main() {
     await tester.tap(find.byKey(const Key('apartment-go-kitchen')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('apartment-place-kitchen')), findsOneWidget);
-    expectRoomHotspots(['open-work-button']);
+    expectRoomHotspots([]);
     expect(find.byKey(const Key('hub-mission-card')), findsOneWidget);
+    expect(find.byKey(const Key('open-work-button')), findsNothing);
     expect(find.byKey(const Key('open-decisions-button')), findsNothing);
+    expect(find.byKey(const Key('open-bank-button')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('apartment-go-corridor')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('apartment-place-corridor')), findsOneWidget);
+    expectRoomHotspots(['open-decisions-button']);
+    expect(find.byKey(const Key('open-work-button')), findsNothing);
+    expect(find.byKey(const Key('open-bank-button')), findsNothing);
     expect(find.byKey(const Key('open-organization-button')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('apartment-go-neighborhood')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('apartment-place-neighborhood')),
+      findsOneWidget,
+    );
+    expectRoomHotspots(['open-bank-button', 'open-work-button']);
+    expect(find.byKey(const Key('open-decisions-button')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('open-bank-button')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('bank-screen')), findsOneWidget);
+    expect(find.byKey(const Key('bank-clerk-welcome')), findsOneWidget);
+    expect(find.byKey(const Key('bank-intro-dialogue')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('bank-intro-continue')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('bank-intro-deposit')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('bank-consultation-panel')), findsOneWidget);
+    expect(find.byKey(const Key('bank-deposit-term-6')), findsOneWidget);
+    expect(find.byKey(const Key('bank-deposit-term-12')), findsOneWidget);
+    expect(find.byKey(const Key('bank-deposit-term-24')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    Navigator.of(tester.element(find.byKey(const Key('bank-screen')))).pop();
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('apartment-place-neighborhood')),
+      findsOneWidget,
+    );
 
     await tester.tap(find.byKey(const Key('open-work-button')));
     await tester.pumpAndSettle();
@@ -456,6 +478,10 @@ void main() {
     );
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('apartment-go-living-room')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('apartment-go-kitchen')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('apartment-go-corridor')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('open-decisions-button')));
     await tester.pumpAndSettle();
@@ -586,7 +612,30 @@ void main() {
       expect(tester.takeException(), isNull);
     }
 
-    for (var index = 0; index < 10; index++) {
+    for (var index = 0; index < 5; index++) {
+      await tester.tap(find.byKey(const Key('story-continue')));
+      await tester.pumpAndSettle();
+      expectPortraitInside();
+    }
+    for (final goal in <String>[
+      'power-cord',
+      'screwdriver',
+      'keyboard',
+      'modem',
+      'parts',
+    ]) {
+      final button = find.byKey(Key('repair-goal-$goal'));
+      await tester.ensureVisible(button);
+      await tester.tap(button);
+      await tester.pumpAndSettle();
+      expectPortraitInside();
+    }
+    await tester.ensureVisible(find.byKey(const Key('repair-power-on')));
+    await tester.tap(find.byKey(const Key('repair-power-on')));
+    await tester.pumpAndSettle();
+    expectPortraitInside();
+
+    for (var index = 0; index < 14; index++) {
       await tester.tap(find.byKey(const Key('story-continue')));
       await tester.pumpAndSettle();
       expectPortraitInside();
@@ -595,7 +644,17 @@ void main() {
     await tester.pumpAndSettle();
     expectPortraitInside();
 
-    for (var index = 0; index < 11; index++) {
+    for (var index = 0; index < 10; index++) {
+      await tester.tap(find.byKey(const Key('story-continue')));
+      await tester.pumpAndSettle();
+      expectPortraitInside();
+    }
+    await tester.tap(find.byKey(const Key('story-continue')));
+    await tester.pump();
+    expect(find.byKey(const Key('academy-travel-loading')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('academy-travel-skip')));
+    await tester.pumpAndSettle();
+    for (var index = 0; index < 2; index++) {
       await tester.tap(find.byKey(const Key('story-continue')));
       await tester.pumpAndSettle();
       expectPortraitInside();
@@ -608,6 +667,18 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('academy-registration-continue')));
     await tester.pumpAndSettle();
+    for (var index = 0; index < 2; index++) {
+      await tester.tap(find.byKey(const Key('story-continue')));
+      await tester.pumpAndSettle();
+      expectPortraitInside();
+    }
+
+    await tester.enterText(find.byKey(const Key('player-name-input')), '민준');
+    await tester.pump();
+    await tester.ensureVisible(find.byKey(const Key('story-next-name')));
+    await tester.tap(find.byKey(const Key('story-next-name')));
+    await tester.pumpAndSettle();
+    expectPortraitInside();
     for (var index = 0; index < 5; index++) {
       await tester.tap(find.byKey(const Key('story-continue')));
       await tester.pumpAndSettle();
@@ -621,28 +692,14 @@ void main() {
     await tester.tap(find.byKey(const Key('academy-tutorial-continue')));
     await tester.pumpAndSettle();
     expectPortraitInside();
-    await tester.tap(find.byKey(const Key('story-continue')));
-    await tester.pumpAndSettle();
-    expectPortraitInside();
-    await tester.enterText(find.byKey(const Key('player-name-input')), '민준');
-    await tester.pump();
-    await tester.ensureVisible(find.byKey(const Key('story-next-name')));
-    await tester.tap(find.byKey(const Key('story-next-name')));
-    await tester.pumpAndSettle();
-    expectPortraitInside();
-    await tester.tap(find.byKey(const Key('story-continue')));
-    await tester.pumpAndSettle();
-    expectPortraitInside();
 
     await tester.tap(find.byKey(const Key('story-trait-analysis')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('story-continue')));
-    await tester.pumpAndSettle();
-    expectPortraitInside();
-    await tester.tap(find.byKey(const Key('story-continue')));
-    await tester.pumpAndSettle();
-    expectPortraitInside();
-
+    for (var index = 0; index < 2; index++) {
+      await tester.tap(find.byKey(const Key('story-continue')));
+      await tester.pumpAndSettle();
+      expectPortraitInside();
+    }
     await tester.tap(find.byKey(const Key('family-rule-report-losses')));
     await tester.pumpAndSettle();
     for (var index = 0; index < 2; index++) {
@@ -681,29 +738,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    for (var index = 0; index < 10; index++) {
-      await tester.tap(find.byKey(const Key('story-continue')));
-      await tester.pumpAndSettle();
-    }
-    await tester.tap(find.byKey(const Key('story-intro-computer')));
+    await tester.tap(find.byKey(const Key('story-skip-button')));
     await tester.pumpAndSettle();
-    for (var index = 0; index < 11; index++) {
-      await tester.tap(find.byKey(const Key('story-continue')));
-      await tester.pumpAndSettle();
-    }
-    await tester.tap(find.byKey(const Key('academy-tuition-pay-button')));
+    await tester.tap(find.byKey(const Key('story-skip-confirm')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('academy-registration-continue')));
-    await tester.pumpAndSettle();
-    for (var index = 0; index < 5; index++) {
-      await tester.tap(find.byKey(const Key('story-continue')));
-      await tester.pumpAndSettle();
-    }
-    await tester.tap(find.byKey(const Key('academy-tutorial-continue')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('story-continue')));
-    await tester.pumpAndSettle();
-
+    expect(find.byKey(const Key('player-name-input')), findsOneWidget);
     await tester.tap(find.byKey(const Key('player-name-input')));
     tester.view.viewInsets = FakeViewPadding(
       bottom: 320 * tester.view.devicePixelRatio,
@@ -735,29 +774,8 @@ void main() {
     await tester.pump();
     tester.view.resetViewInsets();
     await tester.pumpAndSettle();
-    expect(
-      find.byKey(const Key('story-continue')).hitTestable(),
-      findsOneWidget,
-    );
-    await tester.tap(find.byKey(const Key('story-continue')));
-    await tester.pumpAndSettle();
-    expect(
-      find.byKey(const Key('story-trait-analysis')).hitTestable(),
-      findsOneWidget,
-    );
+    expect(find.byKey(const Key('company-name-input')), findsOneWidget);
     expect(tester.takeException(), isNull);
-    await tester.tap(find.byKey(const Key('story-trait-analysis')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('story-continue')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('story-continue')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('family-rule-report-losses')));
-    await tester.pumpAndSettle();
-    for (var index = 0; index < 2; index++) {
-      await tester.tap(find.byKey(const Key('story-continue')));
-      await tester.pumpAndSettle();
-    }
 
     await tester.tap(find.byKey(const Key('company-name-input')));
     tester.view.viewInsets = FakeViewPadding(

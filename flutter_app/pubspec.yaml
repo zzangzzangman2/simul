@@ -22,6 +22,8 @@ flutter:
   assets:
     - assets/images/
     - assets/images/minigames/
+    - assets/images/gameplay_map/
+    - assets/images/gameplay_ambient/
     - assets/images/real_estate/
     - assets/images/주식선생님/06_6자세_블라우스_스커트_투명.png
     - assets/images/주식선생님/07_교실고정포즈_고해상도_투명.png

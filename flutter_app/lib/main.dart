@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'game/news_combinator.dart';
 import 'game/banking_state.dart';
@@ -14,6 +15,7 @@ import 'game/business_state.dart';
 import 'game/game_engine.dart';
 import 'game/game_persistence.dart';
 import 'game/game_state.dart';
+import 'game/home_improvement_state.dart';
 import 'game/investor_flow.dart';
 
 import 'game/market_clock.dart';
@@ -36,12 +38,15 @@ import 'game/star_shop.dart';
 import 'game/story_state.dart';
 import 'game/world_bootstrapper.dart';
 import 'game/world_economy.dart';
+import 'family_portrait_assets.dart';
 
 export 'game/world_bootstrapper.dart'
     show CampaignWorldPreparer, WorldLoadProgress, WorldLoadProgressCallback;
 
 part 'organization_screen.dart';
 part 'apartment_hub_screens.dart';
+part 'apartment_ambient_layer.dart';
+part 'home_improvement_screen.dart';
 part 'business_management_screen.dart';
 part 'bank_screen.dart';
 part 'rider_mini_game.dart';
@@ -752,6 +757,16 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     return result;
   }
 
+  Future<FinanceActionResult> _purchaseHomeImprovement(
+    String improvementId,
+  ) async {
+    final result = _engine.purchaseHomeImprovement(_state!, improvementId);
+    if (!result.success) return result;
+    await _persistence.save(result.state);
+    if (mounted) setState(() => _state = result.state);
+    return result;
+  }
+
   Future<FinanceActionResult> _sellRealEstate(String assetId) async {
     final result = _engine.sellRealEstate(_state!, assetId);
     if (!result.success) return result;
@@ -1300,6 +1315,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
                   onHireEmployee: _hireEmployee,
                   onLaunchFund: _launchFund,
                   onPurchaseSpendingOption: _purchaseSpendingOption,
+                  onPurchaseHomeImprovement: _purchaseHomeImprovement,
                   onAcquireBusiness: _acquireBusiness,
                   onUpdateBusinessPolicy: _updateBusinessPolicy,
                   onInvestInBusiness: _investInBusiness,
@@ -2094,6 +2110,7 @@ class OfficeScreen extends StatelessWidget {
     this.onHireEmployee,
     this.onLaunchFund,
     this.onPurchaseSpendingOption,
+    this.onPurchaseHomeImprovement,
     this.onAcquireBusiness,
     this.onUpdateBusinessPolicy,
     this.onInvestInBusiness,
@@ -2150,6 +2167,8 @@ class OfficeScreen extends StatelessWidget {
   final Future<GameState> Function()? onLaunchFund;
   final Future<FinanceActionResult> Function(String optionId)?
   onPurchaseSpendingOption;
+  final Future<FinanceActionResult> Function(String improvementId)?
+  onPurchaseHomeImprovement;
   final BusinessAcquireCallback? onAcquireBusiness;
   final BusinessPolicyUpdateCallback? onUpdateBusinessPolicy;
   final BusinessInvestmentCallback? onInvestInBusiness;
@@ -2378,6 +2397,29 @@ class OfficeScreen extends StatelessWidget {
     return latestState;
   }
 
+  Future<void> _openHomeImprovements(BuildContext context) async {
+    var latestState = _latestState;
+    await Navigator.of(context).push<void>(
+      _gameSceneRoute<void>(
+        HomeImprovementScreen(
+          state: latestState,
+          onPurchase: (improvementId) async {
+            final handler = onPurchaseHomeImprovement;
+            final result = handler == null
+                ? FinanceActionResult(
+                    state: latestState,
+                    success: false,
+                    message: '이 화면에서는 살림 구매를 저장할 수 없습니다.',
+                  )
+                : await handler(improvementId);
+            if (result.success) latestState = result.state;
+            return result;
+          },
+        ),
+      ),
+    );
+  }
+
   void _openHomeComputer(BuildContext context) {
     Navigator.of(context).push<void>(
       _gameSceneRoute<void>(
@@ -2437,6 +2479,7 @@ class OfficeScreen extends StatelessWidget {
         onOpenMarket: () => _openHomeComputer(context),
         onOpenBank: () => _openBank(context),
         onOpenLedger: () => _openLedger(context),
+        onOpenHomeImprovements: () => _openHomeImprovements(context),
         onOpenOrganization: () => Navigator.of(context).push(
           _gameSceneRoute<void>(
             OrganizationScreen(

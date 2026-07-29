@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'banking_state.dart';
 import 'business_engine.dart';
 import 'game_state.dart';
+import 'home_improvement_state.dart';
 import 'market_clock.dart';
 import 'market_cost_rules.dart';
 import 'market_data.dart';
@@ -3620,6 +3621,111 @@ class GameEngine {
           'reputation': (state.story.reputation + 8).clamp(0, 100),
         },
       ),
+    );
+  }
+
+  FinanceActionResult purchaseHomeImprovement(
+    GameState state,
+    String improvementId,
+  ) {
+    final improvement = homeImprovementById(improvementId);
+    if (improvement == null) {
+      return FinanceActionResult(
+        state: state,
+        success: false,
+        message: '존재하지 않는 살림 항목입니다.',
+      );
+    }
+    if (state.homeImprovements.has(improvement.id)) {
+      return FinanceActionResult(
+        state: state,
+        success: false,
+        message: '이미 마련한 살림입니다.',
+      );
+    }
+    final prerequisiteId = improvement.prerequisiteId;
+    if (prerequisiteId != null && !state.homeImprovements.has(prerequisiteId)) {
+      final prerequisite = homeImprovementById(prerequisiteId);
+      return FinanceActionResult(
+        state: state,
+        success: false,
+        message: '${prerequisite?.title ?? '앞 단계 살림'}부터 먼저 마련해야 합니다.',
+      );
+    }
+    if (state.bankCash < improvement.cost) {
+      return FinanceActionResult(
+        state: state,
+        success: false,
+        message: '회사 통장 잔고가 ${improvement.cost - state.bankCash}원 부족합니다.',
+      );
+    }
+
+    final nextHome = state.homeImprovements.recordPurchase(
+      improvement,
+      day: state.day,
+    );
+    final storyEventIds =
+        state.story.seenStoryEventIds.contains(improvement.storyEventId)
+        ? state.story.seenStoryEventIds
+        : <String>[...state.story.seenStoryEventIds, improvement.storyEventId];
+    var motherAffinity = state.story.motherAffinity;
+    var fatherAffinity = state.story.fatherAffinity;
+    var siblingAffinity = state.story.siblingAffinity;
+    var grandfatherAffinity = state.story.grandfatherAffinity;
+    switch (improvement.familyMember) {
+      case HomeFamilyMember.mother:
+        motherAffinity += improvement.affinityDelta;
+      case HomeFamilyMember.father:
+        fatherAffinity += improvement.affinityDelta;
+      case HomeFamilyMember.sibling:
+        siblingAffinity += improvement.affinityDelta;
+      case HomeFamilyMember.grandfather:
+        grandfatherAffinity += improvement.affinityDelta;
+      case HomeFamilyMember.family:
+        motherAffinity += improvement.affinityDelta;
+        fatherAffinity += improvement.affinityDelta;
+        siblingAffinity += improvement.affinityDelta;
+        grandfatherAffinity += improvement.affinityDelta;
+    }
+    final nextStory = state.story.copyWith(
+      familyTrust: state.story.familyTrust + improvement.familyTrustDelta,
+      motherAffinity: motherAffinity,
+      fatherAffinity: fatherAffinity,
+      siblingAffinity: siblingAffinity,
+      grandfatherAffinity: grandfatherAffinity,
+      householdStability:
+          state.story.householdStability + improvement.householdStabilityDelta,
+      seenStoryEventIds: storyEventIds,
+    );
+    final sourceId = 'home-improvement-${improvement.id}';
+    final next = state.copyWith(
+      cash: state.cash - improvement.cost,
+      homeImprovements: nextHome,
+      story: nextStory,
+      progression: state.progression
+          .record('finance_purchases')
+          .record('home_improvements'),
+      ledger: <LedgerEntry>[
+        ...state.ledger,
+        LedgerEntry(
+          id: sourceId,
+          day: state.day,
+          amount: -improvement.cost,
+          account: 'company_bank',
+          counterAccount: 'family_household',
+          description: improvement.title,
+          sourceId: sourceId,
+        ),
+      ],
+      processedEventIds: state.processedEventIds.contains(sourceId)
+          ? state.processedEventIds
+          : <String>[...state.processedEventIds, sourceId],
+    );
+    return FinanceActionResult(
+      state: next,
+      success: true,
+      message: '${improvement.title} 완료 · 회사 통장 ${next.bankCash}원',
+      cashDelta: -improvement.cost,
     );
   }
 
