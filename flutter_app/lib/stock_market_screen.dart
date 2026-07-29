@@ -386,6 +386,21 @@ List<GameOrderBookLevel> _symmetricVisibleOrderBookLevels(
   ...snapshot.bids.take(_visibleOrderBookSideRows),
 ];
 
+/// Keeps the last complete ladder visible while a FIFO cancellation packet
+/// briefly carries no rows of its own.
+///
+/// A cancellation-only replay is presentation state, not a closed market.
+/// Returning an empty list for that intermediate frame collapses the ladder's
+/// height and makes the whole order book flash white.
+List<GameOrderBookLevel> stableOrderBookPresentationLevels({
+  required GameOrderBookSnapshot snapshot,
+  GameOrderBookSnapshot? fallbackSnapshot,
+}) {
+  final current = _symmetricVisibleOrderBookLevels(snapshot);
+  if (current.isNotEmpty || fallbackSnapshot == null) return current;
+  return _symmetricVisibleOrderBookLevels(fallbackSnapshot);
+}
+
 class _MarketCapRanking {
   const _MarketCapRanking({required this.rank, required this.companyCount});
 
@@ -678,9 +693,12 @@ const _marketAccent = Color(0xFF356FE5);
 const _marketNumberFeatures = <ui.FontFeature>[ui.FontFeature.tabularFigures()];
 
 class _CrtTradingRoomScene extends StatelessWidget {
-  const _CrtTradingRoomScene({required this.minute, required this.child});
+  const _CrtTradingRoomScene({
+    required this.minuteListenable,
+    required this.child,
+  });
 
-  final int minute;
+  final ValueListenable<int> minuteListenable;
   final Widget child;
 
   @override
@@ -705,7 +723,11 @@ class _CrtTradingRoomScene extends StatelessWidget {
                 color: Colors.white,
                 child: Column(
                   children: [
-                    _MarketPhoneStatusBar(minute: minute),
+                    ValueListenableBuilder<int>(
+                      valueListenable: minuteListenable,
+                      builder: (context, minute, _) =>
+                          _MarketPhoneStatusBar(minute: minute),
+                    ),
                     Expanded(child: child),
                   ],
                 ),
@@ -1286,10 +1308,7 @@ class StockOrderBookSessionCache {
     _tradeTapes[assetId] = List<_OrderBookTapePrint>.unmodifiable(tradeTape);
   }
 
-  _OrderBookSweepJournal _sweepJournalFor(
-    String assetId,
-    String sessionKey,
-  ) {
+  _OrderBookSweepJournal _sweepJournalFor(String assetId, String sessionKey) {
     final journal = _sweepJournals.putIfAbsent(
       assetId,
       () => _OrderBookSweepJournal(sessionKey),
@@ -1359,6 +1378,12 @@ class _StockMarketScreenState extends State<StockMarketScreen>
   bool _isLifecyclePaused = false;
   bool _isLifecycleSaving = false;
   final ValueNotifier<int> _minute = ValueNotifier(marketDayStartMinute);
+  // Publishes only after every live quote has settled for the minute. UI
+  // sections listen here so the simulation clock cannot rebuild the scene
+  // once before and once after its quote batch.
+  final ValueNotifier<int> _presentationMinute = ValueNotifier(
+    marketDayStartMinute,
+  );
   int _tick = 0;
   late int _marketMinute;
   late int _lastPersistedMarketMinute;
@@ -1791,6 +1816,7 @@ class _StockMarketScreenState extends State<StockMarketScreen>
     _marketMinute = _state.marketMinute;
     _lastPersistedMarketMinute = _marketMinute;
     _minute.value = _marketMinute;
+    _presentationMinute.value = _marketMinute;
     _tick = marketTickForMinute(_marketMinute);
     _tutorialStep =
         _state.story.marketTutorialEligible &&
@@ -2011,6 +2037,7 @@ class _StockMarketScreenState extends State<StockMarketScreen>
     WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     _minute.dispose();
+    _presentationMinute.dispose();
     _playbackSpeedNotifier.dispose();
     _playerTradeNotifier.dispose();
     _marketStateNotifier.dispose();
@@ -2031,7 +2058,6 @@ class _StockMarketScreenState extends State<StockMarketScreen>
       return;
     }
     _isRealtimeBatchUpdating = true;
-    if (mounted) setState(() {});
     String? pauseMessage;
     try {
       for (
@@ -2106,7 +2132,6 @@ class _StockMarketScreenState extends State<StockMarketScreen>
       }
     } finally {
       _isRealtimeBatchUpdating = false;
-      if (mounted) setState(() {});
     }
     if (pauseMessage != null && mounted) {
       ScaffoldMessenger.of(context)
@@ -2166,6 +2191,7 @@ class _StockMarketScreenState extends State<StockMarketScreen>
             : current.low,
       );
     }
+    _presentationMinute.value = _marketMinute;
     return largeMove;
   }
 
@@ -2425,6 +2451,7 @@ class _StockMarketScreenState extends State<StockMarketScreen>
           sessionHistory: sessionHistory,
         );
       }
+      _presentationMinute.value = _marketMinute;
       _isAdvancingHour = false;
       if (_closeAfterHourAdvance) {
         _closeAfterHourAdvance = false;
@@ -3006,6 +3033,7 @@ class _StockMarketScreenState extends State<StockMarketScreen>
             marketState: _marketStateNotifier,
             playerTrade: _playerTradeNotifier,
             minute: _minute,
+            presentationMinute: _presentationMinute,
             playbackSpeed: _playbackSpeedNotifier,
             onPlaybackSpeedChanged: _setPlaybackSpeed,
             onExecuteTrade: _executeTrade,
@@ -3180,15 +3208,6 @@ class _StockMarketScreenState extends State<StockMarketScreen>
         .toList();
     final ranked = _sortedStocks(domestic);
     final reportItems = _dailyReportItems;
-    final mainIndex = _liveMarketIndex(
-      '미래종합',
-      domestic.where((stock) => stock.market == fictionalMainMarket),
-    );
-    final growthIndex = _liveMarketIndex(
-      '도전종합',
-      domestic.where((stock) => stock.market == fictionalGrowthMarket),
-    );
-    final sectorIndices = _liveSectorIndices(domestic);
     return ListView.builder(
       key: const Key('market-home-section'),
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 28),
@@ -3209,10 +3228,23 @@ class _StockMarketScreenState extends State<StockMarketScreen>
           key: const Key('market-ranking-table'),
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _MarketIndexBoard(
-              mainIndex: mainIndex,
-              growthIndex: growthIndex,
-              sectorIndices: sectorIndices,
+            ValueListenableBuilder<int>(
+              valueListenable: _presentationMinute,
+              builder: (context, _, _) => _MarketIndexBoard(
+                mainIndex: _liveMarketIndex(
+                  '미래종합',
+                  domestic.where(
+                    (stock) => stock.market == fictionalMainMarket,
+                  ),
+                ),
+                growthIndex: _liveMarketIndex(
+                  '도전종합',
+                  domestic.where(
+                    (stock) => stock.market == fictionalGrowthMarket,
+                  ),
+                ),
+                sectorIndices: _liveSectorIndices(domestic),
+              ),
             ),
             const SizedBox(height: 12),
             _DailyMarketReportCard(
@@ -3406,7 +3438,7 @@ class _StockMarketScreenState extends State<StockMarketScreen>
     };
 
     final scene = _CrtTradingRoomScene(
-      minute: _marketMinute,
+      minuteListenable: _presentationMinute,
       child: Scaffold(
         backgroundColor: const Color(0xFFF7F8FA),
         body: Center(
@@ -3415,66 +3447,75 @@ class _StockMarketScreenState extends State<StockMarketScreen>
             child: SafeArea(
               child: Column(
                 children: [
-                  _MarketHomeAppBar(
-                    onBack: _closeMarket,
-                    minute: _marketMinute,
-                    tradingDay: _hasDomesticTradingSession,
-                    onAdvanceHour:
-                        _isAdvancingHour ||
-                            _isRealtimeBatchUpdating ||
-                            _isPurchasingReport ||
-                            _marketNotebookSaveCount > 0 ||
-                            _isClosing ||
-                            _isExecutingTrade ||
-                            _marketMinute >= krxCloseMinute
-                        ? null
-                        : _advanceOneHour,
-                    onJumpToOpen:
-                        _isAdvancingHour ||
-                            _isRealtimeBatchUpdating ||
-                            _isPurchasingReport ||
-                            _marketNotebookSaveCount > 0 ||
-                            _isClosing ||
-                            _isExecutingTrade ||
-                            !_hasDomesticTradingSession ||
-                            _marketMinute >= krxOpenMinute
-                        ? null
-                        : _jumpToMarketOpen,
-                    onJumpToClose:
-                        _isAdvancingHour ||
-                            _isRealtimeBatchUpdating ||
-                            _isPurchasingReport ||
-                            _marketNotebookSaveCount > 0 ||
-                            _isClosing ||
-                            _isExecutingTrade ||
-                            !_hasDomesticTradingSession ||
-                            _marketMinute < krxOpenMinute ||
-                            _marketMinute >= krxCloseMinute
-                        ? null
-                        : _jumpToMarketClose,
+                  ValueListenableBuilder<int>(
+                    valueListenable: _presentationMinute,
+                    builder: (context, currentMinute, _) => _MarketHomeAppBar(
+                      onBack: _closeMarket,
+                      minute: currentMinute,
+                      tradingDay: _hasDomesticTradingSession,
+                      onAdvanceHour:
+                          _isAdvancingHour ||
+                              _isRealtimeBatchUpdating ||
+                              _isPurchasingReport ||
+                              _marketNotebookSaveCount > 0 ||
+                              _isClosing ||
+                              _isExecutingTrade ||
+                              currentMinute >= krxCloseMinute
+                          ? null
+                          : _advanceOneHour,
+                      onJumpToOpen:
+                          _isAdvancingHour ||
+                              _isRealtimeBatchUpdating ||
+                              _isPurchasingReport ||
+                              _marketNotebookSaveCount > 0 ||
+                              _isClosing ||
+                              _isExecutingTrade ||
+                              !_hasDomesticTradingSession ||
+                              currentMinute >= krxOpenMinute
+                          ? null
+                          : _jumpToMarketOpen,
+                      onJumpToClose:
+                          _isAdvancingHour ||
+                              _isRealtimeBatchUpdating ||
+                              _isPurchasingReport ||
+                              _marketNotebookSaveCount > 0 ||
+                              _isClosing ||
+                              _isExecutingTrade ||
+                              !_hasDomesticTradingSession ||
+                              currentMinute < krxOpenMinute ||
+                              currentMinute >= krxCloseMinute
+                          ? null
+                          : _jumpToMarketClose,
+                    ),
                   ),
-                  _MarketPlaybackBar(
-                    speed: _playbackSpeed,
-                    enabled:
-                        !_isAdvancingHour &&
-                        !_isRealtimeBatchUpdating &&
-                        !_isPurchasingReport &&
-                        _marketNotebookSaveCount == 0 &&
-                        !_isLifecyclePaused &&
-                        !_isClosing &&
-                        !_isExecutingTrade &&
-                        !_isTransferringCash &&
-                        !_isMarketSheetOpen &&
-                        _hasDomesticTradingSession &&
-                        _marketMinute < krxCloseMinute,
-                    onChanged: _setPlaybackSpeed,
+                  ValueListenableBuilder<int>(
+                    valueListenable: _presentationMinute,
+                    builder: (context, currentMinute, _) => _MarketPlaybackBar(
+                      speed: _playbackSpeed,
+                      enabled:
+                          !_isAdvancingHour &&
+                          !_isRealtimeBatchUpdating &&
+                          !_isPurchasingReport &&
+                          _marketNotebookSaveCount == 0 &&
+                          !_isLifecyclePaused &&
+                          !_isClosing &&
+                          !_isExecutingTrade &&
+                          !_isTransferringCash &&
+                          !_isMarketSheetOpen &&
+                          _hasDomesticTradingSession &&
+                          currentMinute < krxCloseMinute,
+                      onChanged: _setPlaybackSpeed,
+                    ),
                   ),
                   if (_latestBackgroundNews case final event?)
                     _MarketNewsTicker(event: event),
                   Expanded(
                     child: switch (_section) {
                       _MarketSection.home => _buildHomeSection(),
-                      _MarketSection.account => _buildAccountSection(),
+                      _MarketSection.account => ValueListenableBuilder<int>(
+                        valueListenable: _presentationMinute,
+                        builder: (context, _, _) => _buildAccountSection(),
+                      ),
                       _MarketSection.explore => ListView.builder(
                         padding: const EdgeInsets.fromLTRB(18, 4, 18, 30),
                         itemCount: visibleStocks.isEmpty
@@ -3641,6 +3682,7 @@ class _StockDetailScreen extends StatefulWidget {
     required this.marketState,
     required this.playerTrade,
     required this.minute,
+    required this.presentationMinute,
     required this.playbackSpeed,
     required this.onPlaybackSpeedChanged,
     required this.onExecuteTrade,
@@ -3665,6 +3707,7 @@ class _StockDetailScreen extends StatefulWidget {
   final ValueListenable<GameState> marketState;
   final ValueListenable<Map<String, _PlayerTradeSignal>> playerTrade;
   final ValueNotifier<int> minute;
+  final ValueListenable<int> presentationMinute;
   final ValueNotifier<_MarketPlaybackSpeed> playbackSpeed;
   final ValueChanged<_MarketPlaybackSpeed> onPlaybackSpeedChanged;
   final Future<TradeExecutionResult> Function(TradeOrder) onExecuteTrade;
@@ -5078,119 +5121,229 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
 
   @override
   Widget build(BuildContext context) {
-    final scene = ValueListenableBuilder<int>(
-      valueListenable: minute,
-      builder: (context, currentMinute, _) => _CrtTradingRoomScene(
-        minute: currentMinute,
-        child: Scaffold(
-          backgroundColor: Colors.white,
-          body: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 520),
-              child: SafeArea(
-                child: ValueListenableBuilder<_LiveStock>(
-                  valueListenable: live,
-                  builder: (context, quote, _) {
-                    final financial = definition.financialAt(state.currentDate);
-                    final sharesOutstanding =
-                        definition.asset.sharesOutstandingAtOrBefore(
-                          state.currentDate,
-                        ) ??
-                        financial?.sharesOutstanding ??
-                        0;
-                    final ownedShares = state.positions
-                        .where((position) => position.assetId == definition.id)
-                        .firstOrNull
-                        ?.units;
-                    final investorFlows = sharesOutstanding <= 0
-                        ? const <FictionalInvestorFlowDay>[]
-                        : buildFictionalInvestorFlowHistory(
-                            simulationSeed: state.simulationSeed,
-                            assetId: definition.id,
-                            throughDate: state.currentDate,
-                            priceHistory: quote.history,
-                            currentPrice: quote.price,
-                            sharesOutstanding: sharesOutstanding,
-                            sharesOutstandingAt:
-                                definition.asset.sharesOutstandingAtOrBefore,
-                            referenceCloseAt: (date, previousClose) =>
-                                definition.asset.marketReferenceCloseOn(
-                                  date,
-                                  previousClose: previousClose,
-                                ),
-                            currentMarketMinute: currentMinute,
-                            currentReferencePrice: quote.previousClose,
-                          );
-                    final detailTradingDay =
-                        quote.isTradingDay &&
-                        isMarketTradingDay(state.currentDate);
-                    final detailClock = marketClockAt(
-                      currentMinute,
-                      tradingDay: detailTradingDay,
-                    );
-                    final detailPreviousTradePrice =
-                        quote.sessionHistory.length >= 2
-                        ? quote.sessionHistory[quote.sessionHistory.length - 2]
-                        : quote.price;
-                    final detailViActive =
-                        marketDynamicVolatilityInterruptionActive(
-                          minute: currentMinute,
-                          previousTradePrice: detailPreviousTradePrice,
+    final scene = _CrtTradingRoomScene(
+      minuteListenable: widget.presentationMinute,
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: SafeArea(
+              child: ValueListenableBuilder<int>(
+                valueListenable: widget.presentationMinute,
+                builder: (context, currentMinute, _) {
+                  final quote = live.value;
+                  final financial = definition.financialAt(state.currentDate);
+                  final sharesOutstanding =
+                      definition.asset.sharesOutstandingAtOrBefore(
+                        state.currentDate,
+                      ) ??
+                      financial?.sharesOutstanding ??
+                      0;
+                  final ownedShares = state.positions
+                      .where((position) => position.assetId == definition.id)
+                      .firstOrNull
+                      ?.units;
+                  final investorFlows = sharesOutstanding <= 0
+                      ? const <FictionalInvestorFlowDay>[]
+                      : buildFictionalInvestorFlowHistory(
+                          simulationSeed: state.simulationSeed,
+                          assetId: definition.id,
+                          throughDate: state.currentDate,
+                          priceHistory: quote.history,
                           currentPrice: quote.price,
-                          tradingDay: detailTradingDay,
+                          sharesOutstanding: sharesOutstanding,
+                          sharesOutstandingAt:
+                              definition.asset.sharesOutstandingAtOrBefore,
+                          referenceCloseAt: (date, previousClose) =>
+                              definition.asset.marketReferenceCloseOn(
+                                date,
+                                previousClose: previousClose,
+                              ),
+                          currentMarketMinute: currentMinute,
+                          currentReferencePrice: quote.previousClose,
                         );
-                    final detailMaterialHalt = marketMaterialNewsTradingHaltAt(
-                      simulationSeed: state.simulationSeed,
-                      date: state.currentDate,
-                      assetId: definition.id,
-                      minute: currentMinute,
-                    );
-                    return Column(
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(8, 4, 14, 4),
-                          child: Row(
-                            children: [
-                              IconButton(
-                                key: const Key('close-stock-detail'),
-                                onPressed: () => Navigator.of(context).pop(),
-                                icon: const Icon(
-                                  Icons.arrow_back_ios_new_rounded,
-                                ),
+                  final detailTradingDay =
+                      quote.isTradingDay &&
+                      isMarketTradingDay(state.currentDate);
+                  final detailClock = marketClockAt(
+                    currentMinute,
+                    tradingDay: detailTradingDay,
+                  );
+                  final detailPreviousTradePrice =
+                      quote.sessionHistory.length >= 2
+                      ? quote.sessionHistory[quote.sessionHistory.length - 2]
+                      : quote.price;
+                  final detailViActive =
+                      marketDynamicVolatilityInterruptionActive(
+                        minute: currentMinute,
+                        previousTradePrice: detailPreviousTradePrice,
+                        currentPrice: quote.price,
+                        tradingDay: detailTradingDay,
+                      );
+                  final detailMaterialHalt = marketMaterialNewsTradingHaltAt(
+                    simulationSeed: state.simulationSeed,
+                    date: state.currentDate,
+                    assetId: definition.id,
+                    minute: currentMinute,
+                  );
+                  return Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(8, 4, 14, 4),
+                        child: Row(
+                          children: [
+                            IconButton(
+                              key: const Key('close-stock-detail'),
+                              onPressed: () => Navigator.of(context).pop(),
+                              icon: const Icon(
+                                Icons.arrow_back_ios_new_rounded,
                               ),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      definition.name,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        color: Color(0xFF202632),
-                                        fontSize: 21,
-                                        fontWeight: FontWeight.w900,
-                                        letterSpacing: -0.6,
-                                      ),
+                            ),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    definition.name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: Color(0xFF202632),
+                                      fontSize: 21,
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: -0.6,
                                     ),
-                                    _StockDetailIdentityLine(
-                                      market: definition.market,
-                                      code: definition.code,
-                                      managementRisk:
-                                          marketFinancialSnapshotIsManagementRisk(
-                                            financial,
+                                  ),
+                                  _StockDetailIdentityLine(
+                                    market: definition.market,
+                                    code: definition.code,
+                                    managementRisk:
+                                        marketFinancialSnapshotIsManagementRisk(
+                                          financial,
+                                        ),
+                                    viActive: detailViActive,
+                                    materialHalt: detailMaterialHalt != null,
+                                    phase: detailClock.phase,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            RepaintBoundary(
+                              key: _tutorialPriceKey,
+                              child: ValueListenableBuilder<int>(
+                                valueListenable: _orderBookPulseFrame,
+                                builder: (context, liquidityPulse, _) {
+                                  final snapshot = _continuousOrderBookSnapshot(
+                                    quote,
+                                    currentMinute,
+                                    liquidityPulse,
+                                  );
+                                  final displayPrice =
+                                      _displayedDetailTradePrice(
+                                        quote,
+                                        snapshot,
+                                        currentMinute,
+                                      );
+                                  final change =
+                                      displayPrice - quote.previousClose;
+                                  final rate =
+                                      change / quote.previousClose * 100;
+                                  final color = _priceColor(change);
+                                  return Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      Hero(
+                                        tag: 'stock-${definition.code}',
+                                        child: Material(
+                                          color: Colors.transparent,
+                                          child: Text(
+                                            _displayPrice(
+                                              displayPrice,
+                                              definition.currency,
+                                            ),
+                                            key: const Key(
+                                              'stock-detail-price',
+                                            ),
+                                            maxLines: 1,
+                                            style: TextStyle(
+                                              color: color,
+                                              fontSize: 20,
+                                              height: 1.1,
+                                              fontWeight: FontWeight.w900,
+                                              letterSpacing: -0.5,
+                                              fontFeatures:
+                                                  _marketNumberFeatures,
+                                            ),
                                           ),
-                                      viActive: detailViActive,
-                                      materialHalt: detailMaterialHalt != null,
-                                      phase: detailClock.phase,
-                                    ),
-                                  ],
-                                ),
+                                        ),
+                                      ),
+                                      Text(
+                                        '${_signedDisplayPrice(change, definition.currency)}'
+                                        ' · ${_signedPercent(rate)}',
+                                        key: const Key(
+                                          'stock-detail-change-rate',
+                                        ),
+                                        maxLines: 1,
+                                        style: TextStyle(
+                                          color: color,
+                                          fontSize: 10,
+                                          height: 1.1,
+                                          fontWeight: FontWeight.w800,
+                                          fontFeatures: _marketNumberFeatures,
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                },
                               ),
-                              const SizedBox(width: 8),
-                              RepaintBoundary(
-                                key: _tutorialPriceKey,
-                                child: ValueListenableBuilder<int>(
+                            ),
+                            IconButton(
+                              key: const Key('toggle-market-favorite'),
+                              tooltip: _isFavorite ? '관심 종목 해제' : '관심 종목 저장',
+                              onPressed: _toggleFavorite,
+                              icon: Icon(
+                                _isFavorite
+                                    ? Icons.star_rounded
+                                    : Icons.star_border_rounded,
+                                color: const Color(0xFFFFB020),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      ValueListenableBuilder<_MarketPlaybackSpeed>(
+                        valueListenable: widget.playbackSpeed,
+                        builder: (context, speed, _) => _MarketPlaybackBar(
+                          speed: speed,
+                          enabled:
+                              !widget.tutorialEnabled &&
+                              quote.isTradingDay &&
+                              isMarketTradingDay(state.currentDate) &&
+                              currentMinute < krxCloseMinute,
+                          onChanged: widget.onPlaybackSpeedChanged,
+                        ),
+                      ),
+                      Expanded(
+                        child: LayoutBuilder(
+                          builder: (context, detailConstraints) => ListView(
+                            key: ValueKey<_StockDetailTab>(_detailTab),
+                            padding:
+                                _detailTab == _StockDetailTab.quote ||
+                                    _detailTab == _StockDetailTab.order
+                                ? EdgeInsets.zero
+                                : const EdgeInsets.fromLTRB(20, 16, 20, 28),
+                            physics:
+                                _detailTab == _StockDetailTab.quote ||
+                                    _detailTab == _StockDetailTab.order
+                                ? const NeverScrollableScrollPhysics()
+                                : null,
+                            controller: _detailScrollController,
+                            children: switch (_detailTab) {
+                              _StockDetailTab.quote => <Widget>[
+                                ValueListenableBuilder<int>(
                                   valueListenable: _orderBookPulseFrame,
                                   builder: (context, liquidityPulse, _) {
                                     final snapshot =
@@ -5199,354 +5352,236 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
                                           currentMinute,
                                           liquidityPulse,
                                         );
-                                    final displayPrice =
-                                        _displayedDetailTradePrice(
-                                          quote,
-                                          snapshot,
-                                          currentMinute,
+                                    return _OrderBookPanel(
+                                      definition: definition,
+                                      quote: quote,
+                                      state: state,
+                                      minute: currentMinute,
+                                      playbackSpeed: widget.playbackSpeed,
+                                      snapshot: snapshot,
+                                      sweepPackets: _orderBookSweepPackets(),
+                                      sweepPacketsReader:
+                                          _orderBookSweepPackets,
+                                      onSweepPacketsAccepted:
+                                          _acceptOrderBookSweepPackets,
+                                      availableHeight:
+                                          detailConstraints.maxHeight,
+                                      playerTrade: _lastPlayerTradeSignal,
+                                      tradeTape: _tradeTape,
+                                      tapeCursor: _orderBookTapeCursor,
+                                      selectedPrice: _quoteSelectedPrice,
+                                      quantityPreset: _quoteQuantityPreset,
+                                      onQuantityPresetChanged: (preset) {
+                                        setState(
+                                          () => _quoteQuantityPreset = preset,
                                         );
-                                    final change =
-                                        displayPrice - quote.previousClose;
-                                    final rate =
-                                        change / quote.previousClose * 100;
-                                    final color = _priceColor(change);
-                                    return Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.end,
-                                      children: [
-                                        Hero(
-                                          tag: 'stock-${definition.code}',
-                                          child: Material(
-                                            color: Colors.transparent,
-                                            child: Text(
-                                              _displayPrice(
-                                                displayPrice,
-                                                definition.currency,
-                                              ),
-                                              key: const Key(
-                                                'stock-detail-price',
-                                              ),
-                                              maxLines: 1,
-                                              style: TextStyle(
-                                                color: color,
-                                                fontSize: 20,
-                                                height: 1.1,
-                                                fontWeight: FontWeight.w900,
-                                                letterSpacing: -0.5,
-                                                fontFeatures:
-                                                    _marketNumberFeatures,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                        Text(
-                                          '${_signedDisplayPrice(change, definition.currency)}'
-                                          ' · ${_signedPercent(rate)}',
-                                          key: const Key(
-                                            'stock-detail-change-rate',
-                                          ),
-                                          maxLines: 1,
-                                          style: TextStyle(
-                                            color: color,
-                                            fontSize: 10,
-                                            height: 1.1,
-                                            fontWeight: FontWeight.w800,
-                                            fontFeatures: _marketNumberFeatures,
-                                          ),
-                                        ),
-                                      ],
+                                      },
+                                      onBuy: () =>
+                                          _openQuoteDockOrder(true, snapshot),
+                                      onSell: () =>
+                                          _openQuoteDockOrder(false, snapshot),
+                                      onAmendCancel: () {
+                                        setState(() {
+                                          _detailTab = _StockDetailTab.order;
+                                          _inlineOrderSection =
+                                              _DetailedOrderSection.amendCancel;
+                                        });
+                                      },
+                                      tutorialHeaderKey:
+                                          _tutorialOrderBookHeaderKey,
+                                      tutorialBestAskKey: _tutorialBestAskKey,
+                                      onTapLevel: (level) => unawaited(
+                                        _openQuoteQuickActions(level),
+                                      ),
                                     );
                                   },
                                 ),
-                              ),
-                              IconButton(
-                                key: const Key('toggle-market-favorite'),
-                                tooltip: _isFavorite ? '관심 종목 해제' : '관심 종목 저장',
-                                onPressed: _toggleFavorite,
-                                icon: Icon(
-                                  _isFavorite
-                                      ? Icons.star_rounded
-                                      : Icons.star_border_rounded,
-                                  color: const Color(0xFFFFB020),
+                              ],
+                              _StockDetailTab.order => <Widget>[
+                                _InlineOrderWorkspace(
+                                  definition: definition,
+                                  state: state,
+                                  live: live,
+                                  minute: minute,
+                                  playbackSpeed: widget.playbackSpeed,
+                                  liquidityPulseListenable:
+                                      _orderBookPulseFrame,
+                                  marketSnapshotReader: () =>
+                                      _continuousOrderBookSnapshot(
+                                        live.value,
+                                        minute.value,
+                                        _orderBookPulseFrame.value,
+                                      ),
+                                  sweepPacketsReader: _orderBookSweepPackets,
+                                  onSweepPacketsAccepted:
+                                      _acceptOrderBookSweepPackets,
+                                  playerTrade: _lastPlayerTradeSignal,
+                                  availableHeight: detailConstraints.maxHeight,
+                                  section: _inlineOrderSection,
+                                  formRevision: _inlineOrderRevision,
+                                  initialLimitPrice:
+                                      _inlineOrderLimitPrice ?? quote.price,
+                                  selectedLimitPrice: _inlineOrderSelectedPrice,
+                                  initialQuantity: _inlineOrderQuantity,
+                                  onExecuteTrade: onExecuteTrade,
+                                  onSelectBuy: () => _showInlineOrder(true),
+                                  onSelectSell: () => _showInlineOrder(false),
+                                  onSelectSection: _showInlineOrderSection,
+                                  onSelectPrice: (price) => _showInlineOrder(
+                                    _inlineOrderIsBuy,
+                                    limitPrice: price,
+                                  ),
+                                  onSelectedLimitPriceChanged:
+                                      _updateInlineOrderSelectedPrice,
+                                  onCancelPendingOrder:
+                                      widget.onCancelPendingOrder,
+                                  onAmendPendingOrder: _amendInlineOrder,
+                                  onSuccessContinue: _resetInlineOrderForm,
+                                  onUnavailable: () => _showResearchMessage(
+                                    context,
+                                    '현재 거래할 수 없는 종목입니다.',
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        ValueListenableBuilder<_MarketPlaybackSpeed>(
-                          valueListenable: widget.playbackSpeed,
-                          builder: (context, speed, _) => _MarketPlaybackBar(
-                            speed: speed,
-                            enabled:
-                                !widget.tutorialEnabled &&
-                                quote.isTradingDay &&
-                                isMarketTradingDay(state.currentDate) &&
-                                currentMinute < krxCloseMinute,
-                            onChanged: widget.onPlaybackSpeedChanged,
-                          ),
-                        ),
-                        Expanded(
-                          child: LayoutBuilder(
-                            builder: (context, detailConstraints) => ListView(
-                              key: ValueKey<_StockDetailTab>(_detailTab),
-                              padding:
-                                  _detailTab == _StockDetailTab.quote ||
-                                      _detailTab == _StockDetailTab.order
-                                  ? EdgeInsets.zero
-                                  : const EdgeInsets.fromLTRB(20, 16, 20, 28),
-                              physics:
-                                  _detailTab == _StockDetailTab.quote ||
-                                      _detailTab == _StockDetailTab.order
-                                  ? const NeverScrollableScrollPhysics()
-                                  : null,
-                              controller: _detailScrollController,
-                              children: switch (_detailTab) {
-                                _StockDetailTab.quote => <Widget>[
-                                  ValueListenableBuilder<int>(
-                                    valueListenable: _orderBookPulseFrame,
-                                    builder: (context, liquidityPulse, _) {
-                                      final snapshot =
-                                          _continuousOrderBookSnapshot(
-                                            quote,
-                                            currentMinute,
-                                            liquidityPulse,
-                                          );
-                                      return _OrderBookPanel(
-                                        definition: definition,
-                                        quote: quote,
-                                        state: state,
-                                        minute: currentMinute,
-                                        snapshot: snapshot,
-                                        sweepPackets: _orderBookSweepPackets(),
-                                        sweepPacketsReader:
-                                            _orderBookSweepPackets,
-                                        onSweepPacketsAccepted:
-                                            _acceptOrderBookSweepPackets,
-                                        availableHeight:
-                                            detailConstraints.maxHeight,
-                                        playerTrade: _lastPlayerTradeSignal,
-                                        tradeTape: _tradeTape,
-                                        tapeCursor: _orderBookTapeCursor,
-                                        selectedPrice: _quoteSelectedPrice,
-                                        quantityPreset: _quoteQuantityPreset,
-                                        onQuantityPresetChanged: (preset) {
-                                          setState(
-                                            () => _quoteQuantityPreset = preset,
-                                          );
-                                        },
-                                        onBuy: () =>
-                                            _openQuoteDockOrder(true, snapshot),
-                                        onSell: () => _openQuoteDockOrder(
-                                          false,
-                                          snapshot,
-                                        ),
-                                        onAmendCancel: () {
-                                          setState(() {
-                                            _detailTab = _StockDetailTab.order;
-                                            _inlineOrderSection =
-                                                _DetailedOrderSection
-                                                    .amendCancel;
-                                          });
-                                        },
-                                        tutorialHeaderKey:
-                                            _tutorialOrderBookHeaderKey,
-                                        tutorialBestAskKey: _tutorialBestAskKey,
-                                        onTapLevel: (level) => unawaited(
-                                          _openQuoteQuickActions(level),
-                                        ),
-                                      );
-                                    },
+                              ],
+                              _StockDetailTab.chart => <Widget>[
+                                RepaintBoundary(
+                                  key: _tutorialChartKey,
+                                  child: _MinuteChartPanel(
+                                    quote: quote,
+                                    code: definition.code,
+                                    market: definition.market,
+                                    minute: currentMinute,
+                                    asset: definition.asset,
+                                    simulationSeed: state.simulationSeed,
+                                    throughDate: state.currentDate,
                                   ),
-                                ],
-                                _StockDetailTab.order => <Widget>[
-                                  _InlineOrderWorkspace(
+                                ),
+                                const SizedBox(height: 24),
+                                _QuoteGrid(quote: quote),
+                              ],
+                              _StockDetailTab.info => <Widget>[
+                                if (financial == null)
+                                  const _StockInfoUnavailable()
+                                else ...[
+                                  _InvestorFlowCard(rows: investorFlows),
+                                  const SizedBox(height: 18),
+                                  _CompanyOverviewCard(
                                     definition: definition,
-                                    state: state,
-                                    live: live,
-                                    minute: minute,
-                                    liquidityPulseListenable:
-                                        _orderBookPulseFrame,
-                                    marketSnapshotReader: () =>
-                                        _continuousOrderBookSnapshot(
-                                          live.value,
-                                          minute.value,
-                                          _orderBookPulseFrame.value,
-                                        ),
-                                    sweepPacketsReader: _orderBookSweepPackets,
-                                    onSweepPacketsAccepted:
-                                        _acceptOrderBookSweepPackets,
-                                    playerTrade: _lastPlayerTradeSignal,
-                                    availableHeight:
-                                        detailConstraints.maxHeight,
-                                    section: _inlineOrderSection,
-                                    formRevision: _inlineOrderRevision,
-                                    initialLimitPrice:
-                                        _inlineOrderLimitPrice ?? quote.price,
-                                    selectedLimitPrice:
-                                        _inlineOrderSelectedPrice,
-                                    initialQuantity: _inlineOrderQuantity,
-                                    onExecuteTrade: onExecuteTrade,
-                                    onSelectBuy: () => _showInlineOrder(true),
-                                    onSelectSell: () => _showInlineOrder(false),
-                                    onSelectSection: _showInlineOrderSection,
-                                    onSelectPrice: (price) => _showInlineOrder(
-                                      _inlineOrderIsBuy,
-                                      limitPrice: price,
-                                    ),
-                                    onSelectedLimitPriceChanged:
-                                        _updateInlineOrderSelectedPrice,
-                                    onCancelPendingOrder:
-                                        widget.onCancelPendingOrder,
-                                    onAmendPendingOrder: _amendInlineOrder,
-                                    onSuccessContinue: _resetInlineOrderForm,
-                                    onUnavailable: () => _showResearchMessage(
-                                      context,
-                                      '현재 거래할 수 없는 종목입니다.',
-                                    ),
+                                    snapshot: financial,
+                                    sharesOutstanding: sharesOutstanding,
+                                    marketCap: widget.dailyMarketCap,
+                                    ranking: widget.marketCapRanking,
+                                    ownedShares: ownedShares ?? 0,
+                                  ),
+                                  const SizedBox(height: 18),
+                                  _CompanyFundamentalsCard(
+                                    snapshot: financial,
+                                    sharesOutstanding: sharesOutstanding,
+                                    price: quote.price,
+                                    marketCap: widget.dailyMarketCap,
+                                    relations: definition.relations,
                                   ),
                                 ],
-                                _StockDetailTab.chart => <Widget>[
-                                  RepaintBoundary(
-                                    key: _tutorialChartKey,
-                                    child: _MinuteChartPanel(
-                                      quote: quote,
-                                      code: definition.code,
-                                      market: definition.market,
-                                      minute: currentMinute,
-                                      asset: definition.asset,
-                                      simulationSeed: state.simulationSeed,
-                                      throughDate: state.currentDate,
-                                    ),
+                                const SizedBox(height: 20),
+                                Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF3F6FA),
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(color: _marketLine),
                                   ),
-                                  const SizedBox(height: 24),
-                                  _QuoteGrid(quote: quote),
-                                ],
-                                _StockDetailTab.info => <Widget>[
-                                  if (financial == null)
-                                    const _StockInfoUnavailable()
-                                  else ...[
-                                    _InvestorFlowCard(rows: investorFlows),
-                                    const SizedBox(height: 18),
-                                    _CompanyOverviewCard(
-                                      definition: definition,
-                                      snapshot: financial,
-                                      sharesOutstanding: sharesOutstanding,
-                                      marketCap: widget.dailyMarketCap,
-                                      ranking: widget.marketCapRanking,
-                                      ownedShares: ownedShares ?? 0,
-                                    ),
-                                    const SizedBox(height: 18),
-                                    _CompanyFundamentalsCard(
-                                      snapshot: financial,
-                                      sharesOutstanding: sharesOutstanding,
-                                      price: quote.price,
-                                      marketCap: widget.dailyMarketCap,
-                                      relations: definition.relations,
-                                    ),
-                                  ],
-                                  const SizedBox(height: 20),
-                                  Container(
-                                    padding: const EdgeInsets.all(16),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFF3F6FA),
-                                      borderRadius: BorderRadius.circular(14),
-                                      border: Border.all(color: _marketLine),
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            const Expanded(
-                                              child: Text(
-                                                '오늘의 조사 질문',
-                                                style: TextStyle(
-                                                  color: _marketAccent,
-                                                  fontSize: 11,
-                                                  fontWeight: FontWeight.w700,
-                                                ),
-                                              ),
-                                            ),
-                                            TextButton.icon(
-                                              key: const Key(
-                                                'open-market-research-note',
-                                              ),
-                                              onPressed: _editResearchNote,
-                                              icon: const Icon(
-                                                Icons.edit_note_rounded,
-                                                size: 18,
-                                              ),
-                                              label: Text(
-                                                _researchNote.isEmpty
-                                                    ? '노트 쓰기'
-                                                    : '노트 수정',
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 6),
-                                        Text(
-                                          definition.question,
-                                          style: const TextStyle(
-                                            color: _marketInk,
-                                            fontSize: 14,
-                                            height: 1.45,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                        if (_researchNote.isNotEmpty) ...[
-                                          const SizedBox(height: 12),
-                                          Container(
-                                            key: const Key(
-                                              'saved-research-note',
-                                            ),
-                                            width: double.infinity,
-                                            padding: const EdgeInsets.all(12),
-                                            decoration: BoxDecoration(
-                                              color: Colors.white.withValues(
-                                                alpha: 0.72,
-                                              ),
-                                              borderRadius:
-                                                  BorderRadius.circular(12),
-                                            ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          const Expanded(
                                             child: Text(
-                                              _researchNote,
-                                              style: const TextStyle(
-                                                color: Color(0xFF59491B),
-                                                fontSize: 12,
-                                                height: 1.45,
+                                              '오늘의 조사 질문',
+                                              style: TextStyle(
+                                                color: _marketAccent,
+                                                fontSize: 11,
                                                 fontWeight: FontWeight.w700,
                                               ),
                                             ),
                                           ),
+                                          TextButton.icon(
+                                            key: const Key(
+                                              'open-market-research-note',
+                                            ),
+                                            onPressed: _editResearchNote,
+                                            icon: const Icon(
+                                              Icons.edit_note_rounded,
+                                              size: 18,
+                                            ),
+                                            label: Text(
+                                              _researchNote.isEmpty
+                                                  ? '노트 쓰기'
+                                                  : '노트 수정',
+                                            ),
+                                          ),
                                         ],
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        definition.question,
+                                        style: const TextStyle(
+                                          color: _marketInk,
+                                          fontSize: 14,
+                                          height: 1.45,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      if (_researchNote.isNotEmpty) ...[
+                                        const SizedBox(height: 12),
+                                        Container(
+                                          key: const Key('saved-research-note'),
+                                          width: double.infinity,
+                                          padding: const EdgeInsets.all(12),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white.withValues(
+                                              alpha: 0.72,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            _researchNote,
+                                            style: const TextStyle(
+                                              color: Color(0xFF59491B),
+                                              fontSize: 12,
+                                              height: 1.45,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                        ),
                                       ],
-                                    ),
+                                    ],
                                   ),
-                                  const SizedBox(height: 12),
-                                  const Text(
-                                    '일별 종가와 사건은 이 세이브의 세계 시드로 고정됩니다. 같은 세이브에서는 다시 뽑히지 않으며, 새 게임에서는 다른 미래가 펼쳐집니다.',
-                                    style: TextStyle(
-                                      color: Color(0xFF9A9FA8),
-                                      fontSize: 10,
-                                      height: 1.4,
-                                    ),
+                                ),
+                                const SizedBox(height: 12),
+                                const Text(
+                                  '일별 종가와 사건은 이 세이브의 세계 시드로 고정됩니다. 같은 세이브에서는 다시 뽑히지 않으며, 새 게임에서는 다른 미래가 펼쳐집니다.',
+                                  style: TextStyle(
+                                    color: Color(0xFF9A9FA8),
+                                    fontSize: 10,
+                                    height: 1.4,
                                   ),
-                                ],
-                              },
-                            ),
+                                ),
+                              ],
+                            },
                           ),
                         ),
-                        _StockDetailBottomNav(
-                          selected: _detailTab,
-                          onSelected: _selectDetailTab,
-                        ),
-                      ],
-                    );
-                  },
-                ),
+                      ),
+                      _StockDetailBottomNav(
+                        selected: _detailTab,
+                        onSelected: _selectDetailTab,
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
           ),
@@ -5929,6 +5964,7 @@ class _InlineOrderWorkspace extends StatelessWidget {
     required this.state,
     required this.live,
     required this.minute,
+    required this.playbackSpeed,
     required this.liquidityPulseListenable,
     required this.marketSnapshotReader,
     required this.sweepPacketsReader,
@@ -5956,6 +5992,7 @@ class _InlineOrderWorkspace extends StatelessWidget {
   final GameState state;
   final ValueNotifier<_LiveStock> live;
   final ValueNotifier<int> minute;
+  final ValueListenable<_MarketPlaybackSpeed> playbackSpeed;
   final ValueListenable<int> liquidityPulseListenable;
   final ValueGetter<GameOrderBookSnapshot> marketSnapshotReader;
   final ValueGetter<List<_OrderBookSweepReplayPacket>> sweepPacketsReader;
@@ -6105,6 +6142,7 @@ class _InlineOrderWorkspace extends StatelessWidget {
                         quote: live.value,
                         state: state,
                         minute: minute.value,
+                        playbackSpeed: playbackSpeed,
                         snapshot: snapshot,
                         sweepPackets: sweepPacketsReader(),
                         onSweepPacketsAccepted: onSweepPacketsAccepted,
@@ -6633,6 +6671,10 @@ mixin _OrderBookSweepPlayback<T extends StatefulWidget> on State<T> {
   Duration _orderBookSweepStepDuration = _orderBookSweepMaximumStepDuration;
   _OrderBookSweepPhase _orderBookSweepPhase = _OrderBookSweepPhase.idle;
   int _orderBookSweepScheduleGeneration = 0;
+  int _orderBookSweepPlaybackRate = 1;
+  bool _orderBookSweepPlaybackPaused = false;
+  bool _orderBookSweepAwaitingCompletion = false;
+  GameOrderBookSnapshot? _orderBookPausedPresentationSnapshot;
 
   void onOrderBookSweepBatchCompleted(String identity);
 
@@ -6660,6 +6702,109 @@ mixin _OrderBookSweepPlayback<T extends StatefulWidget> on State<T> {
   bool get _activeOrderBookSweepStepArrived =>
       _orderBookSweepPhase == _OrderBookSweepPhase.draining;
 
+  Duration _scaledOrderBookSweepDuration(Duration duration) {
+    final microseconds = math
+        .max(
+          1,
+          (duration.inMicroseconds / math.max(1, _orderBookSweepPlaybackRate))
+              .round(),
+        )
+        .toInt();
+    return Duration(microseconds: microseconds);
+  }
+
+  Duration get _orderBookSweepMotionDuration {
+    final scaled = _scaledOrderBookSweepDuration(_orderBookMotionDuration);
+    // Even at 10x, keep two 60 Hz frames for each price-row arrival. Faster
+    // motion skips visible intermediate rows and looks like a random jump.
+    return scaled < const Duration(milliseconds: 36)
+        ? const Duration(milliseconds: 36)
+        : scaled;
+  }
+
+  void _initializeOrderBookSweepPlaybackSpeed(
+    _MarketPlaybackSpeed playbackSpeed,
+    GameOrderBookSnapshot initialSnapshot,
+  ) {
+    _orderBookSweepPlaybackPaused =
+        playbackSpeed == _MarketPlaybackSpeed.paused;
+    _orderBookPausedPresentationSnapshot = _orderBookSweepPlaybackPaused
+        ? initialSnapshot
+        : null;
+    if (playbackSpeed.minutesPerSecond > 0) {
+      _orderBookSweepPlaybackRate = playbackSpeed.minutesPerSecond;
+    }
+  }
+
+  void _setOrderBookSweepPlaybackSpeed(
+    _MarketPlaybackSpeed playbackSpeed,
+    GameOrderBookSnapshot currentSnapshot,
+  ) {
+    final paused = playbackSpeed == _MarketPlaybackSpeed.paused;
+    final rate = playbackSpeed.minutesPerSecond > 0
+        ? playbackSpeed.minutesPerSecond
+        : _orderBookSweepPlaybackRate;
+    if (_orderBookSweepPlaybackPaused == paused &&
+        _orderBookSweepPlaybackRate == rate) {
+      return;
+    }
+
+    _orderBookSweepScheduleGeneration += 1;
+    _orderBookSweepTimer?.cancel();
+    _orderBookSweepTimer = null;
+    setState(() {
+      _orderBookSweepPlaybackPaused = paused;
+      _orderBookSweepPlaybackRate = math.max(1, rate);
+      _orderBookPausedPresentationSnapshot = paused
+          ? _activeOrderBookSweepBatch?.snapshot ?? currentSnapshot
+          : null;
+      _refreshOrderBookSweepStepDuration();
+    });
+    if (!paused) _resumeOrderBookSweepPlayback();
+  }
+
+  void _refreshOrderBookSweepStepDuration() {
+    final stepCount = math.max(
+      1,
+      _activeOrderBookSweepBatch?.steps.length ?? 1,
+    );
+    final durationMs = (_orderBookSweepTotalDuration.inMilliseconds / stepCount)
+        .round()
+        .clamp(
+          _orderBookSweepMinimumStepDuration.inMilliseconds,
+          _orderBookSweepMaximumStepDuration.inMilliseconds,
+        )
+        .toInt();
+    _orderBookSweepStepDuration = _scaledOrderBookSweepDuration(
+      Duration(milliseconds: durationMs),
+    );
+  }
+
+  void _resumeOrderBookSweepPlayback() {
+    if (_orderBookSweepPlaybackPaused) return;
+    if (_activeOrderBookSweepBatch == null) {
+      if (_pendingOrderBookSweeps.isNotEmpty) {
+        _beginNextOrderBookSweep();
+      }
+      return;
+    }
+    if (_orderBookSweepPhase == _OrderBookSweepPhase.cancelling) {
+      _scheduleOrderBookSweepTimerAfterFrame(
+        _scaledOrderBookSweepDuration(_orderBookCancellationHoldDuration),
+        _completeActiveOrderBookSweep,
+      );
+    } else if (_orderBookSweepAwaitingCompletion) {
+      _scheduleOrderBookSweepTimerAfterFrame(
+        _scaledOrderBookSweepDuration(_orderBookSweepFinalHoldDuration),
+        _completeActiveOrderBookSweep,
+      );
+    } else if (_orderBookSweepPhase == _OrderBookSweepPhase.draining) {
+      _scheduleOrderBookSweepDrain();
+    } else if (_orderBookSweepPhase == _OrderBookSweepPhase.arriving) {
+      _scheduleOrderBookSweepArrival();
+    }
+  }
+
   int get _activeOrderBookSweepStepNumber => _orderBookSweepIndex + 1;
 
   int get _activeOrderBookSweepStepCount =>
@@ -6667,24 +6812,43 @@ mixin _OrderBookSweepPlayback<T extends StatefulWidget> on State<T> {
 
   GameOrderBookSnapshot _orderBookSweepPresentationSnapshot(
     GameOrderBookSnapshot latest,
-  ) => _activeOrderBookSweepBatch?.snapshot ?? latest;
+  ) =>
+      _activeOrderBookSweepBatch?.snapshot ??
+      (_orderBookSweepPlaybackPaused
+          ? _orderBookPausedPresentationSnapshot
+          : null) ??
+      latest;
 
   List<GameOrderBookLevel> _orderBookSweepPresentationLevels(
     GameOrderBookSnapshot latest,
   ) {
     final batch = _activeOrderBookSweepBatch;
-    if (batch == null) return _symmetricVisibleOrderBookLevels(latest);
+    if (batch == null) {
+      return _symmetricVisibleOrderBookLevels(
+        _orderBookSweepPlaybackPaused
+            ? _orderBookPausedPresentationSnapshot ?? latest
+            : latest,
+      );
+    }
     if (_orderBookSweepPhase == _OrderBookSweepPhase.cancelling ||
         batch.steps.isEmpty) {
-      return _symmetricVisibleOrderBookLevels(batch.snapshot);
+      return stableOrderBookPresentationLevels(
+        snapshot: batch.snapshot,
+        fallbackSnapshot: batch.previousSnapshot,
+      );
     }
-    return orderBookSweepPresentationLevels(
+    final levels = orderBookSweepPresentationLevels(
       snapshot: batch.snapshot,
       previousSnapshot: batch.previousSnapshot,
       steps: batch.steps,
       cancellationNotices: batch.cancellations,
       activeStepIndex: _orderBookSweepIndex,
       activeStepArrived: _activeOrderBookSweepStepArrived,
+    );
+    if (levels.isNotEmpty) return levels;
+    return stableOrderBookPresentationLevels(
+      snapshot: latest,
+      fallbackSnapshot: batch.previousSnapshot,
     );
   }
 
@@ -6745,7 +6909,9 @@ mixin _OrderBookSweepPlayback<T extends StatefulWidget> on State<T> {
     // Never discard an actual fill or cancellation batch: each transition must
     // reach its own FIFO presentation phase at high playback speed.
     _pendingOrderBookSweeps.add(batch);
-    if (_activeOrderBookSweepBatch == null && _orderBookSweepTimer == null) {
+    if (!_orderBookSweepPlaybackPaused &&
+        _activeOrderBookSweepBatch == null &&
+        _orderBookSweepTimer == null) {
       _beginNextOrderBookSweep(deferPresentationUntilAfterFrame: true);
     }
   }
@@ -6753,8 +6919,11 @@ mixin _OrderBookSweepPlayback<T extends StatefulWidget> on State<T> {
   void _beginNextOrderBookSweep({
     bool deferPresentationUntilAfterFrame = false,
   }) {
-    if (_pendingOrderBookSweeps.isEmpty) return;
+    if (_orderBookSweepPlaybackPaused || _pendingOrderBookSweeps.isEmpty) {
+      return;
+    }
     _activeOrderBookSweepBatch = _pendingOrderBookSweeps.removeAt(0);
+    _orderBookSweepAwaitingCompletion = false;
     final batch = _activeOrderBookSweepBatch!;
     if (batch.steps.isEmpty) {
       _orderBookSweepIndex = -1;
@@ -6764,7 +6933,7 @@ mixin _OrderBookSweepPlayback<T extends StatefulWidget> on State<T> {
         deferUntilAfterFrame: deferPresentationUntilAfterFrame,
       );
       _scheduleOrderBookSweepTimerAfterFrame(
-        _orderBookCancellationHoldDuration,
+        _scaledOrderBookSweepDuration(_orderBookCancellationHoldDuration),
         _completeActiveOrderBookSweep,
       );
       return;
@@ -6780,16 +6949,7 @@ mixin _OrderBookSweepPlayback<T extends StatefulWidget> on State<T> {
     onOrderBookSweepPlaybackChanged(
       deferUntilAfterFrame: deferPresentationUntilAfterFrame,
     );
-    final durationMs =
-        (_orderBookSweepTotalDuration.inMilliseconds /
-                math.max(1, batch.steps.length))
-            .round()
-            .clamp(
-              _orderBookSweepMinimumStepDuration.inMilliseconds,
-              _orderBookSweepMaximumStepDuration.inMilliseconds,
-            )
-            .toInt();
-    _orderBookSweepStepDuration = Duration(milliseconds: durationMs);
+    _refreshOrderBookSweepStepDuration();
     if (_orderBookSweepPhase == _OrderBookSweepPhase.draining) {
       _scheduleOrderBookSweepDrain();
     } else {
@@ -6809,6 +6969,7 @@ mixin _OrderBookSweepPlayback<T extends StatefulWidget> on State<T> {
     final phase = _orderBookSweepPhase;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted ||
+          _orderBookSweepPlaybackPaused ||
           generation != _orderBookSweepScheduleGeneration ||
           _activeOrderBookSweepBatch?.identity != batchIdentity ||
           _orderBookSweepIndex != stepIndex ||
@@ -6817,6 +6978,7 @@ mixin _OrderBookSweepPlayback<T extends StatefulWidget> on State<T> {
       }
       _orderBookSweepTimer = Timer(duration, () {
         if (!mounted ||
+            _orderBookSweepPlaybackPaused ||
             generation != _orderBookSweepScheduleGeneration ||
             _activeOrderBookSweepBatch?.identity != batchIdentity ||
             _orderBookSweepIndex != stepIndex ||
@@ -6829,7 +6991,7 @@ mixin _OrderBookSweepPlayback<T extends StatefulWidget> on State<T> {
   }
 
   void _scheduleOrderBookSweepArrival() {
-    _scheduleOrderBookSweepTimerAfterFrame(_orderBookMotionDuration, () {
+    _scheduleOrderBookSweepTimerAfterFrame(_orderBookSweepMotionDuration, () {
       setState(() {
         _orderBookSweepPhase = _OrderBookSweepPhase.draining;
         _activeOrderBookSweepBatch?.progress.arrived = true;
@@ -6849,8 +7011,9 @@ mixin _OrderBookSweepPlayback<T extends StatefulWidget> on State<T> {
       _activeOrderBookSweepBatch = null;
       _orderBookSweepIndex = -1;
       _orderBookSweepPhase = _OrderBookSweepPhase.idle;
+      _orderBookSweepAwaitingCompletion = false;
     });
-    if (_pendingOrderBookSweeps.isNotEmpty) {
+    if (!_orderBookSweepPlaybackPaused && _pendingOrderBookSweeps.isNotEmpty) {
       _beginNextOrderBookSweep();
     } else {
       _orderBookSweepTimer = null;
@@ -6885,13 +7048,14 @@ mixin _OrderBookSweepPlayback<T extends StatefulWidget> on State<T> {
         });
         onOrderBookSweepPlaybackChanged();
         _scheduleOrderBookSweepTimerAfterFrame(
-          _orderBookCancellationHoldDuration,
+          _scaledOrderBookSweepDuration(_orderBookCancellationHoldDuration),
           _completeActiveOrderBookSweep,
         );
         return;
       }
+      setState(() => _orderBookSweepAwaitingCompletion = true);
       _scheduleOrderBookSweepTimerAfterFrame(
-        _orderBookSweepFinalHoldDuration,
+        _scaledOrderBookSweepDuration(_orderBookSweepFinalHoldDuration),
         _completeActiveOrderBookSweep,
       );
     });
@@ -6907,6 +7071,8 @@ mixin _OrderBookSweepPlayback<T extends StatefulWidget> on State<T> {
     _orderBookSweepIdentityLedger.clearInFlight();
     _orderBookSweepIndex = -1;
     _orderBookSweepPhase = _OrderBookSweepPhase.idle;
+    _orderBookSweepAwaitingCompletion = false;
+    _orderBookPausedPresentationSnapshot = null;
     onOrderBookSweepPlaybackChanged(deferUntilAfterFrame: true);
     if (clearHistory) _orderBookSweepIdentityLedger.clear();
   }
@@ -7109,6 +7275,7 @@ class _CompactOrderBookRail extends StatefulWidget {
     required this.quote,
     required this.state,
     required this.minute,
+    required this.playbackSpeed,
     required this.snapshot,
     required this.sweepPackets,
     required this.onSweepPacketsAccepted,
@@ -7121,6 +7288,7 @@ class _CompactOrderBookRail extends StatefulWidget {
   final _LiveStock quote;
   final GameState state;
   final int minute;
+  final ValueListenable<_MarketPlaybackSpeed> playbackSpeed;
   final GameOrderBookSnapshot snapshot;
   final List<_OrderBookSweepReplayPacket> sweepPackets;
   final ValueChanged<Iterable<String>> onSweepPacketsAccepted;
@@ -7151,6 +7319,13 @@ class _CompactOrderBookRailState extends State<_CompactOrderBookRail>
     }
   }
 
+  void _handleOrderBookPlaybackSpeedChanged() {
+    _setOrderBookSweepPlaybackSpeed(
+      widget.playbackSpeed.value,
+      widget.snapshot,
+    );
+  }
+
   @override
   void onOrderBookSweepBatchCompleted(String identity) {
     widget.onSweepPacketsAccepted(<String>[identity]);
@@ -7159,12 +7334,27 @@ class _CompactOrderBookRailState extends State<_CompactOrderBookRail>
   @override
   void initState() {
     super.initState();
+    _initializeOrderBookSweepPlaybackSpeed(
+      widget.playbackSpeed.value,
+      widget.snapshot,
+    );
+    widget.playbackSpeed.addListener(_handleOrderBookPlaybackSpeedChanged);
     _syncCurrentOrderBookSweep();
   }
 
   @override
   void didUpdateWidget(covariant _CompactOrderBookRail oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.playbackSpeed != widget.playbackSpeed) {
+      oldWidget.playbackSpeed.removeListener(
+        _handleOrderBookPlaybackSpeedChanged,
+      );
+      widget.playbackSpeed.addListener(_handleOrderBookPlaybackSpeedChanged);
+      _setOrderBookSweepPlaybackSpeed(
+        widget.playbackSpeed.value,
+        widget.snapshot,
+      );
+    }
     if (oldWidget.snapshot.sourceAssetId != widget.snapshot.sourceAssetId ||
         oldWidget.snapshot.sourceDateKey != widget.snapshot.sourceDateKey) {
       _resetOrderBookSweepPlayback(clearHistory: true);
@@ -7174,6 +7364,7 @@ class _CompactOrderBookRailState extends State<_CompactOrderBookRail>
 
   @override
   void dispose() {
+    widget.playbackSpeed.removeListener(_handleOrderBookPlaybackSpeedChanged);
     _disposeOrderBookSweepPlayback();
     super.dispose();
   }
@@ -7264,6 +7455,33 @@ class _CompactOrderBookRailState extends State<_CompactOrderBookRail>
             .firstOrNull
             ?.price ??
         snapshot.bids.firstOrNull?.price;
+    if (activeSweepStep == null) {
+      final bestAsk = levels
+          .where((level) => level.side == GameOrderBookSide.ask)
+          .lastOrNull;
+      final bestBid = levels
+          .where((level) => level.side == GameOrderBookSide.bid)
+          .firstOrNull;
+      final outlineIsAtTouch = levels.any(
+        (level) =>
+            _matches(level.price, outlinePrice) &&
+            (outlineSide == null || level.side == outlineSide) &&
+            (identical(level, bestAsk) || identical(level, bestBid)),
+      );
+      if (!outlineIsAtTouch) {
+        final touch = outlineSide == GameOrderBookSide.ask
+            ? bestAsk
+            : outlineSide == GameOrderBookSide.bid
+            ? bestBid
+            : outlinePrice != null &&
+                  bestAsk != null &&
+                  outlinePrice >= bestAsk.price
+            ? bestAsk
+            : bestBid ?? bestAsk;
+        outlinePrice = touch?.price;
+        outlineSide = touch?.side;
+      }
+    }
     final observedMaxDepth = levels.fold<int>(
       1,
       (maximum, level) => math.max(maximum, _displayQuantity(level)),
@@ -7278,190 +7496,196 @@ class _CompactOrderBookRailState extends State<_CompactOrderBookRail>
             ),
         ].where((entry) => entry.index >= 0).toList(growable: false);
 
-    return Container(
-      key: const Key('inline-order-book'),
-      color: Colors.white,
-      child: Column(
-        children: [
-          Container(
-            height: 28,
-            padding: const EdgeInsets.symmetric(horizontal: 6),
-            decoration: const BoxDecoration(
-              color: Color(0xFFF4F6F8),
-              border: Border(bottom: BorderSide(color: Color(0xFFDDE2E8))),
-            ),
-            child: Row(
-              children: [
-                const Expanded(
-                  flex: 6,
-                  child: Text(
-                    '가격',
-                    style: TextStyle(
-                      color: _marketMuted,
-                      fontSize: 9,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-                Expanded(
-                  flex: 5,
-                  child: AnimatedSwitcher(
-                    key: const Key('inline-order-book-sweep-status-header'),
-                    duration: _orderBookSweepMinimumStepDuration,
+    return TickerMode(
+      enabled: !_orderBookSweepPlaybackPaused,
+      child: Container(
+        key: const Key('inline-order-book'),
+        color: Colors.white,
+        child: Column(
+          children: [
+            Container(
+              height: 28,
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              decoration: const BoxDecoration(
+                color: Color(0xFFF4F6F8),
+                border: Border(bottom: BorderSide(color: Color(0xFFDDE2E8))),
+              ),
+              child: Row(
+                children: [
+                  const Expanded(
+                    flex: 6,
                     child: Text(
-                      compactSweepHeaderLabel,
-                      key: ValueKey((
-                        'inline-order-book-sweep-status-header',
-                        compactSweepHeaderLabel,
-                      )),
-                      textAlign: TextAlign.right,
-                      maxLines: 1,
+                      '가격',
                       style: TextStyle(
-                        color: compactSweepHeaderColor,
+                        color: _marketMuted,
                         fontSize: 9,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
                   ),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                if (levels.isEmpty) return const SizedBox.shrink();
-                final rowHeight = constraints.maxHeight / levels.length;
-                final outlineIndex = levels.indexWhere(
-                  (level) =>
-                      _matches(level.price, outlinePrice) &&
-                      (outlineSide == null || level.side == outlineSide),
-                );
-                final sweepIndex = activeSweepStep == null
-                    ? -1
-                    : levels.indexWhere(
-                        (level) =>
-                            level.side == activeSweepStep.side &&
-                            (level.price - activeSweepStep.price).abs() <
-                                0.000001,
-                      );
-                return Stack(
-                  clipBehavior: Clip.hardEdge,
-                  children: [
-                    if (activeSweepStep != null)
-                      Offstage(
-                        child: SizedBox(
-                          key: ValueKey((
-                            'order-book-sweep-active',
-                            _activeOrderBookSweepBatch?.identity,
-                            activeSweepStep.sequence,
-                            _orderBookSweepPhase.name,
-                            'compact',
-                          )),
-                        ),
-                      ),
-                    for (final entry in levels.asMap().entries)
-                      Positioned(
+                  Expanded(
+                    flex: 5,
+                    child: AnimatedSwitcher(
+                      key: const Key('inline-order-book-sweep-status-header'),
+                      duration: _orderBookSweepMinimumStepDuration,
+                      child: Text(
+                        compactSweepHeaderLabel,
                         key: ValueKey((
-                          'inline-order-book-price',
-                          entry.value.side.name,
-                          entry.value.price,
+                          'inline-order-book-sweep-status-header',
+                          compactSweepHeaderLabel,
                         )),
-                        top: entry.key * rowHeight,
-                        left: 0,
-                        right: 0,
-                        height: rowHeight,
-                        child: _CompactOrderBookRow(
-                          level: entry.value,
-                          depthAnimationDuration:
-                              activeSweepStep != null &&
-                                  _activeOrderBookSweepStepArrived &&
-                                  entry.value.side == activeSweepStep.side &&
-                                  (entry.value.price - activeSweepStep.price)
-                                          .abs() <
-                                      0.000001
-                              ? _orderBookSweepStepDuration
-                              : _orderBookMotionDuration,
-                          isTradeDrain:
-                              activeSweepStep != null &&
-                              _activeOrderBookSweepStepArrived &&
-                              entry.value.side == activeSweepStep.side &&
-                              (entry.value.price - activeSweepStep.price)
-                                      .abs() <
-                                  0.000001,
-                          quantity: _displayQuantity(entry.value),
-                          maxDepth: maxDepth,
-                          previousClose: widget.quote.previousClose,
-                          isCurrent:
-                              _matches(entry.value.price, outlinePrice) &&
-                              (outlineSide == null ||
-                                  entry.value.side == outlineSide),
-                          isSelected: _matches(
-                            entry.value.price,
-                            widget.selectedPrice,
-                          ),
-                          onTap: () => widget.onSelectPrice(entry.value.price),
+                        textAlign: TextAlign.right,
+                        maxLines: 1,
+                        style: TextStyle(
+                          color: compactSweepHeaderColor,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
-                    for (final flash in cancellationRows)
-                      Positioned(
-                        top: flash.index * rowHeight,
-                        right: 0,
-                        width: constraints.maxWidth * 5 / 11,
-                        height: rowHeight,
-                        child: IgnorePointer(
-                          child: _OrderBookCancellationFlashLabel(
-                            notice: flash.notice,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  if (levels.isEmpty) return const SizedBox.shrink();
+                  final rowHeight = constraints.maxHeight / levels.length;
+                  final outlineIndex = levels.indexWhere(
+                    (level) =>
+                        _matches(level.price, outlinePrice) &&
+                        (outlineSide == null || level.side == outlineSide),
+                  );
+                  final sweepIndex = activeSweepStep == null
+                      ? -1
+                      : levels.indexWhere(
+                          (level) =>
+                              level.side == activeSweepStep.side &&
+                              (level.price - activeSweepStep.price).abs() <
+                                  0.000001,
+                        );
+                  return Stack(
+                    clipBehavior: Clip.hardEdge,
+                    children: [
+                      if (activeSweepStep != null)
+                        Offstage(
+                          child: SizedBox(
+                            key: ValueKey((
+                              'order-book-sweep-active',
+                              _activeOrderBookSweepBatch?.identity,
+                              activeSweepStep.sequence,
+                              _orderBookSweepPhase.name,
+                              'compact',
+                            )),
+                          ),
+                        ),
+                      for (final entry in levels.asMap().entries)
+                        Positioned(
+                          key: ValueKey((
+                            'inline-order-book-price',
+                            entry.value.side.name,
+                            entry.value.price,
+                          )),
+                          top: entry.key * rowHeight,
+                          left: 0,
+                          right: 0,
+                          height: rowHeight,
+                          child: _CompactOrderBookRow(
+                            level: entry.value,
+                            depthAnimationDuration:
+                                activeSweepStep != null &&
+                                    _activeOrderBookSweepStepArrived &&
+                                    entry.value.side == activeSweepStep.side &&
+                                    (entry.value.price - activeSweepStep.price)
+                                            .abs() <
+                                        0.000001
+                                ? _orderBookSweepStepDuration
+                                : _orderBookMotionDuration,
+                            isTradeDrain:
+                                activeSweepStep != null &&
+                                _activeOrderBookSweepStepArrived &&
+                                entry.value.side == activeSweepStep.side &&
+                                (entry.value.price - activeSweepStep.price)
+                                        .abs() <
+                                    0.000001,
+                            quantity: _displayQuantity(entry.value),
+                            maxDepth: maxDepth,
+                            previousClose: widget.quote.previousClose,
+                            isCurrent:
+                                _matches(entry.value.price, outlinePrice) &&
+                                (outlineSide == null ||
+                                    entry.value.side == outlineSide),
+                            isSelected: _matches(
+                              entry.value.price,
+                              widget.selectedPrice,
+                            ),
+                            onTap: () =>
+                                widget.onSelectPrice(entry.value.price),
+                          ),
+                        ),
+                      for (final flash in cancellationRows)
+                        Positioned(
+                          top: flash.index * rowHeight,
+                          right: 0,
+                          width: constraints.maxWidth * 5 / 11,
+                          height: rowHeight,
+                          child: IgnorePointer(
+                            child: _OrderBookCancellationFlashLabel(
+                              notice: flash.notice,
+                              compact: true,
+                            ),
+                          ),
+                        ),
+                      if (sweepIndex >= 0 &&
+                          activeSweepStep != null &&
+                          _activeOrderBookSweepStepArrived)
+                        Positioned(
+                          key: const Key('inline-order-book-sweep-position'),
+                          top: sweepIndex * rowHeight,
+                          left: 0,
+                          right: 0,
+                          height: rowHeight,
+                          child: _OrderBookSweepRowOverlay(
+                            step: activeSweepStep,
+                            stepDuration: _orderBookSweepStepDuration,
+                            stepNumber: _activeOrderBookSweepStepNumber,
+                            stepCount: _activeOrderBookSweepStepCount,
+                            maxDepth: maxDepth,
                             compact: true,
                           ),
                         ),
-                      ),
-                    if (sweepIndex >= 0 &&
-                        activeSweepStep != null &&
-                        _activeOrderBookSweepStepArrived)
-                      Positioned(
-                        key: const Key('inline-order-book-sweep-position'),
-                        top: sweepIndex * rowHeight,
-                        left: 0,
-                        right: 0,
-                        height: rowHeight,
-                        child: _OrderBookSweepRowOverlay(
-                          step: activeSweepStep,
-                          stepDuration: _orderBookSweepStepDuration,
-                          stepNumber: _activeOrderBookSweepStepNumber,
-                          stepCount: _activeOrderBookSweepStepCount,
-                          maxDepth: maxDepth,
-                          compact: true,
-                        ),
-                      ),
-                    if (outlineIndex >= 0)
-                      AnimatedPositioned(
-                        key: const Key(
-                          'inline-order-book-current-price-border',
-                        ),
-                        duration: _orderBookMotionDuration,
-                        curve: Curves.easeOutCubic,
-                        top: outlineIndex * rowHeight,
-                        left: 0,
-                        right: constraints.maxWidth * 5 / 11,
-                        height: rowHeight,
-                        child: IgnorePointer(
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              border: Border.all(
-                                color: const Color(0xFFF04452),
-                                width: 1.7,
+                      if (outlineIndex >= 0)
+                        AnimatedPositioned(
+                          key: const Key(
+                            'inline-order-book-current-price-border',
+                          ),
+                          duration: activeSweepStep == null
+                              ? _orderBookMotionDuration
+                              : _orderBookSweepMotionDuration,
+                          curve: Curves.easeOutCubic,
+                          top: outlineIndex * rowHeight,
+                          left: 0,
+                          right: constraints.maxWidth * 5 / 11,
+                          height: rowHeight,
+                          child: IgnorePointer(
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: const Color(0xFFF04452),
+                                  width: 1.7,
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                  ],
-                );
-              },
+                    ],
+                  );
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -10479,6 +10703,7 @@ class _OrderBookPanel extends StatelessWidget {
     required this.quote,
     required this.state,
     required this.minute,
+    required this.playbackSpeed,
     required this.snapshot,
     required this.sweepPackets,
     required this.sweepPacketsReader,
@@ -10502,6 +10727,7 @@ class _OrderBookPanel extends StatelessWidget {
   final _LiveStock quote;
   final GameState state;
   final int minute;
+  final ValueListenable<_MarketPlaybackSpeed> playbackSpeed;
   final GameOrderBookSnapshot snapshot;
   final List<_OrderBookSweepReplayPacket> sweepPackets;
   final List<_OrderBookSweepReplayPacket> Function() sweepPacketsReader;
@@ -10850,6 +11076,7 @@ class _OrderBookPanel extends StatelessWidget {
             sweepPackets: sweepPackets,
             onSweepPacketsAccepted: onSweepPacketsAccepted,
             tapeCursor: tapeCursor,
+            playbackSpeed: playbackSpeed,
             snapshot: snapshot,
             currentPrice: currentDisplayPrice,
             previousClose: quote.previousClose,
@@ -11493,6 +11720,7 @@ class _OrderBookPriceLadder extends StatefulWidget {
     required this.sweepPackets,
     required this.onSweepPacketsAccepted,
     required this.tapeCursor,
+    required this.playbackSpeed,
     required this.currentPrice,
     required this.previousClose,
     required this.availableHeight,
@@ -11512,6 +11740,7 @@ class _OrderBookPriceLadder extends StatefulWidget {
   final List<_OrderBookSweepReplayPacket> sweepPackets;
   final ValueChanged<Iterable<String>> onSweepPacketsAccepted;
   final ValueNotifier<_OrderBookSweepTapeCursor?> tapeCursor;
+  final ValueListenable<_MarketPlaybackSpeed> playbackSpeed;
   final double currentPrice;
   final double previousClose;
   final double availableHeight;
@@ -11534,6 +11763,7 @@ class _OrderBookPriceLadderState extends State<_OrderBookPriceLadder>
     with _OrderBookSweepPlayback<_OrderBookPriceLadder> {
   String? _depthScaleAssetId;
   double _depthScale = 0;
+  List<GameOrderBookLevel> _lastNonEmptyLevels = const <GameOrderBookLevel>[];
   final Map<(GameOrderBookSide, double), GlobalKey> _depthAnimationKeys =
       <(GameOrderBookSide, double), GlobalKey>{};
   int _tapeCursorPublishGeneration = 0;
@@ -11550,6 +11780,13 @@ class _OrderBookPriceLadderState extends State<_OrderBookPriceLadder>
         replayProgress: packet.progress,
       );
     }
+  }
+
+  void _handleOrderBookPlaybackSpeedChanged() {
+    _setOrderBookSweepPlaybackSpeed(
+      widget.playbackSpeed.value,
+      widget.snapshot,
+    );
   }
 
   @override
@@ -11584,15 +11821,31 @@ class _OrderBookPriceLadderState extends State<_OrderBookPriceLadder>
   @override
   void initState() {
     super.initState();
+    _initializeOrderBookSweepPlaybackSpeed(
+      widget.playbackSpeed.value,
+      widget.snapshot,
+    );
+    widget.playbackSpeed.addListener(_handleOrderBookPlaybackSpeedChanged);
     _syncCurrentOrderBookSweep();
   }
 
   @override
   void didUpdateWidget(covariant _OrderBookPriceLadder oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.playbackSpeed != widget.playbackSpeed) {
+      oldWidget.playbackSpeed.removeListener(
+        _handleOrderBookPlaybackSpeedChanged,
+      );
+      widget.playbackSpeed.addListener(_handleOrderBookPlaybackSpeedChanged);
+      _setOrderBookSweepPlaybackSpeed(
+        widget.playbackSpeed.value,
+        widget.snapshot,
+      );
+    }
     if (oldWidget.snapshot.sourceAssetId != widget.snapshot.sourceAssetId ||
         oldWidget.snapshot.sourceDateKey != widget.snapshot.sourceDateKey) {
       _resetOrderBookSweepPlayback(clearHistory: true);
+      _lastNonEmptyLevels = const <GameOrderBookLevel>[];
     }
     _syncCurrentOrderBookSweep();
   }
@@ -11600,6 +11853,7 @@ class _OrderBookPriceLadderState extends State<_OrderBookPriceLadder>
   @override
   void dispose() {
     _tapeCursorPublishGeneration += 1;
+    widget.playbackSpeed.removeListener(_handleOrderBookPlaybackSpeedChanged);
     _disposeOrderBookSweepPlayback();
     super.dispose();
   }
@@ -11625,18 +11879,43 @@ class _OrderBookPriceLadderState extends State<_OrderBookPriceLadder>
   Widget build(BuildContext context) {
     final activeSweepStep = _activeOrderBookSweepStep;
     final snapshot = _orderBookSweepPresentationSnapshot(widget.snapshot);
-    final levels = _orderBookSweepPresentationLevels(widget.snapshot);
+    final candidateLevels = _orderBookSweepPresentationLevels(widget.snapshot);
+    if (candidateLevels.isNotEmpty) {
+      _lastNonEmptyLevels = List<GameOrderBookLevel>.unmodifiable(
+        candidateLevels,
+      );
+    }
+    final levels = candidateLevels.isEmpty
+        ? _lastNonEmptyLevels
+        : candidateLevels;
+    final pausedTrade = _orderBookSweepPlaybackPaused
+        ? snapshot.lastSyntheticTrade
+        : null;
     final effectiveActiveTradePrice =
-        activeSweepStep?.price ?? widget.activeTradePrice;
+        activeSweepStep?.price ??
+        (_orderBookSweepPlaybackPaused
+            ? pausedTrade?.price ?? snapshot.sourceLastTradePrice
+            : widget.activeTradePrice);
     final effectiveActiveTradeSide = activeSweepStep == null
-        ? widget.activeTradeSide
+        ? _orderBookSweepPlaybackPaused
+              ? pausedTrade == null
+                    ? null
+                    : pausedTrade.levelSide == GameOrderBookSide.ask
+                    ? TradeSide.buy
+                    : TradeSide.sell
+              : widget.activeTradeSide
         : activeSweepStep.side == GameOrderBookSide.ask
         ? TradeSide.buy
         : TradeSide.sell;
     final effectiveActiveTradeLevelSide =
-        activeSweepStep?.side ?? widget.activeTradeLevelSide;
+        activeSweepStep?.side ??
+        (_orderBookSweepPlaybackPaused
+            ? pausedTrade?.levelSide
+            : widget.activeTradeLevelSide);
     final effectiveActiveTradeQuantity = activeSweepStep == null
-        ? widget.activeTradeQuantity
+        ? _orderBookSweepPlaybackPaused
+              ? 0
+              : widget.activeTradeQuantity
         : _activeOrderBookSweepStepArrived
         ? activeSweepStep.consumedQuantity
         : 0;
@@ -11657,19 +11936,54 @@ class _OrderBookPriceLadderState extends State<_OrderBookPriceLadder>
     final rowHeight = levels.isEmpty
         ? 39.0
         : (widget.availableHeight / levels.length).clamp(11.5, 42.0).toDouble();
-    final outlinePrice =
+    final requestedOutlinePrice =
         effectiveActiveTradePrice ??
         levels
             .where((level) => _matchesPrice(level, widget.currentPrice))
             .firstOrNull
             ?.price ??
         snapshot.bids.firstOrNull?.price;
-    final currentRowIndex = levels.indexWhere(
-      (level) =>
-          _matchesPrice(level, outlinePrice) &&
-          (effectiveActiveTradeLevelSide == null ||
-              level.side == effectiveActiveTradeLevelSide),
-    );
+    final bestAskLevel = levels
+        .where((level) => level.side == GameOrderBookSide.ask)
+        .lastOrNull;
+    final bestBidLevel = levels
+        .where((level) => level.side == GameOrderBookSide.bid)
+        .firstOrNull;
+    final requestedOutlineLevel = levels
+        .where(
+          (level) =>
+              _matchesPrice(level, requestedOutlinePrice) &&
+              (effectiveActiveTradeLevelSide == null ||
+                  level.side == effectiveActiveTradeLevelSide),
+        )
+        .firstOrNull;
+    final requestedOutlineIsAtTouch =
+        requestedOutlineLevel != null &&
+        (identical(requestedOutlineLevel, bestAskLevel) ||
+            identical(requestedOutlineLevel, bestBidLevel));
+    final outlineLevel = activeSweepStep != null || requestedOutlineIsAtTouch
+        ? requestedOutlineLevel
+        : effectiveActiveTradeLevelSide == GameOrderBookSide.ask
+        ? bestAskLevel
+        : effectiveActiveTradeLevelSide == GameOrderBookSide.bid
+        ? bestBidLevel
+        : requestedOutlinePrice != null &&
+              bestAskLevel != null &&
+              requestedOutlinePrice >= bestAskLevel.price
+        ? bestAskLevel
+        : bestBidLevel ?? bestAskLevel;
+    final outlinePrice = outlineLevel?.price;
+    final outlineLevelSide = outlineLevel?.side;
+    final currentRowIndex = outlineLevel == null
+        ? -1
+        : levels.indexOf(outlineLevel);
+    final fallbackTradeUsesOutline =
+        activeSweepStep == null &&
+        effectiveActiveTradePrice != null &&
+        outlineLevel != null &&
+        _matchesPrice(outlineLevel, effectiveActiveTradePrice) &&
+        (effectiveActiveTradeLevelSide == null ||
+            outlineLevelSide == effectiveActiveTradeLevelSide);
     final sweepRowIndex = activeSweepStep == null
         ? -1
         : levels.indexWhere(
@@ -11702,163 +12016,181 @@ class _OrderBookPriceLadderState extends State<_OrderBookPriceLadder>
             ),
         ].where((entry) => entry.index >= 0).toList(growable: false);
 
-    return SizedBox(
-      height: rowHeight * levels.length,
-      child: Stack(
-        clipBehavior: Clip.hardEdge,
-        children: [
-          if (activeSweepStep != null)
-            Offstage(
-              child: SizedBox(
-                key: ValueKey((
-                  'order-book-sweep-active',
-                  _activeOrderBookSweepBatch?.identity,
-                  activeSweepStep.sequence,
-                  _orderBookSweepPhase.name,
-                  'full',
-                )),
-              ),
-            ),
-          for (final entry in levels.asMap().entries)
-            Positioned(
-              key: ValueKey((
-                'order-book-price',
-                entry.value.side.name,
-                entry.value.price,
-              )),
-              top: entry.key * rowHeight,
-              left: 0,
-              right: 0,
-              height: rowHeight,
-              child: Builder(
-                builder: (context) {
-                  final level = entry.value;
-                  final isAsk = level.side == GameOrderBookSide.ask;
-                  final levelIndex =
-                      (isAsk
-                          ? askIndexByPrice[level.price]
-                          : bidIndexByPrice[level.price]) ??
-                      0;
-                  Widget row = _OrderBookLevelRow(
-                    key: Key('order-book-${isAsk ? 'ask' : 'bid'}-$levelIndex'),
-                    level: level,
-                    depthAnimationDuration:
-                        activeSweepStep != null &&
-                            _activeOrderBookSweepStepArrived &&
-                            level.side == activeSweepStep.side &&
-                            _matchesPrice(level, activeSweepStep.price)
-                        ? _orderBookSweepStepDuration
-                        : _orderBookMotionDuration,
-                    previousClose: widget.previousClose,
-                    rowHeight: rowHeight,
-                    maxDepth: maxVisibleDepth,
-                    depthAnimationKey: _depthAnimationKeys.putIfAbsent(
-                      (level.side, level.price),
-                      () => GlobalKey(
-                        debugLabel:
-                            'order-book-depth-${level.side.name}-${level.price}',
-                      ),
-                    ),
-                    playerQuantity: widget.playerQuantityForLevel(level),
-                    playerOrderLabel: widget.playerOrderLabelForLevel(level),
-                    isAverageCost: _matchesPrice(
-                      level,
-                      widget.averageCostPrice == null
-                          ? null
-                          : marketSnapPrice(
-                              widget.averageCostPrice!,
-                              market: widget.snapshot.sourceMarket ?? '미래시장',
+    return TickerMode(
+      enabled: !_orderBookSweepPlaybackPaused,
+      child: SizedBox(
+        height: rowHeight * levels.length,
+        child: Stack(
+          key: const Key('order-book-ladder-stack'),
+          clipBehavior: Clip.hardEdge,
+          children: [
+            Column(
+              children: [
+                for (final entry in levels.asMap().entries)
+                  SizedBox(
+                    key: ValueKey((
+                      'order-book-price',
+                      entry.value.side.name,
+                      entry.value.price,
+                    )),
+                    height: rowHeight,
+                    child: Builder(
+                      builder: (context) {
+                        final level = entry.value;
+                        final isAsk = level.side == GameOrderBookSide.ask;
+                        final levelIndex =
+                            (isAsk
+                                ? askIndexByPrice[level.price]
+                                : bidIndexByPrice[level.price]) ??
+                            0;
+                        Widget row = _OrderBookLevelRow(
+                          key: Key(
+                            'order-book-${isAsk ? 'ask' : 'bid'}-$levelIndex',
+                          ),
+                          level: level,
+                          depthAnimationDuration:
+                              activeSweepStep != null &&
+                                  _activeOrderBookSweepStepArrived &&
+                                  level.side == activeSweepStep.side &&
+                                  _matchesPrice(level, activeSweepStep.price)
+                              ? _orderBookSweepStepDuration
+                              : _orderBookMotionDuration,
+                          previousClose: widget.previousClose,
+                          rowHeight: rowHeight,
+                          maxDepth: maxVisibleDepth,
+                          depthAnimationKey: _depthAnimationKeys.putIfAbsent(
+                            (level.side, level.price),
+                            () => GlobalKey(
+                              debugLabel:
+                                  'order-book-depth-${level.side.name}-${level.price}',
                             ),
+                          ),
+                          playerQuantity: widget.playerQuantityForLevel(level),
+                          playerOrderLabel: widget.playerOrderLabelForLevel(
+                            level,
+                          ),
+                          isAverageCost: _matchesPrice(
+                            level,
+                            widget.averageCostPrice == null
+                                ? null
+                                : marketSnapPrice(
+                                    widget.averageCostPrice!,
+                                    market:
+                                        widget.snapshot.sourceMarket ?? '미래시장',
+                                  ),
+                          ),
+                          isSelected: _matchesPrice(
+                            level,
+                            widget.selectedPrice,
+                          ),
+                          isActive:
+                              (!_orderBookSweepPlaybackPaused ||
+                                  activeSweepStep != null) &&
+                              (activeSweepStep == null
+                                  ? _activeOrderBookSweepBatch == null &&
+                                        fallbackTradeUsesOutline
+                                  : _activeOrderBookSweepStepArrived) &&
+                              _matchesPrice(level, outlinePrice) &&
+                              (outlineLevelSide == null ||
+                                  level.side == outlineLevelSide),
+                          isTradeDrain:
+                              activeSweepStep != null &&
+                              _activeOrderBookSweepStepArrived &&
+                              level.side == activeSweepStep.side &&
+                              _matchesPrice(level, activeSweepStep.price),
+                          activeTradeSide: effectiveActiveTradeSide,
+                          activeQuantity: effectiveActiveTradeQuantity,
+                          onTap: widget.onTapLevel == null
+                              ? null
+                              : () => widget.onTapLevel!(level),
+                        );
+                        if (entry.key == currentRowIndex) {
+                          row = KeyedSubtree(
+                            key: const Key('order-book-current-price'),
+                            child: row,
+                          );
+                        }
+                        if (!isAsk ||
+                            levelIndex != 0 ||
+                            widget.tutorialBestAskKey == null) {
+                          return row;
+                        }
+                        return RepaintBoundary(
+                          key: widget.tutorialBestAskKey,
+                          child: row,
+                        );
+                      },
                     ),
-                    isSelected: _matchesPrice(level, widget.selectedPrice),
-                    isActive:
-                        (activeSweepStep == null
-                            ? _activeOrderBookSweepBatch == null
-                            : _activeOrderBookSweepStepArrived) &&
-                        _matchesPrice(level, effectiveActiveTradePrice) &&
-                        (effectiveActiveTradeLevelSide == null ||
-                            level.side == effectiveActiveTradeLevelSide),
-                    isTradeDrain:
-                        activeSweepStep != null &&
-                        _activeOrderBookSweepStepArrived &&
-                        level.side == activeSweepStep.side &&
-                        _matchesPrice(level, activeSweepStep.price),
-                    activeTradeSide: effectiveActiveTradeSide,
-                    activeQuantity: effectiveActiveTradeQuantity,
-                    onTap: widget.onTapLevel == null
-                        ? null
-                        : () => widget.onTapLevel!(level),
-                  );
-                  if (entry.key == currentRowIndex) {
-                    row = KeyedSubtree(
-                      key: const Key('order-book-current-price'),
-                      child: row,
-                    );
-                  }
-                  if (!isAsk ||
-                      levelIndex != 0 ||
-                      widget.tutorialBestAskKey == null) {
-                    return row;
-                  }
-                  return RepaintBoundary(
-                    key: widget.tutorialBestAskKey,
-                    child: row,
-                  );
-                },
-              ),
+                  ),
+              ],
             ),
-          for (final flash in cancellationRows)
-            Positioned(
-              top: flash.index * rowHeight,
-              left: flash.notice.side == GameOrderBookSide.ask ? 8 : null,
-              right: flash.notice.side == GameOrderBookSide.bid ? 8 : null,
-              width: 124,
-              height: rowHeight,
-              child: IgnorePointer(
-                child: _OrderBookCancellationFlashLabel(
-                  notice: flash.notice,
-                  compact: false,
+            if (activeSweepStep != null)
+              Offstage(
+                child: SizedBox(
+                  key: ValueKey((
+                    'order-book-sweep-active',
+                    _activeOrderBookSweepBatch?.identity,
+                    activeSweepStep.sequence,
+                    _orderBookSweepPhase.name,
+                    'full',
+                  )),
                 ),
               ),
-            ),
-          if (sweepRowIndex >= 0 &&
-              activeSweepStep != null &&
-              _activeOrderBookSweepStepArrived)
-            Positioned(
-              key: const Key('order-book-sweep-position'),
-              top: sweepRowIndex * rowHeight,
-              left: 0,
-              right: 0,
-              height: rowHeight,
-              child: _OrderBookSweepRowOverlay(
-                step: activeSweepStep,
-                stepDuration: _orderBookSweepStepDuration,
-                stepNumber: _activeOrderBookSweepStepNumber,
-                stepCount: _activeOrderBookSweepStepCount,
-                maxDepth: maxVisibleDepth,
+            for (final flash in cancellationRows)
+              Positioned(
+                top: flash.index * rowHeight,
+                left: flash.notice.side == GameOrderBookSide.ask ? 8 : null,
+                right: flash.notice.side == GameOrderBookSide.bid ? 8 : null,
+                width: 124,
+                height: rowHeight,
+                child: IgnorePointer(
+                  child: _OrderBookCancellationFlashLabel(
+                    notice: flash.notice,
+                    compact: false,
+                  ),
+                ),
               ),
-            ),
-          if (currentRowIndex >= 0)
-            AnimatedPositioned(
-              key: const Key('order-book-current-price-border'),
-              duration: _orderBookMotionDuration,
-              curve: Curves.easeOutCubic,
-              top: currentRowIndex * rowHeight,
-              left: 132,
-              right: 132,
-              height: rowHeight,
-              child: IgnorePointer(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    border: Border.all(
-                      color: const Color(0xFFF04452),
-                      width: 2,
+            if (sweepRowIndex >= 0 &&
+                activeSweepStep != null &&
+                _activeOrderBookSweepStepArrived)
+              Positioned(
+                key: const Key('order-book-sweep-position'),
+                top: sweepRowIndex * rowHeight,
+                left: 0,
+                right: 0,
+                height: rowHeight,
+                child: _OrderBookSweepRowOverlay(
+                  step: activeSweepStep,
+                  stepDuration: _orderBookSweepStepDuration,
+                  stepNumber: _activeOrderBookSweepStepNumber,
+                  stepCount: _activeOrderBookSweepStepCount,
+                  maxDepth: maxVisibleDepth,
+                ),
+              ),
+            if (currentRowIndex >= 0)
+              AnimatedPositioned(
+                key: const Key('order-book-current-price-border'),
+                duration: activeSweepStep == null
+                    ? _orderBookMotionDuration
+                    : _orderBookSweepMotionDuration,
+                curve: Curves.easeOutCubic,
+                top: currentRowIndex * rowHeight,
+                left: 132,
+                right: 132,
+                height: rowHeight,
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: const Color(0xFFF04452),
+                        width: 2,
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
