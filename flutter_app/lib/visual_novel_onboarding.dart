@@ -1,13 +1,13 @@
 part of 'main.dart';
 
 const _onboardingBeatCount = 51;
-const _computerRepairBeat = 5;
+const _policyBriefingBeat = 5;
 const _introChoiceBeat = 20;
-const _academyTravelDepartureBeat = 31;
-const _academyRegistrationBeat = 34;
+const _accountHallDepartureBeat = 31;
+const _stateAccountActivationBeat = 34;
 const _playerNameBeat = 37;
 const _traitChoiceBeat = 44;
-const _familyChoiceBeat = 47;
+const _principleChoiceBeat = 47;
 const _companyNameBeat = 50;
 const _storyCharacterBottomInset = 122.0;
 const _storyCharacterHeightFactor = 0.78;
@@ -40,32 +40,33 @@ class VisualNovelOnboardingScreen extends StatefulWidget {
 
 class _VisualNovelOnboardingScreenState
     extends State<VisualNovelOnboardingScreen> {
-  static const _repairGoalLabels = <String, String>{
-    'power-cord': '전원선 찾기',
-    'screwdriver': '드라이버 빌리기',
-    'keyboard': '키보드 협상',
-    'modem': '모뎀 연결',
-    'parts': '부품 구분',
+  static const _policyFileLabels = <String, String>{
+    'industry': '수출산업',
+    'population': '인구전망',
+    'children': '보호아동',
+    'capital': '국가계좌',
+    'law': '특별법',
   };
 
   final _playerController = TextEditingController();
   final _companyController = TextEditingController();
-  final Set<String> _completedRepairGoals = <String>{};
+  final Set<String> _reviewedPolicyFiles = <String>{};
   final List<String> _dialogueHistory = <String>[];
   int _beat = 0;
-  String _repairArea = 'small-room';
-  String? _activeRepairGoal;
+  String? _activePolicyFile;
   String? _introChoice;
   StoryTrait? _trait;
   FamilyRule? _familyRule;
   bool _isCreating = false;
+  String? _creationError;
   bool _isTraveling = false;
-  bool _tuitionPaid = false;
+  bool _stateAccountActivated = false;
   bool _quickSetup = false;
   Timer? _travelTimer;
-  String _repairMessage = '좋아. 전원선부터 부품까지, 쓸 수 있는 건 내가 직접 골라 볼 거야.';  WorldLoadProgress _creationProgress = const WorldLoadProgress(
+  String _policyMessage = '보고서 다섯 권을 모두 확인해야 결재안을 완성할 수 있다.';
+  WorldLoadProgress _creationProgress = const WorldLoadProgress(
     0.02,
-    '투자연구소 정보를 정리하는 중…',
+    '제6기 국가계좌 정보를 정리하는 중…',
   );
 
   @override
@@ -77,141 +78,79 @@ class _VisualNovelOnboardingScreenState
   }
 
   String get _background {
-    if (_beat == _computerRepairBeat) {
-      return switch (_repairArea) {
-        'living-room' =>
-          'assets/images/bg_prologue_repair_living_room_keyboard_1999_portrait_cartoon_v6.png',
-        'kitchen' =>
-          'assets/images/bg_prologue_repair_kitchen_modem_1999_portrait_cartoon_v6.png',
-        _ =>
-          'assets/images/bg_prologue_small_room_repair_1999_portrait_cartoon_v6.png',
-      };
-    }
     return switch (_beat) {
       <= 4 =>
-        'assets/images/bg_prologue_small_room_arrival_1999_portrait_cartoon_v6.png',
-      <= 7 =>
-        'assets/images/bg_prologue_small_room_repair_1999_portrait_cartoon_v6.png',
-      <= 10 =>
-        'assets/images/bg_prologue_living_room_tv_1999_portrait_cartoon_v6.png',
-      11 =>
-        'assets/images/bg_prologue_small_room_newspaper_1999_portrait_cartoon_v6.png',
+        'assets/images/historical_prologue/bg_blue_house_policy_room_1981_portrait_cartoon_v1.png',
       <= 13 =>
-        'assets/images/bg_prologue_living_room_tv_1999_portrait_cartoon_v6.png',
+        'assets/images/historical_prologue/bg_blue_house_conference_1981_portrait_cartoon_v1.png',
+      <= 16 =>
+        'assets/images/historical_prologue/bg_future_development_orphanage_1982_portrait_cartoon_v1.png',
       <= 21 =>
-        'assets/images/bg_prologue_living_room_new_year_2000_portrait_cartoon_v6.png',
+        'assets/images/historical_prologue/bg_orphanage_records_room_1999_portrait_cartoon_v1.png',
       <= 25 =>
-        'assets/images/bg_prologue_public_class_2000_portrait_cartoon_v6.png',
+        'assets/images/historical_prologue/bg_orphanage_dormitory_1999_portrait_cartoon_v1.png',
       <= 30 =>
-        'assets/images/bg_prologue_living_room_family_registration_2000_portrait_cartoon_v6.png',
+        'assets/images/historical_prologue/bg_orphanage_electronics_storage_2000_portrait_cartoon_v1.png',
       31 =>
-        'assets/images/bg_prologue_small_room_departure_2000_portrait_cartoon_v6.png',
-      <= 33 =>
-        'assets/images/bg_prologue_academy_exterior_2000_portrait_cartoon_v6.png',
-      34 =>
-        'assets/images/bg_prologue_academy_reception_2000_portrait_cartoon_v6.png',
+        'assets/images/historical_prologue/bg_orphanage_dormitory_1999_portrait_cartoon_v1.png',
       <= 39 =>
-        'assets/images/bg_prologue_academy_classroom_welcome_2000_portrait_cartoon_v6.png',
-      <= 45 =>
-        'assets/images/bg_prologue_academy_classroom_lesson_2000_portrait_cartoon_v6.png',
+        'assets/images/historical_prologue/bg_orphanage_account_hall_2000_portrait_cartoon_v1.png',
       _ =>
-        'assets/images/bg_prologue_academy_classroom_order_practice_2000_portrait_cartoon_v6.png',
+        'assets/images/historical_prologue/bg_orphanage_investment_room_2000_portrait_cartoon_v1.png',
     };
   }
 
   String get _location {
-    if (_beat == _computerRepairBeat) {
-      return switch (_repairArea) {
-        'living-room' => '거실 · 누나의 키보드',
-        'kitchen' => '부엌 · 유선전화와 모뎀',
-        _ => '작은방 · 아버지 공구와 부품',
-      };
-    }
     return switch (_beat) {
-      <= 4 => '재개발 임대아파트 · 작은방 입구',
-      <= 7 => '재개발 임대아파트 · 작은방 수리 책상',
-      <= 10 => '거실 · TV 앞',
-      11 => '작은방 · 컴퓨터 밑 신문',
-      <= 13 => '거실 · 투자학교 광고',
-      <= 21 => '우리 집 · 설날 거실',
-      <= 25 => '오래된 상가 3층 · 무료 공개수업',
-      <= 30 => '우리 집 거실 · 가족 등록회의',
-      31 => '작은방 · 첫 등교 준비',
-      <= 33 => '새천년 청소년 투자학교 · 정문',
-      34 => '새천년 청소년 투자학교 · 접수대',
-      <= 39 => '새천년 청소년 투자학교 · 10대 입문반',
-      <= 45 => '새천년 청소년 투자학교 · 가격 수업',
-      _ => '새천년 청소년 투자학교 · 주문 실습',
+      <= 4 => '청와대 · 정책실',
+      <= 13 => '청와대 · 미래전략 심야회의',
+      <= 16 => '국립 미래양성원 · 개원 기록',
+      <= 21 => '국립 미래양성원 · 제3기록실',
+      <= 25 => '국립 미래양성원 · 6기 기숙사',
+      <= 30 => '국립 미래양성원 · 전자창고',
+      31 => '6기 기숙사 · 계좌 개통일 아침',
+      <= 39 => '국립 미래양성원 · 국가계좌 개통실',
+      _ => '국립 미래양성원 · 제6기 투자실',
     };
   }
 
   String get _dateLabel => switch (_beat) {
-    <= 13 => '1999.12.31  ·  20:50',
-    <= 21 => '2000.01.01  ·  새해 첫날',
-    <= 25 => '2000년 1월  ·  무료 공개수업',
-    <= 30 => '공개수업 날  ·  점심 무렵',
-    31 => '2000년 1월  ·  첫 등교 아침',
-    <= 35 => '2000년 1월  ·  첫 등교',
-    _ => '2000년 1월  ·  첫 수업',
+    <= 13 => '1981.01.12  ·  23:40',
+    <= 16 => '1982년  ·  미래양성계획 1기',
+    <= 21 => '1999.12.31  ·  자정 직전',
+    <= 31 => '2000.01.01  ·  새천년',
+    <= 39 => '2000.01.02  ·  08:00',
+    _ => '2000.01.02  ·  제6기 첫 수업',
   };
 
   String? get _character {
-    if (_beat == _computerRepairBeat) return _repairCharacter;
     return switch (_beat) {
-      1 => FamilyPortraitAssets.pose(
-        FamilyPortraitAssets.mother,
-        FamilyPortraitPose.action,
-      ),
-      27 => FamilyPortraitAssets.pose(
-        FamilyPortraitAssets.mother,
-        FamilyPortraitPose.neutral,
-      ),
-      30 => FamilyPortraitAssets.pose(
-        FamilyPortraitAssets.mother,
-        FamilyPortraitPose.concerned,
-      ),
-      2 || 12 || 31 || 38 || 48 => FamilyPortraitAssets.pose(
-        FamilyPortraitAssets.hero,
-        FamilyPortraitPose.action,
-      ),
-      15 => FamilyPortraitAssets.pose(
-        FamilyPortraitAssets.hero,
-        FamilyPortraitPose.neutral,
-      ),
-      7 || 9 || 24 || 33 || 40 || 42 => FamilyPortraitAssets.pose(
-        FamilyPortraitAssets.hero,
-        FamilyPortraitPose.expressive,
-      ),
-      18 || 28 || 45 => FamilyPortraitAssets.pose(
-        FamilyPortraitAssets.hero,
-        FamilyPortraitPose.concerned,
-      ),
-      3 || 10 || 16 => FamilyPortraitAssets.pose(
-        FamilyPortraitAssets.sister,
-        FamilyPortraitPose.expressive,
-      ),
-      4 => FamilyPortraitAssets.pose(
-        FamilyPortraitAssets.father,
-        FamilyPortraitPose.action,
-      ),
-      13 || 29 => FamilyPortraitAssets.pose(
-        FamilyPortraitAssets.father,
-        FamilyPortraitPose.concerned,
-      ),
-      17 => FamilyPortraitAssets.pose(
-        FamilyPortraitAssets.grandfather,
-        FamilyPortraitPose.expressive,
-      ),
-      19 || 20 || 21 => FamilyPortraitAssets.pose(
-        FamilyPortraitAssets.grandfather,
-        FamilyPortraitPose.action,
-      ),
+      1 ||
+      7 ||
+      11 => 'assets/images/historical_prologue/character_seo_muntae_v1.png',
+      2 ||
+      12 => 'assets/images/historical_prologue/character_baek_gihyeon_v1.png',
+      3 || 13 || 14 =>
+        'assets/images/historical_prologue/character_jeon_dugwang_decree_cartoon_v2.png',
+      4 => 'assets/images/historical_prologue/character_kang_incheol_v1.png',
+      5 => _policyBriefingCharacter,
+      8 || 15 => 'assets/images/historical_prologue/character_yoon_mira_v1.png',
+      10 => 'assets/images/historical_prologue/character_jang_daesik_v1.png',
+      18 ||
+      23 ||
+      28 ||
+      33 => 'assets/images/historical_prologue/character_park_taesu_v1.png',
+      19 || 21 || 24 || 29 || 31 || 38 || 40 || 42 || 45 || 48 =>
+        'assets/images/historical_prologue/character_hero_age14_passbook_v1.png',
+      25 || 27 =>
+        'assets/images/historical_prologue/character_living_guide_oh_gyeongtae_v1.png',
+      34 || 35 =>
+        'assets/images/historical_prologue/character_state_account_officer_cha_eunjoo_v1.png',
       _ => null,
     };
   }
+
   bool get _isAcademyTeacherBeat =>
-      _beat == 23 ||
-      _beat == 25 ||
       _beat == 36 ||
       _beat == 37 ||
       _beat == 39 ||
@@ -220,11 +159,12 @@ class _VisualNovelOnboardingScreenState
       _beat == 44 ||
       _beat == 47 ||
       _beat == 49;
-  bool get _isAcademyReceptionistBeat => _beat == _academyRegistrationBeat;
+  bool get _isAcademyReceptionistBeat =>
+      _beat == _stateAccountActivationBeat || _beat == 35;
 
   String get _teacherPoseAsset => switch (_beat) {
-    23 || 37 || 39 || 43 => 'assets/images/주식선생님/22_포즈1_주인공그림체_공통슬롯_투명.png',
-    25 || 41 || 49 => 'assets/images/주식선생님/23_포즈2_주인공그림체_공통슬롯_투명.png',
+    37 || 39 || 43 => 'assets/images/주식선생님/22_포즈1_주인공그림체_공통슬롯_투명.png',
+    41 || 49 => 'assets/images/주식선생님/23_포즈2_주인공그림체_공통슬롯_투명.png',
     44 || 47 => 'assets/images/주식선생님/25_포즈4_주인공그림체_공통슬롯_투명.png',
     36 || 48 || 50 => 'assets/images/주식선생님/24_포즈3_주인공그림체_공통슬롯_투명.png',
     _ => 'assets/images/주식선생님/26_포즈5_주인공그림체_공통슬롯_투명.png',
@@ -233,9 +173,9 @@ class _VisualNovelOnboardingScreenState
   bool get _isNarration =>
       _beat == 0 ||
       _beat == 6 ||
-      _beat == 8 ||
-      _beat == 11 ||
       _beat == 14 ||
+      _beat == 16 ||
+      _beat == 17 ||
       _beat == 22 ||
       _beat == 26 ||
       _beat == 32 ||
@@ -244,210 +184,172 @@ class _VisualNovelOnboardingScreenState
       _beat == 50;
 
   String get _speaker => switch (_beat) {
-    0 || 6 || 8 || 11 || 14 || 22 || 26 || 32 || 35 || 46 || 50 => '이야기',
-    1 || 27 || 30 => '엄마',
-    2 ||
-    7 ||
-    9 ||
-    12 ||
-    15 ||
-    18 ||
-    24 ||
-    28 ||
-    31 ||
-    33 ||
-    38 ||
-    40 ||
-    42 ||
-    45 ||
-    48 =>
+    0 || 6 || 14 || 16 || 17 || 22 || 26 || 32 || 35 || 46 || 50 => '이야기',
+    1 || 7 || 11 => '서문태 정책실장',
+    2 || 12 => '백기현 비서실장',
+    3 || 13 => '전두광',
+    4 => '강인철 경제수석',
+    5 => _policyBriefingSpeaker,
+    8 || 15 => '윤미라 사회교육수석',
+    9 => '전두광',
+    10 => '장대식 법무수석',
+    18 || 23 || 28 || 33 => '박태수',
+    19 || 21 || 24 || 29 || 31 || 38 || 40 || 42 || 45 || 48 =>
       _playerController.text.trim().isEmpty
           ? '나'
           : _playerController.text.trim(),
-    3 || 10 || 16 => '누나',
-    4 || 13 || 29 => '아빠',
-    5 => _repairSpeaker,
-    17 || 19 || 20 || 21 => '외할아버지',
-    34 => '투자학교 접수원',
-    23 ||
-    25 ||
-    36 ||
-    37 ||
-    39 ||
-    41 ||
-    43 ||
-    44 ||
-    47 ||
-    49 => '한서윤 선생님',
+    20 => '장부',
+    25 || 27 => '오경태 생활지도관',
+    34 || 35 => '차은주 국가계좌 담당관',
+    36 || 37 || 39 || 41 || 43 || 44 || 47 || 49 => '한서윤 선생님',
     _ => '이야기',
   };
   String get _line => switch (_beat) {
     0 =>
-      '드르륵. 쿵. 현관문 밖에서 본체가 계단을 긁었다. 나는 검은 매직으로 ‘폐기’라고 적힌 베이지색 컴퓨터를 두 팔로 안고 작은방까지 끌고 들어왔다.',
-    1 => '그거 당장 내다 버려. 바퀴벌레 나오면 너랑 같이 재운다.',
-    2 => '나보다 밥 덜 먹잖아.',
-    3 => '재벌 회장님, 첫 자산이 쓰레기야?',
-    4 => '전원부도 없고 메모리도 뽑혔네. 공구는 빌려줄 테니, 없는 건 네가 찾아.',
-    5 => _repairMessage,
+      '1981년 1월 12일 밤 11시 40분. 청와대 정책실의 불은 자정이 가까워지도록 꺼지지 않았다. 다섯 권의 보고서 가운데 보호시설 보고서만 유난히 얇았다.',
+    1 => '우리나라의 미래가 어둡습니다.',
+    2 => '각하 앞에서 나라 망한다는 보고부터 꺼내는 배짱은 높이 사겠네. 자네 임기가 오늘 밤 끝날 수도 있다는 건 알고 시작하게.',
+    3 => '계속해.',
+    4 =>
+      '앞으로의 전쟁은 공장 숫자로만 하지 않습니다. 반도체 회로 한 줄, 통신망 하나, 기업 지분 몇 퍼센트가 나라의 목줄을 쥘 수 있습니다.',
+    5 => _policyMessage,
     6 =>
-      '마지막 나사를 조이고 전원을 눌렀다. 팬이 청소기처럼 울고 화면이 두 번 흔들렸다. 초록빛 한가운데에 ‘16384 KB OK’가 떠올랐다.',
-    7 => '봐. 안 죽었잖아. 시끄러운 건 다음에 고치면 돼.',
-    8 =>
-      '거실 TV의 연말 드라마에서는 아무도 거들떠보지 않던 작은 회사를 먼저 알아본 투자자가 넓은 회의실의 주인이 됐다. 전화 한 통마다 큰돈이 움직였다.',
-    9 => '나도 저거 할래. 남들이 모르는 좋은 회사부터 찾는 거.',
-    10 => '뭘, 엔딩에 서 있기? 컴퓨터 하나 살렸다고 회사도 살리게?',
-    11 =>
-      '모뎀이 삐 소리를 내자 부엌 전화가 끊겼다. 엄마가 선을 뽑는 바람에 인터넷 대신 컴퓨터 밑의 헌 신문이 나왔다. 구석에는 ‘새천년 청소년 투자학교’ 광고가 실려 있었다.',
-    12 => '나 여기 갈래. 공개수업은 공짜래.',
-    13 => '공짜는 첫 줄까지고, 입문반은 백만 원이야. 영 하나를 통째로 건너뛰었네.',
+      '보고서 다섯 권이 한 줄로 놓였다. 부잣집 아이는 밥상머리에서 장부와 공장을 배우지만, 보호시설 아이에게는 열아홉 살의 퇴소 가방만 남아 있었다.',
+    7 =>
+      '국가는 이미 그 아이들의 오늘을 책임지고 있습니다. 이제 회계, 산업, 계약, 저축과 투자를 가르쳐 미래의 자본 지휘자로 만들어야 합니다.',
+    8 => '아이를 국가가 소유한 자본이나 실험쥐처럼 취급하겠다는 겁니까?',
+    9 => '국가 물건으로 만들자는 소리는 하지 말게. 국가가 끝까지 책임지는 미래의 쩐주로 만들면 되지.',
+    10 => '미성년자가 국가 재산을 운용할 법적 근거가 없습니다.',
+    11 => '만 열네 살부터 소액 국가계좌를 엽니다. 최초 원금은 단돈 만 원. 운용 판단은 교육생 본인이 합니다.',
+    12 => '잃으면 혈세 낭비라 하고, 벌면 벼룩의 간을 빼먹는다고 할 겁니다. 몇 퍼센트를 회수할 생각인가?',
+    13 => '이십 퍼센트.',
     14 =>
-      '새해 첫날, 외할아버지가 귤 봉지와 모서리를 투명테이프로 기운 장부를 들고 왔다. 나는 귤보다 먼저 허리를 폈다.',
-    15 => '할아버지, 저 만 원만 빌려주세요.',
-    16 => '돈 얘기 나오니까 존댓말도 나오네.',
-    17 => '그 돈으로 뭐 하게?',
-    18 => '십만 원으로 만들려고요. …방법은 지금부터 적을 거고요.',
-    19 => '돈 달란 말은 빨랐네. 그런데 갚는 날짜는 왜 안 적혔지?',
-    20 => '네가 할 수 있는 일 세 개만 골라 봐. 위험한 일과 남의 돈은 빼고.',
+      '전두광의 만년필이 결재란을 눌렀다. 사각. 한 아이의 인생을 바꾸기에는 너무 짧고, 국가의 거대한 실험을 시작하기에는 지나치게 가벼운 소리였다.',
+    15 =>
+      '나머지 80퍼센트는 아이의 자립적립금으로 동결해야 합니다. 열아홉 살이 되면 국가 원금만 돌려주고 전부 본인 이름으로 이전해야 합니다.',
+    16 => '1982년, 국립 미래양성원이 문을 열었다. 아이들은 구구단 다음에 복식부기를, 사회시간 다음에 공장 견학표를 배웠다.',
+    17 =>
+      '1997년 외환위기. 제5기 일부는 무너진 기업을 주워 담았고, 일부의 이름은 국가 기록에서 검은 줄로 지워졌다. 그리고 새천년 전야, 여섯째 줄이 인쇄됐다.',
+    18 => '6기 명단 맞아. 그런데 5기 장부는 왜 이름표가 뜯겨 있지?',
+    19 => '졸업했으면 이름이 더 잘 보여야 하는 거 아냐?',
+    20 => '국가계좌를 운용할 첫 이유를 장부에 남기십시오.',
     21 => _introResponse,
     22 =>
-      '며칠 뒤 무료 공개수업은 오래된 상가 3층에서 열렸다. 흔들리는 접이식 의자 사이에서 나는 가장 작았고, 손은 가장 빨랐다.',
-    23 => '수업 시작도 안 했는데 손부터 들었네요. 질문 있어요?',
-    24 => '좋은 회사 찾으면 무조건 벌어요?',
-    25 =>
-      '같은 전자사전도 만 원이면 사고 싶고, 십만 원이면 망설여지죠? 회사가 좋아도 산 가격이 다르면 결과도 달라져요.',
+      '소등 종이 울렸지만 6기 기숙사의 몇몇 이불 속에서는 손전등과 증권 용어집이 꺼지지 않았다. 국가가 준 만 원은 여의도에서는 점심값, 이곳에서는 열네 해를 기다린 주문권이었다.',
+    23 => '네가 벌면 20퍼센트나 먼저 떼 간대. 남은 돈도 열아홉 살 전에는 못 만지고.',
+    24 => '상관없어. 국가 이름으로 시작해서 내 이름으로 끝내면 되니까.',
+    25 => '국가 기밀을 훔쳐본 운용자 둘은 새벽 전자창고 정리다. 그리고 5기 장부는 못 본 걸로 해.',
     26 =>
-      '집으로 돌아오자 밥상에는 생활비 봉투, 아빠의 새 공구 전단, 누나 잡지 밑의 등록금 분납 안내서가 나란히 놓였다. 나는 입문반 수강료 백만 원을 손으로 가리지 않았다.',
-    27 => '그래서, 뭐 배웠어? 광고 말고 네 장부부터 보여 줘.',
-    28 => '비싼 거 알아. 공짜로 해 달라는 말도 안 할게. 서른 날만 줘. 십만 원짜리 계획부터 보여줄게.',
-    29 =>
-      '백만 원을 내면 새 공구는 미뤄야 해. 그래도 배우겠다면 내가 먼저 돈을 건다. 공짜는 아니다.',
-    30 => '계좌는 내 이름, 비밀번호는 내 손. 넌 왜 사는지부터 설명해.',
-    31 => '초대장, 장부, 연필 세 자루. 다 챙겼어. 이제 진짜 가는 거지?',
+      '전자창고에는 고장 난 전화기와 모뎀이 산처럼 쌓여 있었다. 같은 한빛통신 제품 열두 대 중 아홉 대에 붉은 고장표가 붙어 있었다.',
+    27 => '작동, 고장, 부품용. 세 칸으로 나눠. 고장 났다고 주인이 없어지는 건 아니다.',
+    28 => '불량률이 이 정도면 한빛통신은 안 사는 게 맞아.',
+    29 => '그런데 왜 우리 원은 열두 대나 샀을까? 싸고 빨리 납품했으니까. 중요한 건 이 문제를 고칠 수 있느냐야.',
+    30 =>
+      '수리전표 아래에는 다음 주 신형 통신칩 교체 시험과 추가구매 예정표가 끼워져 있었다. 성공은 아니었다. 그러나 성공하면 달라질 크기는 보였다.',
+    31 => '장부, 통장, 연필. 다 챙겼어. 이제 국가계좌를 받으러 가자.',
     32 =>
-      '버스에서 내려 골목을 돌자 남색 문양이 붙은 투자학교가 보였다. 초등학생부터 고등학생까지 두꺼운 노트와 서류철을 들고 정문으로 모여들었다.',
-    33 => '형, 누나들만 있는 줄 알았는데 나만 한 애도 있네. 내가 제일 작은 건 아니네.',
-    34 => '보호자 서류 확인됐어요. 영수증에는 등록비와 맡긴 투자금을 따로 적어 드릴게요.',
-    35 =>
-      '등록비 영수증을 장부와 다른 칸에 끼웠다. 교실 문을 열자 두꺼운 CRT 모니터, 가격표 두 장, 빈 주문표가 교탁 위에 놓여 있었다.',
-    36 => '안녕하세요, 한서윤입니다. 그런데 저기 손 든 학생. 이름보다 질문이 먼저인가요?',
-    37 => '질문은 환영이에요. 그래도 서로 부를 이름부터 적어 볼까요?',
-    38 => '저는 ${_playerController.text.trim()}예요. 질문은 몇 개까지 해도 돼요?',
-    39 => '끝까지 들을 수 있는 만큼요. 같은 전자사전에 만 원과 십만 원 가격표가 붙어 있어요. 어느 쪽을 살래요?',
-    40 => '만 원짜리요. 그런데 그 회사가 좋은지는 아직 모르잖아요?',
-    41 => '바로 그거예요. 회사와 가격을 따로 본 다음, 사기로 정했을 때 쓰는 게 매수 주문이에요.',
+      '강당을 개조한 계좌개통실에는 책상이 여섯 줄로 놓였다. 각 자리에는 남색 통장, 빈 장부, 그리고 원금 10,000원이 찍힌 표가 기다리고 있었다.',
+    33 => '수익은 같이 먹고 손실은 같이 안 진다. 국가가 계산은 제일 잘하네.',
+    34 => '제6기 국가계좌를 개통합니다. 확정수익 20퍼센트는 국가 환수, 80퍼센트는 만 열아홉 살까지 자립적립금으로 보호됩니다.',
+    35 => '붉은 도장이 통장 위로 떨어졌다. 명의자는 대한민국 미래양성기금. 운용자 칸만 비어 있었다.',
+    36 => '제6기 담당 한서윤입니다. 국가 돈을 받았다고 정답까지 받은 사람?',
+    37 => '정답보다 먼저, 판단을 남길 운용자 이름부터 적어 볼까요?',
+    38 => '저는 ${_playerController.text.trim()}입니다. 정답 말고 주문권 받으러 왔어요.',
+    39 => '좋아요. 만 원이 국가 돈이면, 틀렸을 때 사라지는 건 누구의 기회죠?',
+    40 => '제 기회요. 국가는 다음 7기를 뽑으면 되니까.',
+    41 => '그래서 판단 기록은 네 이름으로 남겨요. 계좌 명의와 생각의 주인은 다를 수 있으니까.',
     42 => '그럼 제가 사고 싶은 가격도 정할 수 있어요?',
-    43 => '정할 수 있어요. 원하는 가격에 줄을 서는 지정가와, 지금 나온 가격부터 사는 시장가를 주문표에서 비교해 봐요.',
-    44 => '첫 회사를 볼 때 네 눈이 어디부터 가는지 골라 볼까요?',
+    43 =>
+      '정할 수 있어요. 원하는 가격에 줄을 서는 지정가와 지금 나온 가격부터 사는 시장가, 그리고 이익이 확정될 때의 국가 환수까지 같이 확인합니다.',
+    44 => '한빛통신을 다시 볼 때 네 눈이 어디부터 가는지 골라 볼까요?',
     45 => _traitResponse,
-    46 =>
-      '한서윤 선생님이 컴퓨터 옆에 주문표를 놓았다. 그때 장부 사이에서 엄마가 접어 준 가족 약속 쪽지가 툭 떨어졌다.',
-    47 => '가족이 정해 준 약속이 있네요. 오늘 주문에 들고 갈 한 줄은 무엇인가요?',
+    46 => '한서윤이 컴퓨터 옆에 주문표를 놓았다. 국가 서약서 위로 주인 없는 빈 장부가 겹쳐졌다.',
+    47 => '국가 규칙 말고, 네가 스스로 지킬 운용 원칙 한 줄을 정하세요.',
     48 => _lessonRuleResponse,
-    49 => '좋아요. 마지막으로 한 달 동안 회사 하나를 볼 관찰팀을 만들어요. 혼자여도 팀 이름은 있어도 돼요.',
-    _ =>
-      '빈 관찰 노트 표지 한가운데에 두 줄을 그었다. 첫 줄에는 내 이름, 둘째 줄에는 오늘부터 키워 갈 투자연구소 이름이 들어간다.',
+    49 => '통장에는 국가 이름이 있죠. 하지만 주문표의 투자회사 칸은 비어 있어요. 먼저 갖고 싶은 이름을 쓰세요.',
+    _ => '빈 장부 표지 한가운데에 두 줄을 그었다. 첫 줄에는 내 이름, 둘째 줄에는 오늘부터 키워 갈 투자회사 이름이 들어간다.',
   };
 
   String get _introResponse => switch (_introChoice) {
-    'computer' =>
-      '좋다. 남의 시간을 빌렸으면 그것도 빚이지. 이 만 원은 네게 맡긴다. 장부 첫 줄부터 써라.',
-    'y2k' =>
-      '좋다. 위험한 부품은 손대지 말고, 번 돈 옆에 쓴 시간도 적어라. 이 만 원은 네게 맡긴다.',
-    'stocks' =>
-      '좋다. 상금과 투자금은 섞지 마라. 이 만 원은 네게 맡긴다. 다음엔 말 말고 숫자를 들고 와.',
+    'computer' => '국가 이름으로 시작해도 마지막에는 내 이름을 남긴다.',
+    'y2k' => '검게 지워진 5기 선배들의 장부부터 되찾는다.',
+    'stocks' => '돈이 없으면 선택도 없다. 내 선택권을 사기 위해 번다.',
     _ => '',
   };
 
   String get _traitResponse => switch (_trait) {
-    StoryTrait.stability => '엄마 돈부터 안 잃는 법이요. 잃으면 다음 질문도 못 하잖아요.',
-    StoryTrait.innovation => '사람들이 새로 줄 서서 사는 물건이요. 그런 건 누가 만드는지 보고 싶어요.',
-    StoryTrait.analysis => '같은 회사인데 어제랑 오늘 값이 다른 이유요. 숫자가 혼자 움직이진 않잖아요.',
-    StoryTrait.control => '한 주만 사도 회사에 말할 수 있어요? 주인이라면서요.',
+    StoryTrait.stability => '불량이 줄지 않으면 안 삽니다. 다음 기회를 잃지 않는 게 먼저예요.',
+    StoryTrait.innovation => '신형 통신칩이 실제로 문제를 바꾸는지부터 봅니다.',
+    StoryTrait.analysis => '불량률, 납품 속도, 추가구매 가격을 같이 비교합니다.',
+    StoryTrait.control => '한 주를 사더라도 회사가 약속을 지키는지 끝까지 묻겠습니다.',
     null => '',
   };
 
   String get _lessonRuleResponse => switch (_familyRule) {
     FamilyRule.reportLosses => '손해가 나도 숨기지 않고 쓸게요. 지우면 왜 틀렸는지도 없어지니까.',
-    FamilyRule.noHotTips => '누가 좋다고 해도 바로 안 살게요. 제 이유가 없으면 제 주문도 아니잖아요.',
+    FamilyRule.noHotTips => '추천보다 제 이유를 먼저 쓸게요. 이유가 없으면 제 주문도 아니니까.',
     FamilyRule.keepCash => '한 번에 다 안 쓸게요. 다음에 다시 고를 돈은 남겨 둬야 하니까.',
     null => '',
   };
 
-  String get _repairSpeaker => switch (_activeRepairGoal) {
-    'power-cord' || 'screwdriver' || 'parts' => '아빠',
-    'keyboard' => '누나',
-    'modem' => '엄마',
-    _ => _playerController.text.trim().isEmpty
-        ? '나'
-        : _playerController.text.trim(),
+  String get _policyBriefingSpeaker => switch (_activePolicyFile) {
+    'industry' || 'population' || 'capital' => '서문태 정책실장',
+    'children' => '윤미라 사회교육수석',
+    'law' => '장대식 법무수석',
+    _ => '이야기',
   };
 
-  String? get _repairCharacter => switch (_activeRepairGoal) {
-    'power-cord' || 'screwdriver' => FamilyPortraitAssets.pose(
-      FamilyPortraitAssets.father,
-      FamilyPortraitPose.action,
-    ),
-    'parts' => FamilyPortraitAssets.pose(
-      FamilyPortraitAssets.father,
-      FamilyPortraitPose.concerned,
-    ),
-    'keyboard' => FamilyPortraitAssets.pose(
-      FamilyPortraitAssets.sister,
-      FamilyPortraitPose.expressive,
-    ),
-    'modem' => FamilyPortraitAssets.pose(
-      FamilyPortraitAssets.mother,
-      FamilyPortraitPose.action,
-    ),
-    _ => FamilyPortraitAssets.pose(
-      FamilyPortraitAssets.hero,
-      FamilyPortraitPose.action,
-    ),
+  String? get _policyBriefingCharacter => switch (_activePolicyFile) {
+    'children' =>
+      'assets/images/historical_prologue/character_yoon_mira_v1.png',
+    'law' => 'assets/images/historical_prologue/character_jang_daesik_v1.png',
+    _ => 'assets/images/historical_prologue/character_seo_muntae_v1.png',
   };
 
   String? get _stageDirection => switch (_beat) {
-    1 => '어머니가 고무장갑 낀 손으로 신문지를 바닥에 펼쳤다.',
-    2 => '나는 본체를 들어 올리려다 무게를 못 이기고 다시 내려놨다.',
-    3 => '누나는 잡지 위로 눈만 들었다. 해진 민소매 면티와 돌핀팬츠 차림이었다.',
-    4 => '아버지는 웃지 않고 본체 뒤쪽의 탄 냄새부터 맡았다.',
-    5 => switch (_activeRepairGoal) {
-      'power-cord' => '책상 밑에서 전원선 두 개를 꺼냈다.',
-      'screwdriver' => '공구함에는 크기가 다른 십자드라이버가 있었다.',
-      'keyboard' => '누나가 키보드를 등 뒤로 감췄다.',
-      'modem' => '부엌 수화기에서는 아직 통화 소리가 났다.',
-      'parts' => '아버지가 부품 다섯 개를 쟁반에 늘어놓았다.',
-      _ => '작은방 바닥에는 부품과 공구가 뒤섞여 있었다.',
+    1 => '서문태가 2000년과 2010년에서 꺾이는 낡은 괘도를 펼쳤다.',
+    2 => '백기현은 천천히 안경을 벗어 탁자 위에 놓았다.',
+    3 => '전두광이 만년필 뚜껑을 열었다.',
+    4 => '강인철의 연필 끝이 반도체와 통신망 도표를 차례로 짚었다.',
+    5 => switch (_activePolicyFile) {
+      'industry' => '수출 보고서에는 공장 숫자와 외화 목표가 빼곡했다.',
+      'population' => '인구 곡선은 2000년을 지나며 완만하게 꺾였다.',
+      'children' => '보호시설 보고서만 다른 서류의 절반 두께였다.',
+      'capital' => '빈 계좌 양식의 명의자 칸에는 국가 이름만 인쇄돼 있었다.',
+      'law' => '법적 근거 칸은 깨끗하게 비어 있었다.',
+      _ => '서로 다른 미래를 말하는 보고서 다섯 권이 탁자 위에 놓였다.',
     },
-    7 => '초록 글씨가 뜨자 나는 모니터 코앞까지 붙었다.',
-    9 => '엔딩 음악이 흐르는데도 나는 TV 앞에서 비키지 않았다.',
-    10 => '누나가 리모컨으로 화면 속 넥타이 차림 남자를 가리켰다.',
-    12 => '나는 광고의 무료 수업 줄만 손가락으로 가렸다.',
-    13 => '아버지의 손가락이 수강료 마지막 영에서 멈췄다.',
-    15 => '나는 귤 봉지보다 장부 가방을 먼저 봤다.',
-    16 => '누나가 귤껍질을 길게 늘어뜨리며 웃었다.',
-    17 => '외할아버지는 웃었지만 지갑은 꺼내지 않았다.',
-    18 => '입이 먼저 움직였다. 십만 원은 말하고 나서야 커 보였다.',
-    19 => '외할아버지가 닳은 장부를 펴서 내 쪽으로 밀었다.',
-    20 => '짧아진 연필 한 자루가 빈 장부 칸 위에 놓였다.',
-    21 => '외할아버지가 내 답을 장부 첫 줄에 그대로 받아 적었다.',
-    23 => '출석부도 펴기 전, 내 손이 먼저 올라갔다.',
-    24 => '뒤쪽에서 웃음이 났다. 나는 손을 내리지 않았다.',
-    25 => '선생님은 같은 전자사전 아래에 서로 다른 가격표를 붙였다.',
-    27 => '어머니는 생활비 봉투를 세면서 장부부터 턱으로 가리켰다.',
-    28 => '나는 신발도 벗기 전에 삐뚤어진 표를 밥상 위에 폈다.',
-    29 => '아버지는 새 공구 전단을 접어 공구함 밑에 넣었다.',
-    30 => '어머니가 가족 규칙 칸에 한 줄만 크게 적었다.',
-    31 => '연필이 불안해 두 자루를 더 챙겼다.',
-    33 => '학생들의 두꺼운 서류철을 보고 가방끈을 고쳐 멨다.',
-    36 => '선생님은 출석부 대신 아직 들려 있는 내 손을 먼저 봤다.',
-    38 => '이름을 적자마자 나는 다시 손을 들었다.',
-    39 => '선생님이 같은 전자사전에 두 가격표를 붙였다.',
-    40 => '나는 십만 원 가격표를 뒤집어 보고 고개를 저었다.',
-    41 => '선생님은 칠판의 ‘회사’와 ‘가격’ 사이에 줄을 그었다.',
+    7 => '서문태의 손이 가장 얇은 보호시설 보고서 위에서 멈췄다.',
+    8 => '윤미라가 보고서를 덮고 자리에서 일어났다.',
+    9 => '전두광은 얇은 보고서를 손가락으로 두 번 두드렸다.',
+    10 => '장대식이 빈 법률수첩을 마지못해 끌어당겼다.',
+    11 => '계좌 양식에 만 14세와 원금 10,000원이 적혔다.',
+    12 => '백기현이 다시 안경을 쓰며 환수율 칸을 바라봤다.',
+    13 => '전두광이 20%라는 숫자에 동그라미를 쳤다.',
+    15 => '윤미라는 80% 아래에 자립적립금이라는 말을 힘주어 적었다.',
+    18 => '도트프린터가 제6기 명단을 거칠게 밀어냈다.',
+    19 => '나는 검게 지워진 세 이름을 손가락으로 문질렀다.',
+    20 => '장부 첫 장의 운용 목적 칸이 푸른빛으로 깜빡였다.',
+    21 => '내가 고른 문장이 빈 장부 첫 줄에 남았다.',
+    23 => '박태수가 윗침대에서 약관을 아래로 내려뜨렸다.',
+    24 => '나는 환수율 20%를 손가락으로 툭툭 두드렸다.',
+    25 => '문간의 오경태가 5기 장부를 점검표 아래로 덮었다.',
+    27 => '오경태가 빈 상자 세 개와 점검표를 내려놓았다.',
+    28 => '박태수가 고장 딱지가 붙은 모뎀을 따로 밀어냈다.',
+    29 => '나는 구매전표와 수리전표를 나란히 펼쳤다.',
+    30 => '다음 주 시험 예정표가 낡은 수리전표 아래에서 나왔다.',
+    31 => '나는 베개 밑 장부와 짧아진 연필을 제일 먼저 챙겼다.',
+    33 => '박태수가 국가 환수 안내서를 반으로 접었다.',
+    34 => '차은주가 남색 통장과 붉은 도장을 들어 보였다.',
+    36 => '한서윤은 켜지지 않은 CRT 여섯 대 앞에 섰다.',
+    38 => '운용자 칸에 이름을 적자 통장과 장부가 동시에 연결됐다.',
+    39 => '한서윤이 국가 명의 통장과 빈 판단 장부를 나란히 놓았다.',
+    40 => '나는 통장보다 장부를 내 쪽으로 끌어당겼다.',
+    41 => '한서윤은 계좌 명의와 운용자 이름 사이에 선을 그었다.',
     42 => '나는 빈 주문표의 가격 칸을 손가락으로 짚었다.',
-    45 => '내가 고른 자료 쪽으로 의자를 바짝 당겼다.',
-    48 => '나는 엄마가 적어 준 한 줄을 소리 내어 다시 읽었다.',
-    49 => '선생님이 빈 관찰 노트 표지를 한 장씩 나눠 줬다.',
+    45 => '내가 고른 자료를 한빛통신 수리전표 옆에 놓았다.',
+    48 => '나는 국가 서약서가 아니라 내 장부 첫 줄에 원칙을 적었다.',
+    49 => '한서윤이 회사명 칸만 비어 있는 첫 주문표를 내밀었다.',
     _ => null,
   };
 
@@ -456,6 +358,7 @@ class _VisualNovelOnboardingScreenState
     if (direction == null || direction.isEmpty) return _line;
     return '$direction\n$_line';
   }
+
   void _rememberCurrentLine() {
     final entry = '$_speaker\n$_historyLine';
     if (_dialogueHistory.isEmpty || _dialogueHistory.last != entry) {
@@ -464,31 +367,42 @@ class _VisualNovelOnboardingScreenState
   }
 
   void _next() {
+    if (_beat >= _companyNameBeat) {
+      if (_beat != _companyNameBeat) {
+        setState(() => _beat = _companyNameBeat);
+      }
+      return;
+    }
+    final currentBeat = _beat;
     FocusManager.instance.primaryFocus?.unfocus();
     _rememberCurrentLine();
     _playStoryFeedback();
-    if (_beat == _academyTravelDepartureBeat) {
-      _travelToAcademy();
+    if (_beat == _accountHallDepartureBeat) {
+      _travelToAccountHall();
       return;
     }
     if (_quickSetup && _beat == _playerNameBeat) {
       setState(() => _beat = _companyNameBeat);
       return;
     }
-    setState(() => _beat += 1);
+    setState(() {
+      if (_beat == currentBeat) {
+        _beat = currentBeat + 1;
+      }
+    });
   }
 
-  void _travelToAcademy() {
+  void _travelToAccountHall() {
     if (_isTraveling) return;
     setState(() => _isTraveling = true);
     _travelTimer?.cancel();
     _travelTimer = Timer(
       const Duration(milliseconds: 2600),
-      _finishAcademyTravel,
+      _finishAccountHallTravel,
     );
   }
 
-  void _finishAcademyTravel() {
+  void _finishAccountHallTravel() {
     _travelTimer?.cancel();
     _travelTimer = null;
     if (!mounted || !_isTraveling) return;
@@ -499,36 +413,27 @@ class _VisualNovelOnboardingScreenState
     });
   }
 
-  void _completeRepairGoal(String id) {
-    if (_completedRepairGoals.contains(id)) return;
+  void _reviewPolicyFile(String id) {
+    if (_reviewedPolicyFiles.contains(id)) return;
     _rememberCurrentLine();
     final message = switch (id) {
-      'power-cord' =>
-        '타는 냄새 맡고 싶으면 국에 코를 박아. 전기는 확인부터. 멀쩡한 선을 다시 골라.',
-      'screwdriver' =>
-        '십자라고 다 같은 건 아니야. 나사에 맞는 걸 대 보고, 손잡이 끝까지 눌러.',
-      'keyboard' =>
-        '부자 될 때까지는 너무 길고. 설거지 두 번. 싫으면 키보드도 안 가.',
-      'modem' =>
-        '전화 끝나기 전엔 꽂지 마. 밤새 연결하면 컴퓨터보다 네가 먼저 밖에 나가.',
-      'parts' =>
-        '탄 냄새 나는 건 내려놔. 먼지만 쌓인 것과 망가진 건 다르니까 다시 봐.',
-      _ => _repairMessage,
+      'industry' => '값싼 노동력과 외산 기계만으로는 몇십 년 뒤의 산업을 지휘할 수 없습니다.',
+      'population' => '아이 수는 줄고 기술은 비싸집니다. 지금 태어난 아이가 미래의 돈을 굴려야 합니다.',
+      'children' => '열아홉 살 퇴소 뒤에도 아이가 자기 삶을 선택할 자산을 남겨야 합니다.',
+      'capital' => '원금 만 원은 국가가 대되, 모든 매수와 매도 이유는 운용자가 장부에 남깁니다.',
+      'law' => '특별법 없이는 불가능합니다. 만들더라도 손실을 아이 개인의 빚으로 남길 수는 없습니다.',
+      _ => _policyMessage,
     };
     _playStoryFeedback();
     setState(() {
-      _activeRepairGoal = id;
-      _completedRepairGoals.add(id);
-      _repairMessage = message;
-      _repairArea = switch (id) {
-        'keyboard' => 'living-room',
-        'modem' => 'kitchen',
-        _ => 'small-room',
-      };
+      _activePolicyFile = id;
+      _reviewedPolicyFiles.add(id);
+      _policyMessage = message;
     });
   }
-  void _powerOnRepairedComputer() {
-    if (_completedRepairGoals.length != _repairGoalLabels.length) return;
+
+  void _finishPolicyBriefing() {
+    if (_reviewedPolicyFiles.length != _policyFileLabels.length) return;
     _rememberCurrentLine();
     _playStoryFeedback(strong: true);
     setState(() => _beat = 6);
@@ -615,7 +520,7 @@ class _VisualNovelOnboardingScreenState
         key: const Key('story-skip-dialog'),
         title: const Text('프롤로그를 건너뛸까요?'),
         content: const Text(
-          '컴퓨터 수리와 가족 이야기를 건너뛰고 이름 설정으로 이동합니다. '
+          '미래양성계획 창설과 제6기 장부 이야기를 건너뛰고 이름 설정으로 이동합니다. '
           '기본 원칙은 숫자 분석·손실 기록으로 저장됩니다.',
         ),
         actions: [
@@ -637,7 +542,7 @@ class _VisualNovelOnboardingScreenState
     _playStoryFeedback(strong: true);
     setState(() {
       _isTraveling = false;
-      _tuitionPaid = true;
+      _stateAccountActivated = true;
       _introChoice ??= 'computer';
       _trait ??= StoryTrait.analysis;
       _familyRule ??= FamilyRule.reportLosses;
@@ -660,12 +565,16 @@ class _VisualNovelOnboardingScreenState
         _introChoice == null ||
         _trait == null ||
         _familyRule == null) {
+      setState(() {
+        _creationError = '이름과 앞에서 선택한 투자 원칙을 모두 확인해 주세요.';
+      });
       return;
     }
     FocusManager.instance.primaryFocus?.unfocus();
     setState(() {
       _isCreating = true;
-      _creationProgress = const WorldLoadProgress(0.02, '투자연구소 정보를 정리하는 중…');
+      _creationError = null;
+      _creationProgress = const WorldLoadProgress(0.02, '제6기 국가계좌 정보를 정리하는 중…');
     });
     await WidgetsBinding.instance.endOfFrame;
     try {
@@ -681,6 +590,13 @@ class _VisualNovelOnboardingScreenState
           if (mounted) setState(() => _creationProgress = progress);
         },
       );
+    } catch (error, stackTrace) {
+      debugPrint('Failed to finish new-game onboarding: $error\n$stackTrace');
+      if (mounted) {
+        setState(() {
+          _creationError = '저장이나 주문 연습 화면 준비에 실패했습니다. 잠시 후 다시 눌러 주세요.';
+        });
+      }
     } finally {
       if (mounted) setState(() => _isCreating = false);
     }
@@ -702,7 +618,7 @@ class _VisualNovelOnboardingScreenState
           final sceneCharacterAsset = _isAcademyTeacherBeat
               ? _teacherPoseAsset
               : _isAcademyReceptionistBeat
-              ? 'assets/images/character_academy_receptionist_v1.png'
+              ? 'assets/images/historical_prologue/character_state_account_officer_cha_eunjoo_v1.png'
               : _character;
           return Stack(
             key: const Key('onboarding-stage'),
@@ -808,6 +724,16 @@ class _VisualNovelOnboardingScreenState
                       constraints: const BoxConstraints(maxWidth: 560),
                       child: AnimatedSwitcher(
                         duration: const Duration(milliseconds: 260),
+                        layoutBuilder: (currentChild, previousChildren) {
+                          return Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              for (final child in previousChildren)
+                                IgnorePointer(child: child),
+                              ?currentChild,
+                            ],
+                          );
+                        },
                         child: _buildDialogue(context),
                       ),
                     ),
@@ -822,7 +748,9 @@ class _VisualNovelOnboardingScreenState
                 ),
               if (_isTraveling)
                 Positioned.fill(
-                  child: _AcademyTravelOverlay(onSkip: _finishAcademyTravel),
+                  child: _AcademyTravelOverlay(
+                    onSkip: _finishAccountHallTravel,
+                  ),
                 ),
             ],
           );
@@ -832,14 +760,16 @@ class _VisualNovelOnboardingScreenState
   }
 
   Widget _buildDialogue(BuildContext context) {
-    if (_beat == _computerRepairBeat) return _computerRepair();
+    if (_beat == _policyBriefingBeat) return _policyBriefing();
     if (_beat == _introChoiceBeat) return _introChoices();
-    if (_beat == _academyRegistrationBeat) return _academyRegistration();
+    if (_beat == _stateAccountActivationBeat) {
+      return _stateAccountActivation();
+    }
     if (_beat == 43) return _academyTutorial();
     if (_beat == _playerNameBeat) return _nameEntry();
     if (_beat == _traitChoiceBeat) return _traitChoices();
-    if (_beat == _familyChoiceBeat) return _familyChoices();
-    if (_beat == _companyNameBeat) return _researchDeskName();
+    if (_beat == _principleChoiceBeat) return _principleChoices();
+    if (_beat >= _companyNameBeat) return _researchDeskName();
 
     return _NovelDialogue(
       key: ValueKey(_beat),
@@ -851,9 +781,9 @@ class _VisualNovelOnboardingScreenState
     );
   }
 
-  Widget _computerRepair() => _NovelDialogue(
+  Widget _policyBriefing() => _NovelDialogue(
     key: ValueKey(
-      'computer-repair-${_completedRepairGoals.length}-$_repairMessage',
+      'policy-briefing-${_reviewedPolicyFiles.length}-$_policyMessage',
     ),
     speaker: _speaker,
     line: _line,
@@ -866,15 +796,15 @@ class _VisualNovelOnboardingScreenState
             return Wrap(
               spacing: 7,
               runSpacing: 7,
-              children: _repairGoalLabels.entries
+              children: _policyFileLabels.entries
                   .map(
                     (entry) => SizedBox(
                       width: width,
                       child: _RepairGoalButton(
-                        key: ValueKey('repair-goal-${entry.key}'),
+                        key: ValueKey('policy-file-${entry.key}'),
                         label: entry.value,
-                        completed: _completedRepairGoals.contains(entry.key),
-                        onTap: () => _completeRepairGoal(entry.key),
+                        completed: _reviewedPolicyFiles.contains(entry.key),
+                        onTap: () => _reviewPolicyFile(entry.key),
                       ),
                     ),
                   )
@@ -884,8 +814,8 @@ class _VisualNovelOnboardingScreenState
         ),
         const SizedBox(height: 10),
         LinearProgressIndicator(
-          key: const Key('repair-progress'),
-          value: _completedRepairGoals.length / _repairGoalLabels.length,
+          key: const Key('policy-briefing-progress'),
+          value: _reviewedPolicyFiles.length / _policyFileLabels.length,
           minHeight: 7,
           borderRadius: BorderRadius.circular(99),
           color: const Color(0xFF54A86B),
@@ -893,12 +823,12 @@ class _VisualNovelOnboardingScreenState
         ),
         const SizedBox(height: 10),
         _NovelNextButton(
-          key: const Key('repair-power-on'),
-          label: _completedRepairGoals.length == _repairGoalLabels.length
-              ? '전원 버튼 누르기'
-              : '${_completedRepairGoals.length}/5 · 부품을 더 찾기',
-          enabled: _completedRepairGoals.length == _repairGoalLabels.length,
-          onTap: _powerOnRepairedComputer,
+          key: const Key('policy-briefing-finish'),
+          label: _reviewedPolicyFiles.length == _policyFileLabels.length
+              ? '다섯 보고서로 결재안 완성'
+              : '${_reviewedPolicyFiles.length}/5 · 보고서를 더 확인',
+          enabled: _reviewedPolicyFiles.length == _policyFileLabels.length,
+          onTap: _finishPolicyBriefing,
         ),
       ],
     ),
@@ -912,17 +842,17 @@ class _VisualNovelOnboardingScreenState
     choices: [
       _NovelChoice(
         key: const Key('story-intro-computer'),
-        label: '누나와 컴퓨터 시간을 나누고 조사한 걸 적을게요',
+        label: '국가 이름으로 시작해도 내 이름으로 끝낸다',
         onTap: () => _chooseIntroChoice('computer'),
       ),
       _NovelChoice(
         key: const Key('story-intro-y2k'),
-        label: '아빠 옆에서 부품을 나누고 확인표를 쓸게요',
+        label: '검게 지워진 5기 선배들의 장부를 찾는다',
         onTap: () => _chooseIntroChoice('y2k'),
       ),
       _NovelChoice(
         key: const Key('story-intro-stocks'),
-        label: '축제 상금과 조사 시간을 장부에 따로 쓸게요',
+        label: '돈으로 내 선택권을 직접 산다',
         onTap: () => _chooseIntroChoice('stocks'),
       ),
     ],
@@ -947,24 +877,24 @@ class _VisualNovelOnboardingScreenState
         const _AcademyLessonRow(
           number: '1',
           title: '지정가',
-          body: '원하는 가격에 주문을 놓고 기다린다',
+          body: '원하는 가격에 줄을 서고 오지 않으면 사지 않는다',
         ),
         const SizedBox(height: 6),
         const _AcademyLessonRow(
           number: '2',
           title: '시장가',
-          body: '지금 나온 가격부터 바로 체결한다',
+          body: '지금 나온 호가부터 체결되어 가격이 달라질 수 있다',
         ),
         const SizedBox(height: 6),
         const _AcademyLessonRow(
           number: '3',
-          title: '주문 전 확인',
-          body: '가격 · 수량 · 수수료는 화면에서 직접 확인한다',
+          title: '확정수익',
+          body: '거래비용을 뺀 이익의 20%는 국가 환수로 기록한다',
         ),
         const SizedBox(height: 10),
         _NovelNextButton(
           key: const Key('academy-tutorial-continue'),
-          label: '두 주문 비교했어요',
+          label: '주문과 국가 환수 규칙 확인',
           enabled: true,
           onTap: _next,
         ),
@@ -972,16 +902,16 @@ class _VisualNovelOnboardingScreenState
     ),
   );
 
-  Widget _academyRegistration() => _NovelDialogue(
-    key: const ValueKey('academy-registration'),
+  Widget _stateAccountActivation() => _NovelDialogue(
+    key: const ValueKey('state-account-activation'),
     speaker: _speaker,
     line: _line,
     stageDirection: _stageDirection,
     child: _AcademyTuitionPaymentPanel(
-      paid: _tuitionPaid,
+      paid: _stateAccountActivated,
       onPay: () {
         _playStoryFeedback(strong: true);
-        setState(() => _tuitionPaid = true);
+        setState(() => _stateAccountActivated = true);
       },
       onContinue: _next,
     ),
@@ -1000,7 +930,7 @@ class _VisualNovelOnboardingScreenState
           maxLength: 12,
           autofocus: false,
           textInputAction: TextInputAction.done,
-          onChanged: (_) => setState(() {}),
+          onChanged: (_) => setState(() => _creationError = null),
           onSubmitted: (_) {
             if (_playerController.text.trim().isNotEmpty) _next();
           },
@@ -1026,22 +956,22 @@ class _VisualNovelOnboardingScreenState
     choices: [
       _NovelChoice(
         key: const Key('story-trait-stability'),
-        label: '엄마 돈부터 안 잃는 법',
+        label: '불량이 줄지 않으면 사지 않는다',
         onTap: () => _chooseTrait(StoryTrait.stability),
       ),
       _NovelChoice(
         key: const Key('story-trait-innovation'),
-        label: '사람들이 줄 서서 사는 물건',
+        label: '신형 통신칩이 문제를 바꾸는지 본다',
         onTap: () => _chooseTrait(StoryTrait.innovation),
       ),
       _NovelChoice(
         key: const Key('story-trait-analysis'),
-        label: '같은 회사 값이 매일 바뀌는 이유',
+        label: '불량률·납품 속도·가격을 같이 본다',
         onTap: () => _chooseTrait(StoryTrait.analysis),
       ),
       _NovelChoice(
         key: const Key('story-trait-control'),
-        label: '한 주만 사도 회사에 말할 수 있는지',
+        label: '회사가 약속을 지키는지 끝까지 묻는다',
         onTap: () => _chooseTrait(StoryTrait.control),
       ),
     ],
@@ -1056,8 +986,8 @@ class _VisualNovelOnboardingScreenState
     });
   }
 
-  Widget _familyChoices() => _NovelDialogue(
-    key: const ValueKey('family-choice'),
+  Widget _principleChoices() => _NovelDialogue(
+    key: const ValueKey('investment-principle-choice'),
     speaker: _speaker,
     line: _line,
     stageDirection: _stageDirection,
@@ -1069,7 +999,7 @@ class _VisualNovelOnboardingScreenState
       ),
       _NovelChoice(
         key: const Key('family-rule-no-hot-tips'),
-        label: '남이 좋다고 해도 바로 사지 않기',
+        label: '추천보다 내 이유를 먼저 쓰기',
         onTap: () => _chooseFamilyRule(FamilyRule.noHotTips),
       ),
       _NovelChoice(
@@ -1102,7 +1032,7 @@ class _VisualNovelOnboardingScreenState
           controller: _companyController,
           maxLength: 24,
           textInputAction: TextInputAction.done,
-          onChanged: (_) => setState(() {}),
+          onChanged: (_) => setState(() => _creationError = null),
           onSubmitted: (_) => _finish(),
           onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
           decoration: _fieldDecoration('예: 별빛 투자'),
@@ -1110,10 +1040,24 @@ class _VisualNovelOnboardingScreenState
         const SizedBox(height: 16),
         _NovelNextButton(
           key: const Key('create-company-button'),
-          label: '투자회사 이름을 정하고 주문 연습 시작',
+          label: '투자회사 이름을 정하고 국가계좌 주문 시작',
           enabled: _companyController.text.trim().isNotEmpty,
           onTap: _finish,
         ),
+        if (_creationError != null) ...[
+          const SizedBox(height: 10),
+          Text(
+            _creationError!,
+            key: const Key('new-game-creation-error'),
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Color(0xFFFFD1C7),
+              fontSize: 11,
+              height: 1.4,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
       ],
     ),
   );
@@ -1161,7 +1105,7 @@ class _AcademyTravelOverlay extends StatelessWidget {
               ),
               const SizedBox(height: 24),
               const Text(
-                '학원으로 이동 중…',
+                '국가계좌 개통실로 이동 중…',
                 key: Key('academy-travel-title'),
                 style: TextStyle(
                   color: Colors.white,
@@ -1172,7 +1116,7 @@ class _AcademyTravelOverlay extends StatelessWidget {
               ),
               const SizedBox(height: 11),
               const Text(
-                '우리 집  ·  버스 정류장  ·  투자학교',
+                '6기 기숙사  ·  중앙 복도  ·  계좌개통실',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Color(0xFFCCD4E6),
@@ -1201,7 +1145,7 @@ class _AcademyTravelOverlay extends StatelessWidget {
                 style: TextButton.styleFrom(foregroundColor: _yellow),
                 icon: const Icon(Icons.fast_forward_rounded, size: 18),
                 label: const Text(
-                  '이동 장면 건너뛰기',
+                  '복도 이동 건너뛰기',
                   style: TextStyle(fontWeight: FontWeight.w900),
                 ),
               ),
@@ -1228,7 +1172,7 @@ class _AcademyTuitionPaymentPanel extends StatelessWidget {
   Widget build(BuildContext context) => Column(
     children: [
       AnimatedContainer(
-        key: const Key('academy-tuition-payment-card'),
+        key: const Key('state-account-activation-card'),
         duration: const Duration(milliseconds: 320),
         width: double.infinity,
         padding: const EdgeInsets.all(12),
@@ -1244,7 +1188,7 @@ class _AcademyTuitionPaymentPanel extends StatelessWidget {
             Row(
               children: [
                 Icon(
-                  paid ? Icons.receipt_long_rounded : Icons.account_balance,
+                  paid ? Icons.verified_rounded : Icons.account_balance,
                   color: paid
                       ? const Color(0xFF258257)
                       : const Color(0xFF536A96),
@@ -1252,7 +1196,7 @@ class _AcademyTuitionPaymentPanel extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    paid ? '등록비 결제 완료' : '아빠 통장 · 등록비 결제',
+                    paid ? '제6기 국가계좌 개통 완료' : '제6기 국가계좌 개통',
                     style: const TextStyle(
                       color: _ink,
                       fontSize: 12,
@@ -1260,64 +1204,23 @@ class _AcademyTuitionPaymentPanel extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (paid)
-                  const Text(
-                    '-1,000,000원',
-                    key: Key('academy-tuition-debit'),
-                    style: TextStyle(
-                      color: Color(0xFFC53F4B),
-                      fontSize: 13,
-                      fontWeight: FontWeight.w900,
-                      fontFeatures: _marketNumberFeatures,
-                    ),
+                const Text(
+                  '10,000원',
+                  key: Key('state-account-principal'),
+                  style: TextStyle(
+                    color: Color(0xFF258257),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                    fontFeatures: _marketNumberFeatures,
                   ),
+                ),
               ],
             ),
             const SizedBox(height: 9),
-            Row(
-              children: [
-                const Text(
-                  '아빠 통장',
-                  style: TextStyle(
-                    color: Color(0xFF697386),
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const Spacer(),
-                if (paid)
-                  TweenAnimationBuilder<double>(
-                    key: const Key('academy-father-balance-animation'),
-                    tween: Tween(begin: 1000000, end: 0),
-                    duration: const Duration(milliseconds: 850),
-                    curve: Curves.easeOutCubic,
-                    builder: (context, value, _) => Text(
-                      '${_money(value.round())}원',
-                      style: const TextStyle(
-                        color: Color(0xFFC53F4B),
-                        fontSize: 17,
-                        fontWeight: FontWeight.w900,
-                        fontFeatures: _marketNumberFeatures,
-                      ),
-                    ),
-                  )
-                else
-                  const Text(
-                    '1,000,000원',
-                    style: TextStyle(
-                      color: _ink,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w900,
-                      fontFeatures: _marketNumberFeatures,
-                    ),
-                  ),
-              ],
-            ),
-            const Divider(height: 17),
             const Row(
               children: [
                 Text(
-                  '내 교육용 투자금',
+                  '계좌 명의',
                   style: TextStyle(
                     color: Color(0xFF697386),
                     fontSize: 10,
@@ -1326,35 +1229,97 @@ class _AcademyTuitionPaymentPanel extends StatelessWidget {
                 ),
                 Spacer(),
                 Text(
-                  '10,000원 그대로',
-                  key: Key('academy-investment-cash-preserved'),
+                  '대한민국 미래양성기금',
                   style: TextStyle(
-                    color: Color(0xFF258257),
+                    color: _ink,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+            const Divider(height: 17),
+            const Row(
+              children: [
+                Text(
+                  '확정수익 국가 환수',
+                  style: TextStyle(
+                    color: Color(0xFF697386),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Spacer(),
+                Text(
+                  '20%',
+                  key: Key('state-recovery-rate'),
+                  style: TextStyle(
+                    color: Color(0xFFC53F4B),
                     fontSize: 12,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
               ],
             ),
-            if (paid) ...[
-              const SizedBox(height: 8),
-              const Row(
-                children: [
-                  Text(
-                    '나중에 갚을 학원비',
-                    style: TextStyle(
-                      color: Color(0xFF697386),
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                    ),
+            const SizedBox(height: 8),
+            const Row(
+              children: [
+                Text(
+                  '자립적립금',
+                  style: TextStyle(
+                    color: Color(0xFF697386),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
                   ),
-                  Spacer(),
+                ),
+                Spacer(),
+                Text(
+                  '80% · 만 19세까지 잠금',
+                  key: Key('self-reliance-rate'),
+                  style: TextStyle(
+                    color: Color(0xFF536A96),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            const Row(
+              children: [
+                Text(
+                  '손실의 개인 채무',
+                  style: TextStyle(
+                    color: Color(0xFF697386),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Spacer(),
+                Text(
+                  '0원',
+                  key: Key('personal-debt-zero'),
+                  style: TextStyle(
+                    color: Color(0xFF258257),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+            if (paid) ...[
+              const SizedBox(height: 10),
+              const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.gavel_rounded, size: 15, color: Color(0xFF258257)),
+                  SizedBox(width: 6),
                   Text(
-                    '+1,000,000원 채무',
-                    key: Key('academy-tuition-debt-created'),
+                    '국가계좌 약관과 위험평가표 연결 완료',
+                    key: Key('state-account-activated'),
                     style: TextStyle(
-                      color: Color(0xFF8F5B25),
-                      fontSize: 11,
+                      color: Color(0xFF258257),
+                      fontSize: 10,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
@@ -1367,9 +1332,11 @@ class _AcademyTuitionPaymentPanel extends StatelessWidget {
       const SizedBox(height: 10),
       _NovelNextButton(
         key: Key(
-          paid ? 'academy-registration-continue' : 'academy-tuition-pay-button',
+          paid
+              ? 'state-account-activation-continue'
+              : 'state-account-activation-button',
         ),
-        label: paid ? '영수증 받고 접수 마치기' : '등록비 1,000,000원 결제',
+        label: paid ? '개통 통장 받고 투자실로 이동' : '국가계좌 약관 확인하고 개통',
         enabled: true,
         onTap: paid ? onContinue : onPay,
       ),
@@ -1416,7 +1383,7 @@ class _NewGamePreparationOverlay extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 const Text(
-                  '첫 투자 수업을 준비하고 있어요',
+                  '국가계좌를 개통하고 있어요',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: Color(0xFF33405F),
@@ -1461,8 +1428,8 @@ class _NewGamePreparationOverlay extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 const Text(
-                  '2000~2026 전체 세계를 만들며 기기에 따라 약 1분 걸릴 수 있어요.\n'
-                  '준비가 끝나면 자동으로 주식 화면으로 넘어갑니다.',
+                  '주식·부동산 세계 계산은 처음하기에서 이미 끝냈어요.\n'
+                  '지금은 운용자·투자회사 이름과 국가 환수 장부를 저장하는 중입니다.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: Color(0xFF8B877F),
@@ -1841,8 +1808,8 @@ class _NovelDialogueState extends State<_NovelDialogue>
                 ),
               ),
               const SizedBox(height: 7),
-            ],            Semantics(
-
+            ],
+            Semantics(
               liveRegion: true,
               label: widget.line,
               child: Text(

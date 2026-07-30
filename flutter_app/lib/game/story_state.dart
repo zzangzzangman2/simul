@@ -60,6 +60,10 @@ class StoryState {
   int get academyTuitionOriginal => flagInt('academyTuitionOriginal');
   bool get academyTuitionRepaid =>
       academyTuitionOriginal > 0 && academyTuitionDebt <= 0;
+  bool get orphanageReboot => flagBool('orphanageReboot');
+  int get stateRecoveryRateBps => flagInt('stateRecoveryRateBps', 2000);
+  int get stateRecoveryTotal => flagInt('stateRecoveryTotal');
+  int get selfRelianceReserve => flagInt('selfRelianceReserve');
   int get reputation => flagInt('reputation');
   int get externalAum => flagInt('externalAum');
   int get officeTier => flagInt('officeTier');
@@ -148,6 +152,86 @@ class StoryState {
       },
       seenStoryEventIds: const ['PROLOGUE_MILLENNIUM'],
       companyCultureTags: [familyRule.name, startingTrait.name, introChoice],
+    );
+  }
+
+  factory StoryState.newOrphanagePlayer({
+    required String playerName,
+    required String introChoice,
+    required StoryTrait startingTrait,
+    required FamilyRule operatingPrinciple,
+  }) {
+    final traitTrust = switch (startingTrait) {
+      StoryTrait.stability => 2,
+      StoryTrait.analysis => 1,
+      StoryTrait.innovation => 0,
+      StoryTrait.control => -1,
+    };
+    final traitSchool = switch (startingTrait) {
+      StoryTrait.analysis => 4,
+      StoryTrait.stability => 2,
+      StoryTrait.innovation => 1,
+      StoryTrait.control => 0,
+    };
+    return StoryState(
+      playerName: playerName.trim(),
+      playerBirthYear: 1985,
+      introChoice: introChoice,
+      startingTrait: startingTrait,
+      familyRule: operatingPrinciple,
+      familyTrust: 30 + traitTrust,
+      motherAffinity: 30,
+      fatherAffinity: 30,
+      siblingAffinity: 30,
+      grandfatherAffinity: 30,
+      householdStability: 55,
+      schoolBalance: 60 + traitSchool,
+      roomLevel: 0,
+      accountAuthorityLevel: 1,
+      guardianAccountHolder: 'future_development_fund',
+      storyFlags: const {
+        'prologueComplete': true,
+        'orphanageReboot': true,
+        'futureDevelopmentCohort': 6,
+        'campaignStartDate': '2000-01-02',
+        'guardianConsent': true,
+        'stateAccountActive': true,
+        'stateAccountOwner': '대한민국 미래양성기금',
+        'stateRecoveryRateBps': 2000,
+        'stateRecoveryTotal': 0,
+        'selfRelianceReserve': 0,
+        'selfRelianceUnlockAge': 19,
+        'isLegalCompany': false,
+        'startingSeedMoney': 0,
+        'seedMoneySource': '',
+        'earnedSeedMoney': 0,
+        'academyTuitionDebt': 0,
+        'academyTuitionOriginal': 0,
+        'academyTuitionPaidByFather': false,
+        'workSessions': 0,
+        'workSessionsToday': 0,
+        'firstSeedGoalReached': true,
+        'firstOrderExecuted': false,
+        'reputation': 0,
+        'officeTier': 0,
+        'fundLaunched': false,
+        'externalAum': 0,
+        'hubTutorialSeen': false,
+        'marketTutorialEligible': true,
+        'marketTutorialSeen': false,
+        'performanceHistory': <Map<String, dynamic>>[],
+        'newsArchive': <Map<String, dynamic>>[],
+      },
+      seenStoryEventIds: const [
+        'PROLOGUE_FUTURE_DEVELOPMENT_PLAN',
+        'COHORT_6_STATE_ACCOUNT_ACTIVATED',
+      ],
+      companyCultureTags: [
+        'futureDevelopmentCohort6',
+        operatingPrinciple.name,
+        startingTrait.name,
+        introChoice,
+      ],
     );
   }
 

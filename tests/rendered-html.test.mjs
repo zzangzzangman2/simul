@@ -15,7 +15,7 @@ async function render() {
   );
 }
 
-test("opens the Flutter family-story prologue from the default route", async () => {
+test("opens the Flutter future-development orphanage prologue from the default route", async () => {
   const response = await render();
   assert.ok([307, 308].includes(response.status));
   assert.equal(new URL(response.headers.get("location"), "http://localhost").pathname, "/play/index.html");
@@ -39,23 +39,24 @@ test("opens the Flutter family-story prologue from the default route", async () 
   assert.match(flutterIndex, /property="og:image" content="\/og\.png"/);
   assert.match(flutterIndex, /name="twitter:card" content="summary_large_image"/);
   assert.doesNotMatch(flutterIndex, /초기자본 100만원/);
-  assert.match(onboarding, /1999\.12\.31\s+·\s+20:50/);
-  assert.match(onboarding, /아무도 거들떠보지 않던 작은 회사를 먼저 알아본 투자자/);
-  assert.match(onboarding, /등록비 1,000,000원 결제/);
-  assert.match(onboarding, /bg_prologue_small_room_arrival_1999_portrait_cartoon_v6\.png/);
-  assert.match(onboarding, /bg_prologue_public_class_2000_portrait_cartoon_v6\.png/);
-  assert.match(onboarding, /bg_prologue_academy_classroom_order_practice_2000_portrait_cartoon_v6\.png/);
-  assert.match(onboarding, /repair-goal-\$\{entry\.key\}/);
-  assert.match(onboarding, /repair-power-on/);
+  assert.match(onboarding, /1981\.01\.12\s+·\s+23:40/);
+  assert.match(onboarding, /우리나라의 미래가 어둡습니다/);
+  assert.match(onboarding, /제6기 국가계좌를 개통합니다/);
+  assert.match(onboarding, /bg_blue_house_policy_room_1981_portrait_cartoon_v1\.png/);
+  assert.match(onboarding, /bg_orphanage_records_room_1999_portrait_cartoon_v1\.png/);
+  assert.match(onboarding, /bg_orphanage_investment_room_2000_portrait_cartoon_v1\.png/);
+  assert.match(onboarding, /policy-file-\$\{entry\.key\}/);
+  assert.match(onboarding, /state-account-activation-button/);
   assert.match(onboarding, /academy-travel-loading/);
   assert.match(onboarding, /academy-tutorial-continue/);
   assert.match(onboarding, /주식선생님\/22_포즈1_주인공그림체_공통슬롯_투명\.png/);
   assert.match(onboarding, /주식선생님\/25_포즈4_주인공그림체_공통슬롯_투명\.png/);
-  assert.match(onboarding, /좋은 회사 찾으면 무조건 벌어요/);
   assert.match(onboarding, /원하는 가격에 줄을 서는 지정가/);
-  assert.match(onboarding, /한 달 동안 회사 하나를 볼 관찰팀을 만들어요/);
-  assert.match(onboarding, /투자회사 이름을 정하고 주문 연습 시작/);
+  assert.match(onboarding, /확정수익 20퍼센트는 국가 환수/);
+  assert.match(onboarding, /투자회사 이름을 정하고 국가계좌 주문 시작/);
+  assert.match(main, /StoryState\.newOrphanagePlayer/);
   assert.match(main, /academy-market-tutorial-screen/);
+  assert.match(stockMarket, /selfRelianceReserve/);
   assert.match(stockMarket, /market-tutorial-teacher-upper-body/);
   assert.match(stockMarket, /stock-order-book/);
   assert.match(stockMarket, /order-book-active-trade/);

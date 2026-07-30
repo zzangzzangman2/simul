@@ -76,7 +76,11 @@ class _ApartmentHubScreenState extends State<ApartmentHubScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final details = _ApartmentPlaceDetails.forPlace(_place);
+    final orphanage = widget.state.story.orphanageReboot;
+    final details = _ApartmentPlaceDetails.forPlace(
+      _place,
+      orphanage: orphanage,
+    );
     final missionProgress = const GameEngine().missionProgress(widget.state);
     final placeIndex = _ApartmentPlace.values.indexOf(_place);
     final previousPlace = placeIndex > 0
@@ -145,6 +149,7 @@ class _ApartmentHubScreenState extends State<ApartmentHubScreen> {
             bottom: 24,
             child: _ApartmentRoomArrow(
               destination: previousPlace,
+              orphanage: orphanage,
               flipHorizontally: true,
               onMove: _moveTo,
             ),
@@ -154,6 +159,7 @@ class _ApartmentHubScreenState extends State<ApartmentHubScreen> {
             bottom: 24,
             child: _ApartmentRoomArrow(
               destination: nextPlace,
+              orphanage: orphanage,
               flipHorizontally: false,
               onMove: _moveTo,
             ),
@@ -174,7 +180,10 @@ class _ApartmentHubScreenState extends State<ApartmentHubScreen> {
           ),
           if (_tutorialVisible)
             Positioned.fill(
-              child: _HubTutorialOverlay(onDone: _dismissTutorial),
+              child: _HubTutorialOverlay(
+                orphanage: orphanage,
+                onDone: _dismissTutorial,
+              ),
             ),
         ],
       ),
@@ -753,8 +762,9 @@ class _ComputerWindowDot extends StatelessWidget {
 }
 
 class _HubTutorialOverlay extends StatelessWidget {
-  const _HubTutorialOverlay({required this.onDone});
+  const _HubTutorialOverlay({required this.orphanage, required this.onDone});
 
+  final bool orphanage;
   final Future<void> Function() onDone;
 
   @override
@@ -776,14 +786,24 @@ class _HubTutorialOverlay extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                '우리 집 투자연구소 사용법',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+              Text(
+                orphanage ? '미래양성원 6기 생활 안내' : '우리 집 투자연구소 사용법',
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
               const SizedBox(height: 12),
-              const Text(
-                '• 작은방 CRT: 홈 PC와 시장 앱\n• 작은방 서류함: 장부·성과\n• 거실 소파: 가족·채용·펀드\n• 거실 밥상 장부: 살림 꾸미기\n• 집 앞 복도 우편함: 새 안건 편지\n• 동네 게시판: 일거리·미니게임\n• 동네 은행 출입구: 예금·대출',
-                style: TextStyle(
+              Text(
+                orphanage
+                    ? '• 6기 기숙사 단말기: 시장·부동산·상권 앱\n'
+                          '• 개인 장부함: 거래 근거·성과\n'
+                          '• 투자실: 6기 동기·지도관·운용 조직\n'
+                          '• 전자창고: 조사 자료와 생활환경\n'
+                          '• 제3기록실: 새 안건과 사라진 5기 기록\n'
+                          '• 본관 앞: 국가계좌 창구·원내 일거리'
+                    : '• 작은방 CRT: 홈 PC와 시장 앱\n• 작은방 서류함: 장부·성과\n• 거실 소파: 가족·채용·펀드\n• 거실 밥상 장부: 살림 꾸미기\n• 집 앞 복도 우편함: 새 안건 편지\n• 동네 게시판: 일거리·미니게임\n• 동네 은행 출입구: 예금·대출',
+                style: const TextStyle(
                   fontSize: 13,
                   height: 1.65,
                   fontWeight: FontWeight.w700,
@@ -838,27 +858,32 @@ class _ApartmentPlaceScene extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final details = _ApartmentPlaceDetails.forPlace(place);
-    final backgroundAsset = switch (place) {
-      _ApartmentPlace.bedroom => _homeImprovementBackgroundAsset(
-        HomeImprovementRoom.bedroom,
-        state.homeImprovements.roomTier(HomeImprovementRoom.bedroom),
-      ),
-      _ApartmentPlace.livingRoom => _homeImprovementBackgroundAsset(
-        HomeImprovementRoom.livingRoom,
-        state.homeImprovements.roomTier(HomeImprovementRoom.livingRoom),
-      ),
-      _ApartmentPlace.kitchen => _homeImprovementBackgroundAsset(
-        HomeImprovementRoom.kitchen,
-        state.homeImprovements.roomTier(HomeImprovementRoom.kitchen),
-      ),
-      _ApartmentPlace.corridor => _gameplayCorridorBackgroundAsset(
-        state.homeImprovements,
-      ),
-      _ApartmentPlace.neighborhood => _gameplayNeighborhoodBackgroundAsset(
-        state,
-      ),
-    };
+    final orphanage = state.story.orphanageReboot;
+    final details = _ApartmentPlaceDetails.forPlace(
+      place,
+      orphanage: orphanage,
+    );
+    final backgroundAsset = orphanage
+        ? details.assetPath
+        : switch (place) {
+            _ApartmentPlace.bedroom => _homeImprovementBackgroundAsset(
+              HomeImprovementRoom.bedroom,
+              state.homeImprovements.roomTier(HomeImprovementRoom.bedroom),
+            ),
+            _ApartmentPlace.livingRoom => _homeImprovementBackgroundAsset(
+              HomeImprovementRoom.livingRoom,
+              state.homeImprovements.roomTier(HomeImprovementRoom.livingRoom),
+            ),
+            _ApartmentPlace.kitchen => _homeImprovementBackgroundAsset(
+              HomeImprovementRoom.kitchen,
+              state.homeImprovements.roomTier(HomeImprovementRoom.kitchen),
+            ),
+            _ApartmentPlace.corridor => _gameplayCorridorBackgroundAsset(
+              state.homeImprovements,
+            ),
+            _ApartmentPlace.neighborhood =>
+              _gameplayNeighborhoodBackgroundAsset(state),
+          };
     return Stack(
       key: Key('apartment-place-${details.id}'),
       fit: StackFit.expand,
@@ -872,19 +897,20 @@ class _ApartmentPlaceScene extends StatelessWidget {
           errorBuilder: (context, error, stackTrace) =>
               _ApartmentFallbackBackground(details: details),
         ),
-        Positioned.fill(
-          child: IgnorePointer(
-            child: _ApartmentAmbientLayer(place: place, state: state),
+        if (!orphanage)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: _ApartmentAmbientLayer(place: place, state: state),
+            ),
           ),
-        ),
         if (place == _ApartmentPlace.bedroom) ...[
           _ApartmentObjectHotspot(
             interactionKey: const Key('open-market-button'),
             alignment: const Alignment(-0.66, -0.20),
             width: 118,
             height: 112,
-            eyebrow: '컴퓨터 켜기',
-            label: '홈 PC',
+            eyebrow: orphanage ? '공용 단말기 켜기' : '컴퓨터 켜기',
+            label: orphanage ? '6기 홈 PC' : '홈 PC',
             icon: Icons.computer_rounded,
             accent: const Color(0xFF80D8FF),
             onTap: onOpenMarket,
@@ -894,8 +920,8 @@ class _ApartmentPlaceScene extends StatelessWidget {
             alignment: const Alignment(0.62, -0.08),
             width: 94,
             height: 126,
-            eyebrow: '서랍 열기',
-            label: '장부 서류함',
+            eyebrow: orphanage ? '개인 장부 꺼내기' : '서랍 열기',
+            label: orphanage ? '국가계좌 장부' : '장부 서류함',
             icon: Icons.inventory_2_rounded,
             accent: const Color(0xFFFFC78E),
             onTap: onOpenLedger,
@@ -907,9 +933,11 @@ class _ApartmentPlaceScene extends StatelessWidget {
             alignment: const Alignment(-0.68, -0.08),
             width: 124,
             height: 148,
-            eyebrow: '소파에서 이야기',
-            label: '가족·조직',
-            icon: Icons.family_restroom_rounded,
+            eyebrow: orphanage ? '동기·지도관과 회의' : '소파에서 이야기',
+            label: orphanage ? '6기·운용조직' : '가족·조직',
+            icon: orphanage
+                ? Icons.groups_2_rounded
+                : Icons.family_restroom_rounded,
             accent: const Color(0xFFFFD27A),
             onTap: onOpenOrganization,
           ),
@@ -918,8 +946,8 @@ class _ApartmentPlaceScene extends StatelessWidget {
             alignment: const Alignment(0.68, 0.04),
             width: 122,
             height: 112,
-            eyebrow: '밥상 위 장부',
-            label: '살림 꾸미기',
+            eyebrow: orphanage ? '공용 시설 정비' : '밥상 위 장부',
+            label: orphanage ? '생활환경 관리' : '살림 꾸미기',
             icon: Icons.home_work_rounded,
             accent: const Color(0xFFFFA97A),
             onTap: onOpenHomeImprovements,
@@ -931,10 +959,12 @@ class _ApartmentPlaceScene extends StatelessWidget {
             alignment: const Alignment(0.08, -0.20),
             width: 106,
             height: 126,
-            eyebrow: '집 앞 우편함 열기',
+            eyebrow: orphanage ? '봉인 기록함 열기' : '집 앞 우편함 열기',
             label: state.pendingDecisions.isEmpty
-                ? '우편함'
-                : '새 편지 ${state.pendingDecisions.length}건',
+                ? (orphanage ? '제3기록실' : '우편함')
+                : (orphanage
+                      ? '새 기록 ${state.pendingDecisions.length}건'
+                      : '새 편지 ${state.pendingDecisions.length}건'),
             icon: Icons.markunread_mailbox_rounded,
             accent: state.pendingDecisions.isEmpty
                 ? const Color(0xFF9ED9EF)
@@ -948,8 +978,8 @@ class _ApartmentPlaceScene extends StatelessWidget {
             alignment: const Alignment(-0.74, -0.34),
             width: 118,
             height: 144,
-            eyebrow: '출입구로 들어가기',
-            label: '새천년은행',
+            eyebrow: orphanage ? '국가계좌 창구 가기' : '출입구로 들어가기',
+            label: orphanage ? '국가계좌 창구' : '새천년은행',
             icon: Icons.account_balance_rounded,
             accent: const Color(0xFF86CBEA),
             onTap: onOpenBank,
@@ -959,8 +989,8 @@ class _ApartmentPlaceScene extends StatelessWidget {
             alignment: const Alignment(0.76, -0.24),
             width: 122,
             height: 148,
-            eyebrow: '동네 일거리 확인',
-            label: '일거리 게시판',
+            eyebrow: orphanage ? '원내 실습 확인' : '동네 일거리 확인',
+            label: orphanage ? '6기 실습 게시판' : '일거리 게시판',
             icon: Icons.sports_esports_rounded,
             accent: const Color(0xFF98E5C1),
             onTap: onOpenWork,
@@ -1820,11 +1850,13 @@ class _ApartmentRailButton extends StatelessWidget {
 class _ApartmentRoomArrow extends StatelessWidget {
   const _ApartmentRoomArrow({
     required this.destination,
+    required this.orphanage,
     required this.flipHorizontally,
     required this.onMove,
   });
 
   final _ApartmentPlace? destination;
+  final bool orphanage;
   final bool flipHorizontally;
   final ValueChanged<_ApartmentPlace> onMove;
 
@@ -1833,7 +1865,7 @@ class _ApartmentRoomArrow extends StatelessWidget {
     final target = destination;
     final details = target == null
         ? null
-        : _ApartmentPlaceDetails.forPlace(target);
+        : _ApartmentPlaceDetails.forPlace(target, orphanage: orphanage);
     final tooltip = details == null ? '더 이동할 방이 없어요' : '${details.title}으로 이동';
     return Tooltip(
       message: tooltip,
@@ -1923,57 +1955,114 @@ class _ApartmentPlaceDetails {
   final Color accent;
 
   static _ApartmentPlaceDetails forPlace(
-    _ApartmentPlace place,
-  ) => switch (place) {
-    _ApartmentPlace.bedroom => const _ApartmentPlaceDetails(
-      id: 'bedroom',
-      title: '가족 아파트 · 작은방',
-      shortTitle: '작은방',
-      hint: '홈 PC · 장부 서류함',
-      assetPath:
-          'assets/images/gameplay_map/bg_gameplay_bedroom_tier0_2000_portrait_cartoon_v1.png',
-      icon: Icons.bedroom_parent_rounded,
-      accent: Color(0xFF82D7FF),
-    ),
-    _ApartmentPlace.livingRoom => const _ApartmentPlaceDetails(
-      id: 'living-room',
-      title: '가족 아파트 · 거실',
-      shortTitle: '거실',
-      hint: '가족 이야기 · 살림 꾸미기',
-      assetPath:
-          'assets/images/gameplay_map/bg_gameplay_living_room_tier0_2000_portrait_cartoon_v1.png',
-      icon: Icons.weekend_rounded,
-      accent: Color(0xFFFFCB78),
-    ),
-    _ApartmentPlace.kitchen => const _ApartmentPlaceDetails(
-      id: 'kitchen',
-      title: '가족 아파트 · 부엌',
-      shortTitle: '부엌',
-      hint: '가족 살림 · 집 안 이동',
-      assetPath:
-          'assets/images/gameplay_map/bg_gameplay_kitchen_tier0_2000_portrait_cartoon_v1.png',
-      icon: Icons.kitchen_rounded,
-      accent: Color(0xFF8CE3BE),
-    ),
-    _ApartmentPlace.corridor => const _ApartmentPlaceDetails(
-      id: 'corridor',
-      title: '가족 아파트 · 우리 집 앞',
-      shortTitle: '집 앞',
-      hint: '우편함 · 새 안건',
-      assetPath:
-          'assets/images/gameplay_map/bg_gameplay_corridor_tier0_2000_portrait_cartoon_v1.png',
-      icon: Icons.meeting_room_rounded,
-      accent: Color(0xFF9ED9EF),
-    ),
-    _ApartmentPlace.neighborhood => const _ApartmentPlaceDetails(
-      id: 'neighborhood',
-      title: '우리 동네 · 골목',
-      shortTitle: '동네',
-      hint: '은행 · 일거리 · 미니게임',
-      assetPath:
-          'assets/images/gameplay_map/bg_gameplay_neighborhood_clear_2000_portrait_cartoon_v1.png',
-      icon: Icons.location_city_rounded,
-      accent: Color(0xFF98E5C1),
-    ),
-  };
+    _ApartmentPlace place, {
+    bool orphanage = false,
+  }) {
+    if (orphanage) {
+      return switch (place) {
+        _ApartmentPlace.bedroom => const _ApartmentPlaceDetails(
+          id: 'bedroom',
+          title: '국립 미래양성원 · 6기 기숙사',
+          shortTitle: '6기 기숙사',
+          hint: '공용 단말기 · 국가계좌 장부',
+          assetPath:
+              'assets/images/historical_prologue/bg_orphanage_dormitory_1999_portrait_cartoon_v1.png',
+          icon: Icons.bed_rounded,
+          accent: Color(0xFF82D7FF),
+        ),
+        _ApartmentPlace.livingRoom => const _ApartmentPlaceDetails(
+          id: 'living-room',
+          title: '국립 미래양성원 · 제6기 투자실',
+          shortTitle: '투자실',
+          hint: '6기 동기 · 지도관 · 운용조직',
+          assetPath:
+              'assets/images/historical_prologue/bg_orphanage_investment_room_2000_portrait_cartoon_v1.png',
+          icon: Icons.monitor_heart_rounded,
+          accent: Color(0xFFFFCB78),
+        ),
+        _ApartmentPlace.kitchen => const _ApartmentPlaceDetails(
+          id: 'kitchen',
+          title: '국립 미래양성원 · 전자창고',
+          shortTitle: '전자창고',
+          hint: '제품 조사 · 공용 시설',
+          assetPath:
+              'assets/images/historical_prologue/bg_orphanage_electronics_storage_2000_portrait_cartoon_v1.png',
+          icon: Icons.inventory_2_rounded,
+          accent: Color(0xFF8CE3BE),
+        ),
+        _ApartmentPlace.corridor => const _ApartmentPlaceDetails(
+          id: 'corridor',
+          title: '국립 미래양성원 · 제3기록실',
+          shortTitle: '제3기록실',
+          hint: '새 안건 · 사라진 5기 장부',
+          assetPath:
+              'assets/images/historical_prologue/bg_orphanage_records_room_1999_portrait_cartoon_v1.png',
+          icon: Icons.folder_copy_rounded,
+          accent: Color(0xFF9ED9EF),
+        ),
+        _ApartmentPlace.neighborhood => const _ApartmentPlaceDetails(
+          id: 'neighborhood',
+          title: '국립 미래양성원 · 본관 앞',
+          shortTitle: '본관 앞',
+          hint: '국가계좌 창구 · 원내 실습',
+          assetPath:
+              'assets/images/historical_prologue/bg_future_development_orphanage_1982_portrait_cartoon_v1.png',
+          icon: Icons.account_balance_rounded,
+          accent: Color(0xFF98E5C1),
+        ),
+      };
+    }
+    return switch (place) {
+      _ApartmentPlace.bedroom => const _ApartmentPlaceDetails(
+        id: 'bedroom',
+        title: '가족 아파트 · 작은방',
+        shortTitle: '작은방',
+        hint: '홈 PC · 장부 서류함',
+        assetPath:
+            'assets/images/gameplay_map/bg_gameplay_bedroom_tier0_2000_portrait_cartoon_v1.png',
+        icon: Icons.bedroom_parent_rounded,
+        accent: Color(0xFF82D7FF),
+      ),
+      _ApartmentPlace.livingRoom => const _ApartmentPlaceDetails(
+        id: 'living-room',
+        title: '가족 아파트 · 거실',
+        shortTitle: '거실',
+        hint: '가족 이야기 · 살림 꾸미기',
+        assetPath:
+            'assets/images/gameplay_map/bg_gameplay_living_room_tier0_2000_portrait_cartoon_v1.png',
+        icon: Icons.weekend_rounded,
+        accent: Color(0xFFFFCB78),
+      ),
+      _ApartmentPlace.kitchen => const _ApartmentPlaceDetails(
+        id: 'kitchen',
+        title: '가족 아파트 · 부엌',
+        shortTitle: '부엌',
+        hint: '가족 살림 · 집 안 이동',
+        assetPath:
+            'assets/images/gameplay_map/bg_gameplay_kitchen_tier0_2000_portrait_cartoon_v1.png',
+        icon: Icons.kitchen_rounded,
+        accent: Color(0xFF8CE3BE),
+      ),
+      _ApartmentPlace.corridor => const _ApartmentPlaceDetails(
+        id: 'corridor',
+        title: '가족 아파트 · 우리 집 앞',
+        shortTitle: '집 앞',
+        hint: '우편함 · 새 안건',
+        assetPath:
+            'assets/images/gameplay_map/bg_gameplay_corridor_tier0_2000_portrait_cartoon_v1.png',
+        icon: Icons.meeting_room_rounded,
+        accent: Color(0xFF9ED9EF),
+      ),
+      _ApartmentPlace.neighborhood => const _ApartmentPlaceDetails(
+        id: 'neighborhood',
+        title: '우리 동네 · 골목',
+        shortTitle: '동네',
+        hint: '은행 · 일거리 · 미니게임',
+        assetPath:
+            'assets/images/gameplay_map/bg_gameplay_neighborhood_clear_2000_portrait_cartoon_v1.png',
+        icon: Icons.location_city_rounded,
+        accent: Color(0xFF98E5C1),
+      ),
+    };
+  }
 }

@@ -24,6 +24,7 @@ import 'story_state.dart';
 
 const initialCompanyCash = 10000;
 const grandfatherNewYearGiftSourceId = 'grandfather-new-year-gift';
+const stateAccountSeedCapitalSourceId = 'state-account-seed-capital';
 const academyTuitionDebtAmount = 1000000;
 const academyTuitionRepaymentSourceId = 'academy-tuition-repayment';
 const gameDividendWithholdingTaxRate = 0.154;
@@ -602,15 +603,23 @@ class GameEngine {
         worldSeed ??
         'world-${DateTime.now().microsecondsSinceEpoch}-${_newGameSerial++}-${_worldSeedRandom.nextInt(0x7fffffff)}-${_stableHash(companyName.trim())}';
     final baseStory = story ?? StoryState.migratedDefault(companyName);
-    final isGrandfatherGiftStart =
+    final isStandardSeedStart =
         initialCompanyCash > 0 && initialCash == initialCompanyCash;
-    final storyState = isGrandfatherGiftStart
+    final isStateAccountStart =
+        isStandardSeedStart && baseStory.orphanageReboot;
+    final seedMoneySource = isStateAccountStart
+        ? 'future_development_fund'
+        : 'grandfather_new_year_gift';
+    final seedMoneySourceId = isStateAccountStart
+        ? stateAccountSeedCapitalSourceId
+        : grandfatherNewYearGiftSourceId;
+    final storyState = isStandardSeedStart
         ? baseStory.copyWith(
             accountAuthorityLevel: math.max(1, baseStory.accountAuthorityLevel),
             storyFlags: {
               ...baseStory.storyFlags,
               'startingSeedMoney': initialCompanyCash,
-              'seedMoneySource': 'grandfather_new_year_gift',
+              'seedMoneySource': seedMoneySource,
               'firstSeedGoalReached': true,
             },
           )
@@ -652,22 +661,24 @@ class GameEngine {
       project: null,
       decisions: [_firstResearchNote(1)],
       scheduledEvents: const [],
-      ledger: isGrandfatherGiftStart
-          ? const [
+      ledger: isStandardSeedStart
+          ? [
               LedgerEntry(
-                id: grandfatherNewYearGiftSourceId,
+                id: seedMoneySourceId,
                 day: 1,
                 amount: initialCompanyCash,
                 account: 'brokerage_cash',
-                counterAccount: 'family_gift',
-                description: '외할아버지 세뱃돈 · 첫 투자금',
-                sourceId: grandfatherNewYearGiftSourceId,
+                counterAccount: isStateAccountStart
+                    ? 'state_seed_capital'
+                    : 'family_gift',
+                description: isStateAccountStart
+                    ? '대한민국 미래양성기금 · 제6기 국가계좌 원금'
+                    : '외할아버지 세뱃돈 · 첫 투자금',
+                sourceId: seedMoneySourceId,
               ),
             ]
           : const [],
-      processedEventIds: isGrandfatherGiftStart
-          ? const [grandfatherNewYearGiftSourceId]
-          : const [],
+      processedEventIds: isStandardSeedStart ? [seedMoneySourceId] : const [],
     );
     return prepareHiddenMarketScenario(state);
   }
@@ -2903,6 +2914,29 @@ class GameEngine {
         'trade-${order.side.name}-${state.day}-${order.marketMinute}-'
         '${order.assetId}-${state.ledger.length + 1}';
     final flags = Map<String, dynamic>.from(state.story.storyFlags);
+    var stateRecovery = 0;
+    var selfRelianceContribution = 0;
+    var spendableCashDelta = cashDelta;
+    if (state.story.orphanageReboot &&
+        order.side == TradeSide.sell &&
+        realizedPnl > 0) {
+      final recoveryRateBps = state.story.stateRecoveryRateBps
+          .clamp(0, 10000)
+          .toInt();
+      stateRecovery = (realizedPnl * recoveryRateBps / 10000)
+          .round()
+          .clamp(0, realizedPnl)
+          .toInt();
+      selfRelianceContribution = realizedPnl - stateRecovery;
+      spendableCashDelta -= stateRecovery + selfRelianceContribution;
+      flags['stateRecoveryTotal'] =
+          state.story.stateRecoveryTotal + stateRecovery;
+      flags['selfRelianceReserve'] =
+          state.story.selfRelianceReserve + selfRelianceContribution;
+      description =
+          '$description · 국가 환수 $stateRecovery원 · '
+          '자립적립 $selfRelianceContribution원';
+    }
     var authority = state.story.accountAuthorityLevel;
     var reputation = state.story.reputation;
     var progression = state.progression.record('trade_volume', notional);
@@ -2948,8 +2982,8 @@ class GameEngine {
     flags['reputation'] = reputation.clamp(0, 100);
     final next = state.copyWith(
       marketMinute: order.marketMinute,
-      brokerageCash: state.brokerageCash + cashDelta,
-      cash: state.cash + cashDelta,
+      brokerageCash: state.brokerageCash + spendableCashDelta,
+      cash: state.cash + spendableCashDelta,
       positions: positions,
       progression: progression,
       story: state.story.copyWith(
@@ -2988,6 +3022,30 @@ class GameEngine {
               ? 0
               : math.max(0, order.orderBookCapacityUnits),
         ),
+        if (stateRecovery > 0)
+          LedgerEntry(
+            id: '$sourceId-state-recovery',
+            day: state.day,
+            amount: -stateRecovery,
+            account: 'brokerage_cash',
+            counterAccount: 'state_profit_recovery',
+            description: '확정수익 국가 환수 20%',
+            sourceId: '$sourceId-state-recovery',
+            assetId: order.assetId,
+            marketMinute: order.marketMinute,
+          ),
+        if (selfRelianceContribution > 0)
+          LedgerEntry(
+            id: '$sourceId-self-reliance',
+            day: state.day,
+            amount: -selfRelianceContribution,
+            account: 'brokerage_cash',
+            counterAccount: 'self_reliance_reserve',
+            description: '만 19세까지 자립적립금 동결',
+            sourceId: '$sourceId-self-reliance',
+            assetId: order.assetId,
+            marketMinute: order.marketMinute,
+          ),
       ],
     );
     return TradeExecutionResult(
@@ -2996,7 +3054,8 @@ class GameEngine {
       message:
           '${order.name} ${_tradeUnits(order.quantity)}주 $sideLabel 완료 · 증권 수수료 $fee원'
           '${transactionTax > 0 ? ' · 거래세 $transactionTax원' : ''}'
-          '${order.side == TradeSide.sell ? ' · 실현손익 ${realizedPnl >= 0 ? '+' : ''}$realizedPnl원' : ''}',
+          '${order.side == TradeSide.sell ? ' · 실현손익 ${realizedPnl >= 0 ? '+' : ''}$realizedPnl원' : ''}'
+          '${stateRecovery > 0 ? ' · 국가 환수 $stateRecovery원 · 자립적립 $selfRelianceContribution원' : ''}',
       notional: notional,
       fee: fee,
       transactionTax: transactionTax,

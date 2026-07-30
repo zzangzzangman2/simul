@@ -38,8 +38,6 @@ import 'game/star_shop.dart';
 import 'game/story_state.dart';
 import 'game/world_bootstrapper.dart';
 import 'game/world_economy.dart';
-import 'family_portrait_assets.dart';
-
 export 'game/world_bootstrapper.dart'
     show CampaignWorldPreparer, WorldLoadProgress, WorldLoadProgressCallback;
 
@@ -140,6 +138,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
   bool _isRestoring = false;
   bool _isContinuingSlot = false;
   bool _isPreparingNewGame = false;
+  bool _isNewGameWorldPrepared = false;
   bool _marketTutorialLaunchScheduled = false;
   WorldLoadProgress? _worldLoadProgress;
   Object? _restoreError;
@@ -239,6 +238,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
   Future<void> _prepareNewGameInSlot(int slot) async {
     if (_isPreparingNewGame || _isContinuingSlot) return;
     _isPreparingNewGame = true;
+    _isNewGameWorldPrepared = false;
     final draftState = _engine.createNewGame(
       '새 투자연구소',
       initialCash: initialCompanyCash,
@@ -258,6 +258,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
       });
       if (!mounted) return;
       setState(() {
+        _isNewGameWorldPrepared = true;
         _worldLoadProgress = null;
         _view = _AppView.onboarding;
         _isReady = true;
@@ -268,6 +269,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
       setState(() {
         _newGameSlot = null;
         _newGameWorldSeed = null;
+        _isNewGameWorldPrepared = false;
         _worldLoadProgress = null;
         _view = _AppView.title;
         _isReady = true;
@@ -399,19 +401,20 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     NewGameSetup setup,
     WorldLoadProgressCallback onProgress,
   ) async {
-    onProgress(const WorldLoadProgress(0.08, '선택한 이름과 투자 성향을 세계에 반영하는 중입니다…'));
+    onProgress(
+      const WorldLoadProgress(0.18, '처음하기에서 준비한 시장과 제6기 국가계좌를 연결하는 중입니다…'),
+    );
     await Future<void>.delayed(Duration.zero);
     final slot = _newGameSlot;
     final worldSeed = _newGameWorldSeed;
-    if (slot == null || worldSeed == null) {
-      _showTitle();
-      return;
+    if (slot == null || worldSeed == null || !_isNewGameWorldPrepared) {
+      throw StateError('The prepared new-game world is unavailable');
     }
-    final story = StoryState.newPlayer(
+    final story = StoryState.newOrphanagePlayer(
       playerName: setup.playerName,
       introChoice: setup.introChoice,
       startingTrait: setup.startingTrait,
-      familyRule: setup.familyRule,
+      operatingPrinciple: setup.familyRule,
     );
     final state = _engine.createNewGame(
       setup.companyName,
@@ -419,7 +422,13 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
       initialCash: initialCompanyCash,
       worldSeed: worldSeed,
     );
-    onProgress(const WorldLoadProgress(0.84, '첫 저장 파일을 안전하게 만드는 중입니다…'));
+    onProgress(
+      const WorldLoadProgress(
+        0.68,
+        '운용자 이름과 국가 환수 장부를 반영했습니다. 첫 저장을 만드는 중입니다…',
+      ),
+    );
+    await Future<void>.delayed(Duration.zero);
     try {
       await _persistence.saveToSlot(state, slot);
       await _persistence.setActiveSlot(slot);
@@ -428,12 +437,17 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
       _scaffoldMessengerKey.currentState
         ?..hideCurrentSnackBar()
         ..showSnackBar(_saveFailureSnackBar());
-      return;
+      rethrow;
     }
     if (!mounted) return;
-    onProgress(const WorldLoadProgress(0.98, '저장 슬롯과 첫 화면을 확인하는 중입니다…'));
+    onProgress(
+      const WorldLoadProgress(0.92, '저장을 마쳤습니다. 국가계좌 주문 화면을 확인하는 중입니다…'),
+    );
+    await Future<void>.delayed(Duration.zero);
     final slots = await _persistence.listSlots();
     if (!mounted) return;
+    onProgress(const WorldLoadProgress(1, '준비 완료. 제6기 첫 주문을 시작합니다.'));
+    await Future<void>.delayed(Duration.zero);
     setState(() {
       _state = state;
       _lastDurablySavedMarketDay = state.day;
@@ -446,9 +460,9 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
           ?.savedAt;
       _newGameSlot = null;
       _newGameWorldSeed = null;
+      _isNewGameWorldPrepared = false;
       _view = _AppView.game;
     });
-    onProgress(const WorldLoadProgress(1, '세계관 구성이 끝났습니다.'));
     _scheduleMarketTutorialLaunch();
   }
 

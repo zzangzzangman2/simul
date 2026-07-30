@@ -92,6 +92,36 @@ void main() {
     expect(state.pendingDecisions.first.id, 'first-research-note');
   });
 
+  test('orphanage reboot starts with an active sixth-cohort state account', () {
+    final story = StoryState.newOrphanagePlayer(
+      playerName: '명박',
+      introChoice: 'stocks',
+      startingTrait: StoryTrait.analysis,
+      operatingPrinciple: FamilyRule.reportLosses,
+    );
+    final state = engine.createNewGame('새천년투자연구소', story: story);
+
+    expect(state.story.orphanageReboot, isTrue);
+    expect(state.story.ageOn(state.currentDate), 14);
+    expect(state.story.guardianAccountHolder, 'future_development_fund');
+    expect(state.story.flagInt('futureDevelopmentCohort'), 6);
+    expect(state.story.flagBool('stateAccountActive'), isTrue);
+    expect(state.story.stateRecoveryRateBps, 2000);
+    expect(state.story.stateRecoveryTotal, 0);
+    expect(state.story.selfRelianceReserve, 0);
+    expect(state.story.academyTuitionDebt, 0);
+    expect(state.cash, 10000);
+    expect(state.brokerageCash, 10000);
+    expect(state.story.startingSeedMoney, 10000);
+    expect(
+      state.story.storyFlags['seedMoneySource'],
+      'future_development_fund',
+    );
+    expect(state.ledger, hasLength(1));
+    expect(state.ledger.single.counterAccount, 'state_seed_capital');
+    expect(state.processedEventIds, contains(stateAccountSeedCapitalSourceId));
+  });
+
   test('market tutorial completion is stored in story state', () {
     final story = StoryState.newPlayer(
       playerName: '민재',
@@ -1041,7 +1071,12 @@ void main() {
     final cashBeforeSale = state.cash;
     final result = engine.executeTrade(
       state,
-      hanbitOrder(side: TradeSide.sell, quantity: 4, unitPrice: 11000),
+      hanbitOrder(
+        side: TradeSide.sell,
+        quantity: 4,
+        unitPrice: 11000,
+        quoteDate: state.currentDate.toIso8601String().split('T').first,
+      ),
     );
     final disposedCost = (costBeforeSale * 4 / 10).round();
     final transactionTax = gameSecuritiesTransactionTax(
@@ -1066,6 +1101,73 @@ void main() {
     expect(result.realizedPnl, proceeds - disposedCost);
     expect(result.state.ledger.last.disposedCost, disposedCost);
     expect(result.state.ledger.last.realizedPnl, proceeds - disposedCost);
+  });
+
+  test('orphanage profitable sale splits profit into recovery and reserve', () {
+    final story = StoryState.newOrphanagePlayer(
+      playerName: '명박',
+      introChoice: 'stocks',
+      startingTrait: StoryTrait.analysis,
+      operatingPrinciple: FamilyRule.reportLosses,
+    );
+    final base = engine.createNewGame('새천년투자연구소', story: story);
+    final state = base.copyWith(
+      day: 4,
+      marketMinute: 9 * 60,
+      cash: 0,
+      brokerageCash: 0,
+      positions: const [
+        PortfolioPosition(
+          assetId: 'hanbit_telecom',
+          symbol: '1001',
+          name: '한빛통신',
+          market: fictionalMainMarket,
+          currency: 'KRW',
+          units: 4,
+          totalCost: 30000,
+        ),
+      ],
+      story: base.story.copyWith(accountAuthorityLevel: 2),
+    );
+    final result = engine.executeTrade(
+      state,
+      hanbitOrder(
+        side: TradeSide.sell,
+        quantity: 4,
+        unitPrice: 11000,
+        quoteDate: state.currentDate.toIso8601String().split('T').first,
+      ),
+    );
+    final transactionTax = gameSecuritiesTransactionTax(
+      state.currentDate,
+      44000,
+    );
+    final tradingFee = gameTradingFeeForState(state, 44000);
+    final proceeds = 44000 - tradingFee - transactionTax;
+    final realizedProfit = proceeds - 30000;
+    final expectedRecovery = (realizedProfit * 0.2).round();
+    final expectedReserve = realizedProfit - expectedRecovery;
+
+    expect(result.success, isTrue, reason: result.message);
+    expect(result.realizedPnl, realizedProfit);
+    expect(result.state.cash, 30000);
+    expect(result.state.brokerageCash, 30000);
+    expect(result.state.story.stateRecoveryTotal, expectedRecovery);
+    expect(result.state.story.selfRelianceReserve, expectedReserve);
+    expect(
+      result.state.ledger
+          .where((entry) => entry.counterAccount == 'state_profit_recovery')
+          .single
+          .amount,
+      -expectedRecovery,
+    );
+    expect(
+      result.state.ledger
+          .where((entry) => entry.counterAccount == 'self_reliance_reserve')
+          .single
+          .amount,
+      -expectedReserve,
+    );
   });
 
   test('fractional market sell follows IOC partial-fill semantics', () {

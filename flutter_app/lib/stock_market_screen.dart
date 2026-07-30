@@ -9824,7 +9824,10 @@ class _PracticalTradeTutorialSheetState
             color: Colors.white,
             shape: BoxShape.circle,
           ),
-          child: const Icon(Icons.school_rounded, color: Color(0xFF715716)),
+          child: const Icon(
+            Icons.account_balance_rounded,
+            color: Color(0xFF715716),
+          ),
         ),
         const SizedBox(width: 11),
         Expanded(
@@ -9857,7 +9860,7 @@ class _PracticalTradeTutorialSheetState
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             const Text(
-              '연습용',
+              '국가 모의계좌',
               style: TextStyle(
                 color: Color(0xFF8D762E),
                 fontSize: 10,
@@ -9883,7 +9886,7 @@ class _PracticalTradeTutorialSheetState
     key: Key(isBuy ? 'tutorial-buy-order' : 'tutorial-sell-order'),
     children: [
       _practiceHeader(
-        phaseLabel: isBuy ? '실전 연습 1 / 3 · 매수' : '실전 연습 3 / 3 · 매도',
+        phaseLabel: isBuy ? '국가계좌 실습 1 / 3 · 매수' : '국가계좌 실습 3 / 3 · 매도',
         description: isBuy
             ? widget.initialBuyLimitPrice == null
                   ? '한 주 사 볼까요? 노란 테두리의 매수 버튼만 눌러 보세요.'
@@ -9900,8 +9903,8 @@ class _PracticalTradeTutorialSheetState
           state: _practiceState,
           minute: _practiceMinuteNotifier,
           onExecuteTrade: _executePracticeOrder,
-          balanceLabel: isBuy ? '연습용 주문 가능 예수금' : null,
-          submitLabel: isBuy ? '연습 매수 주문 실행' : '연습 매도 주문 실행',
+          balanceLabel: isBuy ? '국가 모의계좌 주문 가능 예수금' : null,
+          submitLabel: isBuy ? '지정가 매수 주문 실행' : '매도 주문 실행',
           successLabel: isBuy ? '시간별 계좌 변화 확인하기' : '선생님께 돌아가 결과 보기',
           forceActionHighlight: true,
           initialOrderType: isBuy && widget.initialBuyLimitPrice != null
@@ -9939,7 +9942,7 @@ class _PracticalTradeTutorialSheetState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              '실전 연습 2 / 3 · 실시간 계좌',
+              '국가계좌 실습 2 / 3 · 실시간 계좌',
               style: TextStyle(
                 color: _marketAccent,
                 fontSize: 13,
@@ -10193,7 +10196,7 @@ class _PracticalTradeTutorialSheetState
           ),
           const SizedBox(height: 8),
           const Text(
-            '연습금으로 한 주를 사고, 가격이 바뀐 뒤 다시 팔았어요. 팔고 나서야 손익이 확정된다는 것도 확인했어요.',
+            '모의 국가계좌로 한 주를 사고 다시 팔았습니다. 팔고 나서야 손익과 국가 환수액, 자립적립금이 함께 확정됩니다.',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: _marketMuted,
@@ -10212,11 +10215,11 @@ class _PracticalTradeTutorialSheetState
             child: Column(
               children: [
                 _PracticeSummaryRow(
-                  label: '시작 연습금',
+                  label: '시작 모의 원금',
                   value: '${_money(_practiceSeedMoney)}원',
                 ),
                 _PracticeSummaryRow(
-                  label: '매도 후 연습금',
+                  label: '매도 후 주문 가능금',
                   value: '${_money(_practiceState.brokerageCash)}원',
                 ),
                 _PracticeSummaryRow(
@@ -10225,12 +10228,24 @@ class _PracticalTradeTutorialSheetState
                       '${_realizedPnl >= 0 ? '+' : ''}${_money(_realizedPnl)}원',
                   strong: true,
                 ),
+                if (widget.sourceState.story.orphanageReboot) ...[
+                  _PracticeSummaryRow(
+                    label: '국가 환수 20%',
+                    value:
+                        '${_money(_practiceState.story.stateRecoveryTotal)}원',
+                  ),
+                  _PracticeSummaryRow(
+                    label: '자립적립금 80% · 잠금',
+                    value:
+                        '${_money(_practiceState.story.selfRelianceReserve)}원',
+                  ),
+                ],
               ],
             ),
           ),
           const SizedBox(height: 12),
           const Text(
-            '연습금과 주문 기록은 수업이 끝나면 사라져요. 실제 계좌의 돈과 주식은 그대로예요.',
+            '이 장면은 주문법을 익히는 모의 체결입니다. 완료 뒤 실제 국가계좌 원금 10,000원은 그대로 유지됩니다.',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Color(0xFF8B6F21),
@@ -10271,22 +10286,24 @@ class _PracticalTradeTutorialSheetState
     final speaker = isStudentBeat ? studentName : '한서윤 선생님';
     final characterAsset = switch (_reviewBeat) {
       0 => 'assets/images/주식선생님/26_포즈5_주인공그림체_공통슬롯_투명.png',
-      1 => 'assets/images/character_hero_thoughtful_v1.png',
+      1 =>
+        'assets/images/historical_prologue/character_hero_age14_passbook_v1.png',
       2 => 'assets/images/주식선생님/23_포즈2_주인공그림체_공통슬롯_투명.png',
-      _ => 'assets/images/character_hero_determined_v1.png',
+      _ =>
+        'assets/images/historical_prologue/character_hero_age14_passbook_v1.png',
     };
     final message = switch (_reviewBeat) {
       0 => '첫 거래는 끝났어요.\n가장 먼저 눈에 들어온 건 뭐였어요?',
       1 => '수익 숫자요. 오르니까 제가 잘한 줄 알았어요.',
       2 => '기분은 빠르고 판단은 느려야 해요.\n장부에는 산 이유와 다시 볼 조건을 적어요.',
-      _ => '팔기 전 숫자는 아직 내 돈이 아니고요.\n팔고 나서야 결과가 되는 거죠?',
+      _ => '팔기 전 숫자는 아직 확정이 아니고요.\n팔면 국가 환수와 제 자립적립금도 같이 기록되는 거죠?',
     };
     return Stack(
       key: const Key('tutorial-post-trade-review'),
       fit: StackFit.expand,
       children: [
         Image.asset(
-          'assets/images/bg_stock_academy_2000_portrait_cartoon_v4.png',
+          'assets/images/historical_prologue/bg_orphanage_investment_room_2000_portrait_cartoon_v1.png',
           key: const Key('tutorial-review-academy-background'),
           fit: BoxFit.cover,
           alignment: Alignment.center,
@@ -10336,7 +10353,7 @@ class _PracticalTradeTutorialSheetState
                         ),
                         SizedBox(width: 6),
                         Text(
-                          '첫 거래 복습',
+                          '제6기 첫 주문 복습',
                           style: TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.w900,
@@ -10484,7 +10501,7 @@ class _PracticalTradeTutorialSheetState
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    '첫 수업 끝!',
+                    '제6기 첫 주문 수업 완료',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: _marketInk,
@@ -10496,13 +10513,13 @@ class _PracticalTradeTutorialSheetState
                   const _TutorialDialogueCard(
                     speaker: '한서윤 선생님',
                     message:
-                        '오늘은 여기까지. 다음에는 네가 궁금한 회사 하나를 골라 와요. 가격표보다 먼저, 무엇을 팔아 돈 버는지부터 보는 거예요.',
+                        '오늘은 여기까지. 다음에는 전자창고에서 본 한빛통신처럼 네가 궁금한 회사 하나를 골라 와요. 가격보다 먼저 무엇을 팔아 돈 버는지부터 봅니다.',
                     teacher: true,
                   ),
                   const SizedBox(height: 10),
                   _TutorialDialogueCard(
                     speaker: studentName,
-                    message: '네. 다음에는 제가 고른 회사로, 산 이유부터 쓰고 주문할게요.',
+                    message: '네. 실제 국가계좌에서는 산 이유와 철회 조건부터 장부에 쓰고 주문할게요.',
                   ),
                   const SizedBox(height: 14),
                   Container(
@@ -10513,7 +10530,7 @@ class _PracticalTradeTutorialSheetState
                       border: Border.all(color: const Color(0xFFEACB7B)),
                     ),
                     child: const Text(
-                      '종이 울렸다. 첫 투자노트를 가방에 넣고 교문을 나서자 겨울 공기가 볼을 찔렀다. 이제 내가 고른 회사를 집의 CRT로 다시 볼 차례였다.',
+                      '종이 울렸다. 첫 투자장부와 국가계좌 통장을 챙겼다. 이제 기숙사와 투자실을 오가며 내 이름으로 판단을 쌓을 차례였다.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: Color(0xFF5D4B21),
@@ -10550,7 +10567,7 @@ class _PracticalTradeTutorialSheetState
                       )
                     : const Icon(Icons.directions_walk_rounded),
                 label: Text(
-                  _finishing ? '하교 준비 중…' : '수업을 마치고 작은방으로 돌아가기',
+                  _finishing ? '첫 저장을 확인하는 중…' : '수업을 마치고 6기 생활 시작',
                   style: const TextStyle(fontWeight: FontWeight.w800),
                 ),
               ),
@@ -15564,6 +15581,8 @@ class _BrokerageAccountCard extends StatelessWidget {
       0,
       (sum, entry) => sum + entry.realizedPnl,
     );
+    final selfRelianceReserve = state.story.selfRelianceReserve;
+    final stateRecoveryTotal = state.story.stateRecoveryTotal;
     final pnlColor = _priceColor(pnl.toDouble());
     return Container(
       key: const Key('market-account-summary'),
@@ -15572,7 +15591,9 @@ class _BrokerageAccountCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '${state.companyName} 증권계좌',
+            state.story.orphanageReboot
+                ? '${state.companyName} · 제6기 국가계좌'
+                : '${state.companyName} 증권계좌',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
@@ -15583,7 +15604,7 @@ class _BrokerageAccountCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            '${_money(state.brokerageCash + evaluation)}원',
+            '${_money(state.brokerageCash + evaluation + selfRelianceReserve)}원',
             key: const Key('market-account-total-assets'),
             style: const TextStyle(
               color: _marketInk,
@@ -15646,6 +15667,25 @@ class _BrokerageAccountCard extends StatelessWidget {
                     ),
                   ],
                 ),
+                if (state.story.orphanageReboot) ...[
+                  const Divider(height: 25, color: _marketLine),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _AccountMetric(
+                          label: '국가 환수 누계',
+                          value: '${_money(stateRecoveryTotal)}원',
+                        ),
+                      ),
+                      Expanded(
+                        child: _AccountMetric(
+                          label: '자립적립금 · 잠금',
+                          value: '${_money(selfRelianceReserve)}원',
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
                 const Divider(height: 25, color: _marketLine),
                 Row(
                   children: [
