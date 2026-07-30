@@ -2177,6 +2177,95 @@ void main() {
     }
   });
 
+  test(
+    'intact bid and ask walls breathe gradually without looking redrawn',
+    () {
+      const assetId = 'breathing_walls';
+      const day = 6015;
+      const simulationSeed = 'breathing-wall-book';
+      const currentPrice = 10000.0;
+      const previousClose = 9800.0;
+      final date = DateTime(2016, 6, 20);
+      var minute = 10 * 60 + 12;
+
+      GameOrderBookSnapshot snapshot({
+        required int atMinute,
+        required int pulseSlot,
+        GameOrderBookSnapshot? previous,
+        int? previousMinute,
+      }) => buildGameOrderBookSnapshot(
+        assetId: assetId,
+        day: day,
+        minute: atMinute,
+        currentPrice: currentPrice,
+        previousTradePrice: currentPrice,
+        previousClose: previousClose,
+        date: date,
+        market: '미래시장',
+        simulationSeed: simulationSeed,
+        previousSnapshot: previous,
+        previousSnapshotMinute: previousMinute,
+        liquidityPulse: gameOrderBookLiquidityPulseFrame(
+          marketMinute: atMinute,
+          slotIndex: pulseSlot,
+        ),
+        adaptiveLiquidityPulses: true,
+      );
+
+      var current = snapshot(atMinute: minute, pulseSlot: 0);
+      final changedSides = <GameOrderBookSide>{};
+      var changedTransitions = 0;
+      for (var step = 0; step < 10; step += 1) {
+        final nextMinute = minute + 1;
+        final next = snapshot(
+          atMinute: nextMinute,
+          pulseSlot: 1,
+          previous: current,
+          previousMinute: minute,
+        );
+        final previousWalls = <String, GameOrderBookLevel>{
+          for (final level in [...current.asks, ...current.bids])
+            if (level.isWall &&
+                !level.isStructuralBreached &&
+                level.queueRecoveryTargetQuantity <= level.quantity)
+              '${level.side.name}:${level.price}': level,
+        };
+        final changed = <GameOrderBookLevel>[];
+        for (final level in [...next.asks, ...next.bids]) {
+          final previous = previousWalls['${level.side.name}:${level.price}'];
+          if (previous == null || !level.isWall) continue;
+          final delta = (level.quantity - previous.quantity).abs();
+          if (delta == 0) continue;
+          changed.add(level);
+          changedSides.add(level.side);
+          expect(
+            delta,
+            lessThanOrEqualTo(math.max(1, (previous.quantity * 0.02).ceil())),
+            reason: '${level.price}원 벽이 한 번에 다시 그려진 것처럼 바뀌면 안 됩니다.',
+          );
+        }
+        expect(
+          changed.length,
+          lessThanOrEqualTo(2),
+          reason: '한 펄스에서 여러 벽을 동시에 다시 그리면 안 됩니다.',
+        );
+        if (changed.isNotEmpty) changedTransitions += 1;
+        current = next;
+        minute = nextMinute;
+      }
+
+      expect(changedTransitions, greaterThanOrEqualTo(3));
+      expect(
+        changedSides,
+        containsAll(<GameOrderBookSide>[
+          GameOrderBookSide.ask,
+          GameOrderBookSide.bid,
+        ]),
+        reason: '매도벽과 매수벽 모두 번갈아 아주 조금씩 수정돼야 합니다.',
+      );
+    },
+  );
+
   test('standing depth follows absolute price when its row index changes', () {
     const assetId = 'price_attached_depth';
     const day = 6015;

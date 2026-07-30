@@ -13,7 +13,6 @@ const _orderBookSweepTotalDuration = Duration(milliseconds: 480);
 const _orderBookSweepMinimumStepDuration = Duration(milliseconds: 56);
 const _orderBookSweepMaximumStepDuration = Duration(milliseconds: 96);
 const _orderBookSweepFinalHoldDuration = Duration(milliseconds: 112);
-const _orderBookCancellationHoldDuration = Duration(milliseconds: 520);
 const _orderBookTapeCapacity = 50;
 
 class OrderBookSweepIdentityLedger {
@@ -80,13 +79,31 @@ List<GameOrderBookLevel> orderBookSweepPresentationLevels({
     return _symmetricVisibleOrderBookLevels(snapshot);
   }
 
-  final presentationBase = previousSnapshot ?? snapshot;
+  // Non-trade quote changes are canonical immediately and never receive a
+  // replay label. Only exact prices reached by the trade border are restored
+  // from the before-snapshot so their drain remains synchronized with tape.
   final asks = <double, GameOrderBookLevel>{
-    for (final level in presentationBase.asks) level.price: level,
+    for (final level in snapshot.asks) level.price: level,
   };
   final bids = <double, GameOrderBookLevel>{
-    for (final level in presentationBase.bids) level.price: level,
+    for (final level in snapshot.bids) level.price: level,
   };
+  if (previousSnapshot != null) {
+    for (final step in steps) {
+      final visible =
+          (step.side == GameOrderBookSide.ask
+                  ? previousSnapshot.asks
+                  : previousSnapshot.bids)
+              .where((level) => (level.price - step.price).abs() < 0.000001)
+              .firstOrNull;
+      final remembered = previousSnapshot.rememberedLevels[step.price];
+      final previousLevel =
+          visible ?? (remembered?.side == step.side ? remembered : null);
+      if (previousLevel == null) continue;
+      (step.side == GameOrderBookSide.ask ? asks : bids)[step.price] =
+          previousLevel;
+    }
+  }
   final cancellationByLevel = <(GameOrderBookSide, double), int>{};
   for (final notice in cancellationNotices) {
     cancellationByLevel.update(
@@ -218,7 +235,7 @@ List<GameOrderBookLevel> orderBookSweepPresentationLevels({
 }
 
 String orderBookQuantityDeltaLabel(int delta, {required bool isTrade}) {
-  if (delta < 0 && !isTrade) return '취소 ${_money(-delta)}';
+  if (delta < 0 && !isTrade) return '';
   return '${delta > 0 ? '+' : ''}${_money(delta)}';
 }
 
@@ -314,27 +331,6 @@ List<OrderBookCancellationNotice> orderBookCancellationNotices({
     ));
   }
   return List<OrderBookCancellationNotice>.unmodifiable(notices);
-}
-
-int _orderBookCancellationRowIndex(
-  OrderBookCancellationNotice notice,
-  List<GameOrderBookLevel> levels,
-) {
-  final asks = levels
-      .where((level) => level.side == GameOrderBookSide.ask)
-      .toList(growable: false);
-  final bids = levels
-      .where((level) => level.side == GameOrderBookSide.bid)
-      .toList(growable: false);
-  final sameSide = notice.side == GameOrderBookSide.ask ? asks : bids;
-  if (sameSide.isEmpty) return -1;
-  final insertionIndex = sameSide
-      .where((level) => level.price > notice.price)
-      .length
-      .clamp(0, sameSide.length - 1);
-  return notice.side == GameOrderBookSide.ask
-      ? insertionIndex
-      : asks.length + insertionIndex;
 }
 
 List<int> playerOwnedOrderBookRemainingQuantities(
@@ -3800,6 +3796,10 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
             .where((step) => step.consumedQuantity > 0)
             .toList(growable: false)
           ..sort((left, right) => left.sequence.compareTo(right.sequence));
+    // A cancellation-only quote update belongs directly to the canonical book.
+    // Do not enqueue a fake sweep/hold phase: there is no trade for the border
+    // or tape to replay, and delaying it makes route re-entry reveal stale rows.
+    if (steps.isEmpty) return;
     final cancellations = source == 'market' && previousSnapshot != null
         ? orderBookCancellationNotices(
             previous: previousSnapshot,
@@ -3809,7 +3809,7 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
             transitionLiquidityPulse: snapshot.liquidityPulse,
           )
         : const <OrderBookCancellationNotice>[];
-    if (steps.isEmpty && cancellations.isEmpty) return;
+
     final identity = _orderBookSweepReplayIdentity(
       snapshot,
       steps,
@@ -6528,7 +6528,7 @@ class _InlineBalanceRow extends StatelessWidget {
   );
 }
 
-enum _OrderBookSweepPhase { idle, arriving, draining, cancelling }
+enum _OrderBookSweepPhase { idle, arriving, draining }
 
 class _OrderBookSweepBatch {
   const _OrderBookSweepBatch({
@@ -6737,9 +6737,6 @@ mixin _OrderBookSweepPlayback<T extends StatefulWidget> on State<T> {
   final List<_OrderBookSweepBatch> _pendingOrderBookSweeps = [];
   final OrderBookSweepIdentityLedger _orderBookSweepIdentityLedger =
       OrderBookSweepIdentityLedger(completedHistoryCapacity: 256);
-  final Map<(GameOrderBookSide, double), OrderBookCancellationNotice>
-  _orderBookCancellationFlashes =
-      <(GameOrderBookSide, double), OrderBookCancellationNotice>{};
   _OrderBookSweepBatch? _activeOrderBookSweepBatch;
   int _orderBookSweepIndex = -1;
   Duration _orderBookSweepStepDuration = _orderBookSweepMaximumStepDuration;
@@ -6753,15 +6750,6 @@ mixin _OrderBookSweepPlayback<T extends StatefulWidget> on State<T> {
   void onOrderBookSweepBatchCompleted(String identity);
 
   void onOrderBookSweepPlaybackChanged({bool deferUntilAfterFrame = false}) {}
-
-  void _activateOrderBookCancellationFlashes(
-    Iterable<OrderBookCancellationNotice> notices,
-  ) {
-    _orderBookCancellationFlashes.clear();
-    for (final notice in notices) {
-      _orderBookCancellationFlashes[(notice.side, notice.price)] = notice;
-    }
-  }
 
   GameOrderBookSweepStep? get _activeOrderBookSweepStep {
     final batch = _activeOrderBookSweepBatch;
@@ -6862,12 +6850,7 @@ mixin _OrderBookSweepPlayback<T extends StatefulWidget> on State<T> {
       }
       return;
     }
-    if (_orderBookSweepPhase == _OrderBookSweepPhase.cancelling) {
-      _scheduleOrderBookSweepTimerAfterFrame(
-        _scaledOrderBookSweepDuration(_orderBookCancellationHoldDuration),
-        _completeActiveOrderBookSweep,
-      );
-    } else if (_orderBookSweepAwaitingCompletion) {
+    if (_orderBookSweepAwaitingCompletion) {
       _scheduleOrderBookSweepTimerAfterFrame(
         _scaledOrderBookSweepDuration(_orderBookSweepFinalHoldDuration),
         _completeActiveOrderBookSweep,
@@ -6904,8 +6887,7 @@ mixin _OrderBookSweepPlayback<T extends StatefulWidget> on State<T> {
             : latest,
       );
     }
-    if (_orderBookSweepPhase == _OrderBookSweepPhase.cancelling ||
-        batch.steps.isEmpty) {
+    if (batch.steps.isEmpty) {
       return stableOrderBookPresentationLevels(
         snapshot: batch.snapshot,
         fallbackSnapshot: batch.previousSnapshot,
@@ -6960,7 +6942,7 @@ mixin _OrderBookSweepPlayback<T extends StatefulWidget> on State<T> {
     final replayCancellations = cancellations
         .where((notice) => notice.quantity > 0)
         .toList(growable: false);
-    if (steps.isEmpty && replayCancellations.isEmpty) return;
+    if (steps.isEmpty) return;
     final batchId = _orderBookSweepBatchId(
       snapshot,
       steps,
@@ -6980,7 +6962,7 @@ mixin _OrderBookSweepPlayback<T extends StatefulWidget> on State<T> {
       source: source,
       progress: replayProgress ?? _OrderBookSweepReplayProgress(),
     );
-    // Never discard an actual fill or cancellation batch: each transition must
+    // Never discard an actual fill batch: each transition must
     // reach its own FIFO presentation phase at high playback speed.
     _pendingOrderBookSweeps.add(batch);
     if (!_orderBookSweepPlaybackPaused &&
@@ -6998,20 +6980,6 @@ mixin _OrderBookSweepPlayback<T extends StatefulWidget> on State<T> {
     }
     _activeOrderBookSweepBatch = _pendingOrderBookSweeps.removeAt(0);
     _orderBookSweepAwaitingCompletion = false;
-    final batch = _activeOrderBookSweepBatch!;
-    if (batch.steps.isEmpty) {
-      _orderBookSweepIndex = -1;
-      _orderBookSweepPhase = _OrderBookSweepPhase.cancelling;
-      _activateOrderBookCancellationFlashes(batch.cancellations);
-      onOrderBookSweepPlaybackChanged(
-        deferUntilAfterFrame: deferPresentationUntilAfterFrame,
-      );
-      _scheduleOrderBookSweepTimerAfterFrame(
-        _scaledOrderBookSweepDuration(_orderBookCancellationHoldDuration),
-        _completeActiveOrderBookSweep,
-      );
-      return;
-    }
     final progress = _activeOrderBookSweepBatch!.progress;
     _orderBookSweepIndex = progress.stepIndex
         .clamp(0, _activeOrderBookSweepBatch!.steps.length - 1)
@@ -7081,7 +7049,6 @@ mixin _OrderBookSweepPlayback<T extends StatefulWidget> on State<T> {
       _orderBookSweepIdentityLedger.complete(completedIdentity);
     }
     setState(() {
-      _orderBookCancellationFlashes.clear();
       _activeOrderBookSweepBatch = null;
       _orderBookSweepIndex = -1;
       _orderBookSweepPhase = _OrderBookSweepPhase.idle;
@@ -7114,19 +7081,6 @@ mixin _OrderBookSweepPlayback<T extends StatefulWidget> on State<T> {
         _scheduleOrderBookSweepArrival();
         return;
       }
-      if (batch != null && batch.cancellations.isNotEmpty) {
-        setState(() {
-          _orderBookSweepIndex = -1;
-          _orderBookSweepPhase = _OrderBookSweepPhase.cancelling;
-          _activateOrderBookCancellationFlashes(batch.cancellations);
-        });
-        onOrderBookSweepPlaybackChanged();
-        _scheduleOrderBookSweepTimerAfterFrame(
-          _scaledOrderBookSweepDuration(_orderBookCancellationHoldDuration),
-          _completeActiveOrderBookSweep,
-        );
-        return;
-      }
       setState(() => _orderBookSweepAwaitingCompletion = true);
       _scheduleOrderBookSweepTimerAfterFrame(
         _scaledOrderBookSweepDuration(_orderBookSweepFinalHoldDuration),
@@ -7139,7 +7093,6 @@ mixin _OrderBookSweepPlayback<T extends StatefulWidget> on State<T> {
     _orderBookSweepScheduleGeneration += 1;
     _orderBookSweepTimer?.cancel();
     _orderBookSweepTimer = null;
-    _orderBookCancellationFlashes.clear();
     _pendingOrderBookSweeps.clear();
     _activeOrderBookSweepBatch = null;
     _orderBookSweepIdentityLedger.clearInFlight();
@@ -7298,49 +7251,6 @@ class _OrderBookSweepRowOverlay extends StatelessWidget {
       ),
     );
   }
-}
-
-class _OrderBookCancellationFlashLabel extends StatelessWidget {
-  const _OrderBookCancellationFlashLabel({
-    required this.notice,
-    required this.compact,
-  });
-
-  final OrderBookCancellationNotice notice;
-  final bool compact;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    key: ValueKey((
-      'order-book-cancellation-flash',
-      notice.side.name,
-      notice.price,
-      notice.quantity,
-      compact ? 'compact' : 'full',
-    )),
-    color: Colors.white,
-    padding: EdgeInsets.symmetric(horizontal: compact ? 4 : 7),
-    alignment: compact
-        ? Alignment.centerRight
-        : notice.side == GameOrderBookSide.ask
-        ? Alignment.centerRight
-        : Alignment.centerLeft,
-    child: FittedBox(
-      fit: BoxFit.scaleDown,
-      child: Text(
-        '취소 ${_money(notice.quantity)}',
-        key: const Key('order-book-cancellation-label'),
-        maxLines: 1,
-        style: TextStyle(
-          color: const Color(0xFF7B5A00),
-          fontSize: compact ? 7 : 10,
-          height: 1,
-          fontWeight: FontWeight.w900,
-          fontFeatures: _marketNumberFeatures,
-        ),
-      ),
-    ),
-  );
 }
 
 class _CompactOrderBookRail extends StatefulWidget {
@@ -7561,15 +7471,6 @@ class _CompactOrderBookRailState extends State<_CompactOrderBookRail>
       (maximum, level) => math.max(maximum, _displayQuantity(level)),
     );
     final maxDepth = _stableDepthScale(observedMaxDepth);
-    final cancellationRows =
-        <({OrderBookCancellationNotice notice, int index})>[
-          for (final notice in _orderBookCancellationFlashes.values)
-            (
-              notice: notice,
-              index: _orderBookCancellationRowIndex(notice, levels),
-            ),
-        ].where((entry) => entry.index >= 0).toList(growable: false);
-
     return TickerMode(
       enabled: !_orderBookSweepPlaybackPaused,
       child: Container(
@@ -7697,19 +7598,6 @@ class _CompactOrderBookRailState extends State<_CompactOrderBookRail>
                             ),
                             onTap: () =>
                                 widget.onSelectPrice(entry.value.price),
-                          ),
-                        ),
-                      for (final flash in cancellationRows)
-                        Positioned(
-                          top: flash.index * rowHeight,
-                          right: 0,
-                          width: constraints.maxWidth * 5 / 11,
-                          height: rowHeight,
-                          child: IgnorePointer(
-                            child: _OrderBookCancellationFlashLabel(
-                              notice: flash.notice,
-                              compact: true,
-                            ),
                           ),
                         ),
                       if (sweepIndex >= 0 &&
@@ -7955,7 +7843,11 @@ class _CompactOrderBookQuantityLabelState
           fontFeatures: _marketNumberFeatures,
         ),
       ),
-      if (_quantityDelta != 0) ...[
+      if (_quantityDelta != 0 &&
+          orderBookQuantityDeltaLabel(
+            _quantityDelta,
+            isTrade: _quantityDeltaIsTrade,
+          ).isNotEmpty) ...[
         const SizedBox(width: 2),
         Text(
           orderBookQuantityDeltaLabel(
@@ -12082,15 +11974,6 @@ class _OrderBookPriceLadderState extends State<_OrderBookPriceLadder>
       for (final entry in presentationBids.asMap().entries)
         entry.value.price: entry.key,
     };
-    final cancellationRows =
-        <({OrderBookCancellationNotice notice, int index})>[
-          for (final notice in _orderBookCancellationFlashes.values)
-            (
-              notice: notice,
-              index: _orderBookCancellationRowIndex(notice, levels),
-            ),
-        ].where((entry) => entry.index >= 0).toList(growable: false);
-
     return TickerMode(
       enabled: !_orderBookSweepPlaybackPaused,
       child: SizedBox(
@@ -12209,20 +12092,6 @@ class _OrderBookPriceLadderState extends State<_OrderBookPriceLadder>
                     _orderBookSweepPhase.name,
                     'full',
                   )),
-                ),
-              ),
-            for (final flash in cancellationRows)
-              Positioned(
-                top: flash.index * rowHeight,
-                left: flash.notice.side == GameOrderBookSide.ask ? 8 : null,
-                right: flash.notice.side == GameOrderBookSide.bid ? 8 : null,
-                width: 124,
-                height: rowHeight,
-                child: IgnorePointer(
-                  child: _OrderBookCancellationFlashLabel(
-                    notice: flash.notice,
-                    compact: false,
-                  ),
                 ),
               ),
             if (sweepRowIndex >= 0 &&
@@ -12655,7 +12524,11 @@ class _OrderBookQuantityCellState extends State<_OrderBookQuantityCell> {
                     ),
                   ),
                 ),
-                if (_quantityDelta != 0) ...[
+                if (_quantityDelta != 0 &&
+                    orderBookQuantityDeltaLabel(
+                      _quantityDelta,
+                      isTrade: _quantityDeltaIsTrade,
+                    ).isNotEmpty) ...[
                   const SizedBox(width: 3),
                   Text(
                     orderBookQuantityDeltaLabel(

@@ -2655,14 +2655,31 @@ void main() {
       }
       expect(
         reentryQuantityChanges.length,
-        lessThanOrEqualTo(2),
-        reason: '재진입 중 완료되는 pending FIFO는 최우선 매도·매수 두 행만 바꿀 수 있습니다.',
+        lessThanOrEqualTo(3),
+        reason: 'pending 최우선 두 행과 제한된 벽 호흡 한 행 외에는 바뀌면 안 됩니다.',
       );
+      final ambientWallChanges = reentryQuantityChanges
+          .where(
+            (change) => !change.startsWith('0:') && !change.startsWith('10:'),
+          )
+          .toList(growable: false);
       expect(
-        reentryQuantityChanges,
-        everyElement(anyOf(startsWith('0:'), startsWith('10:'))),
-        reason: '최우선 두 행 이외의 호가 수량을 재추첨하면 안 됩니다.',
+        ambientWallChanges.length,
+        lessThanOrEqualTo(1),
+        reason: '재진입 전후 깊은 호가 여러 줄을 다시 추첨하면 안 됩니다.',
       );
+      for (final change in ambientWallChanges) {
+        final quantities = change
+            .substring(change.indexOf(':') + 1)
+            .split('->');
+        final beforeQuantity = int.parse(quantities[0]);
+        final afterQuantity = int.parse(quantities[1]);
+        expect(
+          (afterQuantity - beforeQuantity).abs(),
+          lessThanOrEqualTo(math.max(1, (beforeQuantity * 0.02).ceil())),
+          reason: '재진입 사이의 벽 호흡도 2%를 넘으면 다시 그리기로 봐야 합니다.',
+        );
+      }
       expect(tester.takeException(), isNull);
     },
   );
@@ -4546,14 +4563,11 @@ void main() {
     );
   });
 
-  test(
-    'order-book quantity decrease distinguishes cancellation from trade',
-    () {
-      expect(orderBookQuantityDeltaLabel(-125, isTrade: false), '취소 125');
-      expect(orderBookQuantityDeltaLabel(-125, isTrade: true), '-125');
-      expect(orderBookQuantityDeltaLabel(125, isTrade: false), '+125');
-    },
-  );
+  test('order-book hides cancellation deltas but keeps actual flow labels', () {
+    expect(orderBookQuantityDeltaLabel(-125, isTrade: false), isEmpty);
+    expect(orderBookQuantityDeltaLabel(-125, isTrade: true), '-125');
+    expect(orderBookQuantityDeltaLabel(125, isTrade: false), '+125');
+  });
 
   test('empty cancellation packet keeps the previous ladder visible', () {
     const ask = GameOrderBookLevel(
