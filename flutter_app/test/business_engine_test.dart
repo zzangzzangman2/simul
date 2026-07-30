@@ -38,6 +38,9 @@ OwnedBusiness _monthlyBusiness({
   required bool profitable,
   int accountsPayable = 0,
   int missedPaymentMonths = 0,
+  int generatorVersion = 1,
+  int consecutiveLossMonths = 0,
+  int totalProfit = 0,
 }) {
   return OwnedBusiness(
     id: id,
@@ -78,6 +81,9 @@ OwnedBusiness _monthlyBusiness({
     riskLevel: profitable ? 10 : 90,
     accountsPayable: accountsPayable,
     missedPaymentMonths: missedPaymentMonths,
+    generatorVersion: generatorVersion,
+    consecutiveLossMonths: consecutiveLossMonths,
+    totalProfit: totalProfit,
   );
 }
 
@@ -780,6 +786,66 @@ void main() {
       expect(
         result.state.processedEventIds,
         contains('business-liquidation-${business.id}'),
+      );
+    });
+
+    test('신규 v3 점포는 12개월 연속 구조적 적자가 누적되면 현금이 있어도 폐업한다', () {
+      final base = _newState(
+        cash: 1000000000,
+        seed: 'persistent-loss-business-closure',
+      );
+      final business = _monthlyBusiness(
+        id: 'persistent-loss-v3',
+        profitable: false,
+        generatorVersion: 3,
+        consecutiveLossMonths: businessPersistentLossClosureMonths - 1,
+        totalProfit: -businessPersistentLossMinimumWon,
+      );
+      final februaryFirst = base.copyWith(
+        day: _dayFor(base, DateTime(2000, 2, 1)),
+        businesses: _portfolioOf(business),
+      );
+
+      final result = _businessEngine.advanceOneDay(februaryFirst);
+      final closed = result.state.businesses.businessById(business.id)!;
+
+      expect(closed.consecutiveLossMonths, businessPersistentLossClosureMonths);
+      expect(closed.missedPaymentMonths, 0);
+      expect(closed.status, BusinessStatus.closed);
+      expect(result.state.businesses.totalClosures, 1);
+      expect(
+        result.state.processedEventIds,
+        contains('business-liquidation-${business.id}'),
+      );
+    });
+
+    test('같은 장기 적자라도 레거시 v2 점포에는 신규 폐업 규칙을 소급하지 않는다', () {
+      final base = _newState(
+        cash: 1000000000,
+        seed: 'persistent-loss-business-v2',
+      );
+      final business = _monthlyBusiness(
+        id: 'persistent-loss-v2',
+        profitable: false,
+        generatorVersion: 2,
+        consecutiveLossMonths: businessPersistentLossClosureMonths - 1,
+        totalProfit: -businessPersistentLossMinimumWon,
+      );
+      final februaryFirst = base.copyWith(
+        day: _dayFor(base, DateTime(2000, 2, 1)),
+        businesses: _portfolioOf(business),
+      );
+
+      final result = _businessEngine.advanceOneDay(februaryFirst);
+      final legacy = result.state.businesses.businessById(business.id)!;
+
+      expect(legacy.consecutiveLossMonths, businessPersistentLossClosureMonths);
+      expect(legacy.missedPaymentMonths, 0);
+      expect(legacy.status, BusinessStatus.struggling);
+      expect(result.state.businesses.totalClosures, 0);
+      expect(
+        result.state.processedEventIds,
+        isNot(contains('business-liquidation-${business.id}')),
       );
     });
   });

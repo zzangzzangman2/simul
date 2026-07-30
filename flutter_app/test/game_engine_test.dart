@@ -36,6 +36,26 @@ void main() {
     throw StateError('No reportable market signal found for $seed');
   }
 
+  GameState advanceToControlOffer() {
+    final base = engine.createNewGame(
+      '경영권 기회 테스트',
+      initialCash: 600000,
+      worldSeed: 'control-system-world',
+    );
+    final triggerDate = DateTime(2005, 1, 1);
+    final triggerDay =
+        triggerDate.difference(base.campaignStartDate).inDays + 1;
+    final ready = base.copyWith(
+      day: triggerDay - 1,
+      brokerageCash: 200000,
+      decisions: const [],
+      story: base.story.copyWith(
+        storyFlags: {...base.story.storyFlags, 'firstOrderExecuted': true},
+      ),
+    );
+    return engine.advanceOneDay(ready);
+  }
+
   test('new game starts as a guardian-approved family research desk', () {
     final story = StoryState.newPlayer(
       playerName: '민준',
@@ -3414,25 +3434,176 @@ void main() {
   });
 
   test(
-    'the first control opportunity is reachable after trading and saving',
+    'the first control opportunity opens in 2005 with three stake levels',
     () {
-      final base = engine.createNewGame('경영권 기회 테스트', initialCash: 600000);
-      final state = base.copyWith(
-        day: 29,
-        brokerageCash: 200000,
-        decisions: const [],
-        story: base.story.copyWith(
-          storyFlags: {...base.story.storyFlags, 'firstOrderExecuted': true},
-        ),
+      final offered = advanceToControlOffer();
+
+      expect(offered.currentDate, DateTime(2005, 1, 1));
+      expect(offered.story.flagBool('controlOfferPresented'), isTrue);
+      expect(offered.pendingDecisions, hasLength(1));
+      expect(offered.pendingDecisions.single.id, startsWith('control-offer-'));
+      expect(
+        offered.pendingDecisions.single.options.map((option) => option.id),
+        containsAll(<String>[
+          'acquire_board_observer',
+          'acquire_board_stake',
+          'acquire_control',
+          'review_control',
+        ]),
       );
-
-      final next = engine.advanceOneDay(state);
-
-      expect(next.story.flagBool('controlOfferPresented'), isTrue);
-      expect(next.pendingDecisions, hasLength(1));
-      expect(next.pendingDecisions.single.id, startsWith('control-offer-'));
     },
   );
+
+  test('minority stake preserves book value and can step up to control', () {
+    final offered = advanceToControlOffer();
+    final netWorthBefore = offered.balanceSheetNetWorth();
+    final observer = engine.resolveDecision(
+      offered,
+      offered.pendingDecisions.single.id,
+      'acquire_board_observer',
+    );
+
+    expect(observer.company.id, 'hanbit_components');
+    expect(observer.company.name, '한빛전자부품');
+    expect(observer.company.effectiveEconomicOwnershipPct, 18);
+    expect(observer.company.votingOwnershipPct, 18);
+    expect(observer.company.boardObserver, isTrue);
+    expect(observer.company.boardSeats, 0);
+    expect(observer.company.isControlled, isFalse);
+    expect(observer.company.controlTierLabel, '이사회 관찰');
+    expect(observer.company.investmentBookValue, 120000);
+    expect(observer.company.monthlyOwnerDistribution, 1512);
+    expect(observer.balanceSheetNetWorth(), netWorthBefore);
+    expect(
+      observer.ledger.last.counterAccount,
+      'controlled_company_investment',
+    );
+    expect(observer.ledger.last.assetId, 'hanbit_components');
+    expect(observer.scheduledEvents.single.type, 'control_stake_followup');
+
+    final restored = GameState.fromJson(observer.toJson());
+    expect(restored.company.effectiveEconomicOwnershipPct, 18);
+    expect(restored.company.boardObserver, isTrue);
+    expect(restored.company.investmentBookValue, 120000);
+
+    final followUpEvent = observer.scheduledEvents.single;
+    final waiting = observer.copyWith(
+      day: followUpEvent.dueDay - 1,
+      processedEventIds: [
+        ...observer.processedEventIds,
+        'era-technology-2005-spring',
+      ],
+    );
+    final followUp = engine.advanceOneDay(waiting);
+    expect(
+      followUp.pendingDecisions.single.id,
+      startsWith('control-stake-followup-'),
+    );
+    final beforeStepUp = followUp.balanceSheetNetWorth();
+    final controlled = engine.resolveDecision(
+      followUp,
+      followUp.pendingDecisions.single.id,
+      'complete_control',
+    );
+
+    expect(controlled.company.votingOwnershipPct, 55);
+    expect(controlled.company.boardSeats, 4);
+    expect(controlled.company.hasBoardMajority, isTrue);
+    expect(controlled.company.isControlled, isTrue);
+    expect(controlled.company.investmentBookValue, 350000);
+    expect(controlled.balanceSheetNetWorth(), beforeStepUp);
+    expect(
+      controlled.pendingDecisions.single.id,
+      startsWith('control-transition-'),
+    );
+  });
+
+  test('direct control leads to leadership and factory strategy decisions', () {
+    final offered = advanceToControlOffer();
+    final netWorthBefore = offered.balanceSheetNetWorth();
+    final controlled = engine.resolveDecision(
+      offered,
+      offered.pendingDecisions.single.id,
+      'acquire_control',
+    );
+
+    expect(controlled.company.votingOwnershipPct, 55);
+    expect(controlled.company.boardSeats, 4);
+    expect(controlled.company.controlTierLabel, '경영권');
+    expect(controlled.company.investmentBookValue, 300000);
+    expect(controlled.balanceSheetNetWorth(), netWorthBefore);
+    expect(controlled.pendingDecisions.single.category, '첫 이사회');
+
+    final employeeCount = controlled.organization.employees.length;
+    final leadership = engine.resolveDecision(
+      controlled,
+      controlled.pendingDecisions.single.id,
+      'appoint_father_advisor',
+    );
+    expect(
+      leadership.company.leadershipModel,
+      CompanyLeadershipModel.fatherAdvisor,
+    );
+    expect(leadership.story.flagBool('fatherOperationsAdvisor'), isTrue);
+    expect(leadership.organization.employees.length, employeeCount);
+    expect(leadership.pendingDecisions.single.category, '공장 운영계획');
+
+    final beforeStrategy = leadership.balanceSheetNetWorth();
+    final strategy = engine.resolveDecision(
+      leadership,
+      leadership.pendingDecisions.single.id,
+      'protect_skilled_workforce',
+    );
+    expect(strategy.company.investmentBookValue, 390000);
+    expect(strategy.company.monthlyRevenue, 175000);
+    expect(strategy.company.monthlyOperatingCost, 140000);
+    expect(strategy.company.monthlyOperatingProfit, 35000);
+    expect(strategy.company.monthlyOwnerDistribution, 5775);
+    final lossCompany = strategy.company.copyWith(monthlyOperatingCost: 200000);
+    expect(lossCompany.monthlyOperatingProfit, -25000);
+    expect(lossCompany.monthlyOwnerDistribution, 0);
+    expect(strategy.balanceSheetNetWorth(), beforeStrategy);
+    expect(strategy.ledger.last.counterAccount, 'controlled_company_capital');
+    expect(
+      strategy.story.storyFlags['controlledCompanyStrategy'],
+      'skilled_workforce',
+    );
+  });
+
+  test('legacy v20 control save gains safe governance defaults', () {
+    final base = engine.createNewGame(
+      'v20 경영권 복원',
+      initialCash: 777777,
+      worldSeed: 'legacy-control-world',
+    );
+    final json = Map<String, dynamic>.from(base.toJson());
+    final company = Map<String, dynamic>.from(json['company'] as Map)
+      ..['votingOwnershipPct'] = 55
+      ..['worldStartedAtDay'] = 30
+      ..remove('economicOwnershipPct')
+      ..remove('boardObserver')
+      ..remove('boardSeats')
+      ..remove('totalBoardSeats')
+      ..remove('investmentBookValue')
+      ..remove('acquiredAtDay')
+      ..remove('leadershipModel')
+      ..remove('monthlyOperatingCost');
+    json['version'] = 20;
+    json['company'] = company;
+
+    final migrated = engine.migrate(json);
+
+    expect(migrated.version, GameState.schemaVersion);
+    expect(migrated.cash, base.cash);
+    expect(migrated.day, base.day);
+    expect(migrated.company.votingOwnershipPct, 55);
+    expect(migrated.company.effectiveEconomicOwnershipPct, 55);
+    expect(migrated.company.boardSeats, 4);
+    expect(migrated.company.totalBoardSeats, 7);
+    expect(migrated.company.controlTierLabel, '경영권');
+    expect(migrated.company.investmentBookValue, 0);
+    expect(migrated.company.leadershipModel, CompanyLeadershipModel.unassigned);
+  });
 
   test('semiannual era choices make the 20-decision mission attainable', () {
     var state = resolveFirst(

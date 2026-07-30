@@ -157,6 +157,13 @@ class _OrganizationScreenState extends State<OrganizationScreen> {
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
                     children: [
                       _OrganizationSummary(state: _state),
+                      if (_state.company.hasOwnership) ...[
+                        const SizedBox(height: 12),
+                        _ControlledCompanyGovernanceCard(
+                          company: _state.company,
+                        ),
+                      ],
+
                       const SizedBox(height: 22),
                       const Text(
                         '지금 함께하는 사람들',
@@ -392,6 +399,184 @@ class _OrganizationSummary extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ControlledCompanyGovernanceCard extends StatelessWidget {
+  const _ControlledCompanyGovernanceCard({required this.company});
+
+  final CompanyState company;
+
+  String get _leadershipLabel => switch (company.leadershipModel) {
+    CompanyLeadershipModel.incumbent => '기존 대표 유임',
+    CompanyLeadershipModel.fatherAdvisor => '아빠 운영자문',
+    CompanyLeadershipModel.professional => '전문경영인',
+    CompanyLeadershipModel.unassigned => '이사회 구성 중',
+  };
+
+  @override
+  Widget build(BuildContext context) => Container(
+    key: const Key('controlled-company-governance-card'),
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: const Color(0xFFFFF2DB),
+      borderRadius: BorderRadius.circular(18),
+      border: Border.all(color: const Color(0xFFE1B96F)),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(
+              Icons.account_balance_rounded,
+              color: Color(0xFF9D6630),
+              size: 19,
+            ),
+            const SizedBox(width: 7),
+            Expanded(
+              child: Text(
+                '${company.name} · ${company.controlTierLabel}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Color(0xFF51371F),
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+            Text(
+              'DAY ${company.acquiredAtDay} 취득',
+              style: const TextStyle(
+                color: Color(0xFF8B6B49),
+                fontSize: 9,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 5),
+        Text(
+          '$_leadershipLabel · ${company.worldPremise ?? '지분 관계 확인 중'}',
+          style: const TextStyle(
+            color: Color(0xFF7A5A38),
+            fontSize: 10,
+            height: 1.35,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 11),
+        Row(
+          children: [
+            Expanded(
+              child: _GovernanceMetric(
+                label: '경제적 지분',
+                value:
+                    '${company.effectiveEconomicOwnershipPct.toStringAsFixed(1)}%',
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _GovernanceMetric(
+                label: '의결권',
+                value: '${company.votingOwnershipPct.toStringAsFixed(1)}%',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: _GovernanceMetric(
+                label: '이사회 권한',
+                value: company.boardObserver && company.boardSeats == 0
+                    ? '관찰권'
+                    : '${company.boardSeats}/${company.totalBoardSeats}석',
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _GovernanceMetric(
+                label: '투자 장부가치',
+                value: '${_money(company.investmentBookValue)}원',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: _GovernanceMetric(
+                label: '월 영업이익',
+                value: '${_money(company.monthlyOperatingProfit)}원',
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _GovernanceMetric(
+                label: '예상 월 배당',
+                value: '${_money(company.monthlyOwnerDistribution)}원',
+              ),
+            ),
+          ],
+        ),
+        if (company.leadershipModel ==
+            CompanyLeadershipModel.fatherAdvisor) ...[
+          const SizedBox(height: 9),
+          const Text(
+            '가족 운영자문은 정식 직원 수와 월급 인원에 포함되지 않습니다.',
+            style: TextStyle(
+              color: Color(0xFF8B5A42),
+              fontSize: 9,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ],
+    ),
+  );
+}
+
+class _GovernanceMetric extends StatelessWidget {
+  const _GovernanceMetric({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 8),
+    decoration: BoxDecoration(
+      color: const Color(0xA6FFFFFF),
+      borderRadius: BorderRadius.circular(10),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            color: Color(0xFF8B6B49),
+            fontSize: 9,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: Color(0xFF51371F),
+            fontSize: 12,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class _OrganizationMetric extends StatelessWidget {

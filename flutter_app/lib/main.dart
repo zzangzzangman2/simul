@@ -574,7 +574,10 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
 
   Future<GameState> _advanceDay() => _advanceDays(1);
 
-  Future<GameState> _advanceDays(int requestedDays) async {
+  Future<GameState> _advanceDays(
+    int requestedDays, {
+    bool stopOnImportantNews = true,
+  }) async {
     final current = _state!;
     final initialFlags = Map<String, dynamic>.from(current.story.storyFlags)
       ..remove('fastForwardStopReason');
@@ -601,29 +604,31 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
           headline: brief.title,
           eventIds: events.map((event) => event.id).toList(growable: false),
         );
-        final trackedAssets = <String>{
-          ...before.positions.map((position) => position.assetId),
-          ...((before.story.storyFlags['marketFavoriteAssetIds'] as List?) ??
-                  const [])
-              .whereType<String>(),
-        };
-        final important = events
-            .where(
-              (event) =>
-                  event.companyId == fictionalWholeMarketCompanyId ||
-                  trackedAssets.contains(event.companyId),
-            )
-            .where(
-              (event) =>
-                  event.tone == NewsTone.shock ||
-                  event.tone == NewsTone.milestone ||
-                  event.impactPct.abs() >= 0.08 ||
-                  event.eyebrow.contains('상장폐지'),
-            );
-        if (important.isNotEmpty) {
-          stopAfterClosing = true;
-          stopReason =
-              '${marketDateKey(before.currentDate)} 보유·관심 종목 중요 뉴스가 공개되어 멈췄습니다.';
+        if (stopOnImportantNews) {
+          final trackedAssets = <String>{
+            ...before.positions.map((position) => position.assetId),
+            ...((before.story.storyFlags['marketFavoriteAssetIds'] as List?) ??
+                    const [])
+                .whereType<String>(),
+          };
+          final important = events
+              .where(
+                (event) =>
+                    event.companyId == fictionalWholeMarketCompanyId ||
+                    trackedAssets.contains(event.companyId),
+              )
+              .where(
+                (event) =>
+                    event.tone == NewsTone.shock ||
+                    event.tone == NewsTone.milestone ||
+                    event.impactPct.abs() >= 0.08 ||
+                    event.eyebrow.contains('상장폐지'),
+              );
+          if (important.isNotEmpty) {
+            stopAfterClosing = true;
+            stopReason =
+                '${marketDateKey(before.currentDate)} 보유·관심 종목 중요 뉴스가 공개되어 멈췄습니다.';
+          }
         }
       }
       final beforeUniverse = universeWindow.asOf(before.currentDate);
@@ -1303,6 +1308,8 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
                   onReturnToTitle: _returnToTitle,
                   onAdvanceDay: _advanceDay,
                   onAdvanceDays: _advanceDays,
+                  onAdvanceDaysQuiet: (days) =>
+                      _advanceDays(days, stopOnImportantNews: false),
                   onSetMarketMinute: _setMarketMinute,
                   onSaveMarketNotebook: _saveMarketNotebook,
                   onSetMarketRightsIssuePreference:
@@ -2086,6 +2093,16 @@ class _BackStoryButton extends StatelessWidget {
   }
 }
 
+class _AdvanceMenuChoice {
+  const _AdvanceMenuChoice({
+    required this.days,
+    this.stopOnImportantNews = true,
+  });
+
+  final int days;
+  final bool stopOnImportantNews;
+}
+
 class OfficeScreen extends StatelessWidget {
   const OfficeScreen({
     super.key,
@@ -2099,6 +2116,7 @@ class OfficeScreen extends StatelessWidget {
     required this.onReturnToTitle,
     required this.onAdvanceDay,
     this.onAdvanceDays,
+    this.onAdvanceDaysQuiet,
     required this.onSetMarketMinute,
     required this.onSaveMarketNotebook,
     this.onSetMarketRightsIssuePreference,
@@ -2152,6 +2170,7 @@ class OfficeScreen extends StatelessWidget {
   final VoidCallback onReturnToTitle;
   final Future<GameState> Function() onAdvanceDay;
   final Future<GameState> Function(int days)? onAdvanceDays;
+  final Future<GameState> Function(int days)? onAdvanceDaysQuiet;
   final Future<GameState> Function(int) onSetMarketMinute;
   final Future<GameState> Function(Set<String>, Map<String, String>)
   onSaveMarketNotebook;
@@ -2679,7 +2698,7 @@ class OfficeScreen extends StatelessWidget {
 
   Future<void> _showAdvanceMenu(BuildContext context) async {
     if (onAdvanceDays == null) return;
-    final selection = await showModalBottomSheet<int>(
+    final selection = await showModalBottomSheet<_AdvanceMenuChoice>(
       context: context,
       showDragHandle: true,
       builder: (sheetContext) => SafeArea(
@@ -2708,23 +2727,46 @@ class OfficeScreen extends StatelessWidget {
                         )) {
                       days++;
                     }
-                    Navigator.pop(sheetContext, days);
+                    Navigator.pop(sheetContext, _AdvanceMenuChoice(days: days));
                   },
                 ),
                 ListTile(
                   leading: const Icon(Icons.view_week_rounded),
                   title: const Text('1주 진행'),
-                  onTap: () => Navigator.pop(sheetContext, 7),
+                  onTap: () => Navigator.pop(
+                    sheetContext,
+                    const _AdvanceMenuChoice(days: 7),
+                  ),
                 ),
                 ListTile(
                   leading: const Icon(Icons.calendar_month_rounded),
                   title: const Text('1개월 진행'),
-                  onTap: () => Navigator.pop(sheetContext, 30),
+                  onTap: () => Navigator.pop(
+                    sheetContext,
+                    const _AdvanceMenuChoice(days: 30),
+                  ),
                 ),
+                if (onAdvanceDaysQuiet != null)
+                  ListTile(
+                    key: const Key('advance-year-quiet-option'),
+                    leading: const Icon(Icons.calendar_view_month_rounded),
+                    title: const Text('1년 저개입 진행'),
+                    subtitle: const Text('중요뉴스는 장부에 보관하고, 안건·캠페인 종료에서만 멈춥니다.'),
+                    onTap: () => Navigator.pop(
+                      sheetContext,
+                      const _AdvanceMenuChoice(
+                        days: 365,
+                        stopOnImportantNews: false,
+                      ),
+                    ),
+                  ),
                 ListTile(
                   leading: const Icon(Icons.event_available_rounded),
                   title: const Text('다음 결정까지 (최대 90일)'),
-                  onTap: () => Navigator.pop(sheetContext, 90),
+                  onTap: () => Navigator.pop(
+                    sheetContext,
+                    const _AdvanceMenuChoice(days: 90),
+                  ),
                 ),
               ],
             ),
@@ -2734,7 +2776,11 @@ class OfficeScreen extends StatelessWidget {
     );
     if (selection == null || !context.mounted) return;
     try {
-      final next = await onAdvanceDays!(selection);
+      final advance = selection.stopOnImportantNews
+          ? onAdvanceDays
+          : onAdvanceDaysQuiet;
+      if (advance == null) return;
+      final next = await advance(selection.days);
       if (!context.mounted) return;
       final advanced = next.day - state.day;
       final stopReason =
@@ -3529,7 +3575,7 @@ class DecisionSheet extends StatelessWidget {
               ),
             ),
             const Text(
-              '실제 회사 이름이 나와도 수치와 결과는 게임용 이야기예요. 선택한 뒤 결과를 보며 천천히 배워 보세요.',
+              '등장 회사와 지분·거래 조건은 모두 게임 전용 가상 설정입니다. 선택 뒤 장부와 운영 결과를 함께 확인해 보세요.',
               style: TextStyle(
                 color: Color(0xFF8A92A2),
                 fontSize: 9,
@@ -3551,8 +3597,7 @@ class _OfficeStatusCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fictionalWorld =
-        state.company.worldMode == CompanyWorldMode.fictional;
+    final hasCompanyStake = state.company.hasOwnership;
     final authority = state.story.accountAuthorityLevel;
     final orderLimit = switch (authority) {
       0 => '관찰 전용',
@@ -3584,13 +3629,15 @@ class _OfficeStatusCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
                 decoration: BoxDecoration(
-                  color: fictionalWorld
+                  color: hasCompanyStake
                       ? const Color(0xFFFFE3DF)
                       : const Color(0xFFDFF7EF),
                   borderRadius: BorderRadius.circular(9),
                 ),
                 child: Text(
-                  fictionalWorld ? '가상 세계 진행 중' : 'FAMILY RESEARCH DESK',
+                  hasCompanyStake
+                      ? '${state.company.controlTierLabel} · ${state.company.name}'
+                      : 'FAMILY RESEARCH DESK',
                   style: const TextStyle(
                     color: _ink,
                     fontSize: 8,
@@ -3621,8 +3668,8 @@ class _OfficeStatusCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            fictionalWorld
-                ? '분기 DAY ${state.company.worldStartedAtDay} · ${state.company.worldPremise}'
+            hasCompanyStake
+                ? '${state.company.name} · DAY ${state.company.acquiredAtDay} 취득 · ${state.company.worldPremise}'
                 : '계좌 명의: 어머니 · 생활비와 분리 · 대출·미수·신용 금지',
             style: const TextStyle(
               color: Color(0xFF7B849A),
@@ -3630,6 +3677,62 @@ class _OfficeStatusCard extends StatelessWidget {
               fontWeight: FontWeight.w700,
             ),
           ),
+          if (hasCompanyStake) ...[
+            const SizedBox(height: 8),
+            Container(
+              key: const Key('controlled-company-status'),
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF4E8),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFE8C89B)),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _StatusValue(
+                          label: '경제적 지분',
+                          value:
+                              '${state.company.effectiveEconomicOwnershipPct.toStringAsFixed(1)}%',
+                        ),
+                      ),
+                      Expanded(
+                        child: _StatusValue(
+                          label: '의결권',
+                          value:
+                              '${state.company.votingOwnershipPct.toStringAsFixed(1)}%',
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _StatusValue(
+                          label: '이사회',
+                          value:
+                              state.company.boardObserver &&
+                                  state.company.boardSeats == 0
+                              ? '관찰권'
+                              : '${state.company.boardSeats}/${state.company.totalBoardSeats}석',
+                        ),
+                      ),
+                      Expanded(
+                        child: _StatusValue(
+                          label: '투자 장부가치',
+                          value:
+                              '${_money(state.company.investmentBookValue)}원',
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );

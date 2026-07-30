@@ -125,6 +125,15 @@ void main() {
 
     expect(afterLabel, beforeLabel);
     expect(find.text('순자산 · 원화 장부'), findsOneWidget);
+    final depositLegend = find.byKey(const Key('ledger-allocation-deposit'));
+    expect(depositLegend, findsOneWidget);
+    expect(
+      find.descendant(
+        of: depositLegend,
+        matching: find.textContaining('500,000원'),
+      ),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 

@@ -6,6 +6,64 @@ import 'package:millennium_capital/game/market_news.dart';
 import 'package:millennium_capital/main.dart';
 
 void main() {
+  testWidgets('1년 저개입 진행은 중요뉴스 정지 없는 전용 콜백을 사용한다', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(360, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    const engine = GameEngine();
+    final state = engine
+        .createNewGame('저개입 진행 테스트', initialCash: 0)
+        .copyWith(decisions: const []);
+    int? normalDays;
+    int? quietDays;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: OfficeScreen(
+          state: state,
+          engine: engine,
+          activeSaveSlot: 1,
+          lastSavedAt: null,
+          onManualSave: () async {},
+          onReturnToTitle: () {},
+          onAdvanceDay: () async => state,
+          onAdvanceDays: (days) async {
+            normalDays = days;
+            return state.copyWith(day: state.day + days);
+          },
+          onAdvanceDaysQuiet: (days) async {
+            quietDays = days;
+            return state.copyWith(day: state.day + days);
+          },
+          onSetMarketMinute: (minute) async =>
+              state.copyWith(marketMinute: minute),
+          onSaveMarketNotebook: (_, _) async => state,
+          onResolveDecision: (_, _) async {},
+          onRequestFamilyHelp: (_) async => state,
+          onCompleteWork: (_) async => state,
+          onExecuteTrade: (_) async => TradeExecutionResult(
+            state: state,
+            success: false,
+            message: 'test',
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('advance-batch-button')));
+    await tester.pumpAndSettle();
+    expect(find.text('1년 저개입 진행'), findsOneWidget);
+    expect(find.textContaining('중요뉴스는 장부에 보관'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('advance-year-quiet-option')));
+    await tester.pumpAndSettle();
+
+    expect(quietDays, 365);
+    expect(normalDays, isNull);
+    expect(find.textContaining('365일 진행했습니다.'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
   for (final closeMethod in ['신문 X', '상단 뒤로가기', '시스템 뒤로가기']) {
     testWidgets(
       'closing daily newspaper starts next day at 08:00: $closeMethod',

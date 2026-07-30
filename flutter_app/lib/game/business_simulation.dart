@@ -6,6 +6,8 @@ import 'business_state.dart';
 const businessWorldGeneratorVersion = 3;
 const businessMonthlyStatementHistoryLimit = 60;
 const businessEventCooldownDays = 10;
+const businessPersistentLossClosureMonths = 12;
+const businessPersistentLossMinimumWon = 20000000;
 
 enum BusinessInvestmentKind {
   equipment,
@@ -1480,7 +1482,17 @@ BusinessMonthSettlement settleBusinessMonth({
       ? business.consecutiveProfitMonths + 1
       : 0;
   final missedMonths = nextPayable > 0 ? business.missedPaymentMonths + 1 : 0;
-  final forcedClosure = missedMonths >= 3;
+  final cumulativeProfitAfterSettlement =
+      business.totalProfit + statement.netProfit;
+  final persistentLossThreshold = math.max(
+    businessPersistentLossMinimumWon,
+    business.bookValue ~/ 2,
+  );
+  final persistentLossClosure =
+      business.generatorVersion >= businessWorldGeneratorVersion &&
+      lossMonths >= businessPersistentLossClosureMonths &&
+      cumulativeProfitAfterSettlement <= -persistentLossThreshold;
+  final forcedClosure = missedMonths >= 3 || persistentLossClosure;
   final status = forcedClosure
       ? BusinessStatus.closed
       : nextPayable > 0 || lossMonths >= 3

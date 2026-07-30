@@ -322,6 +322,7 @@ class GameState {
   int balanceSheetGrossAssets({Map<String, double>? prices}) =>
       cash +
       businesses.totalBookValue +
+      company.investmentBookValue +
       banking.termDepositAssetValueAt(day) +
       (prices == null ? portfolioCost : portfolioValue(prices)) +
       personalFinance.estimatedPropertyValueAt(day);
@@ -607,6 +608,13 @@ class PortfolioPosition {
   }
 }
 
+enum CompanyLeadershipModel {
+  unassigned,
+  incumbent,
+  fatherAdvisor,
+  professional,
+}
+
 class CompanyState {
   const CompanyState({
     required this.id,
@@ -622,6 +630,14 @@ class CompanyState {
     required this.technology,
     required this.morale,
     required this.risk,
+    this.economicOwnershipPct = 0,
+    this.boardObserver = false,
+    this.boardSeats = 0,
+    this.totalBoardSeats = 7,
+    this.investmentBookValue = 0,
+    this.acquiredAtDay = 0,
+    this.leadershipModel = CompanyLeadershipModel.unassigned,
+    this.monthlyOperatingCost = 90000,
   });
 
   final String id;
@@ -637,10 +653,44 @@ class CompanyState {
   final int technology;
   final int morale;
   final int risk;
+  final double economicOwnershipPct;
+  final bool boardObserver;
+  final int boardSeats;
+  final int totalBoardSeats;
+  final int investmentBookValue;
+  final int acquiredAtDay;
+  final CompanyLeadershipModel leadershipModel;
+  final int monthlyOperatingCost;
 
   bool get isControlled => votingOwnershipPct >= 50;
+  double get effectiveEconomicOwnershipPct =>
+      economicOwnershipPct > 0 ? economicOwnershipPct : votingOwnershipPct;
+  bool get hasOwnership =>
+      effectiveEconomicOwnershipPct > 0 ||
+      votingOwnershipPct > 0 ||
+      investmentBookValue > 0;
+  bool get hasBoardAccess => boardObserver || boardSeats > 0 || isControlled;
+  bool get hasBoardMajority =>
+      totalBoardSeats > 0 && boardSeats > totalBoardSeats / 2;
+  int get monthlyOperatingProfit => monthlyRevenue - monthlyOperatingCost;
+  int get monthlyOwnerDistribution => hasOwnership
+      ? (math.max(0, monthlyOperatingProfit) *
+                0.30 *
+                effectiveEconomicOwnershipPct /
+                100)
+            .round()
+      : 0;
+  String get controlTierLabel {
+    if (isControlled) return '경영권';
+    if (votingOwnershipPct >= 33.4 || boardSeats >= 2) return '주요주주';
+    if (hasBoardAccess) return '이사회 관찰';
+    if (hasOwnership) return '소수지분';
+    return '미보유';
+  }
 
   CompanyState copyWith({
+    String? id,
+    String? name,
     CompanyWorldMode? worldMode,
     int? worldStartedAtDay,
     String? worldPremise,
@@ -652,10 +702,18 @@ class CompanyState {
     int? technology,
     int? morale,
     int? risk,
+    double? economicOwnershipPct,
+    bool? boardObserver,
+    int? boardSeats,
+    int? totalBoardSeats,
+    int? investmentBookValue,
+    int? acquiredAtDay,
+    CompanyLeadershipModel? leadershipModel,
+    int? monthlyOperatingCost,
   }) {
     return CompanyState(
-      id: id,
-      name: name,
+      id: id ?? this.id,
+      name: name ?? this.name,
       worldMode: worldMode ?? this.worldMode,
       worldStartedAtDay: worldStartedAtDay ?? this.worldStartedAtDay,
       worldPremise: worldPremise ?? this.worldPremise,
@@ -667,6 +725,24 @@ class CompanyState {
       technology: (technology ?? this.technology).clamp(0, 100),
       morale: (morale ?? this.morale).clamp(0, 100),
       risk: (risk ?? this.risk).clamp(0, 100),
+      economicOwnershipPct: (economicOwnershipPct ?? this.economicOwnershipPct)
+          .clamp(0, 100),
+      boardObserver: boardObserver ?? this.boardObserver,
+      boardSeats: (boardSeats ?? this.boardSeats).clamp(
+        0,
+        totalBoardSeats ?? this.totalBoardSeats,
+      ),
+      totalBoardSeats: math.max(1, totalBoardSeats ?? this.totalBoardSeats),
+      investmentBookValue: math.max(
+        0,
+        investmentBookValue ?? this.investmentBookValue,
+      ),
+      acquiredAtDay: math.max(0, acquiredAtDay ?? this.acquiredAtDay),
+      leadershipModel: leadershipModel ?? this.leadershipModel,
+      monthlyOperatingCost: math.max(
+        0,
+        monthlyOperatingCost ?? this.monthlyOperatingCost,
+      ),
     );
   }
 
@@ -684,27 +760,69 @@ class CompanyState {
     'technology': technology,
     'morale': morale,
     'risk': risk,
+    'economicOwnershipPct': economicOwnershipPct,
+    'boardObserver': boardObserver,
+    'boardSeats': boardSeats,
+    'totalBoardSeats': totalBoardSeats,
+    'investmentBookValue': investmentBookValue,
+    'acquiredAtDay': acquiredAtDay,
+    'leadershipModel': leadershipModel.name,
+    'monthlyOperatingCost': monthlyOperatingCost,
   };
 
-  factory CompanyState.fromJson(Map<String, dynamic> json) => CompanyState(
-    id: json['id'] as String? ?? 'hanbit_telecom',
-    name: json['name'] as String? ?? '한빛통신',
-    worldMode: CompanyWorldMode.fictional,
-    worldStartedAtDay:
-        ((json['worldStartedAtDay'] ?? json['divergedAtDay']) as num?)?.toInt(),
-    worldPremise: (json['worldPremise'] ?? json['divergenceReason']) as String?,
-    votingOwnershipPct: (json['votingOwnershipPct'] as num?)?.toDouble() ?? 0,
-    worldReferencePrice:
-        ((json['worldReferencePrice'] ?? json['historicalPriceAtDivergence'])
-                as num?)
-            ?.toDouble(),
-    simulatedPrice: (json['simulatedPrice'] as num?)?.toDouble(),
-    monthlyRevenue: (json['monthlyRevenue'] as num?)?.toInt() ?? 120000,
-    brand: (json['brand'] as num?)?.toInt() ?? 42,
-    technology: (json['technology'] as num?)?.toInt() ?? 48,
-    morale: (json['morale'] as num?)?.toInt() ?? 55,
-    risk: (json['risk'] as num?)?.toInt() ?? 20,
-  );
+  factory CompanyState.fromJson(Map<String, dynamic> json) {
+    final votingOwnershipPct =
+        (json['votingOwnershipPct'] as num?)?.toDouble() ?? 0;
+    final totalBoardSeats = math.max(
+      1,
+      (json['totalBoardSeats'] as num?)?.toInt() ?? 7,
+    );
+    final defaultBoardSeats = votingOwnershipPct >= 50
+        ? (totalBoardSeats ~/ 2) + 1
+        : 0;
+    final monthlyRevenue = (json['monthlyRevenue'] as num?)?.toInt() ?? 120000;
+    return CompanyState(
+      id: json['id'] as String? ?? 'hanbit_telecom',
+      name: json['name'] as String? ?? '한빛통신',
+      worldMode: CompanyWorldMode.fictional,
+      worldStartedAtDay:
+          ((json['worldStartedAtDay'] ?? json['divergedAtDay']) as num?)
+              ?.toInt(),
+      worldPremise:
+          (json['worldPremise'] ?? json['divergenceReason']) as String?,
+      votingOwnershipPct: votingOwnershipPct,
+      worldReferencePrice:
+          ((json['worldReferencePrice'] ?? json['historicalPriceAtDivergence'])
+                  as num?)
+              ?.toDouble(),
+      simulatedPrice: (json['simulatedPrice'] as num?)?.toDouble(),
+      monthlyRevenue: monthlyRevenue,
+      brand: (json['brand'] as num?)?.toInt() ?? 42,
+      technology: (json['technology'] as num?)?.toInt() ?? 48,
+      morale: (json['morale'] as num?)?.toInt() ?? 55,
+      risk: (json['risk'] as num?)?.toInt() ?? 20,
+      economicOwnershipPct:
+          (json['economicOwnershipPct'] as num?)?.toDouble() ??
+          votingOwnershipPct,
+      boardObserver: json['boardObserver'] as bool? ?? false,
+      boardSeats: ((json['boardSeats'] as num?)?.toInt() ?? defaultBoardSeats)
+          .clamp(0, totalBoardSeats),
+      totalBoardSeats: totalBoardSeats,
+      investmentBookValue: (json['investmentBookValue'] as num?)?.toInt() ?? 0,
+      acquiredAtDay:
+          (json['acquiredAtDay'] as num?)?.toInt() ??
+          ((json['worldStartedAtDay'] ?? json['divergedAtDay']) as num?)
+              ?.toInt() ??
+          0,
+      leadershipModel: CompanyLeadershipModel.values.firstWhere(
+        (value) => value.name == json['leadershipModel'],
+        orElse: () => CompanyLeadershipModel.unassigned,
+      ),
+      monthlyOperatingCost:
+          (json['monthlyOperatingCost'] as num?)?.toInt() ??
+          (monthlyRevenue * 0.75).round(),
+    );
+  }
 }
 
 class ProjectState {

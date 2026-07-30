@@ -1251,7 +1251,17 @@ class _PortfolioLedgerScreenState extends State<PortfolioLedgerScreen> {
                             const SizedBox(height: 10),
                             _LedgerAllocationCard(
                               cash: state.cash,
-                              portfolioValue: portfolioValue,
+                              portfolioValue: snapshot.hasData
+                                  ? portfolioValue
+                                  : state.portfolioCost,
+                              termDepositValue: state.banking
+                                  .termDepositAssetValueAt(state.day),
+                              propertyValue: state.personalFinance
+                                  .estimatedPropertyValueAt(state.day),
+                              businessValue:
+                                  state.businesses.totalBookValue +
+                                  state.company.investmentBookValue,
+                              liabilities: state.totalKnownLiabilities,
                               marketReady: snapshot.hasData,
                             ),
                             const SizedBox(height: 18),
@@ -1718,30 +1728,88 @@ class _LedgerHeroCard extends StatelessWidget {
   }
 }
 
+class _LedgerAllocationAsset {
+  const _LedgerAllocationAsset({
+    required this.id,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final String id;
+  final String label;
+  final int value;
+  final Color color;
+}
+
 class _LedgerAllocationCard extends StatelessWidget {
   const _LedgerAllocationCard({
     required this.cash,
     required this.portfolioValue,
+    required this.termDepositValue,
+    required this.propertyValue,
+    required this.businessValue,
+    required this.liabilities,
     required this.marketReady,
   });
 
   final int cash;
   final int portfolioValue;
+  final int termDepositValue;
+  final int propertyValue;
+  final int businessValue;
+  final int liabilities;
   final bool marketReady;
 
   @override
   Widget build(BuildContext context) {
-    final cashAssets = math.max(0, cash);
-    final stockAssets = math.max(0, portfolioValue);
-    final totalAssets = cashAssets + stockAssets;
-    final hasAssets = marketReady && totalAssets > 0;
-    final cashRatio = hasAssets
-        ? (cashAssets / totalAssets).clamp(0.0, 1.0).toDouble()
-        : 0.0;
-    final cashPercent = (cashRatio * 100).round();
-    final stockPercent = hasAssets ? 100 - cashPercent : 0;
-    final operatingDebt = math.max(0, -cash);
-    final netAum = cash + portfolioValue;
+    final assets = <_LedgerAllocationAsset>[
+      _LedgerAllocationAsset(
+        id: 'cash',
+        label: '현금·예수금',
+        value: math.max(0, cash),
+        color: const Color(0xFFD39A36),
+      ),
+      _LedgerAllocationAsset(
+        id: 'deposit',
+        label: '정기예금',
+        value: math.max(0, termDepositValue),
+        color: const Color(0xFFB77B45),
+      ),
+      _LedgerAllocationAsset(
+        id: 'stock',
+        label: '원화 주식',
+        value: math.max(0, portfolioValue),
+        color: const Color(0xFF4B7A68),
+      ),
+      _LedgerAllocationAsset(
+        id: 'property',
+        label: '부동산',
+        value: math.max(0, propertyValue),
+        color: const Color(0xFF4F6F9B),
+      ),
+      _LedgerAllocationAsset(
+        id: 'business',
+        label: '사업체',
+        value: math.max(0, businessValue),
+        color: const Color(0xFF8A5D87),
+      ),
+    ];
+    final totalAssets = assets.fold<int>(0, (sum, asset) => sum + asset.value);
+    final totalLiabilities = (math.max(0, liabilities) + math.max(0, -cash))
+        .toInt();
+    final netAum = totalAssets - totalLiabilities;
+
+    String allocationValue(_LedgerAllocationAsset asset) {
+      if (asset.id == 'stock' && !marketReady) {
+        return asset.value > 0 ? '원가 ${_money(asset.value)}원' : '시세 연결 중';
+      }
+      final percent = totalAssets > 0
+          ? (asset.value * 100 / totalAssets).round()
+          : 0;
+      return '$percent% · ${_money(asset.value)}원';
+    }
+
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -1761,7 +1829,7 @@ class _LedgerAllocationCard extends StatelessWidget {
               ),
               SizedBox(width: 7),
               Text(
-                '현금 · 주식 운용 비중',
+                '총자산 구성',
                 style: TextStyle(
                   color: Color(0xFF493426),
                   fontSize: 12,
@@ -1770,40 +1838,43 @@ class _LedgerAllocationCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 11),
-          _LedgerRatioBar(
-            cashRatio: cashRatio,
-            marketReady: marketReady,
-            hasAssets: hasAssets,
+          const SizedBox(height: 5),
+          Text(
+            '총자산 ${_money(totalAssets)}원 · 순자산 ${_money(netAum)}원',
+            style: const TextStyle(
+              color: Color(0xFF755B3B),
+              fontSize: 9,
+              fontWeight: FontWeight.w800,
+            ),
           ),
           const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: _AllocationLegend(
-                  color: const Color(0xFFD39A36),
-                  label: '현금',
-                  value: marketReady
-                      ? '$cashPercent% · ${_money(cash)}원'
-                      : '${_money(cash)}원',
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _AllocationLegend(
-                  color: const Color(0xFF4B7A68),
-                  label: '원화 주식',
-                  value: marketReady
-                      ? '$stockPercent% · ${_money(portfolioValue)}원'
-                      : '시세 연결 중',
-                ),
-              ),
-            ],
+          _LedgerRatioBar(assets: assets, totalAssets: totalAssets),
+          const SizedBox(height: 10),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final itemWidth = math.max(0.0, (constraints.maxWidth - 10) / 2);
+              return Wrap(
+                spacing: 10,
+                runSpacing: 9,
+                children: [
+                  for (final asset in assets)
+                    SizedBox(
+                      width: itemWidth,
+                      child: _AllocationLegend(
+                        key: Key('ledger-allocation-${asset.id}'),
+                        color: asset.color,
+                        label: asset.label,
+                        value: allocationValue(asset),
+                      ),
+                    ),
+                ],
+              );
+            },
           ),
           if (!marketReady) ...[
             const SizedBox(height: 8),
             const Text(
-              '시장 시세가 연결되면 정확한 자산 비중을 표시합니다.',
+              '주식 시세가 연결되기 전에는 매입원가를 자산 비중에 사용합니다.',
               style: TextStyle(
                 color: Color(0xFF8B765A),
                 fontSize: 9,
@@ -1811,18 +1882,45 @@ class _LedgerAllocationCard extends StatelessWidget {
               ),
             ),
           ],
-          if (operatingDebt > 0) ...[
-            const SizedBox(height: 8),
-            Text(
-              '운영 부채 ${_money(operatingDebt)}원 · 순자산 ${_money(netAum)}원',
-              key: const Key('ledger-operating-debt'),
-              style: const TextStyle(
-                color: Color(0xFF9E4A42),
-                fontSize: 9,
-                fontWeight: FontWeight.w900,
-              ),
+          const SizedBox(height: 10),
+          Container(
+            key: const Key('ledger-operating-debt'),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF8ED),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFD8B6A4)),
             ),
-          ],
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.account_balance_wallet_outlined,
+                  size: 15,
+                  color: Color(0xFF9E4A42),
+                ),
+                const SizedBox(width: 7),
+                const Expanded(
+                  child: Text(
+                    '총부채',
+                    style: TextStyle(
+                      color: Color(0xFF7B5148),
+                      fontSize: 9,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                Text(
+                  '${_money(totalLiabilities)}원',
+                  key: const Key('ledger-total-liabilities'),
+                  style: const TextStyle(
+                    color: Color(0xFF9E4A42),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -1830,42 +1928,45 @@ class _LedgerAllocationCard extends StatelessWidget {
 }
 
 class _LedgerRatioBar extends StatelessWidget {
-  const _LedgerRatioBar({
-    required this.cashRatio,
-    required this.marketReady,
-    required this.hasAssets,
-  });
+  const _LedgerRatioBar({required this.assets, required this.totalAssets});
 
-  final double cashRatio;
-  final bool marketReady;
-  final bool hasAssets;
+  final List<_LedgerAllocationAsset> assets;
+  final int totalAssets;
 
   @override
-  Widget build(BuildContext context) => Container(
-    key: const Key('ledger-allocation-bar'),
-    height: 13,
-    clipBehavior: Clip.antiAlias,
-    decoration: BoxDecoration(
-      color: marketReady && hasAssets
-          ? const Color(0xFF4B7A68)
-          : const Color(0xFFD8C9A8),
-      borderRadius: BorderRadius.circular(99),
-      border: Border.all(color: const Color(0xFFAA8A58)),
-    ),
-    child: LayoutBuilder(
-      builder: (context, constraints) => Align(
-        alignment: Alignment.centerLeft,
-        child: Container(
-          width: constraints.maxWidth * cashRatio,
-          color: const Color(0xFFD39A36),
-        ),
+  Widget build(BuildContext context) {
+    final visibleAssets = assets
+        .where((asset) => asset.value > 0)
+        .toList(growable: false);
+    return Container(
+      key: const Key('ledger-allocation-bar'),
+      height: 13,
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: const Color(0xFFD8C9A8),
+        borderRadius: BorderRadius.circular(99),
+        border: Border.all(color: const Color(0xFFAA8A58)),
       ),
-    ),
-  );
+      child: totalAssets <= 0
+          ? const SizedBox.shrink()
+          : Row(
+              children: [
+                for (final asset in visibleAssets)
+                  Expanded(
+                    flex: math
+                        .max(1, (asset.value * 1000 / totalAssets).round())
+                        .toInt(),
+                    child: ColoredBox(color: asset.color),
+                  ),
+              ],
+            ),
+    );
+  }
 }
 
 class _AllocationLegend extends StatelessWidget {
   const _AllocationLegend({
+    super.key,
     required this.color,
     required this.label,
     required this.value,

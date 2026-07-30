@@ -89,9 +89,7 @@ int gameQualifyingRecurringMonthlyIncome(GameState state) {
   final managementFee = state.story.fundLaunched
       ? (state.story.externalAum * 0.0005).round()
       : 0;
-  final controlledIncome = state.company.isControlled
-      ? (state.company.monthlyRevenue * 0.05).round()
-      : 0;
+  final controlledIncome = state.company.monthlyOwnerDistribution;
   final recognizedRent =
       (state.personalFinance.monthlyPropertyIncomeAt(state.currentDate) * 0.70)
           .round();
@@ -718,7 +716,9 @@ class GameEngine {
       (sum, position) => sum + position.totalCost,
     );
     const sourceId = 'legacy-real-market-recovery-v14';
-    final companyIsFictional = isCurrentWorldAsset(state.company.id);
+    final companyIsFictional =
+        state.company.id == 'hanbit_components' ||
+        isCurrentWorldAsset(state.company.id);
     final migratedCompany = companyIsFictional
         ? state.company.copyWith(worldMode: CompanyWorldMode.fictional)
         : const CompanyState(
@@ -5383,20 +5383,41 @@ class GameEngine {
             ],
           ),
         );
+      case 'acquire_board_observer':
+        next = _acquireCompanyStake(
+          next,
+          decisionId,
+          option,
+          targetOwnershipPct: 18,
+          boardObserver: true,
+          boardSeats: 0,
+        );
+      case 'acquire_board_stake':
+      case 'expand_board_stake':
+        next = _acquireCompanyStake(
+          next,
+          decisionId,
+          option,
+          targetOwnershipPct: 34,
+          boardObserver: false,
+          boardSeats: 2,
+        );
       case 'acquire_control':
       case 'acquire_control_followup':
-        next = _spend(next, option.cashCost, decisionId, '한빛통신 경영권 시나리오 배정금');
-        final continuityPrice = generatedCompanyPriceForDay(next.day);
+      case 'complete_control':
+        next = _acquireCompanyStake(
+          next,
+          decisionId,
+          option,
+          targetOwnershipPct: 55,
+          boardObserver: false,
+          boardSeats: 4,
+        );
+      case 'hold_company_stake':
         next = next.copyWith(
-          company: next.company.copyWith(
-            worldMode: CompanyWorldMode.fictional,
-            worldStartedAtDay: next.day,
-            worldPremise: '의결권 55% 확보',
-            votingOwnershipPct: 55,
-            worldReferencePrice: continuityPrice,
-            simulatedPrice: continuityPrice,
+          story: next.story.copyWith(
+            storyFlags: {...next.story.storyFlags, 'controlStakeHeld': true},
           ),
-          decisions: [...next.decisions, _productProposal(next.day)],
         );
       case 'review_control':
         next = _schedule(
@@ -5411,9 +5432,81 @@ class GameEngine {
             ...next.decisions,
             _endingCard(
               next.day,
-              '경쟁 세력이 먼저 한빛통신 이사회를 장악했습니다. 다음 기회를 기다려야 해요.',
+              '경쟁 세력이 한빛전자부품의 우호지분을 먼저 모았습니다. 보유 지분은 유지되지만 이번 경영권 기회는 끝났어요.',
             ),
           ],
+        );
+      case 'retain_incumbent_ceo':
+        next = _assignControlLeadership(
+          next,
+          CompanyLeadershipModel.incumbent,
+          moraleDelta: 6,
+          technologyDelta: 0,
+          riskDelta: -2,
+        );
+      case 'appoint_father_advisor':
+        next = _assignControlLeadership(
+          next,
+          CompanyLeadershipModel.fatherAdvisor,
+          moraleDelta: 4,
+          technologyDelta: 4,
+          riskDelta: -3,
+        );
+      case 'appoint_professional_ceo':
+        next = _assignControlLeadership(
+          next,
+          CompanyLeadershipModel.professional,
+          moraleDelta: -2,
+          technologyDelta: 3,
+          riskDelta: 1,
+        );
+      case 'factory_automation':
+        next = _applyFactoryStrategy(
+          next,
+          decisionId,
+          option,
+          strategy: 'automation',
+          revenueDelta: 35000,
+          operatingCostDelta: -12000,
+          technologyDelta: 9,
+          moraleDelta: -6,
+          riskDelta: 5,
+        );
+      case 'protect_skilled_workforce':
+        next = _applyFactoryStrategy(
+          next,
+          decisionId,
+          option,
+          strategy: 'skilled_workforce',
+          revenueDelta: 15000,
+          operatingCostDelta: 8000,
+          technologyDelta: 4,
+          moraleDelta: 9,
+          riskDelta: -3,
+        );
+      case 'premium_components':
+        next = _applyFactoryStrategy(
+          next,
+          decisionId,
+          option,
+          strategy: 'premium_components',
+          revenueDelta: 28000,
+          operatingCostDelta: 15000,
+          technologyDelta: 8,
+          moraleDelta: 3,
+          riskDelta: 2,
+        );
+      case 'stabilize_existing_lines':
+        next = _applyFactoryStrategy(
+          next,
+          decisionId,
+          option,
+          strategy: 'stabilize',
+          revenueDelta: 5000,
+          operatingCostDelta: -5000,
+          technologyDelta: 1,
+          moraleDelta: 4,
+          riskDelta: -5,
         );
       case 'approve_full':
         next = _startProject(
@@ -5656,6 +5749,154 @@ class GameEngine {
         story: next.story.copyWith(familyTrust: next.story.familyTrust + 1),
       );
     }
+    return next;
+  }
+
+  GameState _acquireCompanyStake(
+    GameState state,
+    String sourceId,
+    DecisionOptionData option, {
+    required double targetOwnershipPct,
+    required bool boardObserver,
+    required int boardSeats,
+  }) {
+    final firstAcquisition = !state.company.hasOwnership;
+    var next = _spend(
+      state,
+      option.cashCost,
+      sourceId,
+      '한빛전자부품 지분 취득',
+      counterAccount: 'controlled_company_investment',
+      assetId: 'hanbit_components',
+    );
+    final controlled = targetOwnershipPct >= 50;
+    final premise = controlled
+        ? '의결권 55% · 이사회 4/7석'
+        : targetOwnershipPct >= 33.4
+        ? '의결권 34% · 이사회 2/7석'
+        : '지분 18% · 이사회 관찰권';
+    final company = next.company.copyWith(
+      id: 'hanbit_components',
+      name: '한빛전자부품',
+      worldMode: CompanyWorldMode.fictional,
+      worldStartedAtDay: firstAcquisition
+          ? next.day
+          : next.company.worldStartedAtDay,
+      worldPremise: premise,
+      votingOwnershipPct: targetOwnershipPct,
+      economicOwnershipPct: targetOwnershipPct,
+      boardObserver: boardObserver,
+      boardSeats: boardSeats,
+      totalBoardSeats: 7,
+      investmentBookValue: next.company.investmentBookValue + option.cashCost,
+      acquiredAtDay: firstAcquisition ? next.day : next.company.acquiredAtDay,
+      leadershipModel: controlled
+          ? CompanyLeadershipModel.unassigned
+          : next.company.leadershipModel,
+      monthlyRevenue: firstAcquisition ? 160000 : next.company.monthlyRevenue,
+      monthlyOperatingCost: firstAcquisition
+          ? 132000
+          : next.company.monthlyOperatingCost,
+      brand: firstAcquisition ? 38 : next.company.brand,
+      technology: firstAcquisition ? 44 : next.company.technology,
+      morale: firstAcquisition ? 57 : next.company.morale,
+      risk: firstAcquisition ? 29 : next.company.risk,
+    );
+    final flags = Map<String, dynamic>.from(next.story.storyFlags)
+      ..['controlTargetCompanyId'] = company.id
+      ..['controlOwnershipPct'] = targetOwnershipPct
+      ..['controlBoardSeats'] = boardSeats
+      ..['controlAcquiredAtDay'] = company.acquiredAtDay;
+    if (controlled) {
+      flags['controlEstablished'] = true;
+      next = next.copyWith(
+        company: company,
+        story: next.story.copyWith(storyFlags: flags),
+        decisions: [...next.decisions, _controlTransitionDecision(next.day)],
+      );
+      return next;
+    }
+    next = next.copyWith(
+      company: company,
+      story: next.story.copyWith(storyFlags: flags),
+    );
+    return _schedule(
+      next,
+      'control-stake-followup-${next.day + 90}',
+      'control_stake_followup',
+      90,
+    );
+  }
+
+  GameState _assignControlLeadership(
+    GameState state,
+    CompanyLeadershipModel model, {
+    required int moraleDelta,
+    required int technologyDelta,
+    required int riskDelta,
+  }) {
+    final flags = Map<String, dynamic>.from(state.story.storyFlags)
+      ..['controlledCompanyLeadership'] = model.name;
+    if (model == CompanyLeadershipModel.fatherAdvisor) {
+      flags['fatherOperationsAdvisor'] = true;
+    }
+    return state.copyWith(
+      company: state.company.copyWith(
+        leadershipModel: model,
+        morale: state.company.morale + moraleDelta,
+        technology: state.company.technology + technologyDelta,
+        risk: state.company.risk + riskDelta,
+      ),
+      story: state.story.copyWith(
+        familyTrust:
+            state.story.familyTrust +
+            (model == CompanyLeadershipModel.fatherAdvisor ? 2 : 0),
+        fatherAffinity:
+            state.story.fatherAffinity +
+            (model == CompanyLeadershipModel.fatherAdvisor ? 3 : 0),
+        storyFlags: flags,
+      ),
+      decisions: [...state.decisions, _factoryStrategyDecision(state.day)],
+    );
+  }
+
+  GameState _applyFactoryStrategy(
+    GameState state,
+    String sourceId,
+    DecisionOptionData option, {
+    required String strategy,
+    required int revenueDelta,
+    required int operatingCostDelta,
+    required int technologyDelta,
+    required int moraleDelta,
+    required int riskDelta,
+  }) {
+    var next = _spend(
+      state,
+      option.cashCost,
+      sourceId,
+      '한빛전자부품 운영계획 출자',
+      counterAccount: 'controlled_company_capital',
+      assetId: state.company.id,
+    );
+    next = next.copyWith(
+      company: next.company.copyWith(
+        investmentBookValue: next.company.investmentBookValue + option.cashCost,
+        monthlyRevenue: next.company.monthlyRevenue + revenueDelta,
+        monthlyOperatingCost:
+            next.company.monthlyOperatingCost + operatingCostDelta,
+        technology: next.company.technology + technologyDelta,
+        morale: next.company.morale + moraleDelta,
+        risk: next.company.risk + riskDelta,
+      ),
+      story: next.story.copyWith(
+        storyFlags: {
+          ...next.story.storyFlags,
+          'controlledCompanyStrategy': strategy,
+          'controlledCompanyStrategyDay': next.day,
+        },
+      ),
+    );
     return next;
   }
 
@@ -6117,9 +6358,7 @@ class GameEngine {
     final interest = state.bankCash > 0
         ? (state.bankCash * checkingAnnualRate / 12).round()
         : 0;
-    final controlledIncome = state.company.isControlled
-        ? (state.company.monthlyRevenue * 0.05).round()
-        : 0;
+    final controlledIncome = state.company.monthlyOwnerDistribution;
     final income =
         researchRevenue +
         managementFee +
@@ -6687,7 +6926,7 @@ class GameEngine {
     addEntry('research', researchRevenue, 'research_income', '월간 리서치 수입');
     addEntry('fee', managementFee, 'management_fee', '펀드 월간 운용보수');
     addEntry('interest', interest, 'interest_income', '예수금 이자');
-    addEntry('company', controlledIncome, 'company_income', '지배회사 월간 배당');
+    addEntry('company', controlledIncome, 'company_income', '지분회사 월간 배당');
     addEntry(
       'property-income',
       propertyIncome,
@@ -6776,11 +7015,11 @@ class GameEngine {
 
   GameState _applyControlOpportunity(GameState state) {
     if (state.pendingDecisions.isNotEmpty ||
-        state.company.isControlled ||
+        state.company.hasOwnership ||
         state.story.flagBool('controlOfferPresented') ||
         !state.story.flagBool('firstOrderExecuted') ||
-        state.day < 30 ||
-        state.bankCash < 300000) {
+        state.currentDate.isBefore(DateTime(2005, 1, 1)) ||
+        state.bankCash < 120000) {
       return state;
     }
     final flags = Map<String, dynamic>.from(state.story.storyFlags)
@@ -7035,6 +7274,15 @@ class GameEngine {
               _controlOffer(next.day, followUp: true),
             ],
           );
+        case 'control_stake_followup':
+          if (next.company.hasOwnership && !next.company.isControlled) {
+            next = next.copyWith(
+              decisions: [
+                ...next.decisions,
+                _controlStakeFollowUp(next.day, next.company),
+              ],
+            );
+          }
         case 'development_issue':
           next = next.copyWith(
             decisions: [...next.decisions, _developmentIssue(next.day)],
@@ -7272,8 +7520,10 @@ class GameEngine {
     GameState state,
     int cost,
     String sourceId,
-    String description,
-  ) {
+    String description, {
+    String counterAccount = 'investment',
+    String assetId = '',
+  }) {
     if (cost == 0) return state;
     if (cost > state.bankCash) return state;
     final ledgerId = '$sourceId-${state.day}-$cost';
@@ -7287,9 +7537,10 @@ class GameEngine {
           day: state.day,
           amount: -cost,
           account: 'company_bank',
-          counterAccount: 'investment',
+          counterAccount: counterAccount,
           description: description,
           sourceId: sourceId,
+          assetId: assetId,
         ),
       ],
     );
@@ -7359,91 +7610,189 @@ class GameEngine {
     required bool followUp,
   }) => DecisionCardData(
     id: followUp ? 'control-offer-followup-$day' : 'control-offer-$day',
-    category: '회사 운영 체험',
-    title: followUp ? '한빛통신 운영 체험, 마지막 선택' : '한빛통신 회사를 직접 운영해 볼까?',
-    proposer: '시나리오 운영자 윤 실장',
+    category: '경영권 기회',
+    title: followUp ? '한빛전자부품 지분 협상, 마지막 선택' : '아빠가 다녔던 회사를 우리가 다시 세울까?',
+    proposer: '한빛전자부품 매각자문 윤 실장',
     body: followUp
-        ? '검토하는 사이 경쟁 세력이 이사회 표를 모았습니다. 시나리오 비용은 늘었고 오늘 결론이 필요해요.'
-        : '첫 세로 슬라이스에서는 개발용 시나리오 계약으로 한빛통신 이사회 의결권 55%를 맡습니다. 실제 거래가격이나 내부정보가 아니며, 이후 세계는 우리의 선택으로 움직입니다.',
+        ? '사흘 사이 다른 인수자가 우호지분을 모았습니다. 경영권 가격은 올랐고, 이사회에 들어갈 마지막 조건도 오늘 결정해야 합니다.'
+        : '구조조정 뒤 주인이 여러 번 바뀐 한빛전자부품이 투자자를 찾습니다. 작은 지분으로 이사회를 지켜볼 수도, 주요주주가 될 수도, 과반 의결권을 인수할 수도 있습니다.',
     createdDay: day,
     dueDay: day + (followUp ? 1 : 3),
-    requestedFunds: followUp ? 350000 : 300000,
-    benefit: '한빛통신 경영권과 이사회 과반 체험',
-    risk: '게임 자금 감소 · 제품 성공 불확실',
+    requestedFunds: followUp ? 240000 : 120000,
+    benefit: '지분 단계에 맞는 배당·이사회 정보·경영권',
+    risk: '회사 통장 감소 · 공장 정상화 비용 · 직원과 거래처 책임',
     advisorOpinions: const [
-      '운영자: 실제 인수가 아닌 가상 세계 체험용 조건입니다.',
-      '기술자: 통합형 휴대기기 아이디어는 있으나 성공은 모릅니다.',
-      '친구: 그래도 우리 게임 자금을 거의 3분의 1이나 쓰는 거야!',
+      '아빠: 싸게 사는 것보다 공장과 거래처가 왜 흔들렸는지 먼저 봐야 한다.',
+      '엄마: 지분을 사는 돈은 사라지는 비용이 아니라 투자 장부가치로 남겨야 해.',
+      '누나: 주인이 된다고 제품이 저절로 팔리는 건 아니잖아.',
     ],
     options: followUp
         ? const [
             DecisionOptionData(
+              id: 'acquire_board_stake',
+              label: '24만원 · 주요주주 34%',
+              description: '이사회 2석을 확보하고 경영을 감시하지만 단독 결정권은 없습니다.',
+              cashCost: 240000,
+            ),
+            DecisionOptionData(
               id: 'acquire_control_followup',
-              label: '35만원으로 시나리오 시작',
-              description: '비용은 올랐지만 지금 한빛통신 지배 시나리오를 시작합니다.',
+              label: '35만원 · 경영권 55%',
+              description: '의결권 과반과 이사회 4석을 확보해 첫 경영 안건을 맡습니다.',
               cashCost: 350000,
             ),
             DecisionOptionData(
               id: 'pass_control',
               label: '이번 기회 포기',
-              description: '현금을 지키고 경쟁사의 선택을 지켜봅니다.',
+              description: '현금을 지키고 다른 인수자의 선택을 지켜봅니다.',
             ),
           ]
         : const [
             DecisionOptionData(
+              id: 'acquire_board_observer',
+              label: '12만원 · 지분 18%',
+              description: '이사회 관찰권과 소수지분 배당을 얻고 회사부터 배웁니다.',
+              cashCost: 120000,
+            ),
+            DecisionOptionData(
+              id: 'acquire_board_stake',
+              label: '22만원 · 주요주주 34%',
+              description: '이사회 2석을 확보하지만 경영권은 아직 없습니다.',
+              cashCost: 220000,
+            ),
+            DecisionOptionData(
               id: 'acquire_control',
-              label: '30만원으로 시나리오 시작',
-              description: '오늘의 개발용 기준지수에서 한빛통신 가상 세계를 시작합니다.',
+              label: '30만원 · 경영권 55%',
+              description: '의결권 과반과 이사회 4석을 확보해 직접 운영을 시작합니다.',
               cashCost: 300000,
             ),
             DecisionOptionData(
               id: 'review_control',
               label: '3일 더 검토',
-              description: '정보는 늘지만 가격과 경쟁 위험이 커집니다.',
+              description: '실사 자료는 늘지만 지분 가격과 경쟁 위험이 커집니다.',
             ),
           ],
   );
 
-  static DecisionCardData _productProposal(int day) => DecisionCardData(
-    id: 'product-proposal-$day',
-    category: 'CEO 제안',
-    title: '전화·음악·인터넷을 하나로 합칠까?',
-    proposer: '한빛통신 CEO',
+  static DecisionCardData _controlStakeFollowUp(int day, CompanyState company) {
+    final observerStage = company.votingOwnershipPct < 33.4;
+    return DecisionCardData(
+      id: 'control-stake-followup-$day',
+      category: '주주 행동',
+      title: observerStage ? '관찰권을 이사회 자리로 넓힐까?' : '주요주주에서 경영권으로 올라설까?',
+      proposer: '한빛전자부품 매각자문 윤 실장',
+      body: observerStage
+          ? '90일 동안 공장과 장부를 지켜봤습니다. 34% 주요주주나 55% 경영권으로 지분을 늘릴 수 있습니다.'
+          : '이사회 두 자리는 확보했지만 단독으로 대표와 투자안을 결정할 수는 없습니다. 과반 인수 여부를 정해야 합니다.',
+      createdDay: day,
+      dueDay: day + 7,
+      requestedFunds: observerStage ? 120000 : 160000,
+      benefit: '기존 장부가치와 지분을 보존한 단계적 인수',
+      risk: '추가 출자 · 과반 취득 뒤 운영 책임',
+      advisorOpinions: const [
+        '아빠: 관찰한 문제를 고칠 준비가 됐는지부터 생각하자.',
+        '엄마: 이미 산 지분과 이번 추가대금을 한 장부에서 이어 적자.',
+      ],
+      options: [
+        if (observerStage)
+          const DecisionOptionData(
+            id: 'expand_board_stake',
+            label: '12만원 추가 · 34%',
+            description: '이사회 2석을 확보하고 주요 안건에 목소리를 냅니다.',
+            cashCost: 120000,
+          ),
+        DecisionOptionData(
+          id: 'complete_control',
+          label: observerStage ? '23만원 추가 · 55%' : '16만원 추가 · 55%',
+          description: '의결권 과반과 이사회 4석을 확보합니다.',
+          cashCost: observerStage ? 230000 : 160000,
+        ),
+        const DecisionOptionData(
+          id: 'hold_company_stake',
+          label: '현재 지분 유지',
+          description: '보유 지분과 이사회 권한만 유지하고 이번 증액은 넘깁니다.',
+        ),
+      ],
+    );
+  }
+
+  static DecisionCardData _controlTransitionDecision(
+    int day,
+  ) => DecisionCardData(
+    id: 'control-transition-$day',
+    category: '첫 이사회',
+    title: '한빛전자부품을 누가 이끌어야 할까?',
+    proposer: '한빛전자부품 이사회',
     body:
-        '전화, 음악, 인터넷 기능을 하나의 터치 기기에 통합하고 싶습니다. 게임 속 내부 코드명만 표시하며 정답처럼 알려진 결과는 미리 알려주지 않습니다.',
+        '경영권 인수는 끝났지만 회사를 바로 바꿀 수는 없습니다. 기존 대표, 현장을 아는 아빠, 외부 전문경영인 중 첫 운영 체계를 정해야 합니다.',
     createdDay: day,
-    dueDay: day + 3,
-    requestedFunds: 180000,
-    benefit: '새 시장 진입 · 기술과 브랜드 성장',
-    risk: '배터리 · 생산수율 · 현금 부족',
+    dueDay: day + 7,
+    requestedFunds: 0,
+    benefit: '첫 리더십 확정과 공장 운영계획 안건 개방',
+    risk: '현장 반발 · 가족과 회사 역할 혼동 · 실행 속도',
     advisorOpinions: const [
-      'CEO: 작게 시작해도 우리가 먼저 배워야 합니다.',
-      '회계사: 전액 투자는 회사 현금을 빠르게 줄입니다.',
-      '기술자: 핵심 부품은 준비됐지만 배터리는 불안합니다.',
+      '아빠: 나는 직원으로 들어가는 게 아니라 운영 자문만 맡을 수 있다.',
+      '엄마: 가족을 쓴다면 권한과 보수를 회사 장부와 분리해 적어야 해.',
+      '기존 공장장: 숙련직원이 떠나면 새 설비도 돌릴 사람이 없습니다.',
     ],
     options: const [
       DecisionOptionData(
-        id: 'approve_full',
-        label: '18만원 전액 투자',
-        description: '속도와 팀 사기는 오르지만 실행 위험도 큽니다.',
+        id: 'retain_incumbent_ceo',
+        label: '기존 대표 유임',
+        description: '현장 충격을 줄이고 이사회가 계획을 감독합니다.',
+      ),
+      DecisionOptionData(
+        id: 'appoint_father_advisor',
+        label: '아빠를 운영자문으로',
+        description: '정식 직원 수에는 넣지 않고 현장 실사와 운영 자문만 맡깁니다.',
+      ),
+      DecisionOptionData(
+        id: 'appoint_professional_ceo',
+        label: '전문경영인 선임',
+        description: '변화 속도는 높지만 기존 직원의 불안도 커집니다.',
+      ),
+    ],
+  );
+
+  static DecisionCardData _factoryStrategyDecision(int day) => DecisionCardData(
+    id: 'factory-strategy-$day',
+    category: '공장 운영계획',
+    title: '낡은 공장에 첫 돈을 어디에 쓸까?',
+    proposer: '한빛전자부품 경영회의',
+    body:
+        '한 번에 모든 문제를 고칠 수 없습니다. 회사 통장에서 출자한 돈은 지배회사 투자 장부가치로 남고, 선택은 매출·비용·기술·사기·위험을 함께 바꿉니다.',
+    createdDay: day,
+    dueDay: day + 10,
+    requestedFunds: 180000,
+    benefit: '첫 운영전략과 월간 손익 구조 확정',
+    risk: '자동화 해고 충격 · 인건비 · 신제품 실패 · 현금 부족',
+    advisorOpinions: const [
+      '아빠: 기계만 바꾸지 말고 누가 그 기계를 돌릴지도 봐야 한다.',
+      '엄마: 매출 증가보다 매달 남는 영업이익을 같이 계산하자.',
+      '누나: 비싼 부품이면 고객이 정말 차이를 알아보는지도 확인해야 해.',
+    ],
+    options: const [
+      DecisionOptionData(
+        id: 'factory_automation',
+        label: '18만원 · 공장 자동화',
+        description: '고정비와 기술은 개선되지만 숙련직원 사기와 실행 위험이 흔들립니다.',
         cashCost: 180000,
       ),
       DecisionOptionData(
-        id: 'approve_prototype',
-        label: '7만원 시제품만 승인',
-        description: '위험을 줄이고 다음 단계에서 다시 판단합니다.',
-        cashCost: 70000,
+        id: 'protect_skilled_workforce',
+        label: '9만원 · 숙련직원 유지',
+        description: '급여·교육비는 늘지만 현장 지식과 사기를 지킵니다.',
+        cashCost: 90000,
       ),
       DecisionOptionData(
-        id: 'approve_partner',
-        label: '5만원 공동개발',
-        description: '비용과 위험을 나누지만 주도권도 나눕니다.',
-        cashCost: 50000,
+        id: 'premium_components',
+        label: '14만원 · 고부가 부품',
+        description: '매출과 기술 기회를 늘리지만 개발비와 실패 위험도 커집니다.',
+        cashCost: 140000,
       ),
       DecisionOptionData(
-        id: 'reject_project',
-        label: '제안 거절',
-        description: '현금을 지키지만 팀과 기술 기회를 잃을 수 있습니다.',
+        id: 'stabilize_existing_lines',
+        label: '기존 라인 안정화',
+        description: '큰 출자 없이 불량과 위험부터 줄입니다.',
       ),
     ],
   );

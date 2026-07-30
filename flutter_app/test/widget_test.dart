@@ -1322,6 +1322,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    expect(find.text('총자산 구성'), findsOneWidget);
+    for (final id in ['cash', 'deposit', 'stock', 'property', 'business']) {
+      expect(find.byKey(Key('ledger-allocation-$id')), findsOneWidget);
+    }
+    expect(find.byKey(const Key('ledger-total-liabilities')), findsOneWidget);
     expect(find.text('한빛통신'), findsOneWidget);
     final samsungDetails = tester.widget<Text>(
       find.textContaining('10주 · 평균 6,000원'),
@@ -1333,6 +1338,15 @@ void main() {
     final samsungValue = (samsungTile.trailing! as Text).data!;
     expect(samsungValue, endsWith('원'));
     expect(samsungValue, isNot('시세 없음'));
+    final ledgerScroll = find.descendant(
+      of: find.byKey(const Key('portfolio-ledger-scroll')),
+      matching: find.byType(Scrollable),
+    );
+    await tester.scrollUntilVisible(
+      find.text('애플'),
+      240,
+      scrollable: ledgerScroll,
+    );
     expect(find.text('애플'), findsOneWidget);
     expect(find.text('환율 연결 대기'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -2655,19 +2669,25 @@ void main() {
       }
       expect(
         reentryQuantityChanges.length,
-        lessThanOrEqualTo(3),
-        reason: 'pending 최우선 두 행과 제한된 벽 호흡 한 행 외에는 바뀌면 안 됩니다.',
+        lessThanOrEqualTo(4),
+        reason: 'pending 최우선 두 행과 매도·매수 대표 벽 두 행 외에는 바뀌면 안 됩니다.',
       );
       final ambientWallChanges = reentryQuantityChanges
           .where(
             (change) => !change.startsWith('0:') && !change.startsWith('10:'),
           )
           .toList(growable: false);
+      final ambientAskChanges = ambientWallChanges
+          .where((change) => int.parse(change.split(':').first) < 10)
+          .length;
+      final ambientBidChanges = ambientWallChanges.length - ambientAskChanges;
       expect(
         ambientWallChanges.length,
-        lessThanOrEqualTo(1),
-        reason: '재진입 전후 깊은 호가 여러 줄을 다시 추첨하면 안 됩니다.',
+        lessThanOrEqualTo(2),
+        reason: '재진입 전후 매도·매수 대표 벽 외의 여러 줄을 다시 추첨하면 안 됩니다.',
       );
+      expect(ambientAskChanges, lessThanOrEqualTo(1));
+      expect(ambientBidChanges, lessThanOrEqualTo(1));
       for (final change in ambientWallChanges) {
         final quantities = change
             .substring(change.indexOf(':') + 1)
@@ -2676,8 +2696,8 @@ void main() {
         final afterQuantity = int.parse(quantities[1]);
         expect(
           (afterQuantity - beforeQuantity).abs(),
-          lessThanOrEqualTo(math.max(1, (beforeQuantity * 0.02).ceil())),
-          reason: '재진입 사이의 벽 호흡도 2%를 넘으면 다시 그리기로 봐야 합니다.',
+          lessThanOrEqualTo(math.max(1, (beforeQuantity * 0.05).ceil())),
+          reason: '재진입 누적 벽 수급은 5%를 넘으면 다시 그리기로 봐야 합니다.',
         );
       }
       expect(tester.takeException(), isNull);
@@ -6426,20 +6446,26 @@ void main() {
     expect(find.text('국내 시가총액 순위'), findsOneWidget);
     expect(find.text('내 보유주식수'), findsOneWidget);
     expect(find.text('내 지분율'), findsOneWidget);
+    final finalOwnedShares =
+        current.positions
+            .where((entry) => entry.assetId == 'hanbit_telecom')
+            .firstOrNull
+            ?.units ??
+        0;
+    final finalOwnedSharesLabel =
+        finalOwnedShares == finalOwnedShares.roundToDouble()
+        ? finalOwnedShares.toInt().toString()
+        : finalOwnedShares.toStringAsFixed(4).replaceFirst(RegExp(r'0+$'), '');
     expect(
       tester
           .widget<Text>(find.byKey(const Key('company-owned-shares-value')))
           .data,
-      '0주',
+      '$finalOwnedSharesLabel\uC8FC',
     );
-    expect(
-      tester
-          .widget<Text>(
-            find.byKey(const Key('company-ownership-percent-value')),
-          )
-          .data,
-      '0%',
-    );
+    final ownershipLabel = tester
+        .widget<Text>(find.byKey(const Key('company-ownership-percent-value')))
+        .data;
+    expect(ownershipLabel, finalOwnedShares > 0 ? isNot('0%') : '0%');
     expect(find.text('발행주식수'), findsOneWidget);
     expect(find.text('광대역망'), findsOneWidget);
 
@@ -6513,7 +6539,11 @@ void main() {
       await tester.binding.setSurfaceSize(const Size(390, 844));
       addTearDown(() => tester.binding.setSurfaceSize(null));
       final state = const GameEngine()
-          .createNewGame('호가 슬라이드 보존 테스트', initialCash: 1000000)
+          .createNewGame(
+            '호가 슬라이드 보존 테스트',
+            initialCash: 1000000,
+            worldSeed: 'widget-inline-order-slide-v1',
+          )
           .copyWith(day: 4, marketMinute: 9 * 60);
 
       await tester.pumpWidget(
@@ -6525,10 +6555,10 @@ void main() {
         ),
       );
       await openMarketExplore(tester);
-      await tester.tap(find.byKey(const Key('stock-row-1001')));
-      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('market-speed-pause')).last);
       await tester.pump();
+      await tester.tap(find.byKey(const Key('stock-row-1001')));
+      await tester.pumpAndSettle();
 
       String normalizedPrice(String value) =>
           value.replaceAll(RegExp(r'[^0-9]'), '');
@@ -6712,6 +6742,7 @@ void main() {
         ..sort((left, right) => right.compareTo(left));
       final largeDepthThreshold =
           sortedDepth[math.min(5, sortedDepth.length - 1)];
+
       expect(
         changedQuantities.any((key) {
           final before = quantitiesBeforePulse[key]!;

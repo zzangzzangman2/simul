@@ -985,6 +985,174 @@ void main() {
   });
 
   test(
+    '24500 ask-wall breakout cannot rewind to 24300 without sequential bid fills',
+    () {
+      const assetId = '24500-no-rewind';
+      const simulationSeed = '24500-no-rewind-world';
+      const market = '미래시장';
+      const day = 6015;
+      const minute = 10 * 60 + 13;
+      final date = DateTime(2016, 6, 20);
+
+      List<GameOrderBookLevel> ladder(
+        GameOrderBookSide side,
+        double firstPrice,
+        double step, {
+        double? wallPrice,
+      }) => List<GameOrderBookLevel>.generate(12, (index) {
+        final price = firstPrice + step * index;
+        final isWall = wallPrice != null && price == wallPrice;
+        return GameOrderBookLevel(
+          side: side,
+          price: price,
+          quantity: isWall ? 50 : 20,
+          isWall: isWall,
+        );
+      });
+
+      GameOrderBookSnapshot snapshotAt({
+        required double price,
+        required List<GameOrderBookLevel> asks,
+        required List<GameOrderBookLevel> bids,
+        required int pulse,
+      }) => GameOrderBookSnapshot(
+        asks: asks,
+        bids: bids,
+        turnoverEok: 12,
+        fullDayTurnoverEok: 80,
+        boundaryBidPrice: price,
+        executionCapacity: 10000,
+        totalAskQuantity: asks.fold(0, (sum, level) => sum + level.quantity),
+        totalBidQuantity: bids.fold(0, (sum, level) => sum + level.quantity),
+        tradeStrength: 100,
+        liquidityPulse: pulse,
+        adaptiveLiquidityPulses: true,
+        rememberedLevels: <double, GameOrderBookLevel>{
+          for (final level in [...asks, ...bids]) level.price: level,
+        },
+        sourceAssetId: assetId,
+        sourceLiquidityDayKey: day,
+        sourceDateKey: marketDateKey(date),
+        sourceMarketMinute: minute,
+        sourceLastTradePrice: price,
+        sourceMarket: market,
+        sourceSimulationSeed: simulationSeed,
+      );
+
+      final openingAsks = ladder(
+        GameOrderBookSide.ask,
+        24050,
+        50,
+        wallPrice: 24500,
+      );
+      final opening = snapshotAt(
+        price: 24000,
+        asks: openingAsks,
+        bids: ladder(GameOrderBookSide.bid, 24000, -50),
+        pulse: 10,
+      );
+      final upwardCapacity = openingAsks
+          .where((level) => level.price <= 24500)
+          .fold<int>(0, (sum, level) => sum + level.quantity);
+      final breakout = gameOrderBookPriceTransitionTowardTarget(
+        snapshot: opening,
+        previousPrice: 24000,
+        targetPrice: 24500,
+        availableUnits: upwardCapacity,
+        market: market,
+      );
+
+      expect(breakout.price, 24500);
+      expect(breakout.targetReached, isTrue);
+      expect(
+        breakout.orderedFills.map((fill) => fill.price),
+        orderedEquals(<double>[
+          for (var price = 24050; price <= 24500; price += 50) price.toDouble(),
+        ]),
+      );
+      expect(breakout.orderedFills.last.boundaryCrossed, isTrue);
+      expect(
+        openingAsks.singleWhere((level) => level.price == 24500).isWall,
+        isTrue,
+      );
+
+      final postBreakout = snapshotAt(
+        price: 24500,
+        asks: ladder(GameOrderBookSide.ask, 24550, 50),
+        bids: ladder(GameOrderBookSide.bid, 24500, -50),
+        pulse: 11,
+      );
+      final sameMinuteTargetRewind = buildGameOrderBookSnapshot(
+        assetId: assetId,
+        day: day,
+        minute: minute,
+        currentPrice: 24300,
+        previousTradePrice: 24000,
+        previousClose: 24000,
+        sessionLow: 24000,
+        sessionHigh: 24500,
+        sharesOutstanding: 1000000000,
+        date: date,
+        market: market,
+        simulationSeed: simulationSeed,
+        previousSnapshot: postBreakout,
+        previousSnapshotMinute: minute,
+        liquidityPulse: 12,
+        adaptiveLiquidityPulses: true,
+        holdSameMinuteBoundaryUntilExecution: true,
+      );
+
+      expect(sameMinuteTargetRewind.sourceLastTradePrice, 24500);
+      expect(sameMinuteTargetRewind.boundaryBidPrice, 24500);
+      expect(sameMinuteTargetRewind.bids.first.price, 24500);
+      expect(sameMinuteTargetRewind.asks.first.price, 24550);
+      expect(sameMinuteTargetRewind.sweepSteps, isEmpty);
+
+      final noSellExecution = gameOrderBookPriceTransitionTowardTarget(
+        snapshot: postBreakout,
+        previousPrice: 24500,
+        targetPrice: 24300,
+        availableUnits: 0,
+        market: market,
+      );
+      expect(noSellExecution.price, 24500);
+      expect(noSellExecution.orderedFills, isEmpty);
+
+      final partialBestBid = gameOrderBookPriceTransitionTowardTarget(
+        snapshot: postBreakout,
+        previousPrice: 24500,
+        targetPrice: 24300,
+        availableUnits: 10,
+        market: market,
+      );
+      expect(partialBestBid.price, 24500);
+      expect(partialBestBid.orderedFills, hasLength(1));
+      expect(partialBestBid.orderedFills.single.boundaryCrossed, isFalse);
+
+      final legitimateDrop = gameOrderBookPriceTransitionTowardTarget(
+        snapshot: postBreakout,
+        previousPrice: 24500,
+        targetPrice: 24300,
+        availableUnits: 81,
+        market: market,
+      );
+      expect(legitimateDrop.price, 24300);
+      expect(legitimateDrop.targetReached, isTrue);
+      expect(
+        legitimateDrop.orderedFills.map((fill) => fill.price),
+        orderedEquals(const <double>[24500, 24450, 24400, 24350, 24300]),
+      );
+      expect(
+        legitimateDrop.orderedFills
+            .take(4)
+            .every((fill) => fill.boundaryCrossed),
+        isTrue,
+      );
+      expect(legitimateDrop.orderedFills.last.boundaryCrossed, isFalse);
+      expect(legitimateDrop.orderedFills.last.remainingQuantity, 19);
+    },
+  );
+  test(
     'net book promotes deeper prices and keeps ten asks and bids after exhaustion',
     () {
       final snapshot = buildGameOrderBookSnapshot(
@@ -2266,6 +2434,189 @@ void main() {
     },
   );
 
+  test(
+    'busy quote pulses update one 18-share wall independently from the border',
+    () {
+      const assetId = 'busy-independent-wall-flow';
+      const simulationSeed = 'busy-independent-wall-world';
+      const day = 6015;
+      const minute = 10 * 60 + 12;
+      const currentPrice = 10000.0;
+      const previousClose = 9800.0;
+      const sharesOutstanding = 500000000;
+      final date = DateTime(2016, 6, 20);
+      final pulseZero = gameOrderBookLiquidityPulseFrame(
+        marketMinute: minute,
+        slotIndex: 0,
+      );
+      final base = buildGameOrderBookSnapshot(
+        assetId: assetId,
+        day: day,
+        minute: minute,
+        currentPrice: currentPrice,
+        previousTradePrice: currentPrice,
+        previousClose: previousClose,
+        date: date,
+        market: '미래시장',
+        simulationSeed: simulationSeed,
+        sharesOutstanding: sharesOutstanding,
+        liquidityPulse: pulseZero,
+        adaptiveLiquidityPulses: true,
+      );
+
+      GameOrderBookLevel fixtureLevel(GameOrderBookLevel source) =>
+          GameOrderBookLevel(
+            side: source.side,
+            price: source.price,
+            quantity: source.isWall ? 18 : source.quantity,
+            isWall: source.isWall,
+            structuralKind: source.structuralKind,
+            structuralStrength: source.structuralStrength,
+            structuralHoldTicks: source.structuralHoldTicks,
+            isStructuralWall: source.isStructuralWall,
+            isStructuralBreached: source.isStructuralBreached,
+            structuralVacuumMultiplier: source.structuralVacuumMultiplier,
+            isPsychological: source.isPsychological,
+            technicalPeriods: source.technicalPeriods,
+            wasLiquidityPulseTouched: source.wasLiquidityPulseTouched,
+            queueRecoveryTargetQuantity: source.queueRecoveryTargetQuantity,
+          );
+      final asks = <GameOrderBookLevel>[
+        for (final entry in base.asks.asMap().entries)
+          fixtureLevel(entry.value),
+      ];
+      final bids = <GameOrderBookLevel>[
+        for (final entry in base.bids.asMap().entries)
+          fixtureLevel(entry.value),
+      ];
+      var current = GameOrderBookSnapshot(
+        asks: asks,
+        bids: bids,
+        turnoverEok: base.turnoverEok,
+        fullDayTurnoverEok: base.fullDayTurnoverEok,
+        boundaryBidPrice: base.bids.first.price,
+        executionCapacity: base.executionCapacity,
+        totalAskQuantity: asks.fold<int>(
+          0,
+          (sum, level) => sum + level.quantity,
+        ),
+        totalBidQuantity: bids.fold<int>(
+          0,
+          (sum, level) => sum + level.quantity,
+        ),
+        tradeStrength: base.tradeStrength,
+        liquidityPulse: pulseZero,
+        adaptiveLiquidityPulses: true,
+        rememberedLevels: <double, GameOrderBookLevel>{
+          for (final level in [...asks, ...bids]) level.price: level,
+        },
+        sourceAssetId: assetId,
+        sourceLiquidityDayKey: day,
+        sourceDateKey: marketDateKey(date),
+        sourceMarketMinute: minute,
+        sourceLastTradePrice: currentPrice,
+        sourceMarket: '미래시장',
+        sourceSimulationSeed: simulationSeed,
+      );
+      final fixedBoundary = current.boundaryBidPrice;
+      final changedSides = <GameOrderBookSide>{};
+      final changedWallKeys = <String>{};
+      GameOrderBookSide? previousChangedSide;
+
+      for (
+        var slot = 1;
+        slot <= gameOrderBookMaximumPulsesPerMarketMinute;
+        slot += 1
+      ) {
+        final next = buildGameOrderBookSnapshot(
+          assetId: assetId,
+          day: day,
+          minute: minute,
+          currentPrice: currentPrice,
+          previousTradePrice: currentPrice,
+          previousClose: previousClose,
+          date: date,
+          market: '미래시장',
+          simulationSeed: simulationSeed,
+          sharesOutstanding: sharesOutstanding,
+          previousSnapshot: current,
+          previousSnapshotMinute: minute,
+          liquidityPulse: gameOrderBookLiquidityPulseFrame(
+            marketMinute: minute,
+            slotIndex: slot,
+          ),
+          adaptiveLiquidityPulses: true,
+        );
+        final previousWalls = <String, GameOrderBookLevel>{
+          for (final level in [...current.asks, ...current.bids])
+            if (level.isWall) '${level.side.name}:${level.price}': level,
+        };
+        final changedWalls = <GameOrderBookLevel>[];
+        for (final level in [...next.asks, ...next.bids]) {
+          final previous = previousWalls['${level.side.name}:${level.price}'];
+          if (previous == null || !level.isWall) continue;
+          final delta = (level.quantity - previous.quantity).abs();
+          if (delta == 0) continue;
+          changedWalls.add(level);
+          changedSides.add(level.side);
+          changedWallKeys.add('${level.side.name}:${level.price}');
+          expect(
+            delta,
+            1,
+            reason:
+                'slot $slot ${level.side.name} ${level.price}: '
+                '${previous.quantity} -> ${level.quantity}',
+          );
+        }
+
+        final previousWallSummary = previousWalls.values
+            .map(
+              (level) => '${level.side.name}:${level.price}=${level.quantity}',
+            )
+            .join(',');
+        final nextWallSummary = [...next.asks, ...next.bids]
+            .where((level) => level.isWall)
+            .map(
+              (level) => '${level.side.name}:${level.price}=${level.quantity}',
+            )
+            .join(',');
+        expect(
+          changedWalls,
+          hasLength(1),
+          reason: 'slot $slot: 이전벽=$previousWallSummary 다음벽=$nextWallSummary',
+        );
+        final changedSide = changedWalls.single.side;
+        if (previousChangedSide != null) {
+          expect(
+            changedSide,
+            isNot(previousChangedSide),
+            reason: '배속·펄스 번호와 무관하게 매도·매수 대표 벽을 번갈아야 합니다.',
+          );
+        }
+        previousChangedSide = changedSide;
+        expect(next.boundaryBidPrice, fixedBoundary);
+        expect(next.sourceLastTradePrice, currentPrice);
+        expect(next.lastSyntheticTrade, current.lastSyntheticTrade);
+        expect(next.syntheticTradePrints, current.syntheticTradePrints);
+        expect(next.sweepSteps, current.sweepSteps);
+        current = next;
+      }
+
+      expect(
+        changedWallKeys.length,
+        lessThanOrEqualTo(2),
+        reason: '빠른 펄스를 따라잡아도 매도·매수 대표 벽 가격이 바뀌면 안 됩니다.',
+      );
+      expect(
+        changedSides,
+        containsAll(<GameOrderBookSide>[
+          GameOrderBookSide.ask,
+          GameOrderBookSide.bid,
+        ]),
+        reason: '매수벽과 매도벽은 체결 테두리 이동 없이도 각각 수급돼야 합니다.',
+      );
+    },
+  );
   test(
     'partially filled walls keep breathing while the price ladder moves',
     () {

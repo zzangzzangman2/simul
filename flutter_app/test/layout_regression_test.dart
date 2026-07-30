@@ -153,6 +153,52 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('360px controlled-company governance card stays inside', (
+    tester,
+  ) async {
+    await usePhoneSurface(tester);
+    final base = newState();
+    final state = base.copyWith(
+      company: base.company.copyWith(
+        id: 'hanbit_components',
+        name: '한빛전자부품',
+        worldStartedAtDay: 1828,
+        worldPremise: '의결권 55% · 이사회 4/7석',
+        votingOwnershipPct: 55,
+        economicOwnershipPct: 55,
+        boardSeats: 4,
+        totalBoardSeats: 7,
+        investmentBookValue: 390000,
+        acquiredAtDay: 1828,
+        leadershipModel: CompanyLeadershipModel.fatherAdvisor,
+        monthlyRevenue: 175000,
+        monthlyOperatingCost: 140000,
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: OrganizationScreen(
+          state: state,
+          onRequestFamilyHelp: (_) async => state,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final card = find.byKey(const Key('controlled-company-governance-card'));
+    expect(card, findsOneWidget);
+    await tester.ensureVisible(card);
+    await tester.pumpAndSettle();
+    final rect = tester.getRect(card);
+    expect(rect.left, greaterThanOrEqualTo(0));
+    expect(rect.right, lessThanOrEqualTo(phoneSize.width));
+    expect(find.text('한빛전자부품 · 경영권'), findsOneWidget);
+    expect(find.text('4/7석'), findsOneWidget);
+    expect(find.text('390,000원'), findsOneWidget);
+    expect(find.textContaining('정식 직원 수'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('360px work hub and rider stay inside', (tester) async {
     await usePhoneSurface(tester);
     final state = newState();
