@@ -8,6 +8,7 @@ enum _ChartPeriod { minute, day, week, month, year }
 
 const _visibleOrderBookSideRows = gameOrderBookLevelCount;
 const _orderBookMotionDuration = Duration(milliseconds: 144);
+const _inlineOrderSlideDuration = Duration(milliseconds: 320);
 const _orderBookSweepTotalDuration = Duration(milliseconds: 480);
 const _orderBookSweepMinimumStepDuration = Duration(milliseconds: 56);
 const _orderBookSweepMaximumStepDuration = Duration(milliseconds: 96);
@@ -6052,76 +6053,147 @@ class _InlineOrderWorkspace extends StatelessWidget {
             ),
           ),
           Expanded(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  child: isOrderForm
-                      ? _OrderSheet(
-                          key: ValueKey(
-                            'inline-order-${isBuy ? 'buy' : 'sell'}-$formRevision',
-                          ),
-                          definition: definition,
-                          live: live,
-                          isBuy: isBuy,
-                          state: state,
-                          minute: minute,
-                          liquidityPulseListenable: liquidityPulseListenable,
-                          marketSnapshotReader: marketSnapshotReader,
-                          onExecuteTrade: onExecuteTrade,
-                          initialOrderType: TradeOrderType.limit,
-                          initialLimitPrice: initialLimitPrice,
-                          initialQuantity: initialQuantity,
-                          submitLabel: isBuy ? '매수 주문' : '매도 주문',
-                          successLabel: '다음 주문',
-                          onSuccessContinue: onSuccessContinue,
-                          onSelectedLimitPriceChanged:
-                              onSelectedLimitPriceChanged,
-                          compact: true,
-                        )
-                      : section == _DetailedOrderSection.balance
-                      ? _InlineOrderBalancePanel(
-                          definition: definition,
-                          state: state,
-                        )
-                      : _InlinePendingOrdersPanel(
-                          definition: definition,
-                          state: state,
-                          correctionMode:
-                              section == _DetailedOrderSection.amendCancel,
-                          onCancel: onCancelPendingOrder,
-                          onAmend: onAmendPendingOrder,
-                        ),
-                ),
-                const VerticalDivider(width: 1, thickness: 1),
-                SizedBox(
-                  width: railWidth,
-                  child: ValueListenableBuilder<int>(
-                    valueListenable: liquidityPulseListenable,
-                    builder: (context, _, _) {
-                      final snapshot = marketSnapshotReader();
-                      return _CompactOrderBookRail(
-                        definition: definition,
-                        quote: live.value,
-                        state: state,
-                        minute: minute.value,
-                        snapshot: snapshot,
-                        sweepPackets: sweepPacketsReader(),
-                        onSweepPacketsAccepted: onSweepPacketsAccepted,
-                        playerTrade: playerTrade,
-                        selectedPrice: isOrderForm ? selectedLimitPrice : null,
-                        onSelectPrice: onSelectPrice,
-                      );
-                    },
-                  ),
-                ),
-              ],
+            child: _InlineOrderSlidingBody(
+              railWidth: railWidth,
+              orderPanel: isOrderForm
+                  ? _OrderSheet(
+                      key: ValueKey(
+                        'inline-order-${isBuy ? 'buy' : 'sell'}-$formRevision',
+                      ),
+                      definition: definition,
+                      live: live,
+                      isBuy: isBuy,
+                      state: state,
+                      minute: minute,
+                      liquidityPulseListenable: liquidityPulseListenable,
+                      marketSnapshotReader: marketSnapshotReader,
+                      onExecuteTrade: onExecuteTrade,
+                      initialOrderType: TradeOrderType.limit,
+                      initialLimitPrice: initialLimitPrice,
+                      initialQuantity: initialQuantity,
+                      submitLabel: isBuy ? '매수 주문' : '매도 주문',
+                      successLabel: '다음 주문',
+                      onSuccessContinue: onSuccessContinue,
+                      onSelectedLimitPriceChanged: onSelectedLimitPriceChanged,
+                      compact: true,
+                    )
+                  : section == _DetailedOrderSection.balance
+                  ? _InlineOrderBalancePanel(
+                      definition: definition,
+                      state: state,
+                    )
+                  : _InlinePendingOrdersPanel(
+                      definition: definition,
+                      state: state,
+                      correctionMode:
+                          section == _DetailedOrderSection.amendCancel,
+                      onCancel: onCancelPendingOrder,
+                      onAmend: onAmendPendingOrder,
+                    ),
+              orderBookRail: ValueListenableBuilder<int>(
+                valueListenable: liquidityPulseListenable,
+                builder: (context, _, _) {
+                  final snapshot = marketSnapshotReader();
+                  return _CompactOrderBookRail(
+                    definition: definition,
+                    quote: live.value,
+                    state: state,
+                    minute: minute.value,
+                    snapshot: snapshot,
+                    sweepPackets: sweepPacketsReader(),
+                    onSweepPacketsAccepted: onSweepPacketsAccepted,
+                    playerTrade: playerTrade,
+                    selectedPrice: isOrderForm ? selectedLimitPrice : null,
+                    onSelectPrice: onSelectPrice,
+                  );
+                },
+              ),
             ),
           ),
         ],
       ),
     );
   }
+}
+
+class _InlineOrderSlidingBody extends StatefulWidget {
+  const _InlineOrderSlidingBody({
+    required this.railWidth,
+    required this.orderPanel,
+    required this.orderBookRail,
+  });
+
+  final double railWidth;
+  final Widget orderPanel;
+  final Widget orderBookRail;
+
+  @override
+  State<_InlineOrderSlidingBody> createState() =>
+      _InlineOrderSlidingBodyState();
+}
+
+class _InlineOrderSlidingBodyState extends State<_InlineOrderSlidingBody>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _progress;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: _inlineOrderSlideDuration,
+      vsync: this,
+    );
+    _progress = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOutCubic,
+    );
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final workspaceWidth = constraints.maxWidth;
+      final railWidth = math.min(widget.railWidth, workspaceWidth).toDouble();
+      final panelWidth = math.max(0.0, workspaceWidth - railWidth - 1).toDouble();
+      return AnimatedBuilder(
+        animation: _progress,
+        builder: (context, _) {
+          final progress = _progress.value;
+          final visiblePanelWidth = panelWidth * progress;
+          return Row(
+            key: const Key('inline-order-slide-transition'),
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(
+                width: visiblePanelWidth,
+                child: ClipRect(
+                  child: OverflowBox(
+                    minWidth: panelWidth,
+                    maxWidth: panelWidth,
+                    alignment: Alignment.centerRight,
+                    child: widget.orderPanel,
+                  ),
+                ),
+              ),
+              SizedBox(
+                width: progress,
+                child: const ColoredBox(color: Color(0x1F000000)),
+              ),
+              Expanded(child: widget.orderBookRail),
+            ],
+          );
+        },
+      );
+    },
+  );
 }
 
 class _InlineOrderTab extends StatelessWidget {
@@ -7282,6 +7354,7 @@ class _CompactOrderBookRailState extends State<_CompactOrderBookRail>
       key: const Key('inline-order-book'),
       color: Colors.white,
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Container(
             height: 28,

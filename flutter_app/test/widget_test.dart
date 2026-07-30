@@ -3878,7 +3878,7 @@ void main() {
       await tester.tap(find.byKey(const Key('stock-row-1001')));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('stock-detail-tab-order')));
-      await tester.pump();
+      await tester.pumpAndSettle();
 
       await tester.tap(find.byKey(const Key('order-quantity-plus')));
       await tester.pump();
@@ -5324,7 +5324,7 @@ void main() {
       await tester.tap(find.byKey(const Key('market-speed-pause')).last);
       await tester.pump();
       await tester.tap(find.byKey(const Key('stock-detail-tab-order')));
-      await tester.pump();
+      await tester.pumpAndSettle();
 
       final compactBorder = find.byKey(
         const Key('inline-order-book-current-price-border'),
@@ -5562,7 +5562,7 @@ void main() {
       lastQuantity = positiveAskRows[1].quantity;
 
       await tester.tap(find.byKey(const Key('stock-detail-tab-order')));
-      await tester.pump();
+      await tester.pumpAndSettle();
       await tester.tap(find.text('시장가'));
       await tester.pump();
       await tester.tap(find.byKey(const Key('request-parent-order-approval')));
@@ -6378,6 +6378,180 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+    'buy and sell slide the ticket in while preserving both quote walls',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final state = const GameEngine()
+          .createNewGame('호가 슬라이드 보존 테스트', initialCash: 1000000)
+          .copyWith(day: 4, marketMinute: 9 * 60);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: StockMarketScreen(
+            state: state,
+            universe: testMarketUniverse(includeKnownPartner: true),
+          ),
+        ),
+      );
+      await openMarketExplore(tester);
+      await tester.tap(find.byKey(const Key('stock-row-1001')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('market-speed-pause')).last);
+      await tester.pump();
+
+      String normalizedPrice(String value) =>
+          value.replaceAll(RegExp(r'[^0-9]'), '');
+      Set<String> fullWallPrices(String side) => {
+        for (var index = 0; index < gameOrderBookLevelCount; index++)
+          normalizedPrice(
+            tester
+                .widget<Text>(
+                  find
+                      .descendant(
+                        of: find.byKey(Key('order-book-$side-$index')),
+                        matching: find.byKey(
+                          const ValueKey('order-book-price-label'),
+                        ),
+                      )
+                      .first,
+                )
+                .data!,
+          ),
+      };
+      Set<String> inlineWallPrices(String side) {
+        final rows = find
+            .byKey(ValueKey('inline-order-book-$side-row'))
+            .evaluate();
+        return {
+          for (final row in rows)
+            normalizedPrice(
+              tester
+                  .widget<Text>(
+                    find
+                        .descendant(
+                          of: find.byElementPredicate(
+                            (element) => identical(element, row),
+                          ),
+                          matching: find.byType(Text),
+                        )
+                        .first,
+                  )
+                  .data!,
+            ),
+        };
+      }
+
+      final asksBefore = fullWallPrices('ask');
+      final bidsBefore = fullWallPrices('bid');
+      expect(asksBefore, hasLength(gameOrderBookLevelCount));
+      expect(bidsBefore, hasLength(gameOrderBookLevelCount));
+
+      await tester.tap(find.byKey(const Key('quote-order-dock-buy')));
+      await tester.pump();
+
+      final workspace = find.byKey(const Key('inline-order-workspace'));
+      final ticket = find.byKey(const Key('inline-order-ticket'));
+      final rail = find.byKey(const Key('inline-order-book'));
+      final border = find.byKey(
+        const Key('inline-order-book-current-price-border'),
+      );
+      expect(
+        find.byKey(const Key('inline-order-slide-transition')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('inline-order-book-ask-row')),
+        findsNWidgets(gameOrderBookLevelCount),
+      );
+      expect(
+        find.byKey(const ValueKey('inline-order-book-bid-row')),
+        findsNWidgets(gameOrderBookLevelCount),
+      );
+      expect(inlineWallPrices('ask'), asksBefore);
+      expect(inlineWallPrices('bid'), bidsBefore);
+
+      final workspaceRect = tester.getRect(workspace);
+      final initialTicketRect = tester.getRect(ticket);
+      final initialRailRect = tester.getRect(rail);
+      final initialBorderPosition = tester.getTopLeft(border);
+      expect(
+        tester
+            .getSize(
+              find.byKey(const ValueKey('inline-order-book-ask-row')).first,
+            )
+            .width,
+        closeTo(initialRailRect.width, 0.1),
+      );
+      expect(initialTicketRect.right, closeTo(workspaceRect.left, 0.1));
+      expect(initialRailRect.left, closeTo(workspaceRect.left, 0.1));
+      expect(initialRailRect.right, closeTo(workspaceRect.right, 0.1));
+
+      await tester.pump(const Duration(milliseconds: 160));
+
+      final middleTicketRect = tester.getRect(ticket);
+      final middleRailRect = tester.getRect(rail);
+      final middleBorderPosition = tester.getTopLeft(border);
+      expect(middleTicketRect.left, greaterThan(initialTicketRect.left));
+      expect(middleTicketRect.right, greaterThan(workspaceRect.left));
+      expect(middleRailRect.left, greaterThan(initialRailRect.left));
+      expect(middleRailRect.right, closeTo(workspaceRect.right, 0.1));
+      expect(middleRailRect.width, lessThan(initialRailRect.width));
+      expect(
+        tester
+            .getSize(
+              find.byKey(const ValueKey('inline-order-book-ask-row')).first,
+            )
+            .width,
+        closeTo(middleRailRect.width, 0.1),
+      );
+      expect(middleBorderPosition.dx, greaterThan(initialBorderPosition.dx));
+      expect(middleBorderPosition.dy, closeTo(initialBorderPosition.dy, 0.1));
+      expect(inlineWallPrices('ask'), asksBefore);
+      expect(inlineWallPrices('bid'), bidsBefore);
+
+      await tester.pumpAndSettle();
+
+      final settledTicketRect = tester.getRect(ticket);
+      final settledRailRect = tester.getRect(rail);
+      final settledBorderPosition = tester.getTopLeft(border);
+      expect(settledTicketRect.left, closeTo(workspaceRect.left, 0.1));
+      expect(settledTicketRect.right, lessThanOrEqualTo(settledRailRect.left));
+      expect(settledRailRect.right, closeTo(workspaceRect.right, 0.1));
+      expect(settledRailRect.width, inInclusiveRange(138, 156));
+      expect(
+        tester
+            .getSize(
+              find.byKey(const ValueKey('inline-order-book-ask-row')).first,
+            )
+            .width,
+        closeTo(settledRailRect.width, 0.1),
+      );
+      expect(settledBorderPosition.dx, greaterThan(middleBorderPosition.dx));
+      expect(settledBorderPosition.dy, closeTo(initialBorderPosition.dy, 0.1));
+      expect(inlineWallPrices('ask'), asksBefore);
+      expect(inlineWallPrices('bid'), bidsBefore);
+
+      final preservedRailElement = tester.element(rail);
+      await tester.tap(find.byKey(const Key('sell-stock-button')));
+      await tester.pump();
+      expect(find.text('매도 주문'), findsWidgets);
+      expect(identical(tester.element(rail), preservedRailElement), isTrue);
+      expect(tester.getRect(rail), equals(settledRailRect));
+      expect(inlineWallPrices('ask'), asksBefore);
+      expect(inlineWallPrices('bid'), bidsBefore);
+
+      await tester.tap(find.byKey(const Key('buy-stock-button')));
+      await tester.pump();
+      expect(find.text('매수 주문'), findsWidgets);
+      expect(identical(tester.element(rail), preservedRailElement), isTrue);
+      expect(tester.getRect(rail), equals(settledRailRect));
+      expect(inlineWallPrices('ask'), asksBefore);
+      expect(inlineWallPrices('bid'), bidsBefore);
+      expect(tester.takeException(), isNull);
+    },
+  );
   testWidgets('order book fits a compact phone without quote scrolling', (
     tester,
   ) async {
@@ -6425,7 +6599,7 @@ void main() {
     );
 
     await tester.tap(find.byKey(const Key('stock-detail-tab-order')));
-    await tester.pump();
+    await tester.pumpAndSettle();
     expect(find.byKey(const Key('inline-order-workspace')), findsOneWidget);
     expect(find.byKey(const Key('inline-order-ticket')), findsOneWidget);
     expect(find.byKey(const Key('inline-order-book')), findsOneWidget);
