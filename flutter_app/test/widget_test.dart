@@ -2636,6 +2636,7 @@ void main() {
       );
       final afterReentry = displayedBookSignature();
       expect(afterReentry, hasLength(beforeLeaving.length));
+      final reentryQuantityChanges = <String>[];
       for (var index = 0; index < beforeLeaving.length; index += 1) {
         final before = beforeLeaving[index];
         final after = afterReentry[index];
@@ -2648,12 +2649,20 @@ void main() {
         );
         final beforeQuantity = int.parse(before.substring(beforeSeparator + 1));
         final afterQuantity = int.parse(after.substring(afterSeparator + 1));
-        expect(
-          (afterQuantity - beforeQuantity).abs(),
-          lessThanOrEqualTo(5),
-          reason: '재진입 중 완료된 pending FIFO 이외의 호가 수량 재추첨은 허용되지 않습니다.',
-        );
+        if (afterQuantity != beforeQuantity) {
+          reentryQuantityChanges.add('$index:$beforeQuantity->$afterQuantity');
+        }
       }
+      expect(
+        reentryQuantityChanges.length,
+        lessThanOrEqualTo(2),
+        reason: '재진입 중 완료되는 pending FIFO는 최우선 매도·매수 두 행만 바꿀 수 있습니다.',
+      );
+      expect(
+        reentryQuantityChanges,
+        everyElement(anyOf(startsWith('0:'), startsWith('10:'))),
+        reason: '최우선 두 행 이외의 호가 수량을 재추첨하면 안 됩니다.',
+      );
       expect(tester.takeException(), isNull);
     },
   );

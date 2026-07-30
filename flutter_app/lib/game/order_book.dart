@@ -1886,16 +1886,57 @@ GameOrderBookLevel? _gameOrderBookOppositeQueueAfterTouchConsumption({
           originalTarget ?? target,
           baselineQuantity: recoveryBaseline,
         )
-      : 0;
+      : recoveryBaseline;
+  final seededAssetId =
+      '${snapshot.sourceSimulationSeed ?? ''}:'
+      '${snapshot.sourceAssetId ?? 'order-book'}';
+  final day = snapshot.sourceLiquidityDayKey ?? 0;
+  final priceSalt =
+      target.price.round() * 97 +
+      (target.side == GameOrderBookSide.ask ? 1907 : 3529);
+  final targetVariation =
+      0.84 + _orderBookUnit(seededAssetId, day, priceSalt) * 0.32;
+  final initialShare =
+      0.16 + _orderBookUnit(seededAssetId, day, priceSalt + 811) * 0.12;
+  final ordinaryReference = structuralQueueBreached
+      ? math.max(
+          structuralRecoveryCeiling,
+          math.max(
+            (oppositeTouch.quantity * 0.35).round(),
+            (snapshot.executionCapacity * 0.18).round(),
+          ),
+        )
+      : math.max(
+          recoveryBaseline,
+          math.max(
+            (oppositeTouch.quantity * 0.55).round(),
+            (snapshot.executionCapacity * 0.35).round(),
+          ),
+        );
+  final unboundedRecoveryTarget = math.max(
+    gameOrderBookMinimumDisplayedQuantity * 2,
+    (math.max(1, ordinaryReference) * targetVariation).round(),
+  );
+  final recoveryTarget = structuralQueueBreached
+      ? math.max(
+          gameOrderBookMinimumDisplayedQuantity * 2,
+          math.min(structuralRecoveryCeiling, unboundedRecoveryTarget),
+        )
+      : unboundedRecoveryTarget;
   var practicalQuantity = math.max(
     gameOrderBookMinimumDisplayedQuantity,
     math.max(
-      (math.max(1, recoveryBaseline) * 0.12).round(),
-      (math.max(1, snapshot.executionCapacity) * 0.08).round(),
+      (recoveryTarget * initialShare).round(),
+      (math.max(1, snapshot.executionCapacity) * 0.05).round(),
     ),
   );
-  if (structuralQueueBreached) {
-    practicalQuantity = math.min(practicalQuantity, structuralRecoveryCeiling);
+  practicalQuantity = math.min(practicalQuantity, recoveryTarget);
+  if (practicalQuantity >= recoveryTarget &&
+      recoveryTarget > gameOrderBookMinimumDisplayedQuantity) {
+    practicalQuantity = math.max(
+      gameOrderBookMinimumDisplayedQuantity,
+      recoveryTarget - 1,
+    );
   }
   return GameOrderBookLevel(
     side: target.side == GameOrderBookSide.ask
@@ -1915,7 +1956,9 @@ GameOrderBookLevel? _gameOrderBookOppositeQueueAfterTouchConsumption({
     isPsychological: target.isPsychological,
     technicalPeriods: target.technicalPeriods,
     wasLiquidityPulseTouched: true,
-    queueRecoveryTargetQuantity: 0,
+    queueRecoveryTargetQuantity: recoveryTarget > practicalQuantity
+        ? recoveryTarget
+        : 0,
   );
 }
 
@@ -2729,6 +2772,13 @@ GameOrderBookSnapshot buildGameOrderBookSnapshot({
           )
         : 0;
     if (fill.side != level.side) {
+      final promoted = _gameOrderBookOppositeQueueAfterTouchConsumption(
+        snapshot: previousSnapshot!,
+        target: previousLevel,
+      );
+      if (promoted != null && promoted.side == level.side) {
+        return promoted;
+      }
       if (!structuralQueueBreached) return carried;
       final breachedQuantity = math.min(carried.quantity, recoveryCeiling);
       return _gameOrderBookLevelWithQuantity(
@@ -3160,6 +3210,16 @@ class _GameOrderBookCarryContext {
          ])
            level.price: level,
        },
+       hasCompetingDepletedRecoveries =
+           previousSnapshot.rememberedLevels.values
+               .where(
+                 (level) =>
+                     level.quantity <= 0 &&
+                     level.queueRecoveryTargetQuantity > 0,
+               )
+               .take(2)
+               .length >
+           1,
        pulseAdvanced =
            adaptiveLiquidityPulses &&
            liquidityPulse > previousSnapshot.liquidityPulse,
@@ -3203,6 +3263,7 @@ class _GameOrderBookCarryContext {
   final _GameOrderBookQueueArrivalProfile queueArrivalProfile;
   final double effectiveLimit;
   final bool continuousDisplayedLadder;
+  final bool hasCompetingDepletedRecoveries;
 
   bool _isImmediateLatestDepletion(GameOrderBookLevel level) {
     final trade = latestSyntheticTrade;
@@ -3222,6 +3283,13 @@ class _GameOrderBookCarryContext {
       0,
       previous.queueRecoveryTargetQuantity,
     );
+    final isStructuralVacuum =
+        level.isStructuralBreached ||
+        previous.isStructuralBreached ||
+        level.structuralVacuumMultiplier < 0.999999 ||
+        previous.structuralVacuumMultiplier < 0.999999;
+    final isRecoveringOrdinaryQueue =
+        previousRecoveryTarget > previous.quantity && !previous.isWall;
     if (previous.quantity <= 0) {
       if (level.quantity <= 0) {
         return (
@@ -3236,11 +3304,14 @@ class _GameOrderBookCarryContext {
           queueRecoveryTargetQuantity: previousRecoveryTarget,
         );
       }
-      final isStructuralVacuum =
-          level.isStructuralBreached ||
-          previous.isStructuralBreached ||
-          level.structuralVacuumMultiplier < 0.999999 ||
-          previous.structuralVacuumMultiplier < 0.999999;
+      if (pulseAdvanced &&
+          hasCompetingDepletedRecoveries &&
+          !level.wasLiquidityPulseTouched) {
+        return (
+          quantity: 0,
+          queueRecoveryTargetQuantity: previousRecoveryTarget,
+        );
+      }
       // A just-breached wall leaves a real gap around the touch. Once price is
       // at least two rows away, only a heavily suppressed ordinary queue may
       // enter; the structural-wall flag itself never returns.
@@ -3266,7 +3337,10 @@ class _GameOrderBookCarryContext {
           : level.quantity;
       final firstArrivalCap =
           recoveryTarget > gameOrderBookMinimumDisplayedQuantity
-          ? recoveryTarget - 1
+          ? math.max(
+              gameOrderBookMinimumDisplayedQuantity,
+              (recoveryTarget * 0.45).round(),
+            )
           : recoveryTarget;
       final quantity = math.min(
         level.quantity,
@@ -3286,10 +3360,7 @@ class _GameOrderBookCarryContext {
         queueRecoveryTargetQuantity: previousRecoveryTarget,
       );
     }
-    if (level.isStructuralBreached ||
-        previous.isStructuralBreached ||
-        level.structuralVacuumMultiplier < 0.999999 ||
-        previous.structuralVacuumMultiplier < 0.999999) {
+    if (isStructuralVacuum && !isRecoveringOrdinaryQueue) {
       return (
         quantity: math.min(previous.quantity, level.quantity),
         queueRecoveryTargetQuantity: 0,
@@ -3301,12 +3372,7 @@ class _GameOrderBookCarryContext {
         queueRecoveryTargetQuantity: previousRecoveryTarget,
       );
     }
-    final isRecoveringOrdinaryQueue =
-        previousRecoveryTarget > previous.quantity && !level.isWall;
-    if (pulseAdvanced &&
-        !minuteAdvanced &&
-        !level.wasLiquidityPulseTouched &&
-        !isRecoveringOrdinaryQueue) {
+    if (pulseAdvanced && !level.wasLiquidityPulseTouched) {
       return (
         quantity: previous.quantity,
         queueRecoveryTargetQuantity: previousRecoveryTarget,
@@ -3327,20 +3393,27 @@ class _GameOrderBookCarryContext {
     // gradual interpolation is only for replenishment and must never preserve
     // more standing depth than the current target actually contains.
     quantity = math.min(quantity, level.quantity);
-    if (isRecoveringOrdinaryQueue && level.quantity > previous.quantity) {
-      final arrival = queueArrivalProfile.replenishmentFor(
+    if (isRecoveringOrdinaryQueue) {
+      var arrival = queueArrivalProfile.replenishmentFor(
         level,
         ticksFromTouch: ticksFromTouch,
       );
+      if (isStructuralVacuum && arrival > 0) {
+        arrival = math.max(1, (arrival * 0.35).round());
+      }
       final replenishmentTarget = previousRecoveryTarget > 0
-          ? math.min(previousRecoveryTarget, level.quantity)
+          ? isStructuralVacuum
+                ? previousRecoveryTarget
+                : math.min(previousRecoveryTarget, level.quantity)
           : level.quantity;
       quantity = math.min(
         replenishmentTarget,
         math.max(quantity, previous.quantity + arrival),
       );
     }
-    final recoveryGoal = math.min(previousRecoveryTarget, level.quantity);
+    final recoveryGoal = isStructuralVacuum
+        ? previousRecoveryTarget
+        : math.min(previousRecoveryTarget, level.quantity);
     return (
       quantity: quantity,
       queueRecoveryTargetQuantity: recoveryGoal <= 0 || quantity >= recoveryGoal
@@ -3412,6 +3485,9 @@ class _GameOrderBookCarryContext {
         queueRecoveryTargetQuantity: 0,
       );
     }
+    final carriesRecoveringOrdinaryQueue =
+        previous.queueRecoveryTargetQuantity > previous.quantity &&
+        !previous.isWall;
     final carried = _carriedQueue(
       level,
       previous,
@@ -3424,7 +3500,10 @@ class _GameOrderBookCarryContext {
       side: level.side,
       price: level.price,
       quantity: displayedQuantity,
-      isWall: carriedStructuralBreach || carriedStructuralVacuum < 0.999999
+      isWall:
+          carriesRecoveringOrdinaryQueue ||
+              carriedStructuralBreach ||
+              carriedStructuralVacuum < 0.999999
           ? false
           : level.isStructuralWall
           ? true
@@ -3432,7 +3511,8 @@ class _GameOrderBookCarryContext {
       structuralKind: level.structuralKind,
       structuralStrength: level.structuralStrength,
       structuralHoldTicks: level.structuralHoldTicks,
-      isStructuralWall: carriedStructuralBreach
+      isStructuralWall:
+          carriesRecoveringOrdinaryQueue || carriedStructuralBreach
           ? false
           : level.isStructuralWall,
       isStructuralBreached: carriedStructuralBreach,
