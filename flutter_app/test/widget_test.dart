@@ -4260,145 +4260,152 @@ void main() {
     expect(transition.before, isNot(1.0));
   });
 
-  test(
-    'order-book sweep presentation keeps every future wall until its border arrives',
-    () {
-      const rememberedAsk100 = GameOrderBookLevel(
+  test('order-book sweep keeps future walls and skips consumed zero rows', () {
+    const rememberedAsk100 = GameOrderBookLevel(
+      side: GameOrderBookSide.ask,
+      price: 100,
+      quantity: 50,
+      isWall: true,
+    );
+    const rememberedAsk101 = GameOrderBookLevel(
+      side: GameOrderBookSide.ask,
+      price: 101,
+      quantity: 40,
+      isWall: true,
+    );
+    const finalAsk101 = GameOrderBookLevel(
+      side: GameOrderBookSide.ask,
+      price: 101,
+      quantity: 20,
+      isWall: false,
+    );
+    const finalAsk102 = GameOrderBookLevel(
+      side: GameOrderBookSide.ask,
+      price: 102,
+      quantity: 30,
+      isWall: false,
+    );
+    const promotedBid100 = GameOrderBookLevel(
+      side: GameOrderBookSide.bid,
+      price: 100,
+      quantity: 70,
+      isWall: true,
+    );
+    const bid99 = GameOrderBookLevel(
+      side: GameOrderBookSide.bid,
+      price: 99,
+      quantity: 25,
+      isWall: false,
+    );
+    const steps = <GameOrderBookSweepStep>[
+      GameOrderBookSweepStep(
+        marketMinute: 540,
+        liquidityPulse: 1,
+        sequence: 0,
         side: GameOrderBookSide.ask,
         price: 100,
-        quantity: 50,
-        isWall: true,
-      );
-      const rememberedAsk101 = GameOrderBookLevel(
+        consumedQuantity: 50,
+        remainingQuantity: 0,
+        structuralBreach: true,
+        boundaryCrossed: true,
+      ),
+      GameOrderBookSweepStep(
+        marketMinute: 540,
+        liquidityPulse: 1,
+        sequence: 1,
         side: GameOrderBookSide.ask,
         price: 101,
-        quantity: 40,
-        isWall: true,
-      );
-      const finalAsk101 = GameOrderBookLevel(
-        side: GameOrderBookSide.ask,
-        price: 101,
-        quantity: 20,
-        isWall: false,
-      );
-      const finalAsk102 = GameOrderBookLevel(
-        side: GameOrderBookSide.ask,
-        price: 102,
-        quantity: 30,
-        isWall: false,
-      );
-      const promotedBid100 = GameOrderBookLevel(
-        side: GameOrderBookSide.bid,
-        price: 100,
-        quantity: 70,
-        isWall: true,
-      );
-      const bid99 = GameOrderBookLevel(
-        side: GameOrderBookSide.bid,
-        price: 99,
-        quantity: 25,
-        isWall: false,
-      );
-      const steps = <GameOrderBookSweepStep>[
-        GameOrderBookSweepStep(
-          marketMinute: 540,
-          liquidityPulse: 1,
-          sequence: 0,
-          side: GameOrderBookSide.ask,
-          price: 100,
-          consumedQuantity: 50,
-          remainingQuantity: 0,
-          structuralBreach: true,
-          boundaryCrossed: true,
-        ),
-        GameOrderBookSweepStep(
-          marketMinute: 540,
-          liquidityPulse: 1,
-          sequence: 1,
-          side: GameOrderBookSide.ask,
-          price: 101,
-          consumedQuantity: 20,
-          remainingQuantity: 20,
-          structuralBreach: false,
-          boundaryCrossed: false,
-        ),
-      ];
-      final snapshot = GameOrderBookSnapshot(
-        asks: <GameOrderBookLevel>[finalAsk101, finalAsk102],
-        bids: <GameOrderBookLevel>[promotedBid100, bid99],
-        turnoverEok: 0,
-        executionCapacity: 70,
-        totalAskQuantity: 50,
-        totalBidQuantity: 95,
-        tradeStrength: 190,
-        rememberedLevels: <double, GameOrderBookLevel>{
-          100: rememberedAsk100,
-          101: rememberedAsk101,
-        },
-        sweepSteps: steps,
-      );
+        consumedQuantity: 20,
+        remainingQuantity: 20,
+        structuralBreach: false,
+        boundaryCrossed: false,
+      ),
+    ];
+    final snapshot = GameOrderBookSnapshot(
+      asks: <GameOrderBookLevel>[finalAsk101, finalAsk102],
+      bids: <GameOrderBookLevel>[promotedBid100, bid99],
+      turnoverEok: 0,
+      executionCapacity: 70,
+      totalAskQuantity: 50,
+      totalBidQuantity: 95,
+      tradeStrength: 190,
+      rememberedLevels: <double, GameOrderBookLevel>{
+        100: rememberedAsk100,
+        101: rememberedAsk101,
+      },
+      sweepSteps: steps,
+    );
 
-      GameOrderBookLevel levelAt(
-        List<GameOrderBookLevel> levels,
-        GameOrderBookSide side,
-        double price,
-      ) => levels.firstWhere(
-        (level) => level.side == side && level.price == price,
-      );
+    GameOrderBookLevel levelAt(
+      List<GameOrderBookLevel> levels,
+      GameOrderBookSide side,
+      double price,
+    ) => levels.firstWhere(
+      (level) => level.side == side && level.price == price,
+    );
 
-      final firstArriving = orderBookSweepPresentationLevels(
-        snapshot: snapshot,
-        steps: steps,
-        activeStepIndex: 0,
-        activeStepArrived: false,
-        sideRowCount: 4,
-      );
-      expect(levelAt(firstArriving, GameOrderBookSide.ask, 100).quantity, 50);
-      expect(levelAt(firstArriving, GameOrderBookSide.ask, 101).quantity, 40);
-      expect(
-        firstArriving.any(
-          (level) => level.side == GameOrderBookSide.bid && level.price == 100,
-        ),
-        isFalse,
-        reason: '체결 전에는 같은 가격의 반대편 신규 큐를 먼저 보여주면 안 됩니다.',
-      );
+    final firstArriving = orderBookSweepPresentationLevels(
+      snapshot: snapshot,
+      steps: steps,
+      activeStepIndex: 0,
+      activeStepArrived: false,
+      sideRowCount: 4,
+    );
+    expect(levelAt(firstArriving, GameOrderBookSide.ask, 100).quantity, 50);
+    expect(levelAt(firstArriving, GameOrderBookSide.ask, 101).quantity, 40);
+    expect(
+      firstArriving.any(
+        (level) => level.side == GameOrderBookSide.bid && level.price == 100,
+      ),
+      isFalse,
+      reason: '체결 전에는 같은 가격의 반대편 신규 큐를 먼저 보여주면 안 됩니다.',
+    );
 
-      final firstDraining = orderBookSweepPresentationLevels(
-        snapshot: snapshot,
-        steps: steps,
-        activeStepIndex: 0,
-        activeStepArrived: true,
-        sideRowCount: 4,
-      );
-      expect(levelAt(firstDraining, GameOrderBookSide.ask, 100).quantity, 0);
-      expect(levelAt(firstDraining, GameOrderBookSide.ask, 101).quantity, 40);
+    final firstDraining = orderBookSweepPresentationLevels(
+      snapshot: snapshot,
+      steps: steps,
+      activeStepIndex: 0,
+      activeStepArrived: true,
+      sideRowCount: 4,
+    );
+    expect(
+      firstDraining.any(
+        (level) => level.side == GameOrderBookSide.ask && level.price == 100,
+      ),
+      isFalse,
+      reason: '전량체결된 현재 행도 숫자 0으로 그리지 않고 즉시 다음 양수 호가로 넘어가야 합니다.',
+    );
+    expect(
+      firstDraining.map((level) => level.quantity),
+      everyElement(greaterThan(0)),
+    );
+    expect(levelAt(firstDraining, GameOrderBookSide.ask, 101).quantity, 40);
 
-      final secondArriving = orderBookSweepPresentationLevels(
-        snapshot: snapshot,
-        steps: steps,
-        activeStepIndex: 1,
-        activeStepArrived: false,
-        sideRowCount: 4,
-      );
-      expect(
-        secondArriving.any(
-          (level) => level.side == GameOrderBookSide.ask && level.price == 100,
-        ),
-        isFalse,
-        reason: '지나간 0주 ghost는 다음 깊은 체결행의 10호가 슬롯을 가리면 안 됩니다.',
-      );
-      expect(levelAt(secondArriving, GameOrderBookSide.ask, 101).quantity, 40);
+    final secondArriving = orderBookSweepPresentationLevels(
+      snapshot: snapshot,
+      steps: steps,
+      activeStepIndex: 1,
+      activeStepArrived: false,
+      sideRowCount: 4,
+    );
+    expect(
+      secondArriving.any(
+        (level) => level.side == GameOrderBookSide.ask && level.price == 100,
+      ),
+      isFalse,
+      reason: '지나간 0주 ghost는 다음 깊은 체결행의 10호가 슬롯을 가리면 안 됩니다.',
+    );
+    expect(levelAt(secondArriving, GameOrderBookSide.ask, 101).quantity, 40);
 
-      final secondDraining = orderBookSweepPresentationLevels(
-        snapshot: snapshot,
-        steps: steps,
-        activeStepIndex: 1,
-        activeStepArrived: true,
-        sideRowCount: 4,
-      );
-      expect(levelAt(secondDraining, GameOrderBookSide.ask, 101).quantity, 20);
-    },
-  );
+    final secondDraining = orderBookSweepPresentationLevels(
+      snapshot: snapshot,
+      steps: steps,
+      activeStepIndex: 1,
+      activeStepArrived: true,
+      sideRowCount: 4,
+    );
+    expect(levelAt(secondDraining, GameOrderBookSide.ask, 101).quantity, 20);
+  });
 
   test('repeated passive fills never make the same wall rebound', () {
     const externalBid = GameOrderBookLevel(
@@ -5712,7 +5719,7 @@ void main() {
         reason: '플레이어 체결도 첫 가격 테두리가 도착하기 전에는 테이프에 먼저 나오면 안 됩니다.',
       );
 
-      Finder askRowAtPrice(int price) {
+      Finder askRowFinderAtPrice(int price) {
         for (var index = 0; index < gameOrderBookLevelCount; index += 1) {
           final row = find.byKey(ValueKey('order-book-ask-$index'));
           final label = find.descendant(
@@ -5724,7 +5731,15 @@ void main() {
             return row;
           }
         }
-        fail('매도호가 $price 행이 순차 체결 재생 중 보여야 합니다.');
+        return find.byKey(ValueKey('missing-order-book-ask-$price'));
+      }
+
+      Finder askRowAtPrice(int price) {
+        final row = askRowFinderAtPrice(price);
+        if (row.evaluate().isEmpty) {
+          fail('매도호가 $price 행이 순차 체결 재생 중 보여야 합니다.');
+        }
+        return row;
       }
 
       int askQuantityAtPrice(int price) {
@@ -5759,72 +5774,67 @@ void main() {
       );
       expect(askQuantityAtPrice(lastPrice), lastQuantity);
 
+      final firstTargetTop = tester.getCenter(askRowAtPrice(firstPrice)).dy;
       await tester.pump(const Duration(milliseconds: 72));
       expect(
-        tester.getCenter(border).dy,
-        closeTo(tester.getCenter(askRowAtPrice(firstPrice)).dy, 0.1),
-        reason: '첫 벽 소진은 테두리가 첫 체결가에 도착한 뒤에만 시작해야 합니다.',
-      );
-      final firstPlayerTrade = _displayedOrderBookTrade(tester, player: true);
-      expect(firstPlayerTrade.isBuy, isTrue);
-      expect(firstPlayerTrade.price, firstPrice);
-      expect(firstPlayerTrade.printedQuantity, firstQuantity);
-      final firstDrainBorderTop = tester.getCenter(border).dy;
-      expect(find.byKey(const Key('order-book-sweep-step')), findsOneWidget);
-
-      await tester.pump(const Duration(milliseconds: 96));
-      expect(
-        tester.widget<Widget>(border),
-        isA<AnimatedPositioned>(),
-        reason: 'step 1 drain→step 2 arrival 전환에도 같은 runtime widget을 유지해야 합니다.',
-      );
-      expect(
-        tester.getCenter(border).dy,
-        closeTo(firstDrainBorderTop, 0.1),
-        reason: '두 번째 step 시작 프레임에 테두리가 다음 행으로 순간이동하면 안 됩니다.',
-      );
-      expect(
-        askQuantityAtPrice(lastPrice),
-        lastQuantity,
-        reason: '첫 벽 소진 뒤 두 번째 가격으로 이동 중에도 두 번째 벽은 유지돼야 합니다.',
-      );
-      expect(
-        find.byKey(const Key('order-book-sweep-position')),
+        askRowFinderAtPrice(firstPrice),
         findsNothing,
-        reason: '두 번째 행 arrival 중에는 벽 소진 오버레이가 먼저 보이면 안 됩니다.',
+        reason: '전량 체결된 첫 가격은 0주 drain 행으로 남지 않아야 합니다.',
+      );
+      expect(askQuantityAtPrice(lastPrice), lastQuantity);
+      expect(
+        tester.getCenter(border).dy,
+        closeTo(firstTargetTop, 0.1),
+        reason: '첫 가격 도착 직후 다음 가격 이동은 현재 위치에서 연속으로 시작해야 합니다.',
+      );
+      expect(
+        _displayedOrderBookQuantities(tester).values,
+        everyElement(greaterThan(0)),
+        reason: '첫 전량체결 직후에도 화면에 숫자 0 행을 한 프레임도 남기면 안 됩니다.',
       );
 
       final secondTargetTop = tester.getCenter(askRowAtPrice(lastPrice)).dy;
       await tester.pump(const Duration(milliseconds: 72));
       final midArrivalTop = tester.getCenter(border).dy;
-      if ((firstDrainBorderTop - secondTargetTop).abs() > 0.1) {
+      if ((firstTargetTop - secondTargetTop).abs() > 0.1) {
         expect(
           midArrivalTop,
           allOf(
-            greaterThan(math.min(firstDrainBorderTop, secondTargetTop)),
-            lessThan(math.max(firstDrainBorderTop, secondTargetTop)),
+            greaterThan(math.min(firstTargetTop, secondTargetTop)),
+            lessThan(math.max(firstTargetTop, secondTargetTop)),
           ),
-          reason: 'step 1→2 테두리는 두 실제 행 사이를 연속 이동해야 합니다.',
-        );
-      } else {
-        expect(
-          midArrivalTop,
-          closeTo(secondTargetTop, 0.1),
-          reason: '첫 벽 제거 뒤 다음 가격이 같은 화면 행으로 승격돼도 테두리가 이탈하면 안 됩니다.',
+          reason: '0주 행을 건너뛰어도 테두리는 다음 실제 행까지 연속 이동해야 합니다.',
         );
       }
-      expect(
-        askQuantityAtPrice(lastPrice),
-        lastQuantity,
-        reason: '두 번째 테두리가 이동 중일 때 두 번째 벽이 먼저 줄면 안 됩니다.',
-      );
-      expect(find.byKey(const Key('order-book-sweep-position')), findsNothing);
+      expect(askQuantityAtPrice(lastPrice), lastQuantity);
 
-      await tester.pump(const Duration(milliseconds: 72));
+      var lastFillPresented = false;
+      for (var frame = 0; frame < 24; frame += 1) {
+        await tester.pump(const Duration(milliseconds: 8));
+        expect(
+          _displayedOrderBookQuantities(tester).values,
+          everyElement(greaterThan(0)),
+          reason: '마지막 전량체결 전환 중에도 숫자 0 행이 한 프레임이라도 보이면 안 됩니다.',
+        );
+        final playerTape = find.byKey(
+          const Key('order-book-player-tape-print'),
+        );
+        if (playerTape.evaluate().isNotEmpty) {
+          final visiblePlayerTrade = _displayedOrderBookTrade(
+            tester,
+            player: true,
+          );
+          if (visiblePlayerTrade.price == lastPrice &&
+              visiblePlayerTrade.printedQuantity == lastQuantity) {
+            lastFillPresented = true;
+            break;
+          }
+        }
+      }
       expect(
-        tester.getCenter(border).dy,
-        closeTo(tester.getCenter(askRowAtPrice(lastPrice)).dy, 0.1),
-        reason: '두 번째 벽도 같은 가격에 테두리가 도착한 뒤 소진해야 합니다.',
+        lastFillPresented,
+        isTrue,
+        reason: '마지막 전량체결도 순서대로 도착해야 하며 0주 행은 노출하면 안 됩니다.',
       );
       playerTrade = _displayedOrderBookTrade(tester, player: true);
       expect(playerTrade.isBuy, isTrue);
@@ -5835,17 +5845,6 @@ void main() {
             find.byKey(const Key('order-book-tape-quantity-side')).first,
           )
           .data;
-
-      await tester.pump(const Duration(milliseconds: 96));
-      await tester.pump(const Duration(milliseconds: 112));
-      // Completed zero ghosts disappear after their own arrival/drain playback;
-      // a fresh opposite queue may legally open at the crossed boundary.
-      final displayedAfterFill = _displayedOrderBookQuantities(tester);
-      expect(
-        displayedAfterFill.values.every((quantity) => quantity > 0),
-        isTrue,
-        reason: '플레이어가 전량 체결한 행도 숫자 0으로 남으면 안 됩니다.',
-      );
       expect(
         playerTrade.printedQuantity,
         isNot(firstQuantity + lastQuantity),
@@ -6573,6 +6572,43 @@ void main() {
         };
       }
 
+      Map<String, int> inlineQuantities() {
+        final result = <String, int>{};
+        for (final side in const <String>['ask', 'bid']) {
+          final rows = find
+              .byKey(ValueKey('inline-order-book-$side-row'))
+              .evaluate();
+          for (final row in rows) {
+            final rowFinder = find.byElementPredicate(
+              (element) => identical(element, row),
+            );
+            final priceText = tester
+                .widget<Text>(
+                  find
+                      .descendant(of: rowFinder, matching: find.byType(Text))
+                      .first,
+                )
+                .data!;
+            final quantityText = tester
+                .widget<Text>(
+                  find
+                      .descendant(
+                        of: rowFinder,
+                        matching: find.byKey(
+                          const Key('inline-order-book-quantity-value'),
+                        ),
+                      )
+                      .first,
+                )
+                .data!;
+            result['$side:${normalizedPrice(priceText)}'] = int.parse(
+              normalizedPrice(quantityText),
+            );
+          }
+        }
+        return result;
+      }
+
       final asksBefore = fullWallPrices('ask');
       final bidsBefore = fullWallPrices('bid');
       expect(asksBefore, hasLength(gameOrderBookLevelCount));
@@ -6652,8 +6688,45 @@ void main() {
           .map((builder) => builder.valueListenable)
           .whereType<ValueNotifier<int>>()
           .first;
-      pulseNotifierDuringSlide.value += 1;
+      pulseNotifierDuringSlide.value = gameOrderBookLiquidityPulseFrame(
+        marketMinute: state.marketMinute,
+        slotIndex: 0,
+      );
       await tester.pump();
+      await tester.tap(find.byKey(const Key('market-speed-1x')).last);
+      await tester.pump();
+      final quantitiesBeforePulse = inlineQuantities();
+      pulseNotifierDuringSlide.value = gameOrderBookLiquidityPulseFrame(
+        marketMinute: state.marketMinute,
+        slotIndex: 1,
+      );
+      await tester.pump();
+      final quantitiesAfterPulse = inlineQuantities();
+      final changedQuantities = <String>[
+        for (final entry in quantitiesBeforePulse.entries)
+          if (quantitiesAfterPulse[entry.key] != null &&
+              quantitiesAfterPulse[entry.key] != entry.value)
+            entry.key,
+      ];
+      final sortedDepth = quantitiesBeforePulse.values.toList(growable: false)
+        ..sort((left, right) => right.compareTo(left));
+      final largeDepthThreshold =
+          sortedDepth[math.min(5, sortedDepth.length - 1)];
+      expect(
+        changedQuantities.any((key) {
+          final before = quantitiesBeforePulse[key]!;
+          final after = quantitiesAfterPulse[key]!;
+          return before >= largeDepthThreshold &&
+              (after - before).abs() <= math.max(1, (before * 0.02).ceil());
+        }),
+        isTrue,
+        reason: '슬라이드 중에도 큰 매수벽·매도벽 중 한 행은 2% 이내로 실제 미세 수정돼야 합니다.',
+      );
+      expect(
+        quantitiesAfterPulse.values,
+        everyElement(greaterThan(0)),
+        reason: '분할 호가에서도 0주 행을 렌더링하면 안 됩니다.',
+      );
       expect(workspace, findsOneWidget);
       expect(ticket, findsOneWidget);
       expect(rail, findsOneWidget);
@@ -6667,6 +6740,8 @@ void main() {
         findsNWidgets(gameOrderBookLevelCount),
       );
       expect(tester.takeException(), isNull);
+      await tester.tap(find.byKey(const Key('market-speed-pause')).last);
+      await tester.pump();
 
       await tester.pumpAndSettle();
 
@@ -6686,7 +6761,16 @@ void main() {
         closeTo(settledRailRect.width, 0.1),
       );
       expect(settledBorderPosition.dx, greaterThan(middleBorderPosition.dx));
-      expect(settledBorderPosition.dy, closeTo(initialBorderPosition.dy, 0.1));
+      final settledRowHeight = tester
+          .getSize(
+            find.byKey(const ValueKey('inline-order-book-ask-row')).first,
+          )
+          .height;
+      expect(
+        (settledBorderPosition.dy - initialBorderPosition.dy).abs(),
+        lessThanOrEqualTo(settledRowHeight + 0.1),
+        reason: '호가 펄스 한 번에 현재가 테두리가 여러 칸 점프하면 안 됩니다.',
+      );
       expect(inlineWallPrices('ask'), asksBefore);
       expect(inlineWallPrices('bid'), bidsBefore);
 

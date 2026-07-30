@@ -3205,33 +3205,44 @@ _GameOrderBookQueueArrivalProfile _gameOrderBookQueueArrivalProfile({
     liquidityPulse: liquidityPulse,
   );
   final minuteOffset = math.max(0, minute - krxOpenMinute);
-  // One intact wall breathes on the first quote pulse of every other market
-  // minute. Bid and ask alternate, so a wall stays recognizable instead of
-  // looking redrawn while neither side remains frozen like a concrete column.
-  if (pulseSlot != 1 || (minuteOffset + day).isOdd) return null;
+  // One live wall breathes on the first quote pulse of every market minute.
+  // Bid and ask alternate, so each side changes once every two minutes without
+  // making several rows look regenerated together.
+  if (pulseSlot != 1) return null;
 
-  final intactWalls =
+  final healthyLevels =
       <GameOrderBookLevel>[...previousSnapshot.asks, ...previousSnapshot.bids]
           .where(
             (level) =>
                 level.quantity > 0 &&
-                level.isWall &&
                 !level.isStructuralBreached &&
-                level.structuralVacuumMultiplier >= 0.999999 &&
-                level.queueRecoveryTargetQuantity <= level.quantity,
+                level.structuralVacuumMultiplier >= 0.999999,
           )
           .toList(growable: false);
-  if (intactWalls.isEmpty) return null;
+  if (healthyLevels.isEmpty) return null;
 
   final sideOffset = _orderBookMixedHash(seededAssetId, day, 15401) & 1;
-  final breathCycle = minuteOffset ~/ 2;
+  final breathCycle = minuteOffset;
   final preferredSide = (breathCycle + sideOffset).isEven
       ? GameOrderBookSide.ask
       : GameOrderBookSide.bid;
-  final preferredWalls = intactWalls
+  final preferredLevels = healthyLevels
       .where((level) => level.side == preferredSide)
       .toList(growable: false);
-  final candidates = preferredWalls.isEmpty ? intactWalls : preferredWalls;
+  final sideCandidates = preferredLevels.isEmpty
+      ? healthyLevels
+      : preferredLevels;
+  final flaggedWalls = sideCandidates
+      .where((level) => level.isWall)
+      .toList(growable: false);
+  final candidates = flaggedWalls.isNotEmpty
+      ? flaggedWalls
+      : <GameOrderBookLevel>[
+          sideCandidates.reduce(
+            (largest, level) =>
+                level.quantity > largest.quantity ? level : largest,
+          ),
+        ];
   final selectionHash = _orderBookMixedHash(
     seededAssetId,
     day,
@@ -3246,7 +3257,7 @@ _GameOrderBookQueueArrivalProfile _gameOrderBookQueueArrivalProfile({
   final signedUnit = breathUnit * 2 - 1;
   final signedMagnitude =
       (signedUnit < 0 ? -1.0 : 1.0) * (0.45 + signedUnit.abs() * 0.55);
-  final amplitude = fastMarket ? 0.020 : 0.012;
+  final amplitude = fastMarket ? 0.028 : 0.018;
   return (
     price: selected.price,
     targetMultiplier: 1 + signedMagnitude * amplitude,
@@ -3366,17 +3377,15 @@ class _GameOrderBookCarryContext {
         previous.structuralVacuumMultiplier < 0.999999;
     final isRecoveringOrdinaryQueue =
         previousRecoveryTarget > previous.quantity && !previous.isWall;
-    final isConsumedWall =
-        previous.isWall && previousRecoveryTarget > previous.quantity;
     final activeWallBreath = wallBreath;
-    final isIntactWall =
-        previous.isWall &&
-        !isStructuralVacuum &&
-        previousRecoveryTarget <= previous.quantity;
+    final isLiveWall =
+        previous.isWall && previous.quantity > 0 && !isStructuralVacuum;
     final isBreathingWall =
-        isIntactWall &&
+        previous.quantity > 0 &&
+        !isStructuralVacuum &&
         activeWallBreath != null &&
         (activeWallBreath.price - level.price).abs() < 0.000001;
+    final isProtectedWall = isLiveWall || isBreathingWall;
     if (previous.quantity <= 0) {
       if (level.quantity <= 0) {
         return (
@@ -3441,14 +3450,6 @@ class _GameOrderBookCarryContext {
             : recoveryTarget,
       );
     }
-    if (isConsumedWall) {
-      // A real partial fill owns this queue until another actual fill or full
-      // cancellation changes it. Ambient wall breathing must never refill it.
-      return (
-        quantity: previous.quantity,
-        queueRecoveryTargetQuantity: previousRecoveryTarget,
-      );
-    }
     if (noNewAdaptivePulse && minuteAdvanced) {
       return (
         quantity: previous.quantity,
@@ -3468,7 +3469,7 @@ class _GameOrderBookCarryContext {
       );
     }
     if (pulseAdvanced &&
-        isIntactWall &&
+        isLiveWall &&
         activeWallBreath != null &&
         !isBreathingWall) {
       return (
@@ -3486,18 +3487,26 @@ class _GameOrderBookCarryContext {
     // Close every price to its deterministic path at a minute boundary. Within
     // the minute, near-touch rows move more visibly while outer rows stay calm.
     final proximity = gameOrderBookQueueArrivalProximity(ticksFromTouch);
-    final targetQuantity = isBreathingWall
+    final rawBreathingTarget = isBreathingWall
         ? math.max(
             gameOrderBookMinimumDisplayedQuantity,
-            (level.quantity * activeWallBreath.targetMultiplier).round(),
+            (previous.quantity * activeWallBreath.targetMultiplier).round(),
           )
         : level.quantity;
+    final targetQuantity =
+        isBreathingWall && rawBreathingTarget == previous.quantity
+        ? math.max(
+            gameOrderBookMinimumDisplayedQuantity,
+            previous.quantity +
+                (activeWallBreath.targetMultiplier >= 1 ? 1 : -1),
+          )
+        : rawBreathingTarget;
     final adjustment = isBreathingWall
         ? math.max(
             1,
-            (previous.quantity * (fastMarket ? 0.014 : 0.009)).round(),
+            (previous.quantity * (fastMarket ? 0.020 : 0.012)).round(),
           )
-        : isIntactWall && effectiveLimit > 0
+        : isLiveWall && effectiveLimit > 0
         ? math.max(
             1,
             (previous.quantity *
@@ -3505,7 +3514,7 @@ class _GameOrderBookCarryContext {
                     (0.65 + proximity * 0.35))
                 .round(),
           )
-        : isIntactWall
+        : isLiveWall
         ? 0
         : (previous.quantity * effectiveLimit * proximity).floor();
     var quantity = targetQuantity
@@ -3515,10 +3524,10 @@ class _GameOrderBookCarryContext {
         )
         .toInt();
     // Ordinary cancellations may lower the current deterministic target
-    // immediately. Intact walls instead move inside the small cap above so a
+    // immediately. Live walls instead move inside the small cap above so a
     // single quote pulse cannot make the wall look fully redrawn.
-    if (!isIntactWall) quantity = math.min(quantity, targetQuantity);
-    if (isRecoveringOrdinaryQueue) {
+    if (!isProtectedWall) quantity = math.min(quantity, targetQuantity);
+    if (isRecoveringOrdinaryQueue && !isBreathingWall) {
       var arrival = queueArrivalProfile.replenishmentFor(
         level,
         ticksFromTouch: ticksFromTouch,

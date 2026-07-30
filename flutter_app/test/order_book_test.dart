@@ -2266,6 +2266,126 @@ void main() {
     },
   );
 
+  test(
+    'partially filled walls keep breathing while the price ladder moves',
+    () {
+      const assetId = 'breathing_walls';
+      const day = 6015;
+      const simulationSeed = 'breathing-wall-book';
+      const previousClose = 9800.0;
+      final date = DateTime(2016, 6, 20);
+      var minute = 10 * 60 + 12;
+      var price = 10000.0;
+      var current = buildGameOrderBookSnapshot(
+        assetId: assetId,
+        day: day,
+        minute: minute,
+        currentPrice: price,
+        previousTradePrice: price,
+        previousClose: previousClose,
+        date: date,
+        market: '미래시장',
+        simulationSeed: simulationSeed,
+        liquidityPulse: gameOrderBookLiquidityPulseFrame(
+          marketMinute: minute,
+          slotIndex: 0,
+        ),
+        adaptiveLiquidityPulses: true,
+      );
+      final walls = [...current.asks, ...current.bids]
+          .where(
+            (level) =>
+                level.isWall &&
+                !level.isStructuralBreached &&
+                level.quantity >= gameOrderBookMinimumDisplayedQuantity * 2,
+          )
+          .toList(growable: false);
+      expect(
+        walls.map((level) => level.side).toSet(),
+        containsAll(<GameOrderBookSide>[
+          GameOrderBookSide.ask,
+          GameOrderBookSide.bid,
+        ]),
+      );
+      current = gameOrderBookSnapshotAfterConsumption(
+        snapshot: current,
+        consumedAskByPrice: <double, double>{
+          for (final wall in walls.where(
+            (level) => level.side == GameOrderBookSide.ask,
+          ))
+            wall.price: math.max(1, wall.quantity ~/ 20).toDouble(),
+        },
+        consumedBidByPrice: <double, double>{
+          for (final wall in walls.where(
+            (level) => level.side == GameOrderBookSide.bid,
+          ))
+            wall.price: math.max(1, wall.quantity ~/ 20).toDouble(),
+        },
+      );
+
+      final changedSides = <GameOrderBookSide>{};
+      for (var step = 0; step < 16; step += 1) {
+        final nextMinute = minute + 1;
+        final nextPrice = marketSnapPrice(
+          10000 + (step.isEven ? 10 : 0),
+          market: '미래시장',
+        );
+        final next = buildGameOrderBookSnapshot(
+          assetId: assetId,
+          day: day,
+          minute: nextMinute,
+          currentPrice: nextPrice,
+          previousTradePrice: price,
+          previousClose: previousClose,
+          date: date,
+          market: '미래시장',
+          simulationSeed: simulationSeed,
+          previousSnapshot: current,
+          previousSnapshotMinute: minute,
+          liquidityPulse: gameOrderBookLiquidityPulseFrame(
+            marketMinute: nextMinute,
+            slotIndex: 1,
+          ),
+          adaptiveLiquidityPulses: true,
+        );
+        final previousByKey = <String, GameOrderBookLevel>{
+          for (final level in [...current.asks, ...current.bids])
+            '${level.side.name}:${level.price}': level,
+        };
+        var changedWallCount = 0;
+        for (final level in [...next.asks, ...next.bids]) {
+          final previous = previousByKey['${level.side.name}:${level.price}'];
+          if (previous == null || !previous.isWall || !level.isWall) continue;
+          final delta = (level.quantity - previous.quantity).abs();
+          if (delta == 0) continue;
+          changedWallCount += 1;
+          changedSides.add(level.side);
+          expect(
+            delta,
+            lessThanOrEqualTo(math.max(1, (previous.quantity * 0.02).ceil())),
+            reason: '부분체결 벽도 새 주문이 조금씩 들어오되 한 번에 복원되면 안 됩니다.',
+          );
+        }
+        expect(
+          changedWallCount,
+          lessThanOrEqualTo(1),
+          reason: '가격이 움직여도 한 펄스에서 여러 벽을 함께 다시 그리면 안 됩니다.',
+        );
+        current = next;
+        minute = nextMinute;
+        price = nextPrice;
+      }
+
+      expect(
+        changedSides,
+        containsAll(<GameOrderBookSide>[
+          GameOrderBookSide.ask,
+          GameOrderBookSide.bid,
+        ]),
+        reason: '가격이 움직이고 부분체결된 뒤에도 매수벽·매도벽 모두 미세 수정돼야 합니다.',
+      );
+    },
+  );
   test('standing depth follows absolute price when its row index changes', () {
     const assetId = 'price_attached_depth';
     const day = 6015;

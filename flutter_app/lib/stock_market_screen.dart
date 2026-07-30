@@ -194,12 +194,9 @@ List<GameOrderBookLevel> orderBookSweepPresentationLevels({
       reportedQuantity + cancellationQuantity,
       math.max(0, initialQuantity - consumedQuantity),
     );
-    final keepsActiveZeroGhost =
-        activeEntry != null && activeStepArrived && quantity <= 0;
-    if (quantity <= 0 && !keepsActiveZeroGhost) {
-      // A completed zero row must not occupy one of the fixed 10 visible slots
-      // and hide a deeper current step. The active row alone remains as a
-      // tombstone until its own drain phase ends.
+    if (quantity <= 0) {
+      // A fully consumed price never occupies a visible slot. The next positive
+      // quote replaces it as soon as the border reaches this price.
       sameSideLevels.remove(step.price);
       continue;
     }
@@ -7034,11 +7031,16 @@ mixin _OrderBookSweepPlayback<T extends StatefulWidget> on State<T> {
 
   void _scheduleOrderBookSweepArrival() {
     _scheduleOrderBookSweepTimerAfterFrame(_orderBookSweepMotionDuration, () {
+      final step = _activeOrderBookSweepStep;
       setState(() {
         _orderBookSweepPhase = _OrderBookSweepPhase.draining;
         _activeOrderBookSweepBatch?.progress.arrived = true;
       });
       onOrderBookSweepPlaybackChanged();
+      if (step != null && step.remainingQuantity <= 0) {
+        _advanceOrderBookSweepAfterCurrentStep(skipFinalHold: true);
+        return;
+      }
       _scheduleOrderBookSweepDrain();
     });
   }
@@ -7065,28 +7067,38 @@ mixin _OrderBookSweepPlayback<T extends StatefulWidget> on State<T> {
     }
   }
 
+  void _advanceOrderBookSweepAfterCurrentStep({bool skipFinalHold = false}) {
+    final batch = _activeOrderBookSweepBatch;
+    if (batch == null) return;
+    final nextIndex = _orderBookSweepIndex + 1;
+    if (nextIndex < batch.steps.length) {
+      setState(() {
+        _orderBookSweepIndex = nextIndex;
+        _orderBookSweepPhase = _OrderBookSweepPhase.arriving;
+        batch.progress
+          ..stepIndex = nextIndex
+          ..arrived = false;
+      });
+      onOrderBookSweepPlaybackChanged();
+      _scheduleOrderBookSweepArrival();
+      return;
+    }
+    if (skipFinalHold) {
+      _completeActiveOrderBookSweep();
+      return;
+    }
+    setState(() => _orderBookSweepAwaitingCompletion = true);
+    _scheduleOrderBookSweepTimerAfterFrame(
+      _scaledOrderBookSweepDuration(_orderBookSweepFinalHoldDuration),
+      _completeActiveOrderBookSweep,
+    );
+  }
+
   void _scheduleOrderBookSweepDrain() {
-    _scheduleOrderBookSweepTimerAfterFrame(_orderBookSweepStepDuration, () {
-      final batch = _activeOrderBookSweepBatch;
-      final nextIndex = _orderBookSweepIndex + 1;
-      if (batch != null && nextIndex < batch.steps.length) {
-        setState(() {
-          _orderBookSweepIndex = nextIndex;
-          _orderBookSweepPhase = _OrderBookSweepPhase.arriving;
-          batch.progress
-            ..stepIndex = nextIndex
-            ..arrived = false;
-        });
-        onOrderBookSweepPlaybackChanged();
-        _scheduleOrderBookSweepArrival();
-        return;
-      }
-      setState(() => _orderBookSweepAwaitingCompletion = true);
-      _scheduleOrderBookSweepTimerAfterFrame(
-        _scaledOrderBookSweepDuration(_orderBookSweepFinalHoldDuration),
-        _completeActiveOrderBookSweep,
-      );
-    });
+    _scheduleOrderBookSweepTimerAfterFrame(
+      _orderBookSweepStepDuration,
+      _advanceOrderBookSweepAfterCurrentStep,
+    );
   }
 
   void _resetOrderBookSweepPlayback({bool clearHistory = false}) {
@@ -7835,6 +7847,7 @@ class _CompactOrderBookQuantityLabelState
     children: [
       Text(
         _money(widget.quantity),
+        key: const Key('inline-order-book-quantity-value'),
         maxLines: 1,
         style: const TextStyle(
           color: Color(0xFF343A45),
