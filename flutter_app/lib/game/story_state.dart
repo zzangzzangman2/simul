@@ -43,11 +43,15 @@ class StoryState {
   final List<String> seenStoryEventIds;
   final List<String> companyCultureTags;
 
-  /// The campaign treats the protagonist as ten in 2000 and twenty in 2010.
-  /// Only a birth year is stored, so use the same pre-birthday convention
-  /// throughout the game instead of showing an inconsistent Korean age.
+  /// The orphanage reboot uses the story's Korean year-age convention:
+  /// a 1991-born sixth-cohort student is ten in 2000. Family-world saves keep
+  /// their legacy pre-birthday convention for compatibility.
   int ageOn(DateTime date) =>
-      (date.year - playerBirthYear - 1).clamp(0, 200).toInt();
+      (orphanageReboot
+              ? date.year - playerBirthYear + 1
+              : date.year - playerBirthYear - 1)
+          .clamp(0, 200)
+          .toInt();
 
   int flagInt(String key, [int fallback = 0]) =>
       (storyFlags[key] as num?)?.toInt() ?? fallback;
@@ -175,7 +179,7 @@ class StoryState {
     };
     return StoryState(
       playerName: playerName.trim(),
-      playerBirthYear: 1985,
+      playerBirthYear: 1991,
       introChoice: introChoice,
       startingTrait: startingTrait,
       familyRule: operatingPrinciple,
@@ -193,6 +197,7 @@ class StoryState {
         'prologueComplete': true,
         'orphanageReboot': true,
         'futureDevelopmentCohort': 6,
+        'storyAgeMode': 'koreanYearAge',
         'campaignStartDate': '2000-01-02',
         'guardianConsent': true,
         'stateAccountActive': true,
@@ -326,6 +331,14 @@ class StoryState {
     'companyCultureTags': companyCultureTags,
   };
 
+  static int _migratedPlayerBirthYear(Map<String, dynamic> json) {
+    final stored = (json['playerBirthYear'] as num?)?.toInt() ?? 1989;
+    final flags =
+        (json['storyFlags'] as Map?)?.cast<String, dynamic>() ?? const {};
+    if (flags['orphanageReboot'] == true && stored == 1985) return 1991;
+    return stored;
+  }
+
   factory StoryState.fromJson(
     Map<String, dynamic> json, {
     required String companyName,
@@ -333,7 +346,7 @@ class StoryState {
     if (json.isEmpty) return StoryState.migratedDefault(companyName);
     return StoryState(
       playerName: json['playerName'] as String? ?? '소년',
-      playerBirthYear: (json['playerBirthYear'] as num?)?.toInt() ?? 1989,
+      playerBirthYear: _migratedPlayerBirthYear(json),
       introChoice: json['introChoice'] as String? ?? 'migrated_save',
       startingTrait: StoryTrait.values.firstWhere(
         (value) => value.name == json['startingTrait'],

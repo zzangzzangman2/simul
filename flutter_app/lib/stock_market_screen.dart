@@ -10286,11 +10286,9 @@ class _PracticalTradeTutorialSheetState
     final speaker = isStudentBeat ? studentName : '한서윤 선생님';
     final characterAsset = switch (_reviewBeat) {
       0 => 'assets/images/주식선생님/26_포즈5_주인공그림체_공통슬롯_투명.png',
-      1 =>
-        'assets/images/historical_prologue/character_hero_age14_passbook_v1.png',
+      1 => 'assets/images/character_hero_title_style_v2.png',
       2 => 'assets/images/주식선생님/23_포즈2_주인공그림체_공통슬롯_투명.png',
-      _ =>
-        'assets/images/historical_prologue/character_hero_age14_passbook_v1.png',
+      _ => 'assets/images/character_hero_title_style_v2.png',
     };
     final message = switch (_reviewBeat) {
       0 => '첫 거래는 끝났어요.\n가장 먼저 눈에 들어온 건 뭐였어요?',
@@ -10611,14 +10609,22 @@ class _PracticeSummaryRow extends StatelessWidget {
     padding: const EdgeInsets.symmetric(vertical: 6),
     child: Row(
       children: [
-        Text(label),
-        const Spacer(),
-        Text(
-          value,
-          style: TextStyle(
-            color: strong ? const Color(0xFF168B5E) : _marketInk,
-            fontWeight: FontWeight.w900,
-            fontFeatures: _marketNumberFeatures,
+        Expanded(
+          child: Text(label, maxLines: 2, overflow: TextOverflow.ellipsis),
+        ),
+        const SizedBox(width: 8),
+        Flexible(
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerRight,
+            child: Text(
+              value,
+              style: TextStyle(
+                color: strong ? const Color(0xFF168B5E) : _marketInk,
+                fontWeight: FontWeight.w900,
+                fontFeatures: _marketNumberFeatures,
+              ),
+            ),
           ),
         ),
       ],

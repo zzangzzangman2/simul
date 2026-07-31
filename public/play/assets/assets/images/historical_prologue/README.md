@@ -41,13 +41,22 @@
 - 용도: 2000년 제6기 국가계좌 첫 수업
 - 생성 프롬프트: 2000년 1월 미래양성원 투자실. 여섯 개의 나무 책상, 베이지 CRT, 유선 마우스, 1990년대 키보드, 도트 프린터, 녹색 칠판, 분절형 시세 전광판, 빈 주문표를 포함한다. 중앙 인물 슬롯과 하단 대화창 영역을 비운다. 노트북·스마트폰·평면 디스플레이·현대 거래 UI·글자·로고를 금지한다.
 
-### `character_hero_age14_passbook_v1.png`
+## 2000년 제6기 오리엔테이션 신규 자산
 
-- 용도: 2000년 제6기 주인공의 첫 국가계좌 장면
-- 생성 프롬프트: 기존 10살 주인공의 검은 헝클어진 머리, 따뜻한 갈색 눈, 둥근 볼 정체성을 보존한 채 자연스럽게 만 14세로 성장시킨다. 남색 블레이저, 주황색 파이핑과 넥타이, 흰 셔츠, 차콜 바지, 검은 캔버스화를 입고 글자 없는 남색 투자통장과 연필을 든다. 성인 체형·어린아이 비율·과장 포즈를 금지하고 기존 NPC와 같은 고밀도 2D 애니 게임 렌더링을 사용한다.
-- 원본 크로마: `art_references/historical_prologue/character_hero_age14_passbook_chroma_v1.png`
-- 알파 처리: `#fb03f9` 경계 자동 추출, soft matte, despill
-- 검수: 1024×1536 RGBA, 네 모서리 alpha 0, alpha bbox `(290, 23, 727, 1518)`, 흰색·짙은 회색 합성에서 잔여 자홍색 없음
+### 배경
+
+- `bg_orphanage_departure_2000_portrait_v1.png`: 새봄보육원 현관에서 가방과 합격 통지서를 받는 겨울 아침.
+- `bg_future_development_academy_gate_2000_portrait_v1.png`: 제6기 투자전문과정 정문 도착.
+- `bg_future_development_orientation_hall_2000_portrait_v1.png`: 스무 장의 이름표가 놓인 오리엔테이션 강당. 런타임에서 조명·먼지·카메라 이동을 합성한다.
+
+### 등장인물
+
+- `character_sua_orientation_v1.png`: 사용자 제공 수아 정체성을 보존한 10살 제6기 교복 전신.
+- `character_hakjun_orientation_v1.png`: 규정집을 든 10살 제6기 라이벌 전신.
+
+두 인물은 `#00ff00` 크로마 원본을 soft matte와 despill로 투명화했다.
+강당 합성에서 얼굴·교복·손동작이 390×844 화면에서도 읽히며 잔여 녹색 테두리가
+없는 것을 확인했다. 주인공은 이번 1막에서 화면에 직접 표시하지 않는다.
 
 ## 개막부 추가 배경
 
@@ -64,7 +73,7 @@
 
 ### `bg_orphanage_records_room_1999_portrait_cartoon_v1.png`
 
-- 용도: 주인공과 박태수가 6기 명단과 사라진 5기 장부를 발견하는 제3기록실
+- 용도: 주인공과 학준이 6기 명단과 사라진 5기 장부를 발견하는 제3기록실
 - 생성 프롬프트: 1999년 12월 31일 밤의 국가 보호시설 기록실. 금속 캐비닛, 누런 문서상자, 도트프린터, 연속용지, 베이지 CRT, 청색 복도광을 포함한다. 화면과 문서에는 읽을 수 있는 정보를 넣지 않는다.
 
 ### `bg_orphanage_dormitory_1999_portrait_cartoon_v1.png`
@@ -79,7 +88,7 @@
 
 ### `bg_orphanage_electronics_storage_2000_portrait_cartoon_v1.png`
 
-- 용도: 주인공과 박태수가 한빛통신의 제품 불량과 재구매 가능성을 조사하는 창고
+- 용도: 주인공과 학준이 한빛통신의 제품 불량과 재구매 가능성을 조사하는 창고
 - 생성 프롬프트: 2000년 한국 보호시설 지하 전자창고. 1990년대 모뎀, 유선전화, 팩스, 베이지 키보드, 수리상자, 부품 선반, 형광등을 넣는다. 스마트폰·노트북·평면 모니터·읽을 수 있는 상표는 넣지 않는다.
 
 ## 개막부 추가 캐릭터
@@ -97,7 +106,6 @@ soft matte와 despill로 투명화했다. 실사·반실사·사진 채색·3D·
 | `character_kang_incheol_v1.png` | 1981년 48세 경제수석. 관자놀이가 센 물결머리, 차콜브라운 정장, 계산표와 연필을 든 분석적인 전신. | `art_references/historical_prologue/character_kang_incheol_chroma_v1.png` | `(205, 20, 818, 1516)` |
 | `character_yoon_mira_v1.png` | 1981년 39세 사회교육수석. 검은 단발, 버건디 스커트 정장, 복지 보고서를 들고 손바닥으로 반대 의사를 밝히는 단호한 전신. | `art_references/historical_prologue/character_yoon_mira_chroma_v1.png` | `(237, 20, 787, 1516)` |
 | `character_jang_daesik_v1.png` | 1981년 52세 법무수석. 건장한 체격, 사각 안경, 갈색 정장과 버건디 넥타이, 법률수첩과 만년필을 든 반발 표정의 전신. | `art_references/historical_prologue/character_jang_daesik_chroma_v1.png` | `(224, 20, 799, 1516)` |
-| `character_park_taesu_v1.png` | 2000년 14세 6기 경쟁자. 단정한 갈색 머리, 회갈색 눈, 주황 파이핑 남색 제복, 규칙장부와 계산기를 든 또래 전신. | `art_references/historical_prologue/character_park_taesu_chroma_v1.png` | `(269, 20, 754, 1516)` |
 | `character_living_guide_oh_gyeongtae_v1.png` | 2000년 42세 생활지도관. 짧은 머리, 올리브·남색 활동복, 호루라기와 점검표를 들고 줄을 지시하는 엄격한 전신. | `art_references/historical_prologue/character_living_guide_oh_gyeongtae_chroma_v1.png` | `(121, 20, 903, 1516)` |
 | `character_state_account_officer_cha_eunjoo_v1.png` | 2000년 31세 국가계좌 담당관. 검은 단발, 남색 스커트 정장, 무문자 통장과 붉은 도장이 붙은 점검표를 든 차분한 전신. | `art_references/historical_prologue/character_state_account_officer_cha_eunjoo_chroma_v1.png` | `(282, 20, 742, 1516)` |
 

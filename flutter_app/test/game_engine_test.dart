@@ -102,7 +102,8 @@ void main() {
     final state = engine.createNewGame('새천년투자연구소', story: story);
 
     expect(state.story.orphanageReboot, isTrue);
-    expect(state.story.ageOn(state.currentDate), 14);
+    expect(state.story.playerBirthYear, 1991);
+    expect(state.story.ageOn(state.currentDate), 10);
     expect(state.story.guardianAccountHolder, 'future_development_fund');
     expect(state.story.flagInt('futureDevelopmentCohort'), 6);
     expect(state.story.flagBool('stateAccountActive'), isTrue);

@@ -5,12 +5,40 @@
 
 이 문서는 이후 제작·수정하는 모든 게임 일러스트의 기본 아트 디렉션이다. 사용자가 장면별로 다른 방향을 명시하지 않는 한 이 기준을 최우선으로 적용한다.
 
+## 0. 화풍 승인 게이트 (강제)
+
+SIMUL 이미지는 단순히 `애니풍`이거나 개별 완성도가 높다는 이유로 승인하지 않는다. **`art_references/simul_canonical_art_style_v1.png`와 같은 작품의 같은 장면으로 보이는지**를 유일한 승인 기준으로 삼는다.
+
+- 생성 전에는 새 공통 화풍 원본, 해당 인물의 정체성 원본, 현재 런타임의 같은 인물 이미지를 모두 직접 열고 생성·편집 도구의 실제 이미지 입력으로 넣는다. 경로나 문장만 적은 생성은 자동 불합격이다.
+- 교복·의상 사진은 길이·재봉선·문양·실루엣만 정한다. 사진의 얼굴·피부·조명·카메라·실사 질감은 화풍 기준으로 사용할 수 없다.
+- `final`, `v2`, `v3`, `주인공그림체` 같은 파일명, `pubspec.yaml` 등록, 기존 코드 연결은 승인 증거가 아니다.
+- 런타임 연결 전에는 공통 원본 얼굴·직전 승인 얼굴·신규 얼굴을 같은 표시 크기로 맞추고 전신까지 포함한 비교 시트를 만든다.
+- 아래 여섯 항목을 각각 `통과` 또는 `불합격`으로 기록한다.
+  1. 가는 유색선의 굵기와 색
+  2. 보석형 홍채의 림·그라데이션·복수 하이라이트
+  3. 큰 덩어리·중간 가닥·잔머리의 3단계 머리카락
+  4. 셀 명암을 뼈대로 둔 피부·의상 채색 밀도
+  5. 얼굴 골격·코·입·볼의 렌더링 문법
+  6. 광원 방향·대비·채도·페인터리 보정의 밀도
+- 하나라도 불합격이면 평균 점수나 “대체로 비슷함”으로 통과시키지 않고 폐기·재생성한다.
+- 같은 인물의 4종 또는 6종 포즈는 한 세트로 검사한다. 한 포즈라도 튀면 세트 전체를 보류한다.
+- 인물과 배경도 실제 장면 합성본으로 검사한다. 서로 다른 게임처럼 보이면 불일치 자산을 교체한다.
+- 승인 전 결과는 `draft` 또는 `candidate`로만 저장하고 기존 승인 자산과 부분적으로 섞어 연결하지 않는다.
+- 구형·보관 자산은 명시적으로 재승인하지 않은 채 신규 장면에 다시 연결하지 않는다.
+- 검수 결과는 `ART_STYLE_AUDIT.md`에 기록한다. 해당 문서에서 `승인` 또는 `유지`가 아닌 자산은 화풍 기준으로 승격할 수 없다.
+
 ## 1. 기준 자산
 
-- **모든 신규 NPC의 얼굴 렌더링·눈·선화·머리카락·채색 밀도 최상위 기준**:
+- **모든 신규·수정 인물의 얼굴 렌더링·눈·선화·머리카락·채색 밀도 최상위 기준**:
+  `art_references/simul_canonical_art_style_v1.png`
+- **성인 여성의 얼굴 비율·전신 밀도와 한서윤 정체성 보조 기준**:
   `art_references/npc_canonical_style_teal_v1.png`
 - 한서윤 선생님의 의상 실루엣 기준:
   `art_references/stock_teacher_outfit_reference_v1.png`
+- 미래양성원 여자 SEED 교육생 교복의 절대 길이·비율 기준:
+  `art_references/future_development_uniform_length_reference_v1.png`
+- 미래양성원 남자 SEED 교육생 교복의 셔츠·바지 절대 길이·비율 기준:
+  `art_references/future_development_male_uniform_length_reference_v1.png`
 - 부동산 중개업자의 얼굴·머리·장신구·복장 정체성 기준:
   `art_references/realtor_identity_pose_reference_01.jpg`,
   `art_references/realtor_identity_pose_reference_02.jpg`,
@@ -18,9 +46,15 @@
 - 주인공 얼굴 정체성 기준: `flutter_app/assets/images/title_elementary_landlord_portrait_v2.png`
 - 주인공 전신과 투명 컷아웃 기준: `flutter_app/assets/images/character_hero_title_style_v2.png`
 - 주인공은 메인 타이틀과 같은 인물이어야 한다. 머리 모양, 눈매, 얼굴 비율, 볼의 형태, 표정 밀도를 장면마다 새로 해석하지 않는다.
-- `npc_canonical_style_teal_v1.png`에서 모든 NPC가 가져오는 것은 **그림체와 렌더링 문법**이다. 청록 머리·보라 눈·점 위치는 한서윤의 고유 정체성이므로 다른 NPC에게 복사하지 않는다.
+- `simul_canonical_art_style_v1.png`에서 모든 인물이 가져오는 것은 **가는 유색선, 보석형 홍채, 따뜻한 피부와 홍조, 머리카락의 큰 덩어리와 섬세한 반사광, 셀 명암과 페인터리 보정의 균형**이다. 양갈래·붉은 머리 장식·갈색 눈·교복·어린이 얼굴 비율은 해당 인물 고유 설정이므로 복사하지 않는다.
+- `npc_canonical_style_teal_v1.png`와 현재 주식선생님 자산은 한서윤의 갸름한 성인 얼굴, 성인 전신 비율, 청록 머리, 보라 눈, 뷰티마크를 보존하는 보조 기준이다. 새 공통 원본의 어린이 얼굴 비율을 한서윤에게 복사하지 않는다.
+- 새 공통 원본과 현재 주식선생님은 같은 고밀도 2D 애니 게임 계열로 함께 유지한다. 신규 한서윤 컷은 기존 정체성·의상·포즈를 보존하면서 선의 부드러움, 피부 채색, 머리 반사광만 새 공통 원본과 맞춘다.
+- 사용자가 2026-07-31 확정한 현재 전신 화풍 기준은 프로젝트 루트의 `future_development_seed01_protagonist_friend_neutral/smile/laugh/curious/worried/determined_candidate_v1.png` 6종이다. 신규 전신 인물은 `simul_canonical_art_style_v1.png`의 얼굴 문법과 이 6종의 전신 선화·채색 밀도·투명 컷아웃 마감을 함께 실제 참조 입력으로 사용한다.
+- 위 6종은 화풍과 전신 완성도 기준일 뿐이다. 해당 친구의 밤색 양갈래, 붉은 장식, 갈색 눈, 여자 SEED 교복, 아동 얼굴을 다른 인물의 정체성으로 복사하지 않는다.
 - 인물별 정체성 참조는 최상위 화풍 참조를 대체하지 않는다. 부동산 중개업자 3개 참조에서는 얼굴 골격·남청색에서 시안색으로 이어지는 단발·장신구·프릴 원피스·샌들만 가져오고, 사진의 배경·원근·앉거나 무릎 꿇은 자세·조명은 복사하지 않는다.
 - 캐릭터와 배경은 서로 다른 게임의 그림처럼 보이면 안 된다. 모든 신규 NPC는 위 기준 이미지의 고밀도 2D 애니 게임 채색을 공유하고, 배경은 같은 색 선명도와 명암 밀도를 가진 손그림 2D 카툰으로 맞춘다.
+- 미래양성원 여자 SEED 교복은 `future_development_uniform_length_reference_v1.png`의 **몸 대비 길이 비율**을 절대 기준으로 삼는다. 고정 픽셀이나 고정 센티미터를 모든 인물에게 복사하는 것이 아니라, 캐릭터 키와 아동·청소년 체형에 맞춰 교복의 실제 크기를 함께 축소·확대한다. 예를 들어 키 140cm 캐릭터의 소매·블라우스·넥타이·치마 실제 길이는 키가 큰 캐릭터보다 짧아져야 한다. 다만 소매 끝의 팔 기준 위치, 블라우스 밑단의 몸통 기준 위치, 허리선, 넥타이 끝, 치마 밑단의 허벅지·무릎 사이 상대 위치는 원본과 같은 비율로 유지한다. 캐릭터 체형이나 생성 모델의 관습을 이유로 특정 부분만 늘이거나 길게 내리거나 세로로 스트레치하지 않는다. 이후 생성본이 원본의 신체 기준점 비율과 다르면 생성본을 기준으로 승격하지 않고 이 원본을 우선한다.
+- 미래양성원 남자 SEED 교복은 `future_development_male_uniform_length_reference_v1.png`의 셔츠 소매·셔츠 밑단·바지 허리·바지 밑단과 전체 핏을 몸 대비 길이 기준으로 사용한다. 상의와 하의는 이 일반형 실루엣을 유지하고, 넥타이에만 여자 SEED 교복 하의와 같은 빨강 체크 문양을 적용한다. 여자 교복의 치마 실루엣이나 다른 장식을 남자 교복에 옮기지 않는다. 남자 교복도 캐릭터 키와 연령 체형에 따라 실제 옷 길이를 함께 축소·확대하되 각 끝점의 신체 기준 위치는 원본과 같은 비율로 유지한다.
 
 ## 2. 고정 스타일
 
@@ -82,11 +116,13 @@
 모든 신규 이미지 프롬프트에는 아래 의미를 빠뜨리지 않는다.
 
 ```text
-Canonical NPC rendering reference: art_references/npc_canonical_style_teal_v1.png
-Match its refined high-detail 2D anime-game face rendering, jewel-like layered irises,
-fine colored linework, three-level hair strand structure, crisp cel shading, and subtle painterly highlights.
+Canonical SIMUL rendering reference: art_references/simul_canonical_art_style_v1.png
+Match its refined high-detail 2D anime-game rendering: fine colored linework, rounded softly modeled faces,
+jewel-like layered irises, warm skin and restrained blush, coherent large hair masses with delicate reflected light,
+crisp cel shading, and subtle painterly finishing.
 Keep recurring character identity consistent; do not reinterpret the face.
-The teal hair, violet eyes, and beauty marks belong only to Han Seoyun; use each other NPC's own identity colors.
+The twin tails, red hair ornaments, brown eyes, school uniform, and child facial proportions belong only to the reference child.
+Use each character's own identity, age, hair, eyes, clothing, and body proportions.
 Avoid low-detail generic anime, chibi, photorealism, 3D, flat vector art, mixed styles, text, and watermarks.
 Compose for a 390×844 mobile portrait screen with clear facial readability and safe margins.
 ```
@@ -117,8 +153,8 @@ Create a standing full-body transparent game sprite, not the seated pose, outdoo
 
 - 인물 컷아웃은 머리카락과 신발이 모두 들어온 전신 원본으로 생성한다.
 - 모든 중앙 전신 캐릭터는 `1024×1536` 투명 캔버스로 정규화한다. 알파 인물 높이는 약 `1496px`, 머리 여백은 약 `14~20px`, 발 기준선은 `y=1516`, 발 중심은 `x=512`에 둔다. 포즈가 바뀌어도 이 기준선과 몸 중심은 움직이지 않는다.
-- 런타임은 캐릭터마다 임의 좌표를 만들지 않는다. 공통 슬롯 `Positioned.fill(bottom: 122) → LayoutBuilder → Align.bottomCenter → SizedBox(aspectRatio: 2/3, height: maxHeight×0.78)`을 사용한다.
-- 390×844에서는 공통 이미지 박스가 `left 7.28, top 158.84, width 375.44, height 563.16, bottom 722, centerX 195`, 360×800에서는 `left 3.72, top 149.16, width 352.56, height 528.84, bottom 678, centerX 180`이다. 주인공·선생님·추가 등장인물 모두 같은 값이다.
+- 현재 런타임 공통 슬롯은 `Positioned.fill(bottom: 0) → LayoutBuilder → Align.bottomCenter → SizedBox(aspectRatio: 2/3, height: maxHeight×0.9)`이다. 캐릭터마다 임의 좌표를 만들지 않는다.
+- 화면별 부모 제약이 달라도 주인공·선생님·추가 등장인물은 같은 부모 안에서 같은 90% 높이와 바닥 기준선을 공유한다. 특정 장면만 예전 `bottom: 122`, `0.78` 배율로 되돌리지 않는다.
 - 팔이나 소품 때문에 포즈별 가로폭은 달라도 된다. 대신 인물 높이·발 기준선·몸 중심은 동일해야 하며, 자세 변경을 위해 런타임 `left/top/scale`을 바꾸지 않는다.
 - 투명 배경이 직접 안정적으로 나오지 않으면 인물에 없는 단색 크로마 배경으로 생성한 뒤 알파로 제거한다.
 - 제거 후 네 모서리 알파 0, 인물 바운딩 박스의 충분한 여백, 색 번짐과 초록 테두리 부재를 검사한다.
@@ -127,7 +163,7 @@ Create a standing full-body transparent game sprite, not the seated pose, outdoo
 
 ## 7. 적용 전 확인표
 
-1. `npc_canonical_style_teal_v1.png`를 모든 NPC 생성의 실제 스타일 참조로 넣었는가?
+1. `simul_canonical_art_style_v1.png`와 확정된 현재 전신 화풍 6종 중 연령·체형에 맞는 컷을 실제 스타일 참조로 넣었는가?
 2. 같은 인물의 얼굴과 연령이 유지되는가?
 3. 스타일과 정체성을 구분해 다른 NPC에게 한서윤의 청록 머리·보라 눈을 복사하지 않았는가?
 4. 반복 NPC의 표정뿐 아니라 손·상체 자세도 장면별로 달라지는가?
@@ -136,6 +172,12 @@ Create a standing full-body transparent game sprite, not the seated pose, outdoo
 7. 캐릭터와 배경의 선화·색온도·명암 밀도가 같은가?
 8. 글자, 워터마크, 불필요한 인물과 소품이 들어오지 않았는가?
 9. 투명 자산을 흰색·짙은 회색 양쪽에 합성해 알파 가장자리와 잔여 크로마 색을 검사했는가?
+10. SEED 교복을 캐릭터 키에 맞춰 실제 크기는 조정하되 소매·블라우스·넥타이·치마의 신체 기준점 비율은 원본과 동일하게 유지했는가?
+11. 공통 원본 얼굴·직전 승인 얼굴·신규 얼굴·전신을 한 화면에 둔 비교 시트를 만들었는가?
+12. 선화·홍채·머리카락·채색·얼굴 문법·광원 여섯 항목을 모두 개별 통과했는가?
+13. 같은 인물의 전체 포즈 세트를 동시에 비교했는가?
+14. `ART_STYLE_AUDIT.md`에 승인 결과와 근거를 기록했는가?
+15. 승인 전 후보가 `pubspec.yaml` 또는 런타임 코드에 연결되지 않았는가?
 
 ## 8. 조작형 미니게임 픽셀 아트 예외
 

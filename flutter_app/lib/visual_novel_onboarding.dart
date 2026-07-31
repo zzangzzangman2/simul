@@ -1,16 +1,18 @@
 part of 'main.dart';
 
-const _onboardingBeatCount = 51;
+const _onboardingBeatCount = 54;
 const _policyBriefingBeat = 5;
-const _introChoiceBeat = 20;
-const _accountHallDepartureBeat = 31;
-const _stateAccountActivationBeat = 34;
-const _playerNameBeat = 37;
-const _traitChoiceBeat = 44;
-const _principleChoiceBeat = 47;
-const _companyNameBeat = 50;
-const _storyCharacterBottomInset = 122.0;
-const _storyCharacterHeightFactor = 0.78;
+const _orientationRosterBeat = 43;
+const _orientationCompleteBeat = 53;
+const _introChoiceBeat = 120;
+const _accountHallDepartureBeat = 131;
+const _stateAccountActivationBeat = 134;
+const _playerNameBeat = 137;
+const _traitChoiceBeat = 144;
+const _principleChoiceBeat = 147;
+const _companyNameBeat = 150;
+const _storyCharacterBottomInset = 0.0;
+const _storyCharacterHeightFactor = 0.9;
 const _storyCharacterAspectRatio = 2 / 3;
 
 void _playStoryFeedback({bool strong = false}) {
@@ -29,9 +31,14 @@ typedef NewGameCreator =
     );
 
 class VisualNovelOnboardingScreen extends StatefulWidget {
-  const VisualNovelOnboardingScreen({super.key, required this.onCreate});
+  const VisualNovelOnboardingScreen({
+    super.key,
+    required this.onCreate,
+    this.onExit,
+  });
 
   final NewGameCreator onCreate;
+  final VoidCallback? onExit;
 
   @override
   State<VisualNovelOnboardingScreen> createState() =>
@@ -61,7 +68,6 @@ class _VisualNovelOnboardingScreenState
   String? _creationError;
   bool _isTraveling = false;
   bool _stateAccountActivated = false;
-  bool _quickSetup = false;
   Timer? _travelTimer;
   String _policyMessage = '보고서 다섯 권을 모두 확인해야 결재안을 완성할 수 있다.';
   WorldLoadProgress _creationProgress = const WorldLoadProgress(
@@ -81,215 +87,182 @@ class _VisualNovelOnboardingScreenState
     return switch (_beat) {
       <= 4 =>
         'assets/images/historical_prologue/bg_blue_house_policy_room_1981_portrait_cartoon_v1.png',
-      <= 13 =>
+      <= 15 =>
         'assets/images/historical_prologue/bg_blue_house_conference_1981_portrait_cartoon_v1.png',
-      <= 16 =>
+      16 =>
         'assets/images/historical_prologue/bg_future_development_orphanage_1982_portrait_cartoon_v1.png',
-      <= 21 =>
-        'assets/images/historical_prologue/bg_orphanage_records_room_1999_portrait_cartoon_v1.png',
-      <= 25 =>
-        'assets/images/historical_prologue/bg_orphanage_dormitory_1999_portrait_cartoon_v1.png',
-      <= 30 =>
-        'assets/images/historical_prologue/bg_orphanage_electronics_storage_2000_portrait_cartoon_v1.png',
-      31 =>
-        'assets/images/historical_prologue/bg_orphanage_dormitory_1999_portrait_cartoon_v1.png',
-      <= 39 =>
-        'assets/images/historical_prologue/bg_orphanage_account_hall_2000_portrait_cartoon_v1.png',
+      <= 22 =>
+        'assets/images/historical_prologue/bg_orphanage_departure_2000_portrait_v1.png',
+      <= 31 =>
+        'assets/images/historical_prologue/bg_future_development_academy_gate_2000_portrait_v1.png',
       _ =>
-        'assets/images/historical_prologue/bg_orphanage_investment_room_2000_portrait_cartoon_v1.png',
+        'assets/images/historical_prologue/bg_future_development_orientation_hall_2000_portrait_v1.png',
     };
   }
 
   String get _location {
     return switch (_beat) {
       <= 4 => '청와대 · 정책실',
-      <= 13 => '청와대 · 미래전략 심야회의',
-      <= 16 => '국립 미래양성원 · 개원 기록',
-      <= 21 => '국립 미래양성원 · 제3기록실',
-      <= 25 => '국립 미래양성원 · 6기 기숙사',
-      <= 30 => '국립 미래양성원 · 전자창고',
-      31 => '6기 기숙사 · 계좌 개통일 아침',
-      <= 39 => '국립 미래양성원 · 국가계좌 개통실',
-      _ => '국립 미래양성원 · 제6기 투자실',
+      <= 15 => '청와대 · 미래전략 심야회의',
+      16 => '국립 미래양성원 · 개원 기록',
+      <= 22 => '새봄보육원 · 2층 다섯 번째 방',
+      <= 31 => '국립 미래양성원 · 투자전문과정 정문',
+      _ => '국립 미래양성원 · 제6기 오리엔테이션 강당',
     };
   }
 
   String get _dateLabel => switch (_beat) {
-    <= 13 => '1981.01.12  ·  23:40',
-    <= 16 => '1982년  ·  미래양성계획 1기',
-    <= 21 => '1999.12.31  ·  자정 직전',
-    <= 31 => '2000.01.01  ·  새천년',
-    <= 39 => '2000.01.02  ·  08:00',
-    _ => '2000.01.02  ·  제6기 첫 수업',
+    <= 15 => '1981.01.12  ·  23:40',
+    16 => '1982년  ·  미래양성계획 출범',
+    <= 22 => '2000.01.02  ·  06:42',
+    <= 31 => '2000.01.02  ·  07:31',
+    _ => '2000.01.02  ·  08:00',
   };
 
   String? get _character {
     return switch (_beat) {
-      1 ||
-      7 ||
-      11 => 'assets/images/historical_prologue/character_seo_muntae_v1.png',
-      2 ||
-      12 => 'assets/images/historical_prologue/character_baek_gihyeon_v1.png',
-      3 || 13 || 14 =>
+      1 || 12 || 14 =>
         'assets/images/historical_prologue/character_jeon_dugwang_decree_cartoon_v2.png',
+      2 ||
+      7 ||
+      11 ||
+      13 => 'assets/images/historical_prologue/character_seo_muntae_v1.png',
       4 => 'assets/images/historical_prologue/character_kang_incheol_v1.png',
+      3 ||
+      10 => 'assets/images/historical_prologue/character_baek_gihyeon_v1.png',
       5 => _policyBriefingCharacter,
       8 || 15 => 'assets/images/historical_prologue/character_yoon_mira_v1.png',
-      10 => 'assets/images/historical_prologue/character_jang_daesik_v1.png',
-      18 ||
-      23 ||
-      28 ||
-      33 => 'assets/images/historical_prologue/character_park_taesu_v1.png',
-      19 || 21 || 24 || 29 || 31 || 38 || 40 || 42 || 45 || 48 =>
-        'assets/images/historical_prologue/character_hero_age14_passbook_v1.png',
-      25 || 27 =>
-        'assets/images/historical_prologue/character_living_guide_oh_gyeongtae_v1.png',
-      34 || 35 =>
-        'assets/images/historical_prologue/character_state_account_officer_cha_eunjoo_v1.png',
+      25 || 27 || 29 || 31 || 36 || 38 || 47 =>
+        'assets/images/historical_prologue/character_sua_orientation_v1.png',
+      28 || 30 || 39 || 46 =>
+        'assets/images/historical_prologue/character_hakjun_orientation_v1.png',
       _ => null,
     };
   }
 
   bool get _isAcademyTeacherBeat =>
-      _beat == 36 ||
+      _beat == 34 ||
+      _beat == 35 ||
       _beat == 37 ||
-      _beat == 39 ||
-      _beat == 41 ||
+      _beat == 42 ||
       _beat == 43 ||
       _beat == 44 ||
-      _beat == 47 ||
-      _beat == 49;
+      _beat == 45 ||
+      _beat == 49 ||
+      _beat == 51 ||
+      _beat == 53;
+
   bool get _isAcademyReceptionistBeat =>
-      _beat == _stateAccountActivationBeat || _beat == 35;
+      _beat == _stateAccountActivationBeat || _beat == 135;
 
   String get _teacherPoseAsset => switch (_beat) {
-    37 || 39 || 43 => 'assets/images/주식선생님/22_포즈1_주인공그림체_공통슬롯_투명.png',
-    41 || 49 => 'assets/images/주식선생님/23_포즈2_주인공그림체_공통슬롯_투명.png',
-    44 || 47 => 'assets/images/주식선생님/25_포즈4_주인공그림체_공통슬롯_투명.png',
-    36 || 48 || 50 => 'assets/images/주식선생님/24_포즈3_주인공그림체_공통슬롯_투명.png',
-    _ => 'assets/images/주식선생님/26_포즈5_주인공그림체_공통슬롯_투명.png',
+    34 || 42 || 51 => 'assets/images/주식선생님/22_포즈1_주인공그림체_공통슬롯_투명.png',
+    35 || 43 || 49 => 'assets/images/주식선생님/24_포즈3_주인공그림체_공통슬롯_투명.png',
+    37 || 44 => 'assets/images/주식선생님/23_포즈2_주인공그림체_공통슬롯_투명.png',
+    45 || 53 => 'assets/images/주식선생님/26_포즈5_주인공그림체_공통슬롯_투명.png',
+    _ => 'assets/images/주식선생님/22_포즈1_주인공그림체_공통슬롯_투명.png',
   };
 
   bool get _isNarration =>
       _beat == 0 ||
       _beat == 6 ||
-      _beat == 14 ||
       _beat == 16 ||
       _beat == 17 ||
-      _beat == 22 ||
-      _beat == 26 ||
+      _beat == 20 ||
+      _beat == 23 ||
+      _beat == 27 ||
       _beat == 32 ||
-      _beat == 35 ||
-      _beat == 46 ||
-      _beat == 50;
+      _beat == 41 ||
+      _beat == 52;
 
   String get _speaker => switch (_beat) {
-    0 || 6 || 14 || 16 || 17 || 22 || 26 || 32 || 35 || 46 || 50 => '이야기',
-    1 || 7 || 11 => '서문태 정책실장',
-    2 || 12 => '백기현 비서실장',
-    3 || 13 => '전두광',
+    0 || 6 || 16 || 17 || 20 || 23 || 27 || 32 || 41 || 52 => '이야기',
+    1 || 9 || 12 || 14 => '전두광',
+    2 || 7 || 11 || 13 => '서문태 정책실장',
+    3 || 10 => '백기현 비서실장',
     4 => '강인철 경제수석',
     5 => _policyBriefingSpeaker,
     8 || 15 => '윤미라 사회교육수석',
-    9 => '전두광',
-    10 => '장대식 법무수석',
-    18 || 23 || 28 || 33 => '박태수',
-    19 || 21 || 24 || 29 || 31 || 38 || 40 || 42 || 45 || 48 =>
-      _playerController.text.trim().isEmpty
-          ? '나'
-          : _playerController.text.trim(),
-    20 => '장부',
-    25 || 27 => '오경태 생활지도관',
-    34 || 35 => '차은주 국가계좌 담당관',
-    36 || 37 || 39 || 41 || 43 || 44 || 47 || 49 => '한서윤 선생님',
+    18 => '민호',
+    19 || 21 || 26 || 40 || 48 || 50 => '나',
+    22 => '박선희 원장',
+    24 || 33 => '아이들',
+    25 || 29 || 31 || 36 || 38 || 47 => '수아',
+    28 || 30 || 39 || 46 => '학준',
+    34 || 35 || 37 || 42 || 43 || 44 || 45 || 49 || 51 || 53 => '한서윤 선생님',
     _ => '이야기',
   };
+
   String get _line => switch (_beat) {
     0 =>
-      '1981년 1월 12일 밤 11시 40분. 청와대 정책실의 불은 자정이 가까워지도록 꺼지지 않았다. 다섯 권의 보고서 가운데 보호시설 보고서만 유난히 얇았다.',
-    1 => '우리나라의 미래가 어둡습니다.',
-    2 => '각하 앞에서 나라 망한다는 보고부터 꺼내는 배짱은 높이 사겠네. 자네 임기가 오늘 밤 끝날 수도 있다는 건 알고 시작하게.',
-    3 => '계속해.',
+      '1981년 1월 12일 밤 11시 40분. 청와대 정책실의 불은 자정이 가까워져도 꺼지지 않았다. 보고서 다섯 권 가운데 하나만, 이상할 만큼 얇았다.',
+    1 => '그래서. 당장은 멀쩡한데, 이대로 가면 나라가 망한다?',
+    2 => '당장은 아닙니다. 하지만 당장만 보고 달리면 이십 년 뒤에는 남의 기술과 남의 돈에 목줄이 잡힙니다.',
+    3 => '각하 앞에서 나라 앞날이 어둡다고 했으니, 자네 앞날도 같이 어두워질 수 있겠어.',
     4 =>
-      '앞으로의 전쟁은 공장 숫자로만 하지 않습니다. 반도체 회로 한 줄, 통신망 하나, 기업 지분 몇 퍼센트가 나라의 목줄을 쥘 수 있습니다.',
+      '지금은 공장 세우고 물건을 찍는 쪽이 이깁니다. 하지만 미래에는 어떤 기술에 돈을 넣고, 어떤 회사를 살릴지 정하는 사람이 공장 몇 개보다 더 큰 힘을 갖게 됩니다.',
     5 => _policyMessage,
-    6 =>
-      '보고서 다섯 권이 한 줄로 놓였다. 부잣집 아이는 밥상머리에서 장부와 공장을 배우지만, 보호시설 아이에게는 열아홉 살의 퇴소 가방만 남아 있었다.',
-    7 =>
-      '국가는 이미 그 아이들의 오늘을 책임지고 있습니다. 이제 회계, 산업, 계약, 저축과 투자를 가르쳐 미래의 자본 지휘자로 만들어야 합니다.',
-    8 => '아이를 국가가 소유한 자본이나 실험쥐처럼 취급하겠다는 겁니까?',
-    9 => '국가 물건으로 만들자는 소리는 하지 말게. 국가가 끝까지 책임지는 미래의 쩐주로 만들면 되지.',
-    10 => '미성년자가 국가 재산을 운용할 법적 근거가 없습니다.',
-    11 => '만 열네 살부터 소액 국가계좌를 엽니다. 최초 원금은 단돈 만 원. 운용 판단은 교육생 본인이 합니다.',
-    12 => '잃으면 혈세 낭비라 하고, 벌면 벼룩의 간을 빼먹는다고 할 겁니다. 몇 퍼센트를 회수할 생각인가?',
-    13 => '이십 퍼센트.',
-    14 =>
-      '전두광의 만년필이 결재란을 눌렀다. 사각. 한 아이의 인생을 바꾸기에는 너무 짧고, 국가의 거대한 실험을 시작하기에는 지나치게 가벼운 소리였다.',
-    15 =>
-      '나머지 80퍼센트는 아이의 자립적립금으로 동결해야 합니다. 열아홉 살이 되면 국가 원금만 돌려주고 전부 본인 이름으로 이전해야 합니다.',
-    16 => '1982년, 국립 미래양성원이 문을 열었다. 아이들은 구구단 다음에 복식부기를, 사회시간 다음에 공장 견학표를 배웠다.',
+    6 => '수출산업, 인구전망, 국가계좌, 특별법. 네 권은 벽돌처럼 두꺼웠다. 「요보호아동 시설 현황」만 종잇장처럼 얇았다.',
+    7 => '국가는 이미 아이들의 오늘을 먹이고 재웁니다. 이제 내일을 고를 힘까지 줘야 합니다.',
+    8 => '미치셨습니까? 아이들을 국가가 키우는 자본이나 실험쥐로 보겠다는 겁니까? 실패하면 그 아이 인생은 누가 책임집니까!',
+    9 => '먹이고 재우는 데서 끝내면 세금 낭비지. 스스로 돈을 벌게 만들면 투자가 되고.',
+    10 => '핏덩이들에게 나랏돈을 줬다가 잃으면 혈세 낭비라 할 겁니다. 벌면 나라가 코 묻은 돈을 빼앗는다고 할 테고요.',
+    11 =>
+      '열 살, SEED 01부터 시작합니다. 원금은 만 원. 작아서 우습지만, 잃었을 때 왜 잃었는지는 숨길 수 없는 돈입니다.',
+    12 => '잃으면?',
+    13 => '아이 빚으로 남기지 않습니다. 대신 다음 달 주문 한도를 깎습니다. 벌면 일부를 국가가 회수하고요.',
+    14 => '이십 퍼센트. 나머지는 아이 몫. 대신 왜 샀고 왜 팔았는지 전부 쓰게 해. 성공담 말고, 바닥을 긴 기록까지.',
+    15 => '그 80퍼센트는 시설 돈이 아닙니다. 아이 이름으로 묶어두고, 열아홉에 1원도 빠짐없이 넘기십시오.',
+    16 => '이듬해, 국립 미래양성원이 문을 열었다. 환영 문구 대신 정문에는 한 줄이 걸렸다. 「기록 없는 판단은 우연이다」',
     17 =>
-      '1997년 외환위기. 제5기 일부는 무너진 기업을 주워 담았고, 일부의 이름은 국가 기록에서 검은 줄로 지워졌다. 그리고 새천년 전야, 여섯째 줄이 인쇄됐다.',
-    18 => '6기 명단 맞아. 그런데 5기 장부는 왜 이름표가 뜯겨 있지?',
-    19 => '졸업했으면 이름이 더 잘 보여야 하는 거 아냐?',
-    20 => '국가계좌를 운용할 첫 이유를 장부에 남기십시오.',
-    21 => _introResponse,
+      '2000년 1월 2일 오전 6시 42분. 눈을 뜨자 천장의 누런 물자국이 먼저 보였다. 여섯 살 때부터 귀 잘린 토끼 같다고 생각했던 얼룩. 마지막 날인데도 물자국은 그냥 물자국이었다.',
+    18 => '형아… 진짜 가?',
+    19 => '응. 돈 세는 학교래. 돈을 그냥 주면 좋은데, 세기만 시키면 손가락만 아프잖아.',
+    20 =>
+      '민호가 웃다가 낡은 가방을 보고 입을 다물었다. 나는 왕딱지 한 장만 챙기고 나머지는 민호 이불 위에 던졌다. 가방 안감을 들추자 낯선 쇳조각이 손끝에 걸렸다. 「제5기 · 17번」.',
+    21 =>
+      '이름은 칼로 긁어 지워져 있었다. 뒷면에는 더 이상한 말이 파여 있었다. 「17번을 믿지 마.」 …이게 17번 명찰인데, 누구를 믿지 말라는 거야?',
     22 =>
-      '소등 종이 울렸지만 6기 기숙사의 몇몇 이불 속에서는 손전등과 증권 용어집이 꺼지지 않았다. 국가가 준 만 원은 여의도에서는 점심값, 이곳에서는 열네 해를 기다린 주문권이었다.',
-    23 => '네가 벌면 20퍼센트나 먼저 떼 간대. 남은 돈도 열아홉 살 전에는 못 만지고.',
-    24 => '상관없어. 국가 이름으로 시작해서 내 이름으로 끝내면 되니까.',
-    25 => '국가 기밀을 훔쳐본 운용자 둘은 새벽 전자창고 정리다. 그리고 5기 장부는 못 본 걸로 해.',
-    26 =>
-      '전자창고에는 고장 난 전화기와 모뎀이 산처럼 쌓여 있었다. 같은 한빛통신 제품 열두 대 중 아홉 대에 붉은 고장표가 붙어 있었다.',
-    27 => '작동, 고장, 부품용. 세 칸으로 나눠. 고장 났다고 주인이 없어지는 건 아니다.',
-    28 => '불량률이 이 정도면 한빛통신은 안 사는 게 맞아.',
-    29 => '그런데 왜 우리 원은 열두 대나 샀을까? 싸고 빨리 납품했으니까. 중요한 건 이 문제를 고칠 수 있느냐야.',
-    30 =>
-      '수리전표 아래에는 다음 주 신형 통신칩 교체 시험과 추가구매 예정표가 끼워져 있었다. 성공은 아니었다. 그러나 성공하면 달라질 크기는 보였다.',
-    31 => '장부, 통장, 연필. 다 챙겼어. 이제 국가계좌를 받으러 가자.',
+      '짐 가벼운 걸 부끄러워하지 마. 앞으로 채울 자리가 많은 거니까. 그리고 가서도 이유를 물어. 말이 안 되면 두 번 묻고. 그래도 이상하면 장부에 적어. 말은 날아가도 적은 건 남으니까.',
+    23 =>
+      '버스는 서울을 벗어나 한참을 덜컹거렸다. 눈발 너머로 붉은 벽돌 건물이 나타났다. 학교치고는 담장이 길었고, 공장치고는 창문이 많았다.',
+    24 => '“여기가 그 유명한 데래.”\n“고아원에서 추천받은 애들만 온다던데?”\n“입학식인데 왜 면접장보다 조용해?”',
+    25 => '야, 바퀴 달린 가방. 네 바퀴 하나가 계속 눈을 모으고 있어.',
+    26 => '일부러 눈사람 만드는 중이야. 본관 도착할 때쯤 머리까지 붙이려고.',
+    27 =>
+      '여자아이는 대꾸 대신 쪼그려 앉아 연필로 바퀴의 눈을 긁어냈다. 친화력이 좋다기보다, 남의 일에 거리낌 없이 끼어드는 타입 같았다. 이름은 수아라고 했다.',
+    28 => '정문에서 본관까지 420미터. 권장 도착 시간은 6분. 뛰면 감점이야. 안내문 7쪽.',
+    29 => '안내문에 별명 금지도 있어, 설명서 학준아?',
+    30 => '…없어. 그리고 그렇게 부르지 마.',
+    31 => '그럼 합법이네.',
     32 =>
-      '강당을 개조한 계좌개통실에는 책상이 여섯 줄로 놓였다. 각 자리에는 남색 통장, 빈 장부, 그리고 원금 10,000원이 찍힌 표가 기다리고 있었다.',
-    33 => '수익은 같이 먹고 손실은 같이 안 진다. 국가가 계산은 제일 잘하네.',
-    34 => '제6기 국가계좌를 개통합니다. 확정수익 20퍼센트는 국가 환수, 80퍼센트는 만 열아홉 살까지 자립적립금으로 보호됩니다.',
-    35 => '붉은 도장이 통장 위로 떨어졌다. 명의자는 대한민국 미래양성기금. 운용자 칸만 비어 있었다.',
-    36 => '제6기 담당 한서윤입니다. 국가 돈을 받았다고 정답까지 받은 사람?',
-    37 => '정답보다 먼저, 판단을 남길 운용자 이름부터 적어 볼까요?',
-    38 => '저는 ${_playerController.text.trim()}입니다. 정답 말고 주문권 받으러 왔어요.',
-    39 => '좋아요. 만 원이 국가 돈이면, 틀렸을 때 사라지는 건 누구의 기회죠?',
-    40 => '제 기회요. 국가는 다음 7기를 뽑으면 되니까.',
-    41 => '그래서 판단 기록은 네 이름으로 남겨요. 계좌 명의와 생각의 주인은 다를 수 있으니까.',
-    42 => '그럼 제가 사고 싶은 가격도 정할 수 있어요?',
+      '강당에는 내빈석도 부모 자리도 없었다. 스무 개의 의자만 반원으로 놓여 있었다. 무대 위 나무상자 하나가 더 수상해 보였다.',
+    33 => '“남자 열, 여자 열이래.”\n“자리도 성적순일까?”\n“아직 시험도 안 봤는데 무슨 성적이 있어.”',
+    34 => '제6기 담당 한서윤입니다. 인사는 이따 하죠. 여러분 배에서 나는 소리가 더 급해 보이니까.',
+    35 => '이 상자 안에는 단팥빵 하나와 500원짜리 동전이 있어요. 식당에서 빵은 300원입니다. 하나만 고르세요.',
+    36 => '동전이요! 빵 사고도 200원 남잖아요.',
+    37 => '좋아요. 그런데 식당 문은 두 시간 뒤, 열 시에 열립니다.',
+    38 => '두 시간이요? …참을 수 있어요. 아마도.',
+    39 => '빵이 몇 개 남았는지, 열 시에 새로 들어오는지부터 확인해야 합니다. 동전만 보고 고르면 정보가 부족해요.',
+    40 => '그 전에 상자부터 열어봐야 하는 거 아니에요? 선생님이 단팥빵을 벌써 드셨을 수도 있잖아요.',
+    41 => '아이들 사이에서 웃음이 터졌다. 한서윤은 화내지 않았다. 오히려 상자 뚜껑 위에 손을 얹고 나를 다시 보았다.',
+    42 =>
+      '그래요. 정답은 하나가 아닙니다. 무엇을 아느냐에 따라 답이 바뀌니까. 여기서 제일 먼저 배울 건 돈 버는 법이 아니라, 모르는 걸 모른다고 인정하는 법이에요.',
     43 =>
-      '정할 수 있어요. 원하는 가격에 줄을 서는 지정가와 지금 나온 가격부터 사는 시장가, 그리고 이익이 확정될 때의 국가 환수까지 같이 확인합니다.',
-    44 => '한빛통신을 다시 볼 때 네 눈이 어디부터 가는지 골라 볼까요?',
-    45 => _traitResponse,
-    46 => '한서윤이 컴퓨터 옆에 주문표를 놓았다. 국가 서약서 위로 주인 없는 빈 장부가 겹쳐졌다.',
-    47 => '국가 규칙 말고, 네가 스스로 지킬 운용 원칙 한 줄을 정하세요.',
-    48 => _lessonRuleResponse,
-    49 => '통장에는 국가 이름이 있죠. 하지만 주문표의 투자회사 칸은 비어 있어요. 먼저 갖고 싶은 이름을 쓰세요.',
-    _ => '빈 장부 표지 한가운데에 두 줄을 그었다. 첫 줄에는 내 이름, 둘째 줄에는 오늘부터 키워 갈 투자회사 이름이 들어간다.',
-  };
-
-  String get _introResponse => switch (_introChoice) {
-    'computer' => '국가 이름으로 시작해도 마지막에는 내 이름을 남긴다.',
-    'y2k' => '검게 지워진 5기 선배들의 장부부터 되찾는다.',
-    'stocks' => '돈이 없으면 선택도 없다. 내 선택권을 사기 위해 번다.',
-    _ => '',
-  };
-
-  String get _traitResponse => switch (_trait) {
-    StoryTrait.stability => '불량이 줄지 않으면 안 삽니다. 다음 기회를 잃지 않는 게 먼저예요.',
-    StoryTrait.innovation => '신형 통신칩이 실제로 문제를 바꾸는지부터 봅니다.',
-    StoryTrait.analysis => '불량률, 납품 속도, 추가구매 가격을 같이 비교합니다.',
-    StoryTrait.control => '한 주를 사더라도 회사가 약속을 지키는지 끝까지 묻겠습니다.',
-    null => '',
-  };
-
-  String get _lessonRuleResponse => switch (_familyRule) {
-    FamilyRule.reportLosses => '손해가 나도 숨기지 않고 쓸게요. 지우면 왜 틀렸는지도 없어지니까.',
-    FamilyRule.noHotTips => '추천보다 제 이유를 먼저 쓸게요. 이유가 없으면 제 주문도 아니니까.',
-    FamilyRule.keepCash => '한 번에 다 안 쓸게요. 다음에 다시 고를 돈은 남겨 둬야 하니까.',
-    null => '',
+      '여기 온 아이는 스무 명. 남학생 열, 여학생 열. 모두 전국 보호시설에서 추천받았고, 시험보다 긴 관찰 기록을 거쳐 뽑혔습니다.',
+    44 =>
+      '여긴 고아원 간판만 바꾼 곳도, 부자 흉내를 내는 학원도 아니에요. 숫자 뒤에 숨은 사람과 거짓말, 그리고 자기 판단의 값을 배우는 곳입니다.',
+    45 => '그럼 첫 번째 기록을 남겨볼까요. 자기가 왜 뽑혔다고 생각하죠?',
+    46 => '규칙을 빨리 외우고 계산 실수가 없어서입니다.',
+    47 => '사람 얼굴 보면 뭘 좋아하고 싫어하는지 금방 알아서요.',
+    48 => '돈을 많이 벌 것 같아서 뽑은 거 아니에요?',
+    49 => '지금 가진 돈은 얼마인데요?',
+    50 => '왕딱지 한 장이요. 용 그려진 제일 센 거.',
+    51 => '돈은 빵점. 솔직함은 합격. 뽑힌 이유는 내일부터 직접 찾아보죠.',
+    52 =>
+      '가장 어둡던 형광등이 한 번 떨리고 안정됐다. 스무 개의 이름표가 같은 빛을 받았다. 주머니 속 5기 명찰만 혼자 차갑게 식어 있었다.',
+    _ =>
+      '오늘은 여기까지입니다. 주식도, 국가계좌도 아직 열지 않아요. 먼저 이름과 자리를 외우세요. 내일부터는 틀린 답보다, 이유 없는 답을 더 무섭게 볼 겁니다.',
   };
 
   String get _policyBriefingSpeaker => switch (_activePolicyFile) {
@@ -307,49 +280,63 @@ class _VisualNovelOnboardingScreenState
   };
 
   String? get _stageDirection => switch (_beat) {
-    1 => '서문태가 2000년과 2010년에서 꺾이는 낡은 괘도를 펼쳤다.',
-    2 => '백기현은 천천히 안경을 벗어 탁자 위에 놓았다.',
-    3 => '전두광이 만년필 뚜껑을 열었다.',
-    4 => '강인철의 연필 끝이 반도체와 통신망 도표를 차례로 짚었다.',
+    1 => '전두광이 가장 얇은 보고서를 탁자 가운데로 밀었다.',
+    2 => '밤샘으로 충혈된 서문태의 눈이 잠깐 흔들렸다.',
+    3 => '백기현은 안경을 벗어 천천히 닦았다.',
+    4 => '강인철의 연필이 1981년에서 2000년으로 긴 선을 그었다.',
     5 => switch (_activePolicyFile) {
       'industry' => '수출 보고서에는 공장 숫자와 외화 목표가 빼곡했다.',
       'population' => '인구 곡선은 2000년을 지나며 완만하게 꺾였다.',
       'children' => '보호시설 보고서만 다른 서류의 절반 두께였다.',
-      'capital' => '빈 계좌 양식의 명의자 칸에는 국가 이름만 인쇄돼 있었다.',
+      'capital' => '빈 계좌 양식의 명의자 칸에는 국가 이름만 찍혀 있었다.',
       'law' => '법적 근거 칸은 깨끗하게 비어 있었다.',
       _ => '서로 다른 미래를 말하는 보고서 다섯 권이 탁자 위에 놓였다.',
     },
-    7 => '서문태의 손이 가장 얇은 보호시설 보고서 위에서 멈췄다.',
-    8 => '윤미라가 보고서를 덮고 자리에서 일어났다.',
-    9 => '전두광은 얇은 보고서를 손가락으로 두 번 두드렸다.',
-    10 => '장대식이 빈 법률수첩을 마지못해 끌어당겼다.',
-    11 => '계좌 양식에 만 14세와 원금 10,000원이 적혔다.',
-    12 => '백기현이 다시 안경을 쓰며 환수율 칸을 바라봤다.',
-    13 => '전두광이 20%라는 숫자에 동그라미를 쳤다.',
-    15 => '윤미라는 80% 아래에 자립적립금이라는 말을 힘주어 적었다.',
-    18 => '도트프린터가 제6기 명단을 거칠게 밀어냈다.',
-    19 => '나는 검게 지워진 세 이름을 손가락으로 문질렀다.',
-    20 => '장부 첫 장의 운용 목적 칸이 푸른빛으로 깜빡였다.',
-    21 => '내가 고른 문장이 빈 장부 첫 줄에 남았다.',
-    23 => '박태수가 윗침대에서 약관을 아래로 내려뜨렸다.',
-    24 => '나는 환수율 20%를 손가락으로 툭툭 두드렸다.',
-    25 => '문간의 오경태가 5기 장부를 점검표 아래로 덮었다.',
-    27 => '오경태가 빈 상자 세 개와 점검표를 내려놓았다.',
-    28 => '박태수가 고장 딱지가 붙은 모뎀을 따로 밀어냈다.',
-    29 => '나는 구매전표와 수리전표를 나란히 펼쳤다.',
-    30 => '다음 주 시험 예정표가 낡은 수리전표 아래에서 나왔다.',
-    31 => '나는 베개 밑 장부와 짧아진 연필을 제일 먼저 챙겼다.',
-    33 => '박태수가 국가 환수 안내서를 반으로 접었다.',
-    34 => '차은주가 남색 통장과 붉은 도장을 들어 보였다.',
-    36 => '한서윤은 켜지지 않은 CRT 여섯 대 앞에 섰다.',
-    38 => '운용자 칸에 이름을 적자 통장과 장부가 동시에 연결됐다.',
-    39 => '한서윤이 국가 명의 통장과 빈 판단 장부를 나란히 놓았다.',
-    40 => '나는 통장보다 장부를 내 쪽으로 끌어당겼다.',
-    41 => '한서윤은 계좌 명의와 운용자 이름 사이에 선을 그었다.',
-    42 => '나는 빈 주문표의 가격 칸을 손가락으로 짚었다.',
-    45 => '내가 고른 자료를 한빛통신 수리전표 옆에 놓았다.',
-    48 => '나는 국가 서약서가 아니라 내 장부 첫 줄에 원칙을 적었다.',
-    49 => '한서윤이 회사명 칸만 비어 있는 첫 주문표를 내밀었다.',
+    7 => '서문태의 손이 가장 얇은 보고서 위에서 멈췄다.',
+    8 => '윤미라가 손바닥으로 탁자를 내리쳤다.',
+    9 => '전두광은 대답 대신 보고서 표지를 두 번 두드렸다.',
+    10 => '백기현이 안경을 다시 쓰며 정치적 손익을 셌다.',
+    11 => '서문태가 기다렸다는 듯 새 계좌 양식을 펼쳤다.',
+    12 => '만년필 끝이 손실 처리 칸 위에서 멈췄다.',
+    13 => '서문태가 다음 달 주문 한도 칸을 손가락으로 짚었다.',
+    14 => '전두광은 20%에 동그라미를 치고 「미래양성원」 네 글자를 갈겨썼다.',
+    15 => '윤미라는 80% 아래에 ‘아이 명의’라고 힘주어 적었다.',
+    18 => '옆 침대 이불이 꿈틀거리더니 민호가 코만 내밀었다.',
+    19 => '나는 지퍼가 잘 닫히지 않는 가방을 무릎으로 눌렀다.',
+    20 => '모서리가 닳은 왕딱지 두 장이 민호의 이불 위로 날아갔다.',
+    21 => '나는 쇳조각 명찰을 재빨리 바지 주머니에 쑤셔 넣었다.',
+    22 => '박선희 원장이 목도리를 한 번 더 단단히 매어주었다.',
+    23 => '정문의 돌 표어가 눈발 사이로 드러났다. 「기록 없는 판단은 우연이다」.',
+    24 => '종이상자와 비닐봉지를 든 아이들의 속삭임이 겹쳤다.',
+    25 => '수아가 내 가방이 남긴 삐뚤어진 바퀴 자국을 가리켰다.',
+    26 => '나는 한쪽으로 기운 가방을 태연하게 세웠다.',
+    27 => '연필 끝에서 굳은 눈덩이가 후두둑 떨어졌다.',
+    28 => '남색 규정집을 낀 학준이 우리 옆에 바짝 붙었다.',
+    29 => '수아가 눈을 가늘게 뜨고 학준의 명찰을 읽었다.',
+    30 => '학준의 귀끝이 규정집 표지보다 먼저 붉어졌다.',
+    31 => '수아가 깔깔 웃으며 먼저 언덕을 뛰어올랐다.',
+    32 => '오래된 형광등 아래, 이름표 스무 장이 빈 의자를 지키고 있었다.',
+    33 => '앞자리와 뒷자리에서 서로 다른 소문이 동시에 튀어나왔다.',
+    34 => '구두 소리가 무대에 닿자 웅성거림이 절반쯤 줄었다.',
+    35 => '한서윤이 나무상자 위에 손바닥을 올렸다.',
+    36 => '수아의 손이 누구보다 먼저 천장을 찔렀다.',
+    37 => '한서윤이 벽시계를 턱으로 가리켰다.',
+    38 => '말이 끝나자마자 수아의 배에서 작은 소리가 났다.',
+    39 => '학준은 규정집 모서리를 만지며 상자를 노려봤다.',
+    40 => '나는 열리지 않은 상자 뚜껑을 손가락으로 가리켰다.',
+    41 => '한서윤의 입꼬리가 처음으로 아주 조금 올라갔다.',
+    42 => '칠판에 네 칸이 그어졌다. 아는 것, 모르는 것, 고른 이유, 생각을 바꿀 조건.',
+    43 => '출석부가 펼쳐지고 남학생 열 칸, 여학생 열 칸이 차례로 확인됐다.',
+    44 => '지시봉이 숫자, 사람, 판단 세 단어를 천천히 지나갔다.',
+    45 => '한서윤의 시선이 반원으로 앉은 아이들을 훑었다.',
+    46 => '학준은 기다렸다는 듯 허리를 곧게 폈다.',
+    47 => '수아는 옆자리 아이들의 표정을 한번 훑고 대답했다.',
+    48 => '나는 이유를 찾는 대신 가장 그럴듯한 답부터 꺼냈다.',
+    49 => '한서윤이 웃음을 누르며 되물었다.',
+    50 => '주머니 속 왕딱지가 손끝에 걸렸다.',
+    51 => '한서윤이 출석부 내 이름 옆에 짧은 표시를 남겼다.',
+    52 => '낡은 명찰의 모서리가 주머니 안에서 허벅지를 찔렀다.',
+    53 => '강당 문이 열리고 차가운 복도 공기가 발끝으로 밀려왔다.',
     _ => null,
   };
 
@@ -367,12 +354,7 @@ class _VisualNovelOnboardingScreenState
   }
 
   void _next() {
-    if (_beat >= _companyNameBeat) {
-      if (_beat != _companyNameBeat) {
-        setState(() => _beat = _companyNameBeat);
-      }
-      return;
-    }
+    if (_beat >= _orientationCompleteBeat) return;
     final currentBeat = _beat;
     FocusManager.instance.primaryFocus?.unfocus();
     _rememberCurrentLine();
@@ -381,13 +363,9 @@ class _VisualNovelOnboardingScreenState
       _travelToAccountHall();
       return;
     }
-    if (_quickSetup && _beat == _playerNameBeat) {
-      setState(() => _beat = _companyNameBeat);
-      return;
-    }
     setState(() {
       if (_beat == currentBeat) {
-        _beat = currentBeat + 1;
+        _beat = math.min(currentBeat + 1, _orientationCompleteBeat);
       }
     });
   }
@@ -417,11 +395,11 @@ class _VisualNovelOnboardingScreenState
     if (_reviewedPolicyFiles.contains(id)) return;
     _rememberCurrentLine();
     final message = switch (id) {
-      'industry' => '값싼 노동력과 외산 기계만으로는 몇십 년 뒤의 산업을 지휘할 수 없습니다.',
-      'population' => '아이 수는 줄고 기술은 비싸집니다. 지금 태어난 아이가 미래의 돈을 굴려야 합니다.',
-      'children' => '열아홉 살 퇴소 뒤에도 아이가 자기 삶을 선택할 자산을 남겨야 합니다.',
-      'capital' => '원금 만 원은 국가가 대되, 모든 매수와 매도 이유는 운용자가 장부에 남깁니다.',
-      'law' => '특별법 없이는 불가능합니다. 만들더라도 손실을 아이 개인의 빚으로 남길 수는 없습니다.',
+      'industry' => '공장 백 개를 세워도 돈의 방향을 남이 정하면, 우리는 남의 주문만 받게 됩니다.',
+      'population' => '아이 수는 줄고 기술값은 오릅니다. 지금 태어난 아이가 그때의 돈을 움직입니다.',
+      'children' => '열아홉에 가방 하나만 쥐여 보내선 선택하라고 말할 수도 없습니다.',
+      'capital' => '만 원은 작습니다. 그래서 좋습니다. 실패는 작게, 판단은 숨김없이 남길 수 있으니까요.',
+      'law' => '특별법이 필요합니다. 다만 실패를 아이 개인의 빚으로 돌리는 조항은 넣을 수 없습니다.',
       _ => _policyMessage,
     };
     _playStoryFeedback();
@@ -520,8 +498,9 @@ class _VisualNovelOnboardingScreenState
         key: const Key('story-skip-dialog'),
         title: const Text('프롤로그를 건너뛸까요?'),
         content: const Text(
-          '미래양성계획 창설과 제6기 장부 이야기를 건너뛰고 이름 설정으로 이동합니다. '
-          '기본 원칙은 숫자 분석·손실 기록으로 저장됩니다.',
+          '미래양성계획 창설과 수아·학준의 첫 만남을 건너뛰고 '
+          '제6기 오리엔테이션 마지막 안내로 이동합니다. '
+          '주식 수업과 새 게임 저장은 아직 시작되지 않습니다.',
         ),
         actions: [
           TextButton(
@@ -532,7 +511,7 @@ class _VisualNovelOnboardingScreenState
           FilledButton(
             key: const Key('story-skip-confirm'),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('건너뛰기'),
+            child: const Text('마지막 안내로'),
           ),
         ],
       ),
@@ -542,14 +521,7 @@ class _VisualNovelOnboardingScreenState
     _playStoryFeedback(strong: true);
     setState(() {
       _isTraveling = false;
-      _stateAccountActivated = true;
-      _introChoice ??= 'computer';
-      _trait ??= StoryTrait.analysis;
-      _familyRule ??= FamilyRule.reportLosses;
-      _quickSetup = true;
-      _beat = _playerController.text.trim().isEmpty
-          ? _playerNameBeat
-          : _companyNameBeat;
+      _beat = _orientationCompleteBeat;
     });
   }
 
@@ -629,6 +601,7 @@ class _VisualNovelOnboardingScreenState
                 child: _LivingBackground(
                   key: ValueKey(_background),
                   asset: _background,
+                  ambientFlicker: _beat >= 32,
                 ),
               ),
               const DecoratedBox(
@@ -761,11 +734,13 @@ class _VisualNovelOnboardingScreenState
 
   Widget _buildDialogue(BuildContext context) {
     if (_beat == _policyBriefingBeat) return _policyBriefing();
+    if (_beat == _orientationRosterBeat) return _orientationRoster();
+    if (_beat >= _orientationCompleteBeat) return _orientationComplete();
     if (_beat == _introChoiceBeat) return _introChoices();
     if (_beat == _stateAccountActivationBeat) {
       return _stateAccountActivation();
     }
-    if (_beat == 43) return _academyTutorial();
+    if (_beat == 143) return _academyTutorial();
     if (_beat == _playerNameBeat) return _nameEntry();
     if (_beat == _traitChoiceBeat) return _traitChoices();
     if (_beat == _principleChoiceBeat) return _principleChoices();
@@ -780,6 +755,176 @@ class _VisualNovelOnboardingScreenState
       onContinue: _next,
     );
   }
+
+  Widget _orientationRoster() => _NovelDialogue(
+    key: const ValueKey('orientation-roster'),
+    speaker: _speaker,
+    line: _line,
+    stageDirection: _stageDirection,
+    child: Column(
+      children: [
+        Container(
+          key: const Key('orientation-roster-card'),
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8F2E3),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFD8BE91)),
+          ),
+          child: Column(
+            children: [
+              const Text(
+                '제6기 오리엔테이션 명단',
+                style: TextStyle(
+                  color: _ink,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: _orientationStat(
+                      key: const Key('orientation-total-count'),
+                      label: '총원',
+                      value: '20명',
+                      color: const Color(0xFF536A96),
+                    ),
+                  ),
+                  const SizedBox(width: 7),
+                  Expanded(
+                    child: _orientationStat(
+                      key: const Key('orientation-male-count'),
+                      label: '남학생',
+                      value: '10명',
+                      color: const Color(0xFF3F72A5),
+                    ),
+                  ),
+                  const SizedBox(width: 7),
+                  Expanded(
+                    child: _orientationStat(
+                      key: const Key('orientation-female-count'),
+                      label: '여학생',
+                      value: '10명',
+                      color: const Color(0xFFC85C72),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 9),
+              const Text(
+                '전국 보호시설 추천 · 제6기 투자전문과정',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Color(0xFF697386),
+                  fontSize: 10,
+                  height: 1.35,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        _NovelNextButton(
+          key: const Key('orientation-roster-continue'),
+          label: '스무 명의 이름표 확인',
+          enabled: true,
+          onTap: _next,
+        ),
+      ],
+    ),
+  );
+
+  Widget _orientationStat({
+    required Key key,
+    required String label,
+    required String value,
+    required Color color,
+  }) => Container(
+    key: key,
+    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.1),
+      borderRadius: BorderRadius.circular(11),
+      border: Border.all(color: color.withValues(alpha: 0.35)),
+    ),
+    child: Column(
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            color: Color(0xFF697386),
+            fontSize: 9,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: TextStyle(
+            color: color,
+            fontSize: 13,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ],
+    ),
+  );
+
+  Widget _orientationComplete() => _NovelDialogue(
+    key: const ValueKey('orientation-complete'),
+    speaker: _speaker,
+    line: _line,
+    stageDirection: _stageDirection,
+    child: Column(
+      children: [
+        Container(
+          key: const Key('orientation-complete-card'),
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFEAF2F8),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFF9DB4CC)),
+          ),
+          child: const Column(
+            children: [
+              Text(
+                '제6기 오리엔테이션 · 1막 완료',
+                style: TextStyle(
+                  color: _ink,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              SizedBox(height: 7),
+              Text(
+                '수아와 학준을 만났습니다.\n주식 수업과 국가계좌는 아직 잠겨 있습니다.',
+                key: Key('stock-lesson-locked'),
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Color(0xFF536A96),
+                  fontSize: 10,
+                  height: 1.4,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        _NovelNextButton(
+          key: const Key('orientation-exit-button'),
+          label: '처음 화면으로 돌아가기',
+          enabled: true,
+          onTap: widget.onExit ?? () {},
+        ),
+      ],
+    ),
+  );
 
   Widget _policyBriefing() => _NovelDialogue(
     key: ValueKey(
@@ -1446,24 +1591,130 @@ class _NewGamePreparationOverlay extends StatelessWidget {
   );
 }
 
-class _LivingBackground extends StatelessWidget {
-  const _LivingBackground({super.key, required this.asset});
+class _LivingBackground extends StatefulWidget {
+  const _LivingBackground({
+    super.key,
+    required this.asset,
+    this.ambientFlicker = false,
+  });
 
   final String asset;
+  final bool ambientFlicker;
 
   @override
-  Widget build(BuildContext context) => TweenAnimationBuilder<double>(
-    tween: Tween(begin: 1.04, end: 1),
-    duration: const Duration(seconds: 7),
-    curve: Curves.easeOut,
-    builder: (context, scale, child) =>
-        Transform.scale(scale: scale, child: child),
-    child: Image.asset(
-      asset,
-      key: const Key('story-background-image'),
-      fit: BoxFit.cover,
-      alignment: Alignment.center,
-      filterQuality: FilterQuality.high,
+  State<_LivingBackground> createState() => _LivingBackgroundState();
+}
+
+class _LivingBackgroundState extends State<_LivingBackground>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ambientController;
+
+  @override
+  void initState() {
+    super.initState();
+    _ambientController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 12),
+    );
+    final isTestBinding = WidgetsBinding.instance.runtimeType
+        .toString()
+        .contains('TestWidgetsFlutterBinding');
+    if (const bool.fromEnvironment('FLUTTER_TEST') || isTestBinding) {
+      _ambientController.value = 0.25;
+    } else {
+      _ambientController.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _ambientController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: _ambientController,
+    builder: (context, child) => LayoutBuilder(
+      builder: (context, constraints) {
+        final t = _ambientController.value;
+        final wave = math.sin(t * math.pi * 2);
+        final driftX = wave * 1.8;
+        final driftY = math.cos(t * math.pi * 2) * 1.1;
+        final fluorescentPulse =
+            0.025 +
+            (math.sin(t * math.pi * 14) + 1) * 0.012 +
+            (math.sin(t * math.pi * 34) > 0.97 ? 0.025 : 0);
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            Transform.translate(
+              offset: Offset(driftX, driftY),
+              child: Transform.scale(
+                scale: 1.025,
+                child: Image.asset(
+                  widget.asset,
+                  key: const Key('story-background-image'),
+                  fit: BoxFit.cover,
+                  alignment: Alignment.center,
+                  filterQuality: FilterQuality.high,
+                ),
+              ),
+            ),
+            if (widget.ambientFlicker)
+              IgnorePointer(
+                child: Opacity(
+                  key: const Key('orientation-light-flicker'),
+                  opacity: fluorescentPulse.clamp(0.0, 0.08),
+                  child: const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Color(0xFFFFF4C9),
+                          Color(0x22FFE7A1),
+                          Colors.transparent,
+                        ],
+                        stops: [0, 0.28, 0.66],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            if (widget.ambientFlicker)
+              for (var index = 0; index < 12; index++)
+                Positioned(
+                  left:
+                      ((index * 37) % 101) / 101 * constraints.maxWidth +
+                      math.sin(t * math.pi * 2 + index) * 2,
+                  top:
+                      ((((index * 61) % 97) / 97 * constraints.maxHeight) +
+                          t * 42) %
+                      (constraints.maxHeight * 0.76),
+                  child: IgnorePointer(
+                    child: Opacity(
+                      opacity:
+                          0.11 +
+                          ((math.sin(t * math.pi * 2 + index * 0.8) + 1) *
+                              0.045),
+                      child: Container(
+                        key: index == 0
+                            ? const Key('orientation-dust-motes')
+                            : null,
+                        width: index.isEven ? 2.2 : 1.4,
+                        height: index.isEven ? 2.2 : 1.4,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFFFEDB5),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+          ],
+        );
+      },
     ),
   );
 }
@@ -1744,133 +1995,232 @@ class _NovelDialogueState extends State<_NovelDialogue>
       0,
       math.min(visibleCharacters, widget.line.length),
     );
+    final panelGradient = widget.narration
+        ? const [Color(0xC21B2436), Color(0xAD111A2A)]
+        : const [Color(0xBA172A42), Color(0xA6111E31)];
+    final secondaryText = widget.narration
+        ? const Color(0xFFE1ECFA)
+        : const Color(0xFFEAF4FF);
+
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: _typingComplete ? null : _revealLine,
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 13),
-        decoration: BoxDecoration(
-          color: widget.narration
-              ? const Color(0xEC272A37)
-              : const Color(0xF7FFF9EA),
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: const Color(0xCCFFFFFF), width: 1.5),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x66000000),
-              blurRadius: 22,
-              offset: Offset(0, 8),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            key: const Key('story-dialogue-panel'),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: panelGradient,
+              ),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xB8C8EDFF), width: 1.15),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x5C020814),
+                  blurRadius: 22,
+                  offset: Offset(0, 8),
+                ),
+                BoxShadow(
+                  color: Color(0x344BC7F1),
+                  blurRadius: 12,
+                  spreadRadius: -5,
+                ),
+              ],
             ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (!widget.narration)
-              Transform.translate(
-                offset: const Offset(0, -25),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 13,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: _coral,
-                    borderRadius: BorderRadius.circular(14),
-                    boxShadow: const [
-                      BoxShadow(color: Color(0x4433405F), offset: Offset(0, 3)),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(11),
+              child: BackdropFilter(
+                filter: ui.ImageFilter.blur(sigmaX: 7, sigmaY: 7),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(17, 23, 14, 10),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (widget.stageDirection?.trim().isNotEmpty ??
+                          false) ...[
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.fromLTRB(10, 6, 9, 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0x304FD7FF),
+                            border: const Border(
+                              left: BorderSide(
+                                color: Color(0xFF72DEFF),
+                                width: 3,
+                              ),
+                            ),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            widget.stageDirection!,
+                            key: const Key('story-stage-direction'),
+                            style: const TextStyle(
+                              color: Color(0xFFF2FAFF),
+                              fontFamily: 'Pretendard',
+                              fontSize: 12.5,
+                              height: 1.38,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.15,
+                              shadows: [
+                                Shadow(
+                                  color: Color(0xCC000000),
+                                  blurRadius: 4,
+                                  offset: Offset(0, 1),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 7),
+                      ],
+                      Semantics(
+                        liveRegion: true,
+                        label: widget.line,
+                        child: Text(
+                          visibleLine,
+                          key: const Key('story-line-text'),
+                          style: const TextStyle(
+                            color: Color(0xFFF9FCFF),
+                            fontFamily: 'Maplestory',
+                            fontSize: 15,
+                            height: 1.5,
+                            fontWeight: FontWeight.w400,
+                            letterSpacing: -0.2,
+                            shadows: [
+                              Shadow(
+                                color: Color(0xE6000000),
+                                blurRadius: 5,
+                                offset: Offset(0, 1.4),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      if (!_typingComplete) ...[
+                        const SizedBox(height: 7),
+                        Text(
+                          '화면을 누르면 문장이 한 번에 표시됩니다',
+                          key: const Key('story-typewriter-hint'),
+                          style: TextStyle(
+                            color: secondaryText.withValues(alpha: 0.78),
+                            fontFamily: 'Pretendard',
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                      if (_typingComplete && widget.choices.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        ...widget.choices.map(
+                          (choice) => Padding(
+                            padding: const EdgeInsets.only(bottom: 7),
+                            child: choice,
+                          ),
+                        ),
+                      ],
+                      if (_typingComplete && widget.child != null) ...[
+                        const SizedBox(height: 10),
+                        widget.child!,
+                      ],
+                      if (_typingComplete && widget.onContinue != null) ...[
+                        const SizedBox(height: 2),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton.icon(
+                            key: const Key('story-continue'),
+                            onPressed: widget.onContinue,
+                            label: const Text('다음'),
+                            iconAlignment: IconAlignment.end,
+                            icon: const Icon(
+                              Icons.keyboard_double_arrow_down_rounded,
+                              size: 20,
+                            ),
+                            style: TextButton.styleFrom(
+                              minimumSize: const Size(70, 36),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 9,
+                              ),
+                              foregroundColor: const Color(0xFF83E5FF),
+                              textStyle: const TextStyle(
+                                fontFamily: 'Pretendard',
+                                fontSize: 12,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
-                  child: Text(
-                    widget.speaker,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            left: 14,
+            top: -15,
+            child: Container(
+              key: const Key('story-speaker-chip'),
+              padding: const EdgeInsets.fromLTRB(13, 6, 16, 6),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xF03DB9E9), Color(0xE92D79C7)],
+                ),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(5),
+                  topRight: Radius.circular(15),
+                  bottomRight: Radius.circular(5),
+                  bottomLeft: Radius.circular(5),
+                ),
+                border: Border.all(color: const Color(0xD9E6F9FF)),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x66020A18),
+                    blurRadius: 8,
+                    offset: Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Text(
+                widget.speaker,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontFamily: 'Maplestory',
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.1,
+                  shadows: [Shadow(color: Color(0x99000000), blurRadius: 3)],
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            right: 15,
+            top: 8,
+            child: Row(
+              children: [
+                Container(width: 42, height: 2, color: const Color(0x996FDCFF)),
+                const SizedBox(width: 5),
+                Transform.rotate(
+                  angle: math.pi / 4,
+                  child: Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF8BE6FF),
+                      border: Border.all(color: Colors.white70),
                     ),
                   ),
                 ),
-              ),
-            if (!widget.narration) const SizedBox(height: 0),
-            if (widget.stageDirection?.trim().isNotEmpty ?? false) ...[
-              Text(
-                widget.stageDirection!,
-                key: const Key('story-stage-direction'),
-                style: TextStyle(
-                  color: widget.narration
-                      ? const Color(0xFFCBD4E8)
-                      : const Color(0xFF777268),
-                  fontSize: 11,
-                  height: 1.4,
-                  fontStyle: FontStyle.italic,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 7),
-            ],
-            Semantics(
-              liveRegion: true,
-              label: widget.line,
-              child: Text(
-                visibleLine,
-                key: const Key('story-line-text'),
-                style: TextStyle(
-                  color: widget.narration ? Colors.white : _ink,
-                  fontSize: widget.narration ? 13 : 14,
-                  height: 1.55,
-                  fontWeight: widget.narration
-                      ? FontWeight.w600
-                      : FontWeight.w700,
-                ),
-              ),
+              ],
             ),
-            if (!_typingComplete) ...[
-              const SizedBox(height: 8),
-              Text(
-                '탭하여 문장 펼치기',
-                key: const Key('story-typewriter-hint'),
-                style: TextStyle(
-                  color: widget.narration
-                      ? const Color(0xFFCBD4E8)
-                      : const Color(0xFF8B877F),
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-            if (_typingComplete && widget.choices.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              ...widget.choices.map(
-                (choice) => Padding(
-                  padding: const EdgeInsets.only(bottom: 7),
-                  child: choice,
-                ),
-              ),
-            ],
-            if (_typingComplete && widget.child != null) ...[
-              const SizedBox(height: 12),
-              widget.child!,
-            ],
-            if (_typingComplete && widget.onContinue != null) ...[
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton.icon(
-                  key: const Key('story-continue'),
-                  onPressed: widget.onContinue,
-                  label: Text(widget.narration ? '장면 계속' : '계속'),
-                  iconAlignment: IconAlignment.end,
-                  icon: const Icon(Icons.keyboard_arrow_down_rounded),
-                  style: TextButton.styleFrom(
-                    foregroundColor: widget.narration ? _yellow : _coral,
-                    textStyle: const TextStyle(fontWeight: FontWeight.w900),
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

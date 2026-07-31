@@ -640,20 +640,23 @@ void main() {
       );
       for (var index = 0; index < portraits.evaluate().length; index++) {
         final rect = tester.getRect(portraits.at(index));
-        expect(rect.left, greaterThanOrEqualTo(0));
-        expect(rect.right, lessThanOrEqualTo(phoneSize.width));
-        expect(rect.top, greaterThanOrEqualTo(0));
-        expect(rect.bottom, lessThanOrEqualTo(phoneSize.height));
+        final stageRect = tester.getRect(
+          find.byKey(const Key('onboarding-stage')),
+        );
+        expect(rect.right, greaterThan(stageRect.left));
+        expect(rect.left, lessThan(stageRect.right));
+        expect(rect.top, greaterThanOrEqualTo(stageRect.top));
+        expect(rect.bottom, lessThanOrEqualTo(stageRect.bottom));
       }
       final teacher = find.byKey(const Key('academy-teacher-character'));
       if (teacher.evaluate().isNotEmpty) {
+        final stageRect = tester.getRect(
+          find.byKey(const Key('onboarding-stage')),
+        );
         final teacherRect = tester.getRect(teacher);
-        expect(teacherRect.left, closeTo(3.72, 0.01));
-        expect(teacherRect.center.dx, closeTo(phoneSize.width / 2, 0.01));
-        expect(teacherRect.top, closeTo(149.16, 0.01));
-        expect(teacherRect.width, closeTo(352.56, 0.01));
-        expect(teacherRect.height, closeTo(528.84, 0.01));
-        expect(teacherRect.bottom, closeTo(678, 0.01));
+        expect(teacherRect.center.dx, closeTo(stageRect.center.dx, 0.01));
+        expect(teacherRect.height, closeTo(stageRect.height * 0.9, 0.01));
+        expect(teacherRect.bottom, closeTo(stageRect.bottom, 0.01));
       }
       expect(tester.takeException(), isNull);
     }
@@ -663,118 +666,48 @@ void main() {
       await tester.pumpAndSettle();
       expectPortraitInside();
     }
-    for (final goal in <String>[
-      'power-cord',
-      'screwdriver',
-      'keyboard',
-      'modem',
-      'parts',
+    for (final file in <String>[
+      'industry',
+      'population',
+      'children',
+      'capital',
+      'law',
     ]) {
-      final button = find.byKey(Key('repair-goal-$goal'));
+      final button = find.byKey(Key('policy-file-$file'));
       await tester.ensureVisible(button);
       await tester.tap(button);
       await tester.pumpAndSettle();
       expectPortraitInside();
     }
-    await tester.ensureVisible(find.byKey(const Key('repair-power-on')));
-    await tester.tap(find.byKey(const Key('repair-power-on')));
+    await tester.tap(find.byKey(const Key('policy-briefing-finish')));
     await tester.pumpAndSettle();
     expectPortraitInside();
 
-    for (var index = 0; index < 14; index++) {
+    for (var index = 0; index < 37; index++) {
       await tester.tap(find.byKey(const Key('story-continue')));
       await tester.pumpAndSettle();
       expectPortraitInside();
     }
-    await tester.tap(find.byKey(const Key('story-intro-computer')));
+    expect(find.byKey(const Key('orientation-roster-card')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('orientation-roster-continue')));
     await tester.pumpAndSettle();
     expectPortraitInside();
-
-    for (var index = 0; index < 10; index++) {
+    for (var index = 0; index < 9; index++) {
       await tester.tap(find.byKey(const Key('story-continue')));
       await tester.pumpAndSettle();
       expectPortraitInside();
     }
-    await tester.tap(find.byKey(const Key('story-continue')));
-    await tester.pump();
-    expect(find.byKey(const Key('academy-travel-loading')), findsOneWidget);
-    await tester.tap(find.byKey(const Key('academy-travel-skip')));
-    await tester.pumpAndSettle();
-    for (var index = 0; index < 2; index++) {
-      await tester.tap(find.byKey(const Key('story-continue')));
-      await tester.pumpAndSettle();
-      expectPortraitInside();
-    }
+    expect(find.byKey(const Key('orientation-complete-card')), findsOneWidget);
+    expect(find.byKey(const Key('stock-lesson-locked')), findsOneWidget);
     expect(
-      find.byKey(const Key('academy-receptionist-character')),
-      findsOneWidget,
+      find.byKey(const Key('academy-market-tutorial-screen')),
+      findsNothing,
     );
-    await tester.tap(find.byKey(const Key('academy-tuition-pay-button')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('academy-registration-continue')));
-    await tester.pumpAndSettle();
-    for (var index = 0; index < 2; index++) {
-      await tester.tap(find.byKey(const Key('story-continue')));
-      await tester.pumpAndSettle();
-      expectPortraitInside();
-    }
-
-    await tester.enterText(find.byKey(const Key('player-name-input')), '민준');
-    await tester.pump();
-    await tester.ensureVisible(find.byKey(const Key('story-next-name')));
-    await tester.tap(find.byKey(const Key('story-next-name')));
-    await tester.pumpAndSettle();
-    expectPortraitInside();
-    for (var index = 0; index < 5; index++) {
-      await tester.tap(find.byKey(const Key('story-continue')));
-      await tester.pumpAndSettle();
-      expectPortraitInside();
-    }
-    expect(find.byKey(const Key('academy-teacher-character')), findsOneWidget);
-    final academyTeacherRect = tester.getRect(
-      find.byKey(const Key('academy-teacher-character')),
-    );
-    expect(academyTeacherRect.height, closeTo(528.84, 0.01));
-    await tester.tap(find.byKey(const Key('academy-tutorial-continue')));
-    await tester.pumpAndSettle();
-    expectPortraitInside();
-
-    await tester.tap(find.byKey(const Key('story-trait-analysis')));
-    await tester.pumpAndSettle();
-    for (var index = 0; index < 2; index++) {
-      await tester.tap(find.byKey(const Key('story-continue')));
-      await tester.pumpAndSettle();
-      expectPortraitInside();
-    }
-    await tester.tap(find.byKey(const Key('family-rule-report-losses')));
-    await tester.pumpAndSettle();
-    for (var index = 0; index < 2; index++) {
-      await tester.tap(find.byKey(const Key('story-continue')));
-      await tester.pumpAndSettle();
-    }
-    await tester.enterText(
-      find.byKey(const Key('company-name-input')),
-      '별빛 투자',
-    );
-    await tester.pump();
-    await tester.ensureVisible(find.byKey(const Key('create-company-button')));
-    await tester.tap(find.byKey(const Key('create-company-button')));
-    await tester.pump();
-
-    expect(created, isTrue);
-    expect(
-      find.byKey(const Key('new-game-preparation-overlay')),
-      findsOneWidget,
-    );
-    await tester.pump();
-    expect(find.text('테스트 시장 준비 중…'), findsOneWidget);
-    expect(find.text('18%'), findsOneWidget);
-    creationGate.complete();
-    await tester.pumpAndSettle();
+    expect(created, isFalse);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('name inputs stay above a 320px mobile keyboard', (tester) async {
+  testWidgets('story skip ends before unreleased name inputs', (tester) async {
     await usePhoneSurface(tester);
     addTearDown(tester.view.resetViewInsets);
     await tester.pumpWidget(
@@ -788,71 +721,13 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('story-skip-confirm')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('player-name-input')), findsOneWidget);
-    await tester.tap(find.byKey(const Key('player-name-input')));
-    tester.view.viewInsets = FakeViewPadding(
-      bottom: 320 * tester.view.devicePixelRatio,
-    );
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const Key('player-name-input')), '민준');
-    await tester.pump();
+    expect(find.byKey(const Key('orientation-complete-card')), findsOneWidget);
+    expect(find.byKey(const Key('stock-lesson-locked')), findsOneWidget);
+    expect(find.byKey(const Key('player-name-input')), findsNothing);
+    expect(find.byKey(const Key('company-name-input')), findsNothing);
     final stageRect = tester.getRect(find.byKey(const Key('onboarding-stage')));
     expect(stageRect.top, 0);
     expect(stageRect.height, phoneSize.height);
-    final playerPanelRect = tester.getRect(
-      find.byKey(const Key('keyboard-name-panel')),
-    );
-    expect(playerPanelRect.bottom, lessThanOrEqualTo(phoneSize.height - 320));
-    final playerInput = find.byKey(const Key('player-name-input'));
-    final playerButton = find.byKey(const Key('story-next-name'));
-    final playerInputRect = tester.getRect(playerInput);
-    expect(playerInputRect.top, greaterThanOrEqualTo(0));
-    expect(playerInputRect.bottom, lessThanOrEqualTo(phoneSize.height - 320));
-    expect(playerInput.hitTestable(), findsOneWidget);
-    expect(playerButton.hitTestable(), findsOneWidget);
-    expect(
-      tester.getRect(playerButton).bottom,
-      lessThanOrEqualTo(phoneSize.height - 320),
-    );
-    expect(tester.takeException(), isNull);
-
-    await tester.tap(playerButton);
-    await tester.pump();
-    tester.view.resetViewInsets();
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('company-name-input')), findsOneWidget);
-    expect(tester.takeException(), isNull);
-
-    await tester.tap(find.byKey(const Key('company-name-input')));
-    tester.view.viewInsets = FakeViewPadding(
-      bottom: 320 * tester.view.devicePixelRatio,
-    );
-    await tester.pumpAndSettle();
-    await tester.enterText(
-      find.byKey(const Key('company-name-input')),
-      '별빛 투자',
-    );
-    await tester.pump();
-    final companyStageRect = tester.getRect(
-      find.byKey(const Key('onboarding-stage')),
-    );
-    expect(companyStageRect.top, 0);
-    expect(companyStageRect.height, phoneSize.height);
-    final companyPanelRect = tester.getRect(
-      find.byKey(const Key('keyboard-name-panel')),
-    );
-    expect(companyPanelRect.bottom, lessThanOrEqualTo(phoneSize.height - 320));
-    final companyInput = find.byKey(const Key('company-name-input'));
-    final companyButton = find.byKey(const Key('create-company-button'));
-    final companyInputRect = tester.getRect(companyInput);
-    expect(companyInputRect.top, greaterThanOrEqualTo(0));
-    expect(companyInputRect.bottom, lessThanOrEqualTo(phoneSize.height - 320));
-    expect(companyInput.hitTestable(), findsOneWidget);
-    expect(companyButton.hitTestable(), findsOneWidget);
-    expect(
-      tester.getRect(companyButton).bottom,
-      lessThanOrEqualTo(phoneSize.height - 320),
-    );
     expect(tester.takeException(), isNull);
   });
 }

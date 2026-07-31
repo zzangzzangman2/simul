@@ -1310,6 +1310,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
                 ),
                 _AppView.onboarding => VisualNovelOnboardingScreen(
                   onCreate: _createCompany,
+                  onExit: _showTitle,
                 ),
                 _AppView.game when _state != null => OfficeScreen(
                   state: _state!,

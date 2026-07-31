@@ -403,115 +403,6 @@ void main() {
     expect(overlay, findsNothing);
   }
 
-  Future<void> completeGuidedMarketAndReturnHome(WidgetTester tester) async {
-    await waitForMarketHome(tester);
-    await tester.pump(const Duration(milliseconds: 600));
-    await advanceTutorialPagesToTarget(
-      tester,
-      actionKey: const Key('market-tutorial-next'),
-      targetKey: const Key('market-tutorial-target'),
-    );
-    await tester.tap(find.byKey(const Key('market-tutorial-target')));
-    await tester.pump(const Duration(milliseconds: 750));
-    await advanceTutorialPagesToTarget(
-      tester,
-      actionKey: const Key('market-tutorial-next'),
-      targetKey: const Key('market-tutorial-target'),
-    );
-    await tester.tap(find.byKey(const Key('market-tutorial-target')));
-    await tester.pump(const Duration(milliseconds: 800));
-    await advanceTutorialPagesToTarget(
-      tester,
-      actionKey: const Key('market-detail-tutorial-next'),
-      targetKey: const Key('market-detail-tutorial-target'),
-    );
-    await tester.tap(find.byKey(const Key('market-detail-tutorial-target')));
-    await tester.pump(const Duration(milliseconds: 600));
-    await advanceTutorialPagesToTarget(
-      tester,
-      actionKey: const Key('market-detail-tutorial-next'),
-      targetKey: const Key('market-detail-tutorial-target'),
-    );
-    await tester.tap(find.byKey(const Key('market-detail-tutorial-target')));
-    await tester.pump(const Duration(milliseconds: 700));
-    await advanceTutorialPagesToTarget(
-      tester,
-      actionKey: const Key('market-detail-tutorial-next'),
-      targetKey: const Key('market-detail-tutorial-target'),
-    );
-    await tester.tap(find.byKey(const Key('market-detail-tutorial-target')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 700));
-    await tester.pump();
-    await advanceTutorialPagesUntilDismissed(
-      tester,
-      actionKey: const Key('market-order-tutorial-done'),
-      overlayKey: const Key('market-order-tutorial-overlay'),
-    );
-    expect(
-      find.byKey(const Key('market-order-tutorial-overlay')),
-      findsNothing,
-    );
-    expect(find.byKey(const Key('market-practical-tutorial')), findsOneWidget);
-    expect(find.textContaining('1,000,000원'), findsWidgets);
-
-    await tester.ensureVisible(
-      find.byKey(const Key('request-parent-order-approval')),
-    );
-    await tester.pump();
-    await tester.tap(find.byKey(const Key('request-parent-order-approval')));
-    await tester.pump();
-    expect(find.byKey(const Key('order-result')), findsOneWidget);
-    await tester.ensureVisible(
-      find.byKey(const Key('request-parent-order-approval')),
-    );
-    await tester.pump();
-    await tester.tap(find.byKey(const Key('request-parent-order-approval')));
-    await tester.pump();
-    expect(find.byKey(const Key('tutorial-price-change')), findsOneWidget);
-    await tester.pump(const Duration(seconds: 5));
-    await tester.ensureVisible(
-      find.byKey(const Key('tutorial-price-change-continue')),
-    );
-    await tester.pump();
-
-    await tester.tap(find.byKey(const Key('tutorial-price-change-continue')));
-    await tester.pump();
-    expect(find.byKey(const Key('tutorial-sell-order')), findsOneWidget);
-    await tester.ensureVisible(
-      find.byKey(const Key('request-parent-order-approval')),
-    );
-    await tester.pump();
-    await tester.tap(find.byKey(const Key('request-parent-order-approval')));
-    await tester.pump();
-    expect(find.byKey(const Key('order-result')), findsOneWidget);
-    await tester.ensureVisible(
-      find.byKey(const Key('request-parent-order-approval')),
-    );
-    await tester.pump();
-    await tester.tap(find.byKey(const Key('request-parent-order-approval')));
-    await tester.pump();
-    expect(find.byKey(const Key('tutorial-trade-summary')), findsOneWidget);
-    await tester.tap(find.byKey(const Key('tutorial-summary-continue')));
-    await tester.pump();
-    expect(find.byKey(const Key('tutorial-post-trade-review')), findsOneWidget);
-    for (var reviewBeat = 0; reviewBeat < 4; reviewBeat += 1) {
-      await tester.tap(find.byKey(const Key('tutorial-review-continue')));
-      await tester.pump();
-    }
-    expect(find.byKey(const Key('tutorial-school-dismissal')), findsOneWidget);
-    await tester.tap(
-      find.byKey(const Key('market-practical-tutorial-complete')),
-    );
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('market-practical-tutorial')), findsNothing);
-    expect(
-      find.byKey(const Key('academy-market-tutorial-screen')),
-      findsNothing,
-    );
-    expect(find.byKey(const Key('apartment-place-bedroom')), findsOneWidget);
-  }
-
   Future<void> openMarketExplore(WidgetTester tester) async {
     await waitForMarketHome(tester);
     await tester.tap(find.byKey(const Key('market-nav-explore')));
@@ -617,76 +508,16 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  Future<void> completeStoryOnboarding(WidgetTester tester) async {
+  Future<void> completeOrientationPreview(WidgetTester tester) async {
     await startNewGame(tester);
     await advanceDialogue(tester, 5);
     await completePolicyBriefing(tester);
-
-    await advanceDialogue(tester, 14);
-    await tester.tap(find.byKey(const Key('story-intro-computer')));
+    await advanceDialogue(tester, 37);
+    expect(find.byKey(const Key('orientation-roster-card')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('orientation-roster-continue')));
     await tester.pumpAndSettle();
-
-    await advanceDialogue(tester, 10);
-    await tester.tap(find.byKey(const Key('story-continue')));
-    await tester.pump();
-    expect(find.byKey(const Key('academy-travel-loading')), findsOneWidget);
-    await tester.tap(find.byKey(const Key('academy-travel-skip')));
-    await tester.pumpAndSettle();
-
-    await advanceDialogue(tester, 2);
-    expect(
-      find.byKey(const Key('state-account-activation-button')),
-      findsOneWidget,
-    );
-    await tester.tap(find.byKey(const Key('state-account-activation-button')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('state-account-activated')), findsOneWidget);
-    await tester.tap(
-      find.byKey(const Key('state-account-activation-continue')),
-    );
-    await tester.pumpAndSettle();
-
-    await advanceDialogue(tester, 2);
-    await tester.enterText(find.byKey(const Key('player-name-input')), '민준');
-    await tester.pump();
-    await tester.ensureVisible(find.byKey(const Key('story-next-name')));
-    await tester.tap(find.byKey(const Key('story-next-name')));
-    await tester.pumpAndSettle();
-
-    await advanceDialogue(tester, 5);
-    expect(find.byKey(const Key('academy-tutorial-continue')), findsOneWidget);
-    await tester.tap(find.byKey(const Key('academy-tutorial-continue')));
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.byKey(const Key('story-trait-analysis')));
-    await tester.pumpAndSettle();
-    await advanceDialogue(tester, 2);
-    await tester.tap(find.byKey(const Key('family-rule-report-losses')));
-    await tester.pumpAndSettle();
-    await advanceDialogue(tester, 1);
-
-    final finalStoryContinue = find.byKey(const Key('story-continue'));
-    await tester.tap(finalStoryContinue);
-    await tester.tap(finalStoryContinue);
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('company-name-input')), findsOneWidget);
-    expect(find.byKey(const Key('story-continue')), findsNothing);
-
-    await tester.enterText(
-      find.byKey(const Key('company-name-input')),
-      '별빛 투자',
-    );
-    await tester.pump();
-    await tester.ensureVisible(find.byKey(const Key('create-company-button')));
-    await tester.tap(find.byKey(const Key('create-company-button')));
-    await tester.pumpAndSettle();
-    expect(
-      find.byKey(const Key('academy-market-tutorial-screen')),
-      findsOneWidget,
-    );
-    expect(find.byKey(const Key('apartment-place-bedroom')), findsNothing);
-    await completeGuidedMarketAndReturnHome(tester);
-    await dismissHubTutorial(tester);
+    await advanceDialogue(tester, 9);
+    expect(find.byKey(const Key('orientation-complete-card')), findsOneWidget);
   }
 
   testWidgets('opening dialogue shows the future-development policy cast', (
@@ -711,25 +542,28 @@ void main() {
     expect(find.byKey(portraitKey), findsNothing);
 
     await advanceDialogue(tester, 1);
-    expect(find.textContaining('미래가 어둡습니다'), findsOneWidget);
-    expect(
-      visiblePortraitAsset(),
-      'assets/images/historical_prologue/character_seo_muntae_v1.png',
-    );
-
-    await advanceDialogue(tester, 1);
-    expect(
-      visiblePortraitAsset(),
-      'assets/images/historical_prologue/character_baek_gihyeon_v1.png',
-    );
-
-    await advanceDialogue(tester, 1);
+    expect(find.textContaining('이대로 가면 나라가 망한다'), findsOneWidget);
     expect(
       visiblePortraitAsset(),
       'assets/images/historical_prologue/character_jeon_dugwang_decree_cartoon_v2.png',
     );
 
     await advanceDialogue(tester, 1);
+    expect(find.textContaining('당장은 아닙니다'), findsOneWidget);
+    expect(
+      visiblePortraitAsset(),
+      'assets/images/historical_prologue/character_seo_muntae_v1.png',
+    );
+
+    await advanceDialogue(tester, 1);
+    expect(find.textContaining('자네 앞날도 같이 어두워질'), findsOneWidget);
+    expect(
+      visiblePortraitAsset(),
+      'assets/images/historical_prologue/character_baek_gihyeon_v1.png',
+    );
+
+    await advanceDialogue(tester, 1);
+    expect(find.textContaining('어떤 회사를 살릴지 정하는 사람'), findsOneWidget);
     expect(
       visiblePortraitAsset(),
       'assets/images/historical_prologue/character_kang_incheol_v1.png',
@@ -751,7 +585,7 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
-  testWidgets('prologue switches background when situation changes', (
+  testWidgets('prologue switches through the departure, gate, and hall backgrounds', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
@@ -782,132 +616,121 @@ void main() {
     );
 
     await completePolicyBriefing(tester);
-    await advanceDialogue(tester, 8);
+    await advanceDialogue(tester, 10);
     expect(
       visibleBackgroundAsset(),
       'assets/images/historical_prologue/bg_future_development_orphanage_1982_portrait_cartoon_v1.png',
     );
 
-    await advanceDialogue(tester, 3);
-    expect(
-      visibleBackgroundAsset(),
-      'assets/images/historical_prologue/bg_orphanage_records_room_1999_portrait_cartoon_v1.png',
-    );
-
-    await advanceDialogue(tester, 3);
-    await tester.tap(find.byKey(const Key('story-intro-computer')));
-    await tester.pumpAndSettle();
     await advanceDialogue(tester, 1);
     expect(
       visibleBackgroundAsset(),
-      'assets/images/historical_prologue/bg_orphanage_dormitory_1999_portrait_cartoon_v1.png',
+      'assets/images/historical_prologue/bg_orphanage_departure_2000_portrait_v1.png',
     );
 
-    await advanceDialogue(tester, 4);
+    await advanceDialogue(tester, 6);
     expect(
       visibleBackgroundAsset(),
-      'assets/images/historical_prologue/bg_orphanage_electronics_storage_2000_portrait_cartoon_v1.png',
+      'assets/images/historical_prologue/bg_future_development_academy_gate_2000_portrait_v1.png',
     );
-    expect(tester.takeException(), isNull);
-  });
-  testWidgets('prologue restores the policy briefing and sixth-cohort order', (
-    tester,
-  ) async {
-    await tester.binding.setSurfaceSize(const Size(390, 844));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-    await tester.pumpWidget(
-      const MillenniumCapitalApp(
-        campaignWorldPreparer: _skipCampaignWorldPreparation,
-      ),
-    );
-    await tester.pumpAndSettle();
-    await startNewGame(tester);
 
-    expect(find.textContaining('1981년 1월 12일'), findsOneWidget);
-    expect(find.byKey(const Key('story-backlog-button')), findsOneWidget);
-    expect(find.byKey(const Key('story-skip-button')), findsOneWidget);
-    expect(find.byKey(const Key('policy-file-industry')), findsNothing);
-
-    await advanceDialogue(tester, 5);
-    expect(find.byKey(const Key('story-stage-direction')), findsOneWidget);
-    expect(find.byKey(const Key('policy-file-industry')), findsOneWidget);
-    expect(find.byKey(const Key('policy-file-population')), findsOneWidget);
-    expect(find.byKey(const Key('policy-file-children')), findsOneWidget);
-    expect(find.byKey(const Key('policy-file-capital')), findsOneWidget);
-    expect(find.byKey(const Key('policy-file-law')), findsOneWidget);
+    await advanceDialogue(tester, 9);
     expect(
-      tester
-          .widget<FilledButton>(
-            find.descendant(
-              of: find.byKey(const Key('policy-briefing-finish')),
-              matching: find.byType(FilledButton),
-            ),
-          )
-          .onPressed,
-      isNull,
+      visibleBackgroundAsset(),
+      'assets/images/historical_prologue/bg_future_development_orientation_hall_2000_portrait_v1.png',
     );
-
-    await completePolicyBriefing(tester);
-    expect(find.textContaining('보고서 다섯 권'), findsOneWidget);
-    await advanceDialogue(tester, 14);
-    expect(find.textContaining('첫 이유'), findsOneWidget);
-
-    await tester.tap(find.byKey(const Key('story-backlog-button')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('story-backlog-sheet')), findsOneWidget);
-    expect(find.textContaining('미래가 어둡습니다'), findsOneWidget);
-    Navigator.of(
-      tester.element(find.byKey(const Key('story-backlog-sheet'))),
-    ).pop();
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.byKey(const Key('story-intro-computer')));
-    await tester.pumpAndSettle();
-    expect(find.textContaining('내 이름을 남긴다'), findsOneWidget);
-    await advanceDialogue(tester, 10);
-    expect(find.textContaining('국가계좌를 받으러'), findsOneWidget);
-    await tester.tap(find.byKey(const Key('story-continue')));
-    await tester.pump();
-    expect(find.byKey(const Key('academy-travel-loading')), findsOneWidget);
-    expect(find.byKey(const Key('academy-travel-skip')), findsOneWidget);
-    await tester.tap(find.byKey(const Key('academy-travel-skip')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('academy-travel-loading')), findsNothing);
-
-    await advanceDialogue(tester, 2);
-    expect(
-      find.byKey(const Key('state-account-activation-button')),
-      findsOneWidget,
-    );
-    expect(find.byKey(const Key('state-recovery-rate')), findsOneWidget);
-    expect(find.byKey(const Key('self-reliance-rate')), findsOneWidget);
-    await tester.tap(find.byKey(const Key('state-account-activation-button')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('state-account-activated')), findsOneWidget);
-    expect(find.text('0원'), findsOneWidget);
-    await tester.tap(
-      find.byKey(const Key('state-account-activation-continue')),
-    );
-    await tester.pumpAndSettle();
-
-    await advanceDialogue(tester, 1);
-    expect(find.text('한서윤 선생님'), findsOneWidget);
-    expect(find.byKey(const Key('academy-teacher-character')), findsOneWidget);
-    await advanceDialogue(tester, 1);
-    expect(find.byKey(const Key('player-name-input')), findsOneWidget);
-    expect(find.textContaining('시장가와 지정가'), findsNothing);
-    await tester.enterText(find.byKey(const Key('player-name-input')), '민준');
-    await tester.pump();
-    await tester.tap(find.byKey(const Key('story-next-name')));
-    await tester.pumpAndSettle();
-    await advanceDialogue(tester, 3);
-    expect(find.textContaining('생각의 주인은'), findsOneWidget);
-    await advanceDialogue(tester, 1);
-    expect(find.textContaining('사고 싶은 가격도 정할 수'), findsOneWidget);
+    expect(find.byKey(const Key('orientation-light-flicker')), findsOneWidget);
+    expect(find.byKey(const Key('orientation-dust-motes')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('prologue skip keeps names editable and valid defaults', (
+  testWidgets(
+    'prologue introduces Sua, Hak-jun, and the twenty-student cohort',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(
+        const MillenniumCapitalApp(
+          campaignWorldPreparer: _skipCampaignWorldPreparation,
+        ),
+      );
+      await tester.pumpAndSettle();
+      await startNewGame(tester);
+
+      expect(find.textContaining('1981년 1월 12일'), findsOneWidget);
+      await advanceDialogue(tester, 5);
+      expect(find.byKey(const Key('policy-file-industry')), findsOneWidget);
+      expect(find.byKey(const Key('policy-file-children')), findsOneWidget);
+      await completePolicyBriefing(tester);
+
+      expect(find.textContaining('요보호아동 시설 현황'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('story-backlog-button')));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('당장은 아닙니다'), findsOneWidget);
+      Navigator.of(
+        tester.element(find.byKey(const Key('story-backlog-sheet'))),
+      ).pop();
+      await tester.pumpAndSettle();
+
+      await advanceDialogue(tester, 11);
+      expect(find.textContaining('천장의 누런 물자국'), findsOneWidget);
+      await advanceDialogue(tester, 8);
+      expect(find.text('수아'), findsOneWidget);
+      expect(
+        (tester
+                    .widget<Image>(
+                      find.byKey(const Key('story-character-image')),
+                    )
+                    .image
+                as AssetImage)
+            .assetName,
+        'assets/images/historical_prologue/character_sua_orientation_v1.png',
+      );
+
+      await advanceDialogue(tester, 3);
+      expect(find.text('학준'), findsOneWidget);
+      expect(
+        (tester
+                    .widget<Image>(
+                      find.byKey(const Key('story-character-image')),
+                    )
+                    .image
+                as AssetImage)
+            .assetName,
+        'assets/images/historical_prologue/character_hakjun_orientation_v1.png',
+      );
+
+      await advanceDialogue(tester, 6);
+      expect(find.text('한서윤 선생님'), findsOneWidget);
+      expect(
+        find.byKey(const Key('academy-teacher-character')),
+        findsOneWidget,
+      );
+      await advanceDialogue(tester, 1);
+      expect(find.textContaining('단팥빵 하나와 500원'), findsOneWidget);
+      await advanceDialogue(tester, 8);
+      expect(find.byKey(const Key('orientation-roster-card')), findsOneWidget);
+      expect(find.byKey(const Key('orientation-total-count')), findsOneWidget);
+      expect(find.text('20명'), findsOneWidget);
+      expect(find.text('10명'), findsNWidgets(2));
+      await tester.tap(find.byKey(const Key('orientation-roster-continue')));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('고아원 간판만 바꾼 곳'), findsOneWidget);
+      await advanceDialogue(tester, 9);
+      expect(
+        find.byKey(const Key('orientation-complete-card')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('stock-lesson-locked')), findsOneWidget);
+      expect(
+        find.byKey(const Key('academy-market-tutorial-screen')),
+        findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('prologue skip stops at the locked orientation ending', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
@@ -925,39 +748,24 @@ void main() {
     expect(find.byKey(const Key('story-skip-dialog')), findsOneWidget);
     await tester.tap(find.byKey(const Key('story-skip-confirm')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('player-name-input')), findsOneWidget);
 
-    await tester.enterText(find.byKey(const Key('player-name-input')), '지우');
-    await tester.pump();
-    await tester.tap(find.byKey(const Key('story-next-name')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('company-name-input')), findsOneWidget);
-    await tester.enterText(
-      find.byKey(const Key('company-name-input')),
-      '새천년 연구소',
-    );
-    await tester.pump();
-    await tester.tap(find.byKey(const Key('create-company-button')));
-    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('orientation-complete-card')), findsOneWidget);
+    expect(find.byKey(const Key('stock-lesson-locked')), findsOneWidget);
+    expect(find.byKey(const Key('player-name-input')), findsNothing);
+    expect(find.byKey(const Key('company-name-input')), findsNothing);
     expect(
       find.byKey(const Key('academy-market-tutorial-screen')),
-      findsOneWidget,
+      findsNothing,
     );
   });
+
   testWidgets(
-    'company confirmation shows progress and reuses the world prepared at new game start',
+    'orientation preview does not create a save or open the stock tutorial',
     (tester) async {
       SharedPreferences.setMockInitialValues({});
       final preferences = await SharedPreferences.getInstance();
-      final saveGate = Completer<void>();
+      final persistence = GamePersistence(preferences: preferences);
       var prepareCalls = 0;
-      final persistence = GamePersistence(
-        preferences: preferences,
-        saveString: (key, value) async {
-          await saveGate.future;
-          return preferences.setString(key, value);
-        },
-      );
 
       await tester.binding.setSurfaceSize(const Size(390, 844));
       addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -966,7 +774,7 @@ void main() {
           persistence: persistence,
           campaignWorldPreparer: (state, onProgress) async {
             prepareCalls += 1;
-            onProgress(const WorldLoadProgress(0.96, '처음하기에서 세계 계산 완료'));
+            onProgress(const WorldLoadProgress(0.96, '오리엔테이션 세계 계산 완료'));
             await Future<void>.delayed(Duration.zero);
           },
         ),
@@ -979,35 +787,24 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('story-skip-confirm')));
       await tester.pumpAndSettle();
-      await tester.enterText(find.byKey(const Key('player-name-input')), '지우');
-      await tester.pump();
-      await tester.tap(find.byKey(const Key('story-next-name')));
-      await tester.pumpAndSettle();
-      await tester.enterText(
-        find.byKey(const Key('company-name-input')),
-        '별빛 투자',
-      );
-      await tester.pump();
-
-      await tester.tap(find.byKey(const Key('create-company-button')));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 20));
       expect(
-        find.byKey(const Key('new-game-preparation-overlay')),
+        find.byKey(const Key('orientation-complete-card')),
         findsOneWidget,
       );
-      expect(find.textContaining('처음하기에서 이미 끝냈어요'), findsOneWidget);
-      expect(prepareCalls, 1);
-
-      saveGate.complete();
-      await tester.pumpAndSettle();
       expect(
         find.byKey(const Key('academy-market-tutorial-screen')),
-        findsOneWidget,
+        findsNothing,
       );
+
+      await tester.tap(find.byKey(const Key('orientation-exit-button')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('game-title-screen')), findsOneWidget);
+      final slots = await persistence.listSlots();
+      expect(slots.every((slot) => slot.isEmpty), isTrue);
       expect(prepareCalls, 1);
     },
   );
+
   testWidgets('policy briefing panel fits the 360 by 800 mobile minimum', (
     tester,
   ) async {
@@ -1025,7 +822,7 @@ void main() {
     expect(find.byKey(const Key('story-typewriter-hint')), findsWidgets);
     await tester.tap(find.byKey(const ValueKey(1)));
     await tester.pump();
-    expect(find.textContaining('미래가 어둡습니다'), findsOneWidget);
+    expect(find.textContaining('이대로 가면 나라가 망한다'), findsOneWidget);
     expect(find.byKey(const Key('story-typewriter-hint')), findsOneWidget);
     expect(find.byKey(const Key('story-continue')), findsWidgets);
     await tester.pumpAndSettle();
@@ -1074,7 +871,7 @@ void main() {
     }
   });
 
-  testWidgets('visual novel onboarding saves the sixth-cohort state account', (
+  testWidgets('visual novel onboarding ends before stocks and account setup', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
@@ -1086,19 +883,17 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await completeStoryOnboarding(tester);
+    await completeOrientationPreview(tester);
 
-    final companyHeader = tester.widget<Text>(
-      find.byKey(const Key('company-header-title')),
+    expect(find.byKey(const Key('orientation-complete-card')), findsOneWidget);
+    expect(find.textContaining('수아와 학준'), findsOneWidget);
+    expect(find.byKey(const Key('stock-lesson-locked')), findsOneWidget);
+    expect(
+      find.byKey(const Key('academy-market-tutorial-screen')),
+      findsNothing,
     );
-    expect(companyHeader.data, '별빛 투자');
-    expect(companyHeader.maxLines, 1);
-    expect(companyHeader.softWrap, isFalse);
-    expect(find.text('국립 미래양성원 · 6기 기숙사'), findsOneWidget);
-    expect(find.text('10,000원'), findsOneWidget);
-    expect(find.byKey(const Key('apartment-place-bedroom')), findsOneWidget);
-    expect(find.byKey(const Key('room-company-sign')), findsOneWidget);
-    expect(find.byTooltip('1시간 보내기 · 게임 시간 60분 진행'), findsOneWidget);
+    expect(find.byKey(const Key('apartment-place-bedroom')), findsNothing);
+    expect(find.byKey(const Key('company-name-input')), findsNothing);
   });
 
   testWidgets('father card reveals and repays the academy tuition debt', (
@@ -1766,12 +1561,9 @@ void main() {
       );
       expect(
         reviewTeacherRect.height,
-        closeTo((reviewStageRect.height - 122) * 0.78, 0.01),
+        closeTo(reviewStageRect.height * 0.9, 0.01),
       );
-      expect(
-        reviewTeacherRect.bottom,
-        closeTo(reviewStageRect.bottom - 122, 0.01),
-      );
+      expect(reviewTeacherRect.bottom, closeTo(reviewStageRect.bottom, 0.01));
       expect(
         reviewTeacherRect.center.dx,
         closeTo(reviewStageRect.center.dx, 0.01),
@@ -1801,7 +1593,7 @@ void main() {
                 widget is Image &&
                 widget.image is AssetImage &&
                 (widget.image as AssetImage).assetName ==
-                    'assets/images/character_hero_thoughtful_v1.png',
+                    'assets/images/character_hero_title_style_v2.png',
           ),
         ),
         findsOneWidget,
@@ -1816,7 +1608,7 @@ void main() {
         find.byKey(const Key('tutorial-school-dismissal')),
         findsOneWidget,
       );
-      expect(find.textContaining('교문을 나서자'), findsOneWidget);
+      expect(find.textContaining('기숙사와 투자실을 오가며'), findsOneWidget);
       await tester.tap(
         find.byKey(const Key('market-practical-tutorial-complete')),
       );
