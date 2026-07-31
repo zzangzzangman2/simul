@@ -680,7 +680,7 @@ void main() {
     await tester.tap(find.byKey(const Key('story-continue')));
     await tester.pumpAndSettle();
     expectPortraitInside();
-    for (var index = 0; index < 9; index++) {
+    for (var index = 0; index < 21; index++) {
       await tester.tap(find.byKey(const Key('story-continue')));
       await tester.pumpAndSettle();
       expectPortraitInside();

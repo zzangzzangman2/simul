@@ -61,9 +61,33 @@ export const dialogueBackgrounds: DialogueBackground[] = [
   ),
   background(
     "academy-dormitory",
-    "미래양성원 · 기숙사",
+    "미래양성원 · 구형 기숙사",
     "미래양성원",
     "assets/images/historical_prologue/bg_orphanage_dormitory_1999_portrait_cartoon_v1.png",
+  ),
+  background(
+    "academy-dorm-corridor-2000",
+    "제6기 기숙사 · 중앙 복도",
+    "미래양성원",
+    "assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_corridor_2000_v1.png",
+  ),
+  background(
+    "academy-dorm-shared-day-2000",
+    "제6기 공용 생활실 · 낮",
+    "미래양성원",
+    "assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_day_2000_v1.png",
+  ),
+  background(
+    "academy-dorm-washroom-2000",
+    "제6기 기숙사 · 세면실",
+    "미래양성원",
+    "assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_washroom_2000_v1.png",
+  ),
+  background(
+    "academy-dorm-shared-night-2000",
+    "제6기 공용 생활실 · 첫날 밤",
+    "미래양성원",
+    "assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_night_2000_v1.png",
   ),
   background(
     "account-hall",

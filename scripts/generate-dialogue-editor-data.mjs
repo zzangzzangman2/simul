@@ -87,16 +87,16 @@ const teacherBeats = Array.from(
 );
 
 function teacherPoseForBeat(beat) {
-  if ([34, 42, 51].includes(beat)) {
+  if ([34, 42, 51, 55, 63].includes(beat)) {
     return "assets/images/주식선생님/22_포즈1_주인공그림체_공통슬롯_투명.png";
   }
-  if ([37, 44].includes(beat)) {
+  if ([37, 44, 59].includes(beat)) {
     return "assets/images/주식선생님/23_포즈2_주인공그림체_공통슬롯_투명.png";
   }
-  if ([35, 43, 49].includes(beat)) {
+  if ([35, 43, 49, 57, 61].includes(beat)) {
     return "assets/images/주식선생님/24_포즈3_주인공그림체_공통슬롯_투명.png";
   }
-  if ([45, 53].includes(beat)) {
+  if ([45, 53, 64].includes(beat)) {
     return "assets/images/주식선생님/26_포즈5_주인공그림체_공통슬롯_투명.png";
   }
   return "assets/images/주식선생님/22_포즈1_주인공그림체_공통슬롯_투명.png";
@@ -111,6 +111,7 @@ function chapterFor(beat, location) {
   if (beat <= 22) return "2장 · 한 손으로 드는 전부";
   if (beat <= 31) return "3장 · 설명서 학준";
   if (beat <= 53) return "4장 · 왜 하필 너였을까";
+  if (beat <= 65) return "5장 · 열 명이 쓰는 한 방";
   return `추가 장면 · ${location || "새 장소"}`;
 }
 

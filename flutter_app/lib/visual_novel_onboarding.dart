@@ -1,6 +1,6 @@
 part of 'main.dart';
 
-const _onboardingBeatCount = 54;
+const _onboardingBeatCount = 66;
 const _maximumDialogueBeatCount = 240;
 const _dialogueRuntimeStorageKey = 'future-academy-dialogue-runtime-v1';
 const _dialogueBundleAsset = 'assets/dialogue/dialogue-editor-override.json';
@@ -268,8 +268,16 @@ class _VisualNovelOnboardingScreenState
         'assets/images/historical_prologue/bg_orphanage_departure_2000_portrait_v1.png',
       <= 31 =>
         'assets/images/historical_prologue/bg_future_development_academy_gate_2000_portrait_v1.png',
-      _ =>
+      <= 53 =>
         'assets/images/historical_prologue/bg_future_development_orientation_hall_2000_portrait_v1.png',
+      <= 57 =>
+        'assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_corridor_2000_v1.png',
+      <= 63 =>
+        'assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_day_2000_v1.png',
+      64 =>
+        'assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_washroom_2000_v1.png',
+      _ =>
+        'assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_night_2000_v1.png',
     };
   }
 
@@ -282,7 +290,11 @@ class _VisualNovelOnboardingScreenState
       16 => '국립 미래양성원 · 개원 기록',
       <= 22 => '새봄보육원 · 2층 다섯 번째 방',
       <= 31 => '국립 미래양성원 · 투자전문과정 정문',
-      _ => '국립 미래양성원 · 제6기 오리엔테이션 강당',
+      <= 53 => '국립 미래양성원 · 제6기 오리엔테이션 강당',
+      <= 57 => '국립 미래양성원 · 기숙사 중앙 복도',
+      <= 63 => '국립 미래양성원 · 제6기 공용 생활실',
+      64 => '국립 미래양성원 · 기숙사 세면실',
+      _ => '국립 미래양성원 · 제6기 공용 생활실',
     };
   }
 
@@ -294,7 +306,10 @@ class _VisualNovelOnboardingScreenState
       16 => '1982년  ·  미래양성계획 출범',
       <= 22 => '2000.01.02  ·  06:42',
       <= 31 => '2000.01.02  ·  07:31',
-      _ => '2000.01.02  ·  08:00',
+      <= 53 => '2000.01.02  ·  08:00',
+      <= 57 => '2000.01.02  ·  09:05',
+      <= 64 => '2000.01.02  ·  09:10',
+      _ => '2000.01.02  ·  21:40',
     };
   }
 
@@ -344,6 +359,10 @@ class _VisualNovelOnboardingScreenState
       36 => 'assets/images/cinematic_soft_painted/sua/05_surprised_v1.png',
       38 => 'assets/images/cinematic_soft_painted/sua/06_worried_v1.png',
       47 => 'assets/images/cinematic_soft_painted/sua/02_warm_smile_v1.png',
+      60 => 'assets/images/cinematic_soft_painted/sua/04_playful_tease_v1.png',
+      56 =>
+        'assets/images/historical_prologue/character_hakjun_orientation_v2.png',
+      62 => 'assets/images/protagonist_seed01/04_curious_question.png',
       28 || 30 || 39 || 46 =>
         'assets/images/historical_prologue/character_hakjun_orientation_v2.png',
       _ => null,
@@ -360,7 +379,13 @@ class _VisualNovelOnboardingScreenState
       _beat == 45 ||
       _beat == 49 ||
       _beat == 51 ||
-      _beat == 53;
+      _beat == 53 ||
+      _beat == 55 ||
+      _beat == 57 ||
+      _beat == 59 ||
+      _beat == 61 ||
+      _beat == 63 ||
+      _beat == 64;
 
   bool get _isAcademyReceptionistBeat =>
       _beat == _stateAccountActivationBeat || _beat == 135;
@@ -369,7 +394,10 @@ class _VisualNovelOnboardingScreenState
     34 || 42 || 51 => 'assets/images/주식선생님/22_포즈1_주인공그림체_공통슬롯_투명.png',
     35 || 43 || 49 => 'assets/images/주식선생님/24_포즈3_주인공그림체_공통슬롯_투명.png',
     37 || 44 => 'assets/images/주식선생님/23_포즈2_주인공그림체_공통슬롯_투명.png',
-    45 || 53 => 'assets/images/주식선생님/26_포즈5_주인공그림체_공통슬롯_투명.png',
+    45 || 53 || 64 => 'assets/images/주식선생님/26_포즈5_주인공그림체_공통슬롯_투명.png',
+    55 || 63 => 'assets/images/주식선생님/22_포즈1_주인공그림체_공통슬롯_투명.png',
+    57 || 61 => 'assets/images/주식선생님/24_포즈3_주인공그림체_공통슬롯_투명.png',
+    59 => 'assets/images/주식선생님/23_포즈2_주인공그림체_공통슬롯_투명.png',
     _ => 'assets/images/주식선생님/22_포즈1_주인공그림체_공통슬롯_투명.png',
   };
 
@@ -382,7 +410,19 @@ class _VisualNovelOnboardingScreenState
   String get _speaker =>
       _dialogueOverrides[_beat]?.speaker ??
       switch (_beat) {
-        0 || 6 || 16 || 17 || 20 || 23 || 27 || 32 || 41 || 52 => '이야기',
+        0 ||
+        6 ||
+        16 ||
+        17 ||
+        20 ||
+        23 ||
+        27 ||
+        32 ||
+        41 ||
+        52 ||
+        54 ||
+        58 ||
+        65 => '이야기',
         1 || 9 || 12 || 14 => '전두광',
         2 || 7 || 11 || 13 => '서문태 정책실장',
         3 || 10 => '백기현 비서실장',
@@ -395,8 +435,25 @@ class _VisualNovelOnboardingScreenState
         24 || 33 => '아이들',
         25 || 29 || 31 || 36 || 38 || 47 => '수아',
         28 => '김학준',
-        30 || 39 || 46 => '학준',
-        34 || 35 || 37 || 42 || 43 || 44 || 45 || 49 || 51 || 53 => '한서윤 선생님',
+        30 || 39 || 46 || 56 => '학준',
+        60 => '수아',
+        62 => '나',
+        34 ||
+        35 ||
+        37 ||
+        42 ||
+        43 ||
+        44 ||
+        45 ||
+        49 ||
+        51 ||
+        53 ||
+        55 ||
+        57 ||
+        59 ||
+        61 ||
+        63 ||
+        64 => '한서윤 선생님',
         _ => '이야기',
       };
 
@@ -472,8 +529,26 @@ class _VisualNovelOnboardingScreenState
         51 => '돈은 빵점. 솔직함은 합격. 뽑힌 이유는 내일부터 직접 찾아보죠.',
         52 =>
           '가장 어둡던 형광등이 한 번 떨리고 안정됐다. 열 개의 이름표가 같은 빛을 받았다. 주머니 속 5기 명찰만 혼자 차갑게 식어 있었다.',
+        53 => '자, 이제 오늘은 첫날이니 기숙사 소개를 해줄게요. 짐 챙기고 모두 따라오세요.',
+        54 =>
+          '열 명의 의자가 한꺼번에 밀렸다. 강당 문 너머로 이어진 복도에는 젖은 운동화 자국과 낯선 방문들이 줄지어 있었다.',
+        55 =>
+          '복도 끝이 제6기 생활실이에요. 남학생 둘과 여학생 여덟이 방 하나를 함께 씁니다. 침상과 사물함은 한 사람에게 하나씩 돌아가요.',
+        56 => '남학생하고 여학생이 정말 같은 방에서 잔다고요?',
+        57 =>
+          '같은 방에서 자지만 남의 침상과 사물함은 허락 없이 건드리지 않습니다. 옷을 갈아입거나 씻을 때는 잠금 칸막이실을 쓰고요. 불편한 일이 생기면 참지 말고 바로 말하세요.',
+        58 => '한서윤이 가장 가까운 방문을 밀었다. 양쪽 벽의 이층침대와 열 개의 사물함, 길쭉한 공용 책상이 한눈에 들어왔다.',
+        59 =>
+          '아래층과 위층 중 원하는 자리를 먼저 골라 보세요. 자리를 바꾸고 싶을 때는 둘이 합의하고 생활기록표에 적으면 됩니다.',
+        60 => '그럼 코 고는 사람은 남자든 여자든 창가 자리로 보내도 돼요?',
+        61 => '보내는 건 안 되고, 본인에게 먼저 말하는 건 됩니다. 첫 생활 회의 안건으로 올려도 좋고요.',
+        62 => '맨 위 침대는 먼저 올라가는 사람이 임자예요?',
+        63 =>
+          '오늘만 선착순이에요. 짐을 풀고 서로 이름부터 외우세요. 주식 수업은 내일 시작합니다. 주식이 뭔지도 모른다고 생각하고, 회사와 주식 한 주가 무엇인지부터 천천히 배울 거예요.',
+        64 =>
+          '세면대와 바구니도 한 사람당 하나씩입니다. 씻는 칸과 갈아입는 칸은 문을 잠그고 사용하세요. 같은 방을 쓴다는 말이 서로의 경계까지 없어진다는 뜻은 아니에요.',
         _ =>
-          '오늘은 여기까지예요. 주식과 국가계좌는 아직 열지 않습니다. 먼저 서로 이름부터 외우세요. 내일부터는 틀린 답보다, 이유 없이 고른 답을 더 엄하게 볼 거예요.',
+          '밤 아홉 시 사십 분. 열 개의 침상에서 이불이 차례로 부풀었다. 남자 둘과 여자 여덟이 한 방을 쓰는 첫날, 낯선 숨소리 사이로 내일 배울 ‘주식’이라는 말만 오래 잠들지 않았다.',
       };
 
   String? get _stageDirection {
@@ -533,6 +608,18 @@ class _VisualNovelOnboardingScreenState
       51 => '한서윤이 출석부 내 이름 옆에 짧은 표시를 남겼다.',
       52 => '낡은 명찰의 모서리가 주머니 안에서 허벅지를 찔렀다.',
       53 => '강당 문이 열리고 차가운 복도 공기가 발끝으로 밀려왔다.',
+      54 => '한서윤이 출석부를 덮고 복도 쪽으로 먼저 걸음을 옮겼다.',
+      55 => '한서윤이 복도 끝 열린 방문을 가리켰다.',
+      56 => '학준의 규정집이 가슴팍에서 조금 내려갔다.',
+      57 => '한서윤은 열린 방문보다 먼저 복도 안쪽 칸막이실을 가리켰다.',
+      58 => '낡은 경첩이 낮게 울리고 생활실의 따뜻한 공기가 복도로 흘러나왔다.',
+      59 => '한서윤이 양쪽 이층침대와 사물함을 차례로 짚었다.',
+      60 => '수아가 가장 안쪽 침대를 보며 코끝을 찡긋했다.',
+      61 => '한서윤이 웃음을 참듯 출석부로 입가를 가렸다.',
+      62 => '나는 창가 쪽 위층 침대 사다리에 손을 얹었다.',
+      63 => '한서윤이 공용 책상 위 빈 장부를 펼쳐 보였다.',
+      64 => '세면실 문 안쪽의 잠금쇠가 또각 소리를 냈다.',
+      65 => '소등 뒤에도 창밖의 눈빛이 이층침대 난간에 가늘게 남아 있었다.',
       _ => null,
     };
   }
@@ -1107,7 +1194,7 @@ class _VisualNovelOnboardingScreenState
           child: const Column(
             children: [
               Text(
-                '제6기 오리엔테이션 · 1막 완료',
+                '제6기 첫날 · 기숙사 안내 완료',
                 style: TextStyle(
                   color: _ink,
                   fontSize: 13,
@@ -1116,7 +1203,7 @@ class _VisualNovelOnboardingScreenState
               ),
               SizedBox(height: 7),
               Text(
-                '수아와 학준을 만났습니다.\n주식 수업과 국가계좌는 아직 잠겨 있습니다.',
+                '남학생 둘과 여학생 여덟이 한 생활실을 함께 씁니다.\n다음 수업은 주식이 무엇인지부터 시작합니다.',
                 key: Key('stock-lesson-locked'),
                 textAlign: TextAlign.center,
                 style: TextStyle(

@@ -45,7 +45,12 @@ test("opens the Flutter future-development orphanage prologue from the default r
   assert.doesNotMatch(flutterIndex, /초기자본 100만원/);
   assert.match(onboarding, /1981\.01\.12\s+·\s+23:40/);
   assert.match(onboarding, /이대로 가면 나라가 망한다/);
-  assert.match(onboarding, /제6기 오리엔테이션 · 1막 완료/);
+  assert.match(onboarding, /제6기 첫날 · 기숙사 안내 완료/);
+  assert.match(onboarding, /자, 이제 오늘은 첫날이니 기숙사 소개를 해줄게요/);
+  assert.match(onboarding, /bg_future_academy_dorm_shared_room_day_2000_v1\.png/);
+  assert.match(onboarding, /bg_future_academy_dorm_corridor_2000_v1\.png/);
+  assert.match(onboarding, /bg_future_academy_dorm_washroom_2000_v1\.png/);
+  assert.match(onboarding, /bg_future_academy_dorm_shared_room_night_2000_v1\.png/);
   assert.match(onboarding, /cinematic_soft_painted\/policy_1981\/backgrounds\/bg_policy_room_night_v1\.png/);
   assert.match(onboarding, /cinematic_soft_painted\/sua\/03_bright_laugh_v1\.png/);
   assert.match(onboarding, /cinematic_soft_painted\/policy_1981\/jeon_dugwang\/05_pressure_v1\.png/);
@@ -67,7 +72,7 @@ test("opens the Flutter future-development orphanage prologue from the default r
   assert.match(onboarding, /주식선생님\/24_포즈3_주인공그림체_공통슬롯_투명\.png/);
   assert.match(onboarding, /모르는 걸 모른다고 말하는 법/);
   assert.match(onboarding, /나머지는 아이 몫/);
-  assert.match(onboarding, /주식과 국가계좌는 아직 열지 않습니다/);
+  assert.match(onboarding, /다음 수업은 주식이 무엇인지부터 시작합니다/);
   assert.match(main, /StoryState\.newOrphanagePlayer/);
   assert.match(main, /academy-market-tutorial-screen/);
   assert.match(stockMarket, /selfRelianceReserve/);
@@ -453,7 +458,7 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
   assert.doesNotMatch(editor, /이 장면을 저장하시겠습니까/);
   assert.doesNotMatch(editor, /저장하고 이동/);
   assert.match(editor, /새 장면 .*개 자동 추가/);
-  assert.equal((data.match(/"id": "scene-/g) ?? []).length, 54);
+  assert.equal((data.match(/"id": "scene-/g) ?? []).length, 66);
   assert.match(data, /단팥빵 하나와 500원/);
   assert.match(data, /설명서 학준아, 별명 붙이면 안 된다는 규정도 있어/);
   assert.doesNotMatch(data, /안내문에 별명 금지도 있어, 설명서 학준아/);

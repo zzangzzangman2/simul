@@ -497,7 +497,7 @@ void main() {
     await advanceDialogue(tester, 43);
     expect(find.byKey(const Key('orientation-roster-card')), findsOneWidget);
     await advanceDialogue(tester, 1);
-    await advanceDialogue(tester, 9);
+    await advanceDialogue(tester, 21);
     expect(find.byKey(const Key('orientation-complete-card')), findsOneWidget);
   }
 
@@ -993,8 +993,45 @@ void main() {
     await advanceDialogue(tester, 1);
     expect(find.textContaining('간판만 바꾼 고아원'), findsOneWidget);
     await advanceDialogue(tester, 9);
+    expect(find.textContaining('오늘은 첫날이니 기숙사 소개를 해줄게요'), findsOneWidget);
+    await advanceDialogue(tester, 1);
+    expect(
+      (tester
+                  .widget<Image>(
+                    find.byKey(const Key('story-background-image')),
+                  )
+                  .image
+              as AssetImage)
+          .assetName,
+      'assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_corridor_2000_v1.png',
+    );
+    await advanceDialogue(tester, 4);
+    expect(
+      (tester
+                  .widget<Image>(
+                    find.byKey(const Key('story-background-image')),
+                  )
+                  .image
+              as AssetImage)
+          .assetName,
+      'assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_day_2000_v1.png',
+    );
+    expect(find.textContaining('이층침대와 열 개의 사물함'), findsOneWidget);
+    await advanceDialogue(tester, 6);
+    expect(
+      (tester
+                  .widget<Image>(
+                    find.byKey(const Key('story-background-image')),
+                  )
+                  .image
+              as AssetImage)
+          .assetName,
+      'assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_washroom_2000_v1.png',
+    );
+    await advanceDialogue(tester, 1);
     expect(find.byKey(const Key('orientation-complete-card')), findsOneWidget);
     expect(find.byKey(const Key('stock-lesson-locked')), findsOneWidget);
+    expect(find.textContaining('남학생 둘과 여학생 여덟'), findsOneWidget);
     expect(
       find.byKey(const Key('academy-market-tutorial-screen')),
       findsNothing,
@@ -1159,7 +1196,7 @@ void main() {
     await completeOrientationPreview(tester);
 
     expect(find.byKey(const Key('orientation-complete-card')), findsOneWidget);
-    expect(find.textContaining('수아와 학준'), findsOneWidget);
+    expect(find.textContaining('남학생 둘과 여학생 여덟'), findsOneWidget);
     expect(find.byKey(const Key('stock-lesson-locked')), findsOneWidget);
     expect(
       find.byKey(const Key('academy-market-tutorial-screen')),

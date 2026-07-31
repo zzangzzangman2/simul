@@ -25,6 +25,7 @@
 - `policy_1981/kang_incheol/`: 강인철 경제수석 4종
 - `policy_1981/yoon_mira/`: 윤미라 사회교육수석 4종
 - `policy_1981/backgrounds/`: 정책실·심야회의실 2종
+- `dormitory_2000/`: 제6기 중앙 복도·남녀 공용 생활실 낮·세면실·첫날 밤 4종
 
 ## 정책실 인물 버전
 
