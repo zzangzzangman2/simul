@@ -398,3 +398,28 @@ test("offers a disposable stock-only test entry", async () => {
   assert.match(main, /worldSeed: 'stock-market-test-v1'/);
   assert.match(main, /if \(widget\.stockTestMode\) return;/);
 });
+
+
+test("ships a simple dialogue editor and keeps future story beats synchronized", async () => {
+  const [editor, data, generator, packageJson] = await Promise.all([
+    readFile(new URL("../app/editor/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/editor/dialogue-data.ts", import.meta.url), "utf8"),
+    readFile(
+      new URL("../scripts/generate-dialogue-editor-data.mjs", import.meta.url),
+      "utf8",
+    ),
+    readFile(new URL("../package.json", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(editor, /대사 편집기/);
+  assert.match(editor, /자동 저장됨/);
+  assert.match(editor, /말맛 체크/);
+  assert.match(editor, /적용용 JSON 저장/);
+  assert.match(editor, /새 장면 .*개 자동 추가/);
+  assert.equal((data.match(/"id": "scene-/g) ?? []).length, 54);
+  assert.match(data, /단팥빵 하나와 500원/);
+  assert.match(generator, /_onboardingBeatCount/);
+  assert.match(generator, /Dialogue editor synced/);
+  assert.match(packageJson, /prebuild:flutter-web/);
+  assert.match(packageJson, /dialogue:sync/);
+});
