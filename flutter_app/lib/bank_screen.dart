@@ -380,6 +380,7 @@ class _BankScreenState extends State<BankScreen> {
                 ),
               ),
               Positioned.fill(
+                top: -_storyCharacterBottomInset,
                 bottom: _storyCharacterBottomInset,
                 child: Stack(
                   fit: StackFit.expand,

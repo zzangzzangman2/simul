@@ -9,6 +9,7 @@ import {
   rm,
 } from "node:fs/promises";
 import { dirname, relative, resolve } from "node:path";
+import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -45,6 +46,68 @@ function run(command, args, cwd) {
       else rejectRun(new Error(`${command} failed (${signal ?? `exit ${code}`})`));
     });
   });
+}
+
+async function findFlutterUnder(searchRoot, maxDepth = 6) {
+  const queue = [{ path: searchRoot, depth: 0 }];
+  const skipped = new Set([
+    ".git",
+    ".next",
+    ".vinext",
+    "build",
+    "node_modules",
+    "public",
+  ]);
+  let visited = 0;
+
+  while (queue.length && visited < 5000) {
+    const current = queue.shift();
+    if (!current) break;
+    let entries;
+    try {
+      entries = await readdir(current.path, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    visited += entries.length;
+    for (const entry of entries) {
+      if (!entry.isDirectory() || skipped.has(entry.name)) continue;
+      const child = resolve(current.path, entry.name);
+      if (entry.name.toLowerCase() === "flutter") {
+        const executable = resolve(
+          child,
+          "bin",
+          process.platform === "win32" ? "flutter.bat" : "flutter",
+        );
+        if (await exists(executable)) return executable;
+      }
+      if (current.depth < maxDepth) {
+        queue.push({ path: child, depth: current.depth + 1 });
+      }
+    }
+  }
+  return null;
+}
+
+async function resolveFlutterCommand() {
+  const executableName = process.platform === "win32" ? "flutter.bat" : "flutter";
+  const configured = [
+    process.env.FLUTTER_BIN,
+    process.env.FLUTTER_ROOT
+      ? resolve(process.env.FLUTTER_ROOT, "bin", executableName)
+      : null,
+    resolve(homedir(), "flutter", "bin", executableName),
+    resolve(homedir(), "development", "flutter", "bin", executableName),
+  ].filter(Boolean);
+  for (const candidate of configured) {
+    if (await exists(candidate)) return candidate;
+  }
+
+  if (process.platform === "win32") {
+    const codexFlutter = await findFlutterUnder(resolve(homedir(), "Documents", "Codex"));
+    if (codexFlutter) return codexFlutter;
+  }
+  return "flutter";
 }
 
 async function exists(path) {
@@ -155,8 +218,10 @@ async function syncBuild() {
 }
 
 try {
+  const flutterCommand = await resolveFlutterCommand();
+  console.log(`Using Flutter: ${flutterCommand}`);
   await run(
-    "flutter",
+    flutterCommand,
     ["build", "web", "--release", "--base-href", "/play/"],
     flutterRoot,
   );

@@ -1,25 +1,25 @@
 > [!CAUTION]
-> **생성 버튼을 누르기 전 필수:** 아래에 지정된 기준 이미지와 같은 인물·장소의 기존 런타임 이미지를 먼저 직접 열어 확인하고, 반드시 생성·편집 도구에 실제 참조 이미지로 넣는다. 프롬프트 문장만 보고 화풍을 추측하는 생성은 금지한다. 결과물은 기존 자산과 동일한 고밀도 2D 카툰/애니 게임의 가는 유색선, 얼굴·눈 렌더링, 셀 채색과 명암 밀도를 유지해야 한다. **실사·사진풍·3D·건축 시각화·임의의 다른 애니/웹툰 화풍은 별도 사용자 요청이 없는 한 불합격**이다. 기존 이미지와 나란히 놓았을 때 같은 게임으로 보이지 않으면 저장·연결하지 말고 즉시 재생성한다.
+> **생성 버튼을 누르기 전 필수:** 2026-07-31 사용자가 확정한 SIMUL의 정식 화풍은 **`cinematic soft-painted anime realism`**이다. `art_references/simul_cinematic_soft_painted_style_v1.png`와 해당 인물·장소의 기존 정체성 이미지를 모두 실제 참조 입력으로 사용한다. 공통 원본은 렌더링 문법만 정하며 수아의 얼굴·머리·체형·교복을 다른 인물에게 복사하지 않는다. 기존 카툰 자산은 인물 정체성·의상·소품·동작·공간 배치 자료로만 사용하고, 구형 굵은 선과 하드 셀 채색은 재현하지 않는다. 실사 사진 얼굴, 3D, 플라스틱 피부, 치비, 굵은 검은 외곽선, 평평한 하드 셀 채색은 불합격이다.
 
-# SIMUL 고정 그림체 가이드
+# SIMUL `cinematic soft-painted anime realism` 고정 그림체 가이드
 
-이 문서는 이후 제작·수정하는 모든 게임 일러스트의 기본 아트 디렉션이다. 사용자가 장면별로 다른 방향을 명시하지 않는 한 이 기준을 최우선으로 적용한다.
+이 문서는 이후 제작·수정하는 모든 게임 일러스트의 기본 아트 디렉션이다. 구형 자산 설명에서 `고밀도 2D 카툰`, `보석형 홍채`, `셀 채색`이라는 표현이 나오면 제작 이력으로만 읽고, 신규·재생성 승인에는 이 문서의 `cinematic soft-painted anime realism` 기준만 적용한다.
 
 ## 0. 화풍 승인 게이트 (강제)
 
-SIMUL 이미지는 단순히 `애니풍`이거나 개별 완성도가 높다는 이유로 승인하지 않는다. **`art_references/simul_canonical_art_style_v1.png`와 같은 작품의 같은 장면으로 보이는지**를 유일한 승인 기준으로 삼는다.
+SIMUL 이미지는 단순히 `애니풍`이거나 개별 완성도가 높다는 이유로 승인하지 않는다. **`art_references/simul_cinematic_soft_painted_style_v1.png`와 같은 렌더링 세계의 장면으로 보이는지**를 승인 기준으로 삼는다.
 
-- 생성 전에는 새 공통 화풍 원본, 해당 인물의 정체성 원본, 현재 런타임의 같은 인물 이미지를 모두 직접 열고 생성·편집 도구의 실제 이미지 입력으로 넣는다. 경로나 문장만 적은 생성은 자동 불합격이다.
+- 생성 전에는 새 공통 화풍 원본, 해당 인물의 정체성 원본, 현재 런타임의 같은 인물 이미지를 모두 직접 열고 생성·편집 도구의 실제 이미지 입력으로 넣는다. 공통 원본은 스타일만, 기존 인물 이미지는 정체성·의상·소품·동작만 담당한다. 경로나 문장만 적은 생성은 자동 불합격이다.
 - 교복·의상 사진은 길이·재봉선·문양·실루엣만 정한다. 사진의 얼굴·피부·조명·카메라·실사 질감은 화풍 기준으로 사용할 수 없다.
 - `final`, `v2`, `v3`, `주인공그림체` 같은 파일명, `pubspec.yaml` 등록, 기존 코드 연결은 승인 증거가 아니다.
 - 런타임 연결 전에는 공통 원본 얼굴·직전 승인 얼굴·신규 얼굴을 같은 표시 크기로 맞추고 전신까지 포함한 비교 시트를 만든다.
 - 아래 여섯 항목을 각각 `통과` 또는 `불합격`으로 기록한다.
-  1. 가는 유색선의 굵기와 색
-  2. 보석형 홍채의 림·그라데이션·복수 하이라이트
-  3. 큰 덩어리·중간 가닥·잔머리의 3단계 머리카락
-  4. 셀 명암을 뼈대로 둔 피부·의상 채색 밀도
-  5. 얼굴 골격·코·입·볼의 렌더링 문법
-  6. 광원 방향·대비·채도·페인터리 보정의 밀도
+  1. 거의 보이지 않는 유색 경계선과 부드러운 가장자리
+  2. 자연스러운 다층 홍채와 절제된 젖은 하이라이트
+  3. 큰 머리 덩어리 위에 살아 있는 중간 가닥·잔머리
+  4. 피부·의상의 매끈한 소프트 페인터리 명암
+  5. 인물 고유 얼굴 골격·코·입·볼과 연령
+  6. 은은한 광학 조명·대비·채도와 배경의 시네마틱 깊이
 - 하나라도 불합격이면 평균 점수나 “대체로 비슷함”으로 통과시키지 않고 폐기·재생성한다.
 - 같은 인물의 4종 또는 6종 포즈는 한 세트로 검사한다. 한 포즈라도 튀면 세트 전체를 보류한다.
 - 인물과 배경도 실제 장면 합성본으로 검사한다. 서로 다른 게임처럼 보이면 불일치 자산을 교체한다.
@@ -29,8 +29,9 @@ SIMUL 이미지는 단순히 `애니풍`이거나 개별 완성도가 높다는 
 
 ## 1. 기준 자산
 
-- **모든 신규·수정 인물의 얼굴 렌더링·눈·선화·머리카락·채색 밀도 최상위 기준**:
-  `art_references/simul_canonical_art_style_v1.png`
+- **모든 신규·수정 인물과 배경의 최상위 렌더링 기준**:
+  `art_references/simul_cinematic_soft_painted_style_v1.png`
+- 이 원본의 얼굴·긴 검은 머리·회갈색 눈·빨강 체크 교복은 수아의 정체성이다. 다른 인물은 부드러운 페인터리 명암, 가는 머리카락, 절제된 윤광, 거의 보이지 않는 유색 경계선만 공유한다.
 - **성인 여성의 얼굴 비율·전신 밀도와 한서윤 정체성 보조 기준**:
   `art_references/npc_canonical_style_teal_v1.png`
 - 한서윤 선생님의 의상 실루엣 기준:
@@ -44,27 +45,27 @@ SIMUL 이미지는 단순히 `애니풍`이거나 개별 완성도가 높다는 
   `art_references/realtor_identity_pose_reference_02.jpg`,
   `art_references/realtor_identity_pose_reference_03.jpg`
 - 주인공 얼굴 정체성 기준: `flutter_app/assets/images/title_elementary_landlord_portrait_v2.png`
-- 주인공 전신과 투명 컷아웃 기준: `flutter_app/assets/images/character_hero_title_style_v2.png`
+- 주인공 전신과 투명 컷아웃 기준: `flutter_app/assets/images/protagonist_seed01/01_neutral.png`와 같은 폴더의 24종
 - 주인공은 메인 타이틀과 같은 인물이어야 한다. 머리 모양, 눈매, 얼굴 비율, 볼의 형태, 표정 밀도를 장면마다 새로 해석하지 않는다.
-- `simul_canonical_art_style_v1.png`에서 모든 인물이 가져오는 것은 **가는 유색선, 보석형 홍채, 따뜻한 피부와 홍조, 머리카락의 큰 덩어리와 섬세한 반사광, 셀 명암과 페인터리 보정의 균형**이다. 양갈래·붉은 머리 장식·갈색 눈·교복·어린이 얼굴 비율은 해당 인물 고유 설정이므로 복사하지 않는다.
+- `simul_canonical_art_style_v1.png`는 2026-07-31 이전 카툰 세트의 정체성·의상·포즈를 해석할 때만 쓰는 레거시 보조 자료다. 신규·재생성 인물의 선·눈·피부·머리카락·조명은 반드시 `simul_cinematic_soft_painted_style_v1.png`를 따른다.
 - `npc_canonical_style_teal_v1.png`와 현재 주식선생님 자산은 한서윤의 갸름한 성인 얼굴, 성인 전신 비율, 청록 머리, 보라 눈, 뷰티마크를 보존하는 보조 기준이다. 새 공통 원본의 어린이 얼굴 비율을 한서윤에게 복사하지 않는다.
-- 새 공통 원본과 현재 주식선생님은 같은 고밀도 2D 애니 게임 계열로 함께 유지한다. 신규 한서윤 컷은 기존 정체성·의상·포즈를 보존하면서 선의 부드러움, 피부 채색, 머리 반사광만 새 공통 원본과 맞춘다.
-- 사용자가 2026-07-31 확정한 현재 전신 화풍 기준은 프로젝트 루트의 `future_development_seed01_protagonist_friend_neutral/smile/laugh/curious/worried/determined_candidate_v1.png` 6종이다. 신규 전신 인물은 `simul_canonical_art_style_v1.png`의 얼굴 문법과 이 6종의 전신 선화·채색 밀도·투명 컷아웃 마감을 함께 실제 참조 입력으로 사용한다.
-- 위 6종은 화풍과 전신 완성도 기준일 뿐이다. 해당 친구의 밤색 양갈래, 붉은 장식, 갈색 눈, 여자 SEED 교복, 아동 얼굴을 다른 인물의 정체성으로 복사하지 않는다.
+- 현재 주식선생님 자산은 한서윤의 정체성·의상·포즈를 보존하는 자료다. 신규 한서윤 컷은 그 정체성을 유지하면서 경계선·피부·홍채·머리 반사광·광학 조명을 새 공통 원본에 맞춘다.
+- 현재 수아 7종 `flutter_app/assets/images/cinematic_soft_painted/sua/*.png`는 승인된 어린이 전신 세트다. 신규 전신 인물은 공통 화풍 원본의 렌더링 문법과 해당 인물의 승인 정체성·의상·포즈를 함께 실제 참조 입력으로 사용한다.
+- 수아 7종은 화풍과 전신 마감 기준일 뿐이다. 수아의 긴 검은 머리, 회갈색 눈, 얼굴 골격, 여자 SEED 교복과 아동 체형을 다른 인물의 정체성으로 복사하지 않는다.
 - 인물별 정체성 참조는 최상위 화풍 참조를 대체하지 않는다. 부동산 중개업자 3개 참조에서는 얼굴 골격·남청색에서 시안색으로 이어지는 단발·장신구·프릴 원피스·샌들만 가져오고, 사진의 배경·원근·앉거나 무릎 꿇은 자세·조명은 복사하지 않는다.
-- 캐릭터와 배경은 서로 다른 게임의 그림처럼 보이면 안 된다. 모든 신규 NPC는 위 기준 이미지의 고밀도 2D 애니 게임 채색을 공유하고, 배경은 같은 색 선명도와 명암 밀도를 가진 손그림 2D 카툰으로 맞춘다.
+- 캐릭터와 배경은 서로 다른 게임의 그림처럼 보이면 안 된다. 모든 신규 NPC와 배경은 공통 원본의 부드러운 페인터리 명암, 거의 보이지 않는 유색 경계선, 절제된 채도와 시네마틱 깊이를 공유한다.
 - 미래양성원 여자 SEED 교복은 `future_development_uniform_length_reference_v1.png`의 **몸 대비 길이 비율**을 절대 기준으로 삼는다. 고정 픽셀이나 고정 센티미터를 모든 인물에게 복사하는 것이 아니라, 캐릭터 키와 아동·청소년 체형에 맞춰 교복의 실제 크기를 함께 축소·확대한다. 예를 들어 키 140cm 캐릭터의 소매·블라우스·넥타이·치마 실제 길이는 키가 큰 캐릭터보다 짧아져야 한다. 다만 소매 끝의 팔 기준 위치, 블라우스 밑단의 몸통 기준 위치, 허리선, 넥타이 끝, 치마 밑단의 허벅지·무릎 사이 상대 위치는 원본과 같은 비율로 유지한다. 캐릭터 체형이나 생성 모델의 관습을 이유로 특정 부분만 늘이거나 길게 내리거나 세로로 스트레치하지 않는다. 이후 생성본이 원본의 신체 기준점 비율과 다르면 생성본을 기준으로 승격하지 않고 이 원본을 우선한다.
 - 미래양성원 남자 SEED 교복은 `future_development_male_uniform_length_reference_v1.png`의 셔츠 소매·셔츠 밑단·바지 허리·바지 밑단과 전체 핏을 몸 대비 길이 기준으로 사용한다. 상의와 하의는 이 일반형 실루엣을 유지하고, 넥타이에만 여자 SEED 교복 하의와 같은 빨강 체크 문양을 적용한다. 여자 교복의 치마 실루엣이나 다른 장식을 남자 교복에 옮기지 않는다. 남자 교복도 캐릭터 키와 연령 체형에 따라 실제 옷 길이를 함께 축소·확대하되 각 끝점의 신체 기준 위치는 원본과 같은 비율로 유지한다.
 
-## 2. 고정 스타일
+## 2. 고정 스타일 — cinematic soft-painted anime realism
 
-- 한국 모바일 스토리 게임에 어울리는 **고밀도 2D 애니 게임 일러스트**
-- 선화는 검은 외곽선을 굵게 두르지 않고, 머리·피부·의상 색에 맞춘 가는 유색선과 부분적인 굵기 변화를 쓴다.
-- 얼굴은 부드러운 타원형과 자연스러운 볼 입체감, 작지만 생략하지 않은 코, 얇고 섬세한 입술을 함께 그린다. 눈만 크게 붙인 범용 애니 얼굴이나 인물마다 다른 얼굴 문법은 금지한다.
-- 눈은 어두운 림, 홍채의 방사형 그라데이션, 안쪽 명암, 큰 주 하이라이트와 작은 보조 하이라이트를 겹친 보석 같은 구조로 그린다. 속눈썹은 또렷하되 한 덩어리 검은 띠가 되지 않게 한다.
-- 머리카락은 큰 덩어리 → 중간 가닥 → 가는 잔머리의 3단계로 나누고, 셀 명암 위에 띠 모양의 밝은 반사광과 소수의 가는 하이라이트를 얹는다. 플라스틱 덩어리나 한 색 면으로 처리하지 않는다.
-- 피부는 따뜻한 기본색, 턱·목·팔 아래의 선명한 셀 그림자, 볼과 관절의 아주 옅은 혈색, 코끝·쇄골의 절제된 밝은 점을 사용한다. 과한 광택이나 실사 피부 모공은 넣지 않는다.
-- 채색은 선명한 셀 셰이딩을 뼈대로 두고 부드러운 페인터리 보정을 얹는다. 주광과 얇은 림라이트는 허용하지만 인물마다 광원 방향과 대비가 제멋대로 달라지면 안 된다.
+- 한국 모바일 비주얼노벨에 어울리는 **cinematic soft-painted anime realism**을 사용한다. 구조는 애니메이션 70%, 재질과 광학 조명은 현실감 30% 정도로 유지한다.
+- 외곽선은 피부·머리·의상 색에 녹아드는 매우 얇은 유색 경계선으로만 남긴다. 검은 잉크 외곽선이나 두꺼운 선화가 먼저 보이면 불합격이다.
+- 얼굴은 애니메이션식 단순화를 유지하되 볼·코·입술·턱을 부드러운 명암으로 입체화한다. 사진 피부의 모공과 실사 인물 복사는 금지한다.
+- 눈은 과장된 보석 문양보다 자연스러운 다층 홍채, 맑은 반사광, 촉촉한 눈꺼풀 가장자리로 표현한다. 인물의 눈 모양과 간격은 정체성 원본을 따른다.
+- 머리카락은 큰 실루엣 위에 중간 가닥과 가는 잔머리를 얹고, 밝은 띠 하나로 뭉개지 않는 섬세한 반사광을 쓴다.
+- 피부와 옷은 딱 끊기는 하드 셀 그림자 대신 매끈한 그라데이션과 절제된 붓결을 쓴다. 인물 스프라이트는 여러 배경에 재사용할 수 있도록 중립적이고 부드러운 조명을 사용한다.
+- 배경은 따뜻한 실내광과 차가운 창밖광, 은은한 bloom, atmospheric depth, 부드러운 초점 분리를 사용할 수 있다. 인물 스프라이트에는 배경 전용 bokeh나 강한 색광을 굽지 않는다.
 - 모바일 세로 화면에서 축소해도 눈·표정·손동작과 주요 소품이 선명하게 읽히는 대비
 - 2000년 서울이라는 시대 배경은 소품과 공간으로 표현하되 화면 전체에 과도한 세피아 필터를 씌우지 않는다.
 
@@ -86,6 +87,21 @@ SIMUL 이미지는 단순히 `애니풍`이거나 개별 완성도가 높다는 
 - 주황 후드 전신 컷아웃을 수정할 때는 의상·자세·연령·체형을 보존하고 얼굴 정체성만 흐트러지지 않게 한다.
 
 ## 4. 다른 캐릭터와 배경
+
+### 4-1. 이미지 레퍼런스가 없는 신규 캐릭터의 정체성 설계 (강제)
+
+- 사용자가 특정 캐릭터의 얼굴·외형 이미지 레퍼런스를 주지 않은 경우에도 공통 화풍 원본은 반드시 스타일 참조로 사용한다. 다만 **주인공이나 기존 NPC의 얼굴을 신규 캐릭터의 정체성 참조로 재사용·변형하지 않는다.** 공통 화풍은 렌더링 문법만 공유하고 얼굴 정체성은 새로 설계한다.
+- 생성 전에 신규 캐릭터의 고유 정체성 명세를 먼저 작성한다. 최소한 `얼굴 외곽·턱과 볼`, `눈 모양·간격·색`, `눈썹`, `코·입`, `머리 실루엣·가르마·색`, `귀·점·주근깨 등 식별점`, `체형·자세 인상`을 정한다.
+- 신규 캐릭터는 기존 주요 캐릭터와 위 정체성 축 중 최소 4개 이상이 명확히 달라야 한다. 그중 최소 2개는 반드시 `얼굴 골격`, `눈의 기하`, `머리 실루엣`에서 달라야 한다. 의상·나이·머리색만 바꾸고 같은 얼굴을 쓰는 것은 금지한다.
+- 새 인물을 생성할 때는 주인공만이 아니라 **현재 런타임의 전체 등장인물**을 비교 대상으로 삼는다. 같은 장면·같은 직군·비슷한 연령의 인물은 가장 먼저 1:1로 대조한다.
+- 얼굴 비교에서는 의상 색, 넥타이, 안경, 들고 있는 소품과 배경을 가리고 얼굴·머리·목선만 본다. 이 상태에서 두 인물을 즉시 구분하지 못하면 옷이 달라도 같은 얼굴로 판정한다.
+- 얼굴형·턱·광대, 눈의 크기·각도·간격, 눈썹, 코의 폭·길이·끝 모양, 입술·인중, 헤어라인·가르마, 귀, 체격 중 **최소 5개 축**이 가장 닮은 기존 인물과 달라야 한다. 얼굴 골격·눈·코·머리 실루엣 중에는 반드시 3개 이상이 달라야 한다.
+- 생성 모델이 기존 캐릭터를 참조 입력으로 받더라도 그 이미지의 얼굴은 절대 정체성 템플릿으로 쓰지 않는다. 기존 이미지는 포즈·의상·소품 자료, 공통 원본은 렌더링 자료로만 역할을 분리한다.
+- 생성 전후에 신규 캐릭터, 주인공, 같은 연령대 또는 역할이 가장 가까운 기존 캐릭터를 같은 크기로 놓은 비교 시트를 만든다. 축소한 얼굴이나 전신 실루엣만 보고도 제3자가 즉시 구분하지 못하면 저장·연결하지 않고 재설계·재생성한다.
+- **“기존 캐릭터의 어린 버전/나이 든 버전처럼 보임”, “같은 얼굴에 머리와 옷만 바꿈”, “주인공과 형제라는 설정이 없는데 형제처럼 닮음”은 자동 불합격**이다.
+- 민호를 포함한 신규 아동 NPC도 주인공의 짙은 헝클어진 머리, 둥근 볼, 눈 모양과 얼굴 비율을 한꺼번에 따라 쓰지 않는다. 민호는 주인공의 축소판이 아니라 머리 실루엣·얼굴형·눈 모양과 색·고유 식별점이 분명히 다른 독립 캐릭터로 설계한다.
+- 민호의 승인 정체성은 `character_minho_farewell_v3.png`다. 7살의 작은 체형, 긴 타원형 얼굴, 높은 이마, 깊은 옆가르마의 단정한 짙은 갈색 머리, 회청색의 처진 눈, 작은 돌출 귀, 코와 볼의 옅은 주근깨를 유지한다. 수아에게서는 부드러운 피부·눈가·머리카락 렌더링만 가져오고 수아 얼굴과 여성적인 비율은 복사하지 않는다.
+- 학준의 승인 정체성은 `character_hakjun_orientation_v2.png`다. 10살의 마른 체형, 좁은 턱의 각진 얼굴, 날카로운 비대칭 앞머리, 가늘고 비스듬한 호박빛 회갈색 눈, 한쪽이 살짝 올라간 눈썹과 계산적인 반미소를 유지한다. 주인공의 둥근 밝은 얼굴·헝클어진 머리·큰 갈색 눈과 민호의 처진 회청색 눈·주근깨·깊은 옆가르마를 섞지 않는다.
 
 - 성인 캐릭터는 주인공보다 확실히 성인 비율과 키로 표현한다. 선생님을 꼬마처럼 축소하지 않는다.
 - 한서윤 선생님은 만 23세 성인 여성으로 고정한다. `npc_canonical_style_teal_v1.png`와 같은 긴 물결형 청록색 머리·성긴 일자 앞머리·겹 하이라이트가 있는 보라색 눈·작은 뷰티마크·섬세한 성인 얼굴을 모든 컷에서 유지한다.
@@ -116,15 +132,31 @@ SIMUL 이미지는 단순히 `애니풍`이거나 개별 완성도가 높다는 
 모든 신규 이미지 프롬프트에는 아래 의미를 빠뜨리지 않는다.
 
 ```text
-Canonical SIMUL rendering reference: art_references/simul_canonical_art_style_v1.png
-Match its refined high-detail 2D anime-game rendering: fine colored linework, rounded softly modeled faces,
-jewel-like layered irises, warm skin and restrained blush, coherent large hair masses with delicate reflected light,
-crisp cel shading, and subtle painterly finishing.
+Canonical SIMUL rendering reference: art_references/simul_cinematic_soft_painted_style_v1.png
+Match cinematic soft-painted anime realism: anime facial construction with softly modeled dimensional cheeks, nose and lips,
+natural layered irises, warm skin with restrained blush, fine individual hair strands, smooth painterly skin and fabric shading,
+realistic diffused optical light, soft tonal edges, and virtually invisible colored boundary lines.
 Keep recurring character identity consistent; do not reinterpret the face.
-The twin tails, red hair ornaments, brown eyes, school uniform, and child facial proportions belong only to the reference child.
+The long black hair, gray-brown eyes, red tartan uniform, and this exact face belong only to Sua, the reference child.
 Use each character's own identity, age, hair, eyes, clothing, and body proportions.
-Avoid low-detail generic anime, chibi, photorealism, 3D, flat vector art, mixed styles, text, and watermarks.
+Avoid hard cel shading, thick black outlines, low-detail generic anime, chibi, photoreal faces, 3D, plastic skin,
+flat vector art, mixed styles, text, and watermarks.
 Compose for a 390×844 mobile portrait screen with clear facial readability and safe margins.
+```
+
+사용자가 신규 캐릭터의 이미지 레퍼런스를 제공하지 않았다면 다음 문구도 반드시 추가한다.
+
+```text
+This is a brand-new character with no identity image reference.
+Use the canonical reference for rendering style only, never as a face or identity template.
+Do not reuse, approximate, age-shift, or recolor the face, eye geometry, hairstyle silhouette,
+or body silhouette of the protagonist or any existing cast member.
+Design an unmistakably distinct identity that remains recognizable across every pose and expression.
+A same-face result with only different clothes, age, or hair color is rejected.
+Compare against the entire existing cast, especially characters of similar age, gender, and role.
+The identity must remain unmistakably different when clothing, glasses, props, and background are hidden.
+Differentiate facial bone structure, eye geometry and spacing, brows, nose shape, mouth and philtrum,
+hairline and silhouette, ears, and body build; do not borrow a previous cast member's face as a template.
 ```
 
 주인공이 포함되면 다음도 추가한다.
@@ -163,7 +195,7 @@ Create a standing full-body transparent game sprite, not the seated pose, outdoo
 
 ## 7. 적용 전 확인표
 
-1. `simul_canonical_art_style_v1.png`와 확정된 현재 전신 화풍 6종 중 연령·체형에 맞는 컷을 실제 스타일 참조로 넣었는가?
+1. `simul_cinematic_soft_painted_style_v1.png`와 해당 인물의 정체성 원본을 실제 참조로 넣었는가?
 2. 같은 인물의 얼굴과 연령이 유지되는가?
 3. 스타일과 정체성을 구분해 다른 NPC에게 한서윤의 청록 머리·보라 눈을 복사하지 않았는가?
 4. 반복 NPC의 표정뿐 아니라 손·상체 자세도 장면별로 달라지는가?
@@ -173,15 +205,17 @@ Create a standing full-body transparent game sprite, not the seated pose, outdoo
 8. 글자, 워터마크, 불필요한 인물과 소품이 들어오지 않았는가?
 9. 투명 자산을 흰색·짙은 회색 양쪽에 합성해 알파 가장자리와 잔여 크로마 색을 검사했는가?
 10. SEED 교복을 캐릭터 키에 맞춰 실제 크기는 조정하되 소매·블라우스·넥타이·치마의 신체 기준점 비율은 원본과 동일하게 유지했는가?
-11. 공통 원본 얼굴·직전 승인 얼굴·신규 얼굴·전신을 한 화면에 둔 비교 시트를 만들었는가?
-12. 선화·홍채·머리카락·채색·얼굴 문법·광원 여섯 항목을 모두 개별 통과했는가?
+11. 공통 원본의 스타일과 직전 승인 인물의 정체성·신규 얼굴·전신을 함께 비교했는가?
+12. 경계선·홍채·머리카락·소프트 페인터리 채색·얼굴 정체성·광학 조명 여섯 항목을 모두 개별 통과했는가?
 13. 같은 인물의 전체 포즈 세트를 동시에 비교했는가?
 14. `ART_STYLE_AUDIT.md`에 승인 결과와 근거를 기록했는가?
 15. 승인 전 후보가 `pubspec.yaml` 또는 런타임 코드에 연결되지 않았는가?
+16. 이미지 레퍼런스가 없는 신규 캐릭터라면 기존 인물과 구분되는 정체성 명세를 먼저 작성했는가?
+17. 신규 인물·주인공·가장 유사한 기존 인물의 비교 시트에서 얼굴과 전신 실루엣을 즉시 구분할 수 있는가?
 
 ## 8. 조작형 미니게임 픽셀 아트 예외
 
-서사 장면·대화 인물·배경은 위의 고밀도 2D 카툰 기준을 그대로 따른다. 조작형 아케이드 미니게임의 작은 플레이 오브젝트만 화면 판독성을 위해 의도적인 16비트 픽셀 아트로 변환할 수 있다.
+서사 장면·대화 인물·배경은 위의 `cinematic soft-painted anime realism` 기준을 그대로 따른다. 조작형 아케이드 미니게임의 작은 플레이 오브젝트만 화면 판독성을 위해 의도적인 16비트 픽셀 아트로 변환할 수 있다.
 
 - 주인공의 검은 헝클어진 머리, 갈색 눈, 둥근 볼, 주황 후드와 연령은 메인 타이틀 정체성을 유지한다.
 - 픽셀 캐릭터는 얼굴·팔다리·이동 수단이 구분되는 완성 스프라이트를 사용한다. 얼굴 아이콘, 원, 점, 단색 사각형으로 대체하지 않는다.

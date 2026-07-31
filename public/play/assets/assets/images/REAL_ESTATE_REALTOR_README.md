@@ -4,12 +4,13 @@
 
 ## 기준 참조의 역할
 
-- 최상위 렌더링 화풍: `art_references/npc_canonical_style_teal_v1.png`
+- 최상위 렌더링 화풍: `art_references/simul_cinematic_soft_painted_style_v1.png`
 - 서하늘 정체성·복장·장신구:
   - `art_references/realtor_identity_pose_reference_01.jpg`
   - `art_references/realtor_identity_pose_reference_02.jpg`
   - `art_references/realtor_identity_pose_reference_03.jpg`
-- 화풍 참조에서는 가는 유색선, 보석형 다층 홍채, 3단계 머리카락, 셀 명암과 절제된 페인터리 보정만 가져온다.
+- 화풍 참조에서는 거의 보이지 않는 유색 경계선, 자연스러운 다층 홍채,
+  섬세한 머리카락, 부드러운 페인터리 명암과 은은한 광학 조명만 가져온다.
 - 정체성 참조에서는 얼굴·머리·장신구·의상·샌들만 가져온다. 야외 배경, 내려다보는 카메라, 앉거나 무릎 꿇은 자세와 햇빛 방향은 가져오지 않는다.
 - 화풍 참조의 청록 머리·보라 눈·뷰티마크는 한서윤의 정체성이므로 서하늘에게 섞지 않는다.
 
@@ -67,7 +68,7 @@
 ## 생성 프롬프트 고정 블록
 
 ```text
-Canonical rendering reference: art_references/npc_canonical_style_teal_v1.png.
+Canonical rendering reference: art_references/simul_cinematic_soft_painted_style_v1.png.
 Identity references: art_references/realtor_identity_pose_reference_01.jpg,
 art_references/realtor_identity_pose_reference_02.jpg,
 art_references/realtor_identity_pose_reference_03.jpg.
@@ -79,10 +80,9 @@ Keep exactly the same white and pale-blue short off-shoulder frilled dress,
 fixed blue bows, right-thigh black garter, white wrist frill,
 and blue-black ribbon platform sandals in every pose.
 
-Match the canonical reference's refined high-detail 2D anime-game rendering,
-fine colored linework, jewel-like layered irises, three-level hair strands,
-crisp cel shading, and subtle painterly highlights.
-Do not copy Han Seoyun's teal hair, violet eyes, or beauty marks.
+Match the cinematic soft-painted anime realism: nearly invisible colored edges,
+natural layered irises, delicate hair strands, smooth painterly skin and cloth shading,
+and subtle optical light. Do not copy Sua's face, black hair, body, or uniform.
 Standing full-body transparent sprite, 1024x1536, common baseline,
 no background, no cast shadow, no text, no logo, no watermark.
 ```

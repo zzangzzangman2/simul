@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import test from "node:test";
 import vm from "node:vm";
 
@@ -29,6 +29,10 @@ test("opens the Flutter future-development orphanage prologue from the default r
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../public/og.png", import.meta.url)),
   ]);
+  const protagonistPoses = await readdir(
+    new URL("../flutter_app/assets/images/protagonist_seed01/", import.meta.url),
+  );
+  assert.equal(protagonistPoses.filter((name) => name.endsWith(".png")).length, 24);
   assert.match(page, /redirect\("\/play\/index\.html"\)/);
   assert.doesNotMatch(page, /GameClient/);
   assert.match(flutterIndex, /<base href="\/play\/">/);
@@ -42,18 +46,28 @@ test("opens the Flutter future-development orphanage prologue from the default r
   assert.match(onboarding, /1981\.01\.12\s+·\s+23:40/);
   assert.match(onboarding, /이대로 가면 나라가 망한다/);
   assert.match(onboarding, /제6기 오리엔테이션 · 1막 완료/);
-  assert.match(onboarding, /bg_blue_house_policy_room_1981_portrait_cartoon_v1\.png/);
+  assert.match(onboarding, /cinematic_soft_painted\/policy_1981\/backgrounds\/bg_policy_room_night_v1\.png/);
+  assert.match(onboarding, /cinematic_soft_painted\/sua\/03_bright_laugh_v1\.png/);
+  assert.match(onboarding, /cinematic_soft_painted\/policy_1981\/jeon_dugwang\/05_pressure_v1\.png/);
+  assert.match(onboarding, /cinematic_soft_painted\/policy_1981\/baek_gihyeon\/03_warning_v2\.png/);
+  assert.match(onboarding, /cinematic_soft_painted\/policy_1981\/kang_incheol\/02_explain_v2\.png/);
+  assert.doesNotMatch(onboarding, /baek_gihyeon\/\w+_v1\.png/);
+  assert.doesNotMatch(onboarding, /kang_incheol\/\w+_v1\.png/);
   assert.match(onboarding, /bg_orphanage_departure_2000_portrait_v1\.png/);
   assert.match(onboarding, /bg_future_development_orientation_hall_2000_portrait_v1\.png/);
-  assert.match(onboarding, /policy-file-\$\{entry\.key\}/);
-  assert.match(onboarding, /orientation-roster-continue/);
+  assert.doesNotMatch(onboarding, /policy-file-\$\{entry\.key\}/);
+  assert.doesNotMatch(onboarding, /orientation-roster-continue/);
+  assert.match(onboarding, /미래에 살 아이들은 뺐나/);
+  assert.match(onboarding, /protagonist_seed01\/03_playful_grin\.png/);
+  assert.match(onboarding, /protagonist_seed01\/17_holding_badge\.png/);
+  assert.match(onboarding, /protagonist_seed01\/22_victory_fist\.png/);
   assert.match(onboarding, /orientation-exit-button/);
   assert.match(onboarding, /stock-lesson-locked/);
   assert.match(onboarding, /주식선생님\/22_포즈1_주인공그림체_공통슬롯_투명\.png/);
   assert.match(onboarding, /주식선생님\/24_포즈3_주인공그림체_공통슬롯_투명\.png/);
-  assert.match(onboarding, /모르는 걸 모른다고 인정하는 법/);
+  assert.match(onboarding, /모르는 걸 모른다고 말하는 법/);
   assert.match(onboarding, /나머지는 아이 몫/);
-  assert.match(onboarding, /주식도, 국가계좌도 아직 열지 않아요/);
+  assert.match(onboarding, /주식과 국가계좌는 아직 열지 않습니다/);
   assert.match(main, /StoryState\.newOrphanagePlayer/);
   assert.match(main, /academy-market-tutorial-screen/);
   assert.match(stockMarket, /selfRelianceReserve/);
@@ -400,30 +414,81 @@ test("offers a disposable stock-only test entry", async () => {
 });
 
 
-test("ships a simple dialogue editor and keeps future story beats synchronized", async () => {
-  const [editor, data, generator, packageJson] = await Promise.all([
+test("ships an intuitive dialogue editor and builds saved dialogue into the game", async () => {
+  const [editor, editorCss, catalog, backgroundCatalog, data, generator, packageJson, buildRoute, onboarding, pubspec] = await Promise.all([
     readFile(new URL("../app/editor/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/editor/editor.module.css", import.meta.url), "utf8"),
+    readFile(new URL("../app/editor/character-catalog.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/editor/background-catalog.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/editor/dialogue-data.ts", import.meta.url), "utf8"),
     readFile(
       new URL("../scripts/generate-dialogue-editor-data.mjs", import.meta.url),
       "utf8",
     ),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/dialogue/build/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../flutter_app/lib/visual_novel_onboarding.dart", import.meta.url), "utf8"),
+    readFile(new URL("../flutter_app/pubspec.yaml", import.meta.url), "utf8"),
   ]);
 
   assert.match(editor, /대사 편집기/);
   assert.match(editor, /자동 저장됨/);
   assert.match(editor, /말맛 체크/);
-  assert.match(editor, /게임에 저장/);
+  assert.match(editor, /저장하고 게임 빌드/);
+  assert.match(editor, /\/api\/dialogue\/build/);
+  assert.match(editor, /게임 빌드 완료/);
+  assert.match(editor, /화자 선택/);
+  assert.match(editor, /표정·동작/);
+  assert.match(editor, /이 화자만 표시/);
+  assert.match(editor, /새 장면 만들기/);
+  assert.match(editor, /기존 장면도 여기서 바로 바꿀 수 있어요/);
+  assert.match(editor, /BackgroundPicker/);
+  assert.match(editor, /장면 추가/);
+  assert.match(backgroundCatalog, /bg_bank_branch_2000_portrait_cartoon_v2\.png/);
+  assert.match(backgroundCatalog, /bg_future_development_orientation_hall_2000_portrait_v1\.png/);
+  assert.match(editorCss, /\.sceneComposer\s*\{/);
+  assert.match(editorCss, /\.backgroundGrid\s*\{/);
+  assert.match(editorCss, /\.character\s*\{[\s\S]*?bottom: 12\.3%/);
   assert.match(editor, /future-academy-dialogue-runtime-v1/);
-  assert.match(editor, /이 장면을 저장하시겠습니까/);
-  assert.match(editor, /저장 안 함/);
-  assert.match(editor, /저장하고 이동/);
+  assert.doesNotMatch(editor, /이 장면을 저장하시겠습니까/);
+  assert.doesNotMatch(editor, /저장하고 이동/);
   assert.match(editor, /새 장면 .*개 자동 추가/);
   assert.equal((data.match(/"id": "scene-/g) ?? []).length, 54);
   assert.match(data, /단팥빵 하나와 500원/);
+  assert.match(data, /설명서 학준아, 별명 붙이면 안 된다는 규정도 있어/);
+  assert.doesNotMatch(data, /안내문에 별명 금지도 있어, 설명서 학준아/);
+  assert.equal(data.includes("\\\\n"), false);
+  assert.match(data, /character_minho_farewell_v3\.png/);
+  assert.match(data, /character_hakjun_orientation_v2\.png/);
   assert.match(generator, /_onboardingBeatCount/);
+  assert.match(generator, /teacherPoseForBeat/);
+  assert.match(generator, /appearanceVersion !== 6/);
   assert.match(generator, /Dialogue editor synced/);
+  const protagonistCatalog = catalog.slice(
+    catalog.indexOf("const protagonistPoses"),
+    catalog.indexOf("const teacherPoses"),
+  );
+  const teacherCatalog = catalog.slice(
+    catalog.indexOf("const teacherPoses"),
+    catalog.indexOf("const suaPoses"),
+  );
+  assert.equal((protagonistCatalog.match(/\.png/g) ?? []).length, 24);
+  assert.equal((teacherCatalog.match(/\.png/g) ?? []).length, 6);
+  assert.match(catalog, /character_minho_farewell_v3\.png/);
+  assert.doesNotMatch(catalog, /character_minho_farewell_v2\.png/);
   assert.match(packageJson, /prebuild:flutter-web/);
   assert.match(packageJson, /dialogue:sync/);
+  assert.match(buildRoute, /dialogue-editor-override\.json/);
+  assert.match(buildRoute, /appearanceVersion: 6/);
+  assert.match(buildRoute, /dialogueTextValue/);
+  assert.match(buildRoute, /scripts\/build-flutter-web\.mjs/);
+  assert.match(onboarding, /_dialogueBundleAsset/);
+  assert.match(onboarding, /rootBundle\.loadString/);
+  assert.match(onboarding, /character: asset\('character'\)/);
+  assert.match(onboarding, /background: asset\('background'\)/);
+  assert.match(onboarding, /_dialogueEndBeat = loaded\.keys\.reduce\(math\.max\)/);
+  assert.match(onboarding, /_storyCharacterBottomInset = 104\.0/);
+  assert.match(onboarding, /_minhoCharacterScale = 0\.72/);
+  assert.doesNotMatch(onboarding, /왼쪽으로 움직여 대화창 배경을 더 투명하게 조절/);
+  assert.match(pubspec, /assets\/dialogue\//);
 });

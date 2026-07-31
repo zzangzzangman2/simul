@@ -1145,7 +1145,11 @@ CRT 화면에 한빛통신 시세가 나타났다.
 | 강인철 | `character_kang_incheol_v1.png` | 경제수석. 기술과 지분이 국가의 힘이 될 미래를 예측한다. |
 | 윤미라 | `character_yoon_mira_v1.png` | 사회교육수석. 자립적립금 80%와 아이의 소유권을 지켜 낸다. |
 | 장대식 | `character_jang_daesik_v1.png` | 법무수석. 비공개 특별법의 위험을 안다. |
-| 학준 | `character_park_taesu_v1.png` | 6기 경쟁자. 규칙과 손실통제를 중시한다. |
+| 김학준(학준) | `character_park_taesu_v1.png` | 6기 경쟁자. 규칙과 손실통제를 중시한다. |
 | 오경태 | `character_living_guide_oh_gyeongtae_v1.png` | 생활지도관. 사라진 5기의 비밀을 숨기고 있다. |
 | 차은주 | `character_state_account_officer_cha_eunjoo_v1.png` | 국가계좌 담당관. 환수·자립적립 정산을 집행한다. |
+
+`character_park_taesu_v1.png`는 김학준의 구형 자산명이다. 이 원고의 경쟁자와
+현재 런타임의 `character_hakjun_orientation_v2.png`는 모두 같은 인물 `김학준`이며,
+`park_taesu`를 별도 등장인물로 세지 않는다.
 

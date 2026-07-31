@@ -7,12 +7,13 @@
 ## 기준 참조
 
 - 정체성 참조: `art_references/girlfriend_identity_reference_v1.jpg`
-- 최상위 화풍 참조: `art_references/npc_canonical_style_teal_v1.png`
+- 최상위 화풍 참조: `art_references/simul_cinematic_soft_painted_style_v1.png`
+- 한서윤 보조 정체성 자료: `art_references/npc_canonical_style_teal_v1.png` — 여자친구 화풍 기준으로 사용하지 않음
 - 정체성 참조에서는 둥근 얼굴의 인상, 밤색 양갈래, 분홍 리본, 루비·코랄색 눈과
   분홍·흰색 파자마 색 구성을 가져온다.
-- 화풍 참조에서는 가는 유색 선화, 보석형 다층 홍채, 3단계 머리카락 묘사,
-  선명한 셀 명암과 절제된 페인터리 하이라이트만 가져온다. 한서윤의 청록 머리,
-  보라 눈, 뷰티마크는 가져오지 않는다.
+- 화풍 참조에서는 거의 보이지 않는 유색 경계선, 자연스러운 다층 홍채,
+  섬세한 머리카락, 부드러운 페인터리 피부·의상 명암과 은은한 광학 조명만
+  가져온다. 공통 원본 수아의 얼굴·검은 머리·회갈색 눈·교복은 가져오지 않는다.
 
 ## 고정 정체성
 
@@ -50,6 +51,10 @@
 여섯 자산은 모두 `1024×1536` RGBA 투명 전신이다. 머리 시작 `y=20`,
 발 마지막 픽셀 `y=1516`, 발 중심 `x=512`를 공통으로 유지한다.
 
+v3는 현재 미연결 보관 자산이며 구형 카툰 채색 때문에 현행 화풍 승인본이 아니다.
+관계 시스템 연결 전 동일 정체성·홈웨어를 보존해 cinematic soft-painted 세트로
+재생성하고 `ART_STYLE_AUDIT.md` 승인을 받아야 한다.
+
 ## 기존 여자1 자산과의 관계
 
 `flutter_app/assets/images/여자1/` 및 기존 `character_girlfriend_*_v1/v2.png`
@@ -61,12 +66,13 @@
 ```text
 Create the same wholesome 10-year-old Korean childhood-friend character.
 Identity reference: art_references/girlfriend_identity_reference_v1.jpg.
-Rendering reference: art_references/npc_canonical_style_teal_v1.png.
+Rendering reference: art_references/simul_cinematic_soft_painted_style_v1.png.
 Keep her round child face, layered ruby-coral eyes, straight chestnut-brown bangs,
 long symmetrical high twin-tails, matching dusty-pink bows, and natural school-age proportions.
 Keep the same loose pink-and-white child pajama set and closed-toe pink slippers.
-Match the canonical fine colored linework, jewel-like irises, three-level hair strands,
-crisp cel shading, and subtle painterly highlights without copying Han Seoyun's identity.
+Match the cinematic soft-painted anime realism: nearly invisible colored edges,
+natural layered irises, delicate hair strands, smooth painterly skin and cloth shading,
+and subtle optical light without copying Sua's face, hair, body, or uniform.
 Full-body standing sprite, 1024x1536 common canvas and baseline, no background,
 no cast shadow, no text, no logo, no watermark, and no chibi proportions.
 ```

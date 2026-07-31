@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart' show ValueListenable;
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -107,11 +108,13 @@ class MillenniumCapitalApp extends StatefulWidget {
     this.persistence,
     this.campaignWorldPreparer,
     this.stockTestMode = false,
+    this.dialogueOverrideJson,
   });
 
   final GamePersistence? persistence;
   final CampaignWorldPreparer? campaignWorldPreparer;
   final bool stockTestMode;
+  final String? dialogueOverrideJson;
 
   @override
   State<MillenniumCapitalApp> createState() => _MillenniumCapitalAppState();
@@ -1313,6 +1316,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
                 _AppView.onboarding => VisualNovelOnboardingScreen(
                   onCreate: _createCompany,
                   onExit: _showTitle,
+                  dialogueOverrideJson: widget.dialogueOverrideJson,
                 ),
                 _AppView.game when _state != null => OfficeScreen(
                   state: _state!,
@@ -1739,7 +1743,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             width: 82,
             height: 118,
             child: Image.asset(
-              'assets/images/character_hero_title_style_v2.png',
+              'assets/images/protagonist_seed01/04_curious_question.png',
               fit: BoxFit.contain,
             ),
           ),

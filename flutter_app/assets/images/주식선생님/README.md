@@ -6,7 +6,8 @@
 
 - 나이: 23세 성인 여성
 - 역할: 주식 투자 학원 선생님 및 주식시장 튜토리얼 안내자
-- 그림체 기준: `art_references/npc_canonical_style_teal_v1.png`
+- 최상위 그림체 기준: `art_references/simul_cinematic_soft_painted_style_v1.png`
+- 얼굴·머리·눈 정체성 보조: `art_references/npc_canonical_style_teal_v1.png`
 - 체형: 키가 크고 굴곡이 있으면서도 자연스러운 성인 여성 비율
 - 얼굴: 보석처럼 여러 층의 하이라이트가 있는 보라색 눈, 작은 뷰티마크, 섬세하고 친근한 성인 인상
 - 머리: 허리까지 내려오는 긴 물결형 청록색 머리, 성긴 일자 앞머리, 큰 덩어리·중간 가닥·잔머리와 띠 모양 하이라이트
@@ -36,8 +37,7 @@
 - 머리 시작: `y=20`
 - 발 마지막 픽셀: `y=1516`
 - 발 중심/몸 중심 앵커: `x=512`
-- 런타임: `Positioned.fill(bottom: 122) → LayoutBuilder → Align.bottomCenter → SizedBox(aspectRatio: 2/3, height: maxHeight×0.78)`
-- 390×844: `left 7.28 / top 158.84 / width 375.44 / height 563.16 / bottom 722 / centerX 195`
-- 360×800: `left 3.72 / top 149.16 / width 352.56 / height 528.84 / bottom 678 / centerX 180`
+- 런타임: 공통 캐릭터 부모의 `Positioned.fill(bottom: 0) → LayoutBuilder → Align.bottomCenter → SizedBox(aspectRatio: 2/3, height: maxHeight×0.9)`
+- 모든 화면 크기에서 다른 중앙 전신 인물과 같은 부모·90% 높이·발 기준선을 공유한다. 과거 `bottom: 122`, `0.78` 배율로 되돌리지 않는다.
 
 포즈 추가 시 얼굴 골격, 홍채의 하이라이트 구조, 청록색 머리 길이·앞머리·가르마, 체형, 블라우스 칼라·레이스·사원증·치마 밑단·타이츠를 그대로 유지한다. 새 포즈도 위 캔버스와 발/몸 앵커에 맞추며 장면별 `left`, `top`, `scale`을 따로 만들지 않는다. 중앙 전신으로 추가되는 다른 등장인물도 같은 캔버스 규격과 NPC 렌더링 문법을 사용하되 한서윤의 고유 머리·눈 색은 복사하지 않는다.

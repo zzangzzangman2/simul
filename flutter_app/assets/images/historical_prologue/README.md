@@ -3,13 +3,37 @@
 생성일: 2026-07-30  
 생성 방식: Codex 내장 ImageGen  
 공통 기준 화면: 모바일 세로 390×844  
-공통 스타일 참조:
+2026-07-31 이후 최상위 스타일 참조:
 
-- `art_references/npc_canonical_style_teal_v1.png`
+- `art_references/simul_cinematic_soft_painted_style_v1.png`
+
+아래 기존 자산은 장소·정체성·의상·포즈 참고이며 화풍 기준이 아니다.
+
 - `assets/images/bg_prologue_academy_classroom_welcome_2000_portrait_cartoon_v6.png`
 - `assets/images/title_elementary_landlord_portrait_v2.png`
-- `assets/images/character_hero_title_style_v2.png`
+- `assets/images/protagonist_seed01/`의 정식 교복 주인공 전신 24종
 - `assets/images/character_father_title_style_v2.png`
+
+정식 화풍명은 **`cinematic soft-painted anime realism`**이다. 위 공통 원본은
+부드러운 페인터리 명암·섬세한 머리카락·자연스러운 다층 홍채·은은한 광학
+조명만 스타일로 공유한다. 원본 수아의 얼굴·머리·체형·빨강 체크 교복은 다른
+인물에게 복사하지 않는다. 아래의 구형 `2D 카툰·셀 셰이딩` 기록은 자산의
+제작 이력이며 신규 생성 기준이 아니다.
+
+## cinematic soft-painted 교체 자산
+
+- 수아 7종: `assets/images/cinematic_soft_painted/sua/`
+- 민호: `assets/images/historical_prologue/character_minho_farewell_v3.png`
+- 학준: `assets/images/historical_prologue/character_hakjun_orientation_v2.png`
+- 1981년 전두광 6종: `assets/images/cinematic_soft_painted/policy_1981/jeon_dugwang/`
+- 서문태·백기현·강인철·윤미라 각 4종:
+  `assets/images/cinematic_soft_painted/policy_1981/`
+- 정책실·심야회의실 배경 2종:
+  `assets/images/cinematic_soft_painted/policy_1981/backgrounds/`
+
+전신 컷은 모두 1024×1536 RGBA 투명 PNG이며, 배경은 390×844 모바일 세로
+비율을 따른다. 구형 역사 프롤로그 인물·청와대 배경 파일은 보관하되 현재
+1~15번 장면과 수아 등장 장면에는 새 경로를 사용한다.
 
 ## 자산 목록
 
@@ -47,16 +71,17 @@
 
 - `bg_orphanage_departure_2000_portrait_v1.png`: 새봄보육원 현관에서 가방과 합격 통지서를 받는 겨울 아침.
 - `bg_future_development_academy_gate_2000_portrait_v1.png`: 제6기 투자전문과정 정문 도착.
-- `bg_future_development_orientation_hall_2000_portrait_v1.png`: 스무 장의 이름표가 놓인 오리엔테이션 강당. 런타임에서 조명·먼지·카메라 이동을 합성한다.
+- `bg_future_development_orientation_hall_2000_portrait_v1.png`: 열 장의 이름표가 놓인 오리엔테이션 강당. 런타임에서 조명·먼지·카메라 이동을 합성한다.
 
 ### 등장인물
 
-- `character_sua_orientation_v1.png`: 사용자 제공 수아 정체성을 보존한 10살 제6기 교복 전신.
-- `character_hakjun_orientation_v1.png`: 규정집을 든 10살 제6기 라이벌 전신.
+- `assets/images/cinematic_soft_painted/sua/`: 사용자 승인 수아 얼굴·긴 검은 머리·10살 제6기 교복을 보존한 표정·동작 7종.
+- `character_hakjun_orientation_v2.png`: 수아와 같은 cinematic soft-painted anime realism 피부 명암으로 다시 그린, 규정집을 든 10살 제6기 라이벌 전신.
+- `character_minho_farewell_v3.png`: 수아와 같은 부드러운 피부·눈가·머리카락 질감으로 다시 그린 7살 민호의 작별 전신. 긴 타원형 얼굴, 회청색 처진 눈, 주근깨와 잠옷·이불 정체성을 유지한다.
 
-두 인물은 `#00ff00` 크로마 원본을 soft matte와 despill로 투명화했다.
+세 인물 자산은 투명 RGBA로 정규화하고 필요한 크로마 원본은 soft matte와 despill로 처리했다.
 강당 합성에서 얼굴·교복·손동작이 390×844 화면에서도 읽히며 잔여 녹색 테두리가
-없는 것을 확인했다. 주인공은 이번 1막에서 화면에 직접 표시하지 않는다.
+없는 것을 확인했다. 주인공은 `protagonist_seed01/`의 정식 남자 교복 포즈를 대사에 맞춰 표시한다.
 
 ## 개막부 추가 배경
 

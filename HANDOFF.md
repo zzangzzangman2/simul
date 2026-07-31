@@ -1,6 +1,6 @@
 # 초딩부터 건물주 인수인계
 
-최종 갱신: 2026-07-31
+최종 갱신: 2026-08-01
 
 새 채팅은 이 문서를 먼저 읽는다. 현재 구현은 `WORK_LOG.md`, 남은 범위는
 `GAMEPLAY_GAPS.md`, 채택된 규칙은 `DECISIONS.md`가 담당한다. 서로 충돌하면
@@ -86,8 +86,15 @@
     20% 국가 환수, 80% 자립적립금 규칙을 사용한다. 가족 학원비 채무는 만들지
     않는다. 상태 모델은 구현됐지만 현재 오리엔테이션에서는 아직 첫 저장을
     만들지 않는다. 기존 가족 세계관 저장은 레거시로 보존한다.
-18. 확정 전신 화풍으로 리부트 등장인물 11명의 52개 후보를
-    `art_candidates/story_reboot_v1/`에 만들었으며 사용자 세트 승인 전에는 런타임에 연결하지 않는다.
+18. 정식 화풍은 `cinematic soft-painted anime realism`이다. 수아 7종,
+    민호 `character_minho_farewell_v3.png`, 학준
+    `character_hakjun_orientation_v2.png`와 정책실 구분 얼굴을 현재 런타임에
+    연결했다. `art_candidates/story_reboot_v1/`의 구형 후보는 승인 없이 다시
+    연결하지 않는다.
+19. `/editor`에서 기존 장면의 배경·장 메타데이터·화자·화자별 포즈·지문·대사를
+    수정하고, 완성형 작성 창으로 새 장면을 선택 장면 다음에 추가할 수 있다.
+    저장·빌드는 대사 JSON, Flutter Web release와 `public/play/`를 함께 갱신하며
+    런타임은 최대 240장면 안에서 편집본의 실제 마지막 장면까지 재생한다.
 ## 2. 신규 게임의 정확한 순서
 
 다른 문서에 아래와 다른 과거 순서가 보이면 이 순서로 고친다.
@@ -301,23 +308,19 @@
 
 ## 5. 최신 검증 상태
 
-2026-07-30 현재 호가 FIFO·인라인 주문 슬라이드·실시간 양방향 대표 벽 수급과
-장기 적자·1년 저개입·통합 장부 병합 검증은 **완료(PASS)**다.
+2026-08-01 현재 대사 편집기 장면·배경 추가, cinematic 인물 교체와 기존
+호가·사업·부동산 전체 회귀 검증은 **완료(PASS)**다.
 
 - `flutter analyze`: PASS, issue 0
-- 주문장·미시구조 집중 회귀: 90/90 PASS
-- 전체 `flutter_app/test/widget_test.dart`: 71/71 PASS
-- 사업 엔진: 16/16 PASS
-- 일괄 진행: 4/4 PASS
-- 은행 장부: 3/3 PASS
-- 360px 레이아웃: 10/10 PASS
-- 기준 10년 사업 재생: 1/1 PASS, 2001-01-01 폐업, 미지급금·장부가치 0
-- `npm test`: 8/8 PASS
+- Flutter 테스트 파일별 전수 실행: 47/47 파일 PASS
+- 전체 `flutter_app/test/widget_test.dart`: 78/78 PASS
+- 360px 레이아웃·프롤로그 스킵·편집본 55번째 장면 회귀: PASS
+- 기준 10년 사업 재생·2000~2026 전체 플레이: PASS
+- `npm test`: 9/9 PASS
 - `npm run lint`: PASS
 - Flutter Web release와 Vinext production build: PASS
-- `flutter_app/build/web` ↔ `public/play`: 243/243개, SHA-256 불일치 0
-- `main.dart.js`: 4,887,165바이트, SHA-256 `13D10DBD69C12DDAD00A7F681440B8588C4F48EB988E8FB5C48477665BE20E4B`
-- 주식시장 바로 테스트: `https://millennium-capital-2000.alphathepark.chatgpt.site/play/stock-test.html`
+- `flutter_app/build/web` ↔ `public/play`: 294/294개, SHA-256 불일치 0
+- `main.dart.js`: 4,928,685바이트, SHA-256 `E3DD963CC2A4CF81836AA71C9D3EC8A75550919B4D3CBBD57A75DF5B388382D6`
 
 ## 6. 다음 행동
 
@@ -368,12 +371,17 @@
 | `flutter_app/web/stock-test.html` | 저장과 격리된 주식 전용 테스트 리다이렉트 |
 | `flutter_app/lib/game/game_persistence.dart` | 5슬롯 저장·복구 |
 | `scripts/build-flutter-web.mjs` | Flutter Web release 동기화 |
+| `app/editor/page.tsx` | 대사·장면 편집, 화자별 포즈, 배경 선택과 새 장면 작성 |
+| `app/editor/background-catalog.ts` | 편집기 배경 카탈로그 |
+| `app/api/dialogue/build/route.ts` | 대사 JSON 저장과 Flutter Web 빌드 API |
+| `flutter_app/lib/visual_novel_onboarding.dart` | 편집본 배경·동적 장면 수를 적용하는 프롤로그 런타임 |
 
 ## 8. 문서 역할
 
 | 문서 | 한 가지 역할 |
 | --- | --- |
 | `AGENTS.md` | 절대 작업 규칙 |
+| `DOCUMENTATION_INDEX.md` | 현행·검증·레거시 문서 우선순위 |
 | `HANDOFF.md` | 새 채팅용 현재 상태·작업 트리·다음 행동 |
 | `PROJECT_GUIDE.md` | 제품 구조·실행·필수 회귀 |
 | `DECISIONS.md` | 현재 채택된 설계 결정 |
@@ -387,6 +395,7 @@
 | `PROTAGONIST_AGE_LINE.md` | 10~19살 실제 나이와 SEED 01~10 성장선 |
 | `ORPHANAGE_WEBNOVEL_PROLOGUE.md` | 개막부 전체 원고 |
 | `ART_STYLE_AUDIT.md` | 확정 화풍과 자산 세트 승인 상태 |
+| `DIALOGUE_EDITOR_GUIDE.md` | 대사·장면·배경 편집과 게임 빌드 |
 | `story.md` | 기존 가족 세계관 저장의 레거시 서사·대사 톤 |
 
 ## 9. 검증 명령

@@ -5,6 +5,12 @@ const project = process.cwd();
 const sourcePath = path.join(project, "flutter_app/lib/visual_novel_onboarding.dart");
 const outputPath = path.join(project, "app/editor/dialogue-data.ts");
 const source = fs.readFileSync(sourcePath, "utf8");
+const stringConstants = new Map(
+  Array.from(
+    source.matchAll(/const\s+([A-Za-z_]\w*)\s*=\s*'((?:\\.|[^'])*)';/gs),
+    (match) => [match[1], decodeDartString(match[2])],
+  ),
+);
 
 function between(startMarker, endMarker) {
   const start = source.indexOf(startMarker);
@@ -15,17 +21,30 @@ function between(startMarker, endMarker) {
 
 function decodeDartString(value) {
   return value
-    .replaceAll("\\\\n", "\n")
+    .replaceAll("\\n", "\n")
     .replaceAll("\\\\'", "'")
     .replaceAll("\\\\", "\\");
+}
+
+function normalizeDialogueText(value) {
+  return typeof value === "string"
+    ? value
+        .replaceAll("\\r\\n", "\n")
+        .replaceAll("\\n", "\n")
+        .replaceAll("\\r", "\n")
+    : value;
 }
 
 function parseRules(text) {
   const rules = [];
   const pattern =
-    /^\s*(<=\s*\d+|\d+(?:\s*\|\|\s*\d+)*|_)\s*=>\s*(?:\r?\n\s*)?'((?:\\.|[^'])*)',?\s*$/gm;
+    /^\s*(<=\s*\d+|\d+(?:\s*\|\|\s*\d+)*|_)\s*=>\s*(?:\r?\n\s*)?(?:'((?:\\.|[^'])*)'|([A-Za-z_]\w*)),?\s*$/gm;
   for (const match of text.matchAll(pattern)) {
-    rules.push({ condition: match[1].replaceAll(/\s/g, ""), value: decodeDartString(match[2]) });
+    const value = match[2] === undefined
+      ? stringConstants.get(match[3])
+      : decodeDartString(match[2]);
+    if (value === undefined) continue;
+    rules.push({ condition: match[1].replaceAll(/\s/g, ""), value });
   }
   return rules;
 }
@@ -49,19 +68,13 @@ function constant(name) {
 }
 
 const beatCount = constant("_onboardingBeatCount");
-const policyBeat = constant("_policyBriefingBeat");
 const speakerRules = parseRules(between("  String get _speaker", "  String get _line"));
-const lineRules = parseRules(between("  String get _line", "  String get _policyBriefingSpeaker"));
+const lineRules = parseRules(between("  String get _line", "  String? get _stageDirection"));
 const directionSource = between(
   "  String? get _stageDirection",
   "  String get _historyLine",
 );
-const directionRules = parseRules(
-  directionSource.replace(
-    /^\s*\d+\s*=>\s*switch \(_activePolicyFile\) \{[\s\S]*?^\s*\},\s*$/m,
-    "",
-  ),
-);
+const directionRules = parseRules(directionSource);
 const backgroundRules = parseRules(between("  String get _background", "  String get _location"));
 const locationRules = parseRules(between("  String get _location", "  String get _dateLabel"));
 const dateRules = parseRules(between("  String get _dateLabel", "  String? get _character"));
@@ -72,6 +85,22 @@ const teacherBeats = Array.from(
   ),
   (match) => Number(match[1]),
 );
+
+function teacherPoseForBeat(beat) {
+  if ([34, 42, 51].includes(beat)) {
+    return "assets/images/주식선생님/22_포즈1_주인공그림체_공통슬롯_투명.png";
+  }
+  if ([37, 44].includes(beat)) {
+    return "assets/images/주식선생님/23_포즈2_주인공그림체_공통슬롯_투명.png";
+  }
+  if ([35, 43, 49].includes(beat)) {
+    return "assets/images/주식선생님/24_포즈3_주인공그림체_공통슬롯_투명.png";
+  }
+  if ([45, 53].includes(beat)) {
+    return "assets/images/주식선생님/26_포즈5_주인공그림체_공통슬롯_투명.png";
+  }
+  return "assets/images/주식선생님/22_포즈1_주인공그림체_공통슬롯_투명.png";
+}
 
 function webAsset(asset) {
   return asset ? `/play/assets/${asset}` : "";
@@ -91,16 +120,8 @@ const scenes = Array.from({ length: beatCount }, (_, beat) => {
   let line = resolveRule(lineRules, beat, "");
   let direction = resolveRule(directionRules, beat, "");
   let character = resolveRule(characterRules, beat, "");
-  if (beat === policyBeat) {
-    speaker = "정책 보고서";
-    line = "보고서 다섯 권을 차례로 확인한다.";
-    direction =
-      "수출산업·인구전망·보호아동·국가계좌·특별법 보고서가 탁자 위에 놓였다.";
-    character = "";
-  }
   if (teacherBeats.includes(beat)) {
-    character =
-      "assets/images/주식선생님/22_포즈1_주인공그림체_공통슬롯_투명.png";
+    character = teacherPoseForBeat(beat);
   }
   return {
     id: `scene-${String(beat + 1).padStart(2, "0")}`,
@@ -134,4 +155,37 @@ export const initialDialogue: DialogueScene[] = ${JSON.stringify(scenes, null, 2
 
 fs.mkdirSync(path.dirname(outputPath), { recursive: true });
 fs.writeFileSync(outputPath, output, "utf8");
+
+const overridePath = path.join(
+  project,
+  "flutter_app/assets/dialogue/dialogue-editor-override.json",
+);
+if (fs.existsSync(overridePath)) {
+  try {
+    const originalOverride = fs.readFileSync(overridePath, "utf8");
+    const override = JSON.parse(originalOverride);
+    if (Array.isArray(override.scenes) && override.scenes.length > 0) {
+      const upgradeAppearance = override.appearanceVersion !== 6;
+      const defaultById = new Map(scenes.map((scene) => [scene.id, scene]));
+      override.scenes = override.scenes.map((scene) => ({
+        ...scene,
+        direction: normalizeDialogueText(scene.direction),
+        line: normalizeDialogueText(scene.line),
+        background: upgradeAppearance
+          ? defaultById.get(scene.id)?.background ?? scene.background ?? ""
+          : scene.background ?? "",
+        character: upgradeAppearance
+          ? defaultById.get(scene.id)?.character ?? scene.character ?? ""
+          : scene.character ?? "",
+      }));
+      override.appearanceVersion = 6;
+      const normalizedOverride = `${JSON.stringify(override, null, 2)}\n`;
+      if (normalizedOverride !== originalOverride) {
+        fs.writeFileSync(overridePath, normalizedOverride, "utf8");
+      }
+    }
+  } catch {
+    // A damaged local override must not block regenerating the editor source.
+  }
+}
 console.log(`Dialogue editor synced: ${scenes.length} scenes`);

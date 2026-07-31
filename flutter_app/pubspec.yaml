@@ -20,8 +20,17 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
+    - assets/dialogue/
     - assets/images/
     - assets/images/historical_prologue/
+    - assets/images/protagonist_seed01/
+    - assets/images/cinematic_soft_painted/sua/
+    - assets/images/cinematic_soft_painted/policy_1981/backgrounds/
+    - assets/images/cinematic_soft_painted/policy_1981/jeon_dugwang/
+    - assets/images/cinematic_soft_painted/policy_1981/seo_muntae/
+    - assets/images/cinematic_soft_painted/policy_1981/baek_gihyeon/
+    - assets/images/cinematic_soft_painted/policy_1981/kang_incheol/
+    - assets/images/cinematic_soft_painted/policy_1981/yoon_mira/
     - assets/images/minigames/
     - assets/images/gameplay_map/
     - assets/images/gameplay_ambient/

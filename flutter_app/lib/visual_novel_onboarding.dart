@@ -1,10 +1,19 @@
 part of 'main.dart';
 
 const _onboardingBeatCount = 54;
+const _maximumDialogueBeatCount = 240;
 const _dialogueRuntimeStorageKey = 'future-academy-dialogue-runtime-v1';
-const _policyBriefingBeat = 5;
+const _dialogueBundleAsset = 'assets/dialogue/dialogue-editor-override.json';
+const _dialoguePanelOpacityStorageKey =
+    'future-academy-dialogue-panel-opacity-v2';
+const _dialoguePanelOpacityMin = 0.0;
+const _dialoguePanelOpacityMax = 0.74;
+const _dialoguePanelOpacityDefault = _dialoguePanelOpacityMin;
+final ValueNotifier<double> _dialoguePanelOpacity = ValueNotifier<double>(
+  _dialoguePanelOpacityDefault,
+);
 const _orientationRosterBeat = 43;
-const _orientationCompleteBeat = 53;
+const _orientationCompleteBeat = _onboardingBeatCount - 1;
 const _introChoiceBeat = 120;
 const _accountHallDepartureBeat = 131;
 const _stateAccountActivationBeat = 134;
@@ -12,9 +21,17 @@ const _playerNameBeat = 137;
 const _traitChoiceBeat = 144;
 const _principleChoiceBeat = 147;
 const _companyNameBeat = 150;
-const _storyCharacterBottomInset = 0.0;
+const _storyCharacterBottomInset = 104.0;
 const _storyCharacterHeightFactor = 0.9;
 const _storyCharacterAspectRatio = 2 / 3;
+const _minhoCharacterAsset =
+    'assets/images/historical_prologue/character_minho_farewell_v3.png';
+const _minhoCharacterScale = 0.72;
+const _maximumWheelBackSteps = 12;
+const _wheelBackDebounce = Duration(milliseconds: 180);
+
+double _storyCharacterScaleForAsset(String asset) =>
+    asset == _minhoCharacterAsset ? _minhoCharacterScale : 1.0;
 
 void _playStoryFeedback({bool strong = false}) {
   if (strong) {
@@ -25,6 +42,34 @@ void _playStoryFeedback({bool strong = false}) {
   unawaited(SystemSound.play(SystemSoundType.click));
 }
 
+double _clampDialoguePanelOpacity(double value) =>
+    value.clamp(_dialoguePanelOpacityMin, _dialoguePanelOpacityMax).toDouble();
+
+double _dialogueBackdropBlurSigma(double panelOpacity) {
+  final progress =
+      ((panelOpacity - _dialoguePanelOpacityMin) /
+              (_dialoguePanelOpacityMax - _dialoguePanelOpacityMin))
+          .clamp(0.0, 1.0)
+          .toDouble();
+  return 7 * progress * progress;
+}
+
+void _setDialoguePanelOpacity(double value) {
+  _dialoguePanelOpacity.value = _clampDialoguePanelOpacity(value);
+}
+
+Future<void> _saveDialoguePanelOpacity() async {
+  try {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setDouble(
+      _dialoguePanelOpacityStorageKey,
+      _dialoguePanelOpacity.value,
+    );
+  } catch (_) {
+    // The control must remain usable even when browser storage is unavailable.
+  }
+}
+
 typedef NewGameCreator =
     Future<void> Function(
       NewGameSetup setup,
@@ -33,18 +78,24 @@ typedef NewGameCreator =
 
 class _DialogueOverride {
   const _DialogueOverride({
+    required this.id,
     required this.speaker,
     required this.line,
     required this.direction,
     required this.date,
     required this.location,
+    this.background,
+    this.character,
   });
 
+  final String id;
   final String speaker;
   final String line;
   final String direction;
   final String date;
   final String location;
+  final String? background;
+  final String? character;
 }
 
 class VisualNovelOnboardingScreen extends StatefulWidget {
@@ -52,10 +103,12 @@ class VisualNovelOnboardingScreen extends StatefulWidget {
     super.key,
     required this.onCreate,
     this.onExit,
+    this.dialogueOverrideJson,
   });
 
   final NewGameCreator onCreate;
   final VoidCallback? onExit;
+  final String? dialogueOverrideJson;
 
   @override
   State<VisualNovelOnboardingScreen> createState() =>
@@ -64,22 +117,14 @@ class VisualNovelOnboardingScreen extends StatefulWidget {
 
 class _VisualNovelOnboardingScreenState
     extends State<VisualNovelOnboardingScreen> {
-  static const _policyFileLabels = <String, String>{
-    'industry': '수출산업',
-    'population': '인구전망',
-    'children': '보호아동',
-    'capital': '국가계좌',
-    'law': '특별법',
-  };
-
   final _playerController = TextEditingController();
   final _companyController = TextEditingController();
-  final Set<String> _reviewedPolicyFiles = <String>{};
   final List<String> _dialogueHistory = <String>[];
+  final List<int> _beatNavigationHistory = <int>[];
   Map<int, _DialogueOverride> _dialogueOverrides =
       const <int, _DialogueOverride>{};
   int _beat = 0;
-  String? _activePolicyFile;
+  int _dialogueEndBeat = _orientationCompleteBeat;
   String? _introChoice;
   StoryTrait? _trait;
   FamilyRule? _familyRule;
@@ -88,7 +133,8 @@ class _VisualNovelOnboardingScreenState
   bool _isTraveling = false;
   bool _stateAccountActivated = false;
   Timer? _travelTimer;
-  String _policyMessage = '보고서 다섯 권을 모두 확인해야 결재안을 완성할 수 있다.';
+  DateTime? _lastWheelBackAt;
+  late final Future<void> _dialogueLoadFuture;
   WorldLoadProgress _creationProgress = const WorldLoadProgress(
     0.02,
     '제6기 국가계좌 정보를 정리하는 중…',
@@ -97,48 +143,107 @@ class _VisualNovelOnboardingScreenState
   @override
   void initState() {
     super.initState();
-    unawaited(_loadDialogueOverrides());
+    _dialogueLoadFuture = _loadDialogueOverrides();
+    unawaited(_dialogueLoadFuture);
+    unawaited(_loadDialoguePanelOpacity());
   }
 
-  Future<void> _loadDialogueOverrides() async {
+  Future<void> _loadDialoguePanelOpacity() async {
     try {
       final preferences = await SharedPreferences.getInstance();
       await preferences.reload();
-      final raw = preferences.getString(_dialogueRuntimeStorageKey);
-      if (raw == null || raw.trim().isEmpty) return;
+      _setDialoguePanelOpacity(
+        preferences.getDouble(_dialoguePanelOpacityStorageKey) ??
+            _dialoguePanelOpacityDefault,
+      );
+    } catch (_) {
+      _setDialoguePanelOpacity(_dialoguePanelOpacityDefault);
+    }
+  }
 
-      final decoded = jsonDecode(raw);
-      if (decoded is! Map<String, dynamic>) return;
-      final rawScenes = decoded['scenes'];
-      if (rawScenes is! List) return;
+  Map<int, _DialogueOverride> _decodeDialogueOverrides(String raw) {
+    final decoded = jsonDecode(raw);
+    if (decoded is! Map<String, dynamic>) return const {};
+    final rawScenes = decoded['scenes'];
+    if (rawScenes is! List) return const {};
 
-      final loaded = <int, _DialogueOverride>{};
-      for (final rawScene in rawScenes) {
-        if (rawScene is! Map<String, dynamic>) continue;
-        final order = rawScene['order'];
-        if (order is! num) continue;
-        final beat = order.toInt() - 1;
-        if (beat < 0 || beat >= _onboardingBeatCount) continue;
+    final loaded = <int, _DialogueOverride>{};
+    for (final rawScene in rawScenes) {
+      if (rawScene is! Map<String, dynamic>) continue;
+      final order = rawScene['order'];
+      if (order is! num) continue;
+      final beat = order.toInt() - 1;
+      if (beat < 0 || beat >= _maximumDialogueBeatCount) continue;
 
-        String text(String key) =>
-            rawScene[key] is String ? rawScene[key] as String : '';
-
-        loaded[beat] = _DialogueOverride(
-          speaker: text('speaker'),
-          line: text('line'),
-          direction: text('direction'),
-          date: text('date'),
-          location: text('location'),
-        );
+      String text(String key) {
+        final value = rawScene[key] is String ? rawScene[key] as String : '';
+        return value
+            .replaceAll(r'\r\n', '\n')
+            .replaceAll(r'\n', '\n')
+            .replaceAll(r'\r', '\n');
       }
 
-      if (!mounted || loaded.isEmpty) return;
-      setState(() {
-        _dialogueOverrides = Map<int, _DialogueOverride>.unmodifiable(loaded);
-      });
-    } catch (_) {
-      // A damaged browser draft must never prevent the prologue from starting.
+      String? asset(String key) {
+        if (!rawScene.containsKey(key)) return null;
+        final value = text(key).trim();
+        const webAssetPrefix = '/play/assets/';
+        return value.startsWith(webAssetPrefix)
+            ? value.substring(webAssetPrefix.length)
+            : value;
+      }
+
+      loaded[beat] = _DialogueOverride(
+        id: text('id'),
+        speaker: text('speaker'),
+        line: text('line'),
+        direction: text('direction'),
+        date: text('date'),
+        location: text('location'),
+        background: asset('background'),
+        character: asset('character'),
+      );
     }
+    return loaded;
+  }
+
+  Future<void> _loadDialogueOverrides() async {
+    final loaded = <int, _DialogueOverride>{};
+    final injectedRaw = widget.dialogueOverrideJson;
+    if (injectedRaw != null) {
+      loaded.addAll(_decodeDialogueOverrides(injectedRaw));
+    }
+
+    if (injectedRaw == null) {
+      try {
+        final bundledRaw = await rootBundle.loadString(_dialogueBundleAsset);
+        loaded.addAll(_decodeDialogueOverrides(bundledRaw));
+      } catch (_) {
+        // An absent or damaged generated asset falls back to the source dialogue.
+      }
+    }
+
+    if (injectedRaw == null) {
+      try {
+        final preferences = await SharedPreferences.getInstance();
+        final raw = preferences.getString(_dialogueRuntimeStorageKey);
+        if (raw != null && raw.trim().isNotEmpty) {
+          final browserDraft = _decodeDialogueOverrides(raw);
+          if (browserDraft.isNotEmpty) {
+            loaded
+              ..clear()
+              ..addAll(browserDraft);
+          }
+        }
+      } catch (_) {
+        // A damaged browser draft must never prevent the prologue from starting.
+      }
+    }
+
+    if (!mounted || loaded.isEmpty) return;
+    setState(() {
+      _dialogueOverrides = Map<int, _DialogueOverride>.unmodifiable(loaded);
+      _dialogueEndBeat = loaded.keys.reduce(math.max);
+    });
   }
 
   @override
@@ -150,11 +255,13 @@ class _VisualNovelOnboardingScreenState
   }
 
   String get _background {
+    final override = _dialogueOverrides[_beat]?.background?.trim();
+    if (override != null && override.isNotEmpty) return override;
     return switch (_beat) {
       <= 4 =>
-        'assets/images/historical_prologue/bg_blue_house_policy_room_1981_portrait_cartoon_v1.png',
+        'assets/images/cinematic_soft_painted/policy_1981/backgrounds/bg_policy_room_night_v1.png',
       <= 15 =>
-        'assets/images/historical_prologue/bg_blue_house_conference_1981_portrait_cartoon_v1.png',
+        'assets/images/cinematic_soft_painted/policy_1981/backgrounds/bg_conference_night_v1.png',
       16 =>
         'assets/images/historical_prologue/bg_future_development_orphanage_1982_portrait_cartoon_v1.png',
       <= 22 =>
@@ -193,21 +300,52 @@ class _VisualNovelOnboardingScreenState
 
   String? get _character {
     return switch (_beat) {
-      1 || 12 || 14 =>
-        'assets/images/historical_prologue/character_jeon_dugwang_decree_cartoon_v2.png',
-      2 ||
-      7 ||
-      11 ||
-      13 => 'assets/images/historical_prologue/character_seo_muntae_v1.png',
-      4 => 'assets/images/historical_prologue/character_kang_incheol_v1.png',
-      3 ||
-      10 => 'assets/images/historical_prologue/character_baek_gihyeon_v1.png',
-      5 => _policyBriefingCharacter,
-      8 || 15 => 'assets/images/historical_prologue/character_yoon_mira_v1.png',
-      25 || 27 || 29 || 31 || 36 || 38 || 47 =>
-        'assets/images/historical_prologue/character_sua_orientation_v1.png',
+      1 =>
+        'assets/images/cinematic_soft_painted/policy_1981/jeon_dugwang/02_listening_v1.png',
+      5 =>
+        'assets/images/cinematic_soft_painted/policy_1981/jeon_dugwang/05_pressure_v1.png',
+      9 =>
+        'assets/images/cinematic_soft_painted/policy_1981/jeon_dugwang/04_cold_laugh_v1.png',
+      12 =>
+        'assets/images/cinematic_soft_painted/policy_1981/jeon_dugwang/03_calculating_v1.png',
+      14 =>
+        'assets/images/cinematic_soft_painted/policy_1981/jeon_dugwang/01_signing_v1.png',
+      2 =>
+        'assets/images/cinematic_soft_painted/policy_1981/seo_muntae/01_policy_pitch_v1.png',
+      7 =>
+        'assets/images/cinematic_soft_painted/policy_1981/seo_muntae/04_exhausted_concession_v1.png',
+      11 =>
+        'assets/images/cinematic_soft_painted/policy_1981/seo_muntae/02_searching_chart_v1.png',
+      13 =>
+        'assets/images/cinematic_soft_painted/policy_1981/seo_muntae/03_rebuttal_v1.png',
+      3 =>
+        'assets/images/cinematic_soft_painted/policy_1981/baek_gihyeon/03_warning_v2.png',
+      10 =>
+        'assets/images/cinematic_soft_painted/policy_1981/baek_gihyeon/02_advice_v2.png',
+      4 =>
+        'assets/images/cinematic_soft_painted/policy_1981/kang_incheol/02_explain_v2.png',
+      8 =>
+        'assets/images/cinematic_soft_painted/policy_1981/yoon_mira/03_objection_v1.png',
+      15 =>
+        'assets/images/cinematic_soft_painted/policy_1981/yoon_mira/04_solution_v1.png',
+      18 => _minhoCharacterAsset,
+      19 => 'assets/images/protagonist_seed01/03_playful_grin.png',
+      21 => 'assets/images/protagonist_seed01/17_holding_badge.png',
+      26 => 'assets/images/protagonist_seed01/02_cheerful_laugh.png',
+      40 => 'assets/images/protagonist_seed01/04_curious_question.png',
+      48 => 'assets/images/protagonist_seed01/16_hands_on_hips.png',
+      50 => 'assets/images/protagonist_seed01/22_victory_fist.png',
+      22 =>
+        'assets/images/historical_prologue/character_park_sunhee_farewell_v1.png',
+      25 => 'assets/images/cinematic_soft_painted/sua/07_determined_v1.png',
+      27 => 'assets/images/cinematic_soft_painted/sua/01_neutral_v1.png',
+      29 => 'assets/images/cinematic_soft_painted/sua/04_playful_tease_v1.png',
+      31 => 'assets/images/cinematic_soft_painted/sua/03_bright_laugh_v1.png',
+      36 => 'assets/images/cinematic_soft_painted/sua/05_surprised_v1.png',
+      38 => 'assets/images/cinematic_soft_painted/sua/06_worried_v1.png',
+      47 => 'assets/images/cinematic_soft_painted/sua/02_warm_smile_v1.png',
       28 || 30 || 39 || 46 =>
-        'assets/images/historical_prologue/character_hakjun_orientation_v1.png',
+        'assets/images/historical_prologue/character_hakjun_orientation_v2.png',
       _ => null,
     };
   }
@@ -235,17 +373,11 @@ class _VisualNovelOnboardingScreenState
     _ => 'assets/images/주식선생님/22_포즈1_주인공그림체_공통슬롯_투명.png',
   };
 
-  bool get _isNarration =>
-      _beat == 0 ||
-      _beat == 6 ||
-      _beat == 16 ||
-      _beat == 17 ||
-      _beat == 20 ||
-      _beat == 23 ||
-      _beat == 27 ||
-      _beat == 32 ||
-      _beat == 41 ||
-      _beat == 52;
+  bool get _isNarration => _speaker == '이야기';
+
+  bool get _isOrientationRosterScene =>
+      _dialogueOverrides[_beat]?.id == 'scene-44' ||
+      (_dialogueOverrides[_beat] == null && _beat == _orientationRosterBeat);
 
   String get _speaker =>
       _dialogueOverrides[_beat]?.speaker ??
@@ -255,14 +387,15 @@ class _VisualNovelOnboardingScreenState
         2 || 7 || 11 || 13 => '서문태 정책실장',
         3 || 10 => '백기현 비서실장',
         4 => '강인철 경제수석',
-        5 => _policyBriefingSpeaker,
+        5 => '전두광',
         8 || 15 => '윤미라 사회교육수석',
         18 => '민호',
         19 || 21 || 26 || 40 || 48 || 50 => '나',
         22 => '박선희 원장',
         24 || 33 => '아이들',
         25 || 29 || 31 || 36 || 38 || 47 => '수아',
-        28 || 30 || 39 || 46 => '학준',
+        28 => '김학준',
+        30 || 39 || 46 => '학준',
         34 || 35 || 37 || 42 || 43 || 44 || 45 || 49 || 51 || 53 => '한서윤 선생님',
         _ => '이야기',
       };
@@ -273,87 +406,75 @@ class _VisualNovelOnboardingScreenState
         0 =>
           '1981년 1월 12일 밤 11시 40분. 청와대 정책실의 불은 자정이 가까워져도 꺼지지 않았다. 보고서 다섯 권 가운데 하나만, 이상할 만큼 얇았다.',
         1 => '그래서. 당장은 멀쩡한데, 이대로 가면 나라가 망한다?',
-        2 => '당장은 아닙니다. 하지만 당장만 보고 달리면 이십 년 뒤에는 남의 기술과 남의 돈에 목줄이 잡힙니다.',
+        2 => '당장은 아닙니다. 하지만 지금만 보고 달리면 이십 년 뒤에는 남의 기술과 남의 돈에 나라의 목줄이 잡힙니다.',
         3 => '각하 앞에서 나라 앞날이 어둡다고 했으니, 자네 앞날도 같이 어두워질 수 있겠어.',
         4 =>
           '지금은 공장 세우고 물건을 찍는 쪽이 이깁니다. 하지만 미래에는 어떤 기술에 돈을 넣고, 어떤 회사를 살릴지 정하는 사람이 공장 몇 개보다 더 큰 힘을 갖게 됩니다.',
-        5 => _policyMessage,
+        5 => '공장도, 인구도, 법도 두꺼운데 아이들 보고서만 이 모양이군. 미래를 말하면서, 미래에 살 아이들은 뺐나?',
         6 => '수출산업, 인구전망, 국가계좌, 특별법. 네 권은 벽돌처럼 두꺼웠다. 「요보호아동 시설 현황」만 종잇장처럼 얇았다.',
-        7 => '국가는 이미 아이들의 오늘을 먹이고 재웁니다. 이제 내일을 고를 힘까지 줘야 합니다.',
+        7 => '국가는 이미 아이들에게 밥과 잠자리를 줍니다. 이제는 내일을 고를 힘도 줘야 합니다.',
         8 => '미치셨습니까? 아이들을 국가가 키우는 자본이나 실험쥐로 보겠다는 겁니까? 실패하면 그 아이 인생은 누가 책임집니까!',
         9 => '먹이고 재우는 데서 끝내면 세금 낭비지. 스스로 돈을 벌게 만들면 투자가 되고.',
         10 => '핏덩이들에게 나랏돈을 줬다가 잃으면 혈세 낭비라 할 겁니다. 벌면 나라가 코 묻은 돈을 빼앗는다고 할 테고요.',
         11 =>
-          '열 살, SEED 01부터 시작합니다. 원금은 만 원. 작아서 우습지만, 잃었을 때 왜 잃었는지는 숨길 수 없는 돈입니다.',
+          '열 살, SEED 01부터 시작합니다. 원금은 만 원입니다. 작아서 우스워 보여도, 손실 이유를 감추기엔 충분히 큰 돈입니다.',
         12 => '잃으면?',
         13 => '아이 빚으로 남기지 않습니다. 대신 다음 달 주문 한도를 깎습니다. 벌면 일부를 국가가 회수하고요.',
-        14 => '이십 퍼센트. 나머지는 아이 몫. 대신 왜 샀고 왜 팔았는지 전부 쓰게 해. 성공담 말고, 바닥을 긴 기록까지.',
+        14 =>
+          '이십 퍼센트. 나머지는 아이 몫. 대신 왜 샀고 왜 팔았는지 전부 쓰게 해. 잘한 이야기만 말고, 손실로 바닥까지 내려간 기록도.',
         15 => '그 80퍼센트는 시설 돈이 아닙니다. 아이 이름으로 묶어두고, 열아홉에 1원도 빠짐없이 넘기십시오.',
         16 => '이듬해, 국립 미래양성원이 문을 열었다. 환영 문구 대신 정문에는 한 줄이 걸렸다. 「기록 없는 판단은 우연이다」',
         17 =>
           '2000년 1월 2일 오전 6시 42분. 눈을 뜨자 천장의 누런 물자국이 먼저 보였다. 여섯 살 때부터 귀 잘린 토끼 같다고 생각했던 얼룩. 마지막 날인데도 물자국은 그냥 물자국이었다.',
         18 => '형아… 진짜 가?',
-        19 => '응. 돈 세는 학교래. 돈을 그냥 주면 좋은데, 세기만 시키면 손가락만 아프잖아.',
+        19 => '응. 돈 세는 학교래. 그냥 주면 더 좋을 텐데, 세기만 시키면 손가락만 아프잖아.',
         20 =>
           '민호가 웃다가 낡은 가방을 보고 입을 다물었다. 나는 왕딱지 한 장만 챙기고 나머지는 민호 이불 위에 던졌다. 가방 안감을 들추자 낯선 쇳조각이 손끝에 걸렸다. 「제5기 · 17번」.',
         21 =>
           '이름은 칼로 긁어 지워져 있었다. 뒷면에는 더 이상한 말이 파여 있었다. 「17번을 믿지 마.」 …이게 17번 명찰인데, 누구를 믿지 말라는 거야?',
         22 =>
-          '짐 가벼운 걸 부끄러워하지 마. 앞으로 채울 자리가 많은 거니까. 그리고 가서도 이유를 물어. 말이 안 되면 두 번 묻고. 그래도 이상하면 장부에 적어. 말은 날아가도 적은 건 남으니까.',
+          '짐이 가볍다고 주눅 들지 마. 앞으로 채울 게 많다는 뜻이니까. 가서도 이상한 말은 그냥 넘기지 말고 두 번 물어. 그래도 이상하면 장부에 적어 둬. 말은 날아가도 글은 남으니까.',
         23 =>
           '버스는 서울을 벗어나 한참을 덜컹거렸다. 눈발 너머로 붉은 벽돌 건물이 나타났다. 학교치고는 담장이 길었고, 공장치고는 창문이 많았다.',
         24 => '“여기가 그 유명한 데래.”\n“고아원에서 추천받은 애들만 온다던데?”\n“입학식인데 왜 면접장보다 조용해?”',
-        25 => '야, 바퀴 달린 가방. 네 바퀴 하나가 계속 눈을 모으고 있어.',
+        25 => '야, 가방 바퀴 하나가 눈을 계속 끌고 다녀.',
         26 => '일부러 눈사람 만드는 중이야. 본관 도착할 때쯤 머리까지 붙이려고.',
         27 =>
-          '여자아이는 대꾸 대신 쪼그려 앉아 연필로 바퀴의 눈을 긁어냈다. 친화력이 좋다기보다, 남의 일에 거리낌 없이 끼어드는 타입 같았다. 이름은 수아라고 했다.',
-        28 => '정문에서 본관까지 420미터. 권장 도착 시간은 6분. 뛰면 감점이야. 안내문 7쪽.',
-        29 => '안내문에 별명 금지도 있어, 설명서 학준아?',
+          '여자아이는 대꾸 대신 쪼그려 앉아 연필로 바퀴의 눈을 긁어냈다. 처음 보는 사이인데도 망설임이 없었다. 이름은 수아라고 했다.',
+        28 => '정문에서 본관까지 420미터. 6분 안에 도착해야 하고, 뛰면 감점이야. 안내문 7쪽에 있어.',
+        29 => '설명서 학준아, 별명 붙이면 안 된다는 규정도 있어?',
         30 => '…없어. 그리고 그렇게 부르지 마.',
         31 => '그럼 합법이네.',
         32 =>
-          '강당에는 내빈석도 부모 자리도 없었다. 스무 개의 의자만 반원으로 놓여 있었다. 무대 위 나무상자 하나가 더 수상해 보였다.',
-        33 => '“남자 열, 여자 열이래.”\n“자리도 성적순일까?”\n“아직 시험도 안 봤는데 무슨 성적이 있어.”',
-        34 => '제6기 담당 한서윤입니다. 인사는 이따 하죠. 여러분 배에서 나는 소리가 더 급해 보이니까.',
+          '강당에는 내빈석도 부모 자리도 없었다. 열 개의 의자만 반원으로 놓여 있었다. 무대 위 나무상자 하나가 더 수상해 보였다.',
+        33 => '“남자 둘, 여자 여덟이래.”\n“자리도 성적순일까?”\n“아직 시험도 안 봤는데 무슨 성적이 있어.”',
+        34 => '제6기 교육을 맡은 한서윤입니다. 인사는 조금 뒤에 하죠. 여러분 배에서 나는 소리가 더 급해 보이니까.',
         35 => '이 상자 안에는 단팥빵 하나와 500원짜리 동전이 있어요. 식당에서 빵은 300원입니다. 하나만 고르세요.',
         36 => '동전이요! 빵 사고도 200원 남잖아요.',
         37 => '좋아요. 그런데 식당 문은 두 시간 뒤, 열 시에 열립니다.',
         38 => '두 시간이요? …참을 수 있어요. 아마도.',
-        39 => '빵이 몇 개 남았는지, 열 시에 새로 들어오는지부터 확인해야 합니다. 동전만 보고 고르면 정보가 부족해요.',
+        39 =>
+          '빵이 얼마나 남았는지, 열 시에 새 빵이 들어오는지부터 알아야 해요. 동전만 보고 고르기엔 모르는 게 너무 많아요.',
         40 => '그 전에 상자부터 열어봐야 하는 거 아니에요? 선생님이 단팥빵을 벌써 드셨을 수도 있잖아요.',
         41 => '아이들 사이에서 웃음이 터졌다. 한서윤은 화내지 않았다. 오히려 상자 뚜껑 위에 손을 얹고 나를 다시 보았다.',
         42 =>
-          '그래요. 정답은 하나가 아닙니다. 무엇을 아느냐에 따라 답이 바뀌니까. 여기서 제일 먼저 배울 건 돈 버는 법이 아니라, 모르는 걸 모른다고 인정하는 법이에요.',
+          '그래요. 아는 게 달라지면 답도 달라집니다. 여기서 제일 먼저 배울 건 돈 버는 법이 아니라, 모르는 걸 모른다고 말하는 법이에요.',
         43 =>
-          '여기 온 아이는 스무 명. 남학생 열, 여학생 열. 모두 전국 보호시설에서 추천받았고, 시험보다 긴 관찰 기록을 거쳐 뽑혔습니다.',
+          '여기 온 아이는 열 명, 남학생 두 명과 여학생 여덟 명입니다. 이번 기수는 여학생이 유난히 많네요. 모두 전국 보호시설의 추천을 받고, 오랫동안 생활 기록을 살핀 끝에 선발됐어요.',
         44 =>
-          '여긴 고아원 간판만 바꾼 곳도, 부자 흉내를 내는 학원도 아니에요. 숫자 뒤에 숨은 사람과 거짓말, 그리고 자기 판단의 값을 배우는 곳입니다.',
-        45 => '그럼 첫 번째 기록을 남겨볼까요. 자기가 왜 뽑혔다고 생각하죠?',
-        46 => '규칙을 빨리 외우고 계산 실수가 없어서입니다.',
+          '여긴 간판만 바꾼 고아원도, 부자 흉내를 내는 학원도 아니에요. 숫자 뒤에 있는 사람과 거짓말을 보고, 자기 판단에 책임지는 법을 배우는 곳입니다.',
+        45 => '그럼 첫 기록부터 남겨 볼까요? 자기가 왜 뽑혔다고 생각해요?',
+        46 => '규칙을 빨리 외우고, 계산을 잘해서요.',
         47 => '사람 얼굴 보면 뭘 좋아하고 싫어하는지 금방 알아서요.',
         48 => '돈을 많이 벌 것 같아서 뽑은 거 아니에요?',
         49 => '지금 가진 돈은 얼마인데요?',
         50 => '왕딱지 한 장이요. 용 그려진 제일 센 거.',
         51 => '돈은 빵점. 솔직함은 합격. 뽑힌 이유는 내일부터 직접 찾아보죠.',
         52 =>
-          '가장 어둡던 형광등이 한 번 떨리고 안정됐다. 스무 개의 이름표가 같은 빛을 받았다. 주머니 속 5기 명찰만 혼자 차갑게 식어 있었다.',
+          '가장 어둡던 형광등이 한 번 떨리고 안정됐다. 열 개의 이름표가 같은 빛을 받았다. 주머니 속 5기 명찰만 혼자 차갑게 식어 있었다.',
         _ =>
-          '오늘은 여기까지입니다. 주식도, 국가계좌도 아직 열지 않아요. 먼저 이름과 자리를 외우세요. 내일부터는 틀린 답보다, 이유 없는 답을 더 무섭게 볼 겁니다.',
+          '오늘은 여기까지예요. 주식과 국가계좌는 아직 열지 않습니다. 먼저 서로 이름부터 외우세요. 내일부터는 틀린 답보다, 이유 없이 고른 답을 더 엄하게 볼 거예요.',
       };
-
-  String get _policyBriefingSpeaker => switch (_activePolicyFile) {
-    'industry' || 'population' || 'capital' => '서문태 정책실장',
-    'children' => '윤미라 사회교육수석',
-    'law' => '장대식 법무수석',
-    _ => '이야기',
-  };
-
-  String? get _policyBriefingCharacter => switch (_activePolicyFile) {
-    'children' =>
-      'assets/images/historical_prologue/character_yoon_mira_v1.png',
-    'law' => 'assets/images/historical_prologue/character_jang_daesik_v1.png',
-    _ => 'assets/images/historical_prologue/character_seo_muntae_v1.png',
-  };
 
   String? get _stageDirection {
     final override = _dialogueOverrides[_beat];
@@ -366,14 +487,7 @@ class _VisualNovelOnboardingScreenState
       2 => '밤샘으로 충혈된 서문태의 눈이 잠깐 흔들렸다.',
       3 => '백기현은 안경을 벗어 천천히 닦았다.',
       4 => '강인철의 연필이 1981년에서 2000년으로 긴 선을 그었다.',
-      5 => switch (_activePolicyFile) {
-        'industry' => '수출 보고서에는 공장 숫자와 외화 목표가 빼곡했다.',
-        'population' => '인구 곡선은 2000년을 지나며 완만하게 꺾였다.',
-        'children' => '보호시설 보고서만 다른 서류의 절반 두께였다.',
-        'capital' => '빈 계좌 양식의 명의자 칸에는 국가 이름만 찍혀 있었다.',
-        'law' => '법적 근거 칸은 깨끗하게 비어 있었다.',
-        _ => '서로 다른 미래를 말하는 보고서 다섯 권이 탁자 위에 놓였다.',
-      },
+      5 => '전두광이 「요보호아동 시설 현황」 표지를 손가락으로 두 번 두드렸다.',
       7 => '서문태의 손이 가장 얇은 보고서 위에서 멈췄다.',
       8 => '윤미라가 손바닥으로 탁자를 내리쳤다.',
       9 => '전두광은 대답 대신 보고서 표지를 두 번 두드렸다.',
@@ -393,11 +507,11 @@ class _VisualNovelOnboardingScreenState
       25 => '수아가 내 가방이 남긴 삐뚤어진 바퀴 자국을 가리켰다.',
       26 => '나는 한쪽으로 기운 가방을 태연하게 세웠다.',
       27 => '연필 끝에서 굳은 눈덩이가 후두둑 떨어졌다.',
-      28 => '남색 규정집을 낀 학준이 우리 옆에 바짝 붙었다.',
-      29 => '수아가 눈을 가늘게 뜨고 학준의 명찰을 읽었다.',
+      28 => '남색 규정집을 낀 김학준이 우리 옆에 바짝 붙었다.',
+      29 => '수아가 눈을 가늘게 뜨고 김학준의 명찰을 읽었다.',
       30 => '학준의 귀끝이 규정집 표지보다 먼저 붉어졌다.',
       31 => '수아가 깔깔 웃으며 먼저 언덕을 뛰어올랐다.',
-      32 => '오래된 형광등 아래, 이름표 스무 장이 빈 의자를 지키고 있었다.',
+      32 => '오래된 형광등 아래, 이름표 열 장이 빈 의자를 지키고 있었다.',
       33 => '앞자리와 뒷자리에서 서로 다른 소문이 동시에 튀어나왔다.',
       34 => '구두 소리가 무대에 닿자 웅성거림이 절반쯤 줄었다.',
       35 => '한서윤이 나무상자 위에 손바닥을 올렸다.',
@@ -408,7 +522,7 @@ class _VisualNovelOnboardingScreenState
       40 => '나는 열리지 않은 상자 뚜껑을 손가락으로 가리켰다.',
       41 => '한서윤의 입꼬리가 처음으로 아주 조금 올라갔다.',
       42 => '칠판에 네 칸이 그어졌다. 아는 것, 모르는 것, 고른 이유, 생각을 바꿀 조건.',
-      43 => '출석부가 펼쳐지고 남학생 열 칸, 여학생 열 칸이 차례로 확인됐다.',
+      43 => '출석부가 펼쳐지고 남학생 두 칸, 여학생 여덟 칸이 차례로 확인됐다.',
       44 => '지시봉이 숫자, 사람, 판단 세 단어를 천천히 지나갔다.',
       45 => '한서윤의 시선이 반원으로 앉은 아이들을 훑었다.',
       46 => '학준은 기다렸다는 듯 허리를 곧게 폈다.',
@@ -436,11 +550,41 @@ class _VisualNovelOnboardingScreenState
     }
   }
 
+  void _rememberNavigationBeat(int beat) {
+    if (_beatNavigationHistory.isNotEmpty &&
+        _beatNavigationHistory.last == beat) {
+      return;
+    }
+    _beatNavigationHistory.add(beat);
+    if (_beatNavigationHistory.length > _maximumWheelBackSteps) {
+      _beatNavigationHistory.removeAt(0);
+    }
+  }
+
+  void _goBackOneBeat() {
+    if (_isCreating || _isTraveling || _beatNavigationHistory.isEmpty) return;
+    final previousBeat = _beatNavigationHistory.removeLast();
+    if (previousBeat == _beat) return;
+    FocusManager.instance.primaryFocus?.unfocus();
+    _playStoryFeedback();
+    setState(() => _beat = previousBeat);
+  }
+
+  void _handlePointerSignal(PointerSignalEvent event) {
+    if (event is! PointerScrollEvent || event.scrollDelta.dy >= 0) return;
+    final now = DateTime.now();
+    final last = _lastWheelBackAt;
+    if (last != null && now.difference(last) < _wheelBackDebounce) return;
+    _lastWheelBackAt = now;
+    _goBackOneBeat();
+  }
+
   void _next() {
-    if (_beat >= _orientationCompleteBeat) return;
+    if (_beat >= _dialogueEndBeat) return;
     final currentBeat = _beat;
     FocusManager.instance.primaryFocus?.unfocus();
     _rememberCurrentLine();
+    _rememberNavigationBeat(currentBeat);
     _playStoryFeedback();
     if (_beat == _accountHallDepartureBeat) {
       _travelToAccountHall();
@@ -448,7 +592,7 @@ class _VisualNovelOnboardingScreenState
     }
     setState(() {
       if (_beat == currentBeat) {
-        _beat = math.min(currentBeat + 1, _orientationCompleteBeat);
+        _beat = math.min(currentBeat + 1, _dialogueEndBeat);
       }
     });
   }
@@ -472,32 +616,6 @@ class _VisualNovelOnboardingScreenState
       _isTraveling = false;
       _beat = 32;
     });
-  }
-
-  void _reviewPolicyFile(String id) {
-    if (_reviewedPolicyFiles.contains(id)) return;
-    _rememberCurrentLine();
-    final message = switch (id) {
-      'industry' => '공장 백 개를 세워도 돈의 방향을 남이 정하면, 우리는 남의 주문만 받게 됩니다.',
-      'population' => '아이 수는 줄고 기술값은 오릅니다. 지금 태어난 아이가 그때의 돈을 움직입니다.',
-      'children' => '열아홉에 가방 하나만 쥐여 보내선 선택하라고 말할 수도 없습니다.',
-      'capital' => '만 원은 작습니다. 그래서 좋습니다. 실패는 작게, 판단은 숨김없이 남길 수 있으니까요.',
-      'law' => '특별법이 필요합니다. 다만 실패를 아이 개인의 빚으로 돌리는 조항은 넣을 수 없습니다.',
-      _ => _policyMessage,
-    };
-    _playStoryFeedback();
-    setState(() {
-      _activePolicyFile = id;
-      _reviewedPolicyFiles.add(id);
-      _policyMessage = message;
-    });
-  }
-
-  void _finishPolicyBriefing() {
-    if (_reviewedPolicyFiles.length != _policyFileLabels.length) return;
-    _rememberCurrentLine();
-    _playStoryFeedback(strong: true);
-    setState(() => _beat = 6);
   }
 
   Future<void> _showBacklog() async {
@@ -604,8 +722,11 @@ class _VisualNovelOnboardingScreenState
     _playStoryFeedback(strong: true);
     setState(() {
       _isTraveling = false;
-      _beat = _orientationCompleteBeat;
+      _beat = _dialogueEndBeat;
     });
+    await _dialogueLoadFuture;
+    if (!mounted || _beat == _dialogueEndBeat) return;
+    setState(() => _beat = _dialogueEndBeat);
   }
 
   Future<void> _finish() async {
@@ -665,160 +786,180 @@ class _VisualNovelOnboardingScreenState
     final keyboardLift = isKeyboardOpen && isNameEntry
         ? viewInsets.bottom
         : 0.0;
-    return Scaffold(
-      backgroundColor: const Color(0xFF171B2A),
-      resizeToAvoidBottomInset: false,
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final sceneCharacterAsset = _isAcademyTeacherBeat
-              ? _teacherPoseAsset
-              : _isAcademyReceptionistBeat
-              ? 'assets/images/historical_prologue/character_state_account_officer_cha_eunjoo_v1.png'
-              : _character;
-          return Stack(
-            key: const Key('onboarding-stage'),
-            fit: StackFit.expand,
-            children: [
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 700),
-                child: _LivingBackground(
-                  key: ValueKey(_background),
-                  asset: _background,
-                  ambientFlicker: _beat >= 32,
-                ),
-              ),
-              const DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Color(0x33000000),
-                      Colors.transparent,
-                      Color(0xA6000000),
-                    ],
-                    stops: [0, 0.52, 1],
+    return Listener(
+      key: const Key('story-wheel-navigation-listener'),
+      onPointerSignal: _handlePointerSignal,
+      child: Scaffold(
+        backgroundColor: const Color(0xFF171B2A),
+        resizeToAvoidBottomInset: false,
+        body: LayoutBuilder(
+          builder: (context, constraints) {
+            final characterOverride = _dialogueOverrides[_beat]?.character;
+            final sceneCharacterAsset = characterOverride != null
+                ? (characterOverride.isEmpty ? null : characterOverride)
+                : _isAcademyTeacherBeat
+                ? _teacherPoseAsset
+                : _isAcademyReceptionistBeat
+                ? 'assets/images/historical_prologue/character_state_account_officer_cha_eunjoo_v1.png'
+                : _character;
+            return Stack(
+              key: const Key('onboarding-stage'),
+              fit: StackFit.expand,
+              children: [
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 700),
+                  child: _LivingBackground(
+                    key: ValueKey(_background),
+                    asset: _background,
+                    ambientFlicker: _beat >= 32,
                   ),
                 ),
-              ),
-              SafeArea(
-                child: Align(
-                  alignment: Alignment.topCenter,
-                  child: _SceneLabel(
-                    date: _dateLabel,
-                    location: _location,
-                    progress: (_beat + 1) / _onboardingBeatCount,
+                const DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Color(0x33000000),
+                        Colors.transparent,
+                        Color(0xA6000000),
+                      ],
+                      stops: [0, 0.52, 1],
+                    ),
                   ),
                 ),
-              ),
+                Positioned.fill(
+                  child: GestureDetector(
+                    key: const Key('story-stage-advance-area'),
+                    behavior: HitTestBehavior.translucent,
+                    onTap: _isCreating || _isTraveling
+                        ? null
+                        : () => _activeNovelDialogueState?._handleExternalTap(),
+                  ),
+                ),
+                SafeArea(
+                  child: IgnorePointer(
+                    child: Align(
+                      alignment: Alignment.topCenter,
+                      child: _SceneLabel(
+                        date: _dateLabel,
+                        location: _location,
+                        progress: (_beat + 1) / (_dialogueEndBeat + 1),
+                      ),
+                    ),
+                  ),
+                ),
 
-              SafeArea(
-                child: Align(
-                  alignment: Alignment.topRight,
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 54, right: 10),
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: const Color(0xB8292B3A),
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: const Color(0x55FFFFFF)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            key: const Key('story-backlog-button'),
-                            tooltip: '지난 대사',
-                            visualDensity: VisualDensity.compact,
-                            color: Colors.white,
-                            onPressed: _showBacklog,
-                            icon: const Icon(Icons.history_rounded, size: 19),
-                          ),
-                          IconButton(
-                            key: const Key('story-skip-button'),
-                            tooltip: '프롤로그 건너뛰기',
-                            visualDensity: VisualDensity.compact,
-                            color: _yellow,
-                            onPressed: _showSkipDialog,
-                            icon: const Icon(
-                              Icons.fast_forward_rounded,
-                              size: 19,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              if (sceneCharacterAsset != null)
-                Positioned.fill(
-                  bottom: _storyCharacterBottomInset,
-                  child: _OnboardingCharacterSlot(
-                    key: const Key('story-character-stage-slot'),
-                    asset: sceneCharacterAsset,
-                    alignment: Alignment.bottomCenter,
-                    characterKey: _isAcademyTeacherBeat
-                        ? const Key('academy-teacher-character')
-                        : _isAcademyReceptionistBeat
-                        ? const Key('academy-receptionist-character')
-                        : const Key('story-character-character'),
-                  ),
-                ),
-              AnimatedPositioned(
-                key: const Key('keyboard-name-panel'),
-                duration: const Duration(milliseconds: 180),
-                curve: Curves.easeOutCubic,
-                left: 12,
-                right: 12,
-                bottom: keyboardLift + 10,
-                child: SafeArea(
-                  top: false,
+                SafeArea(
                   child: Align(
-                    alignment: Alignment.bottomCenter,
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 560),
-                      child: AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 260),
-                        layoutBuilder: (currentChild, previousChildren) {
-                          return Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              for (final child in previousChildren)
-                                IgnorePointer(child: child),
-                              ?currentChild,
-                            ],
-                          );
-                        },
-                        child: _buildDialogue(context),
+                    alignment: Alignment.topRight,
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 54, right: 10),
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: const Color(0xB8292B3A),
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: const Color(0x55FFFFFF)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              key: const Key('story-backlog-button'),
+                              tooltip: '지난 대사',
+                              visualDensity: VisualDensity.compact,
+                              color: Colors.white,
+                              onPressed: _showBacklog,
+                              icon: const Icon(Icons.history_rounded, size: 19),
+                            ),
+                            IconButton(
+                              key: const Key('story-skip-button'),
+                              tooltip: '프롤로그 건너뛰기',
+                              visualDensity: VisualDensity.compact,
+                              color: _yellow,
+                              onPressed: _showSkipDialog,
+                              icon: const Icon(
+                                Icons.fast_forward_rounded,
+                                size: 19,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-              if (_isCreating)
-                Positioned.fill(
-                  child: _NewGamePreparationOverlay(
-                    progress: _creationProgress,
+                if (sceneCharacterAsset != null)
+                  Positioned.fill(
+                    top: -_storyCharacterBottomInset,
+                    bottom: _storyCharacterBottomInset,
+                    child: IgnorePointer(
+                      child: _OnboardingCharacterSlot(
+                        key: const Key('story-character-stage-slot'),
+                        asset: sceneCharacterAsset,
+                        alignment: Alignment.bottomCenter,
+                        characterKey: _isAcademyTeacherBeat
+                            ? const Key('academy-teacher-character')
+                            : _isAcademyReceptionistBeat
+                            ? const Key('academy-receptionist-character')
+                            : const Key('story-character-character'),
+                      ),
+                    ),
+                  ),
+                AnimatedPositioned(
+                  key: const Key('keyboard-name-panel'),
+                  duration: const Duration(milliseconds: 180),
+                  curve: Curves.easeOutCubic,
+                  left: 12,
+                  right: 12,
+                  bottom: keyboardLift + 10,
+                  child: SafeArea(
+                    top: false,
+                    child: Align(
+                      alignment: Alignment.bottomCenter,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 560),
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 260),
+                          layoutBuilder: (currentChild, previousChildren) {
+                            return Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                for (final child in previousChildren)
+                                  IgnorePointer(child: child),
+                                ?currentChild,
+                              ],
+                            );
+                          },
+                          child: _buildDialogue(context),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
-              if (_isTraveling)
-                Positioned.fill(
-                  child: _AcademyTravelOverlay(
-                    onSkip: _finishAccountHallTravel,
+                if (_isCreating)
+                  Positioned.fill(
+                    child: _NewGamePreparationOverlay(
+                      progress: _creationProgress,
+                    ),
                   ),
-                ),
-            ],
-          );
-        },
+                if (_isTraveling)
+                  Positioned.fill(
+                    child: _AcademyTravelOverlay(
+                      onSkip: _finishAccountHallTravel,
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
 
   Widget _buildDialogue(BuildContext context) {
-    if (_beat == _policyBriefingBeat) return _policyBriefing();
-    if (_beat == _orientationRosterBeat) return _orientationRoster();
-    if (_beat >= _orientationCompleteBeat) return _orientationComplete();
+    if (_beat >= _dialogueEndBeat) return _orientationComplete();
+    if (_isOrientationRosterScene) return _orientationRoster();
     if (_beat == _introChoiceBeat) return _introChoices();
     if (_beat == _stateAccountActivationBeat) {
       return _stateAccountActivation();
@@ -844,80 +985,70 @@ class _VisualNovelOnboardingScreenState
     speaker: _speaker,
     line: _line,
     stageDirection: _stageDirection,
-    child: Column(
-      children: [
-        Container(
-          key: const Key('orientation-roster-card'),
-          width: double.infinity,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF8F2E3),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFD8BE91)),
+    onContinue: _next,
+    child: Container(
+      key: const Key('orientation-roster-card'),
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8F2E3),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFD8BE91)),
+      ),
+      child: Column(
+        children: [
+          const Text(
+            '제6기 오리엔테이션 명단',
+            style: TextStyle(
+              color: _ink,
+              fontSize: 13,
+              fontWeight: FontWeight.w900,
+            ),
           ),
-          child: Column(
+          const SizedBox(height: 10),
+          Row(
             children: [
-              const Text(
-                '제6기 오리엔테이션 명단',
-                style: TextStyle(
-                  color: _ink,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w900,
+              Expanded(
+                child: _orientationStat(
+                  key: const Key('orientation-total-count'),
+                  label: '총원',
+                  value: '10명',
+                  color: const Color(0xFF536A96),
                 ),
               ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: _orientationStat(
-                      key: const Key('orientation-total-count'),
-                      label: '총원',
-                      value: '20명',
-                      color: const Color(0xFF536A96),
-                    ),
-                  ),
-                  const SizedBox(width: 7),
-                  Expanded(
-                    child: _orientationStat(
-                      key: const Key('orientation-male-count'),
-                      label: '남학생',
-                      value: '10명',
-                      color: const Color(0xFF3F72A5),
-                    ),
-                  ),
-                  const SizedBox(width: 7),
-                  Expanded(
-                    child: _orientationStat(
-                      key: const Key('orientation-female-count'),
-                      label: '여학생',
-                      value: '10명',
-                      color: const Color(0xFFC85C72),
-                    ),
-                  ),
-                ],
+              const SizedBox(width: 7),
+              Expanded(
+                child: _orientationStat(
+                  key: const Key('orientation-male-count'),
+                  label: '남학생',
+                  value: '2명',
+                  color: const Color(0xFF3F72A5),
+                ),
               ),
-              const SizedBox(height: 9),
-              const Text(
-                '전국 보호시설 추천 · 제6기 투자전문과정',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Color(0xFF697386),
-                  fontSize: 10,
-                  height: 1.35,
-                  fontWeight: FontWeight.w800,
+              const SizedBox(width: 7),
+              Expanded(
+                child: _orientationStat(
+                  key: const Key('orientation-female-count'),
+                  label: '여학생',
+                  value: '8명',
+                  color: const Color(0xFFC85C72),
                 ),
               ),
             ],
           ),
-        ),
-        const SizedBox(height: 10),
-        _NovelNextButton(
-          key: const Key('orientation-roster-continue'),
-          label: '스무 명의 이름표 확인',
-          enabled: true,
-          onTap: _next,
-        ),
-      ],
+          const SizedBox(height: 9),
+          const Text(
+            '전국 보호시설 추천 · 제6기 투자전문과정',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Color(0xFF697386),
+              fontSize: 10,
+              height: 1.35,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
     ),
   );
 
@@ -1009,59 +1140,6 @@ class _VisualNovelOnboardingScreenState
     ),
   );
 
-  Widget _policyBriefing() => _NovelDialogue(
-    key: ValueKey(
-      'policy-briefing-${_reviewedPolicyFiles.length}-$_policyMessage',
-    ),
-    speaker: _speaker,
-    line: _line,
-    stageDirection: _stageDirection,
-    child: Column(
-      children: [
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final width = (constraints.maxWidth - 7) / 2;
-            return Wrap(
-              spacing: 7,
-              runSpacing: 7,
-              children: _policyFileLabels.entries
-                  .map(
-                    (entry) => SizedBox(
-                      width: width,
-                      child: _RepairGoalButton(
-                        key: ValueKey('policy-file-${entry.key}'),
-                        label: entry.value,
-                        completed: _reviewedPolicyFiles.contains(entry.key),
-                        onTap: () => _reviewPolicyFile(entry.key),
-                      ),
-                    ),
-                  )
-                  .toList(growable: false),
-            );
-          },
-        ),
-        const SizedBox(height: 10),
-        LinearProgressIndicator(
-          key: const Key('policy-briefing-progress'),
-          value: _reviewedPolicyFiles.length / _policyFileLabels.length,
-          minHeight: 7,
-          borderRadius: BorderRadius.circular(99),
-          color: const Color(0xFF54A86B),
-          backgroundColor: const Color(0xFFD9D6CC),
-        ),
-        const SizedBox(height: 10),
-        _NovelNextButton(
-          key: const Key('policy-briefing-finish'),
-          label: _reviewedPolicyFiles.length == _policyFileLabels.length
-              ? '다섯 보고서로 결재안 완성'
-              : '${_reviewedPolicyFiles.length}/5 · 보고서를 더 확인',
-          enabled: _reviewedPolicyFiles.length == _policyFileLabels.length,
-          onTap: _finishPolicyBriefing,
-        ),
-      ],
-    ),
-  );
-
   Widget _introChoices() => _NovelDialogue(
     key: const ValueKey('intro-choice'),
     speaker: _speaker,
@@ -1088,6 +1166,7 @@ class _VisualNovelOnboardingScreenState
 
   void _chooseIntroChoice(String choice) {
     _rememberCurrentLine();
+    _rememberNavigationBeat(_beat);
     _playStoryFeedback();
     setState(() {
       _introChoice = choice;
@@ -1207,6 +1286,7 @@ class _VisualNovelOnboardingScreenState
 
   void _chooseTrait(StoryTrait trait) {
     _rememberCurrentLine();
+    _rememberNavigationBeat(_beat);
     _playStoryFeedback();
     setState(() {
       _trait = trait;
@@ -1240,6 +1320,7 @@ class _VisualNovelOnboardingScreenState
 
   void _chooseFamilyRule(FamilyRule rule) {
     _rememberCurrentLine();
+    _rememberNavigationBeat(_beat);
     _playStoryFeedback();
     setState(() {
       _familyRule = rule;
@@ -1848,19 +1929,37 @@ class _OnboardingCharacterSlot extends StatelessWidget {
         builder: (context, constraints) {
           final characterHeight =
               constraints.maxHeight * _storyCharacterHeightFactor;
+          final characterWidth = (characterHeight * _storyCharacterAspectRatio)
+              .clamp(0.0, constraints.maxWidth)
+              .toDouble();
+          final characterImageHeight = characterHeight
+              .clamp(0.0, constraints.maxHeight - _storyCharacterBottomInset)
+              .toDouble();
           return Align(
             alignment: alignment,
             child: SizedBox(
               key: characterKey,
-              width: characterHeight * _storyCharacterAspectRatio,
+              width: characterWidth,
               height: characterHeight,
-              child: Image.asset(
-                key: const Key('story-character-image'),
-                asset,
-                fit: BoxFit.contain,
+              child: Align(
                 alignment: Alignment.bottomCenter,
-                filterQuality: FilterQuality.high,
-                gaplessPlayback: true,
+                child: Transform.scale(
+                  key: const Key('story-character-scale'),
+                  scale: _storyCharacterScaleForAsset(asset),
+                  alignment: Alignment.bottomCenter,
+                  child: SizedBox(
+                    width: characterWidth,
+                    height: characterImageHeight,
+                    child: Image.asset(
+                      key: const Key('story-character-image'),
+                      asset,
+                      fit: BoxFit.contain,
+                      alignment: Alignment.bottomCenter,
+                      filterQuality: FilterQuality.high,
+                      gaplessPlayback: true,
+                    ),
+                  ),
+                ),
               ),
             ),
           );
@@ -2002,6 +2101,8 @@ class _SceneLabel extends StatelessWidget {
   );
 }
 
+_NovelDialogueState? _activeNovelDialogueState;
+
 class _NovelDialogue extends StatefulWidget {
   const _NovelDialogue({
     super.key,
@@ -2039,6 +2140,8 @@ class _NovelDialogueState extends State<_NovelDialogue>
   @override
   void initState() {
     super.initState();
+    _activeNovelDialogueState = this;
+    _dialoguePanelOpacity.addListener(_handlePanelOpacityChanged);
     _typingController = AnimationController(
       vsync: this,
       duration: _typingDuration(widget.line),
@@ -2063,8 +2166,38 @@ class _NovelDialogueState extends State<_NovelDialogue>
     _typingController.value = 1;
   }
 
+  void _handleExternalTap() {
+    if (!_typingComplete) {
+      _revealLine();
+      return;
+    }
+    widget.onContinue?.call();
+  }
+
+  void _handlePanelOpacityChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _updatePanelOpacity(double localX, double width) {
+    if (width <= 0) return;
+    final normalized = (localX / width).clamp(0.0, 1.0).toDouble();
+    _setDialoguePanelOpacity(
+      _dialoguePanelOpacityMin +
+          ((_dialoguePanelOpacityMax - _dialoguePanelOpacityMin) * normalized),
+    );
+  }
+
+  void _adjustPanelOpacity(double delta) {
+    _setDialoguePanelOpacity(_dialoguePanelOpacity.value + delta);
+    unawaited(_saveDialoguePanelOpacity());
+  }
+
   @override
   void dispose() {
+    if (identical(_activeNovelDialogueState, this)) {
+      _activeNovelDialogueState = null;
+    }
+    _dialoguePanelOpacity.removeListener(_handlePanelOpacityChanged);
     _typingController.dispose();
     super.dispose();
   }
@@ -2078,16 +2211,27 @@ class _NovelDialogueState extends State<_NovelDialogue>
       0,
       math.min(visibleCharacters, widget.line.length),
     );
+    final panelOpacity = _dialoguePanelOpacity.value;
+    final panelStrength = (panelOpacity / _dialoguePanelOpacityMax)
+        .clamp(0.0, 1.0)
+        .toDouble();
+    final backdropBlurSigma = _dialogueBackdropBlurSigma(panelOpacity);
     final panelGradient = widget.narration
-        ? const [Color(0xC21B2436), Color(0xAD111A2A)]
-        : const [Color(0xBA172A42), Color(0xA6111E31)];
+        ? [
+            const Color(0xFF1B2436).withValues(alpha: panelOpacity),
+            const Color(0xFF111A2A).withValues(alpha: panelOpacity * 0.9),
+          ]
+        : [
+            const Color(0xFF172A42).withValues(alpha: panelOpacity),
+            const Color(0xFF111E31).withValues(alpha: panelOpacity * 0.9),
+          ];
     final secondaryText = widget.narration
         ? const Color(0xFFE1ECFA)
         : const Color(0xFFEAF4FF);
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: _typingComplete ? null : _revealLine,
+      onTap: _handleExternalTap,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
@@ -2117,7 +2261,13 @@ class _NovelDialogueState extends State<_NovelDialogue>
             child: ClipRRect(
               borderRadius: BorderRadius.circular(11),
               child: BackdropFilter(
-                filter: ui.ImageFilter.blur(sigmaX: 7, sigmaY: 7),
+                key: ValueKey(
+                  'story-dialogue-backdrop-blur-${backdropBlurSigma.toStringAsFixed(2)}',
+                ),
+                filter: ui.ImageFilter.blur(
+                  sigmaX: backdropBlurSigma,
+                  sigmaY: backdropBlurSigma,
+                ),
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(17, 23, 14, 10),
                   child: Column(
@@ -2130,7 +2280,9 @@ class _NovelDialogueState extends State<_NovelDialogue>
                           width: double.infinity,
                           padding: const EdgeInsets.fromLTRB(10, 6, 9, 6),
                           decoration: BoxDecoration(
-                            color: const Color(0x304FD7FF),
+                            color: const Color(
+                              0xFF4FD7FF,
+                            ).withValues(alpha: 0.19 * panelStrength),
                             border: const Border(
                               left: BorderSide(
                                 color: Color(0xFF72DEFF),
@@ -2283,71 +2435,96 @@ class _NovelDialogueState extends State<_NovelDialogue>
             ),
           ),
           Positioned(
-            right: 15,
-            top: 8,
-            child: Row(
-              children: [
-                Container(width: 42, height: 2, color: const Color(0x996FDCFF)),
-                const SizedBox(width: 5),
-                Transform.rotate(
-                  angle: math.pi / 4,
-                  child: Container(
-                    width: 6,
-                    height: 6,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF8BE6FF),
-                      border: Border.all(color: Colors.white70),
-                    ),
-                  ),
+            right: 10,
+            top: 0,
+            child: Semantics(
+              slider: true,
+              label: '대화창 배경 농도',
+              value: '${(panelOpacity * 100).round()}%',
+              increasedValue:
+                  '${((_clampDialoguePanelOpacity(panelOpacity + 0.08)) * 100).round()}%',
+              decreasedValue:
+                  '${((_clampDialoguePanelOpacity(panelOpacity - 0.08)) * 100).round()}%',
+              onIncrease: () => _adjustPanelOpacity(0.08),
+              onDecrease: () => _adjustPanelOpacity(-0.08),
+              child: SizedBox(
+                key: const Key('story-dialogue-opacity-control'),
+                width: 72,
+                height: 28,
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    const thumbSize = 8.0;
+                    const horizontalInset = 5.0;
+                    final trackWidth =
+                        constraints.maxWidth - (horizontalInset * 2);
+                    final normalized =
+                        (panelOpacity - _dialoguePanelOpacityMin) /
+                        (_dialoguePanelOpacityMax - _dialoguePanelOpacityMin);
+                    final thumbLeft =
+                        horizontalInset +
+                        ((trackWidth - thumbSize) * normalized);
+                    return GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTapUp: (details) {
+                        _updatePanelOpacity(
+                          details.localPosition.dx - horizontalInset,
+                          trackWidth,
+                        );
+                        unawaited(_saveDialoguePanelOpacity());
+                      },
+                      onHorizontalDragUpdate: (details) => _updatePanelOpacity(
+                        details.localPosition.dx - horizontalInset,
+                        trackWidth,
+                      ),
+                      onHorizontalDragEnd: (_) =>
+                          unawaited(_saveDialoguePanelOpacity()),
+                      child: Stack(
+                        alignment: Alignment.centerLeft,
+                        children: [
+                          Positioned(
+                            left: horizontalInset,
+                            right: horizontalInset,
+                            child: Container(
+                              height: 2,
+                              decoration: BoxDecoration(
+                                color: const Color(0x996FDCFF),
+                                borderRadius: BorderRadius.circular(99),
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            left: thumbLeft,
+                            child: Transform.rotate(
+                              angle: math.pi / 4,
+                              child: Container(
+                                key: const Key('story-dialogue-opacity-thumb'),
+                                width: thumbSize,
+                                height: thumbSize,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF8BE6FF),
+                                  border: Border.all(color: Colors.white70),
+                                  boxShadow: const [
+                                    BoxShadow(
+                                      color: Color(0xAA39CFFF),
+                                      blurRadius: 5,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
-              ],
+              ),
             ),
           ),
         ],
       ),
     );
   }
-}
-
-class _RepairGoalButton extends StatelessWidget {
-  const _RepairGoalButton({
-    super.key,
-    required this.label,
-    required this.completed,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool completed;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) => SizedBox(
-    height: 40,
-    child: OutlinedButton.icon(
-      onPressed: completed ? null : onTap,
-      style: OutlinedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        alignment: Alignment.centerLeft,
-        foregroundColor: _ink,
-        disabledForegroundColor: const Color(0xFF258257),
-        backgroundColor: completed
-            ? const Color(0xFFE9F8EF)
-            : const Color(0xEFFFFFFF),
-        disabledBackgroundColor: const Color(0xFFE9F8EF),
-        side: BorderSide(
-          color: completed ? const Color(0xFF78BE91) : const Color(0xFFD8BE91),
-        ),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        textStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900),
-      ),
-      icon: Icon(
-        completed ? Icons.check_circle_rounded : Icons.search_rounded,
-        size: 16,
-      ),
-      label: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
-    ),
-  );
 }
 
 class _NovelChoice extends StatelessWidget {

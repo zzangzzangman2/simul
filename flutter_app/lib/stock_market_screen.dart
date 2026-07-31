@@ -10286,9 +10286,9 @@ class _PracticalTradeTutorialSheetState
     final speaker = isStudentBeat ? studentName : '한서윤 선생님';
     final characterAsset = switch (_reviewBeat) {
       0 => 'assets/images/주식선생님/26_포즈5_주인공그림체_공통슬롯_투명.png',
-      1 => 'assets/images/character_hero_title_style_v2.png',
+      1 => 'assets/images/protagonist_seed01/22_victory_fist.png',
       2 => 'assets/images/주식선생님/23_포즈2_주인공그림체_공통슬롯_투명.png',
-      _ => 'assets/images/character_hero_title_style_v2.png',
+      _ => 'assets/images/protagonist_seed01/18_passbook_pencil.png',
     };
     final message = switch (_reviewBeat) {
       0 => '첫 거래는 끝났어요.\n가장 먼저 눈에 들어온 건 뭐였어요?',
@@ -10374,6 +10374,7 @@ class _PracticalTradeTutorialSheetState
           ),
         ),
         Positioned.fill(
+          top: -_storyCharacterBottomInset,
           bottom: _storyCharacterBottomInset,
           child: _OnboardingCharacterSlot(
             key: ValueKey<String>('tutorial-review-slot-$characterAsset'),
@@ -14426,7 +14427,7 @@ class _StockTutorialStudent extends StatelessWidget {
       width: width,
       height: height,
       child: Image.asset(
-        'assets/images/character_hero_thoughtful_v1.png',
+        'assets/images/protagonist_seed01/12_thinking.png',
         key: const Key('market-tutorial-student-upper-body'),
         fit: BoxFit.contain,
         alignment: Alignment.bottomCenter,

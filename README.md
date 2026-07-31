@@ -142,6 +142,7 @@ v1·v2·v3 보유분은 저장된 생성기를 그대로 사용해 과거 가격
 | 문서 | 역할 |
 | --- | --- |
 | [AGENTS.md](./AGENTS.md) | 필수 작업 규칙 |
+| [DOCUMENTATION_INDEX.md](./DOCUMENTATION_INDEX.md) | 현행·검증·레거시 문서 우선순위 |
 | [PROJECT_GUIDE.md](./PROJECT_GUIDE.md) | 제품 구조·실행·검증 |
 | [HANDOFF.md](./HANDOFF.md) | 새 채팅이 먼저 읽을 현재 상태·작업 트리·다음 행동 |
 | [ORPHANAGE_STORY_REBOOT.md](./ORPHANAGE_STORY_REBOOT.md) | 미래양성원 6기 리부트 정규 설정 |
@@ -154,6 +155,7 @@ v1·v2·v3 보유분은 저장된 생성기를 그대로 사용해 과거 가격
 | [DATA_SOURCES.md](./DATA_SOURCES.md) | 시장·부동산 자료와 저작권 |
 | [ART_STYLE_GUIDE.md](./ART_STYLE_GUIDE.md) | 고정 그림체·캐릭터 슬롯 |
 | [ART_STYLE_AUDIT.md](./ART_STYLE_AUDIT.md) | 화풍 세트 승인·보류 기록 |
+| [DIALOGUE_EDITOR_GUIDE.md](./DIALOGUE_EDITOR_GUIDE.md) | 대사·장면·배경 편집과 게임 빌드 |
 | [CHARACTER_REGENERATION_RESULT.md](./CHARACTER_REGENERATION_RESULT.md) | 리부트 인물 52개 후보 제작 현황 |
 | [story.md](./story.md) | 기존 가족 세계관 저장의 레거시 서사 기준 |
 
@@ -207,3 +209,16 @@ npm run build:release
 기준 화면은 390×844px이며 최소 360px에서 가로 스크롤이 없어야 합니다.
 데스크톱은 390×844 앱 프레임을 가운데 고정하고, 창이 작을 때만 프레임 전체를
 비례 축소합니다.
+
+## 대사·장면 편집기
+
+`/editor`에서 프롤로그 장면을 검색·재정렬하고, 기존 장면의 장 제목·날짜·장소·
+배경·화자·화자별 포즈·지문·대사를 수정할 수 있습니다. `＋ 장면 추가`는 현재
+장면의 메타데이터를 이어받는 작성 창을 열며, 배경 카탈로그 또는 직접 자산 경로를
+선택해 현재 장면 다음에 삽입합니다.
+
+브라우저 자동저장은 로컬 복구용입니다. `저장하고 게임 빌드`가 성공해야
+`flutter_app/assets/dialogue/dialogue-editor-override.json`과 `public/play/`가
+함께 갱신됩니다. Flutter 런타임은 편집본의 실제 마지막 장면을 종료점으로 사용하며
+최대 240장면까지 배경·화자·포즈·대사를 적용합니다. 상세 규칙은
+[DIALOGUE_EDITOR_GUIDE.md](./DIALOGUE_EDITOR_GUIDE.md)를 따릅니다.

@@ -381,7 +381,7 @@ class FamilyHelperStatus {
         effect: json['effect'] as String? ?? '조사에 도움을 줍니다.',
         asset:
             json['asset'] as String? ??
-            'assets/images/character_hero_title_style_v2.png',
+            'assets/images/protagonist_seed01/01_neutral.png',
         fatigue: (json['fatigue'] as num?)?.toInt() ?? 0,
         helpCount: (json['helpCount'] as num?)?.toInt() ?? 0,
         lastHelpDay: (json['lastHelpDay'] as num?)?.toInt(),

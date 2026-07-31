@@ -22,20 +22,15 @@ flutter build web --release --base-href /play/
 ```
 
 27년 월드 생성 테스트는 메모리 점유가 크므로 테스트 파일을 하나씩 실행합니다.
-2026-07-29 최종 병합 검증은 **완료(PASS)**입니다. `flutter analyze` issue 0,
-주문장·미시구조 집중 회귀 86/86, 전체 `widget_test.dart` 69/69,
-변경 기능 묶음 212/212가 통과했습니다. `npm test` 8/8, `npm run lint`,
-Flutter Web release와 Vinext production build도 통과했습니다.
-`flutter_app/build/web`과 `public/play`은 243/243개 파일의 SHA-256이 모두 일치합니다.
-
-`main.dart.js`는 4,875,711바이트이고 SHA-256은
-`C501A7C26F14362F8B983FE4C3F40C9F6CE9A99D6C2D2DFE542FA967BF81E0F9`입니다.
-주식시장 바로 테스트는 `https://millennium-capital-2000.alphathepark.chatgpt.site/play/stock-test.html`입니다.
-전체 장기 통합 단일 명령은 Windows 10분 명령 제한으로 종료되어 최신 전체 PASS 숫자로 기록하지 않습니다.
+특정 테스트 개수, 번들 크기와 SHA-256은 빌드마다 달라지므로 영구 기준으로
+고정하지 않습니다. 가장 최근 실행 결과는 루트 `WORK_LOG.md`와 `HANDOFF.md`에
+기록하며, `flutter analyze`, 파일별 Flutter 테스트, `npm test`, `npm run lint`,
+`npm run build:release`, `git diff --check`가 모두 통과한 상태만 푸시합니다.
 
 ## 핵심 구조
 
 - `lib/main.dart`: 앱 상태·저장·신문·화면 연결
+- `lib/visual_novel_onboarding.dart`: 편집본 장면·배경·화자·포즈와 동적 종료점을 적용하는 리부트 프롤로그
 - `lib/game/game_state.dart`: 저장 스키마 v20와 사업 자산·미지급금 합산
 - `lib/game/game_engine.dart`: 거래·경제·기업행동·부동산·동네 사업 일일 훅·마이그레이션
 - `lib/game/business_state.dart`: 점포·6축 정책·월 손익·사건 포트폴리오
@@ -59,6 +54,7 @@ Flutter Web release와 Vinext production build도 통과했습니다.
 - `test/business_simulation_test.dart`: 카탈로그·손익·사건·JSON 결정론 회귀
 - `test/business_engine_test.dart`: 인수·부동산 연결·정책·투자·월 정산·강제폐업 회귀
 - `test/business_ui_test.dart`: 390×844·360×800 앱 진입·5탭·상권판세·실제 인수·6축·투자·폐업 회귀
+- `test/widget_test.dart`: 프롤로그, 대사 편집본 배경과 추가 장면을 포함한 위젯 회귀
 
 ## 공통 경제 규칙
 

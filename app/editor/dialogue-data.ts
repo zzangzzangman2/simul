@@ -21,7 +21,7 @@ export const initialDialogue: DialogueScene[] = [
     "speaker": "이야기",
     "direction": "",
     "line": "1981년 1월 12일 밤 11시 40분. 청와대 정책실의 불은 자정이 가까워져도 꺼지지 않았다. 보고서 다섯 권 가운데 하나만, 이상할 만큼 얇았다.",
-    "background": "/play/assets/assets/images/historical_prologue/bg_blue_house_policy_room_1981_portrait_cartoon_v1.png",
+    "background": "/play/assets/assets/images/cinematic_soft_painted/policy_1981/backgrounds/bg_policy_room_night_v1.png",
     "character": ""
   },
   {
@@ -33,8 +33,8 @@ export const initialDialogue: DialogueScene[] = [
     "speaker": "전두광",
     "direction": "전두광이 가장 얇은 보고서를 탁자 가운데로 밀었다.",
     "line": "그래서. 당장은 멀쩡한데, 이대로 가면 나라가 망한다?",
-    "background": "/play/assets/assets/images/historical_prologue/bg_blue_house_policy_room_1981_portrait_cartoon_v1.png",
-    "character": "/play/assets/assets/images/historical_prologue/character_jeon_dugwang_decree_cartoon_v2.png"
+    "background": "/play/assets/assets/images/cinematic_soft_painted/policy_1981/backgrounds/bg_policy_room_night_v1.png",
+    "character": "/play/assets/assets/images/cinematic_soft_painted/policy_1981/jeon_dugwang/02_listening_v1.png"
   },
   {
     "id": "scene-03",
@@ -44,9 +44,9 @@ export const initialDialogue: DialogueScene[] = [
     "location": "청와대 · 정책실",
     "speaker": "서문태 정책실장",
     "direction": "밤샘으로 충혈된 서문태의 눈이 잠깐 흔들렸다.",
-    "line": "당장은 아닙니다. 하지만 당장만 보고 달리면 이십 년 뒤에는 남의 기술과 남의 돈에 목줄이 잡힙니다.",
-    "background": "/play/assets/assets/images/historical_prologue/bg_blue_house_policy_room_1981_portrait_cartoon_v1.png",
-    "character": "/play/assets/assets/images/historical_prologue/character_seo_muntae_v1.png"
+    "line": "당장은 아닙니다. 하지만 지금만 보고 달리면 이십 년 뒤에는 남의 기술과 남의 돈에 나라의 목줄이 잡힙니다.",
+    "background": "/play/assets/assets/images/cinematic_soft_painted/policy_1981/backgrounds/bg_policy_room_night_v1.png",
+    "character": "/play/assets/assets/images/cinematic_soft_painted/policy_1981/seo_muntae/01_policy_pitch_v1.png"
   },
   {
     "id": "scene-04",
@@ -57,8 +57,8 @@ export const initialDialogue: DialogueScene[] = [
     "speaker": "백기현 비서실장",
     "direction": "백기현은 안경을 벗어 천천히 닦았다.",
     "line": "각하 앞에서 나라 앞날이 어둡다고 했으니, 자네 앞날도 같이 어두워질 수 있겠어.",
-    "background": "/play/assets/assets/images/historical_prologue/bg_blue_house_policy_room_1981_portrait_cartoon_v1.png",
-    "character": "/play/assets/assets/images/historical_prologue/character_baek_gihyeon_v1.png"
+    "background": "/play/assets/assets/images/cinematic_soft_painted/policy_1981/backgrounds/bg_policy_room_night_v1.png",
+    "character": "/play/assets/assets/images/cinematic_soft_painted/policy_1981/baek_gihyeon/03_warning_v2.png"
   },
   {
     "id": "scene-05",
@@ -69,8 +69,8 @@ export const initialDialogue: DialogueScene[] = [
     "speaker": "강인철 경제수석",
     "direction": "강인철의 연필이 1981년에서 2000년으로 긴 선을 그었다.",
     "line": "지금은 공장 세우고 물건을 찍는 쪽이 이깁니다. 하지만 미래에는 어떤 기술에 돈을 넣고, 어떤 회사를 살릴지 정하는 사람이 공장 몇 개보다 더 큰 힘을 갖게 됩니다.",
-    "background": "/play/assets/assets/images/historical_prologue/bg_blue_house_policy_room_1981_portrait_cartoon_v1.png",
-    "character": "/play/assets/assets/images/historical_prologue/character_kang_incheol_v1.png"
+    "background": "/play/assets/assets/images/cinematic_soft_painted/policy_1981/backgrounds/bg_policy_room_night_v1.png",
+    "character": "/play/assets/assets/images/cinematic_soft_painted/policy_1981/kang_incheol/02_explain_v2.png"
   },
   {
     "id": "scene-06",
@@ -78,11 +78,11 @@ export const initialDialogue: DialogueScene[] = [
     "chapter": "1장 · 사람을 자본으로 만드는 밤",
     "date": "1981.01.12  ·  23:40",
     "location": "청와대 · 미래전략 심야회의",
-    "speaker": "정책 보고서",
-    "direction": "수출산업·인구전망·보호아동·국가계좌·특별법 보고서가 탁자 위에 놓였다.",
-    "line": "보고서 다섯 권을 차례로 확인한다.",
-    "background": "/play/assets/assets/images/historical_prologue/bg_blue_house_conference_1981_portrait_cartoon_v1.png",
-    "character": ""
+    "speaker": "전두광",
+    "direction": "전두광이 「요보호아동 시설 현황」 표지를 손가락으로 두 번 두드렸다.",
+    "line": "공장도, 인구도, 법도 두꺼운데 아이들 보고서만 이 모양이군. 미래를 말하면서, 미래에 살 아이들은 뺐나?",
+    "background": "/play/assets/assets/images/cinematic_soft_painted/policy_1981/backgrounds/bg_conference_night_v1.png",
+    "character": "/play/assets/assets/images/cinematic_soft_painted/policy_1981/jeon_dugwang/05_pressure_v1.png"
   },
   {
     "id": "scene-07",
@@ -93,7 +93,7 @@ export const initialDialogue: DialogueScene[] = [
     "speaker": "이야기",
     "direction": "",
     "line": "수출산업, 인구전망, 국가계좌, 특별법. 네 권은 벽돌처럼 두꺼웠다. 「요보호아동 시설 현황」만 종잇장처럼 얇았다.",
-    "background": "/play/assets/assets/images/historical_prologue/bg_blue_house_conference_1981_portrait_cartoon_v1.png",
+    "background": "/play/assets/assets/images/cinematic_soft_painted/policy_1981/backgrounds/bg_conference_night_v1.png",
     "character": ""
   },
   {
@@ -104,9 +104,9 @@ export const initialDialogue: DialogueScene[] = [
     "location": "청와대 · 미래전략 심야회의",
     "speaker": "서문태 정책실장",
     "direction": "서문태의 손이 가장 얇은 보고서 위에서 멈췄다.",
-    "line": "국가는 이미 아이들의 오늘을 먹이고 재웁니다. 이제 내일을 고를 힘까지 줘야 합니다.",
-    "background": "/play/assets/assets/images/historical_prologue/bg_blue_house_conference_1981_portrait_cartoon_v1.png",
-    "character": "/play/assets/assets/images/historical_prologue/character_seo_muntae_v1.png"
+    "line": "국가는 이미 아이들에게 밥과 잠자리를 줍니다. 이제는 내일을 고를 힘도 줘야 합니다.",
+    "background": "/play/assets/assets/images/cinematic_soft_painted/policy_1981/backgrounds/bg_conference_night_v1.png",
+    "character": "/play/assets/assets/images/cinematic_soft_painted/policy_1981/seo_muntae/04_exhausted_concession_v1.png"
   },
   {
     "id": "scene-09",
@@ -117,8 +117,8 @@ export const initialDialogue: DialogueScene[] = [
     "speaker": "윤미라 사회교육수석",
     "direction": "윤미라가 손바닥으로 탁자를 내리쳤다.",
     "line": "미치셨습니까? 아이들을 국가가 키우는 자본이나 실험쥐로 보겠다는 겁니까? 실패하면 그 아이 인생은 누가 책임집니까!",
-    "background": "/play/assets/assets/images/historical_prologue/bg_blue_house_conference_1981_portrait_cartoon_v1.png",
-    "character": "/play/assets/assets/images/historical_prologue/character_yoon_mira_v1.png"
+    "background": "/play/assets/assets/images/cinematic_soft_painted/policy_1981/backgrounds/bg_conference_night_v1.png",
+    "character": "/play/assets/assets/images/cinematic_soft_painted/policy_1981/yoon_mira/03_objection_v1.png"
   },
   {
     "id": "scene-10",
@@ -129,8 +129,8 @@ export const initialDialogue: DialogueScene[] = [
     "speaker": "전두광",
     "direction": "전두광은 대답 대신 보고서 표지를 두 번 두드렸다.",
     "line": "먹이고 재우는 데서 끝내면 세금 낭비지. 스스로 돈을 벌게 만들면 투자가 되고.",
-    "background": "/play/assets/assets/images/historical_prologue/bg_blue_house_conference_1981_portrait_cartoon_v1.png",
-    "character": ""
+    "background": "/play/assets/assets/images/cinematic_soft_painted/policy_1981/backgrounds/bg_conference_night_v1.png",
+    "character": "/play/assets/assets/images/cinematic_soft_painted/policy_1981/jeon_dugwang/04_cold_laugh_v1.png"
   },
   {
     "id": "scene-11",
@@ -141,8 +141,8 @@ export const initialDialogue: DialogueScene[] = [
     "speaker": "백기현 비서실장",
     "direction": "백기현이 안경을 다시 쓰며 정치적 손익을 셌다.",
     "line": "핏덩이들에게 나랏돈을 줬다가 잃으면 혈세 낭비라 할 겁니다. 벌면 나라가 코 묻은 돈을 빼앗는다고 할 테고요.",
-    "background": "/play/assets/assets/images/historical_prologue/bg_blue_house_conference_1981_portrait_cartoon_v1.png",
-    "character": "/play/assets/assets/images/historical_prologue/character_baek_gihyeon_v1.png"
+    "background": "/play/assets/assets/images/cinematic_soft_painted/policy_1981/backgrounds/bg_conference_night_v1.png",
+    "character": "/play/assets/assets/images/cinematic_soft_painted/policy_1981/baek_gihyeon/02_advice_v2.png"
   },
   {
     "id": "scene-12",
@@ -152,9 +152,9 @@ export const initialDialogue: DialogueScene[] = [
     "location": "청와대 · 미래전략 심야회의",
     "speaker": "서문태 정책실장",
     "direction": "서문태가 기다렸다는 듯 새 계좌 양식을 펼쳤다.",
-    "line": "열 살, SEED 01부터 시작합니다. 원금은 만 원. 작아서 우습지만, 잃었을 때 왜 잃었는지는 숨길 수 없는 돈입니다.",
-    "background": "/play/assets/assets/images/historical_prologue/bg_blue_house_conference_1981_portrait_cartoon_v1.png",
-    "character": "/play/assets/assets/images/historical_prologue/character_seo_muntae_v1.png"
+    "line": "열 살, SEED 01부터 시작합니다. 원금은 만 원입니다. 작아서 우스워 보여도, 손실 이유를 감추기엔 충분히 큰 돈입니다.",
+    "background": "/play/assets/assets/images/cinematic_soft_painted/policy_1981/backgrounds/bg_conference_night_v1.png",
+    "character": "/play/assets/assets/images/cinematic_soft_painted/policy_1981/seo_muntae/02_searching_chart_v1.png"
   },
   {
     "id": "scene-13",
@@ -165,8 +165,8 @@ export const initialDialogue: DialogueScene[] = [
     "speaker": "전두광",
     "direction": "만년필 끝이 손실 처리 칸 위에서 멈췄다.",
     "line": "잃으면?",
-    "background": "/play/assets/assets/images/historical_prologue/bg_blue_house_conference_1981_portrait_cartoon_v1.png",
-    "character": "/play/assets/assets/images/historical_prologue/character_jeon_dugwang_decree_cartoon_v2.png"
+    "background": "/play/assets/assets/images/cinematic_soft_painted/policy_1981/backgrounds/bg_conference_night_v1.png",
+    "character": "/play/assets/assets/images/cinematic_soft_painted/policy_1981/jeon_dugwang/03_calculating_v1.png"
   },
   {
     "id": "scene-14",
@@ -177,8 +177,8 @@ export const initialDialogue: DialogueScene[] = [
     "speaker": "서문태 정책실장",
     "direction": "서문태가 다음 달 주문 한도 칸을 손가락으로 짚었다.",
     "line": "아이 빚으로 남기지 않습니다. 대신 다음 달 주문 한도를 깎습니다. 벌면 일부를 국가가 회수하고요.",
-    "background": "/play/assets/assets/images/historical_prologue/bg_blue_house_conference_1981_portrait_cartoon_v1.png",
-    "character": "/play/assets/assets/images/historical_prologue/character_seo_muntae_v1.png"
+    "background": "/play/assets/assets/images/cinematic_soft_painted/policy_1981/backgrounds/bg_conference_night_v1.png",
+    "character": "/play/assets/assets/images/cinematic_soft_painted/policy_1981/seo_muntae/03_rebuttal_v1.png"
   },
   {
     "id": "scene-15",
@@ -188,9 +188,9 @@ export const initialDialogue: DialogueScene[] = [
     "location": "청와대 · 미래전략 심야회의",
     "speaker": "전두광",
     "direction": "전두광은 20%에 동그라미를 치고 「미래양성원」 네 글자를 갈겨썼다.",
-    "line": "이십 퍼센트. 나머지는 아이 몫. 대신 왜 샀고 왜 팔았는지 전부 쓰게 해. 성공담 말고, 바닥을 긴 기록까지.",
-    "background": "/play/assets/assets/images/historical_prologue/bg_blue_house_conference_1981_portrait_cartoon_v1.png",
-    "character": "/play/assets/assets/images/historical_prologue/character_jeon_dugwang_decree_cartoon_v2.png"
+    "line": "이십 퍼센트. 나머지는 아이 몫. 대신 왜 샀고 왜 팔았는지 전부 쓰게 해. 잘한 이야기만 말고, 손실로 바닥까지 내려간 기록도.",
+    "background": "/play/assets/assets/images/cinematic_soft_painted/policy_1981/backgrounds/bg_conference_night_v1.png",
+    "character": "/play/assets/assets/images/cinematic_soft_painted/policy_1981/jeon_dugwang/01_signing_v1.png"
   },
   {
     "id": "scene-16",
@@ -201,8 +201,8 @@ export const initialDialogue: DialogueScene[] = [
     "speaker": "윤미라 사회교육수석",
     "direction": "윤미라는 80% 아래에 ‘아이 명의’라고 힘주어 적었다.",
     "line": "그 80퍼센트는 시설 돈이 아닙니다. 아이 이름으로 묶어두고, 열아홉에 1원도 빠짐없이 넘기십시오.",
-    "background": "/play/assets/assets/images/historical_prologue/bg_blue_house_conference_1981_portrait_cartoon_v1.png",
-    "character": "/play/assets/assets/images/historical_prologue/character_yoon_mira_v1.png"
+    "background": "/play/assets/assets/images/cinematic_soft_painted/policy_1981/backgrounds/bg_conference_night_v1.png",
+    "character": "/play/assets/assets/images/cinematic_soft_painted/policy_1981/yoon_mira/04_solution_v1.png"
   },
   {
     "id": "scene-17",
@@ -238,7 +238,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "옆 침대 이불이 꿈틀거리더니 민호가 코만 내밀었다.",
     "line": "형아… 진짜 가?",
     "background": "/play/assets/assets/images/historical_prologue/bg_orphanage_departure_2000_portrait_v1.png",
-    "character": ""
+    "character": "/play/assets/assets/images/historical_prologue/character_minho_farewell_v3.png"
   },
   {
     "id": "scene-20",
@@ -248,9 +248,9 @@ export const initialDialogue: DialogueScene[] = [
     "location": "새봄보육원 · 2층 다섯 번째 방",
     "speaker": "나",
     "direction": "나는 지퍼가 잘 닫히지 않는 가방을 무릎으로 눌렀다.",
-    "line": "응. 돈 세는 학교래. 돈을 그냥 주면 좋은데, 세기만 시키면 손가락만 아프잖아.",
+    "line": "응. 돈 세는 학교래. 그냥 주면 더 좋을 텐데, 세기만 시키면 손가락만 아프잖아.",
     "background": "/play/assets/assets/images/historical_prologue/bg_orphanage_departure_2000_portrait_v1.png",
-    "character": ""
+    "character": "/play/assets/assets/images/protagonist_seed01/03_playful_grin.png"
   },
   {
     "id": "scene-21",
@@ -274,7 +274,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "나는 쇳조각 명찰을 재빨리 바지 주머니에 쑤셔 넣었다.",
     "line": "이름은 칼로 긁어 지워져 있었다. 뒷면에는 더 이상한 말이 파여 있었다. 「17번을 믿지 마.」 …이게 17번 명찰인데, 누구를 믿지 말라는 거야?",
     "background": "/play/assets/assets/images/historical_prologue/bg_orphanage_departure_2000_portrait_v1.png",
-    "character": ""
+    "character": "/play/assets/assets/images/protagonist_seed01/17_holding_badge.png"
   },
   {
     "id": "scene-23",
@@ -284,9 +284,9 @@ export const initialDialogue: DialogueScene[] = [
     "location": "새봄보육원 · 2층 다섯 번째 방",
     "speaker": "박선희 원장",
     "direction": "박선희 원장이 목도리를 한 번 더 단단히 매어주었다.",
-    "line": "짐 가벼운 걸 부끄러워하지 마. 앞으로 채울 자리가 많은 거니까. 그리고 가서도 이유를 물어. 말이 안 되면 두 번 묻고. 그래도 이상하면 장부에 적어. 말은 날아가도 적은 건 남으니까.",
+    "line": "짐이 가볍다고 주눅 들지 마. 앞으로 채울 게 많다는 뜻이니까. 가서도 이상한 말은 그냥 넘기지 말고 두 번 물어. 그래도 이상하면 장부에 적어 둬. 말은 날아가도 글은 남으니까.",
     "background": "/play/assets/assets/images/historical_prologue/bg_orphanage_departure_2000_portrait_v1.png",
-    "character": ""
+    "character": "/play/assets/assets/images/historical_prologue/character_park_sunhee_farewell_v1.png"
   },
   {
     "id": "scene-24",
@@ -308,7 +308,7 @@ export const initialDialogue: DialogueScene[] = [
     "location": "국립 미래양성원 · 투자전문과정 정문",
     "speaker": "아이들",
     "direction": "종이상자와 비닐봉지를 든 아이들의 속삭임이 겹쳤다.",
-    "line": "“여기가 그 유명한 데래.”\\n“고아원에서 추천받은 애들만 온다던데?”\\n“입학식인데 왜 면접장보다 조용해?”",
+    "line": "“여기가 그 유명한 데래.”\n“고아원에서 추천받은 애들만 온다던데?”\n“입학식인데 왜 면접장보다 조용해?”",
     "background": "/play/assets/assets/images/historical_prologue/bg_future_development_academy_gate_2000_portrait_v1.png",
     "character": ""
   },
@@ -320,9 +320,9 @@ export const initialDialogue: DialogueScene[] = [
     "location": "국립 미래양성원 · 투자전문과정 정문",
     "speaker": "수아",
     "direction": "수아가 내 가방이 남긴 삐뚤어진 바퀴 자국을 가리켰다.",
-    "line": "야, 바퀴 달린 가방. 네 바퀴 하나가 계속 눈을 모으고 있어.",
+    "line": "야, 가방 바퀴 하나가 눈을 계속 끌고 다녀.",
     "background": "/play/assets/assets/images/historical_prologue/bg_future_development_academy_gate_2000_portrait_v1.png",
-    "character": "/play/assets/assets/images/historical_prologue/character_sua_orientation_v1.png"
+    "character": "/play/assets/assets/images/cinematic_soft_painted/sua/07_determined_v1.png"
   },
   {
     "id": "scene-27",
@@ -334,7 +334,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "나는 한쪽으로 기운 가방을 태연하게 세웠다.",
     "line": "일부러 눈사람 만드는 중이야. 본관 도착할 때쯤 머리까지 붙이려고.",
     "background": "/play/assets/assets/images/historical_prologue/bg_future_development_academy_gate_2000_portrait_v1.png",
-    "character": ""
+    "character": "/play/assets/assets/images/protagonist_seed01/02_cheerful_laugh.png"
   },
   {
     "id": "scene-28",
@@ -344,9 +344,9 @@ export const initialDialogue: DialogueScene[] = [
     "location": "국립 미래양성원 · 투자전문과정 정문",
     "speaker": "이야기",
     "direction": "연필 끝에서 굳은 눈덩이가 후두둑 떨어졌다.",
-    "line": "여자아이는 대꾸 대신 쪼그려 앉아 연필로 바퀴의 눈을 긁어냈다. 친화력이 좋다기보다, 남의 일에 거리낌 없이 끼어드는 타입 같았다. 이름은 수아라고 했다.",
+    "line": "여자아이는 대꾸 대신 쪼그려 앉아 연필로 바퀴의 눈을 긁어냈다. 처음 보는 사이인데도 망설임이 없었다. 이름은 수아라고 했다.",
     "background": "/play/assets/assets/images/historical_prologue/bg_future_development_academy_gate_2000_portrait_v1.png",
-    "character": "/play/assets/assets/images/historical_prologue/character_sua_orientation_v1.png"
+    "character": "/play/assets/assets/images/cinematic_soft_painted/sua/01_neutral_v1.png"
   },
   {
     "id": "scene-29",
@@ -354,11 +354,11 @@ export const initialDialogue: DialogueScene[] = [
     "chapter": "3장 · 설명서 학준",
     "date": "2000.01.02  ·  07:31",
     "location": "국립 미래양성원 · 투자전문과정 정문",
-    "speaker": "학준",
-    "direction": "남색 규정집을 낀 학준이 우리 옆에 바짝 붙었다.",
-    "line": "정문에서 본관까지 420미터. 권장 도착 시간은 6분. 뛰면 감점이야. 안내문 7쪽.",
+    "speaker": "김학준",
+    "direction": "남색 규정집을 낀 김학준이 우리 옆에 바짝 붙었다.",
+    "line": "정문에서 본관까지 420미터. 6분 안에 도착해야 하고, 뛰면 감점이야. 안내문 7쪽에 있어.",
     "background": "/play/assets/assets/images/historical_prologue/bg_future_development_academy_gate_2000_portrait_v1.png",
-    "character": "/play/assets/assets/images/historical_prologue/character_hakjun_orientation_v1.png"
+    "character": "/play/assets/assets/images/historical_prologue/character_hakjun_orientation_v2.png"
   },
   {
     "id": "scene-30",
@@ -367,10 +367,10 @@ export const initialDialogue: DialogueScene[] = [
     "date": "2000.01.02  ·  07:31",
     "location": "국립 미래양성원 · 투자전문과정 정문",
     "speaker": "수아",
-    "direction": "수아가 눈을 가늘게 뜨고 학준의 명찰을 읽었다.",
-    "line": "안내문에 별명 금지도 있어, 설명서 학준아?",
+    "direction": "수아가 눈을 가늘게 뜨고 김학준의 명찰을 읽었다.",
+    "line": "설명서 학준아, 별명 붙이면 안 된다는 규정도 있어?",
     "background": "/play/assets/assets/images/historical_prologue/bg_future_development_academy_gate_2000_portrait_v1.png",
-    "character": "/play/assets/assets/images/historical_prologue/character_sua_orientation_v1.png"
+    "character": "/play/assets/assets/images/cinematic_soft_painted/sua/04_playful_tease_v1.png"
   },
   {
     "id": "scene-31",
@@ -382,7 +382,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "학준의 귀끝이 규정집 표지보다 먼저 붉어졌다.",
     "line": "…없어. 그리고 그렇게 부르지 마.",
     "background": "/play/assets/assets/images/historical_prologue/bg_future_development_academy_gate_2000_portrait_v1.png",
-    "character": "/play/assets/assets/images/historical_prologue/character_hakjun_orientation_v1.png"
+    "character": "/play/assets/assets/images/historical_prologue/character_hakjun_orientation_v2.png"
   },
   {
     "id": "scene-32",
@@ -394,7 +394,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "수아가 깔깔 웃으며 먼저 언덕을 뛰어올랐다.",
     "line": "그럼 합법이네.",
     "background": "/play/assets/assets/images/historical_prologue/bg_future_development_academy_gate_2000_portrait_v1.png",
-    "character": "/play/assets/assets/images/historical_prologue/character_sua_orientation_v1.png"
+    "character": "/play/assets/assets/images/cinematic_soft_painted/sua/03_bright_laugh_v1.png"
   },
   {
     "id": "scene-33",
@@ -403,8 +403,8 @@ export const initialDialogue: DialogueScene[] = [
     "date": "2000.01.02  ·  08:00",
     "location": "국립 미래양성원 · 제6기 오리엔테이션 강당",
     "speaker": "이야기",
-    "direction": "오래된 형광등 아래, 이름표 스무 장이 빈 의자를 지키고 있었다.",
-    "line": "강당에는 내빈석도 부모 자리도 없었다. 스무 개의 의자만 반원으로 놓여 있었다. 무대 위 나무상자 하나가 더 수상해 보였다.",
+    "direction": "오래된 형광등 아래, 이름표 열 장이 빈 의자를 지키고 있었다.",
+    "line": "강당에는 내빈석도 부모 자리도 없었다. 열 개의 의자만 반원으로 놓여 있었다. 무대 위 나무상자 하나가 더 수상해 보였다.",
     "background": "/play/assets/assets/images/historical_prologue/bg_future_development_orientation_hall_2000_portrait_v1.png",
     "character": ""
   },
@@ -416,7 +416,7 @@ export const initialDialogue: DialogueScene[] = [
     "location": "국립 미래양성원 · 제6기 오리엔테이션 강당",
     "speaker": "아이들",
     "direction": "앞자리와 뒷자리에서 서로 다른 소문이 동시에 튀어나왔다.",
-    "line": "“남자 열, 여자 열이래.”\\n“자리도 성적순일까?”\\n“아직 시험도 안 봤는데 무슨 성적이 있어.”",
+    "line": "“남자 둘, 여자 여덟이래.”\n“자리도 성적순일까?”\n“아직 시험도 안 봤는데 무슨 성적이 있어.”",
     "background": "/play/assets/assets/images/historical_prologue/bg_future_development_orientation_hall_2000_portrait_v1.png",
     "character": ""
   },
@@ -428,7 +428,7 @@ export const initialDialogue: DialogueScene[] = [
     "location": "국립 미래양성원 · 제6기 오리엔테이션 강당",
     "speaker": "한서윤 선생님",
     "direction": "구두 소리가 무대에 닿자 웅성거림이 절반쯤 줄었다.",
-    "line": "제6기 담당 한서윤입니다. 인사는 이따 하죠. 여러분 배에서 나는 소리가 더 급해 보이니까.",
+    "line": "제6기 교육을 맡은 한서윤입니다. 인사는 조금 뒤에 하죠. 여러분 배에서 나는 소리가 더 급해 보이니까.",
     "background": "/play/assets/assets/images/historical_prologue/bg_future_development_orientation_hall_2000_portrait_v1.png",
     "character": "/play/assets/assets/images/주식선생님/22_포즈1_주인공그림체_공통슬롯_투명.png"
   },
@@ -442,7 +442,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "한서윤이 나무상자 위에 손바닥을 올렸다.",
     "line": "이 상자 안에는 단팥빵 하나와 500원짜리 동전이 있어요. 식당에서 빵은 300원입니다. 하나만 고르세요.",
     "background": "/play/assets/assets/images/historical_prologue/bg_future_development_orientation_hall_2000_portrait_v1.png",
-    "character": "/play/assets/assets/images/주식선생님/22_포즈1_주인공그림체_공통슬롯_투명.png"
+    "character": "/play/assets/assets/images/주식선생님/24_포즈3_주인공그림체_공통슬롯_투명.png"
   },
   {
     "id": "scene-37",
@@ -454,7 +454,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "수아의 손이 누구보다 먼저 천장을 찔렀다.",
     "line": "동전이요! 빵 사고도 200원 남잖아요.",
     "background": "/play/assets/assets/images/historical_prologue/bg_future_development_orientation_hall_2000_portrait_v1.png",
-    "character": "/play/assets/assets/images/historical_prologue/character_sua_orientation_v1.png"
+    "character": "/play/assets/assets/images/cinematic_soft_painted/sua/05_surprised_v1.png"
   },
   {
     "id": "scene-38",
@@ -466,7 +466,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "한서윤이 벽시계를 턱으로 가리켰다.",
     "line": "좋아요. 그런데 식당 문은 두 시간 뒤, 열 시에 열립니다.",
     "background": "/play/assets/assets/images/historical_prologue/bg_future_development_orientation_hall_2000_portrait_v1.png",
-    "character": "/play/assets/assets/images/주식선생님/22_포즈1_주인공그림체_공통슬롯_투명.png"
+    "character": "/play/assets/assets/images/주식선생님/23_포즈2_주인공그림체_공통슬롯_투명.png"
   },
   {
     "id": "scene-39",
@@ -478,7 +478,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "말이 끝나자마자 수아의 배에서 작은 소리가 났다.",
     "line": "두 시간이요? …참을 수 있어요. 아마도.",
     "background": "/play/assets/assets/images/historical_prologue/bg_future_development_orientation_hall_2000_portrait_v1.png",
-    "character": "/play/assets/assets/images/historical_prologue/character_sua_orientation_v1.png"
+    "character": "/play/assets/assets/images/cinematic_soft_painted/sua/06_worried_v1.png"
   },
   {
     "id": "scene-40",
@@ -488,9 +488,9 @@ export const initialDialogue: DialogueScene[] = [
     "location": "국립 미래양성원 · 제6기 오리엔테이션 강당",
     "speaker": "학준",
     "direction": "학준은 규정집 모서리를 만지며 상자를 노려봤다.",
-    "line": "빵이 몇 개 남았는지, 열 시에 새로 들어오는지부터 확인해야 합니다. 동전만 보고 고르면 정보가 부족해요.",
+    "line": "빵이 얼마나 남았는지, 열 시에 새 빵이 들어오는지부터 알아야 해요. 동전만 보고 고르기엔 모르는 게 너무 많아요.",
     "background": "/play/assets/assets/images/historical_prologue/bg_future_development_orientation_hall_2000_portrait_v1.png",
-    "character": "/play/assets/assets/images/historical_prologue/character_hakjun_orientation_v1.png"
+    "character": "/play/assets/assets/images/historical_prologue/character_hakjun_orientation_v2.png"
   },
   {
     "id": "scene-41",
@@ -502,7 +502,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "나는 열리지 않은 상자 뚜껑을 손가락으로 가리켰다.",
     "line": "그 전에 상자부터 열어봐야 하는 거 아니에요? 선생님이 단팥빵을 벌써 드셨을 수도 있잖아요.",
     "background": "/play/assets/assets/images/historical_prologue/bg_future_development_orientation_hall_2000_portrait_v1.png",
-    "character": ""
+    "character": "/play/assets/assets/images/protagonist_seed01/04_curious_question.png"
   },
   {
     "id": "scene-42",
@@ -524,7 +524,7 @@ export const initialDialogue: DialogueScene[] = [
     "location": "국립 미래양성원 · 제6기 오리엔테이션 강당",
     "speaker": "한서윤 선생님",
     "direction": "칠판에 네 칸이 그어졌다. 아는 것, 모르는 것, 고른 이유, 생각을 바꿀 조건.",
-    "line": "그래요. 정답은 하나가 아닙니다. 무엇을 아느냐에 따라 답이 바뀌니까. 여기서 제일 먼저 배울 건 돈 버는 법이 아니라, 모르는 걸 모른다고 인정하는 법이에요.",
+    "line": "그래요. 아는 게 달라지면 답도 달라집니다. 여기서 제일 먼저 배울 건 돈 버는 법이 아니라, 모르는 걸 모른다고 말하는 법이에요.",
     "background": "/play/assets/assets/images/historical_prologue/bg_future_development_orientation_hall_2000_portrait_v1.png",
     "character": "/play/assets/assets/images/주식선생님/22_포즈1_주인공그림체_공통슬롯_투명.png"
   },
@@ -535,10 +535,10 @@ export const initialDialogue: DialogueScene[] = [
     "date": "2000.01.02  ·  08:00",
     "location": "국립 미래양성원 · 제6기 오리엔테이션 강당",
     "speaker": "한서윤 선생님",
-    "direction": "출석부가 펼쳐지고 남학생 열 칸, 여학생 열 칸이 차례로 확인됐다.",
-    "line": "여기 온 아이는 스무 명. 남학생 열, 여학생 열. 모두 전국 보호시설에서 추천받았고, 시험보다 긴 관찰 기록을 거쳐 뽑혔습니다.",
+    "direction": "출석부가 펼쳐지고 남학생 두 칸, 여학생 여덟 칸이 차례로 확인됐다.",
+    "line": "여기 온 아이는 열 명, 남학생 두 명과 여학생 여덟 명입니다. 이번 기수는 여학생이 유난히 많네요. 모두 전국 보호시설의 추천을 받고, 오랫동안 생활 기록을 살핀 끝에 선발됐어요.",
     "background": "/play/assets/assets/images/historical_prologue/bg_future_development_orientation_hall_2000_portrait_v1.png",
-    "character": "/play/assets/assets/images/주식선생님/22_포즈1_주인공그림체_공통슬롯_투명.png"
+    "character": "/play/assets/assets/images/주식선생님/24_포즈3_주인공그림체_공통슬롯_투명.png"
   },
   {
     "id": "scene-45",
@@ -548,9 +548,9 @@ export const initialDialogue: DialogueScene[] = [
     "location": "국립 미래양성원 · 제6기 오리엔테이션 강당",
     "speaker": "한서윤 선생님",
     "direction": "지시봉이 숫자, 사람, 판단 세 단어를 천천히 지나갔다.",
-    "line": "여긴 고아원 간판만 바꾼 곳도, 부자 흉내를 내는 학원도 아니에요. 숫자 뒤에 숨은 사람과 거짓말, 그리고 자기 판단의 값을 배우는 곳입니다.",
+    "line": "여긴 간판만 바꾼 고아원도, 부자 흉내를 내는 학원도 아니에요. 숫자 뒤에 있는 사람과 거짓말을 보고, 자기 판단에 책임지는 법을 배우는 곳입니다.",
     "background": "/play/assets/assets/images/historical_prologue/bg_future_development_orientation_hall_2000_portrait_v1.png",
-    "character": "/play/assets/assets/images/주식선생님/22_포즈1_주인공그림체_공통슬롯_투명.png"
+    "character": "/play/assets/assets/images/주식선생님/23_포즈2_주인공그림체_공통슬롯_투명.png"
   },
   {
     "id": "scene-46",
@@ -560,9 +560,9 @@ export const initialDialogue: DialogueScene[] = [
     "location": "국립 미래양성원 · 제6기 오리엔테이션 강당",
     "speaker": "한서윤 선생님",
     "direction": "한서윤의 시선이 반원으로 앉은 아이들을 훑었다.",
-    "line": "그럼 첫 번째 기록을 남겨볼까요. 자기가 왜 뽑혔다고 생각하죠?",
+    "line": "그럼 첫 기록부터 남겨 볼까요? 자기가 왜 뽑혔다고 생각해요?",
     "background": "/play/assets/assets/images/historical_prologue/bg_future_development_orientation_hall_2000_portrait_v1.png",
-    "character": "/play/assets/assets/images/주식선생님/22_포즈1_주인공그림체_공통슬롯_투명.png"
+    "character": "/play/assets/assets/images/주식선생님/26_포즈5_주인공그림체_공통슬롯_투명.png"
   },
   {
     "id": "scene-47",
@@ -572,9 +572,9 @@ export const initialDialogue: DialogueScene[] = [
     "location": "국립 미래양성원 · 제6기 오리엔테이션 강당",
     "speaker": "학준",
     "direction": "학준은 기다렸다는 듯 허리를 곧게 폈다.",
-    "line": "규칙을 빨리 외우고 계산 실수가 없어서입니다.",
+    "line": "규칙을 빨리 외우고, 계산을 잘해서요.",
     "background": "/play/assets/assets/images/historical_prologue/bg_future_development_orientation_hall_2000_portrait_v1.png",
-    "character": "/play/assets/assets/images/historical_prologue/character_hakjun_orientation_v1.png"
+    "character": "/play/assets/assets/images/historical_prologue/character_hakjun_orientation_v2.png"
   },
   {
     "id": "scene-48",
@@ -586,7 +586,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "수아는 옆자리 아이들의 표정을 한번 훑고 대답했다.",
     "line": "사람 얼굴 보면 뭘 좋아하고 싫어하는지 금방 알아서요.",
     "background": "/play/assets/assets/images/historical_prologue/bg_future_development_orientation_hall_2000_portrait_v1.png",
-    "character": "/play/assets/assets/images/historical_prologue/character_sua_orientation_v1.png"
+    "character": "/play/assets/assets/images/cinematic_soft_painted/sua/02_warm_smile_v1.png"
   },
   {
     "id": "scene-49",
@@ -598,7 +598,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "나는 이유를 찾는 대신 가장 그럴듯한 답부터 꺼냈다.",
     "line": "돈을 많이 벌 것 같아서 뽑은 거 아니에요?",
     "background": "/play/assets/assets/images/historical_prologue/bg_future_development_orientation_hall_2000_portrait_v1.png",
-    "character": ""
+    "character": "/play/assets/assets/images/protagonist_seed01/16_hands_on_hips.png"
   },
   {
     "id": "scene-50",
@@ -610,7 +610,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "한서윤이 웃음을 누르며 되물었다.",
     "line": "지금 가진 돈은 얼마인데요?",
     "background": "/play/assets/assets/images/historical_prologue/bg_future_development_orientation_hall_2000_portrait_v1.png",
-    "character": "/play/assets/assets/images/주식선생님/22_포즈1_주인공그림체_공통슬롯_투명.png"
+    "character": "/play/assets/assets/images/주식선생님/24_포즈3_주인공그림체_공통슬롯_투명.png"
   },
   {
     "id": "scene-51",
@@ -622,7 +622,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "주머니 속 왕딱지가 손끝에 걸렸다.",
     "line": "왕딱지 한 장이요. 용 그려진 제일 센 거.",
     "background": "/play/assets/assets/images/historical_prologue/bg_future_development_orientation_hall_2000_portrait_v1.png",
-    "character": ""
+    "character": "/play/assets/assets/images/protagonist_seed01/22_victory_fist.png"
   },
   {
     "id": "scene-52",
@@ -644,7 +644,7 @@ export const initialDialogue: DialogueScene[] = [
     "location": "국립 미래양성원 · 제6기 오리엔테이션 강당",
     "speaker": "이야기",
     "direction": "낡은 명찰의 모서리가 주머니 안에서 허벅지를 찔렀다.",
-    "line": "가장 어둡던 형광등이 한 번 떨리고 안정됐다. 스무 개의 이름표가 같은 빛을 받았다. 주머니 속 5기 명찰만 혼자 차갑게 식어 있었다.",
+    "line": "가장 어둡던 형광등이 한 번 떨리고 안정됐다. 열 개의 이름표가 같은 빛을 받았다. 주머니 속 5기 명찰만 혼자 차갑게 식어 있었다.",
     "background": "/play/assets/assets/images/historical_prologue/bg_future_development_orientation_hall_2000_portrait_v1.png",
     "character": ""
   },
@@ -656,8 +656,8 @@ export const initialDialogue: DialogueScene[] = [
     "location": "국립 미래양성원 · 제6기 오리엔테이션 강당",
     "speaker": "한서윤 선생님",
     "direction": "강당 문이 열리고 차가운 복도 공기가 발끝으로 밀려왔다.",
-    "line": "오늘은 여기까지입니다. 주식도, 국가계좌도 아직 열지 않아요. 먼저 이름과 자리를 외우세요. 내일부터는 틀린 답보다, 이유 없는 답을 더 무섭게 볼 겁니다.",
+    "line": "오늘은 여기까지예요. 주식과 국가계좌는 아직 열지 않습니다. 먼저 서로 이름부터 외우세요. 내일부터는 틀린 답보다, 이유 없이 고른 답을 더 엄하게 볼 거예요.",
     "background": "/play/assets/assets/images/historical_prologue/bg_future_development_orientation_hall_2000_portrait_v1.png",
-    "character": "/play/assets/assets/images/주식선생님/22_포즈1_주인공그림체_공통슬롯_투명.png"
+    "character": "/play/assets/assets/images/주식선생님/26_포즈5_주인공그림체_공통슬롯_투명.png"
   }
 ];

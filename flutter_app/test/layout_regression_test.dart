@@ -656,7 +656,7 @@ void main() {
         final teacherRect = tester.getRect(teacher);
         expect(teacherRect.center.dx, closeTo(stageRect.center.dx, 0.01));
         expect(teacherRect.height, closeTo(stageRect.height * 0.9, 0.01));
-        expect(teacherRect.bottom, closeTo(stageRect.bottom, 0.01));
+        expect(teacherRect.bottom, closeTo(stageRect.bottom - 104, 0.01));
       }
       expect(tester.takeException(), isNull);
     }
@@ -666,20 +666,8 @@ void main() {
       await tester.pumpAndSettle();
       expectPortraitInside();
     }
-    for (final file in <String>[
-      'industry',
-      'population',
-      'children',
-      'capital',
-      'law',
-    ]) {
-      final button = find.byKey(Key('policy-file-$file'));
-      await tester.ensureVisible(button);
-      await tester.tap(button);
-      await tester.pumpAndSettle();
-      expectPortraitInside();
-    }
-    await tester.tap(find.byKey(const Key('policy-briefing-finish')));
+    expect(find.byKey(const Key('policy-file-children')), findsNothing);
+    await tester.tap(find.byKey(const Key('story-continue')));
     await tester.pumpAndSettle();
     expectPortraitInside();
 
@@ -689,7 +677,7 @@ void main() {
       expectPortraitInside();
     }
     expect(find.byKey(const Key('orientation-roster-card')), findsOneWidget);
-    await tester.tap(find.byKey(const Key('orientation-roster-continue')));
+    await tester.tap(find.byKey(const Key('story-continue')));
     await tester.pumpAndSettle();
     expectPortraitInside();
     for (var index = 0; index < 9; index++) {
