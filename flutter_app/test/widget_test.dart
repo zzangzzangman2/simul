@@ -497,7 +497,7 @@ void main() {
     await advanceDialogue(tester, 43);
     expect(find.byKey(const Key('orientation-roster-card')), findsOneWidget);
     await advanceDialogue(tester, 1);
-    await advanceDialogue(tester, 21);
+    await advanceDialogue(tester, 28);
     expect(find.byKey(const Key('orientation-complete-card')), findsOneWidget);
   }
 
@@ -1003,7 +1003,7 @@ void main() {
                   .image
               as AssetImage)
           .assetName,
-      'assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_corridor_2000_v1.png',
+      'assets/images/photorealistic/prologue_1981_2000/bg_dorm_corridor_2000_photoreal_v1.png',
     );
     await advanceDialogue(tester, 4);
     expect(
@@ -1014,7 +1014,7 @@ void main() {
                   .image
               as AssetImage)
           .assetName,
-      'assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_day_2000_v1.png',
+      'assets/images/photorealistic/prologue_1981_2000/bg_dorm_shared_room_day_2000_photoreal_v1.png',
     );
     expect(find.textContaining('이층침대와 열 개의 사물함'), findsOneWidget);
     await advanceDialogue(tester, 6);
@@ -1026,12 +1026,36 @@ void main() {
                   .image
               as AssetImage)
           .assetName,
-      'assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_washroom_2000_v1.png',
+      'assets/images/photorealistic/prologue_1981_2000/bg_dorm_washroom_2000_photoreal_v1.png',
     );
     await advanceDialogue(tester, 1);
+    expect(
+      (tester
+                  .widget<Image>(
+                    find.byKey(const Key('story-background-image')),
+                  )
+                  .image
+              as AssetImage)
+          .assetName,
+      'assets/images/photorealistic/prologue_1981_2000/bg_dorm_shared_room_night_2000_photoreal_v1.png',
+    );
+    await advanceDialogue(tester, 3);
+    expect(
+      (tester
+                  .widget<Image>(
+                    find.byKey(const Key('story-background-image')),
+                  )
+                  .image
+              as AssetImage)
+          .assetName,
+      'assets/images/photorealistic/prologue_1981_2000/bg_stock_pc_classroom_2000_photoreal_v1.png',
+    );
+    await advanceDialogue(tester, 1);
+    expect(find.textContaining('한 사람당 컴퓨터 한 대'), findsOneWidget);
+    await advanceDialogue(tester, 3);
     expect(find.byKey(const Key('orientation-complete-card')), findsOneWidget);
     expect(find.byKey(const Key('stock-lesson-locked')), findsOneWidget);
-    expect(find.textContaining('남학생 둘과 여학생 여덟'), findsOneWidget);
+    expect(find.textContaining('학생마다 PC 한 대'), findsOneWidget);
     expect(
       find.byKey(const Key('academy-market-tutorial-screen')),
       findsNothing,
@@ -1181,30 +1205,34 @@ void main() {
     }
   });
 
-  testWidgets('visual novel onboarding ends before stocks and account setup', (
-    tester,
-  ) async {
-    await tester.binding.setSurfaceSize(const Size(390, 844));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-    await tester.pumpWidget(
-      const MillenniumCapitalApp(
-        campaignWorldPreparer: _skipCampaignWorldPreparation,
-      ),
-    );
-    await tester.pumpAndSettle();
+  testWidgets(
+    'visual novel onboarding ends after the PC classroom introduction',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(
+        const MillenniumCapitalApp(
+          campaignWorldPreparer: _skipCampaignWorldPreparation,
+        ),
+      );
+      await tester.pumpAndSettle();
 
-    await completeOrientationPreview(tester);
+      await completeOrientationPreview(tester);
 
-    expect(find.byKey(const Key('orientation-complete-card')), findsOneWidget);
-    expect(find.textContaining('남학생 둘과 여학생 여덟'), findsOneWidget);
-    expect(find.byKey(const Key('stock-lesson-locked')), findsOneWidget);
-    expect(
-      find.byKey(const Key('academy-market-tutorial-screen')),
-      findsNothing,
-    );
-    expect(find.byKey(const Key('apartment-place-bedroom')), findsNothing);
-    expect(find.byKey(const Key('company-name-input')), findsNothing);
-  });
+      expect(
+        find.byKey(const Key('orientation-complete-card')),
+        findsOneWidget,
+      );
+      expect(find.textContaining('학생마다 PC 한 대'), findsOneWidget);
+      expect(find.byKey(const Key('stock-lesson-locked')), findsOneWidget);
+      expect(
+        find.byKey(const Key('academy-market-tutorial-screen')),
+        findsNothing,
+      );
+      expect(find.byKey(const Key('apartment-place-bedroom')), findsNothing);
+      expect(find.byKey(const Key('company-name-input')), findsNothing);
+    },
+  );
 
   testWidgets('father card reveals and repays the academy tuition debt', (
     tester,

@@ -1,7 +1,8 @@
-# Cinematic soft-painted anime realism 런타임 자산
+# Cinematic soft-painted anime realism 인물·레거시 배경 자산
 
-2026-07-31부터 SIMUL의 정식 인물·배경 화풍은
-`cinematic soft-painted anime realism`이다.
+2026-07-31 제작 세트다. 2026-08-01부터 신규 정식 화풍은 밝은 실사풍이며,
+이 폴더의 인물은 실사 전환 전 정체성·포즈 자료이자 현재 임시 런타임 자산이다.
+정책실과 기숙사 배경은 밝은 실사 자산으로 교체되어 보관만 한다.
 
 ## 공통 렌더링
 
@@ -24,8 +25,8 @@
 - `policy_1981/baek_gihyeon/`: 백기현 비서실장 4종
 - `policy_1981/kang_incheol/`: 강인철 경제수석 4종
 - `policy_1981/yoon_mira/`: 윤미라 사회교육수석 4종
-- `policy_1981/backgrounds/`: 정책실·심야회의실 2종
-- `dormitory_2000/`: 제6기 중앙 복도·남녀 공용 생활실 낮·세면실·첫날 밤 4종
+- `policy_1981/backgrounds/`: 정책실·심야회의실 레거시 2종
+- `dormitory_2000/`: 제6기 기숙사 레거시 4종
 
 ## 정책실 인물 버전
 
@@ -33,5 +34,6 @@
 - 런타임과 대사 편집기는 백기현 `01_report_v2`~`04_confirmation_v2`, 강인철 `01_calculation_v2`~`04_revision_v2`만 사용한다.
 - 새 인물 생성 시 의상·안경·소품을 가린 얼굴 비교에서 기존 전체 등장인물과 즉시 구분되어야 한다.
 
-인물 파일은 1024×1536 RGBA 투명 PNG다. 현재 런타임은 프롤로그 1~15번 장면과
-수아 등장 장면에 이 자산을 사용한다. 구형 `historical_prologue` 파일은 보관용이다.
+인물 파일은 1024×1536 RGBA 투명 PNG다. 현재 런타임은 실사 인물 교체 전까지
+프롤로그 1~15번 장면과 수아 등장 장면에 이 자산을 임시 사용한다. 활성 배경은
+`assets/images/photorealistic/prologue_1981_2000/`을 따른다.

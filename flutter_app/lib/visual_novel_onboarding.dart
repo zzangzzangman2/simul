@@ -1,6 +1,6 @@
 part of 'main.dart';
 
-const _onboardingBeatCount = 66;
+const _onboardingBeatCount = 73;
 const _maximumDialogueBeatCount = 240;
 const _dialogueRuntimeStorageKey = 'future-academy-dialogue-runtime-v1';
 const _dialogueBundleAsset = 'assets/dialogue/dialogue-editor-override.json';
@@ -259,25 +259,31 @@ class _VisualNovelOnboardingScreenState
     if (override != null && override.isNotEmpty) return override;
     return switch (_beat) {
       <= 4 =>
-        'assets/images/cinematic_soft_painted/policy_1981/backgrounds/bg_policy_room_night_v1.png',
+        'assets/images/photorealistic/prologue_1981_2000/bg_policy_room_night_photoreal_v1.png',
       <= 15 =>
-        'assets/images/cinematic_soft_painted/policy_1981/backgrounds/bg_conference_night_v1.png',
+        'assets/images/photorealistic/prologue_1981_2000/bg_conference_night_photoreal_v1.png',
       16 =>
-        'assets/images/historical_prologue/bg_future_development_orphanage_1982_portrait_cartoon_v1.png',
+        'assets/images/photorealistic/prologue_1981_2000/bg_academy_opening_1982_photoreal_v1.png',
       <= 22 =>
-        'assets/images/historical_prologue/bg_orphanage_departure_2000_portrait_v1.png',
+        'assets/images/photorealistic/prologue_1981_2000/bg_orphanage_departure_2000_photoreal_v1.png',
       <= 31 =>
-        'assets/images/historical_prologue/bg_future_development_academy_gate_2000_portrait_v1.png',
+        'assets/images/photorealistic/prologue_1981_2000/bg_academy_gate_2000_photoreal_v1.png',
       <= 53 =>
-        'assets/images/historical_prologue/bg_future_development_orientation_hall_2000_portrait_v1.png',
+        'assets/images/photorealistic/prologue_1981_2000/bg_orientation_hall_2000_photoreal_v1.png',
       <= 57 =>
-        'assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_corridor_2000_v1.png',
+        'assets/images/photorealistic/prologue_1981_2000/bg_dorm_corridor_2000_photoreal_v1.png',
       <= 63 =>
-        'assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_day_2000_v1.png',
+        'assets/images/photorealistic/prologue_1981_2000/bg_dorm_shared_room_day_2000_photoreal_v1.png',
       64 =>
-        'assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_washroom_2000_v1.png',
+        'assets/images/photorealistic/prologue_1981_2000/bg_dorm_washroom_2000_photoreal_v1.png',
+      65 =>
+        'assets/images/photorealistic/prologue_1981_2000/bg_dorm_shared_room_night_2000_photoreal_v1.png',
+      66 =>
+        'assets/images/photorealistic/prologue_1981_2000/bg_dorm_shared_room_day_2000_photoreal_v1.png',
+      67 =>
+        'assets/images/photorealistic/prologue_1981_2000/bg_dorm_corridor_2000_photoreal_v1.png',
       _ =>
-        'assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_night_2000_v1.png',
+        'assets/images/photorealistic/prologue_1981_2000/bg_stock_pc_classroom_2000_photoreal_v1.png',
     };
   }
 
@@ -294,7 +300,9 @@ class _VisualNovelOnboardingScreenState
       <= 57 => '국립 미래양성원 · 기숙사 중앙 복도',
       <= 63 => '국립 미래양성원 · 제6기 공용 생활실',
       64 => '국립 미래양성원 · 기숙사 세면실',
-      _ => '국립 미래양성원 · 제6기 공용 생활실',
+      65 || 66 => '국립 미래양성원 · 제6기 공용 생활실',
+      67 => '국립 미래양성원 · 기숙사 중앙 복도',
+      _ => '국립 미래양성원 · 주식 PC 실습실',
     };
   }
 
@@ -309,7 +317,10 @@ class _VisualNovelOnboardingScreenState
       <= 53 => '2000.01.02  ·  08:00',
       <= 57 => '2000.01.02  ·  09:05',
       <= 64 => '2000.01.02  ·  09:10',
-      _ => '2000.01.02  ·  21:40',
+      65 => '2000.01.02  ·  21:40',
+      66 => '2000.01.03  ·  08:40',
+      67 => '2000.01.03  ·  08:55',
+      _ => '2000.01.03  ·  09:00',
     };
   }
 
@@ -362,6 +373,8 @@ class _VisualNovelOnboardingScreenState
       60 => 'assets/images/cinematic_soft_painted/sua/04_playful_tease_v1.png',
       56 =>
         'assets/images/historical_prologue/character_hakjun_orientation_v2.png',
+      70 =>
+        'assets/images/historical_prologue/character_hakjun_orientation_v2.png',
       62 => 'assets/images/protagonist_seed01/04_curious_question.png',
       28 || 30 || 39 || 46 =>
         'assets/images/historical_prologue/character_hakjun_orientation_v2.png',
@@ -385,7 +398,11 @@ class _VisualNovelOnboardingScreenState
       _beat == 59 ||
       _beat == 61 ||
       _beat == 63 ||
-      _beat == 64;
+      _beat == 64 ||
+      _beat == 67 ||
+      _beat == 69 ||
+      _beat == 71 ||
+      _beat == 72;
 
   bool get _isAcademyReceptionistBeat =>
       _beat == _stateAccountActivationBeat || _beat == 135;
@@ -394,10 +411,10 @@ class _VisualNovelOnboardingScreenState
     34 || 42 || 51 => 'assets/images/주식선생님/22_포즈1_주인공그림체_공통슬롯_투명.png',
     35 || 43 || 49 => 'assets/images/주식선생님/24_포즈3_주인공그림체_공통슬롯_투명.png',
     37 || 44 => 'assets/images/주식선생님/23_포즈2_주인공그림체_공통슬롯_투명.png',
-    45 || 53 || 64 => 'assets/images/주식선생님/26_포즈5_주인공그림체_공통슬롯_투명.png',
-    55 || 63 => 'assets/images/주식선생님/22_포즈1_주인공그림체_공통슬롯_투명.png',
-    57 || 61 => 'assets/images/주식선생님/24_포즈3_주인공그림체_공통슬롯_투명.png',
-    59 => 'assets/images/주식선생님/23_포즈2_주인공그림체_공통슬롯_투명.png',
+    45 || 53 || 64 || 72 => 'assets/images/주식선생님/26_포즈5_주인공그림체_공통슬롯_투명.png',
+    55 || 63 || 67 => 'assets/images/주식선생님/22_포즈1_주인공그림체_공통슬롯_투명.png',
+    57 || 61 || 69 => 'assets/images/주식선생님/24_포즈3_주인공그림체_공통슬롯_투명.png',
+    59 || 71 => 'assets/images/주식선생님/23_포즈2_주인공그림체_공통슬롯_투명.png',
     _ => 'assets/images/주식선생님/22_포즈1_주인공그림체_공통슬롯_투명.png',
   };
 
@@ -422,7 +439,9 @@ class _VisualNovelOnboardingScreenState
         52 ||
         54 ||
         58 ||
-        65 => '이야기',
+        65 ||
+        66 ||
+        68 => '이야기',
         1 || 9 || 12 || 14 => '전두광',
         2 || 7 || 11 || 13 => '서문태 정책실장',
         3 || 10 => '백기현 비서실장',
@@ -435,7 +454,7 @@ class _VisualNovelOnboardingScreenState
         24 || 33 => '아이들',
         25 || 29 || 31 || 36 || 38 || 47 => '수아',
         28 => '김학준',
-        30 || 39 || 46 || 56 => '학준',
+        30 || 39 || 46 || 56 || 70 => '학준',
         60 => '수아',
         62 => '나',
         34 ||
@@ -453,7 +472,11 @@ class _VisualNovelOnboardingScreenState
         59 ||
         61 ||
         63 ||
-        64 => '한서윤 선생님',
+        64 ||
+        67 ||
+        69 ||
+        71 ||
+        72 => '한서윤 선생님',
         _ => '이야기',
       };
 
@@ -474,7 +497,7 @@ class _VisualNovelOnboardingScreenState
         9 => '먹이고 재우는 데서 끝내면 세금 낭비지. 스스로 돈을 벌게 만들면 투자가 되고.',
         10 => '핏덩이들에게 나랏돈을 줬다가 잃으면 혈세 낭비라 할 겁니다. 벌면 나라가 코 묻은 돈을 빼앗는다고 할 테고요.',
         11 =>
-          '열 살, SEED 01부터 시작합니다. 원금은 만 원입니다. 작아서 우스워 보여도, 손실 이유를 감추기엔 충분히 큰 돈입니다.',
+          '열네 살, SEED 01부터 시작합니다. 원금은 만 원입니다. 작아서 우스워 보여도, 손실 이유를 감추기엔 충분히 큰 돈입니다.',
         12 => '잃으면?',
         13 => '아이 빚으로 남기지 않습니다. 대신 다음 달 주문 한도를 깎습니다. 벌면 일부를 국가가 회수하고요.',
         14 =>
@@ -547,8 +570,21 @@ class _VisualNovelOnboardingScreenState
           '오늘만 선착순이에요. 짐을 풀고 서로 이름부터 외우세요. 주식 수업은 내일 시작합니다. 주식이 뭔지도 모른다고 생각하고, 회사와 주식 한 주가 무엇인지부터 천천히 배울 거예요.',
         64 =>
           '세면대와 바구니도 한 사람당 하나씩입니다. 씻는 칸과 갈아입는 칸은 문을 잠그고 사용하세요. 같은 방을 쓴다는 말이 서로의 경계까지 없어진다는 뜻은 아니에요.',
-        _ =>
+        65 =>
           '밤 아홉 시 사십 분. 열 개의 침상에서 이불이 차례로 부풀었다. 남자 둘과 여자 여덟이 한 방을 쓰는 첫날, 낯선 숨소리 사이로 내일 배울 ‘주식’이라는 말만 오래 잠들지 않았다.',
+        66 =>
+          '다음 날 아침 여덟 시 사십 분. 창문으로 들어온 겨울 햇빛이 침상과 사물함을 환하게 훑었다. 세수를 마친 열 명은 공책 한 권씩 챙겼다.',
+        67 =>
+          '첫 수업은 교실이 아니라 PC 실습실에서 합니다. 앞으로 주식 수업은 각자 자기 컴퓨터로 화면을 직접 보면서 배울 거예요.',
+        68 =>
+          '문이 열리자 베이지색 모니터와 본체가 두 줄로 늘어서 있었다. 학생 자리마다 키보드와 줄 달린 마우스가 하나씩 놓여 있었다.',
+        69 =>
+          '자, 여기가 주식 PC 실습실이에요. 오늘부터 한 사람당 컴퓨터 한 대를 맡습니다. 하지만 아직 아무 버튼도 누르지 마세요.',
+        70 => '컴퓨터를 켜면 바로 주식을 살 수 있는 건가요?',
+        71 =>
+          '아니요. 먼저 회사가 무엇인지, 주식 한 주가 그 회사의 얼마나 작은 소유 조각인지부터 배웁니다. 모르는 말은 그 자리에서 바로 풀어 설명할게요.',
+        _ =>
+          '이제 자기 번호가 붙은 PC 앞에 앉으세요. 오늘 목표는 돈을 버는 게 아니라, 화면에 무엇이 있고 왜 숫자가 움직이는지 이해하는 겁니다.',
       };
 
   String? get _stageDirection {
@@ -620,6 +656,13 @@ class _VisualNovelOnboardingScreenState
       63 => '한서윤이 공용 책상 위 빈 장부를 펼쳐 보였다.',
       64 => '세면실 문 안쪽의 잠금쇠가 또각 소리를 냈다.',
       65 => '소등 뒤에도 창밖의 눈빛이 이층침대 난간에 가늘게 남아 있었다.',
+      66 => '알람시계가 울리기 전부터 침상 사다리와 사물함 문이 차례로 움직였다.',
+      67 => '한서윤이 출석부 대신 얇은 PC 좌석표를 들고 복도 끝으로 걸었다.',
+      68 => 'CRT 모니터 열 대가 꺼진 유리 화면으로 아이들을 비췄다.',
+      69 => '한서윤이 중앙 통로에 서서 양쪽 컴퓨터 줄을 펼친 손으로 가리켰다.',
+      70 => '학준의 시선이 전원 버튼과 키보드 사이를 빠르게 오갔다.',
+      71 => '한서윤이 칠판에 회사, 한 주, 가격 세 단어를 크게 적었다.',
+      72 => '교실 앞의 큰 CRT 화면 두 대에 아직 이름 없는 차트 선만 떠올랐다.',
       _ => null,
     };
   }
@@ -1194,7 +1237,7 @@ class _VisualNovelOnboardingScreenState
           child: const Column(
             children: [
               Text(
-                '제6기 첫날 · 기숙사 안내 완료',
+                '둘째 날 · 주식 PC 실습실 입실 완료',
                 style: TextStyle(
                   color: _ink,
                   fontSize: 13,
@@ -1203,7 +1246,7 @@ class _VisualNovelOnboardingScreenState
               ),
               SizedBox(height: 7),
               Text(
-                '남학생 둘과 여학생 여덟이 한 생활실을 함께 씁니다.\n다음 수업은 주식이 무엇인지부터 시작합니다.',
+                '학생마다 PC 한 대를 배정받았습니다.\n첫 수업은 회사와 주식 한 주의 뜻부터 시작합니다.',
                 key: Key('stock-lesson-locked'),
                 textAlign: TextAlign.center,
                 style: TextStyle(

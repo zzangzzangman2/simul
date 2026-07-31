@@ -85,7 +85,7 @@ void main() {
     },
   );
 
-  test('campaign age stays ten in 2000 and twenty in 2010', () {
+  test('legacy family campaign keeps its saved age convention', () {
     final story = engine.createNewGame('나이 기준 테스트').story;
 
     expect(story.ageOn(DateTime(2000, 1, 2)), 10);

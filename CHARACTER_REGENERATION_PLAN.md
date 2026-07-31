@@ -1,23 +1,26 @@
 # 현 스토리 등장인물 전면 재생성 계획
 
-확정일: 2026-07-31
+최종 방향 갱신: 2026-08-01
 
 ## 1. 최종 화풍
 
-- 공식 화풍: **cinematic soft-painted anime realism**
-- 최상위 렌더링 화풍 기준: `art_references/simul_cinematic_soft_painted_style_v1.png`
-- 얼굴 정체성 기준은 각 캐릭터의 승인된 기존 얼굴 이미지다. 위 화풍 기준 이미지는 피부·광원·붓질·명암 같은 렌더링 방식만 참고하고 수아의 얼굴, 머리, 체형을 다른 인물에게 복사하지 않는다.
-- 수아의 승인된 최종 전신 기준: `flutter_app/assets/images/cinematic_soft_painted/sua/`의 7종
-- 아래 주인공 친구 6종은 포즈·의상·캐릭터 정체성 참고용 레거시 기준이며, 렌더링 화풍은 공식 cinematic soft-painted 기준으로 재해석한다.
+- 공식 화풍: **bright photorealistic natural realism**
+- 최상위 렌더링 화풍 기준: `flutter_app/assets/images/photorealistic/prologue_1981_2000/`
+- 얼굴 정체성 기준은 각 캐릭터의 승인된 기존 얼굴 이미지다. 기존 그림에서는 얼굴·머리·체형·의상·포즈만 가져오고 선화와 채색은 복사하지 않는다.
+- 수아의 기존 7종은 실사 재생성 전 얼굴·교복·표정·포즈 정체성 자료다.
+- 아래 주인공 친구 6종은 포즈·의상·캐릭터 정체성 참고용 레거시 기준이며, 렌더링은 밝은 실사 기준으로 재해석한다.
   - `future_development_seed01_protagonist_friend_neutral_candidate_v1.png`
   - `future_development_seed01_protagonist_friend_smile_candidate_v1.png`
   - `future_development_seed01_protagonist_friend_laugh_candidate_v1.png`
   - `future_development_seed01_protagonist_friend_curious_candidate_v1.png`
   - `future_development_seed01_protagonist_friend_worried_candidate_v1.png`
   - `future_development_seed01_protagonist_friend_determined_candidate_v1.png`
-- 모든 신규·재생성 인물은 부드러운 페인터리 피부와 머리카락, 자연스러운 시네마틱 광원, 절제된 선, 애니메이션형 얼굴 비율을 함께 유지한다. 두꺼운 외곽선, 딱딱한 셀 명암, 플라스틱 3D 질감, 사진 같은 실사는 사용하지 않는다.
+- 모든 신규·재생성 인물은 자연스러운 피부·머리카락·직물과 실제 카메라 광원을 사용한다. 애니·카툰·페인터리 선화, 셀 명암, 플라스틱 3D 질감과 과도한 사진 보정은 사용하지 않는다.
 - 인물마다 얼굴 골격, 나이, 체형, 머리색, 눈색, 의상은 다르게 유지한다. 주인공 친구의 양갈래·붉은 장식·갈색 눈·여자 교복은 다른 인물에게 복사하지 않는다.
 - 성인에게 아동 얼굴과 체형을 복사하지 않고, 아동에게 성인 얼굴과 체형을 복사하지 않는다.
+- 제6기 신규 여학생 8명은 실제 중학교 1학년 또래의 풋풋함을 유지하면서 각자 예쁘장하고 아이돌 연습생처럼 정돈된 인상을 갖는다. 이전 5명과 기존 여성 캐릭터 얼굴은 생성 입력에서 제외하고, 생성 뒤 닮은꼴을 거르는 비교 자료로만 사용한다.
+- 여덟 명은 같은 평균 미인형 얼굴을 공유하지 않는다. 얼굴형·눈매·눈썹·코·입·헤어라인·머리 실루엣·키·체형의 조합을 인물마다 먼저 명세하고, 얼굴 골격·눈·코·머리 실루엣 중 최소 3개가 서로 다르지 않으면 재생성한다.
+- 여자 교복은 `art_references/future_development_female_uniform_photoreal_reference_01.png`와 `art_references/future_development_female_uniform_photoreal_reference_02.png`의 의상 구성·길이·체크 직물만 사용하고, 참조 사진 속 사람의 얼굴·피부·체형·포즈는 복사하지 않는다.
 
 ## 2. 제작 수량
 
@@ -41,19 +44,19 @@
 
 ## 3. 인물 정체성
 
-### 주인공 — 10살, SEED 01
+### 주인공 — 14살, SEED 01
 
 - 기존 주인공과 같은 검은 헝클어진 머리, 따뜻한 갈색 눈, 둥근 볼
-- 자연스러운 한국식 나이 10살 체형
+- 자연스러운 한국식 나이 14살 청소년 체형
 - 남자 SEED 교복은 `art_references/future_development_male_uniform_length_reference_v1.png`의 반소매 셔츠와 바지 길이를 유지하고 넥타이에 여자 교복과 같은 빨강 체크를 사용
-- 기존 `character_hero_age14_passbook_v1.png`의 14살 체형과 주황 파이핑 제복은 레거시이므로 복사하지 않음
+- 기존 `character_hero_age14_passbook_v1.png`는 체형 참고 후보로만 재검수하고 주황 파이핑 제복은 복사하지 않음
 
 24종은 [`PROTAGONIST_POSE_LIBRARY.md`](PROTAGONIST_POSE_LIBRARY.md)에 고정한다.
 표정만 바꾸지 않고 웃음·질문·항의·결의·당황·의심·설명·지목·손들기·명찰·
 통장·장부·계산·손실·승리·작별·보호 행동까지 손, 팔, 어깨와 체중 이동을
 각각 분리한다.
 
-### 김학준(학준) — 10살, SEED 01
+### 김학준(학준) — 14살, SEED 01
 
 - 주인공과 동갑
 - 단정한 갈색 머리, 회갈색 눈, 모범생 인상

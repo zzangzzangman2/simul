@@ -445,7 +445,7 @@ class _ChorePeriodNotice extends StatelessWidget {
               ),
               SizedBox(height: 3),
               Text(
-                '10살인 지금은 일반 고용 알바가 아니라, 보호자와 함께 참가하는 동네 축제 코스 상금으로 시작해요!',
+                '14살인 지금은 보호자와 함께 참가하는 안전한 동네 축제 코스 상금으로 시작해요!',
                 style: TextStyle(
                   color: Color(0xFF737C8E),
                   fontSize: 9.2,

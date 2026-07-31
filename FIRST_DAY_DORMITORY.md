@@ -1,10 +1,10 @@
-# 제6기 첫날 기숙사와 초보 주식 수업 경계
+# 제6기 첫날 기숙사와 둘째 날 PC 주식 수업 입실
 
 최종 갱신: 2026-08-01
 
 ## 현재 연결 범위
 
-리부트 프롤로그는 66장면이다. 오리엔테이션 마지막에 한서윤이
+리부트 프롤로그는 73장면이다. 오리엔테이션 마지막에 한서윤이
 `자, 이제 오늘은 첫날이니 기숙사 소개를 해줄게요`라고 말하고 학생들을
 기숙사로 데려간다.
 
@@ -15,13 +15,26 @@
 3. 남학생 2명과 여학생 8명이 함께 쓰는 공용 생활실
 4. 잠금 가능한 탈의·세면 칸이 있는 공용 세면실
 5. 21시 40분 소등 뒤 첫날 밤
+6. 다음 날 08시 40분 기상
+7. 08시 55분 PC 좌석표를 들고 이동
+8. 09시 주식 PC 실습실 입실과 수업 소개
 
 생활실은 성별로 구역을 나누지 않는다. 대신 침상·사물함·세면 바구니를 한
 사람당 하나씩 배정하고, 다른 학생의 자리를 허락 없이 건드리지 않는다.
 탈의·세면은 잠금 가능한 완전 칸막이에서 하며 불편한 일은 참지 않고 즉시
 말하는 규칙을 첫 안내에서 분명히 전달한다.
 
-## 다음 날 주식 튜토리얼 원칙
+## 연결된 둘째 날 PC 수업 소개
+
+학생 10명에게 베이지색 CRT PC·본체·키보드·유선 마우스를 한 세트씩
+배정한다. 한서윤은 중앙 통로에서 이 방이 앞으로 모든 주식 수업을 진행하는
+PC 실습실이라고 소개한다. 학준이 컴퓨터를 켜면 바로 주식을 살 수 있느냐고
+묻고, 한서윤은 버튼보다 먼저 회사·주식 한 주·가격을 설명한다고 답한다.
+
+현재 연결 끝은 PC 앞에 앉아 화면의 구성과 숫자가 움직이는 이유를 배우기
+직전이다. 실제 매수 클릭과 주문 실습은 다음 연결 범위다.
+
+## 이어질 초보 주식 튜토리얼 원칙
 
 다음 날 수업은 플레이어가 주식을 한 번도 본 적 없다고 가정한다. 화면을
 누르게 하기 전에 아래 개념을 생활어로 한 번씩 설명한다.
@@ -41,10 +54,12 @@
 
 ## 연결 자산
 
-- `bg_future_academy_dorm_corridor_2000_v1.png`
-- `bg_future_academy_dorm_shared_room_day_2000_v1.png`
-- `bg_future_academy_dorm_washroom_2000_v1.png`
-- `bg_future_academy_dorm_shared_room_night_2000_v1.png`
+- `photorealistic/prologue_1981_2000/bg_dorm_corridor_2000_photoreal_v1.png`
+- `photorealistic/prologue_1981_2000/bg_dorm_shared_room_day_2000_photoreal_v1.png`
+- `photorealistic/prologue_1981_2000/bg_dorm_washroom_2000_photoreal_v1.png`
+- `photorealistic/prologue_1981_2000/bg_dorm_shared_room_night_2000_photoreal_v1.png`
+- `photorealistic/prologue_1981_2000/bg_stock_pc_classroom_2000_photoreal_v1.png`
 
-모든 배경은 `cinematic soft-painted anime realism`, 1024×1536 세로형이며
-대화창 아래도 검은 그라데이션을 굽지 않은 완전한 배경이다.
+현재 프롤로그 배경 11종은 모두 밝은 `photorealistic natural realism`,
+1024×1536 세로형이며 대화창 아래도 검은 그라데이션을 굽지 않은 완전한
+배경이다. 밤 장면도 가구와 이동 동선이 보이도록 그림자 노출을 확보한다.

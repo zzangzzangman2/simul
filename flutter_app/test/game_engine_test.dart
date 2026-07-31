@@ -102,10 +102,17 @@ void main() {
     final state = engine.createNewGame('새천년투자연구소', story: story);
 
     expect(state.story.orphanageReboot, isTrue);
-    expect(state.story.playerBirthYear, 1991);
-    expect(state.story.ageOn(state.currentDate), 10);
+    expect(state.story.playerBirthYear, 1987);
+    expect(state.story.ageOn(state.currentDate), 14);
     expect(state.story.guardianAccountHolder, 'future_development_fund');
     expect(state.story.flagInt('futureDevelopmentCohort'), 6);
+    expect(state.story.academyLevel, 1);
+    expect(state.story.academyMaxLevel, 6);
+    expect(state.story.expectedSeedAge, 14);
+    expect(state.story.storyFlags['academyLevelTitle'], '첫빛');
+    expect(state.story.academyLevelOn(DateTime(2005, 1, 2)), 6);
+    expect(state.story.academyLevelTitleOn(DateTime(2005, 1, 2)), '내 이름');
+    expect(state.story.ageOn(DateTime(2005, 1, 2)), 19);
     expect(state.story.flagBool('stateAccountActive'), isTrue);
     expect(state.story.stateRecoveryRateBps, 2000);
     expect(state.story.stateRecoveryTotal, 0);
@@ -122,6 +129,35 @@ void main() {
     expect(state.ledger.single.counterAccount, 'state_seed_capital');
     expect(state.processedEventIds, contains(stateAccountSeedCapitalSourceId));
   });
+
+  test(
+    'old ten-year-old reboot saves migrate to the fourteen-year-old track',
+    () {
+      final oldStory = StoryState.newOrphanagePlayer(
+        playerName: '명박',
+        introChoice: 'stocks',
+        startingTrait: StoryTrait.analysis,
+        operatingPrinciple: FamilyRule.reportLosses,
+      ).toJson()..['playerBirthYear'] = 1991;
+      final oldFlags =
+          Map<String, dynamic>.from(
+              oldStory['storyFlags'] as Map<String, dynamic>,
+            )
+            ..remove('academyMaxLevel')
+            ..remove('seedTrackStartAge')
+            ..remove('seedTrackCompletionAge');
+      oldStory['storyFlags'] = oldFlags;
+
+      final migrated = StoryState.fromJson(oldStory, companyName: '이전 리부트 저장');
+
+      expect(migrated.playerBirthYear, 1987);
+      expect(migrated.ageOn(DateTime(2000, 1, 2)), 14);
+      expect(migrated.academyLevel, 1);
+      expect(migrated.academyMaxLevel, 6);
+      expect(migrated.expectedSeedAge, 14);
+      expect(migrated.storyFlags['seedTrackCompletionAge'], 19);
+    },
+  );
 
   test('market tutorial completion is stored in story state', () {
     final story = StoryState.newPlayer(

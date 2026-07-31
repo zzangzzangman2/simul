@@ -23,10 +23,10 @@
 | `DO_NOTS.md` | 반복하면 안 되는 구현·문서 패턴 |
 | `GAMEPLAY_GAPS.md` | 아직 연결되지 않은 기능 |
 | `ORPHANAGE_STORY_REBOOT.md` | 미래양성원 제6기 리부트 설정 |
-| `PROTAGONIST_AGE_LINE.md` | 10~19살과 SEED 01~10 성장선 |
+| `PROTAGONIST_AGE_LINE.md` | 14~19살과 SEED 01~06 성장선 |
 | `DIALOGUE_EDITOR_GUIDE.md` | 대사·장면·배경 편집과 빌드 규칙 |
-| `FIRST_DAY_DORMITORY.md` | 첫날 남녀 공용 기숙사 장면과 다음 날 초보 주식 수업 경계 |
-| `ART_STYLE_GUIDE.md` | `cinematic soft-painted anime realism` 제작 규칙 |
+| `FIRST_DAY_DORMITORY.md` | 첫날 남녀 공용 기숙사와 둘째 날 PC 주식 수업 입실 장면 |
+| `ART_STYLE_GUIDE.md` | 밝은 `photorealistic natural realism` 제작 규칙 |
 | `ART_STYLE_AUDIT.md` | 런타임 자산 승인·보류·폐기 기록 |
 | `CONTENT_GUIDE.md` | 가상기업·사건·업종 문법 |
 | `DATA_SOURCES.md` | 출처·라이선스·현실 자료 경계 |
@@ -48,6 +48,7 @@
 | `flutter_app/README.md` | Flutter 실행·검증과 핵심 파일 |
 | `flutter_app/assets/images/cinematic_soft_painted/README.md` | 현행 cinematic 런타임 자산군 |
 | `flutter_app/assets/images/cinematic_soft_painted/dormitory_2000/README.md` | 제6기 기숙사 배경 4종과 생성·검수 기준 |
+| `flutter_app/assets/images/photorealistic/prologue_1981_2000/README.md` | 밝은 실사 프롤로그·기숙사·주식 PC실 배경 11종 기준 |
 | `flutter_app/assets/images/historical_prologue/README.md` | 역사 프롤로그 자산별 제작·교체 이력 |
 | `flutter_app/assets/images/gameplay_map/README.md` | 장소·맵 자산 메모 |
 | `flutter_app/assets/images/real_estate/README.md` | 부동산 배경 자산 메모 |

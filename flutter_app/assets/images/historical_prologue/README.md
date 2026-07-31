@@ -75,8 +75,8 @@
 
 ### 등장인물
 
-- `assets/images/cinematic_soft_painted/sua/`: 사용자 승인 수아 얼굴·긴 검은 머리·10살 제6기 교복을 보존한 표정·동작 7종.
-- `character_hakjun_orientation_v2.png`: 수아와 같은 cinematic soft-painted anime realism 피부 명암으로 다시 그린, 규정집을 든 10살 제6기 라이벌 전신.
+- `assets/images/cinematic_soft_painted/sua/`: 사용자 승인 수아 얼굴·긴 검은 머리·제6기 교복을 보존한 이전 연령 표정·동작 7종. 14살 비율 재검수 전 보관본.
+- `character_hakjun_orientation_v2.png`: 수아와 같은 cinematic soft-painted anime realism 피부 명암으로 그린 규정집 든 제6기 라이벌 전신. 얼굴 정체성만 유지하고 14살 비율로 재생성한다.
 - `character_minho_farewell_v3.png`: 수아와 같은 부드러운 피부·눈가·머리카락 질감으로 다시 그린 7살 민호의 작별 전신. 긴 타원형 얼굴, 회청색 처진 눈, 주근깨와 잠옷·이불 정체성을 유지한다.
 
 세 인물 자산은 투명 RGBA로 정규화하고 필요한 크로마 원본은 soft matte와 despill로 처리했다.

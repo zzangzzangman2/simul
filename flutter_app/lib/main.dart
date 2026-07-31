@@ -1752,7 +1752,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     ),
     const SizedBox(height: 16),
     const Text(
-      '열 살인 나는 처음으로 뭐라고 말했을까?',
+      '열네 살인 나는 처음으로 뭐라고 말했을까?',
       style: TextStyle(color: _ink, fontSize: 14, fontWeight: FontWeight.w900),
     ),
     const SizedBox(height: 8),

@@ -3,6 +3,23 @@ enum StoryTrait { stability, innovation, analysis, control }
 enum FamilyRule { reportLosses, noHotTips, keepCash }
 
 class StoryState {
+  static const academyLevelKeys = <int, String>{
+    1: 'firstLight',
+    2: 'smallLedger',
+    3: 'hiddenValue',
+    4: 'marketGrain',
+    5: 'ownersSeat',
+    6: 'myName',
+  };
+  static const academyLevelTitles = <int, String>{
+    1: '첫빛',
+    2: '작은 장부',
+    3: '숨은 가치',
+    4: '시장의 결',
+    5: '주인의 자리',
+    6: '내 이름',
+  };
+
   const StoryState({
     required this.playerName,
     required this.playerBirthYear,
@@ -44,7 +61,7 @@ class StoryState {
   final List<String> companyCultureTags;
 
   /// The orphanage reboot uses the story's Korean year-age convention:
-  /// a 1991-born sixth-cohort student is ten in 2000. Family-world saves keep
+  /// a 1987-born sixth-cohort student is fourteen in 2000. Family-world saves keep
   /// their legacy pre-birthday convention for compatibility.
   int ageOn(DateTime date) =>
       (orphanageReboot
@@ -65,6 +82,17 @@ class StoryState {
   bool get academyTuitionRepaid =>
       academyTuitionOriginal > 0 && academyTuitionDebt <= 0;
   bool get orphanageReboot => flagBool('orphanageReboot');
+  int get academyLevel => flagInt('academyLevel', orphanageReboot ? 1 : 0);
+  int get academyMaxLevel =>
+      flagInt('academyMaxLevel', orphanageReboot ? 6 : 0);
+  int get expectedSeedAge => academyLevel + 13;
+  int academyLevelOn(DateTime date) => orphanageReboot
+      ? (ageOn(date) - 13).clamp(1, academyMaxLevel).toInt()
+      : academyLevel;
+  String academyLevelKeyOn(DateTime date) =>
+      academyLevelKeys[academyLevelOn(date)] ?? '';
+  String academyLevelTitleOn(DateTime date) =>
+      academyLevelTitles[academyLevelOn(date)] ?? '';
   int get stateRecoveryRateBps => flagInt('stateRecoveryRateBps', 2000);
   int get stateRecoveryTotal => flagInt('stateRecoveryTotal');
   int get selfRelianceReserve => flagInt('selfRelianceReserve');
@@ -179,7 +207,7 @@ class StoryState {
     };
     return StoryState(
       playerName: playerName.trim(),
-      playerBirthYear: 1991,
+      playerBirthYear: 1987,
       introChoice: introChoice,
       startingTrait: startingTrait,
       familyRule: operatingPrinciple,
@@ -198,6 +226,13 @@ class StoryState {
         'orphanageReboot': true,
         'futureDevelopmentCohort': 6,
         'storyAgeMode': 'koreanYearAge',
+        'academyProgram': 'seedTrack',
+        'academyLevel': 1,
+        'academyMaxLevel': 6,
+        'academyLevelKey': 'firstLight',
+        'academyLevelTitle': '첫빛',
+        'seedTrackStartAge': 14,
+        'seedTrackCompletionAge': 19,
         'campaignStartDate': '2000-01-02',
         'guardianConsent': true,
         'stateAccountActive': true,
@@ -335,8 +370,29 @@ class StoryState {
     final stored = (json['playerBirthYear'] as num?)?.toInt() ?? 1989;
     final flags =
         (json['storyFlags'] as Map?)?.cast<String, dynamic>() ?? const {};
-    if (flags['orphanageReboot'] == true && stored == 1985) return 1991;
+    if (flags['orphanageReboot'] == true) return 1987;
     return stored;
+  }
+
+  static Map<String, dynamic> _migratedStoryFlags(Map<String, dynamic> json) {
+    final stored =
+        (json['storyFlags'] as Map?)?.cast<String, dynamic>() ?? const {};
+    if (stored['orphanageReboot'] != true) return stored;
+    final migrated = Map<String, dynamic>.from(stored);
+    final storedLevel = (migrated['academyLevel'] as num?)?.toInt() ?? 1;
+    final academyLevel = storedLevel.clamp(1, 6).toInt();
+    migrated
+      ..['futureDevelopmentCohort'] = 6
+      ..['storyAgeMode'] = 'koreanYearAge'
+      ..['academyProgram'] = 'seedTrack'
+      ..['academyLevel'] = academyLevel
+      ..['academyMaxLevel'] = 6
+      ..['academyLevelKey'] = academyLevelKeys[academyLevel]
+      ..['academyLevelTitle'] = academyLevelTitles[academyLevel]
+      ..['seedTrackStartAge'] = 14
+      ..['seedTrackCompletionAge'] = 19
+      ..['selfRelianceUnlockAge'] = 19;
+    return migrated;
   }
 
   factory StoryState.fromJson(
@@ -368,8 +424,7 @@ class StoryState {
           (json['accountAuthorityLevel'] as num?)?.toInt() ?? 0,
       guardianAccountHolder:
           json['guardianAccountHolder'] as String? ?? 'mother',
-      storyFlags:
-          (json['storyFlags'] as Map?)?.cast<String, dynamic>() ?? const {},
+      storyFlags: _migratedStoryFlags(json),
       seenStoryEventIds: ((json['seenStoryEventIds'] as List?) ?? const [])
           .cast<String>(),
       companyCultureTags: ((json['companyCultureTags'] as List?) ?? const [])
