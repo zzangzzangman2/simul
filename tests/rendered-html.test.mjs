@@ -414,7 +414,11 @@ test("ships a simple dialogue editor and keeps future story beats synchronized",
   assert.match(editor, /대사 편집기/);
   assert.match(editor, /자동 저장됨/);
   assert.match(editor, /말맛 체크/);
-  assert.match(editor, /적용용 JSON 저장/);
+  assert.match(editor, /게임에 저장/);
+  assert.match(editor, /future-academy-dialogue-runtime-v1/);
+  assert.match(editor, /이 장면을 저장하시겠습니까/);
+  assert.match(editor, /저장 안 함/);
+  assert.match(editor, /저장하고 이동/);
   assert.match(editor, /새 장면 .*개 자동 추가/);
   assert.equal((data.match(/"id": "scene-/g) ?? []).length, 54);
   assert.match(data, /단팥빵 하나와 500원/);

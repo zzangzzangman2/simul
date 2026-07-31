@@ -644,6 +644,48 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('dialogue editor save overrides the next prologue immediately', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'future-academy-dialogue-runtime-v1': jsonEncode({
+        'version': 1,
+        'updatedAt': '2000-01-02T00:00:00.000Z',
+        'scenes': [
+          {
+            'id': 'scene-001',
+            'order': 1,
+            'chapter': '프롤로그',
+            'date': '편집기 날짜',
+            'location': '편집기 장소',
+            'speaker': '편집기 화자',
+            'direction': '편집기에서 고친 지문이다.',
+            'line': '편집기에서 고친 대사가 게임에 적용됐다.',
+            'background': '',
+            'character': '',
+          },
+        ],
+      }),
+    });
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      const MillenniumCapitalApp(
+        campaignWorldPreparer: _skipCampaignWorldPreparation,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await startNewGame(tester);
+    await tester.pumpAndSettle();
+
+    expect(find.text('편집기 화자'), findsOneWidget);
+    expect(find.text('편집기에서 고친 지문이다.'), findsOneWidget);
+    expect(find.text('편집기에서 고친 대사가 게임에 적용됐다.'), findsOneWidget);
+    expect(find.textContaining('편집기 장소'), findsOneWidget);
+    expect(find.textContaining('편집기 날짜'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'prologue introduces Sua, Hak-jun, and the twenty-student cohort',
     (tester) async {

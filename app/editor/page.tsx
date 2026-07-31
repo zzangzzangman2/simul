@@ -13,6 +13,8 @@ import { DialogueScene, initialDialogue } from "./dialogue-data";
 import styles from "./editor.module.css";
 
 const STORAGE_KEY = "future-academy-dialogue-editor-v1";
+const GAME_STORAGE_KEY = "future-academy-dialogue-runtime-v1";
+const FLUTTER_GAME_STORAGE_KEY = `flutter.${GAME_STORAGE_KEY}`;
 
 type SavedDraft = {
   version: 1;
@@ -34,6 +36,33 @@ function validScenes(value: unknown): value is DialogueScene[] {
       typeof scene.speaker === "string" &&
       typeof scene.line === "string",
   );
+}
+
+function mergeWithCurrentStory(saved: DialogueScene[]) {
+  const savedById = new Map(saved.map((scene) => [scene.id, scene]));
+  const builtInIds = new Set(initialDialogue.map((scene) => scene.id));
+  return [
+    ...initialDialogue.map((scene) => ({
+      ...scene,
+      ...(savedById.get(scene.id) ?? {}),
+    })),
+    ...saved.filter((scene) => !builtInIds.has(scene.id)),
+  ].map((scene, index) => ({ ...scene, order: index + 1 }));
+}
+
+function sceneFingerprint(scene: DialogueScene | undefined) {
+  if (!scene) return "";
+  return JSON.stringify({
+    order: scene.order,
+    chapter: scene.chapter,
+    date: scene.date,
+    location: scene.location,
+    speaker: scene.speaker,
+    direction: scene.direction,
+    line: scene.line,
+    background: scene.background,
+    character: scene.character,
+  });
 }
 
 function downloadFile(name: string, contents: string, type: string) {
@@ -81,12 +110,14 @@ function tasteChecks(scene: DialogueScene) {
 
 export default function DialogueEditorPage() {
   const [scenes, setScenes] = useState<DialogueScene[]>(cloneInitial);
+  const [appliedScenes, setAppliedScenes] = useState<DialogueScene[]>(cloneInitial);
   const [selectedId, setSelectedId] = useState(initialDialogue[0]?.id ?? "");
   const [query, setQuery] = useState("");
   const [speakerFilter, setSpeakerFilter] = useState("전체");
   const [ready, setReady] = useState(false);
   const [saveLabel, setSaveLabel] = useState("불러오는 중");
   const [notice, setNotice] = useState("");
+  const [pendingSceneId, setPendingSceneId] = useState<string | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -96,20 +127,8 @@ export default function DialogueEditorPage() {
         if (raw) {
           const parsed = JSON.parse(raw) as SavedDraft;
           if (validScenes(parsed.scenes)) {
-            const savedById = new Map(
-              parsed.scenes.map((scene) => [scene.id, scene]),
-            );
             const builtInIds = new Set(initialDialogue.map((scene) => scene.id));
-            const mergedDefaults = initialDialogue.map((scene) => ({
-              ...scene,
-              ...(savedById.get(scene.id) ?? {}),
-            }));
-            const customScenes = parsed.scenes.filter(
-              (scene) => !builtInIds.has(scene.id),
-            );
-            const merged = [...mergedDefaults, ...customScenes].map(
-              (scene, index) => ({ ...scene, order: index + 1 }),
-            );
+            const merged = mergeWithCurrentStory(parsed.scenes);
             const addedCount = Math.max(
               0,
               initialDialogue.length -
@@ -122,6 +141,14 @@ export default function DialogueEditorPage() {
                 ? `새 장면 ${addedCount}개 자동 추가`
                 : "임시저장 불러옴",
             );
+          }
+        }
+
+        const appliedRaw = localStorage.getItem(GAME_STORAGE_KEY);
+        if (appliedRaw) {
+          const applied = JSON.parse(appliedRaw) as SavedDraft;
+          if (validScenes(applied.scenes)) {
+            setAppliedScenes(mergeWithCurrentStory(applied.scenes));
           }
         }
       } catch {
@@ -163,6 +190,28 @@ export default function DialogueEditorPage() {
   );
   const selected = scenes[selectedIndex] ?? scenes[0];
 
+  const appliedById = useMemo(
+    () => new Map(appliedScenes.map((scene) => [scene.id, scene])),
+    [appliedScenes],
+  );
+  const dirtyIds = useMemo(() => {
+    const dirty = new Set<string>();
+    for (const scene of scenes) {
+      if (sceneFingerprint(scene) !== sceneFingerprint(appliedById.get(scene.id))) {
+        dirty.add(scene.id);
+      }
+    }
+    for (const applied of appliedScenes) {
+      if (!scenes.some((scene) => scene.id === applied.id)) dirty.add(applied.id);
+    }
+    return dirty;
+  }, [appliedById, appliedScenes, scenes]);
+  const dirtyCount = dirtyIds.size;
+  const selectedDirty = selected ? dirtyIds.has(selected.id) : false;
+  const pendingScene = pendingSceneId
+    ? scenes.find((scene) => scene.id === pendingSceneId)
+    : undefined;
+
   const speakers = useMemo(
     () => ["전체", ...Array.from(new Set(scenes.map((scene) => scene.speaker))).sort()],
     [scenes],
@@ -180,6 +229,16 @@ export default function DialogueEditorPage() {
     });
   }, [query, scenes, speakerFilter]);
 
+  useEffect(() => {
+    if (!dirtyCount) return;
+    const warnBeforeClose = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warnBeforeClose);
+    return () => window.removeEventListener("beforeunload", warnBeforeClose);
+  }, [dirtyCount]);
+
   const warnings = selected ? tasteChecks(selected) : [];
 
   function updateSelected(patch: Partial<DialogueScene>) {
@@ -189,9 +248,59 @@ export default function DialogueEditorPage() {
     );
   }
 
+  function saveToGame() {
+    const payload: SavedDraft = {
+      version: 1,
+      updatedAt: new Date().toISOString(),
+      scenes,
+    };
+    const raw = JSON.stringify(payload);
+
+    // shared_preferences_web stores Dart strings as a JSON-encoded localStorage value.
+    localStorage.setItem(GAME_STORAGE_KEY, raw);
+    localStorage.setItem(FLUTTER_GAME_STORAGE_KEY, JSON.stringify(raw));
+    localStorage.setItem(STORAGE_KEY, raw);
+    setAppliedScenes(scenes.map((scene) => ({ ...scene })));
+    setSaveLabel("임시저장됨");
+    setNotice("게임에 바로 적용했어요 · 새 게임에서 확인할 수 있어요");
+  }
+
+  function requestScene(targetId: string) {
+    if (targetId === selectedId) return;
+    if (selectedDirty) {
+      setPendingSceneId(targetId);
+      return;
+    }
+    setSelectedId(targetId);
+  }
+
+  function discardCurrentAndMove() {
+    if (!pendingSceneId || !selected) return;
+    const applied = appliedById.get(selected.id);
+    setScenes((current) => {
+      const restored = applied
+        ? current.map((scene) =>
+            scene.id === selected.id ? { ...applied } : scene,
+          )
+        : current.filter((scene) => scene.id !== selected.id);
+      return restored.map((scene, index) => ({ ...scene, order: index + 1 }));
+    });
+    setSelectedId(pendingSceneId);
+    setPendingSceneId(null);
+    setNotice("수정 내용을 버리고 이동했어요");
+  }
+
+  function saveCurrentAndMove() {
+    if (!pendingSceneId) return;
+    const targetId = pendingSceneId;
+    saveToGame();
+    setPendingSceneId(null);
+    setSelectedId(targetId);
+  }
+
   function selectRelative(offset: number) {
     const next = Math.min(Math.max(selectedIndex + offset, 0), scenes.length - 1);
-    setSelectedId(scenes[next].id);
+    requestScene(scenes[next].id);
   }
 
   function addScene() {
@@ -305,8 +414,11 @@ export default function DialogueEditorPage() {
     if (!window.confirm("모든 수정을 버리고 현재 게임 원본으로 돌아갈까요?")) return;
     const reset = cloneInitial();
     setScenes(reset);
+    setAppliedScenes(reset);
     setSelectedId(reset[0].id);
     localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(GAME_STORAGE_KEY);
+    localStorage.removeItem(FLUTTER_GAME_STORAGE_KEY);
     setNotice("게임 원본으로 되돌렸어요");
   }
 
@@ -319,7 +431,7 @@ export default function DialogueEditorPage() {
   function handleEditorKey(event: KeyboardEvent<HTMLElement>) {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
       event.preventDefault();
-      exportJson();
+      saveToGame();
     }
     if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
       event.preventDefault();
@@ -339,9 +451,13 @@ export default function DialogueEditorPage() {
             <p>미래양성원 제6기 · {scenes.length}개 장면</p>
           </div>
         </div>
-        <div className={styles.saveState}>
+        <div
+          className={`${styles.saveState} ${dirtyCount ? styles.saveStateDirty : ""}`}
+        >
           <i />
-          {saveLabel}
+          {dirtyCount
+            ? `게임 미적용 ${dirtyCount}개 · ${saveLabel}`
+            : `게임 적용 완료 · ${saveLabel}`}
         </div>
         <nav className={styles.actions} aria-label="파일 메뉴">
           <a href="/play/index.html" target="_blank" rel="noreferrer">
@@ -353,8 +469,11 @@ export default function DialogueEditorPage() {
           <button type="button" onClick={exportTxt}>
             TXT 저장
           </button>
-          <button className={styles.primaryAction} type="button" onClick={exportJson}>
-            적용용 JSON 저장
+          <button type="button" onClick={exportJson}>
+            JSON 백업
+          </button>
+          <button className={styles.primaryAction} type="button" onClick={saveToGame}>
+            게임에 저장{dirtyCount ? ` · ${dirtyCount}` : ""}
           </button>
           <input
             ref={importRef}
@@ -401,9 +520,12 @@ export default function DialogueEditorPage() {
                 className={scene.id === selected.id ? styles.sceneActive : styles.sceneItem}
                 type="button"
                 key={scene.id}
-                onClick={() => setSelectedId(scene.id)}
+                onClick={() => requestScene(scene.id)}
                 aria-current={scene.id === selected.id ? "true" : undefined}
               >
+                {dirtyIds.has(scene.id) ? (
+                  <i className={styles.dirtyMark} aria-label="게임에 저장되지 않은 수정" />
+                ) : null}
                 <span className={styles.sceneNumber}>
                   {String(scene.order).padStart(2, "0")}
                 </span>
@@ -568,12 +690,41 @@ export default function DialogueEditorPage() {
           </div>
           <div className={styles.previewTips}>
             <span>단축키</span>
-            <b>Ctrl/⌘ + S</b> JSON 저장
+            <b>Ctrl/⌘ + S</b> 게임에 저장
             <b>Ctrl/⌘ + Enter</b> 다음 장면
           </div>
         </aside>
       </section>
       {notice ? <div className={styles.toast}>{notice}</div> : null}
+      {pendingSceneId ? (
+        <div className={styles.modalBackdrop}>
+          <section
+            className={styles.saveModal}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="save-dialogue-title"
+          >
+            <span className={styles.modalIcon}>✎</span>
+            <h3 id="save-dialogue-title">이 장면을 저장하시겠습니까?</h3>
+            <p>
+              장면 {String(selected.order).padStart(2, "0")}의 수정 내용이 아직 게임에
+              적용되지 않았어요.
+              {pendingScene ? ` 장면 ${String(pendingScene.order).padStart(2, "0")}로 이동할게요.` : ""}
+            </p>
+            <div className={styles.modalActions}>
+              <button type="button" onClick={() => setPendingSceneId(null)}>
+                취소
+              </button>
+              <button className={styles.discardAction} type="button" onClick={discardCurrentAndMove}>
+                저장 안 함
+              </button>
+              <button className={styles.confirmAction} type="button" onClick={saveCurrentAndMove} autoFocus>
+                저장하고 이동
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </main>
   );
 }
