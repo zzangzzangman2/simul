@@ -37,7 +37,7 @@ const CHARACTER_GROUPS = [
 
 type SavedDraft = {
   version: 1;
-  appearanceVersion?: 6;
+  appearanceVersion?: 8;
   updatedAt: string;
   scenes: DialogueScene[];
 };
@@ -298,7 +298,7 @@ export default function DialogueEditorPage() {
             const builtInIds = new Set(initialDialogue.map((scene) => scene.id));
             const merged = mergeWithCurrentStory(
               parsed.scenes,
-              parsed.appearanceVersion !== 6,
+              parsed.appearanceVersion !== 8,
             );
             const addedCount = Math.max(
               0,
@@ -322,7 +322,7 @@ export default function DialogueEditorPage() {
             setAppliedScenes(
               mergeWithCurrentStory(
                 applied.scenes,
-                applied.appearanceVersion !== 6,
+                applied.appearanceVersion !== 8,
               ),
             );
             setLastBuiltAt(applied.updatedAt);
@@ -345,7 +345,7 @@ export default function DialogueEditorPage() {
     const timer = window.setTimeout(() => {
       const draft: SavedDraft = {
         version: 1,
-        appearanceVersion: 6,
+        appearanceVersion: 8,
         updatedAt: new Date().toISOString(),
         scenes,
       };
@@ -463,7 +463,7 @@ export default function DialogueEditorPage() {
     const snapshot = scenes.map((scene) => normalizeScene({ ...scene }));
     const payload: SavedDraft = {
       version: 1,
-      appearanceVersion: 6,
+      appearanceVersion: 8,
       updatedAt: new Date().toISOString(),
       scenes: snapshot,
     };
@@ -612,7 +612,7 @@ export default function DialogueEditorPage() {
   function exportJson() {
     const payload: SavedDraft = {
       version: 1,
-      appearanceVersion: 6,
+      appearanceVersion: 8,
       updatedAt: new Date().toISOString(),
       scenes,
     };
@@ -652,13 +652,13 @@ export default function DialogueEditorPage() {
         direction: normalizeDialogueText(scene.direction || ""),
         line: normalizeDialogueText(scene.line || ""),
         background:
-          appearanceVersion === 6
+          appearanceVersion === 8
             ? scene.background || ""
             : initialDialogue.find((current) => current.id === scene.id)?.background ||
               scene.background ||
               "",
         character:
-          appearanceVersion === 6
+          appearanceVersion === 8
             ? scene.character || ""
             : initialDialogue.find((current) => current.id === scene.id)?.character ||
               scene.character ||
@@ -679,7 +679,7 @@ export default function DialogueEditorPage() {
     setSelectedId(reset[0].id);
     const payload: SavedDraft = {
       version: 1,
-      appearanceVersion: 6,
+      appearanceVersion: 8,
       updatedAt: new Date().toISOString(),
       scenes: reset,
     };

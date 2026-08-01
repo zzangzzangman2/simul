@@ -9572,7 +9572,7 @@ class _PracticalTradeTutorialSheet extends StatefulWidget {
 
 class _PracticalTradeTutorialSheetState
     extends State<_PracticalTradeTutorialSheet> {
-  static const _practiceSeedMoney = 1000000;
+  static const _practiceSeedMoney = initialCompanyCash;
   static const _practiceMinute = krxOpenMinute + 10;
   static const _engine = GameEngine();
 
@@ -9860,7 +9860,7 @@ class _PracticalTradeTutorialSheetState
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             const Text(
-              '국가 모의계좌',
+              '국가 실습계좌',
               style: TextStyle(
                 color: Color(0xFF8D762E),
                 fontSize: 10,
@@ -9903,7 +9903,7 @@ class _PracticalTradeTutorialSheetState
           state: _practiceState,
           minute: _practiceMinuteNotifier,
           onExecuteTrade: _executePracticeOrder,
-          balanceLabel: isBuy ? '국가 모의계좌 주문 가능 예수금' : null,
+          balanceLabel: isBuy ? '국가 실습계좌 주문 가능 예수금' : null,
           submitLabel: isBuy ? '지정가 매수 주문 실행' : '매도 주문 실행',
           successLabel: isBuy ? '시간별 계좌 변화 확인하기' : '선생님께 돌아가 결과 보기',
           forceActionHighlight: true,
@@ -10215,7 +10215,7 @@ class _PracticalTradeTutorialSheetState
             child: Column(
               children: [
                 _PracticeSummaryRow(
-                  label: '시작 모의 원금',
+                  label: '시작 국가원금',
                   value: '${_money(_practiceSeedMoney)}원',
                 ),
                 _PracticeSummaryRow(
@@ -10245,7 +10245,7 @@ class _PracticalTradeTutorialSheetState
           ),
           const SizedBox(height: 12),
           const Text(
-            '이 장면은 주문법을 익히는 모의 체결입니다. 완료 뒤 실제 국가계좌 원금 10,000원은 그대로 유지됩니다.',
+            '실제 한빛통신 시세·호가를 복제한 수업용 계좌입니다. 완료 뒤 정식 국가계좌 원금 10,000원은 그대로 유지됩니다.',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Color(0xFF8B6F21),

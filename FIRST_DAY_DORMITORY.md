@@ -54,12 +54,12 @@ PC 실습실이라고 소개한다. 학준이 컴퓨터를 켜면 바로 주식�
 
 ## 연결 자산
 
-- `photorealistic/prologue_1981_2000/bg_dorm_corridor_2000_photoreal_v1.png`
-- `photorealistic/prologue_1981_2000/bg_dorm_shared_room_day_2000_photoreal_v1.png`
-- `photorealistic/prologue_1981_2000/bg_dorm_washroom_2000_photoreal_v1.png`
-- `photorealistic/prologue_1981_2000/bg_dorm_shared_room_night_2000_photoreal_v1.png`
-- `photorealistic/prologue_1981_2000/bg_stock_pc_classroom_2000_photoreal_v1.png`
+- `cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_corridor_2000_v1.png`
+- `cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_day_2000_v1.png`
+- `cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_washroom_2000_v1.png`
+- `cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_night_2000_v1.png`
+- `bg_stock_academy_2000_portrait_cartoon_v4.png`
 
-현재 프롤로그 배경 11종은 모두 밝은 `photorealistic natural realism`,
-1024×1536 세로형이며 대화창 아래도 검은 그라데이션을 굽지 않은 완전한
-배경이다. 밤 장면도 가구와 이동 동선이 보이도록 그림자 노출을 확보한다.
+현재 연결 배경은 모두 카툰·소프트 페인터리 세로형이며 대화창 아래도 검은
+그라데이션을 굽지 않은 완전한 배경이다. 밤 장면도 가구와 이동 동선이 보이도록
+그림자 노출을 확보한다.

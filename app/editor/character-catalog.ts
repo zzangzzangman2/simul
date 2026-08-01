@@ -68,27 +68,6 @@ const suaPoses = [
   pose(id, label, `assets/images/cinematic_soft_painted/sua/${file}`),
 );
 
-const iseoPoses = [
-  ["01", "차분한 기본", "01_neutral_master.png"],
-  ["02", "밝은 인사 웃음", "02_bright_greeting_smile.png"],
-  ["03", "차분한 설명", "03_calm_explain_hands_together.png"],
-  ["04", "궁금한 질문", "04_curious_open_palm.png"],
-  ["05", "깜짝 놀람", "05_surprised_hands_up.png"],
-  ["06", "걱정", "06_worried_hands_clasped.png"],
-  ["07", "수줍음", "07_shy_hair_touch.png"],
-  ["08", "살짝 삐침", "08_mild_annoyed_arms_crossed.png"],
-  ["09", "의심", "09_skeptical_hand_on_hip.png"],
-  ["10", "단호한 결심", "10_determined_fist.png"],
-  ["11", "속상함", "11_sad_downcast.png"],
-  ["12", "화난 항의", "12_angry_hand_on_hip.png"],
-].map(([id, label, file]) =>
-  pose(
-    id,
-    label,
-    `assets/images/photorealistic/students/choi_iseo/${file}`,
-  ),
-);
-
 function policyPoses(
   character: string,
   entries: [string, string, string][],
@@ -169,11 +148,6 @@ export const dialogueCharacters: DialogueCharacter[] = [
     speaker: "수아",
     group: "주요 인물",
     poses: suaPoses,
-  },
-  {
-    speaker: "이서",
-    group: "미래양성원",
-    poses: iseoPoses,
   },
   {
     speaker: "학준",

@@ -785,37 +785,37 @@ void main() {
 
     expect(
       visibleBackgroundAsset(),
-      'assets/images/photorealistic/prologue_1981_2000/bg_policy_room_night_photoreal_v1.png',
+      'assets/images/cinematic_soft_painted/policy_1981/backgrounds/bg_policy_room_night_v1.png',
     );
 
     await advanceDialogue(tester, 5);
     expect(
       visibleBackgroundAsset(),
-      'assets/images/photorealistic/prologue_1981_2000/bg_conference_night_photoreal_v1.png',
+      'assets/images/cinematic_soft_painted/policy_1981/backgrounds/bg_conference_night_v1.png',
     );
 
     await advanceDialogue(tester, 11);
     expect(
       visibleBackgroundAsset(),
-      'assets/images/photorealistic/prologue_1981_2000/bg_academy_opening_1982_photoreal_v1.png',
+      'assets/images/historical_prologue/bg_future_development_orphanage_1982_portrait_cartoon_v1.png',
     );
 
     await advanceDialogue(tester, 1);
     expect(
       visibleBackgroundAsset(),
-      'assets/images/photorealistic/prologue_1981_2000/bg_orphanage_departure_2000_photoreal_v1.png',
+      'assets/images/historical_prologue/bg_orphanage_departure_2000_portrait_v1.png',
     );
 
     await advanceDialogue(tester, 6);
     expect(
       visibleBackgroundAsset(),
-      'assets/images/photorealistic/prologue_1981_2000/bg_academy_gate_2000_photoreal_v1.png',
+      'assets/images/historical_prologue/bg_future_development_academy_gate_2000_portrait_v1.png',
     );
 
     await advanceDialogue(tester, 9);
     expect(
       visibleBackgroundAsset(),
-      'assets/images/photorealistic/prologue_1981_2000/bg_orientation_hall_2000_photoreal_v1.png',
+      'assets/images/historical_prologue/bg_future_development_orientation_hall_2000_portrait_v1.png',
     );
     expect(find.byKey(const Key('orientation-light-flicker')), findsOneWidget);
     expect(find.byKey(const Key('orientation-dust-motes')), findsOneWidget);
@@ -1003,7 +1003,7 @@ void main() {
                   .image
               as AssetImage)
           .assetName,
-      'assets/images/photorealistic/prologue_1981_2000/bg_dorm_corridor_2000_photoreal_v1.png',
+      'assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_corridor_2000_v1.png',
     );
     await advanceDialogue(tester, 4);
     expect(
@@ -1014,7 +1014,7 @@ void main() {
                   .image
               as AssetImage)
           .assetName,
-      'assets/images/photorealistic/prologue_1981_2000/bg_dorm_shared_room_day_2000_photoreal_v1.png',
+      'assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_day_2000_v1.png',
     );
     expect(find.textContaining('이층침대와 열 개의 사물함'), findsOneWidget);
     await advanceDialogue(tester, 6);
@@ -1026,7 +1026,7 @@ void main() {
                   .image
               as AssetImage)
           .assetName,
-      'assets/images/photorealistic/prologue_1981_2000/bg_dorm_washroom_2000_photoreal_v1.png',
+      'assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_washroom_2000_v1.png',
     );
     await advanceDialogue(tester, 1);
     expect(
@@ -1037,7 +1037,7 @@ void main() {
                   .image
               as AssetImage)
           .assetName,
-      'assets/images/photorealistic/prologue_1981_2000/bg_dorm_shared_room_night_2000_photoreal_v1.png',
+      'assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_night_2000_v1.png',
     );
     await advanceDialogue(tester, 3);
     expect(
@@ -1048,14 +1048,15 @@ void main() {
                   .image
               as AssetImage)
           .assetName,
-      'assets/images/photorealistic/prologue_1981_2000/bg_stock_pc_classroom_2000_photoreal_v1.png',
+      'assets/images/bg_stock_academy_2000_portrait_cartoon_v4.png',
     );
     await advanceDialogue(tester, 1);
     expect(find.textContaining('한 사람당 컴퓨터 한 대'), findsOneWidget);
     await advanceDialogue(tester, 3);
     expect(find.byKey(const Key('orientation-complete-card')), findsOneWidget);
-    expect(find.byKey(const Key('stock-lesson-locked')), findsOneWidget);
-    expect(find.textContaining('학생마다 PC 한 대'), findsOneWidget);
+    expect(find.byKey(const Key('academy-pc-powered-off')), findsOneWidget);
+    expect(find.byKey(const Key('academy-pc-power-toggle')), findsOneWidget);
+    expect(find.text('전원 OFF'), findsOneWidget);
     expect(
       find.byKey(const Key('academy-market-tutorial-screen')),
       findsNothing,
@@ -1063,7 +1064,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('prologue skip stops at the locked PC classroom ending', (
+  testWidgets('prologue skip stops at the interactive PC classroom', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
@@ -1083,9 +1084,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('orientation-complete-card')), findsOneWidget);
-    expect(find.byKey(const Key('stock-lesson-locked')), findsOneWidget);
-    expect(find.byKey(const Key('player-name-input')), findsNothing);
-    expect(find.byKey(const Key('company-name-input')), findsNothing);
+    expect(find.byKey(const Key('academy-pc-powered-off')), findsOneWidget);
+    expect(find.byKey(const Key('academy-pc-power-toggle')), findsOneWidget);
+    expect(find.byKey(const Key('academy-player-name-input')), findsNothing);
+    expect(find.byKey(const Key('academy-company-name-input')), findsNothing);
     expect(
       find.byKey(const Key('academy-market-tutorial-screen')),
       findsNothing,
@@ -1205,32 +1207,101 @@ void main() {
     }
   });
 
+  testWidgets('visual novel onboarding ends at the powered-off classroom PC', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      const MillenniumCapitalApp(
+        campaignWorldPreparer: _skipCampaignWorldPreparation,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await completeOrientationPreview(tester);
+
+    expect(find.byKey(const Key('orientation-complete-card')), findsOneWidget);
+    expect(find.byKey(const Key('academy-pc-powered-off')), findsOneWidget);
+    expect(find.byKey(const Key('academy-pc-power-toggle')), findsOneWidget);
+    expect(find.text('전원 OFF'), findsOneWidget);
+    expect(
+      find.byKey(const Key('academy-market-tutorial-screen')),
+      findsNothing,
+    );
+    expect(find.byKey(const Key('apartment-place-bedroom')), findsNothing);
+    expect(find.byKey(const Key('company-name-input')), findsNothing);
+  });
+
   testWidgets(
-    'visual novel onboarding ends after the PC classroom introduction',
+    'classroom PC powers on and launches the first live stock lesson',
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(390, 844));
       addTearDown(() => tester.binding.setSurfaceSize(null));
+      final preferences = await SharedPreferences.getInstance();
+      final persistence = GamePersistence(preferences: preferences);
+
       await tester.pumpWidget(
-        const MillenniumCapitalApp(
+        MillenniumCapitalApp(
+          persistence: persistence,
           campaignWorldPreparer: _skipCampaignWorldPreparation,
         ),
       );
       await tester.pumpAndSettle();
+      await startNewGame(tester);
+      await tester.tap(find.byKey(const Key('story-skip-button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('story-skip-confirm')));
+      await tester.pumpAndSettle();
 
-      await completeOrientationPreview(tester);
+      expect(find.byKey(const Key('academy-pc-powered-off')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('academy-pc-power-toggle')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('academy-pc-desktop')), findsOneWidget);
+      expect(find.text('전원 ON'), findsOneWidget);
 
+      await tester.tap(find.byKey(const Key('academy-stock-app-icon')));
+      await tester.pumpAndSettle();
       expect(
-        find.byKey(const Key('orientation-complete-card')),
+        find.byKey(const Key('academy-stock-setup-screen')),
         findsOneWidget,
       );
-      expect(find.textContaining('학생마다 PC 한 대'), findsOneWidget);
-      expect(find.byKey(const Key('stock-lesson-locked')), findsOneWidget);
-      expect(
-        find.byKey(const Key('academy-market-tutorial-screen')),
-        findsNothing,
+      expect(find.textContaining('한빛통신 · 거래일 시세'), findsOneWidget);
+      expect(find.textContaining('국가원금 10,000원'), findsOneWidget);
+
+      await tester.enterText(
+        find.byKey(const Key('academy-player-name-input')),
+        '민준',
       );
-      expect(find.byKey(const Key('apartment-place-bedroom')), findsNothing);
-      expect(find.byKey(const Key('company-name-input')), findsNothing);
+      await tester.enterText(
+        find.byKey(const Key('academy-company-name-input')),
+        '첫빛 투자연구소',
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('academy-start-market-tutorial')));
+
+      final tutorialScreen = find.byKey(
+        const Key('academy-market-tutorial-screen'),
+      );
+      for (var attempt = 0; attempt < 160; attempt += 1) {
+        await tester.pump(const Duration(milliseconds: 100));
+        if (tutorialScreen.evaluate().isNotEmpty) break;
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 10)),
+        );
+      }
+      expect(tutorialScreen, findsOneWidget);
+      await waitForMarketHome(tester);
+      expect(find.byKey(const Key('market-tutorial-overlay')), findsOneWidget);
+
+      final saved = await persistence.loadSlot(1);
+      expect(saved, isNotNull);
+      expect(saved!.story.playerName, '민준');
+      expect(saved.companyName, '첫빛 투자연구소');
+      expect(saved.story.orphanageReboot, isTrue);
+      expect(saved.story.marketTutorialSeen, isFalse);
+      expect(saved.brokerageCash, initialCompanyCash);
+      expect(tester.takeException(), isNull);
     },
   );
 
@@ -1786,7 +1857,7 @@ void main() {
         tester.widget<Text>(find.byKey(const Key('limit-price-value'))).data,
         bestAskPrice,
       );
-      expect(find.textContaining('1,000,000원'), findsWidgets);
+      expect(find.textContaining('10,000원'), findsWidgets);
       expect(
         find.byKey(const Key('tutorial-buy-action-highlight')),
         findsOneWidget,

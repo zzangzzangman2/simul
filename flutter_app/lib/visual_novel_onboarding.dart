@@ -132,6 +132,8 @@ class _VisualNovelOnboardingScreenState
   String? _creationError;
   bool _isTraveling = false;
   bool _stateAccountActivated = false;
+  bool _academyPcPoweredOn = false;
+  bool _academyStockAppOpen = false;
   Timer? _travelTimer;
   DateTime? _lastWheelBackAt;
   late final Future<void> _dialogueLoadFuture;
@@ -259,31 +261,30 @@ class _VisualNovelOnboardingScreenState
     if (override != null && override.isNotEmpty) return override;
     return switch (_beat) {
       <= 4 =>
-        'assets/images/photorealistic/prologue_1981_2000/bg_policy_room_night_photoreal_v1.png',
+        'assets/images/cinematic_soft_painted/policy_1981/backgrounds/bg_policy_room_night_v1.png',
       <= 15 =>
-        'assets/images/photorealistic/prologue_1981_2000/bg_conference_night_photoreal_v1.png',
+        'assets/images/cinematic_soft_painted/policy_1981/backgrounds/bg_conference_night_v1.png',
       16 =>
-        'assets/images/photorealistic/prologue_1981_2000/bg_academy_opening_1982_photoreal_v1.png',
+        'assets/images/historical_prologue/bg_future_development_orphanage_1982_portrait_cartoon_v1.png',
       <= 22 =>
-        'assets/images/photorealistic/prologue_1981_2000/bg_orphanage_departure_2000_photoreal_v1.png',
+        'assets/images/historical_prologue/bg_orphanage_departure_2000_portrait_v1.png',
       <= 31 =>
-        'assets/images/photorealistic/prologue_1981_2000/bg_academy_gate_2000_photoreal_v1.png',
+        'assets/images/historical_prologue/bg_future_development_academy_gate_2000_portrait_v1.png',
       <= 53 =>
-        'assets/images/photorealistic/prologue_1981_2000/bg_orientation_hall_2000_photoreal_v1.png',
+        'assets/images/historical_prologue/bg_future_development_orientation_hall_2000_portrait_v1.png',
       <= 57 =>
-        'assets/images/photorealistic/prologue_1981_2000/bg_dorm_corridor_2000_photoreal_v1.png',
+        'assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_corridor_2000_v1.png',
       <= 63 =>
-        'assets/images/photorealistic/prologue_1981_2000/bg_dorm_shared_room_day_2000_photoreal_v1.png',
+        'assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_day_2000_v1.png',
       64 =>
-        'assets/images/photorealistic/prologue_1981_2000/bg_dorm_washroom_2000_photoreal_v1.png',
+        'assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_washroom_2000_v1.png',
       65 =>
-        'assets/images/photorealistic/prologue_1981_2000/bg_dorm_shared_room_night_2000_photoreal_v1.png',
+        'assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_night_2000_v1.png',
       66 =>
-        'assets/images/photorealistic/prologue_1981_2000/bg_dorm_shared_room_day_2000_photoreal_v1.png',
+        'assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_day_2000_v1.png',
       67 =>
-        'assets/images/photorealistic/prologue_1981_2000/bg_dorm_corridor_2000_photoreal_v1.png',
-      _ =>
-        'assets/images/photorealistic/prologue_1981_2000/bg_stock_pc_classroom_2000_photoreal_v1.png',
+        'assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_corridor_2000_v1.png',
+      _ => 'assets/images/bg_stock_academy_2000_portrait_cartoon_v4.png',
     };
   }
 
@@ -830,8 +831,8 @@ class _VisualNovelOnboardingScreenState
         title: const Text('프롤로그를 건너뛸까요?'),
         content: const Text(
           '미래양성계획 창설과 수아·학준의 첫 만남을 건너뛰고 '
-          '제6기 오리엔테이션 마지막 안내로 이동합니다. '
-          '주식 수업과 새 게임 저장은 아직 시작되지 않습니다.',
+          '제6기 주식 PC 실습실의 전원 실습으로 이동합니다. '
+          'PC를 켜고 주식실습 프로그램을 열기 전에는 저장이 만들어지지 않습니다.',
         ),
         actions: [
           TextButton(
@@ -908,11 +909,58 @@ class _VisualNovelOnboardingScreenState
     }
   }
 
+  void _toggleAcademyPcPower() {
+    if (_isCreating) return;
+    _playStoryFeedback(strong: true);
+    setState(() {
+      _academyPcPoweredOn = !_academyPcPoweredOn;
+      if (!_academyPcPoweredOn) _academyStockAppOpen = false;
+      _creationError = null;
+    });
+  }
+
+  void _openAcademyStockApp() {
+    if (_isCreating || !_academyPcPoweredOn) return;
+    _playStoryFeedback();
+    setState(() {
+      _academyStockAppOpen = true;
+      _creationError = null;
+    });
+  }
+
+  void _closeAcademyStockApp() {
+    if (_isCreating || !_academyPcPoweredOn) return;
+    FocusManager.instance.primaryFocus?.unfocus();
+    _playStoryFeedback();
+    setState(() {
+      _academyStockAppOpen = false;
+      _creationError = null;
+    });
+  }
+
+  Future<void> _startAcademyMarketTutorial() async {
+    if (_isCreating || !_academyPcPoweredOn || !_academyStockAppOpen) return;
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() {
+      _introChoice = 'stocks';
+      _trait = StoryTrait.analysis;
+      _familyRule = FamilyRule.reportLosses;
+      _stateAccountActivated = true;
+      _creationError = null;
+    });
+    await _finish();
+  }
+
   @override
   Widget build(BuildContext context) {
     final viewInsets = MediaQuery.viewInsetsOf(context);
     final isKeyboardOpen = viewInsets.bottom > 0;
-    final isNameEntry = _beat == _playerNameBeat || _beat == _companyNameBeat;
+    final isNameEntry =
+        _beat == _playerNameBeat ||
+        _beat == _companyNameBeat ||
+        (_beat >= _dialogueEndBeat &&
+            _academyPcPoweredOn &&
+            _academyStockAppOpen);
     final keyboardLift = isKeyboardOpen && isNameEntry
         ? viewInsets.bottom
         : 0.0;
@@ -1218,57 +1266,47 @@ class _VisualNovelOnboardingScreenState
     ),
   );
 
-  Widget _orientationComplete() => _NovelDialogue(
-    key: const ValueKey('orientation-complete'),
-    speaker: _speaker,
-    line: _line,
-    stageDirection: _stageDirection,
-    child: Column(
-      children: [
-        Container(
-          key: const Key('orientation-complete-card'),
-          width: double.infinity,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: const Color(0xFFEAF2F8),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFF9DB4CC)),
-          ),
-          child: const Column(
-            children: [
-              Text(
-                '둘째 날 · 주식 PC 실습실 입실 완료',
-                style: TextStyle(
-                  color: _ink,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              SizedBox(height: 7),
-              Text(
-                '학생마다 PC 한 대를 배정받았습니다.\n첫 수업은 회사와 주식 한 주의 뜻부터 시작합니다.',
-                key: Key('stock-lesson-locked'),
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Color(0xFF536A96),
-                  fontSize: 10,
-                  height: 1.4,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 10),
-        _NovelNextButton(
-          key: const Key('orientation-exit-button'),
-          label: '처음 화면으로 돌아가기',
-          enabled: true,
-          onTap: widget.onExit ?? () {},
-        ),
-      ],
-    ),
-  );
+  Widget _orientationComplete() {
+    final endingOverride = _dialogueOverrides[_beat];
+    final isCanonicalPcEnding = endingOverride == null
+        ? _beat == _orientationCompleteBeat
+        : endingOverride.id == 'scene-73';
+    return _NovelDialogue(
+      key: const ValueKey('orientation-complete'),
+      speaker: isCanonicalPcEnding
+          ? _academyPcPoweredOn
+                ? '미래양성원 실습 PC'
+                : _speaker
+          : _speaker,
+      line: !isCanonicalPcEnding
+          ? _line
+          : !_academyPcPoweredOn
+          ? '각자 배정된 PC의 전원 버튼을 눌러 보세요. 켜고 끄는 것부터 자기 손으로 확인합니다.'
+          : _academyStockAppOpen
+          ? '한빛통신의 실제 거래일 시세를 불러옵니다. 이름과 투자장부 이름을 정하면 첫 주문 실습이 시작됩니다.'
+          : '부팅이 끝났습니다. 바탕화면의 주식실습 프로그램을 열어 회사·한 주·가격을 실제 화면에서 확인하세요.',
+      stageDirection: !isCanonicalPcEnding
+          ? _stageDirection
+          : !_academyPcPoweredOn
+          ? '06번 좌석의 베이지색 CRT와 본체는 아직 꺼져 있다.'
+          : _academyStockAppOpen
+          ? '주식실습 프로그램이 국가계좌 개통 정보를 기다리고 있다.'
+          : '본체 팬이 돌고 CRT 화면에 미래양성원 바탕화면이 떠올랐다.',
+      child: _AcademyPcTerminal(
+        poweredOn: _academyPcPoweredOn,
+        stockAppOpen: _academyStockAppOpen,
+        playerController: _playerController,
+        companyController: _companyController,
+        creationError: _creationError,
+        onTogglePower: _toggleAcademyPcPower,
+        onOpenStockApp: _openAcademyStockApp,
+        onCloseStockApp: _closeAcademyStockApp,
+        onChanged: () => setState(() => _creationError = null),
+        onStartTutorial: () => unawaited(_startAcademyMarketTutorial()),
+        onExit: widget.onExit ?? () {},
+      ),
+    );
+  }
 
   Widget _introChoices() => _NovelDialogue(
     key: const ValueKey('intro-choice'),
@@ -2157,6 +2195,399 @@ class _AcademyLessonRow extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _AcademyPcTerminal extends StatelessWidget {
+  const _AcademyPcTerminal({
+    required this.poweredOn,
+    required this.stockAppOpen,
+    required this.playerController,
+    required this.companyController,
+    required this.creationError,
+    required this.onTogglePower,
+    required this.onOpenStockApp,
+    required this.onCloseStockApp,
+    required this.onChanged,
+    required this.onStartTutorial,
+    required this.onExit,
+  });
+
+  final bool poweredOn;
+  final bool stockAppOpen;
+  final TextEditingController playerController;
+  final TextEditingController companyController;
+  final String? creationError;
+  final VoidCallback onTogglePower;
+  final VoidCallback onOpenStockApp;
+  final VoidCallback onCloseStockApp;
+  final VoidCallback onChanged;
+  final VoidCallback onStartTutorial;
+  final VoidCallback onExit;
+
+  bool get _canStart =>
+      playerController.text.trim().isNotEmpty &&
+      companyController.text.trim().isNotEmpty;
+
+  InputDecoration _inputDecoration(String label, String hint) =>
+      InputDecoration(
+        labelText: label,
+        hintText: hint,
+        counterText: '',
+        isDense: true,
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 11,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: Color(0xFF9FB6CB)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: Color(0xFF9FB6CB)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: Color(0xFF2D79C7), width: 2),
+        ),
+      );
+
+  Widget _header() => Row(
+    children: [
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        decoration: BoxDecoration(
+          color: const Color(0xFFD8C8A8),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: const Text(
+          '좌석 06 · CRT-06',
+          style: TextStyle(
+            color: Color(0xFF4B4335),
+            fontSize: 10,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ),
+      const Spacer(),
+      Icon(
+        poweredOn ? Icons.circle : Icons.circle_outlined,
+        size: 11,
+        color: poweredOn ? const Color(0xFF4BD37B) : const Color(0xFF807A70),
+      ),
+      const SizedBox(width: 5),
+      Text(
+        poweredOn ? '전원 ON' : '전원 OFF',
+        key: const Key('academy-pc-power-status'),
+        style: TextStyle(
+          color: poweredOn ? const Color(0xFF217C45) : const Color(0xFF6F6A61),
+          fontSize: 10,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+      if (poweredOn) ...[
+        const SizedBox(width: 4),
+        IconButton(
+          key: const Key('academy-pc-power-off'),
+          tooltip: 'PC 전원 끄기',
+          visualDensity: VisualDensity.compact,
+          onPressed: onTogglePower,
+          icon: const Icon(Icons.power_settings_new_rounded, size: 19),
+          color: const Color(0xFFC44848),
+        ),
+      ],
+    ],
+  );
+
+  Widget _poweredOff() => Column(
+    key: const Key('academy-pc-powered-off'),
+    children: [
+      Container(
+        width: double.infinity,
+        height: 92,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: const Color(0xFF111419),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFF756D60), width: 5),
+          boxShadow: const [BoxShadow(color: Color(0x66000000), blurRadius: 8)],
+        ),
+        child: const Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.power_off_rounded, color: Color(0xFF656A70), size: 30),
+            SizedBox(height: 4),
+            Text(
+              '화면 신호 없음',
+              style: TextStyle(
+                color: Color(0xFF777D84),
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
+      const SizedBox(height: 10),
+      Row(
+        children: [
+          Expanded(
+            child: TextButton(
+              key: const Key('orientation-exit-button'),
+              onPressed: onExit,
+              child: const Text('처음 화면으로'),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            flex: 2,
+            child: FilledButton.icon(
+              key: const Key('academy-pc-power-toggle'),
+              onPressed: onTogglePower,
+              icon: const Icon(Icons.power_settings_new_rounded),
+              label: const Text('PC 전원 켜기'),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(46),
+                backgroundColor: const Color(0xFF2D79C7),
+                textStyle: const TextStyle(fontWeight: FontWeight.w900),
+              ),
+            ),
+          ),
+        ],
+      ),
+    ],
+  );
+
+  Widget _desktop() => Container(
+    key: const Key('academy-pc-desktop'),
+    width: double.infinity,
+    height: 150,
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      gradient: const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color(0xFF3D6B92), Color(0xFF75A6C7)],
+      ),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: const Color(0xFF756D60), width: 5),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          '국립 미래양성원 · 제6기 실습 PC',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 10,
+            fontWeight: FontWeight.w800,
+            shadows: [Shadow(color: Colors.black45, blurRadius: 3)],
+          ),
+        ),
+        const Spacer(),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: InkWell(
+            key: const Key('academy-stock-app-icon'),
+            onTap: onOpenStockApp,
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              width: 112,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+              decoration: BoxDecoration(
+                color: const Color(0xEFFFFFFF),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFDFE9F2)),
+              ),
+              child: const Column(
+                children: [
+                  Icon(
+                    Icons.candlestick_chart_rounded,
+                    color: Color(0xFFCE3E4E),
+                    size: 30,
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    '주식실습',
+                    style: TextStyle(
+                      color: _ink,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const Spacer(),
+        const Text(
+          '시작 → 프로그램 → 주식실습',
+          style: TextStyle(
+            color: Color(0xFFEAF4FF),
+            fontSize: 9,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    ),
+  );
+
+  Widget _stockSetup() => Container(
+    key: const Key('academy-stock-setup-screen'),
+    width: double.infinity,
+    padding: const EdgeInsets.all(11),
+    decoration: BoxDecoration(
+      color: const Color(0xFFF1F6FA),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: const Color(0xFF8FA9BF), width: 2),
+    ),
+    child: Column(
+      children: [
+        Row(
+          children: [
+            IconButton(
+              key: const Key('academy-stock-app-back'),
+              tooltip: '바탕화면으로',
+              visualDensity: VisualDensity.compact,
+              onPressed: onCloseStockApp,
+              icon: const Icon(Icons.arrow_back_rounded, size: 19),
+            ),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '제6기 주식실습',
+                    style: TextStyle(
+                      color: _ink,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  Text(
+                    '한빛통신 · 거래일 시세와 호가 연동',
+                    style: TextStyle(
+                      color: Color(0xFF536A96),
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.lock_rounded, size: 17, color: Color(0xFF258257)),
+          ],
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          key: const Key('academy-player-name-input'),
+          controller: playerController,
+          maxLength: 12,
+          textInputAction: TextInputAction.next,
+          onChanged: (_) => onChanged(),
+          decoration: _inputDecoration('운용자 이름', '예: 민준'),
+        ),
+        const SizedBox(height: 7),
+        TextField(
+          key: const Key('academy-company-name-input'),
+          controller: companyController,
+          maxLength: 20,
+          textInputAction: TextInputAction.done,
+          onChanged: (_) => onChanged(),
+          onSubmitted: (_) {
+            if (_canStart) onStartTutorial();
+          },
+          decoration: _inputDecoration('투자장부 이름', '예: 첫빛 투자연구소'),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFF5D9),
+            borderRadius: BorderRadius.circular(9),
+            border: Border.all(color: const Color(0xFFE4C779)),
+          ),
+          child: const Text(
+            '국가원금 10,000원 · 기록형 원칙 · 확정이익 20% 국가 환수 / 80% 자립적립',
+            key: Key('academy-state-account-rule'),
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Color(0xFF6D571A),
+              fontSize: 9,
+              height: 1.35,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        if (creationError != null) ...[
+          const SizedBox(height: 6),
+          Text(
+            creationError!,
+            key: const Key('academy-pc-creation-error'),
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Color(0xFFC53F4B),
+              fontSize: 9,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+        const SizedBox(height: 8),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            key: const Key('academy-start-market-tutorial'),
+            onPressed: _canStart ? onStartTutorial : null,
+            icon: const Icon(Icons.play_arrow_rounded),
+            label: const Text('국가계좌 만들고 실시간 주식 실습 시작'),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(46),
+              backgroundColor: const Color(0xFFCE3E4E),
+              textStyle: const TextStyle(fontWeight: FontWeight.w900),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+
+  @override
+  Widget build(BuildContext context) => AnimatedContainer(
+    key: const Key('orientation-complete-card'),
+    duration: const Duration(milliseconds: 220),
+    width: double.infinity,
+    padding: const EdgeInsets.all(11),
+    decoration: BoxDecoration(
+      color: const Color(0xFFE9E3D4),
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: const Color(0xFF9A8F7D), width: 2),
+      boxShadow: const [
+        BoxShadow(
+          color: Color(0x33000000),
+          blurRadius: 10,
+          offset: Offset(0, 4),
+        ),
+      ],
+    ),
+    child: Column(
+      children: [
+        _header(),
+        const SizedBox(height: 7),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 220),
+          child: !poweredOn
+              ? _poweredOff()
+              : stockAppOpen
+              ? _stockSetup()
+              : _desktop(),
         ),
       ],
     ),

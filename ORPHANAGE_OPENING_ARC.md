@@ -1,6 +1,6 @@
 # 미래양성원 6기 — 개막부
 
-> 현재 런타임은 수아·학준·한서윤의 제6기 오리엔테이션, 첫날 기숙사 안내와 둘째 날 주식 PC 실습실 소개까지 연결한다. 아래 실제 매수·국가계좌 장면은 후속 확장 원고이며 아직 게임에 연결하지 않는다.
+> 현재 런타임은 수아·학준·한서윤의 제6기 오리엔테이션, 첫날 기숙사 안내, 둘째 날 주식 PC 실습실의 전원 ON/OFF와 한빛통신 실제 시세 기반 매수·가격 변화·매도 튜토리얼까지 연결한다. 아래 원고 중 생활 허브 이후 장면만 후속 확장 범위다.
 
 이 원고는 `[프롤로그] 서른아홉 년짜리 장부` 바로 다음 장면부터 이어진다.
 
@@ -1129,7 +1129,7 @@ CRT 화면에 한빛통신 시세가 나타났다.
 
 | 구간 | 배경 | 주요 캐릭터 |
 | --- | --- | --- |
-| 1981년 심야 회의 | `bg_blue_house_conference_1981_portrait_cartoon_v1.png` | 전두광, 백기현, 서문태, 강인철, 윤미라, 장대식 |
+| 1981년 심야 회의 | `assets/images/cinematic_soft_painted/policy_1981/backgrounds/bg_conference_night_v1.png` | 전두광, 백기현, 서문태, 강인철, 윤미라, 장대식 |
 | 2000년 제3기록실 | `bg_orphanage_records_room_1999_portrait_cartoon_v1.png` | 주인공, 학준, 오경태 |
 | 6기 기숙사 | `bg_orphanage_dormitory_1999_portrait_cartoon_v1.png` | 주인공, 학준, 오경태 |
 | 국가계좌 개통 | `bg_orphanage_account_hall_2000_portrait_cartoon_v1.png` | 차은주, 한서윤, 주인공, 학준 |
@@ -1140,10 +1140,10 @@ CRT 화면에 한빛통신 시세가 나타났다.
 
 | 인물 | 파일 | 역할 |
 | --- | --- | --- |
-| 백기현 | `character_baek_gihyeon_v1.png` | 1981년 비서실장. 정치적 위험을 가장 먼저 계산한다. |
-| 서문태 | `character_seo_muntae_v1.png` | 정책실장. 미래양성계획을 설계한다. |
-| 강인철 | `character_kang_incheol_v1.png` | 경제수석. 기술과 지분이 국가의 힘이 될 미래를 예측한다. |
-| 윤미라 | `character_yoon_mira_v1.png` | 사회교육수석. 자립적립금 80%와 아이의 소유권을 지켜 낸다. |
+| 백기현 | `assets/images/cinematic_soft_painted/policy_1981/baek_gihyeon/*.png` | 1981년 비서실장. 정치적 위험을 가장 먼저 계산한다. |
+| 서문태 | `assets/images/cinematic_soft_painted/policy_1981/seo_muntae/*.png` | 정책실장. 미래양성계획을 설계한다. |
+| 강인철 | `assets/images/cinematic_soft_painted/policy_1981/kang_incheol/*.png` | 경제수석. 기술과 지분이 국가의 힘이 될 미래를 예측한다. |
+| 윤미라 | `assets/images/cinematic_soft_painted/policy_1981/yoon_mira/*.png` | 사회교육수석. 자립적립금 80%와 아이의 소유권을 지켜 낸다. |
 | 장대식 | `character_jang_daesik_v1.png` | 법무수석. 비공개 특별법의 위험을 안다. |
 | 김학준(학준) | `character_park_taesu_v1.png` | 6기 경쟁자. 규칙과 손실통제를 중시한다. |
 | 오경태 | `character_living_guide_oh_gyeongtae_v1.png` | 생활지도관. 사라진 5기의 비밀을 숨기고 있다. |

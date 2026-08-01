@@ -686,7 +686,8 @@ void main() {
       expectPortraitInside();
     }
     expect(find.byKey(const Key('orientation-complete-card')), findsOneWidget);
-    expect(find.byKey(const Key('stock-lesson-locked')), findsOneWidget);
+    expect(find.byKey(const Key('academy-pc-powered-off')), findsOneWidget);
+    expect(find.byKey(const Key('academy-pc-power-toggle')), findsOneWidget);
     expect(
       find.byKey(const Key('academy-market-tutorial-screen')),
       findsNothing,
@@ -695,7 +696,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('story skip ends before unreleased name inputs', (tester) async {
+  testWidgets('story skip opens the powered-off classroom PC', (tester) async {
     await usePhoneSurface(tester);
     addTearDown(tester.view.resetViewInsets);
     await tester.pumpWidget(
@@ -710,12 +711,29 @@ void main() {
     await tester.tap(find.byKey(const Key('story-skip-confirm')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('orientation-complete-card')), findsOneWidget);
-    expect(find.byKey(const Key('stock-lesson-locked')), findsOneWidget);
-    expect(find.byKey(const Key('player-name-input')), findsNothing);
-    expect(find.byKey(const Key('company-name-input')), findsNothing);
+    expect(find.byKey(const Key('academy-pc-powered-off')), findsOneWidget);
+    expect(find.byKey(const Key('academy-pc-power-toggle')), findsOneWidget);
+    expect(find.byKey(const Key('academy-player-name-input')), findsNothing);
+    expect(find.byKey(const Key('academy-company-name-input')), findsNothing);
     final stageRect = tester.getRect(find.byKey(const Key('onboarding-stage')));
     expect(stageRect.top, 0);
     expect(stageRect.height, phoneSize.height);
+
+    await tester.tap(find.byKey(const Key('academy-pc-power-toggle')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('academy-pc-desktop')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('academy-stock-app-icon')));
+    await tester.pumpAndSettle();
+    final setupRect = tester.getRect(
+      find.byKey(const Key('academy-stock-setup-screen')),
+    );
+    expect(setupRect.left, greaterThanOrEqualTo(stageRect.left));
+    expect(setupRect.right, lessThanOrEqualTo(stageRect.right));
+    expect(setupRect.top, greaterThanOrEqualTo(stageRect.top));
+    expect(setupRect.bottom, lessThanOrEqualTo(stageRect.bottom));
+    await tester.tap(find.byKey(const Key('academy-pc-power-off')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('academy-pc-powered-off')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

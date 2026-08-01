@@ -45,14 +45,14 @@ test("opens the Flutter future-development orphanage prologue from the default r
   assert.doesNotMatch(flutterIndex, /초기자본 100만원/);
   assert.match(onboarding, /1981\.01\.12\s+·\s+23:40/);
   assert.match(onboarding, /이대로 가면 나라가 망한다/);
-  assert.match(onboarding, /둘째 날 · 주식 PC 실습실 입실 완료/);
+  assert.match(onboarding, /자, 여기가 주식 PC 실습실이에요/);
   assert.match(onboarding, /자, 이제 오늘은 첫날이니 기숙사 소개를 해줄게요/);
-  assert.match(onboarding, /bg_dorm_shared_room_day_2000_photoreal_v1\.png/);
-  assert.match(onboarding, /bg_dorm_corridor_2000_photoreal_v1\.png/);
-  assert.match(onboarding, /bg_dorm_washroom_2000_photoreal_v1\.png/);
-  assert.match(onboarding, /bg_dorm_shared_room_night_2000_photoreal_v1\.png/);
-  assert.match(onboarding, /bg_policy_room_night_photoreal_v1\.png/);
-  assert.match(onboarding, /bg_stock_pc_classroom_2000_photoreal_v1\.png/);
+  assert.match(onboarding, /bg_future_academy_dorm_shared_room_day_2000_v1\.png/);
+  assert.match(onboarding, /bg_future_academy_dorm_corridor_2000_v1\.png/);
+  assert.match(onboarding, /bg_future_academy_dorm_washroom_2000_v1\.png/);
+  assert.match(onboarding, /bg_future_academy_dorm_shared_room_night_2000_v1\.png/);
+  assert.match(onboarding, /bg_policy_room_night_v1\.png/);
+  assert.match(onboarding, /bg_stock_academy_2000_portrait_cartoon_v4\.png/);
   assert.match(onboarding, /앞으로 주식 수업은 각자 자기 컴퓨터로 화면을 직접 보면서 배울 거예요/);
   assert.match(onboarding, /cinematic_soft_painted\/sua\/03_bright_laugh_v1\.png/);
   assert.match(onboarding, /cinematic_soft_painted\/policy_1981\/jeon_dugwang\/05_pressure_v1\.png/);
@@ -60,8 +60,8 @@ test("opens the Flutter future-development orphanage prologue from the default r
   assert.match(onboarding, /cinematic_soft_painted\/policy_1981\/kang_incheol\/02_explain_v2\.png/);
   assert.doesNotMatch(onboarding, /baek_gihyeon\/\w+_v1\.png/);
   assert.doesNotMatch(onboarding, /kang_incheol\/\w+_v1\.png/);
-  assert.match(onboarding, /bg_orphanage_departure_2000_photoreal_v1\.png/);
-  assert.match(onboarding, /bg_orientation_hall_2000_photoreal_v1\.png/);
+  assert.match(onboarding, /bg_orphanage_departure_2000_portrait_v1\.png/);
+  assert.match(onboarding, /bg_future_development_orientation_hall_2000_portrait_v1\.png/);
   assert.doesNotMatch(onboarding, /policy-file-\$\{entry\.key\}/);
   assert.doesNotMatch(onboarding, /orientation-roster-continue/);
   assert.match(onboarding, /미래에 살 아이들은 뺐나/);
@@ -69,12 +69,12 @@ test("opens the Flutter future-development orphanage prologue from the default r
   assert.match(onboarding, /protagonist_seed01\/17_holding_badge\.png/);
   assert.match(onboarding, /protagonist_seed01\/22_victory_fist\.png/);
   assert.match(onboarding, /orientation-exit-button/);
-  assert.match(onboarding, /stock-lesson-locked/);
+  assert.match(onboarding, /academy-pc-powered-off/);
   assert.match(onboarding, /주식선생님\/22_포즈1_주인공그림체_공통슬롯_투명\.png/);
   assert.match(onboarding, /주식선생님\/24_포즈3_주인공그림체_공통슬롯_투명\.png/);
   assert.match(onboarding, /모르는 걸 모른다고 말하는 법/);
   assert.match(onboarding, /나머지는 아이 몫/);
-  assert.match(onboarding, /첫 수업은 회사와 주식 한 주의 뜻부터 시작합니다/);
+  assert.match(onboarding, /회사와 주식 한 주가 무엇인지부터 천천히 배울 거예요/);
   assert.match(main, /StoryState\.newOrphanagePlayer/);
   assert.match(main, /academy-market-tutorial-screen/);
   assert.match(stockMarket, /selfRelianceReserve/);
@@ -452,7 +452,7 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
   assert.match(editor, /BackgroundPicker/);
   assert.match(editor, /장면 추가/);
   assert.match(backgroundCatalog, /bg_bank_branch_2000_portrait_cartoon_v2\.png/);
-  assert.match(backgroundCatalog, /bg_orientation_hall_2000_photoreal_v1\.png/);
+  assert.match(backgroundCatalog, /bg_future_development_orientation_hall_2000_portrait_v1\.png/);
   assert.match(editorCss, /\.sceneComposer\s*\{/);
   assert.match(editorCss, /\.backgroundGrid\s*\{/);
   assert.match(editorCss, /\.character\s*\{[\s\S]*?bottom: 12\.3%/);
@@ -469,7 +469,7 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
   assert.match(data, /character_hakjun_orientation_v2\.png/);
   assert.match(generator, /_onboardingBeatCount/);
   assert.match(generator, /teacherPoseForBeat/);
-  assert.match(generator, /appearanceVersion !== 6/);
+  assert.match(generator, /appearanceVersion !== 8/);
   assert.match(generator, /Dialogue editor synced/);
   const protagonistCatalog = catalog.slice(
     catalog.indexOf("const protagonistPoses"),
@@ -486,7 +486,7 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
   assert.match(packageJson, /prebuild:flutter-web/);
   assert.match(packageJson, /dialogue:sync/);
   assert.match(buildRoute, /dialogue-editor-override\.json/);
-  assert.match(buildRoute, /appearanceVersion: 6/);
+  assert.match(buildRoute, /appearanceVersion: 8/);
   assert.match(buildRoute, /dialogueTextValue/);
   assert.match(buildRoute, /scripts\/build-flutter-web\.mjs/);
   assert.match(onboarding, /_dialogueBundleAsset/);

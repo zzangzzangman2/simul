@@ -217,22 +217,6 @@
   7종으로 구성한다. 표정마다 고개 기울기와 좌우 회전을 분산하며, 성격·가정사·
   투자 성향과 첫 등장 장면은 아직 확정하지 않는다.
 
-#### 최이서(이서) — 6기 동기
-
-- 주인공과 같은 1987년생, 2000년 14살이며 현재 본편 런타임에는 등장하지 않았다.
-- 본명은 `최이서`, 첫 등장 이후 평소 호칭과 화자명은 `이서`로 사용한다.
-- 얼굴 절대 기준은 `art_references/choi_iseo_face_anchor_v2.png`, 전신·교복 절대
-  기준은 `art_references/choi_iseo_summer_uniform_fullbody_master_v1.png`다.
-- 중앙 가르마의 긴 생머리 흑발, 좁은 타원형과 부드러운 V형 사이의 얼굴,
-  선명한 아몬드형 눈과 차분한 입매를 유지한다. 다른 제6기 여학생의 얼굴 특징을
-  섞거나 표정마다 눈 간격·턱 폭·코·입술 비율을 바꾸지 않는다.
-- 제6기 여학생 규정 하복인 배꼽을 완전히 가리는 정상 길이 흰 반소매 단추 셔츠,
-  빨강 체크 넥타이, 빨강 체크 이중 랩 허리판과 주름치마를 착용한다.
-- 신발은 흰 발목양말과 로고 없는 흰 로우톱 끈 스니커즈로 고정한다.
-- `assets/images/photorealistic/students/choi_iseo/`의 기본·웃음·설명·질문·놀람·
-  걱정·수줍음·삐침·의심·결심·슬픔·화남 12종을 편집기 화자 `이서`에 연결했다.
-- 성격·가정사·투자 성향과 첫 등장 장면은 아직 확정하지 않는다.
-
 #### 정아린(아린) — 6기 동기
 
 - 주인공과 같은 1987년생, 2000년 14살이며 아직 런타임에는 등장하지 않았다.
@@ -290,8 +274,8 @@
 아래 54장면은 기본 초안이다. `/editor`에서 장면을 추가·삭제·재정렬할 수 있으며
 Flutter 런타임은 편집본의 실제 마지막 장면까지 최대 240장면을 재생한다.
 
-현재 빌드는 청와대 창설 회의에서 시작해 2000년 제6기 오리엔테이션, 첫날 기숙사 안내와 둘째 날 주식 PC 실습실 소개까지 진행한다.
-주식 수업, 국가계좌 개통, 이름·회사명 입력, 첫 주문은 아직 연결하지 않는다.
+현재 빌드는 청와대 창설 회의에서 시작해 2000년 제6기 오리엔테이션, 첫날 기숙사 안내와 둘째 날 주식 PC 실습실까지 진행한다.
+교실 CRT 전원 ON/OFF, `주식실습` 앱, 운용자·투자장부 이름 입력, 국가계좌 개통과 한빛통신 첫 매수·가격 변화·매도 수업까지 실제 런타임에 연결됐다.
 
 ### 1장 — 사람을 자본으로 만드는 밤 (0~15)
 
@@ -334,9 +318,9 @@ Flutter 런타임은 편집본의 실제 마지막 장면까지 최대 240장면
 
 | 장면 | 런타임 자산 |
 | --- | --- |
-| 1981년 청와대 정책실 | `assets/images/historical_prologue/bg_blue_house_policy_room_1981_portrait_cartoon_v1.png` |
-| 1981년 청와대 회의실 | `assets/images/historical_prologue/bg_blue_house_conference_1981_portrait_cartoon_v1.png` |
-| 전두광 결재 전신 | `assets/images/historical_prologue/character_jeon_dugwang_decree_cartoon_v2.png` |
+| 1981년 청와대 정책실 | `assets/images/cinematic_soft_painted/policy_1981/backgrounds/bg_policy_room_night_v1.png` |
+| 1981년 청와대 회의실 | `assets/images/cinematic_soft_painted/policy_1981/backgrounds/bg_conference_night_v1.png` |
+| 전두광 결재 전신 | `assets/images/cinematic_soft_painted/policy_1981/jeon_dugwang/01_signing_v1.png` |
 | 1982년 미래양성원 | `assets/images/historical_prologue/bg_future_development_orphanage_1982_portrait_cartoon_v1.png` |
 | 2000년 보육원 출발 현관 | `assets/images/historical_prologue/bg_orphanage_departure_2000_portrait_v1.png` |
 | 민호 작별 전신 | `assets/images/historical_prologue/character_minho_farewell_v3.png` |

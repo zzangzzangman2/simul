@@ -1,18 +1,14 @@
-# 제6기 기숙사 배경 4종 · 레거시 보관
+# 제6기 기숙사 배경 4종 · 현행 런타임
 
-2026-08-01 `imagegen` 내장 경로로 제작한 1024×1536 PNG 배경이다. 같은 날
-사용자 지시에 따라 밝은 실사 배경으로 교체되었으며 현재 런타임에는 연결하지
-않는다. 공간 배치 참조와 제작 이력으로만 보관한다.
+2026-08-01 `imagegen` 내장 경로로 제작한 1024×1536 PNG 카툰·소프트 페인터리
+배경이다. 실사 전환 중단 뒤 현재 런타임에 다시 연결했다.
 
 | 파일 | 장면 | 상태 |
 | --- | --- | --- |
-| `bg_future_academy_dorm_corridor_2000_v1.png` | 강당에서 생활실로 이어지는 중앙 복도 | 레거시 보관 |
-| `bg_future_academy_dorm_shared_room_day_2000_v1.png` | 남학생 2명·여학생 8명의 한 방 공용 생활실 | 레거시 보관 |
-| `bg_future_academy_dorm_washroom_2000_v1.png` | 잠금 칸막이가 있는 세면·탈의 공간 | 레거시 보관 |
-| `bg_future_academy_dorm_shared_room_night_2000_v1.png` | 같은 생활실의 첫날 소등 뒤 | 레거시 보관 |
-
-활성 대체 자산은
-`assets/images/photorealistic/prologue_1981_2000/README.md`를 따른다.
+| `bg_future_academy_dorm_corridor_2000_v1.png` | 강당에서 생활실로 이어지는 중앙 복도 | 현행 연결 |
+| `bg_future_academy_dorm_shared_room_day_2000_v1.png` | 남학생 2명·여학생 8명의 한 방 공용 생활실 | 현행 연결 |
+| `bg_future_academy_dorm_washroom_2000_v1.png` | 잠금 칸막이가 있는 세면·탈의 공간 | 현행 연결 |
+| `bg_future_academy_dorm_shared_room_night_2000_v1.png` | 같은 생활실의 첫날 소등 뒤 | 현행 연결 |
 
 ## 실제 참조 입력
 
