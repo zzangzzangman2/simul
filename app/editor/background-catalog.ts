@@ -126,16 +126,16 @@ export const dialogueBackgrounds: DialogueBackground[] = [
     "assets/images/bg_stationery_shop_2000.webp",
   ),
   background(
-    "boy-room",
-    "소년의 방 · 1999",
+    "dorm-shared-room-day",
+    "제6기 공용 기숙사 · 주간",
     "생활·투자",
-    "assets/images/bg_boy_room_1999.png",
+    "assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_day_2000_v1.png",
   ),
   background(
-    "living-room",
-    "가족 거실 · 1999",
+    "dorm-shared-room-night",
+    "제6기 공용 기숙사 · 야간",
     "생활·투자",
-    "assets/images/bg_living_room_1999_portrait_cartoon_v2.png",
+    "assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_night_2000_v1.png",
   ),
 ];
 

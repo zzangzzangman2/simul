@@ -597,12 +597,8 @@ class OwnedRealEstate {
     Map<String, dynamic> json,
   ) => OwnedRealEstate(
     id: json['id'] as String? ?? '',
-    optionId: json['optionId'] == 'family_home_trust'
-        ? 'alumni_housing_trust'
-        : json['optionId'] as String? ?? '',
-    name: json['optionId'] == 'family_home_trust'
-        ? '수료생 공동주거 신탁'
-        : json['name'] as String? ?? '부동산',
+    optionId: json['optionId'] as String? ?? '',
+    name: json['name'] as String? ?? '부동산',
     purchasePrice: (json['purchasePrice'] as num?)?.toInt() ?? 0,
     acquiredDay: (json['acquiredDay'] as num?)?.toInt() ?? 1,
     monthlyIncome: (json['monthlyIncome'] as num?)?.toInt() ?? 0,
@@ -811,11 +807,6 @@ class PersonalFinanceState {
 
   factory PersonalFinanceState.fromJson(Map<String, dynamic> json) {
     if (json.isEmpty) return PersonalFinanceState.initial();
-    String migrateOptionId(String id) => switch (id) {
-      'family_outing' => 'cohort_field_day',
-      'family_home_trust' => 'alumni_housing_trust',
-      _ => id,
-    };
     final knownOptionIds = spendingCatalog.map((option) => option.id).toSet();
     return PersonalFinanceState(
       realEstate: ((json['realEstate'] as List?) ?? const [])
@@ -825,14 +816,12 @@ class PersonalFinanceState {
           .toList(growable: false),
       permanentPurchases: ((json['permanentPurchases'] as List?) ?? const [])
           .whereType<String>()
-          .map(migrateOptionId)
           .where(knownOptionIds.contains)
           .toSet()
           .toList(growable: false),
       lastPurchasePeriods:
           ((json['lastPurchasePeriods'] as Map?) ?? const {}).map(
-            (key, value) =>
-                MapEntry(migrateOptionId(key.toString()), value.toString()),
+            (key, value) => MapEntry(key.toString(), value.toString()),
           )..removeWhere((key, _) => !knownOptionIds.contains(key)),
       totalSpent: (json['totalSpent'] as num?)?.toInt() ?? 0,
       totalPropertyIncome: (json['totalPropertyIncome'] as num?)?.toInt() ?? 0,

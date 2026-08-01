@@ -45,7 +45,6 @@
 | --- | --- |
 | `WORK_LOG.md` | 날짜별 완료 내용과 검증 명령 |
 | `CHARACTER_REGENERATION_RESULT.md` | 리부트 인물 후보와 현재 승인본 연결 상태 |
-| `PROLOGUE_DIALOGUE_FULL_AUDIT.md` | 과거 가족 프롤로그 감사와 반영 이력 |
 | `REAL_ESTATE_SYSTEM.md` | 부동산 시스템 상세 참고 |
 | `SPENDING_CONTENT_PROPOSAL.md` | 자산 지출 콘텐츠 제안·구현 대조 |
 | `STOCK_MARKET_REVIEW.md` | 주식시장 과거 검토와 회귀 참고 |
@@ -63,10 +62,6 @@
 
 ## 레거시·보관 문서
 
-- `story.md`, `PROLOGUE_STORY_REVIEW.md`, `PROLOGUE_DIALOGUE_FULL_AUDIT.md`의
-  2026-07-30 이전 가족·투자학원 서술은 기존 저장 호환과 제작 이력이다.
-- `PROLOGUE_BACKGROUNDS.md`, `PROLOGUE_FAMILY_PORTRAITS.md`,
-  `여자1/README.md`는 레거시 자산 매핑이며 신규 리부트의 런타임 명세가 아니다.
 - `ORPHANAGE_OPENING_ARC.md`, `ORPHANAGE_WEBNOVEL_PROLOGUE.md`는 서사 원고,
   `PROTAGONIST_AGE_LINE.md`는 성장선 기준이다. 원고의 묘사가 런타임 연결 상태를
   의미하지는 않는다.

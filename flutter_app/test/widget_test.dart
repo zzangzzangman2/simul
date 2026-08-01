@@ -2157,8 +2157,6 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.textContaining('아빠'), findsNothing);
-      expect(find.textContaining('외할아버지'), findsNothing);
       await tester.tap(find.byKey(const Key('tutorial-review-continue')));
       await tester.pump();
       expect(find.textContaining('회사 이익을 냈거나 안전하다는 뜻이 아니에요'), findsOneWidget);

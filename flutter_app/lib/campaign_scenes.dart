@@ -1212,7 +1212,7 @@ class NewsGeneratingScene extends StatelessWidget {
         children: [
           Positioned.fill(
             child: Image.asset(
-              'assets/images/bg_living_room_1999_portrait_cartoon_v2.png',
+              'assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_night_2000_v1.png',
               fit: BoxFit.cover,
             ),
           ),
@@ -1326,7 +1326,7 @@ class KoreaEconomicNewspaperScene extends StatelessWidget {
       children: [
         Positioned.fill(
           child: Image.asset(
-            'assets/images/bg_living_room_1999_portrait_cartoon_v2.png',
+            'assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_day_2000_v1.png',
             fit: BoxFit.cover,
           ),
         ),

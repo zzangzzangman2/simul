@@ -704,7 +704,6 @@ class MissionProgressionState {
     final claimedMissionIds =
         ((json['claimedMissionIds'] as List?) ?? const <dynamic>[])
             .whereType<String>()
-            .map((id) => id == 'family_help_two' ? 'academy_help_two' : id)
             .toSet()
             .toList(growable: false);
     final migratedStarBalance =
@@ -724,15 +723,10 @@ class MissionProgressionState {
       missionStartCash:
           (json['missionStartCash'] as num?)?.toInt() ?? fallbackCash,
       missionStartCounter: (json['missionStartCounter'] as num?)?.toInt() ?? 0,
-      counters: ((json['counters'] as Map?) ?? const <String, dynamic>{}).map((
-        key,
-        value,
-      ) {
-        final metric = key.toString() == 'family_help'
-            ? 'academy_help'
-            : key.toString();
-        return MapEntry(metric, (value as num?)?.toInt() ?? 0);
-      }),
+      counters: ((json['counters'] as Map?) ?? const <String, dynamic>{}).map(
+        (key, value) =>
+            MapEntry(key.toString(), (value as num?)?.toInt() ?? 0),
+      ),
       claimedMissionIds: claimedMissionIds,
       starBalance: migratedStarBalance.clamp(0, 1 << 30),
       totalStarsEarned:

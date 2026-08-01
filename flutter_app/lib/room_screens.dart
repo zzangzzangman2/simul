@@ -75,7 +75,7 @@ class _InteractiveBedroom extends StatelessWidget {
           fit: StackFit.expand,
           children: [
             Image.asset(
-              'assets/images/bg_boy_room_1999.png',
+              'assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_day_2000_v1.png',
               fit: BoxFit.cover,
               alignment: Alignment.centerLeft,
               filterQuality: FilterQuality.high,
@@ -354,7 +354,7 @@ class DecisionInboxScreen extends StatelessWidget {
         children: [
           Positioned.fill(
             child: Image.asset(
-              'assets/images/bg_boy_room_1999.png',
+              'assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_day_2000_v1.png',
               fit: BoxFit.cover,
               alignment: Alignment.centerLeft,
             ),
@@ -1136,7 +1136,7 @@ class _PortfolioLedgerScreenState extends State<PortfolioLedgerScreen> {
       children: [
         Positioned.fill(
           child: Image.asset(
-            'assets/images/bg_boy_room_1999.png',
+            'assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_day_2000_v1.png',
             fit: BoxFit.cover,
             alignment: Alignment.centerLeft,
           ),
