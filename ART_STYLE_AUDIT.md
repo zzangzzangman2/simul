@@ -12,15 +12,68 @@
 - **성인 여성의 얼굴 비율·전신 밀도·한서윤 정체성 보조 기준:** `art_references/npc_canonical_style_teal_v1.png`와 런타임 `주식선생님/22_포즈1`~`27_포즈6`. 이 자산의 구형 선화·하드 셀 채색은 화풍 기준으로 사용하지 않는다.
 - 한서윤의 갸름한 성인 얼굴, 청록 머리, 보라 눈, 뷰티마크, 체형, 의상과 포즈는 그대로 유지한다. 어린이의 둥근 얼굴 비율을 성인에게 복사하지 않는다.
 
+## 2026-08-01 최이서 현행 하복 대사 전신 12종
+
+- 사용자가 직전 변형본의 얼굴이 정체성 기준과 다르다고 판정했으므로 이전
+  `original_girl_01_fullbody_master_v2.png`와 그 파생 세트는 최이서 현행 기준에서
+  제외했다.
+- 새 얼굴 절대 기준은 `art_references/choi_iseo_face_anchor_v2.png`, 새 전신 절대
+  기준은 `art_references/choi_iseo_summer_uniform_fullbody_master_v1.png`다.
+- 현행 하복은 배꼽과 복부를 완전히 가리는 정상 길이의 불투명 흰 반소매 단추
+  셔츠, 빨강 체크 넥타이, 빨강 체크 이중 랩 허리판과 주름치마다. 흰 발목양말과
+  로고 없는 흰 로우톱 끈 스니커즈를 함께 착용한다. 이전 긴소매·크롭·무양말·
+  검정 로퍼 기준은 폐기한다.
+
+| 자산 | 얼굴 일치 | 현행 하복 | 양말·흰 스니커즈 | 전신 | 대사 기능 | 상태 |
+| --- | --- | --- | --- | --- | --- | --- |
+| `01_neutral_master.png` | 통과 | 통과 | 통과 | 통과 | 기본 | **마스터 고정** |
+| `02_bright_greeting_smile.png` | 통과 | 통과 | 통과 | 통과 | 환한 인사 | **연결** |
+| `03_calm_explain_hands_together.png` | 통과 | 통과 | 통과 | 통과 | 차분한 설명 | **연결** |
+| `04_curious_open_palm.png` | 통과 | 통과 | 통과 | 통과 | 질문 | **연결** |
+| `05_surprised_hands_up.png` | 통과 | 통과 | 통과 | 통과 | 놀람 | **연결** |
+| `06_worried_hands_clasped.png` | 통과 | 통과 | 통과 | 통과 | 걱정 | **연결** |
+| `07_shy_hair_touch.png` | 통과 | 통과 | 통과 | 통과 | 수줍음 | **연결** |
+| `08_mild_annoyed_arms_crossed.png` | 통과 | 통과 | 통과 | 통과 | 삐침 | **연결** |
+| `09_skeptical_hand_on_hip.png` | 통과 | 통과 | 통과 | 통과 | 의심 | **연결** |
+| `10_determined_fist.png` | 통과 | 통과 | 통과 | 통과 | 결심 | **연결** |
+| `11_sad_downcast.png` | 통과 | 통과 | 통과 | 통과 | 슬픔 | **연결** |
+| `12_angry_hand_on_hip.png` | 통과 | 통과 | 통과 | 통과 | 화남 | **연결** |
+
+- 정식 자산 경로는 `flutter_app/assets/images/photorealistic/students/choi_iseo/`이며
+  편집기 화자 `이서`에 12종을 연결했다. 최이서가 실제 본편 장면에 등장하기 전까지
+  현재 수아 장면을 덮어쓰지 않는다.
+- 12종은 회색 스튜디오 배경을 포함한 전신 원본이다. 본편 장면 합성용 투명 컷아웃은
+  별도 승인·배경 분리 과정을 거친 뒤 연결한다.
+
 ## 2026-08-01 오리지널 여학생 01 후보
+
+> 아래 항목은 최이서 얼굴 앵커와 반소매 하복이 확정되기 전의 제작 이력이다.
+> 최이서 현행 생성·연결 기준으로 사용하지 않는다.
 
 | 자산 | 완전 실사 | 중1 연령감 | 아이돌형 미감 | 얼굴 비중복 | 상태 |
 | --- | --- | --- | --- | --- | --- |
 | `art_candidates/photorealistic_v1/original_girl_01/01_neutral_candidate_v1.png` | 통과 | 통과 | 불합격 | 통과 | **사용자 반려·폐기** |
-| `art_candidates/photorealistic_v1/original_girl_01/01_neutral_candidate_v2.png` | 통과 | 통과 | 통과 | 신규 얼굴 | **사용자 최종 승인 대기** |
+| `art_candidates/photorealistic_v1/original_girl_01/01_neutral_candidate_v2.png` | 통과 | 통과 | 방향 불일치 | 신규 얼굴 | **사용자 반려·폐기** |
+| `art_candidates/photorealistic_v1/original_girl_01/01_neutral_candidate_v3.png` | 통과 | 통과 | 도회적 K-pop 센터형 | 신규 얼굴 | **사용자 승인·정체성 고정** |
 
-- v2는 교복 사진 2장을 의상 전용 입력으로 사용했다. 사진 속 인물과 기존 5명의 얼굴은 입력하지 않았다.
-- v2는 실제 중1 또래의 풋풋함을 유지하면서 아이돌 연습생 캐스팅 사진처럼 정돈된 미감으로 재생성했다. 승인 전에는 런타임에 연결하지 않는다.
+- v3는 교복 사진 2장을 의상 전용 입력으로 사용했다. 사진 속 인물과 기존 5명의 얼굴은 입력하지 않았다.
+- v3는 작은 얼굴·선명한 고양이상 눈매·긴 흑발·도회적인 K-pop 센터 분위기를 사용하되, 실존 연예인의 얼굴을 복제하지 않은 오리지널 중1 인물로 만들었다. 사용자의 “좋아 얘로” 승인을 받아 `art_references/original_girl_01_identity_v1.png`로 정체성을 고정했다.
+- 대사용 부드러운 미소 1차 결과는 블라우스를 일반 길이로 바꿔 교복 불합격, 2차 결과는 교복은 맞았지만 양말·검은 로퍼를 사용해 신발 불합격이다. 둘 다 승인 세트에서 제외했다.
+- 여학생 기본 신발은 양말·스타킹·풋커버 없이 바로 신는 로고 없는 흰색 계열 일반 로우톱 스니커즈다. 흰 양말·검은 로퍼·구두·부츠·클로그는 불합격이다. 기존 `future_development_female_pink_clogs_barefoot_reference_v1.png`는 사용자가 철회한 중간안으로만 보관한다.
+
+### 오리지널 여학생 01 대사용 기본 전신 재설계
+
+| 자산 | 얼굴 정체성 | 기본 인상 | 교복 | 신발 | 상태 |
+| --- | --- | --- | --- | --- | --- |
+| `dialogue_expressions_v1/01_neutral.png` | 통과 | 차갑고 무서움 | 통과 | 통과 | **사용자 반려·폐기** |
+| `dialogue_expressions_v1/02_gentle_smile.png` | 통과 | 웃음이 무서움 | 통과 | 통과 | **사용자 반려·폐기** |
+| `dialogue_expressions_v2/01_soft_neutral_candidate_v1.png` | 통과 | 부드러운 기본 인상 | 통과 | 통과 | **사용자 승인·전신 마스터 고정** |
+| `dialogue_expressions_v2/02_required_bright_smile_pose_candidate_v1.png` | 통과 | 환한 웃음·오른손 포즈 | 통과 | 통과 | **사용자 승인 대기** |
+
+- v2 기본 후보는 승인 정체성 전신을 편집 대상으로 사용하고, `smile_pose_reference_v1`, `neutral_hands_pose_reference_v1`, `soft_neutral_uniform_reference_v1` 세 장을 표정·포즈·교복 자료로 함께 사용했다. 참조 사진 속 사람의 얼굴은 복사하지 않았다.
+- 사용자가 “이제 이 기본사진을 기준”이라고 지정해 v2 기본 후보를 `art_references/original_girl_01_fullbody_master_v2.png`로 고정했다.
+- 필수 환한 웃음은 `original_girl_01_required_bright_smile_pose_v2.png`를 실제 표정·포즈 입력으로 사용했다. 참조 사진의 긴 셔츠·양말·검은 로퍼는 복사하지 않고, 마스터의 짧은 셔츠·이중 허리판·양말 없는 흰 스니커즈를 유지했다.
+- 후속 포즈는 허수아비처럼 양팔을 반복해서 내리지 않고 대사마다 손·팔·어깨·머리 기울기와 체중 중심을 함께 바꾼다. 다만 기본 전신과 필수 웃음 포즈의 사용자 승인 상태를 먼저 확인한 뒤 세트를 확장한다.
 
 ## 2026-07-31 cinematic soft-painted 1차 런타임 교체 — 현행 화풍 승인으로 사용하지 않음
 

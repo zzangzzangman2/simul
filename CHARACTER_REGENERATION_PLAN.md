@@ -20,7 +20,8 @@
 - 성인에게 아동 얼굴과 체형을 복사하지 않고, 아동에게 성인 얼굴과 체형을 복사하지 않는다.
 - 제6기 신규 여학생 8명은 실제 중학교 1학년 또래의 풋풋함을 유지하면서 각자 예쁘장하고 아이돌 연습생처럼 정돈된 인상을 갖는다. 이전 5명과 기존 여성 캐릭터 얼굴은 생성 입력에서 제외하고, 생성 뒤 닮은꼴을 거르는 비교 자료로만 사용한다.
 - 여덟 명은 같은 평균 미인형 얼굴을 공유하지 않는다. 얼굴형·눈매·눈썹·코·입·헤어라인·머리 실루엣·키·체형의 조합을 인물마다 먼저 명세하고, 얼굴 골격·눈·코·머리 실루엣 중 최소 3개가 서로 다르지 않으면 재생성한다.
-- 여자 교복은 `art_references/future_development_female_uniform_photoreal_reference_01.png`와 `art_references/future_development_female_uniform_photoreal_reference_02.png`의 의상 구성·길이·체크 직물만 사용하고, 참조 사진 속 사람의 얼굴·피부·체형·포즈는 복사하지 않는다.
+- 여자 교복은 `art_references/future_development_female_uniform_photoreal_reference_01.png`와 `art_references/future_development_female_uniform_photoreal_reference_02.png`의 빨강 체크 넥타이·이중 랩 허리판·주름치마만 구조 기준으로 사용한다. 상의는 배꼽과 복부를 완전히 가리는 정상 길이의 불투명 흰 반소매 단추 셔츠로 고정하며 긴소매·크롭·배 노출은 금지한다. 참조 사진 속 사람의 얼굴·피부·체형·포즈는 복사하지 않는다.
+- 제6기 여학생의 기본 발 착장은 흰 발목양말과 로고 없는 흰색 일반 로우톱 끈 스니커즈다. 현실적인 끈과 고무 밑창을 유지하며 무양말·검정 로퍼·구두·부츠·클로그는 사용하지 않는다.
 
 ## 2. 제작 수량
 

@@ -133,7 +133,8 @@
 - 2026-08-01부터 모든 신규 인물·배경의 최상위 **렌더링 화풍** 기준은 `flutter_app/assets/images/photorealistic/prologue_1981_2000/`의 밝은 `photorealistic natural realism`이다.
 - 주인공 타이틀 자산, 한서윤의 `npc_canonical_style_teal_v1.png`와 의상 참조, 부동산 중개업자 `realtor_identity_pose_reference_01.jpg`~`03.jpg` 같은 기존 인물별 참조는 얼굴·연령·머리색·의상·장신구의 **정체성 기준**이며 최상위 렌더링 기준을 대체하지 않는다. 수아 얼굴·검은 머리·빨강 체크 교복도 다른 인물의 정체성을 덮지 않는다.
 - 제6기 신규 여학생 8명은 모두 완전 실사풍으로 새 얼굴을 설계한다. 실제 중학교 1학년 또래의 풋풋함과 아이돌 연습생처럼 예쁘장하고 정돈된 인상을 함께 주되, 이전 5명과 기존 여성 캐릭터 얼굴은 생성 입력에서 제외하고 중복 검사에만 쓴다. 여덟 명은 얼굴 구조·눈·코·입·헤어 실루엣과 체형이 서로 명확히 달라야 하며 유명 실존 아이돌을 복제하지 않는다.
-- 여자 교복은 `art_references/future_development_female_uniform_photoreal_reference_01.png`와 `art_references/future_development_female_uniform_photoreal_reference_02.png`의 의상 구조·길이·체크 직물만 사용하고 참조 사진 속 사람의 얼굴·체형·포즈는 복사하지 않는다.
+- 여자 교복은 `art_references/future_development_female_uniform_photoreal_reference_01.png`와 `art_references/future_development_female_uniform_photoreal_reference_02.png`의 빨강 체크 넥타이·이중 랩 허리판·주름치마를 구조 기준으로 사용한다. 상의는 최신 하복 결정에 따라 배꼽과 복부를 완전히 가리는 정상 길이의 불투명 흰 반소매 단추 셔츠로 고정하며 긴소매·크롭·배 노출은 사용하지 않는다. 참조 사진 속 사람의 얼굴·체형·포즈는 복사하지 않는다.
+- 제6기 여학생의 기본 발 착장은 흰 발목양말과 로고 없는 흰색 일반 로우톱 끈 스니커즈다. 현실적인 끈과 고무 밑창을 사용하며 무양말·검정 로퍼·구두·부츠·클로그로 바꾸지 않는다.
 - 신규·수정 이미지는 `ART_STYLE_GUIDE.md`를 먼저 따른다.
 - 중앙 전신 캐릭터는 1024×1536 공통 캔버스와 동일한 발 기준선을 사용한다.
 - 이미지에 정확한 글자·로고를 생성하지 않고 Flutter UI로 합성한다.
