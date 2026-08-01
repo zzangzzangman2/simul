@@ -20,12 +20,22 @@ test("opens the Flutter future-development orphanage prologue from the default r
   assert.ok([307, 308].includes(response.status));
   assert.equal(new URL(response.headers.get("location"), "http://localhost").pathname, "/play/index.html");
 
-  const [page, flutterIndex, onboarding, main, stockMarket, layout, socialCard] = await Promise.all([
+  const [
+    page,
+    flutterIndex,
+    onboarding,
+    main,
+    stockMarket,
+    stockOrderBook,
+    layout,
+    socialCard,
+  ] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../public/play/index.html", import.meta.url), "utf8"),
     readFile(new URL("../flutter_app/lib/visual_novel_onboarding.dart", import.meta.url), "utf8"),
     readFile(new URL("../flutter_app/lib/main.dart", import.meta.url), "utf8"),
     readFile(new URL("../flutter_app/lib/stock_market_screen.dart", import.meta.url), "utf8"),
+    readFile(new URL("../flutter_app/lib/stock_market_order_book.dart", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../public/og.png", import.meta.url)),
   ]);
@@ -54,7 +64,7 @@ test("opens the Flutter future-development orphanage prologue from the default r
   assert.match(onboarding, /bg_policy_room_night_v1\.png/);
   assert.match(onboarding, /bg_stock_academy_2000_portrait_cartoon_v4\.png/);
   assert.match(onboarding, /앞으로 주식 수업은 각자 자기 컴퓨터로 화면을 직접 보면서 배울 거예요/);
-  assert.match(onboarding, /cinematic_soft_painted\/sua\/03_bright_laugh_v1\.png/);
+  assert.match(onboarding, /production_soft_painted\/han_sua\/03_bright_laugh_v1\.png/);
   assert.match(onboarding, /cinematic_soft_painted\/policy_1981\/jeon_dugwang\/05_pressure_v1\.png/);
   assert.match(onboarding, /cinematic_soft_painted\/policy_1981\/baek_gihyeon\/03_warning_v2\.png/);
   assert.match(onboarding, /cinematic_soft_painted\/policy_1981\/kang_incheol\/02_explain_v2\.png/);
@@ -79,8 +89,8 @@ test("opens the Flutter future-development orphanage prologue from the default r
   assert.match(main, /academy-market-tutorial-screen/);
   assert.match(stockMarket, /selfRelianceReserve/);
   assert.match(stockMarket, /market-tutorial-teacher-upper-body/);
-  assert.match(stockMarket, /stock-order-book/);
-  assert.match(stockMarket, /order-book-active-trade/);
+  assert.match(stockOrderBook, /stock-order-book/);
+  assert.match(stockOrderBook, /order-book-active-trade/);
   assert.match(layout, /초딩부터 건물주/);
   assert.match(layout, /images: \[\{ url: `\$\{origin\}\/og\.png`, width: 1734, height: 907/);
   assert.match(layout, /themeColor: "#061F2A"/);
@@ -163,13 +173,13 @@ test("keeps Flutter launch metadata aligned with the current starting conditions
 
   assert.match(flutterTemplate, /초딩부터 건물주/);
   assert.match(flutterTemplate, /2000년 서울/);
-  assert.match(flutterTemplate, /세뱃돈 1만원/);
+  assert.match(flutterTemplate, /국가계좌 1만원/);
   assert.match(flutterTemplate, /property="og:image" content="\/og\.png"/);
   assert.match(flutterTemplate, /name="twitter:image" content="\/og\.png"/);
   assert.doesNotMatch(flutterTemplate, /초기자본 100만원/);
   assert.equal(parsedManifest.name, "초딩부터 건물주");
   assert.match(parsedManifest.description, /2000년 서울/);
-  assert.match(parsedManifest.description, /세뱃돈 1만원/);
+  assert.match(parsedManifest.description, /국가계좌 1만원/);
   assert.doesNotMatch(parsedManifest.description, /초기자본 100만원/);
 });
 
@@ -204,7 +214,7 @@ test("documents and preserves the portrait-mobile product contract", async () =>
   assert.match(rules, /390×844px/);
   assert.match(rules, /최소 360px/);
   assert.match(guide, /처음하기.*이어하기/);
-  assert.match(guide, /현재 상태 스키마는 `v20`/);
+  assert.match(guide, /현재 상태 스키마는 `v24`/);
   assert.match(guide, /최대 5슬롯/);
   assert.doesNotMatch(rules, /게임 화면보다 먼저 회사 이름/);
   assert.doesNotMatch(guide, /첫 방문 시 회사 이름 입력 화면/);
@@ -212,7 +222,7 @@ test("documents and preserves the portrait-mobile product contract", async () =>
   assert.match(css, /env\(safe-area-inset-bottom\)/);
   assert.match(css, /width: min\(100%, 430px\)/);
   assert.match(css, /\.asset-grid \{[\s\S]*?grid-template-columns: 1fr;/);
-  assert.match(state, /schemaVersion = 20/);
+  assert.match(state, /schemaVersion = 24/);
   assert.match(state, /simulationSeed/);
   assert.match(market, /daily-market-report-card/);
   assert.match(market, /purchase-market-report-button/);
@@ -227,7 +237,7 @@ test("documents and preserves the portrait-mobile product contract", async () =>
 });
 
 test("uses the deterministic local news combinator without a remote API", async () => {
-  const [packageJson, flutterPubspec, combinator, marketNews, main] =
+  const [packageJson, flutterPubspec, combinator, marketNews, main, campaignScenes] =
     await Promise.all([
       readFile(new URL("../package.json", import.meta.url), "utf8"),
       readFile(new URL("../flutter_app/pubspec.yaml", import.meta.url), "utf8"),
@@ -240,17 +250,18 @@ test("uses the deterministic local news combinator without a remote API", async 
         "utf8",
       ),
       readFile(new URL("../flutter_app/lib/main.dart", import.meta.url), "utf8"),
+      readFile(new URL("../flutter_app/lib/campaign_scenes.dart", import.meta.url), "utf8"),
     ]);
 
   assert.doesNotMatch(packageJson, /@google\/genai/i);
   assert.doesNotMatch(flutterPubspec, /^\s+http:/m);
-  assert.doesNotMatch(`${combinator}${marketNews}${main}`, /\/api\/news/);
-  assert.doesNotMatch(`${combinator}${marketNews}${main}`, /package:http/);
+  assert.doesNotMatch(`${combinator}${marketNews}${main}${campaignScenes}`, /\/api\/news/);
+  assert.doesNotMatch(`${combinator}${marketNews}${main}${campaignScenes}`, /package:http/);
   assert.match(combinator, /theoreticalCombinationCount/);
   assert.match(combinator, /12 \* 10 \* 12 \* 10 \* 12 \* 10/);
   assert.match(combinator, /simulationSeed/);
   assert.match(combinator, /toSafeSnapshot/);
-  assert.match(main, /NewsCombinator\(\)/);
+  assert.match(campaignScenes, /NewsCombinator\(\)/);
 });
 
 test("tracks mobile browser chrome and provides an exact desktop phone preview", async () => {
@@ -422,7 +433,7 @@ test("offers a disposable stock-only test entry", async () => {
 
 
 test("ships an intuitive dialogue editor and builds saved dialogue into the game", async () => {
-  const [editor, editorCss, catalog, backgroundCatalog, data, generator, packageJson, buildRoute, onboarding, pubspec] = await Promise.all([
+  const [editor, editorCss, catalog, backgroundCatalog, data, generator, packageJson, buildRoute, onboarding, pubspec, mbtiGuide] = await Promise.all([
     readFile(new URL("../app/editor/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/editor/editor.module.css", import.meta.url), "utf8"),
     readFile(new URL("../app/editor/character-catalog.ts", import.meta.url), "utf8"),
@@ -436,6 +447,7 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
     readFile(new URL("../app/api/dialogue/build/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../flutter_app/lib/visual_novel_onboarding.dart", import.meta.url), "utf8"),
     readFile(new URL("../flutter_app/pubspec.yaml", import.meta.url), "utf8"),
+    readFile(new URL("../characters/cohort6_girls/README.md", import.meta.url), "utf8"),
   ]);
 
   assert.match(editor, /대사 편집기/);
@@ -460,7 +472,41 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
   assert.doesNotMatch(editor, /이 장면을 저장하시겠습니까/);
   assert.doesNotMatch(editor, /저장하고 이동/);
   assert.match(editor, /새 장면 .*개 자동 추가/);
-  assert.equal((data.match(/"id": "scene-/g) ?? []).length, 73);
+  assert.equal((data.match(/"id": "scene-/g) ?? []).length, 102);
+  for (const student of [
+    "김서아",
+    "이지안",
+    "최이서",
+    "정아린",
+    "박하은",
+    "오지우",
+    "윤채아",
+    "수아",
+    "김학준",
+    "나",
+  ]) {
+    assert.match(data, new RegExp(`"speaker": "${student}"`));
+  }
+  for (const [student, type] of [
+    ["김서아", "ISFJ"],
+    ["이지안", "ISTP"],
+    ["최이서", "ISFP"],
+    ["정아린", "ESTJ"],
+    ["박하은", "ENFJ"],
+    ["한수아", "ENFP"],
+    ["오지우", "ENTP"],
+    ["윤채아", "INTJ"],
+  ]) {
+    assert.match(mbtiGuide, new RegExp(`${student}.*${type}`));
+  }
+  assert.match(data, /열어 보기 전엔 고장이라고 못 해/);
+  assert.match(data, /아직 말 안 한 사람, 더 필요한 규칙 있어/);
+  assert.match(data, /우리 첫 약속으로 남기자/);
+  assert.match(data, /어제 가격일 수도 있으니까/);
+  assert.match(data, /침상/);
+  assert.match(data, /사물함/);
+  assert.match(data, /사물함과 침상은 허락받기/);
+  assert.match(data, /제5기 (?:배지|명찰)/);
   assert.match(data, /단팥빵 하나와 500원/);
   assert.match(data, /설명서 학준아, 별명 붙이면 안 된다는 규정도 있어/);
   assert.doesNotMatch(data, /안내문에 별명 금지도 있어, 설명서 학준아/);
@@ -469,7 +515,7 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
   assert.match(data, /character_hakjun_orientation_v2\.png/);
   assert.match(generator, /_onboardingBeatCount/);
   assert.match(generator, /teacherPoseForBeat/);
-  assert.match(generator, /appearanceVersion !== 8/);
+  assert.match(generator, /appearanceVersion !== 11/);
   assert.match(generator, /Dialogue editor synced/);
   const protagonistCatalog = catalog.slice(
     catalog.indexOf("const protagonistPoses"),
@@ -486,10 +532,34 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
   assert.match(packageJson, /prebuild:flutter-web/);
   assert.match(packageJson, /dialogue:sync/);
   assert.match(buildRoute, /dialogue-editor-override\.json/);
-  assert.match(buildRoute, /appearanceVersion: 8/);
+  assert.match(buildRoute, /appearanceVersion: 11/);
+  assert.match(catalog, /production_soft_painted\/park_haeun/);
+  assert.match(catalog, /production_soft_painted\/yoon_chaea/);
+  assert.match(catalog, /production_soft_painted\/han_sua/);
+  assert.match(catalog, /production_soft_painted\/kim_seoa/);
+  assert.match(catalog, /production_soft_painted\/lee_jian/);
+  assert.match(catalog, /production_soft_painted\/choi_iseo/);
+  assert.match(catalog, /production_soft_painted\/oh_jiwoo/);
+  assert.match(catalog, /speaker: "윤채아"[\s\S]*?poses: yoonChaeaPoses/);
+  assert.match(catalog, /speaker: "김서아"[\s\S]*?poses: kimSeoaPoses/);
+  assert.match(catalog, /speaker: "이지안"[\s\S]*?poses: leeJianPoses/);
+  assert.match(catalog, /speaker: "최이서"[\s\S]*?poses: choiIseoPoses/);
+  assert.match(catalog, /speaker: "오지우"[\s\S]*?poses: ohJiwooPoses/);
+  assert.match(catalog, /09_explaining_v1\.png/);
+  assert.match(data, /scene-dorm-intro-haeun[\s\S]*?park_haeun\/02_warm_smile_v1\.png/);
+  assert.match(data, /scene-dorm-boundary-proposal[\s\S]*?park_haeun\/09_explaining_v1\.png/);
+  assert.match(data, /scene-dorm-intro-chaea[\s\S]*?yoon_chaea\/09_explaining_v1\.png/);
+  assert.match(data, /scene-dorm-awkward-question[\s\S]*?yoon_chaea\/06_worried_v1\.png/);
+  assert.match(data, /scene-dorm-intro-seoa[\s\S]*?kim_seoa\/09_explaining_ledger_v1\.png/);
+  assert.match(data, /scene-dorm-intro-jian[\s\S]*?lee_jian\/09_explaining_mechanism_v1\.png/);
+  assert.match(data, /scene-dorm-intro-iseo[\s\S]*?choi_iseo\/01_base_thread_v1\.png/);
+  assert.match(data, /scene-dorm-intro-jiwoo[\s\S]*?oh_jiwoo\/09_explaining_report_v1\.png/);
+  assert.match(data, /scene-dorm-intro-sua[\s\S]*?han_sua\/08_explaining_v1\.png/);
   assert.match(buildRoute, /dialogueTextValue/);
   assert.match(buildRoute, /scripts\/build-flutter-web\.mjs/);
   assert.match(onboarding, /_dialogueBundleAsset/);
+  assert.match(onboarding, /_dialogueAppearanceVersion = 11/);
+  assert.match(onboarding, /_mergeCurrentAppearance/);
   assert.match(onboarding, /rootBundle\.loadString/);
   assert.match(onboarding, /character: asset\('character'\)/);
   assert.match(onboarding, /background: asset\('background'\)/);

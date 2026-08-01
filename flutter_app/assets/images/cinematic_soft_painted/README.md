@@ -5,7 +5,7 @@
 
 ## 공통 렌더링
 
-- 스타일 기준: `art_references/simul_cinematic_soft_painted_style_v1.png`
+- 스타일 기준: `art_references/simul_production_soft_painted_vn_style_anchor_v1.png`
 - 애니메이션식 얼굴 구조에 부드러운 페인터리 피부·의상 명암을 결합한다.
 - 외곽선은 거의 보이지 않는 유색 경계만 사용한다.
 - 머리카락은 큰 실루엣, 중간 가닥, 잔머리와 섬세한 반사광을 모두 표현한다.

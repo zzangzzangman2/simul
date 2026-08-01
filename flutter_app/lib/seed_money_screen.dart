@@ -77,14 +77,14 @@ class _SeedMoneyHubScreenState extends State<SeedMoneyHubScreen> {
         child: Column(
           children: [
             _WorkTopBar(
-              title: '오늘 뭐 하고 벌까?',
+              title: '오늘 어떤 실습을 할까?',
               subtitle:
-                  '${_state.currentDate.year}년 · $age살 · 세뱃돈과 일거리 수입을 구분해 기록',
+                  '${_state.currentDate.year}년 · $age살 · 국가원금과 실습 수입을 구분해 기록',
               onBack: () => Navigator.of(context).pop(),
             ),
             _SceneClockStrip(
-              location: '우리 동네 · 용돈 퀘스트',
-              caption: '일을 마치면 수입과 함께 한 시간이 흐른다.',
+              location: '국립 미래양성원 · 실기 훈련장',
+              caption: '실습을 마치면 활동 수당과 함께 한 시간이 흐른다.',
               minute: _state.marketMinute,
               costLabel: '완료 +60분',
               dark: false,
@@ -133,7 +133,7 @@ class _SeedMoneyHubScreenState extends State<SeedMoneyHubScreen> {
                         ],
                       ),
                       child: const Text(
-                        '오늘 할 수 있는 일은 충분히 했어요. 공부와 가족 시간을 지키려면 하루를 보낸 뒤 다시 선택하세요.',
+                        '오늘 할 수 있는 실습은 충분히 했어요. 수업과 공동생활 시간을 지키려면 하루를 보낸 뒤 다시 선택하세요.',
                         style: TextStyle(
                           color: _ink,
                           fontSize: 11,
@@ -233,7 +233,7 @@ class _SeedMoneyIllustratedSummary extends StatelessWidget {
                     Icon(Icons.savings_rounded, color: _coral, size: 16),
                     SizedBox(width: 6),
                     Text(
-                      '외할아버지 세뱃돈 · 첫 투자금',
+                      '미래양성기금 · 국가계좌 원금',
                       style: TextStyle(
                         color: _ink,
                         fontSize: 11,
@@ -436,7 +436,7 @@ class _ChorePeriodNotice extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '엄마의 2000년 용돈 메모',
+                '미래양성원 실기 활동 규정',
                 style: TextStyle(
                   color: _ink,
                   fontSize: 10.5,
@@ -445,7 +445,7 @@ class _ChorePeriodNotice extends StatelessWidget {
               ),
               SizedBox(height: 3),
               Text(
-                '14살인 지금은 보호자와 함께 참가하는 안전한 동네 축제 코스 상금으로 시작해요!',
+                '14살인 지금은 지도관이 확인한 폐쇄형 훈련 코스에서만 활동 수당을 받을 수 있어요.',
                 style: TextStyle(
                   color: Color(0xFF737C8E),
                   fontSize: 9.2,

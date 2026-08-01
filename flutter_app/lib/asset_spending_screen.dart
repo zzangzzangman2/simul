@@ -795,7 +795,7 @@ class _AssetSpendingScreenState extends State<AssetSpendingScreen> {
   Widget build(BuildContext context) {
     final finance = _state.personalFinance;
     final propertyValue = finance.estimatedPropertyValueAt(_state.day);
-    final familyOption = spendingOptionById('family_outing')!;
+    final communityOption = spendingOptionById('cohort_field_day')!;
     return Scaffold(
       key: const Key('asset-spending-screen'),
       backgroundColor: const Color(0xFFF3EBDD),
@@ -856,10 +856,10 @@ class _AssetSpendingScreenState extends State<AssetSpendingScreen> {
                 const _FinanceNoticeCard(),
                 const SizedBox(height: 10),
                 _SpendingOptionCard(
-                  option: familyOption,
-                  lockReason: _lockReason(familyOption),
+                  option: communityOption,
+                  lockReason: _lockReason(communityOption),
                   busy: _busy,
-                  onTap: () => _purchase(familyOption),
+                  onTap: () => _purchase(communityOption),
                 ),
               ],
               const SizedBox(height: 18),
@@ -900,7 +900,7 @@ class _AssetSpendingScreenState extends State<AssetSpendingScreen> {
                     .where(
                       (option) =>
                           option.marketAssetId == null &&
-                          option.id != familyOption.id,
+                          option.id != communityOption.id,
                     )
                     .map(
                       (option) => Padding(
@@ -4362,7 +4362,7 @@ class _SpendingOptionCard extends StatelessWidget {
   final VoidCallback onTap;
 
   String get categoryLabel => switch (option.category) {
-    SpendingCategory.family => '가족',
+    SpendingCategory.community => '공동체',
     SpendingCategory.education => '교육',
     SpendingCategory.business => '사업',
     SpendingCategory.realEstate => '부동산',
@@ -4496,7 +4496,7 @@ class _OwnedPropertyCard extends StatelessWidget {
         asset.marketAsset?.type ?? RealEstateAssetType.commercialUnit;
     final directUse =
         asset.optionId == 'owner_office' ||
-        asset.optionId == 'family_home_trust';
+        asset.optionId == 'alumni_housing_trust';
     final supportsManagedLease =
         realEstateSupportsManagedLease(assetType) && !directUse;
     final monthlyHoldingTax = realEstateMonthlyHoldingTax(
@@ -4839,7 +4839,7 @@ class _AssetSpendingEntry extends StatelessWidget {
                     style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
                   ),
                   Text(
-                    '부동산 ${state.personalFinance.realEstate.length}건 · 교육·가족·사회공헌·성인 오락',
+                    '부동산 ${state.personalFinance.realEstate.length}건 · 교육·공동체·사회공헌·성인 오락',
                     style: const TextStyle(fontSize: 9, height: 1.35),
                   ),
                 ],

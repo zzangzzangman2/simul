@@ -54,7 +54,7 @@
 ## 생성 화풍과 프롬프트 요약
 
 이 폴더의 현재 파일은 레거시 카툰 화풍으로 제작된 자산이며, 재생성 시에는
-`ART_STYLE_GUIDE.md`의 공식 **cinematic soft-painted anime realism**을 적용한다.
+`ART_STYLE_GUIDE.md`의 공식 **SIMUL production soft-painted VN anime v1**을 적용한다.
 부드러운 페인터리 질감, 자연스러운 시네마틱 광원과 공기 원근을 사용하고
 두꺼운 외곽선, 딱딱한 셀 명암, 플라스틱 3D와 사진식 실사는 피한다.
 배경 프롬프트는 2000년 재개발 대기 임대아파트와 동네의 가난하지만

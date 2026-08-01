@@ -141,14 +141,14 @@ void main() {
       MaterialApp(
         home: OrganizationScreen(
           state: state,
-          onRequestFamilyHelp: (_) async => state,
+          onRequestAcademyHelp: (_) async => state,
         ),
       ),
     );
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('assignment-portrait-mother')), findsOneWidget);
-    await tester.ensureVisible(find.byKey(const Key('assignment-card-father')));
+    expect(find.byKey(const Key('assignment-portrait-hakjun')), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const Key('assignment-card-sua')));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
   });
@@ -170,7 +170,7 @@ void main() {
         totalBoardSeats: 7,
         investmentBookValue: 390000,
         acquiredAtDay: 1828,
-        leadershipModel: CompanyLeadershipModel.fatherAdvisor,
+        leadershipModel: CompanyLeadershipModel.academyAdvisor,
         monthlyRevenue: 175000,
         monthlyOperatingCost: 140000,
       ),
@@ -179,7 +179,7 @@ void main() {
       MaterialApp(
         home: OrganizationScreen(
           state: state,
-          onRequestFamilyHelp: (_) async => state,
+          onRequestAcademyHelp: (_) async => state,
         ),
       ),
     );
@@ -239,7 +239,7 @@ void main() {
           onSetMarketMinute: (_) async => state,
           onSaveMarketNotebook: (_, _) async => state,
           onResolveDecision: (_, _) async {},
-          onRequestFamilyHelp: (_) async => state,
+          onRequestAcademyHelp: (_) async => state,
           onCompleteWork: (_) async => state,
           onExecuteTrade: (_) async => TradeExecutionResult(
             success: false,
@@ -489,7 +489,7 @@ void main() {
     await tester.tap(appendix.hitTestable());
     await tester.pumpAndSettle();
 
-    expect(find.text('가족 계좌 상태와 오늘의 신문 스크랩'), findsOneWidget);
+    expect(find.text('국가계좌 상태와 오늘의 신문 스크랩'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -512,7 +512,7 @@ void main() {
           onSetMarketMinute: (_) async => state,
           onSaveMarketNotebook: (_, _) async => state,
           onResolveDecision: (_, _) => save.future,
-          onRequestFamilyHelp: (_) async => state,
+          onRequestAcademyHelp: (_) async => state,
           onCompleteWork: (_) async => state,
           onExecuteTrade: (_) async => TradeExecutionResult(
             success: false,

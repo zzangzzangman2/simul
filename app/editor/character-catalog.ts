@@ -60,12 +60,111 @@ const suaPoses = [
   ["01", "차분한 기본", "01_neutral_v1.png"],
   ["02", "따뜻한 미소", "02_warm_smile_v1.png"],
   ["03", "활짝 웃음", "03_bright_laugh_v1.png"],
-  ["04", "장난스러운 놀림", "04_playful_tease_v1.png"],
+  ["04", "깜짝 놀람", "04_surprised_v1.png"],
+  ["05", "걱정", "05_worried_v1.png"],
+  ["06", "불만", "06_annoyed_v1.png"],
+  ["07", "단호한 결심", "07_determined_v1.png"],
+  ["08", "활기찬 설명", "08_explaining_v1.png"],
+].map(([id, label, file]) =>
+  pose(id, label, `assets/images/production_soft_painted/han_sua/${file}`),
+);
+
+const kimSeoaPoses = [
+  ["01", "공책 든 기본", "01_neutral_notebook_v1.png"],
+  ["02", "부드러운 동의", "02_soft_smile_agree_v1.png"],
+  ["03", "안도하는 웃음", "03_relieved_laugh_v1.png"],
+  ["04", "수줍은 감사", "04_shy_appreciative_v1.png"],
+  ["05", "기록 중 놀람", "05_surprised_record_v1.png"],
+  ["06", "장부 걱정", "06_worried_checking_v1.png"],
+  ["07", "단호한 경계", "07_firm_boundary_v1.png"],
+  ["08", "기록 결심", "08_determined_record_v1.png"],
+  ["09", "장부 설명", "09_explaining_ledger_v1.png"],
+].map(([id, label, file]) =>
+  pose(id, label, `assets/images/production_soft_painted/kim_seoa/${file}`),
+);
+
+const leeJianPoses = [
+  ["01", "드라이버 든 기본", "01_neutral_screwdriver_v1.png"],
+  ["02", "수리 완료 미소", "02_soft_smile_fixed_v1.png"],
+  ["03", "수리 집중", "03_focused_repair_v1.png"],
+  ["04", "고장 발견 놀람", "04_surprised_fault_v1.png"],
+  ["05", "진단 걱정", "05_worried_diagnosis_v1.png"],
+  ["06", "방해받은 불만", "06_annoyed_interrupted_v1.png"],
+  ["07", "책임지는 사과", "07_apologetic_boundary_v1.png"],
+  ["08", "수리 결심", "08_determined_repair_v1.png"],
+  ["09", "작동 원리 설명", "09_explaining_mechanism_v1.png"],
+].map(([id, label, file]) =>
+  pose(id, label, `assets/images/production_soft_painted/lee_jian/${file}`),
+);
+
+const choiIseoPoses = [
+  ["01", "실 든 기본", "01_base_thread_v1.png"],
+  ["02", "온화한 미소", "02_gentle_smile_v1.png"],
+  ["03", "기쁜 웃음", "03_pleased_laugh_v1.png"],
+  ["04", "수줍은 당황", "04_shy_flustered_v1.png"],
+  ["05", "깜짝 놀람", "05_surprised_v1.png"],
+  ["06", "상처받은 침묵", "06_hurt_withdrawn_v1.png"],
+  ["07", "단호한 경계", "07_firm_boundary_v1.png"],
+  ["08", "바느질 집중", "08_focused_mending_v1.png"],
+  ["09", "꼼꼼한 확인", "09_skeptical_inspection_v1.png"],
+].map(([id, label, file]) =>
+  pose(id, label, `assets/images/production_soft_painted/choi_iseo/${file}`),
+);
+
+const ohJiwooPoses = [
+  ["01", "방송 준비 기본", "01_alert_neutral_v1.png"],
+  ["02", "덧니 미소와 인사", "02_cheerful_fang_wave_v1.png"],
+  ["03", "속보 흥분", "03_breaking_news_excited_v1.png"],
+  ["04", "장난스러운 반론", "04_playful_counterpoint_v1.png"],
+  ["05", "정정 보도 놀람", "05_surprised_correction_v1.png"],
+  ["06", "의심하며 생각", "06_skeptical_thinking_v1.png"],
+  ["07", "짜증 섞인 반박", "07_annoyed_rebuttal_v1.png"],
+  ["08", "방송 결심", "08_determined_broadcast_v1.png"],
+  ["09", "보도 설명", "09_explaining_report_v1.png"],
+].map(([id, label, file]) =>
+  pose(id, label, `assets/images/production_soft_painted/oh_jiwoo/${file}`),
+);
+
+const parkHaeunPoses = [
+  ["01", "기본 인사", "01_base_wave_v1.png"],
+  ["02", "따뜻한 미소", "02_warm_smile_v1.png"],
+  ["03", "신나는 웃음", "03_delighted_laugh_v1.png"],
+  ["04", "수줍은 미소", "04_shy_blush_v1.png"],
   ["05", "깜짝 놀람", "05_surprised_v1.png"],
   ["06", "걱정", "06_worried_v1.png"],
-  ["07", "단호한 결심", "07_determined_v1.png"],
+  ["07", "삐친 표정", "07_sulky_pout_v1.png"],
+  ["08", "단호한 결심", "08_determined_v1.png"],
+  ["09", "차분한 설명", "09_explaining_v1.png"],
 ].map(([id, label, file]) =>
-  pose(id, label, `assets/images/cinematic_soft_painted/sua/${file}`),
+  pose(id, label, `assets/images/production_soft_painted/park_haeun/${file}`),
+);
+
+const jungArinPoses = [
+  ["01", "기본 장난기", "01_base_cheeky_v1.png"],
+  ["02", "자신감 있는 미소", "02_confident_smile_v1.png"],
+  ["03", "깜찍한 웃음", "03_cheeky_laugh_v1.png"],
+  ["04", "담당 지정", "04_assigning_tasks_v1.png"],
+  ["05", "깜짝 놀람", "05_startled_v1.png"],
+  ["06", "일정 걱정", "06_schedule_worried_v1.png"],
+  ["07", "마감 불만", "07_deadline_annoyed_v1.png"],
+  ["08", "실행 결의", "08_determined_ready_v1.png"],
+  ["09", "순서 설명", "09_counting_explain_v1.png"],
+].map(([id, label, file]) =>
+  pose(id, label, `assets/images/production_soft_painted/jung_arin/${file}`),
+);
+
+const yoonChaeaPoses = [
+  ["01", "차분한 기본", "01_neutral_tie_v1.png"],
+  ["02", "부드러운 미소", "02_soft_smile_wave_v1.png"],
+  ["03", "기쁜 웃음", "03_delighted_laugh_v1.png"],
+  ["04", "수줍은 홍조", "04_shy_blush_v1.png"],
+  ["05", "깜짝 놀람", "05_surprised_v1.png"],
+  ["06", "조용한 걱정", "06_worried_v1.png"],
+  ["07", "삐친 표정", "07_sulky_pout_v1.png"],
+  ["08", "단단한 결심", "08_determined_v1.png"],
+  ["09", "가격 구조 설명", "09_explaining_v1.png"],
+].map(([id, label, file]) =>
+  pose(id, label, `assets/images/production_soft_painted/yoon_chaea/${file}`),
 );
 
 function policyPoses(
@@ -148,6 +247,41 @@ export const dialogueCharacters: DialogueCharacter[] = [
     speaker: "수아",
     group: "주요 인물",
     poses: suaPoses,
+  },
+  {
+    speaker: "김서아",
+    group: "주요 인물",
+    poses: kimSeoaPoses,
+  },
+  {
+    speaker: "이지안",
+    group: "주요 인물",
+    poses: leeJianPoses,
+  },
+  {
+    speaker: "최이서",
+    group: "주요 인물",
+    poses: choiIseoPoses,
+  },
+  {
+    speaker: "박하은",
+    group: "주요 인물",
+    poses: parkHaeunPoses,
+  },
+  {
+    speaker: "정아린",
+    group: "주요 인물",
+    poses: jungArinPoses,
+  },
+  {
+    speaker: "윤채아",
+    group: "주요 인물",
+    poses: yoonChaeaPoses,
+  },
+  {
+    speaker: "오지우",
+    group: "주요 인물",
+    poses: ohJiwooPoses,
   },
   {
     speaker: "학준",

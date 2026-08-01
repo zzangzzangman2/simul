@@ -15,5 +15,5 @@
 - 이후 캐릭터도 같은 몸에 얼굴만 바꾸지 않는다.
 - 인물마다 키, 어깨, 몸통, 골반, 팔다리, 다리 굵기와 체중 중심을 다르게 설계한다.
 - 모든 차이는 정상적이고 건강한 연령 비율 안에서 표현한다.
-- 정식 화풍은 `cinematic soft-painted anime realism`이다.
-
+- 정식 화풍은 `SIMUL production soft-painted VN anime v1`이며, 공식 앵커는 `art_references/simul_production_soft_painted_vn_style_anchor_v1.png`다.
+- 모든 새 채팅과 캐릭터 생성은 `IMAGE_GENERATION_STYLE_PROMPT.md`를 먼저 사용한다.

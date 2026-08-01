@@ -80,7 +80,7 @@ const locationRules = parseRules(between("  String get _location", "  String get
 const dateRules = parseRules(between("  String get _dateLabel", "  String? get _character"));
 const characterRules = parseRules(between("  String? get _character", "  bool get _isAcademyTeacherBeat"));
 const teacherBeats = Array.from(
-  between("  bool get _isAcademyTeacherBeat", "  bool get _isAcademyReceptionistBeat").matchAll(
+  between("  bool get _isAcademyTeacherBeat", "  String get _teacherPoseAsset").matchAll(
     /_beat == (\d+)/g,
   ),
   (match) => Number(match[1]),
@@ -116,7 +116,7 @@ function chapterFor(beat, location) {
   return `추가 장면 · ${location || "새 장소"}`;
 }
 
-const scenes = Array.from({ length: beatCount }, (_, beat) => {
+let scenes = Array.from({ length: beatCount }, (_, beat) => {
   const location = resolveRule(locationRules, beat, "새 장소");
   let speaker = resolveRule(speakerRules, beat, "이야기");
   let line = resolveRule(lineRules, beat, "");
@@ -139,6 +139,45 @@ const scenes = Array.from({ length: beatCount }, (_, beat) => {
   };
 });
 
+// The bundled override is the canonical authored story once it exists. The
+// Dart source remains a safe fallback, but editor regeneration must not throw
+// away scenes that were added after the original source beats.
+const overridePath = path.join(
+  project,
+  "flutter_app/assets/dialogue/dialogue-editor-override.json",
+);
+if (fs.existsSync(overridePath)) {
+  try {
+    const originalOverride = fs.readFileSync(overridePath, "utf8");
+    const override = JSON.parse(originalOverride);
+    if (Array.isArray(override.scenes) && override.scenes.length > 0) {
+      const upgradeAppearance = override.appearanceVersion !== 11;
+      const defaultById = new Map(scenes.map((scene) => [scene.id, scene]));
+      override.scenes = override.scenes
+        .map((scene) => ({
+          ...scene,
+          direction: normalizeDialogueText(scene.direction),
+          line: normalizeDialogueText(scene.line),
+          background: upgradeAppearance
+            ? defaultById.get(scene.id)?.background ?? scene.background ?? ""
+            : scene.background ?? "",
+          character: upgradeAppearance
+            ? defaultById.get(scene.id)?.character ?? scene.character ?? ""
+            : scene.character ?? "",
+        }))
+        .sort((left, right) => left.order - right.order);
+      override.appearanceVersion = 11;
+      const normalizedOverride = `${JSON.stringify(override, null, 2)}\n`;
+      if (normalizedOverride !== originalOverride) {
+        fs.writeFileSync(overridePath, normalizedOverride, "utf8");
+      }
+      scenes = override.scenes;
+    }
+  } catch {
+    // A damaged local override falls back to the source dialogue.
+  }
+}
+
 const output = `export type DialogueScene = {
   id: string;
   order: number;
@@ -157,37 +196,4 @@ export const initialDialogue: DialogueScene[] = ${JSON.stringify(scenes, null, 2
 
 fs.mkdirSync(path.dirname(outputPath), { recursive: true });
 fs.writeFileSync(outputPath, output, "utf8");
-
-const overridePath = path.join(
-  project,
-  "flutter_app/assets/dialogue/dialogue-editor-override.json",
-);
-if (fs.existsSync(overridePath)) {
-  try {
-    const originalOverride = fs.readFileSync(overridePath, "utf8");
-    const override = JSON.parse(originalOverride);
-    if (Array.isArray(override.scenes) && override.scenes.length > 0) {
-      const upgradeAppearance = override.appearanceVersion !== 8;
-      const defaultById = new Map(scenes.map((scene) => [scene.id, scene]));
-      override.scenes = override.scenes.map((scene) => ({
-        ...scene,
-        direction: normalizeDialogueText(scene.direction),
-        line: normalizeDialogueText(scene.line),
-        background: upgradeAppearance
-          ? defaultById.get(scene.id)?.background ?? scene.background ?? ""
-          : scene.background ?? "",
-        character: upgradeAppearance
-          ? defaultById.get(scene.id)?.character ?? scene.character ?? ""
-          : scene.character ?? "",
-      }));
-      override.appearanceVersion = 8;
-      const normalizedOverride = `${JSON.stringify(override, null, 2)}\n`;
-      if (normalizedOverride !== originalOverride) {
-        fs.writeFileSync(overridePath, normalizedOverride, "utf8");
-      }
-    }
-  } catch {
-    // A damaged local override must not block regenerating the editor source.
-  }
-}
 console.log(`Dialogue editor synced: ${scenes.length} scenes`);

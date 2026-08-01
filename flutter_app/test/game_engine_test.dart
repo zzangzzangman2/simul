@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter_test/flutter_test.dart';
@@ -56,12 +57,12 @@ void main() {
     return engine.advanceOneDay(ready);
   }
 
-  test('new game starts as a guardian-approved family research desk', () {
+  test('new game always starts with the sixth-cohort state account', () {
     final story = StoryState.newPlayer(
       playerName: '민준',
       introChoice: 'computer',
       startingTrait: StoryTrait.analysis,
-      familyRule: FamilyRule.reportLosses,
+      operatingPrinciple: OperatingPrinciple.reportLosses,
     );
     final state = engine.createNewGame('별빛', story: story);
 
@@ -73,22 +74,23 @@ void main() {
     expect(state.story.earnedSeedMoney, 0);
     expect(state.story.seedMoneyTotal, 10000);
     expect(state.story.accountAuthorityLevel, 1);
-    expect(state.story.guardianAccountHolder, 'mother');
-    expect(state.story.storyFlags['guardianConsent'], isTrue);
+    expect(state.story.stateAccountHolder, 'future_development_fund');
+    expect(state.story.orphanageReboot, isTrue);
     expect(state.story.storyFlags['isLegalCompany'], isFalse);
     expect(state.story.marketTutorialEligible, isTrue);
     expect(state.story.marketTutorialSeen, isFalse);
-    expect(state.story.academyTuitionDebt, academyTuitionDebtAmount);
-    expect(state.story.academyTuitionRepaid, isFalse);
     expect(
       state.story.storyFlags['seedMoneySource'],
-      'grandfather_new_year_gift',
+      'future_development_fund',
     );
+    expect(state.story.toJson(), isNot(contains('academyTuitionDebt')));
+    expect(state.story.toJson(), isNot(contains('motherAffinity')));
+    expect(state.story.toJson(), isNot(contains('fatherAffinity')));
     expect(state.ledger, hasLength(1));
     expect(state.ledger.single.amount, 10000);
     expect(state.ledger.single.account, 'brokerage_cash');
-    expect(state.ledger.single.counterAccount, 'family_gift');
-    expect(state.ledger.single.description, contains('외할아버지 세뱃돈'));
+    expect(state.ledger.single.counterAccount, 'state_seed_capital');
+    expect(state.ledger.single.description, contains('미래양성기금'));
     expect(state.pendingDecisions.first.id, 'first-research-note');
   });
 
@@ -97,14 +99,14 @@ void main() {
       playerName: '명박',
       introChoice: 'stocks',
       startingTrait: StoryTrait.analysis,
-      operatingPrinciple: FamilyRule.reportLosses,
+      operatingPrinciple: OperatingPrinciple.reportLosses,
     );
     final state = engine.createNewGame('새천년투자연구소', story: story);
 
     expect(state.story.orphanageReboot, isTrue);
     expect(state.story.playerBirthYear, 1987);
     expect(state.story.ageOn(state.currentDate), 14);
-    expect(state.story.guardianAccountHolder, 'future_development_fund');
+    expect(state.story.stateAccountHolder, 'future_development_fund');
     expect(state.story.flagInt('futureDevelopmentCohort'), 6);
     expect(state.story.academyLevel, 1);
     expect(state.story.academyMaxLevel, 6);
@@ -117,7 +119,6 @@ void main() {
     expect(state.story.stateRecoveryRateBps, 2000);
     expect(state.story.stateRecoveryTotal, 0);
     expect(state.story.selfRelianceReserve, 0);
-    expect(state.story.academyTuitionDebt, 0);
     expect(state.cash, 10000);
     expect(state.brokerageCash, 10000);
     expect(state.story.startingSeedMoney, 10000);
@@ -137,7 +138,7 @@ void main() {
         playerName: '명박',
         introChoice: 'stocks',
         startingTrait: StoryTrait.analysis,
-        operatingPrinciple: FamilyRule.reportLosses,
+        operatingPrinciple: OperatingPrinciple.reportLosses,
       ).toJson()..['playerBirthYear'] = 1991;
       final oldFlags =
           Map<String, dynamic>.from(
@@ -164,7 +165,7 @@ void main() {
       playerName: '민재',
       introChoice: 'stocks',
       startingTrait: StoryTrait.analysis,
-      familyRule: FamilyRule.reportLosses,
+      operatingPrinciple: OperatingPrinciple.reportLosses,
     );
     final initial = engine
         .createNewGame('별빛 투자', story: story)
@@ -178,71 +179,21 @@ void main() {
     expect(initial.story.marketTutorialSeen, isFalse);
   });
 
-  test('academy tuition is repaid from bank cash once and recorded', () {
-    final story = StoryState.newPlayer(
-      playerName: '민준',
-      introChoice: 'computer',
-      startingTrait: StoryTrait.analysis,
-      familyRule: FamilyRule.reportLosses,
-    );
-    final initial = engine
-        .createNewGame('별빛', story: story)
-        .copyWith(cash: academyTuitionDebtAmount + 10000);
-    final fatherBefore = initial.story.fatherAffinity;
-    final trustBefore = initial.story.familyTrust;
+  test(
+    'first research choice changes cohort trust and is applied only once',
+    () {
+      var state = engine.createNewGame('조사 연구소');
+      final decisionId = state.pendingDecisions.first.id;
+      final trustBefore = state.story.flagInt('cohortTrust', 30);
+      state = engine.resolveDecision(state, decisionId, 'research_cashflow');
+      final afterFirst = state;
+      state = engine.resolveDecision(state, decisionId, 'research_cashflow');
 
-    final result = engine.repayAcademyTuitionDebt(initial);
-
-    expect(result.success, isTrue);
-    expect(result.cashDelta, -academyTuitionDebtAmount);
-    expect(result.state.cash, 10000);
-    expect(result.state.brokerageCash, 10000);
-    expect(result.state.story.academyTuitionDebt, 0);
-    expect(result.state.story.academyTuitionRepaid, isTrue);
-    expect(result.state.story.fatherAffinity, fatherBefore + 3);
-    expect(result.state.story.familyTrust, trustBefore + 2);
-    expect(result.state.ledger.last.account, 'company_bank');
-    expect(result.state.ledger.last.counterAccount, 'family_debt_repayment');
-    expect(result.state.ledger.last.amount, -academyTuitionDebtAmount);
-
-    final repeated = engine.repayAcademyTuitionDebt(result.state);
-    expect(repeated.success, isFalse);
-    expect(repeated.state.toJson(), result.state.toJson());
-  });
-
-  test('academy tuition never withdraws from brokerage cash', () {
-    final story = StoryState.newPlayer(
-      playerName: '민준',
-      introChoice: 'stocks',
-      startingTrait: StoryTrait.stability,
-      familyRule: FamilyRule.keepCash,
-    );
-    final initial = engine
-        .createNewGame('별빛', story: story)
-        .copyWith(
-          cash: academyTuitionDebtAmount,
-          brokerageCash: academyTuitionDebtAmount,
-        );
-
-    final result = engine.repayAcademyTuitionDebt(initial);
-
-    expect(result.success, isFalse);
-    expect(result.message, contains('회사 통장'));
-    expect(result.state.toJson(), initial.toJson());
-  });
-
-  test('first research choice changes trust and is applied only once', () {
-    var state = engine.createNewGame('조사 연구소');
-    final decisionId = state.pendingDecisions.first.id;
-    final trustBefore = state.story.familyTrust;
-    state = engine.resolveDecision(state, decisionId, 'research_cashflow');
-    final afterFirst = state;
-    state = engine.resolveDecision(state, decisionId, 'research_cashflow');
-
-    expect(afterFirst.story.familyTrust, trustBefore + 1);
-    expect(afterFirst.story.storyFlags['firstResearchFocus'], 'cashflow');
-    expect(state.toJson(), afterFirst.toJson());
-  });
+      expect(afterFirst.story.flagInt('cohortTrust'), trustBefore + 1);
+      expect(afterFirst.story.storyFlags['firstResearchFocus'], 'cashflow');
+      expect(state.toJson(), afterFirst.toJson());
+    },
+  );
 
   test('new games start with Hanbit Telecom in a fictional world', () {
     final state = engine.createNewGame(
@@ -351,22 +302,22 @@ void main() {
     },
   );
 
-  test('family helper fatigue, daily limit, and recovery are persisted', () {
-    var state = engine.createNewGame('가족 연구소');
+  test('academy helper fatigue, daily limit, and recovery are persisted', () {
+    var state = engine.createNewGame('제6기 연구소');
     state = resolveFirst(state, 'research_products');
-    final motherBefore = state.organization.familyHelpers.first;
+    final helperBefore = state.organization.academyHelpers.first;
 
-    state = engine.requestFamilyHelp(state, 'mother');
-    final afterHelp = state.organization.familyHelpers.first;
-    expect(afterHelp.fatigue, motherBefore.fatigue + 12);
+    state = engine.requestAcademyHelp(state, 'hakjun');
+    final afterHelp = state.organization.academyHelpers.first;
+    expect(afterHelp.fatigue, helperBefore.fatigue + 12);
     expect(afterHelp.helpCount, 1);
     expect(state.organization.helpLog, hasLength(1));
 
-    final duplicate = engine.requestFamilyHelp(state, 'mother');
+    final duplicate = engine.requestAcademyHelp(state, 'hakjun');
     expect(duplicate.toJson(), state.toJson());
 
     state = engine.advanceOneDay(state);
-    final afterRest = state.organization.familyHelpers.first;
+    final afterRest = state.organization.academyHelpers.first;
     expect(afterRest.fatigue, afterHelp.fatigue - 3);
   });
   test(
@@ -433,7 +384,94 @@ void main() {
     expect(state.cash, 765432);
     expect(state.team, 2);
     expect(state.story.playerName, '소년');
-    expect(state.story.storyFlags['guardianConsent'], isTrue);
+    expect(state.story.stateAccountHolder, 'future_development_fund');
+  });
+
+  test('v20 family content is normalized to academy-only current state', () {
+    final base = engine.createNewGame('구형 가족 저장');
+    final json = base.toJson()..['version'] = 20;
+    final story = Map<String, dynamic>.from(json['story'] as Map)
+      ..['familyRule'] = 'keepCash'
+      ..['familyTrust'] = 99
+      ..['motherAffinity'] = 98
+      ..['fatherAffinity'] = 97
+      ..['siblingAffinity'] = 96
+      ..['grandfatherAffinity'] = 95
+      ..['guardianAccountHolder'] = 'mother';
+    story['storyFlags'] = <String, dynamic>{
+      ...Map<String, dynamic>.from(story['storyFlags'] as Map),
+      'academyTuitionDebt': 1000000,
+      'academyTuitionOriginal': 1000000,
+      'academyTuitionPaidByFather': true,
+      'activeResearchHelper': 'mother',
+      'activeResearchHelperDay': 3,
+      'fatherOperationsAdvisor': true,
+    };
+    story['seenStoryEventIds'] = <String>[
+      ...((story['seenStoryEventIds'] as List?) ?? const <dynamic>[]),
+      'HOME_FATHER_TOOLS',
+    ];
+    json
+      ..['story'] = story
+      ..['organization'] = <String, dynamic>{
+        'familyHelpers': <Map<String, dynamic>>[
+          <String, dynamic>{'id': 'mother', 'name': '엄마'},
+        ],
+      }
+      ..['homeImprovements'] = <String, dynamic>{
+        'purchasedIds': <String>['bedroom_father_tools'],
+        'purchaseDayById': <String, int>{'bedroom_father_tools': 1},
+        'totalSpent': 30000,
+      }
+      ..['progression'] = <String, dynamic>{
+        ...Map<String, dynamic>.from(json['progression'] as Map),
+        'claimedMissionIds': <String>['family_help_two'],
+        'counters': <String, int>{'family_help': 2},
+      }
+      ..['personalFinance'] = <String, dynamic>{
+        ...Map<String, dynamic>.from(json['personalFinance'] as Map),
+        'permanentPurchases': <String>['family_outing'],
+        'lastPurchasePeriods': <String, String>{'family_outing': '2000-01'},
+      };
+
+    final migrated = GameState.fromJson(json);
+
+    expect(migrated.version, GameState.schemaVersion);
+    expect(migrated.story.orphanageReboot, isTrue);
+    expect(migrated.story.stateAccountHolder, 'future_development_fund');
+    expect(migrated.story.storyFlags, isNot(contains('academyTuitionDebt')));
+    expect(migrated.story.storyFlags, isNot(contains('activeResearchHelper')));
+    expect(
+      migrated.story.storyFlags,
+      isNot(contains('fatherOperationsAdvisor')),
+    );
+    expect(
+      migrated.story.storyFlags['seedMoneySource'],
+      'future_development_fund',
+    );
+    expect(
+      migrated.story.seenStoryEventIds,
+      isNot(contains('HOME_FATHER_TOOLS')),
+    );
+    expect(
+      migrated.organization.academyHelpers.map((item) => item.id),
+      <String>['hakjun', 'sua', 'seoyoon'],
+    );
+    expect(migrated.homeImprovements.completedCount, 0);
+    expect(migrated.progression.counter('academy_help'), 2);
+    expect(
+      migrated.progression.claimedMissionIds,
+      contains('academy_help_two'),
+    );
+    expect(
+      migrated.personalFinance.permanentPurchases,
+      contains('cohort_field_day'),
+    );
+    final encoded = jsonEncode(migrated.toJson());
+    expect(encoded, isNot(contains('"familyTrust"')));
+    expect(encoded, isNot(contains('"motherAffinity"')));
+    expect(encoded, isNot(contains('"family_help"')));
+    expect(encoded, isNot(contains('bedroom_father_tools')));
   });
 
   TradeOrder hanbitOrder({
@@ -1145,7 +1183,7 @@ void main() {
       playerName: '명박',
       introChoice: 'stocks',
       startingTrait: StoryTrait.analysis,
-      operatingPrinciple: FamilyRule.reportLosses,
+      operatingPrinciple: OperatingPrinciple.reportLosses,
     );
     final base = engine.createNewGame('새천년투자연구소', story: story);
     final state = base.copyWith(
@@ -1377,8 +1415,14 @@ void main() {
 
       expect(first.success, isTrue);
       expect(second.success, isTrue);
-      expect(first.state.story.familyTrust, state.story.familyTrust + 1);
-      expect(second.state.story.familyTrust, first.state.story.familyTrust);
+      expect(
+        first.state.story.flagInt('cohortTrust'),
+        state.story.flagInt('cohortTrust') + 1,
+      );
+      expect(
+        second.state.story.flagInt('cohortTrust'),
+        first.state.story.flagInt('cohortTrust'),
+      );
       expect(first.state.story.reputation, 13);
       expect(second.state.story.reputation, first.state.story.reputation);
     },
@@ -2522,7 +2566,7 @@ void main() {
   });
 
   test(
-    'React v3 date, fractional positions, cash, team, and businesses migrate to v20',
+    'React v3 date, fractional positions, cash, team, and businesses migrate',
     () {
       final state = engine.migrate({
         'version': 3,
@@ -2536,7 +2580,7 @@ void main() {
       });
 
       expect(state.version, GameState.schemaVersion);
-      expect(GameState.schemaVersion, 20);
+      expect(GameState.schemaVersion, 24);
       expect(state.businesses.businesses, isEmpty);
       expect(state.day, 5);
       expect(state.cash, 765432);
@@ -3211,7 +3255,7 @@ void main() {
     expect(next.ledger.last.description, contains('신주인수권 없음'));
   });
 
-  test('earned seed money unlocks the first guardian order authority', () {
+  test('earned seed money unlocks the first state-account order authority', () {
     final base = engine.createNewGame('종잣돈 권한 테스트', initialCash: 0);
     final state = base.copyWith(
       story: base.story.copyWith(
@@ -3228,7 +3272,7 @@ void main() {
     expect(next.story.reputation, 3);
   });
 
-  test('guardian authority enforces the displayed per-order limit', () {
+  test('state-account authority enforces the displayed per-order limit', () {
     final funded = engine.createNewGame('주문 한도 테스트', initialCash: 300000);
     final state = funded.copyWith(
       day: 4,
@@ -3485,7 +3529,7 @@ void main() {
         playerName: '민준',
         introChoice: 'computer',
         startingTrait: StoryTrait.analysis,
-        familyRule: FamilyRule.reportLosses,
+        operatingPrinciple: OperatingPrinciple.reportLosses,
       );
       final initial = engine.createNewGame('일요일 시작 연구소', story: story);
 
@@ -3677,13 +3721,13 @@ void main() {
     final leadership = engine.resolveDecision(
       controlled,
       controlled.pendingDecisions.single.id,
-      'appoint_father_advisor',
+      'appoint_academy_advisor',
     );
     expect(
       leadership.company.leadershipModel,
-      CompanyLeadershipModel.fatherAdvisor,
+      CompanyLeadershipModel.academyAdvisor,
     );
-    expect(leadership.story.flagBool('fatherOperationsAdvisor'), isTrue);
+    expect(leadership.story.flagBool('academyOperationsAdvisor'), isTrue);
     expect(leadership.organization.employees.length, employeeCount);
     expect(leadership.pendingDecisions.single.category, '공장 운영계획');
 

@@ -39,29 +39,38 @@
 
 ## 목표 플레이 루프
 
-현재 런타임의 리부트 프롤로그는 아래 1번의 제6기 오리엔테이션과 첫날 기숙사 안내를 거쳐 둘째 날 주식 PC 실습실 소개까지 연결되어
-있습니다. 이름·회사명·국가계좌 개통·첫 시장 실습과 미래양성원 자유 플레이
-허브는 다음 연결 범위이며, 아래 목록은 완성하려는 전체 루프입니다.
+현재 런타임의 리부트 프롤로그는 제6기 열 명이 공용 생활실에 둥글게 앉아
+서로의 말을 받아 이어 가는 첫인사, 침상·사물함 배정,
+공동생활 경계 합의, 첫 갈등과 제5기 배지 비밀 대화를 포함한 102장면을 거쳐
+둘째 날 주식 PC 실습실까지 연결됩니다. 이름·투자장부 입력, 국가계좌 첫 저장과
+첫 시장 실습도 같은 흐름에서 이어집니다.
 
 1. 1981년 미래양성계획 결재부터 2000년 새봄보육원 출발과 제6기 입소까지의 프롤로그를 진행한다.
 2. 수아·학준·한서윤을 만나고 주인공 이름과 판단을 기록할 투자회사 이름을 정한다.
 3. 국가계좌 규칙을 확인한 뒤 한서윤의 안내로 한빛통신 조사, 호가, 지정가 매수·가격 변화·매도와 확정손익을 연습한다.
 4. 출발 가상기업 50개와 이후 상장·분사 기업을 조사하고 실제 장중 호가를 거래한다.
 5. 현실 1초=게임 1분 또는 3배·10배로 시간을 진행하며 체결과 장중 속보를 확인한다.
-6. 하루가 끝나면 20:00 상태를 저장하고 다음 날 08:00에 전날 조간신문을 읽는다.
-7. 부동산, 은행, 전국 32개 상권의 18업종 동네 사업과 기업 경영권을 같은 세계에서 운영한다.
-8. SEED 01부터 SEED 06까지 판단 장부와 자산을 키우고 국가계좌 명의이전 협상을 준비한다.
+6. 하루가 끝나면 15:00 종가 직후 제6기 10명의 오늘 손익·총금액 결과표를 확인하고, 나보다 돈이 적은 동기에게 하루 한 번 돈을 빌려줄 수 있다.
+7. 이어 20:00에 여학생 8명 중 한 명과 대화·데이트하거나 혼자 쉬며 1~100 호감도를 쌓고 다음 날 08:00 조간신문으로 넘어간다.
+8. 부동산, 은행, 전국 32개 상권의 18업종 동네 사업과 기업 경영권을 같은 세계에서 운영한다.
+9. SEED 01부터 SEED 06까지 판단 장부와 자산을 키우고 국가계좌 명의이전 협상을 준비한다.
 
 새 캠페인은 `처음하기` 직후 프롤로그보다 먼저 월드시드를 확정합니다.
 2000~2026 주식 연표와 기업 생애주기, 서울·경기 부동산, 전국 상권과 공통
 경제를 예열하고 단계와 퍼센트를 표시합니다. 전체 세계를 준비해도 화면에는
 현재 날짜까지 공개된 정보만 전달합니다.
 
-현재 저장 스키마는 v20입니다. 리부트 저장 모델은 1987년생 주인공,
-한국식 나이, 미래양성원 제6기와 국가계좌를 지원하지만 현재 오리엔테이션은
-첫 저장을 만들기 전에 끝납니다. 기존 가족·아파트
-세계관 저장은 삭제하거나 억지로 변환하지 않고 레거시 흐름으로 보존합니다.
-자유 플레이 생활 허브와 관계 시스템의 미래양성원 전환은 진행 중입니다.
+현재 저장 스키마는 v24입니다. 모든 저장은 1987년생 주인공, 한국식 나이,
+미래양성원 제6기와 국가계좌 상태로 복원됩니다. 구형 가족 인물·호감도·세뱃돈·
+학원비 채무·가족 미션은 폐기하고, 조직과 시설은 제6기 동기·교사·원내 공간으로
+정규화합니다. 최종 생활 허브 배경 에셋 연결은 후속 작업입니다.
+
+직접 `하루 보내기`를 누르면 15:00에 플레이어·김학준·여학생 8명의 투자 결과표를 먼저 확인합니다. 나보다 총금액이 적은 동기에게 출금 가능한 현금 범위에서 하루 한 번 7일 무이자로 빌려줄 수 있으며 대여는 호감도와 별개입니다. 이어 20:00에 여학생 8명 중 한 명을 골라 이야기하거나,
+호감도 20부터 공개 장소의 또래 데이트를 신청할 수 있습니다. 전원 1점에서 시작해
+선택에 따라 1~100에서 변하고, 같은 날에는 한 번만 진행됩니다. 편지 아이콘에서는
+각 인물의 현재 단계와 대화·데이트 횟수를 확인합니다.
+
+생활 허브의 휴대폰 아이콘에서는 `미래톡`을 열어 김학준과 여학생 8명에게 추천 답장 또는 자유 문장을 보낼 수 있습니다. 읽지 않음 배지와 좌우 말풍선을 사용하며, 친구마다 하루 3번까지 각자의 MBTI·성격에 맞는 답장을 합니다. 휴대폰 대화는 하루 관계 선택을 우회해 호감도를 반복 획득하지 않습니다.
 
 현재 자유 플레이 홈 PC에는 주식시장·부동산·`동네상권넷`·별빛 상점이 있습니다.
 동네상권넷에서는 PC방·노래방을 포함한 18업종, 6개 미시 입지 유형과 전국 주요
@@ -84,7 +93,7 @@
 장중에 공개된 주식 사건은 날짜 단위인 부동산·상권 화면에서 다음 달력일부터
 보이며, 숫자 효과가 활성화된 사건은 최근 목록 한도를 넘어도 원인을 확인할 수 있다.
 
-저장 스키마는 `GameState` v20을 유지한다. 신규 점포는 사업 생성기 v3와 상권
+저장 스키마는 `GameState` v24다. 신규 점포는 사업 생성기 v3와 상권
 생성기 v2, 신규 부동산은 생성기 v4를 사용한다. 기존 사업 v1·v2와 부동산
 v1·v2·v3 보유분은 저장된 생성기를 그대로 사용해 과거 가격과 손익을 바꾸지
 않는다. 부동산 14개 중심 지역은 상권 32곳 중 대응 상권 하나로 연결한다.
@@ -143,6 +152,9 @@ v1·v2·v3 보유분은 저장된 생성기를 그대로 사용해 과거 가격
 | [HANDOFF.md](./HANDOFF.md) | 새 채팅이 먼저 읽을 현재 상태·작업 트리·다음 행동 |
 | [ORPHANAGE_STORY_REBOOT.md](./ORPHANAGE_STORY_REBOOT.md) | 미래양성원 6기 리부트 정규 설정 |
 | [PROTAGONIST_AGE_LINE.md](./PROTAGONIST_AGE_LINE.md) | 14~19살 실제 나이와 SEED 01~06 성장선 |
+| [RELATIONSHIP_SYSTEM.md](./RELATIONSHIP_SYSTEM.md) | 여학생 8명 호감도·하루 종료 선택·데이트 규칙 |
+| [COHORT_DAILY_INVESTMENT.md](./COHORT_DAILY_INVESTMENT.md) | 제6기 10명 일일 투자 결과·친구 대여·자동 상환 규칙 |
+| [PHONE_MESSENGER_SYSTEM.md](./PHONE_MESSENGER_SYSTEM.md) | 미래톡 휴대폰·제6기 9명 MBTI 채팅·저장 규칙 |
 | [ORPHANAGE_WEBNOVEL_PROLOGUE.md](./ORPHANAGE_WEBNOVEL_PROLOGUE.md) | 개막부 웹소설형 전체 원고 |
 | [WORK_LOG.md](./WORK_LOG.md) | 현재 완료 범위와 마지막 검증 |
 | [GAMEPLAY_GAPS.md](./GAMEPLAY_GAPS.md) | 아직 남은 기능만 |
@@ -150,10 +162,11 @@ v1·v2·v3 보유분은 저장된 생성기를 그대로 사용해 과거 가격
 | [CONTENT_GUIDE.md](./CONTENT_GUIDE.md) | 가상기업 사건·업종 문법 |
 | [DATA_SOURCES.md](./DATA_SOURCES.md) | 시장·부동산 자료와 저작권 |
 | [ART_STYLE_GUIDE.md](./ART_STYLE_GUIDE.md) | 고정 그림체·캐릭터 슬롯 |
+| [IMAGE_GENERATION_STYLE_PROMPT.md](./IMAGE_GENERATION_STYLE_PROMPT.md) | 모든 채팅에서 쓰는 공식 화풍 앵커·복사용 캐릭터 생성 프롬프트 |
 | [ART_STYLE_AUDIT.md](./ART_STYLE_AUDIT.md) | 화풍 세트 승인·보류 기록 |
 | [DIALOGUE_EDITOR_GUIDE.md](./DIALOGUE_EDITOR_GUIDE.md) | 대사·장면·배경 편집과 게임 빌드 |
 | [CHARACTER_REGENERATION_RESULT.md](./CHARACTER_REGENERATION_RESULT.md) | 리부트 인물 52개 후보 제작 현황 |
-| [story.md](./story.md) | 기존 가족 세계관 저장의 레거시 서사 기준 |
+| [story.md](./story.md) | 폐기된 가족 세계관의 제작 이력 참고 |
 
 ## 실행과 검증
 
@@ -186,7 +199,12 @@ npm run build:release
 - `flutter_app/lib/game/world_economy.dart`: 주식의 공개 거시 사건을 부동산·상권 효과로 한 번만 투영하고 14개 부동산 지역을 상권에 매핑
 - `flutter_app/lib/game/order_book.dart`: 방향별 대기잔량·거래대금·분당 소화량·양수 실행 호가 기반 가격 전이와 저유동 빈 가격
 - `flutter_app/lib/game/news_combinator.dart`: 외부 연결 없는 결정론적 신문 문장 조합기
-- `flutter_app/lib/game/game_engine.dart`: 저장 v20, 거래·경제·부동산·동네 사업 일일 훅·스타 상점·마이그레이션
+- `flutter_app/lib/game/game_engine.dart`: 저장 v24, 거래·경제·부동산·동네 사업 일일 훅·일일 투자 정산·대여·미래톡·호감도·마이그레이션
+- `flutter_app/lib/game/phone_messenger_state.dart`, `flutter_app/lib/phone_messenger_screens.dart`: 제6기 9명 인물별 메시지 저장·자유 입력 답장·휴대폰 UI
+- `flutter_app/lib/game/cohort_investment_state.dart`, `flutter_app/lib/cohort_investment_screens.dart`: 제6기 10명 결과·대여 저장과 결과표 UI
+- `flutter_app/lib/game/relationship_state.dart`, `flutter_app/lib/relationship_screens.dart`: 여학생 8명 관계 저장·대화·데이트·목록 UI
+- `flutter_app/lib/game/game_engine_corporate_actions.dart`: 분할·배당·합병·분사 기업행동
+- `flutter_app/lib/game/game_engine_story_decisions.dart`: 연구·경영권·캠페인 선택 결과
 - `flutter_app/lib/game/star_shop.dart`: 미션 스타 상품과 다음 거래일 힌트
 - `flutter_app/lib/game/real_estate_world.dart`: 생성기 v4 개별 매물·지역 사건·공통 경제 투영·공간 영향과 v1~v3 레거시 보존
 - `flutter_app/lib/game/world_bootstrapper.dart`: 시작·이어하기 세계 예열과 진행률
@@ -200,7 +218,7 @@ npm run build:release
 - `flutter_app/test/business_districts_test.dart`, `business_simulation_test.dart`, `business_engine_test.dart`, `business_ui_test.dart`: 상권·사업 계산·저장·엔진·UI 회귀
 - `flutter_app/lib/rider_mini_game.dart`: 픽셀 아트 3차선 회피·체크포인트·콤보·완주 점수
 - `flutter_app/lib/stock_market_screen.dart`: 호가·주문·차트·배속·보고서·속보
-- `flutter_app/lib/main.dart`: 앱 상태와 저장, 20:00→08:00 신문 흐름
+- `flutter_app/lib/main.dart`: 앱 상태와 저장, 15:00 결과표→20:00 관계→08:00 신문 흐름
 
 기준 화면은 390×844px이며 최소 360px에서 가로 스크롤이 없어야 합니다.
 데스크톱은 390×844 앱 프레임을 가운데 고정하고, 창이 작을 때만 프레임 전체를

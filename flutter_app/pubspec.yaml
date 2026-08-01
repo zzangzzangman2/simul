@@ -1,5 +1,5 @@
 name: millennium_capital
-description: "A bright, casual family wealth and life simulation set in Seoul in 2000."
+description: "A bright academy cohort investment and life simulation set in Seoul in 2000."
 publish_to: "none"
 version: 0.1.0+1
 
@@ -24,7 +24,14 @@ flutter:
     - assets/images/
     - assets/images/historical_prologue/
     - assets/images/protagonist_seed01/
-    - assets/images/cinematic_soft_painted/sua/
+    - assets/images/production_soft_painted/kim_seoa/
+    - assets/images/production_soft_painted/lee_jian/
+    - assets/images/production_soft_painted/choi_iseo/
+    - assets/images/production_soft_painted/park_haeun/
+    - assets/images/production_soft_painted/jung_arin/
+    - assets/images/production_soft_painted/han_sua/
+    - assets/images/production_soft_painted/oh_jiwoo/
+    - assets/images/production_soft_painted/yoon_chaea/
     - assets/images/cinematic_soft_painted/dormitory_2000/
     - assets/images/cinematic_soft_painted/policy_1981/backgrounds/
     - assets/images/cinematic_soft_painted/policy_1981/jeon_dugwang/

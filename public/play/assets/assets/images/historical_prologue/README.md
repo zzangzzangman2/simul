@@ -5,7 +5,7 @@
 공통 기준 화면: 모바일 세로 390×844  
 2026-07-31 이후 최상위 스타일 참조:
 
-- `art_references/simul_cinematic_soft_painted_style_v1.png`
+- `art_references/simul_production_soft_painted_vn_style_anchor_v1.png`
 
 아래 기존 자산은 장소·정체성·의상·포즈 참고이며 화풍 기준이 아니다.
 
@@ -14,7 +14,7 @@
 - `assets/images/protagonist_seed01/`의 정식 교복 주인공 전신 24종
 - `assets/images/character_father_title_style_v2.png`
 
-정식 화풍명은 **`cinematic soft-painted anime realism`**이다. 위 공통 원본은
+정식 화풍명은 **`SIMUL production soft-painted VN anime v1`**이다. 위 공통 원본은
 부드러운 페인터리 명암·섬세한 머리카락·자연스러운 다층 홍채·은은한 광학
 조명만 스타일로 공유한다. 원본 수아의 얼굴·머리·체형·빨강 체크 교복은 다른
 인물에게 복사하지 않는다. 아래의 구형 `2D 카툰·셀 셰이딩` 기록은 자산의
@@ -22,7 +22,7 @@
 
 ## cinematic soft-painted 교체 자산
 
-- 수아 7종: `assets/images/cinematic_soft_painted/sua/`
+- 한수아 8종: `assets/images/production_soft_painted/han_sua/`
 - 민호: `assets/images/historical_prologue/character_minho_farewell_v3.png`
 - 학준: `assets/images/historical_prologue/character_hakjun_orientation_v2.png`
 - 1981년 전두광 6종: `assets/images/cinematic_soft_painted/policy_1981/jeon_dugwang/`
@@ -75,8 +75,9 @@
 
 ### 등장인물
 
-- `assets/images/cinematic_soft_painted/sua/`: 사용자 승인 수아 얼굴·긴 검은 머리·제6기 교복을 보존한 이전 연령 표정·동작 7종. 14살 비율 재검수 전 보관본.
-- `character_hakjun_orientation_v2.png`: 수아와 같은 cinematic soft-painted anime realism 피부 명암으로 그린 규정집 든 제6기 라이벌 전신. 얼굴 정체성만 유지하고 14살 비율로 재생성한다.
+- `assets/images/cinematic_soft_painted/sua/`: 이전 수아 보관본. 런타임과 대사 편집기에서는 사용하지 않는다.
+- `assets/images/production_soft_painted/han_sua/`: 현재 승인 화풍의 한수아 표정·동작 8종. 런타임과 대사 편집기의 정식 자산이다.
+- `character_hakjun_orientation_v2.png`: 수아와 같은 SIMUL production soft-painted VN anime v1 피부 명암으로 그린 규정집 든 제6기 라이벌 전신. 얼굴 정체성만 유지하고 14살 비율로 재생성한다.
 - `character_minho_farewell_v3.png`: 수아와 같은 부드러운 피부·눈가·머리카락 질감으로 다시 그린 7살 민호의 작별 전신. 긴 타원형 얼굴, 회청색 처진 눈, 주근깨와 잠옷·이불 정체성을 유지한다.
 
 세 인물 자산은 투명 RGBA로 정규화하고 필요한 크로마 원본은 soft matte와 despill로 처리했다.

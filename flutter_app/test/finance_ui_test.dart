@@ -34,19 +34,19 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('asset-spending-screen')), findsOneWidget);
-      final familyOuting = find.byKey(
-        const Key('spending-option-family_outing'),
+      final cohortFieldDay = find.byKey(
+        const Key('spending-option-cohort_field_day'),
       );
       await tester.scrollUntilVisible(
-        familyOuting,
+        cohortFieldDay,
         320,
         scrollable: find.byType(Scrollable).first,
       );
       await tester.pump();
-      expect(familyOuting, findsOneWidget);
+      expect(cohortFieldDay, findsOneWidget);
       expect(tester.takeException(), isNull);
 
-      await tester.tap(familyOuting);
+      await tester.tap(cohortFieldDay);
       await tester.pumpAndSettle();
       expect(find.text('지출 확정'), findsOneWidget);
       await tester.tap(find.text('지출 확정'));

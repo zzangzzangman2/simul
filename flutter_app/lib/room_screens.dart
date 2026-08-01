@@ -328,7 +328,7 @@ class DecisionInboxScreen extends StatelessWidget {
     final inboxNavigator = Navigator.of(context);
     inboxNavigator.push<void>(
       _gameSceneRoute<void>(
-        FamilyDecisionScene(
+        AcademyDecisionScene(
           state: state,
           decision: decision,
           onSelect: (decisionContext, optionId) async {
@@ -1420,7 +1420,7 @@ _LedgerGrade _ledgerGradeFor(int aum, int holdingCount) {
   if (aum >= 100000 || holdingCount >= 3) {
     return const _LedgerGrade(
       rank: 'C',
-      title: '가족 계좌 연습생',
+      title: 'SEED 01 국가계좌 운용자',
       caption: '첫 분산투자 원칙을 세우기 시작했어요.',
       color: Color(0xFF4C78B8),
     );
@@ -2637,7 +2637,7 @@ class _LedgerAppendix extends StatelessWidget {
         ),
       ),
       subtitle: const Text(
-        '가족 계좌 상태와 오늘의 신문 스크랩',
+        '국가계좌 상태와 오늘의 신문 스크랩',
         style: TextStyle(
           color: Color(0xFF806C55),
           fontSize: 8,

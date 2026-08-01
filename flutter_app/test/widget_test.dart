@@ -856,7 +856,7 @@ void main() {
           'background':
               '/play/assets/assets/images/historical_prologue/bg_future_development_orientation_hall_2000_portrait_v1.png',
           'character':
-              '/play/assets/assets/images/cinematic_soft_painted/sua/02_warm_smile_v1.png',
+              '/play/assets/assets/images/production_soft_painted/han_sua/02_warm_smile_v1.png',
         };
       }
       return {
@@ -963,7 +963,7 @@ void main() {
                   .image
               as AssetImage)
           .assetName,
-      'assets/images/cinematic_soft_painted/sua/07_determined_v1.png',
+      'assets/images/production_soft_painted/han_sua/07_determined_v1.png',
     );
 
     await advanceDialogue(tester, 3);
@@ -1305,56 +1305,6 @@ void main() {
     },
   );
 
-  testWidgets('father card reveals and repays the academy tuition debt', (
-    tester,
-  ) async {
-    await tester.binding.setSurfaceSize(const Size(390, 844));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-    const engine = GameEngine();
-    final story = StoryState.newPlayer(
-      playerName: '민준',
-      introChoice: 'computer',
-      startingTrait: StoryTrait.analysis,
-      familyRule: FamilyRule.reportLosses,
-    );
-    var state = engine
-        .createNewGame('별빛 투자', story: story)
-        .copyWith(cash: academyTuitionDebtAmount + 10000);
-
-    await tester.pumpWidget(
-      MaterialApp(
-        home: OrganizationScreen(
-          state: state,
-          onRequestFamilyHelp: (helperId) async => state,
-          onRepayAcademyTuitionDebt: () async {
-            final result = engine.repayAcademyTuitionDebt(state);
-            state = result.state;
-            return result;
-          },
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.byKey(const Key('academy-tuition-debt-card')), findsNothing);
-    await tester.ensureVisible(find.byKey(const Key('assignment-card-father')));
-    await tester.tap(find.byKey(const Key('assignment-card-father')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('academy-tuition-debt-card')), findsOneWidget);
-    expect(find.textContaining('1,000,000'), findsWidgets);
-
-    await tester.ensureVisible(
-      find.byKey(const Key('repay-academy-tuition-button')),
-    );
-    await tester.tap(find.byKey(const Key('repay-academy-tuition-button')));
-    await tester.pumpAndSettle();
-
-    expect(find.text('학원비 전액 상환 완료'), findsOneWidget);
-    expect(state.story.academyTuitionDebt, 0);
-    expect(state.cash, 10000);
-    expect(state.brokerageCash, 10000);
-  });
-
   testWidgets('existing v1 save is restored with safe story defaults', (
     tester,
   ) async {
@@ -1682,7 +1632,7 @@ void main() {
         playerName: '민재',
         introChoice: 'stocks',
         startingTrait: StoryTrait.analysis,
-        familyRule: FamilyRule.reportLosses,
+        operatingPrinciple: OperatingPrinciple.reportLosses,
       );
       var current = engine
           .createNewGame('별빛 투자', initialCash: 237000, story: story)
@@ -1696,6 +1646,18 @@ void main() {
           home: StockMarketScreen(
             state: current,
             universe: testMarketUniverse(tradingDate: current.currentDate),
+            onSaveMarketNotebook: (favorites, notes) async {
+              current = current.copyWith(
+                story: current.story.copyWith(
+                  storyFlags: <String, dynamic>{
+                    ...current.story.storyFlags,
+                    'marketFavoriteAssetIds': favorites.toList()..sort(),
+                    'marketResearchNotes': <String, String>{...notes},
+                  },
+                ),
+              );
+              return current;
+            },
             onCompleteTutorial: () async {
               current = engine.markMarketTutorialSeen(current);
               await persistence.save(current);
@@ -1742,14 +1704,30 @@ void main() {
       await tester.pump();
       expect(find.byKey(const Key('market-home-section')), findsOneWidget);
 
-      expect(find.text('1 / 2').hitTestable(), findsOneWidget);
+      expect(find.text('1 / 4').hitTestable(), findsOneWidget);
+      expect(find.textContaining('거래대금은 오늘 주식을 사고판 돈의 합계'), findsOneWidget);
+      await tester.tapAt(const Offset(8, 8));
+      await tester.pump();
       expect(
-        find.text('홈에는 시장 지수·뉴스·거래대금 순위가 모여 있어요. 아래에는 홈·주식·내 투자 세 메뉴가 있고요.'),
+        find.byKey(const Key('market-tutorial-wrong-tap-feedback')),
         findsOneWidget,
       );
+      expect(find.textContaining('노란 테두리부터 보자'), findsOneWidget);
       await tester.tap(find.byKey(const Key('market-tutorial-next')));
       await tester.pump(const Duration(milliseconds: 650));
       expect(find.byKey(const Key('market-tutorial-student')), findsOneWidget);
+      expect(
+        (tester
+                    .widget<Image>(
+                      find.byKey(
+                        const Key('market-tutorial-student-upper-body'),
+                      ),
+                    )
+                    .image
+                as AssetImage)
+            .assetName,
+        'assets/images/production_soft_painted/han_sua/03_bright_laugh_v1.png',
+      );
       expect(find.byKey(const Key('market-tutorial-teacher')), findsNothing);
       await advanceTutorialPagesToTarget(
         tester,
@@ -1768,10 +1746,7 @@ void main() {
         targetKey: const Key('market-tutorial-target'),
       );
       expect(find.byKey(const Key('market-tutorial-target')), findsOneWidget);
-      expect(
-        find.text('가격만 보지 말랬죠. 한빛통신을 열어서 호가·주문·차트·정보를 차례로 볼게요.'),
-        findsOneWidget,
-      );
+      expect(find.textContaining('한 주 가격은 회사의 작은 조각 가격일 뿐이에요'), findsOneWidget);
       expect(
         find.byKey(const Key('market-tutorial-target')).hitTestable(),
         findsOneWidget,
@@ -1785,7 +1760,7 @@ void main() {
         find.byKey(const Key('market-detail-tutorial-overlay')),
         findsOneWidget,
       );
-      expect(find.text('1 / 2').hitTestable(), findsOneWidget);
+      expect(find.text('1 / 4').hitTestable(), findsOneWidget);
       await advanceTutorialPagesToTarget(
         tester,
         actionKey: const Key('market-detail-tutorial-next'),
@@ -1829,7 +1804,6 @@ void main() {
       await tester.tap(find.byKey(const Key('market-detail-tutorial-target')));
       await tester.pump(const Duration(milliseconds: 600));
       expect(find.byKey(const Key('stock-detail-tab-info')), findsOneWidget);
-      expect(find.byKey(const Key('open-market-research-note')), findsOneWidget);
       expect(
         (tester
                     .widget<Image>(
@@ -1842,11 +1816,43 @@ void main() {
             .assetName,
         'assets/images/주식선생님/25_포즈4_주인공그림체_공통슬롯_투명.png',
       );
-      expect(find.textContaining('투자노트도 여기서 씁니다'), findsOneWidget);
-      await tester.tap(find.byKey(const Key('market-detail-tutorial-next')));
+      expect(find.textContaining('매수 이유와 매도 조건을 실제로 적어야'), findsOneWidget);
+      for (var page = 0; page < 4; page += 1) {
+        await tester.tap(find.byKey(const Key('market-detail-tutorial-next')));
+        await tester.pump(const Duration(milliseconds: 250));
+      }
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(
+        find.byKey(const Key('tutorial-buy-reason-input')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('tutorial-sell-rule-input')), findsOneWidget);
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.byKey(const Key('save-market-research-note')),
+            )
+            .onPressed,
+        isNull,
+      );
+      await tester.enterText(
+        find.byKey(const Key('tutorial-buy-reason-input')),
+        '통신 가입자와 재무 흐름을 함께 확인했다.',
+      );
+      await tester.enterText(
+        find.byKey(const Key('tutorial-sell-rule-input')),
+        '가입자 증가가 꺾이거나 손실선에 닿으면 판다.',
+      );
       await tester.pump();
-      await tester.tap(find.byKey(const Key('market-detail-tutorial-next')));
-      await tester.pump(const Duration(milliseconds: 600));
+      await tester.ensureVisible(
+        find.byKey(const Key('save-market-research-note')),
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('save-market-research-note')));
+      await tester.pump(const Duration(milliseconds: 700));
+      final savedNotes = current.story.storyFlags['marketResearchNotes'] as Map;
+      expect(savedNotes.values.single, contains('매수 이유:'));
+      expect(savedNotes.values.single, contains('매도 조건:'));
 
       await advanceTutorialPagesToTarget(
         tester,
@@ -1858,7 +1864,7 @@ void main() {
         findsOneWidget,
       );
 
-      expect(find.textContaining('VI·거래정지·동시호가 표시'), findsOneWidget);
+      expect(find.textContaining('VI는 가격이 너무 빨리 움직일 때'), findsOneWidget);
       await tester.tap(find.byKey(const Key('market-detail-tutorial-target')));
       await tester.pump(const Duration(milliseconds: 600));
       expect(
@@ -1901,11 +1907,10 @@ void main() {
             .assetName,
         'assets/images/주식선생님/26_포즈5_주인공그림체_공통슬롯_투명.png',
       );
-      await advanceTutorialPagesUntilDismissed(
-        tester,
-        actionKey: const Key('market-detail-tutorial-next'),
-        overlayKey: const Key('market-detail-tutorial-overlay'),
-      );
+      for (var page = 0; page < 4; page += 1) {
+        await tester.tap(find.byKey(const Key('market-detail-tutorial-next')));
+        await tester.pump(const Duration(milliseconds: 180));
+      }
       await tester.pump(const Duration(milliseconds: 700));
       expect(
         find.byKey(const Key('market-order-tutorial-overlay')),
@@ -1915,7 +1920,7 @@ void main() {
         find.byKey(const Key('market-order-tutorial-done')),
         findsOneWidget,
       );
-      expect(find.text('1 / 3'), findsOneWidget);
+      expect(find.text('1 / 5'), findsOneWidget);
       expect(find.textContaining('국가원금 10,000원'), findsOneWidget);
 
       await advanceTutorialPagesUntilDismissed(
@@ -1927,6 +1932,31 @@ void main() {
         find.byKey(const Key('market-order-tutorial-overlay')),
         findsNothing,
       );
+      expect(
+        find.byKey(const Key('tutorial-failure-practice')),
+        findsOneWidget,
+      );
+      expect(find.text('틀려 봐야 주문표가 보입니다'), findsOneWidget);
+      await tester.tap(
+        find.byKey(const Key('tutorial-insufficient-funds-try')),
+      );
+      await tester.pump();
+      expect(find.textContaining('접수 거절'), findsOneWidget);
+      await tester.ensureVisible(
+        find.byKey(const Key('tutorial-partial-fill-try')),
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('tutorial-partial-fill-try')));
+      await tester.pump();
+      expect(find.textContaining('나머지 1주는 미체결'), findsOneWidget);
+      await tester.ensureVisible(
+        find.byKey(const Key('tutorial-failure-practice-complete')),
+      );
+      await tester.pump();
+      await tester.tap(
+        find.byKey(const Key('tutorial-failure-practice-complete')),
+      );
+      await tester.pump();
       expect(find.byKey(const Key('order-type-selector')), findsOneWidget);
       expect(
         tester
@@ -1949,10 +1979,12 @@ void main() {
       expect(current.story.marketTutorialSeen, isFalse);
 
       await tester.ensureVisible(
-        find.byKey(const Key('request-parent-order-approval')),
+        find.byKey(const Key('request-state-account-order-approval')),
       );
       await tester.pump();
-      await tester.tap(find.byKey(const Key('request-parent-order-approval')));
+      await tester.tap(
+        find.byKey(const Key('request-state-account-order-approval')),
+      );
       await tester.pump();
       expect(find.byKey(const Key('order-result')), findsOneWidget);
       expect(find.textContaining('지정가 1주 전량 체결'), findsOneWidget);
@@ -1962,16 +1994,26 @@ void main() {
       expect(current.positions.length, actualPositionsBefore);
 
       await tester.ensureVisible(
-        find.byKey(const Key('request-parent-order-approval')),
+        find.byKey(const Key('request-state-account-order-approval')),
       );
       await tester.pump();
-      await tester.tap(find.byKey(const Key('request-parent-order-approval')));
+      await tester.tap(
+        find.byKey(const Key('request-state-account-order-approval')),
+      );
       await tester.pump();
       expect(find.byKey(const Key('tutorial-price-change')), findsOneWidget);
       expect(find.text('매수 뒤 가격이 움직였어요'), findsOneWidget);
       expect(tester.takeException(), isNull);
       expect(
         find.byKey(const Key('tutorial-live-account-state')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(
+          const ValueKey<String>(
+            'tutorial-dialogue-character-assets/images/주식선생님/26_포즈5_주인공그림체_공통슬롯_투명.png',
+          ),
+        ),
         findsOneWidget,
       );
       final firstLivePrice = tester
@@ -1995,6 +2037,14 @@ void main() {
         find.text('화면의 이익은 아직 평가액이에요. 한 주를 팔아 결과를 확정해 볼까요?'),
         findsOneWidget,
       );
+      expect(
+        find.byKey(
+          const ValueKey<String>(
+            'tutorial-dialogue-character-assets/images/주식선생님/27_포즈6_주인공그림체_공통슬롯_투명.png',
+          ),
+        ),
+        findsOneWidget,
+      );
       expect(find.text('한 주 팔고 결과 확정하기'), findsOneWidget);
       await tester.ensureVisible(
         find.byKey(const Key('tutorial-price-change-continue')),
@@ -2010,20 +2060,24 @@ void main() {
         findsOneWidget,
       );
       await tester.ensureVisible(
-        find.byKey(const Key('request-parent-order-approval')),
+        find.byKey(const Key('request-state-account-order-approval')),
       );
       await tester.pump();
-      await tester.tap(find.byKey(const Key('request-parent-order-approval')));
+      await tester.tap(
+        find.byKey(const Key('request-state-account-order-approval')),
+      );
       await tester.pump();
       expect(find.byKey(const Key('order-result')), findsOneWidget);
       expect(find.textContaining('매도 완료'), findsOneWidget);
       expect(tester.takeException(), isNull);
 
       await tester.ensureVisible(
-        find.byKey(const Key('request-parent-order-approval')),
+        find.byKey(const Key('request-state-account-order-approval')),
       );
       await tester.pump();
-      await tester.tap(find.byKey(const Key('request-parent-order-approval')));
+      await tester.tap(
+        find.byKey(const Key('request-state-account-order-approval')),
+      );
       await tester.pump();
       expect(find.byKey(const Key('tutorial-trade-summary')), findsOneWidget);
       expect(find.text('매수부터 매도까지 완료!'), findsOneWidget);
@@ -2067,9 +2121,19 @@ void main() {
         find.byKey(const Key('tutorial-review-protagonist-character')),
         findsNothing,
       );
-      await tester.tap(find.byKey(const Key('tutorial-review-continue')));
+      expect(
+        find.byKey(const Key('tutorial-review-choice-turnover')),
+        findsOneWidget,
+      );
+      await tester.ensureVisible(
+        find.byKey(const Key('tutorial-review-choice-turnover')),
+      );
       await tester.pump();
-      expect(find.textContaining('수익 숫자요. 오르니까 제가 잘한 줄 알았어요'), findsOneWidget);
+      await tester.tap(
+        find.byKey(const Key('tutorial-review-choice-turnover')),
+      );
+      await tester.pump();
+      expect(find.textContaining('거래대금이랑 회전율 큰 종목만 타면'), findsOneWidget);
       expect(
         find.byKey(const Key('tutorial-review-protagonist-character')),
         findsOneWidget,
@@ -2088,21 +2152,34 @@ void main() {
                 widget is Image &&
                 widget.image is AssetImage &&
                 (widget.image as AssetImage).assetName ==
-                    'assets/images/protagonist_seed01/22_victory_fist.png',
+                    'assets/images/protagonist_seed01/12_thinking.png',
           ),
         ),
         findsOneWidget,
       );
       expect(find.textContaining('아빠'), findsNothing);
       expect(find.textContaining('외할아버지'), findsNothing);
-      for (var reviewBeat = 1; reviewBeat < 4; reviewBeat += 1) {
-        await tester.tap(find.byKey(const Key('tutorial-review-continue')));
-        await tester.pump();
-      }
+      await tester.tap(find.byKey(const Key('tutorial-review-continue')));
+      await tester.pump();
+      expect(find.textContaining('회사 이익을 냈거나 안전하다는 뜻이 아니에요'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('tutorial-review-continue')));
+      await tester.pump();
+      expect(
+        find.byKey(const Key('tutorial-review-peer-character')),
+        findsOneWidget,
+      );
+      expect(find.textContaining('회전율 이름에 낚였네'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('tutorial-review-continue')));
+      await tester.pump();
       expect(
         find.byKey(const Key('tutorial-school-dismissal')),
         findsOneWidget,
       );
+      expect(
+        find.byKey(const Key('tutorial-stock-feature-map')),
+        findsOneWidget,
+      );
+      expect(find.text('호가 · 주문 · 차트 · 회사 정보/투자노트'), findsOneWidget);
       expect(find.textContaining('기숙사와 투자실을 오가며'), findsOneWidget);
       await tester.tap(
         find.byKey(const Key('market-practical-tutorial-complete')),
@@ -2422,7 +2499,9 @@ void main() {
     expect(tester.takeException(), isNull);
     await tester.tap(find.text('시장가'));
     await tester.pump();
-    await tester.tap(find.byKey(const Key('request-parent-order-approval')));
+    await tester.tap(
+      find.byKey(const Key('request-state-account-order-approval')),
+    );
     for (var attempt = 0; attempt < 20; attempt++) {
       await tester.pump(const Duration(milliseconds: 50));
       if (find.byKey(const Key('order-result')).evaluate().isNotEmpty) break;
@@ -2460,7 +2539,9 @@ void main() {
       marketOrderSucceeded ? lessThan(1000000) : 1000000,
     );
     if (marketOrderSucceeded) {
-      await tester.tap(find.byKey(const Key('request-parent-order-approval')));
+      await tester.tap(
+        find.byKey(const Key('request-state-account-order-approval')),
+      );
       await tester.pumpAndSettle();
     }
     expect(tester.takeException(), isNull);
@@ -4369,7 +4450,9 @@ void main() {
         isFalse,
       );
 
-      await tester.tap(find.byKey(const Key('request-parent-order-approval')));
+      await tester.tap(
+        find.byKey(const Key('request-state-account-order-approval')),
+      );
       await tester.pump();
       expect(submittedOrder, isNotNull);
       expect(submittedOrder!.microstructureFrame, pulseNotifier.value);
@@ -6039,7 +6122,9 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('시장가'));
       await tester.pump();
-      await tester.tap(find.byKey(const Key('request-parent-order-approval')));
+      await tester.tap(
+        find.byKey(const Key('request-state-account-order-approval')),
+      );
       await tester.pump();
       expect(submittedOrder, isNotNull);
 
@@ -6624,19 +6709,23 @@ void main() {
       {TradeOrderType.market},
     );
     await tester.ensureVisible(
-      find.byKey(const Key('request-parent-order-approval')),
+      find.byKey(const Key('request-state-account-order-approval')),
     );
-    await tester.tap(find.byKey(const Key('request-parent-order-approval')));
+    await tester.tap(
+      find.byKey(const Key('request-state-account-order-approval')),
+    );
     for (var attempt = 0; attempt < 20; attempt += 1) {
       await tester.pump(const Duration(milliseconds: 50));
       if (find.byKey(const Key('order-result')).evaluate().isNotEmpty) break;
     }
     expect(find.byKey(const Key('order-result')), findsOneWidget);
     await tester.ensureVisible(
-      find.byKey(const Key('request-parent-order-approval')),
+      find.byKey(const Key('request-state-account-order-approval')),
     );
     await tester.pump();
-    await tester.tap(find.byKey(const Key('request-parent-order-approval')));
+    await tester.tap(
+      find.byKey(const Key('request-state-account-order-approval')),
+    );
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('order-book-active-summary')), findsNothing);
     expect(find.byKey(const Key('inline-order-workspace')), findsOneWidget);
@@ -6709,7 +6798,9 @@ void main() {
       tester.widget<Text>(find.byKey(const Key('limit-price-value'))).data,
       selectedBidPrice,
     );
-    final sellSubmit = find.byKey(const Key('request-parent-order-approval'));
+    final sellSubmit = find.byKey(
+      const Key('request-state-account-order-approval'),
+    );
     await tester.ensureVisible(sellSubmit);
     if (position == null) {
       expect(tester.widget<FilledButton>(sellSubmit).onPressed, isNull);
@@ -7277,7 +7368,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('grandfather gift opens the first guardian order authority', (
+  testWidgets('state principal opens the first state-account order authority', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
@@ -7311,7 +7402,7 @@ void main() {
     expect(find.text('현금'), findsNothing);
     expect(find.text('신용'), findsNothing);
     final button = tester.widget<FilledButton>(
-      find.byKey(const Key('request-parent-order-approval')),
+      find.byKey(const Key('request-state-account-order-approval')),
     );
     expect(button.onPressed, isNotNull);
     expect(tester.takeException(), isNull);
@@ -7511,7 +7602,9 @@ void main() {
     await tester.pump();
     await tester.tap(find.byKey(const Key('buy-stock-button')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('request-parent-order-approval')));
+    await tester.tap(
+      find.byKey(const Key('request-state-account-order-approval')),
+    );
     for (var attempt = 0; attempt < 20; attempt++) {
       await tester.pump(const Duration(milliseconds: 50));
       if (find.byKey(const Key('order-result')).evaluate().isNotEmpty) break;
@@ -7522,7 +7615,7 @@ void main() {
     expect(
       tester
           .widget<FilledButton>(
-            find.byKey(const Key('request-parent-order-approval')),
+            find.byKey(const Key('request-state-account-order-approval')),
           )
           .onPressed,
       isNotNull,
@@ -7538,7 +7631,7 @@ void main() {
       SharedPreferences.setMockInitialValues({
         GamePersistence.saveKey: jsonEncode({
           'version': 1,
-          'companyName': '가족 배치 연구소',
+          'companyName': '제6기 배치 연구소',
           'day': 1,
           'cash': 1000000,
           'team': 1,
@@ -7564,24 +7657,21 @@ void main() {
         tester
             .widget<Text>(find.byKey(const Key('organization-company-name')))
             .data,
-        '가족 배치 연구소',
+        '제6기 배치 연구소',
       );
       expect(find.text('정식 직원 0명'), findsOneWidget);
       expect(
-        find.byKey(const Key('assignment-portrait-mother')),
+        find.byKey(const Key('assignment-portrait-hakjun')),
         findsOneWidget,
       );
 
-      final fatherCard = find.byKey(const Key('assignment-card-father'));
-      await tester.ensureVisible(fatherCard);
-      await tester.tap(fatherCard);
+      final suaCard = find.byKey(const Key('assignment-card-sua'));
+      await tester.ensureVisible(suaCard);
+      await tester.tap(suaCard);
       await tester.pumpAndSettle();
-      expect(
-        find.byKey(const Key('assignment-portrait-father')),
-        findsOneWidget,
-      );
+      expect(find.byKey(const Key('assignment-portrait-sua')), findsOneWidget);
 
-      final helpButton = find.byKey(const Key('family-help-father'));
+      final helpButton = find.byKey(const Key('academy-help-sua'));
       await tester.ensureVisible(helpButton);
       await tester.tap(helpButton);
       await tester.pumpAndSettle();
@@ -7696,7 +7786,7 @@ void main() {
         },
         onSaveMarketNotebook: (_, _) async => currentState,
         onResolveDecision: (_, _) async {},
-        onRequestFamilyHelp: (_) async => currentState,
+        onRequestAcademyHelp: (_) async => currentState,
         onCompleteWork: (_) async => currentState,
         onExecuteTrade: (_) async => TradeExecutionResult(
           state: currentState,
@@ -7758,7 +7848,7 @@ void main() {
           },
           onSaveMarketNotebook: (_, _) async => state,
           onResolveDecision: (_, _) async {},
-          onRequestFamilyHelp: (_) async => state,
+          onRequestAcademyHelp: (_) async => state,
           onCompleteWork: (_) async => state,
           onExecuteTrade: (_) async => TradeExecutionResult(
             state: state,

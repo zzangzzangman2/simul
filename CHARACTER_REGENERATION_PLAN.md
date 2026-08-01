@@ -4,10 +4,11 @@
 
 ## 1. 최종 화풍
 
-- 공식 화풍: **cinematic soft-painted anime realism**
-- 최상위 화풍 기준: `art_references/simul_cinematic_soft_painted_style_v1.png`
+- 공식 화풍: **SIMUL production soft-painted VN anime v1**
+- 최상위 화풍 기준: `art_references/simul_production_soft_painted_vn_style_anchor_v1.png`
+- 모든 채팅용 고정 프롬프트: `IMAGE_GENERATION_STYLE_PROMPT.md`
 - 실사 인물과 사진형 배경은 사용하지 않는다.
-- 현재 수아 7종과 1981년 정책실 카툰 자산을 런타임 기준으로 유지한다.
+- 현재 수아 7종과 1981년 정책실 카툰 자산을 런타임 호환 기준으로 유지하되, 신규 캐릭터와 수아의 신규 표정은 새 공식 화풍 앵커를 사용한다.
 
 ## 2. 캐릭터별 설계 규칙
 
@@ -32,4 +33,3 @@
 - 실사 학생·청와대 인물·배경·후보·참조 이미지는 삭제했다.
 - 삭제됐던 기존 카툰 정책실 인물과 배경을 복원했다.
 - 다음 신규 여학생 작업은 사용자의 새 요청 전까지 시작하지 않는다.
-

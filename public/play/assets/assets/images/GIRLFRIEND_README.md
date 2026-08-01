@@ -7,7 +7,7 @@
 ## 기준 참조
 
 - 정체성 참조: `art_references/girlfriend_identity_reference_v1.jpg`
-- 최상위 화풍 참조: `art_references/simul_cinematic_soft_painted_style_v1.png`
+- 최상위 화풍 참조: `art_references/simul_production_soft_painted_vn_style_anchor_v1.png`
 - 한서윤 보조 정체성 자료: `art_references/npc_canonical_style_teal_v1.png` — 여자친구 화풍 기준으로 사용하지 않음
 - 정체성 참조에서는 둥근 얼굴의 인상, 밤색 양갈래, 분홍 리본, 루비·코랄색 눈과
   분홍·흰색 파자마 색 구성을 가져온다.
@@ -66,11 +66,11 @@ v3는 현재 미연결 보관 자산이며 구형 카툰 채색 때문에 현행
 ```text
 Create the same wholesome 10-year-old Korean childhood-friend character.
 Identity reference: art_references/girlfriend_identity_reference_v1.jpg.
-Rendering reference: art_references/simul_cinematic_soft_painted_style_v1.png.
+Rendering reference: art_references/simul_production_soft_painted_vn_style_anchor_v1.png.
 Keep her round child face, layered ruby-coral eyes, straight chestnut-brown bangs,
 long symmetrical high twin-tails, matching dusty-pink bows, and natural school-age proportions.
 Keep the same loose pink-and-white child pajama set and closed-toe pink slippers.
-Match the cinematic soft-painted anime realism: nearly invisible colored edges,
+Match the SIMUL production soft-painted VN anime v1: nearly invisible colored edges,
 natural layered irises, delicate hair strands, smooth painterly skin and cloth shading,
 and subtle optical light without copying Sua's face, hair, body, or uniform.
 Full-body standing sprite, 1024x1536 common canvas and baseline, no background,

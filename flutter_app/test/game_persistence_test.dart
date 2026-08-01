@@ -87,8 +87,12 @@ void main() {
 
       expect(migrated, isNotNull);
       expect(migrated!.cash, 0);
-      expect(migrated.story.academyTuitionDebt, 0);
-      expect(migrated.story.academyTuitionOriginal, 0);
+      expect(migrated.story.orphanageReboot, isTrue);
+      expect(migrated.story.storyFlags, isNot(contains('academyTuitionDebt')));
+      expect(
+        migrated.story.storyFlags,
+        isNot(contains('academyTuitionOriginal')),
+      );
       expect(migrated.story.marketTutorialEligible, isFalse);
       expect(migrated.story.marketTutorialSeen, isTrue);
       expect(migrated.version, GameState.schemaVersion);
@@ -464,7 +468,7 @@ void main() {
           companyName: '시드 유지 연구소',
           introChoice: 'stocks',
           startingTrait: StoryTrait.analysis,
-          familyRule: FamilyRule.reportLosses,
+          operatingPrinciple: OperatingPrinciple.reportLosses,
         ),
         (_) {},
       ),

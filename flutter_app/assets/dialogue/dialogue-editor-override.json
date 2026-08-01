@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-07-31T23:26:36.938Z",
+  "updatedAt": "2026-08-01T15:30:00.000+09:00",
   "scenes": [
     {
       "id": "scene-01",
@@ -312,7 +312,7 @@
       "direction": "수아가 내 가방이 남긴 삐뚤어진 바퀴 자국을 가리켰다.",
       "line": "야, 가방 바퀴 하나가 눈을 계속 끌고 다녀.",
       "background": "/play/assets/assets/images/historical_prologue/bg_future_development_academy_gate_2000_portrait_v1.png",
-      "character": "/play/assets/assets/images/cinematic_soft_painted/sua/07_determined_v1.png"
+      "character": "/play/assets/assets/images/production_soft_painted/han_sua/07_determined_v1.png"
     },
     {
       "id": "scene-27",
@@ -336,7 +336,7 @@
       "direction": "연필 끝에서 굳은 눈덩이가 후두둑 떨어졌다.",
       "line": "여자아이는 대꾸 대신 쪼그려 앉아 연필로 바퀴의 눈을 긁어냈다. 처음 보는 사이인데도 망설임이 없었다. 이름은 수아라고 했다.",
       "background": "/play/assets/assets/images/historical_prologue/bg_future_development_academy_gate_2000_portrait_v1.png",
-      "character": "/play/assets/assets/images/cinematic_soft_painted/sua/01_neutral_v1.png"
+      "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_v1.png"
     },
     {
       "id": "scene-29",
@@ -360,7 +360,7 @@
       "direction": "수아가 눈을 가늘게 뜨고 김학준의 명찰을 읽었다.",
       "line": "설명서 학준아, 별명 붙이면 안 된다는 규정도 있어?",
       "background": "/play/assets/assets/images/historical_prologue/bg_future_development_academy_gate_2000_portrait_v1.png",
-      "character": "/play/assets/assets/images/cinematic_soft_painted/sua/04_playful_tease_v1.png"
+      "character": "/play/assets/assets/images/production_soft_painted/han_sua/02_warm_smile_v1.png"
     },
     {
       "id": "scene-31",
@@ -384,7 +384,7 @@
       "direction": "수아가 깔깔 웃으며 먼저 언덕을 뛰어올랐다.",
       "line": "그럼 합법이네.",
       "background": "/play/assets/assets/images/historical_prologue/bg_future_development_academy_gate_2000_portrait_v1.png",
-      "character": "/play/assets/assets/images/cinematic_soft_painted/sua/03_bright_laugh_v1.png"
+      "character": "/play/assets/assets/images/production_soft_painted/han_sua/03_bright_laugh_v1.png"
     },
     {
       "id": "scene-33",
@@ -444,7 +444,7 @@
       "direction": "수아의 손이 누구보다 먼저 천장을 찔렀다.",
       "line": "동전이요! 빵 사고도 200원 남잖아요.",
       "background": "/play/assets/assets/images/historical_prologue/bg_future_development_orientation_hall_2000_portrait_v1.png",
-      "character": "/play/assets/assets/images/cinematic_soft_painted/sua/05_surprised_v1.png"
+      "character": "/play/assets/assets/images/production_soft_painted/han_sua/04_surprised_v1.png"
     },
     {
       "id": "scene-38",
@@ -468,7 +468,7 @@
       "direction": "말이 끝나자마자 수아의 배에서 작은 소리가 났다.",
       "line": "두 시간이요? …참을 수 있어요. 아마도.",
       "background": "/play/assets/assets/images/historical_prologue/bg_future_development_orientation_hall_2000_portrait_v1.png",
-      "character": "/play/assets/assets/images/cinematic_soft_painted/sua/06_worried_v1.png"
+      "character": "/play/assets/assets/images/production_soft_painted/han_sua/05_worried_v1.png"
     },
     {
       "id": "scene-40",
@@ -576,7 +576,7 @@
       "direction": "수아는 옆자리 아이들의 표정을 한번 훑고 대답했다.",
       "line": "사람 얼굴 보면 뭘 좋아하고 싫어하는지 금방 알아서요.",
       "background": "/play/assets/assets/images/historical_prologue/bg_future_development_orientation_hall_2000_portrait_v1.png",
-      "character": "/play/assets/assets/images/cinematic_soft_painted/sua/02_warm_smile_v1.png"
+      "character": "/play/assets/assets/images/production_soft_painted/han_sua/02_warm_smile_v1.png"
     },
     {
       "id": "scene-49",
@@ -732,7 +732,7 @@
       "direction": "수아가 가장 안쪽 침대를 보며 코끝을 찡긋했다.",
       "line": "그럼 코 고는 사람은 남자든 여자든 창가 자리로 보내도 돼요?",
       "background": "/play/assets/assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_day_2000_v1.png",
-      "character": "/play/assets/assets/images/cinematic_soft_painted/sua/04_playful_tease_v1.png"
+      "character": "/play/assets/assets/images/production_soft_painted/han_sua/03_bright_laugh_v1.png"
     },
     {
       "id": "scene-62",
@@ -783,8 +783,356 @@
       "character": "/play/assets/assets/images/주식선생님/26_포즈5_주인공그림체_공통슬롯_투명.png"
     },
     {
-      "id": "scene-66",
+      "id": "scene-dorm-intro-circle",
       "order": 66,
+      "chapter": "5장 · 열 명이 쓰는 한 방",
+      "date": "2000.01.02  ·  09:22",
+      "location": "국립 미래양성원 · 제6기 공용 생활실",
+      "speaker": "이야기",
+      "direction": "세면실에서 돌아온 열 명이 공용 책상의 낡은 의자와 가까운 아래층 침상에 둥글게 나눠 앉았다.",
+      "line": "의자가 모자란 아이들은 침상 끝에 걸터앉았다. 서로 눈치만 보던 사이, 수아가 손가락으로 시계 방향을 그렸다. 한 바퀴 돌면서 이름부터 말하자는 신호였다.",
+      "background": "/play/assets/assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_day_2000_v1.png",
+      "character": ""
+    },
+    {
+      "id": "scene-dorm-intro-seoa",
+      "order": 67,
+      "chapter": "5장 · 열 명이 쓰는 한 방",
+      "date": "2000.01.02  ·  09:23",
+      "location": "국립 미래양성원 · 제6기 공용 생활실",
+      "speaker": "김서아",
+      "direction": "창가 쪽 의자에 앉은 김서아가 자기 이름이 적힌 작은 종이 상자를 책상 위에 반듯하게 놓았다.",
+      "line": "안녕, 김서아야. 물건 빌려 가면 여기에 적어 줘. 잊어버린 사람을 의심하는 것보다 기록을 보는 게 빠르니까. 그럼 내 옆은 누구야?",
+      "background": "/play/assets/assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_day_2000_v1.png",
+      "character": "/play/assets/assets/images/production_soft_painted/kim_seoa/09_explaining_ledger_v1.png"
+    },
+    {
+      "id": "scene-dorm-intro-jian",
+      "order": 68,
+      "chapter": "5장 · 열 명이 쓰는 한 방",
+      "date": "2000.01.02  ·  09:24",
+      "location": "국립 미래양성원 · 제6기 공용 생활실",
+      "speaker": "이지안",
+      "direction": "서아 옆 침상 끝에 걸터앉은 이지안이 나사 두 개가 빠진 알람시계와 짧은 드라이버를 무릎 위에 올렸다.",
+      "line": "나? 이지안. 소리만 이상한 건 열어 보기 전엔 고장이라고 못 해. 내가 꺼낸 부품은 치우기 전에 물어봐. 그리고 이 실 뭉치는 누구 거야?",
+      "background": "/play/assets/assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_day_2000_v1.png",
+      "character": "/play/assets/assets/images/production_soft_painted/lee_jian/09_explaining_mechanism_v1.png"
+    },
+    {
+      "id": "scene-dorm-intro-iseo",
+      "order": 69,
+      "chapter": "5장 · 열 명이 쓰는 한 방",
+      "date": "2000.01.02  ·  09:25",
+      "location": "국립 미래양성원 · 제6기 공용 생활실",
+      "speaker": "최이서",
+      "direction": "맞은편 아래층 침상에 앉은 최이서가 지안이 든 실 뭉치를 받아 색색의 실과 이름표 천 조각 사이에 놓았다.",
+      "line": "내 거야. 최이서. 헷갈리는 물건에는 이름표 달아 줄게. 공짜는 첫 번만이고, 두 번째부터는 단추 하나씩 받아. 아린아, 너는 아까부터 시계만 봐?",
+      "background": "/play/assets/assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_day_2000_v1.png",
+      "character": "/play/assets/assets/images/production_soft_painted/choi_iseo/01_base_thread_v1.png"
+    },
+    {
+      "id": "scene-dorm-intro-arin",
+      "order": 70,
+      "chapter": "5장 · 열 명이 쓰는 한 방",
+      "date": "2000.01.02  ·  09:26",
+      "location": "국립 미래양성원 · 제6기 공용 생활실",
+      "speaker": "정아린",
+      "direction": "침상 사다리를 등받이 삼아 앉은 정아린이 젖은 클로그를 바닥에 가지런히 맞추고 벽시계를 한 번 더 확인했다.",
+      "line": "응. 정아린. 아침에 늦는 사람은 깨워 줄 수 있어. 세 번 불러도 안 일어나면 그다음부터는 진짜 안 깨워. 다음, 박하은 맞지?",
+      "background": "/play/assets/assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_day_2000_v1.png",
+      "character": "/play/assets/assets/images/production_soft_painted/jung_arin/09_counting_explain_v1.png"
+    },
+    {
+      "id": "scene-dorm-intro-haeun",
+      "order": 71,
+      "chapter": "5장 · 열 명이 쓰는 한 방",
+      "date": "2000.01.02  ·  09:27",
+      "location": "국립 미래양성원 · 제6기 공용 생활실",
+      "speaker": "박하은",
+      "direction": "책상 모서리 의자에 앉은 박하은이 약봉지와 눌러 말린 잎을 끼운 공책을 무릎 위에 포갰다.",
+      "line": "맞아, 박하은이야. 아픈 데 있으면 숨기지 말고 말해. 약을 나눠 먹자는 뜻은 아니고, 선생님한테 같이 가 주겠다는 뜻이야. 지우도 인사할래?",
+      "background": "/play/assets/assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_day_2000_v1.png",
+      "character": "/play/assets/assets/images/production_soft_painted/park_haeun/02_warm_smile_v1.png"
+    },
+    {
+      "id": "scene-dorm-intro-jiwoo",
+      "order": 72,
+      "chapter": "5장 · 열 명이 쓰는 한 방",
+      "date": "2000.01.02  ·  09:28",
+      "location": "국립 미래양성원 · 제6기 공용 생활실",
+      "speaker": "오지우",
+      "direction": "의자에 비스듬히 앉은 오지우가 손바닥만 한 라디오의 주파수 다이얼을 줄이자 잡음이 짧게 잦아들었다.",
+      "line": "오지우. 전파 잡는 거 좋아해. 밤에는 이어폰 쓸 거고, 여기서 몰래 방송국 만들 생각은 아직 없어. 다음 출연자는 윤채아 님입니다.",
+      "background": "/play/assets/assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_day_2000_v1.png",
+      "character": "/play/assets/assets/images/production_soft_painted/oh_jiwoo/09_explaining_report_v1.png"
+    },
+    {
+      "id": "scene-dorm-intro-chaea",
+      "order": 73,
+      "chapter": "5장 · 열 명이 쓰는 한 방",
+      "date": "2000.01.02  ·  09:29",
+      "location": "국립 미래양성원 · 제6기 공용 생활실",
+      "speaker": "윤채아",
+      "direction": "지우 맞은편에 앉은 윤채아가 여러 가게 영수증을 고무줄로 묶어 책상 한쪽에 세웠다.",
+      "line": "윤채아야. 같은 물건이 어디서 얼마인지 보는 걸 좋아해. 내가 싸다고 해도 바로 믿지는 마. 어제 가격일 수도 있으니까. 수아, 아까부터 간식 얘기하던데 너는?",
+      "background": "/play/assets/assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_day_2000_v1.png",
+      "character": "/play/assets/assets/images/production_soft_painted/yoon_chaea/09_explaining_v1.png"
+    },
+    {
+      "id": "scene-dorm-intro-sua",
+      "order": 74,
+      "chapter": "5장 · 열 명이 쓰는 한 방",
+      "date": "2000.01.02  ·  09:30",
+      "location": "국립 미래양성원 · 제6기 공용 생활실",
+      "speaker": "수아",
+      "direction": "아래층 침상 끝에 걸터앉은 수아가 아직 굳은 얼굴들을 한 바퀴 살피고 손을 번쩍 들었다.",
+      "line": "한수아. 수아라고 불러. 사람 표정은 잘 보는데 내 배고픈 표정은 못 숨겨. 간식 숨긴 사람은 지금 자수해. 자, 이제 남자 둘 차례.",
+      "background": "/play/assets/assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_day_2000_v1.png",
+      "character": "/play/assets/assets/images/production_soft_painted/han_sua/08_explaining_v1.png"
+    },
+    {
+      "id": "scene-dorm-intro-hakjun",
+      "order": 75,
+      "chapter": "5장 · 열 명이 쓰는 한 방",
+      "date": "2000.01.02  ·  09:31",
+      "location": "국립 미래양성원 · 제6기 공용 생활실",
+      "speaker": "김학준",
+      "direction": "출입문 가까운 의자에 앉은 학준이 무릎 위 규정집의 색인을 가지런히 누르고 목을 가다듬었다.",
+      "line": "안녕. 김학준이야. 규칙을 잔소리하려고 외우는 건 아니야. 누가 규칙을 멋대로 바꿀 때 잡아내려고 외우는 거야. 이제 너만 남았어.",
+      "background": "/play/assets/assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_day_2000_v1.png",
+      "character": ""
+    },
+    {
+      "id": "scene-dorm-intro-player",
+      "order": 76,
+      "chapter": "5장 · 열 명이 쓰는 한 방",
+      "date": "2000.01.02  ·  09:32",
+      "location": "국립 미래양성원 · 제6기 공용 생활실",
+      "speaker": "나",
+      "direction": "나는 남은 의자를 끌어 원 안에 앉은 채 주머니 속 제5기 명찰을 손으로 가리고 빈 가방을 발뒤꿈치로 밀었다.",
+      "line": "안녕. 나는 아직 잘하는 건 모르겠고, 왕딱지는 좀 있어. 고장 난 가방 바퀴로 눈사람 만드는 것도 잘해. 다들 그냥 편하게 말 걸어 줘.",
+      "background": "/play/assets/assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_day_2000_v1.png",
+      "character": ""
+    },
+    {
+      "id": "scene-dorm-bed-rush",
+      "order": 77,
+      "chapter": "5장 · 열 명이 쓰는 한 방",
+      "date": "2000.01.02  ·  09:36",
+      "location": "국립 미래양성원 · 제6기 공용 생활실",
+      "speaker": "이야기",
+      "direction": "소개가 끝나자 열 명이 동시에 침상과 사물함으로 흩어졌다.",
+      "line": "창가, 문가, 위층, 아래층. 방금 외운 이름들이 침상 번호와 뒤섞이며 첫 번째 생활 협상이 시작됐다.",
+      "background": "/play/assets/assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_day_2000_v1.png",
+      "character": ""
+    },
+    {
+      "id": "scene-dorm-bed-choice",
+      "order": 78,
+      "chapter": "5장 · 열 명이 쓰는 한 방",
+      "date": "2000.01.02  ·  09:38",
+      "location": "국립 미래양성원 · 제6기 공용 생활실",
+      "speaker": "정아린",
+      "direction": "아린이 출입문 가까운 아래층 침상을 가리켰다.",
+      "line": "나는 아침 운동 때문에 먼저 나갈 거야. 문가 아래층을 쓰면 다른 사람 사다리를 안 흔들어도 돼. 반대하는 사람 있어?",
+      "background": "/play/assets/assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_day_2000_v1.png",
+      "character": "/play/assets/assets/images/production_soft_painted/jung_arin/04_assigning_tasks_v1.png"
+    },
+    {
+      "id": "scene-dorm-locker-mistake",
+      "order": 79,
+      "chapter": "5장 · 열 명이 쓰는 한 방",
+      "date": "2000.01.02  ·  09:40",
+      "location": "국립 미래양성원 · 제6기 공용 생활실",
+      "speaker": "이야기",
+      "direction": "지안이 콘센트 위치를 재다가 드라이버 통을 옆 사물함에 밀어 넣었다. 문에 붙은 이름은 최이서였다.",
+      "line": "철문이 닫히는 소리에 방 안의 말이 한순간 끊겼다.",
+      "background": "/play/assets/assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_day_2000_v1.png",
+      "character": ""
+    },
+    {
+      "id": "scene-dorm-locker-conflict",
+      "order": 80,
+      "chapter": "5장 · 열 명이 쓰는 한 방",
+      "date": "2000.01.02  ·  09:41",
+      "location": "국립 미래양성원 · 제6기 공용 생활실",
+      "speaker": "최이서",
+      "direction": "이서가 사물함 문을 다시 열어 드라이버 통을 두 손가락으로 집어 들었다.",
+      "line": "방금 선생님이 남의 사물함은 허락 없이 열지 말라고 했어. 실수여도 먼저 말해 줘. 내 물건이 없어지면 너부터 의심하고 싶지 않으니까.",
+      "background": "/play/assets/assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_day_2000_v1.png",
+      "character": "/play/assets/assets/images/production_soft_painted/choi_iseo/07_firm_boundary_v1.png"
+    },
+    {
+      "id": "scene-dorm-locker-apology",
+      "order": 81,
+      "chapter": "5장 · 열 명이 쓰는 한 방",
+      "date": "2000.01.02  ·  09:42",
+      "location": "국립 미래양성원 · 제6기 공용 생활실",
+      "speaker": "이지안",
+      "direction": "지안은 변명하려다 사물함 번호를 다시 확인하고 드라이버 통을 자기 가슴에 안았다.",
+      "line": "미안. 콘센트만 보고 번호를 안 봤어. 다음부터 남의 칸을 열었으면 바로 말할게. 아니, 애초에 이름부터 볼게.",
+      "background": "/play/assets/assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_day_2000_v1.png",
+      "character": "/play/assets/assets/images/production_soft_painted/lee_jian/07_apologetic_boundary_v1.png"
+    },
+    {
+      "id": "scene-dorm-boundary-proposal",
+      "order": 82,
+      "chapter": "5장 · 열 명이 쓰는 한 방",
+      "date": "2000.01.02  ·  09:43",
+      "location": "국립 미래양성원 · 제6기 공용 생활실",
+      "speaker": "박하은",
+      "direction": "하은이 공용 책상의 빈 생활기록표를 가운데로 당겼다.",
+      "line": "우리 지금 정하자. 사물함과 침상은 허락받기, 세면실은 노크하고 대답 듣기. 아직 말 안 한 사람, 더 필요한 규칙 있어?",
+      "background": "/play/assets/assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_day_2000_v1.png",
+      "character": "/play/assets/assets/images/production_soft_painted/park_haeun/09_explaining_v1.png"
+    },
+    {
+      "id": "scene-dorm-boundary-agreement",
+      "order": 83,
+      "chapter": "5장 · 열 명이 쓰는 한 방",
+      "date": "2000.01.02  ·  09:45",
+      "location": "국립 미래양성원 · 제6기 공용 생활실",
+      "speaker": "김서아",
+      "direction": "서아가 세 가지 규칙을 적고 아래에 열 칸을 그었다.",
+      "line": "불편한 일은 뒤에서 말하지 말고 생활회의에 적기. 세 규칙 모두 동의하면 자기 이름을 직접 써. 우리 첫 약속으로 남기자.",
+      "background": "/play/assets/assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_day_2000_v1.png",
+      "character": "/play/assets/assets/images/production_soft_painted/kim_seoa/08_determined_record_v1.png"
+    },
+    {
+      "id": "scene-dorm-boundary-signatures",
+      "order": 84,
+      "chapter": "5장 · 열 명이 쓰는 한 방",
+      "date": "2000.01.02  ·  09:47",
+      "location": "국립 미래양성원 · 제6기 공용 생활실",
+      "speaker": "이야기",
+      "direction": "삐뚤고 반듯한 글씨 열 개가 한 줄씩 채워졌다.",
+      "line": "마지막 서명이 끝나자 방은 조금 덜 낯설어졌고, 각자의 사물함 문은 오히려 전보다 더 분명한 경계가 되었다.",
+      "background": "/play/assets/assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_day_2000_v1.png",
+      "character": ""
+    },
+    {
+      "id": "scene-dorm-joke",
+      "order": 85,
+      "chapter": "5장 · 열 명이 쓰는 한 방",
+      "date": "2000.01.02  ·  09:49",
+      "location": "국립 미래양성원 · 제6기 공용 생활실",
+      "speaker": "수아",
+      "direction": "수아가 내 텅 빈 사물함에 남은 이름표 하나를 붙였다. 「왕딱지 중앙은행」.",
+      "line": "예금은 왕딱지만 받고 이자는 웃긴 이야기로 줍니다. 단, 총재가 가진 돈은 현재 한 장입니다.",
+      "background": "/play/assets/assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_day_2000_v1.png",
+      "character": "/play/assets/assets/images/production_soft_painted/han_sua/03_bright_laugh_v1.png"
+    },
+    {
+      "id": "scene-dorm-laughter",
+      "order": 86,
+      "chapter": "5장 · 열 명이 쓰는 한 방",
+      "date": "2000.01.02  ·  09:50",
+      "location": "국립 미래양성원 · 제6기 공용 생활실",
+      "speaker": "오지우",
+      "direction": "지우가 라디오 잡음에 맞춰 짧은 뉴스 진행 목소리를 냈다.",
+      "line": "속보입니다. 왕딱지 중앙은행이 개업 첫날부터 현금 부족을 발표했습니다. 예금자 보호는 안 됩니다.",
+      "background": "/play/assets/assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_day_2000_v1.png",
+      "character": "/play/assets/assets/images/production_soft_painted/oh_jiwoo/03_breaking_news_excited_v1.png"
+    },
+    {
+      "id": "scene-dorm-awkward-question",
+      "order": 87,
+      "chapter": "5장 · 열 명이 쓰는 한 방",
+      "date": "2000.01.02  ·  09:53",
+      "location": "국립 미래양성원 · 제6기 공용 생활실",
+      "speaker": "윤채아",
+      "direction": "웃음이 잦아들자 채아가 열 개의 이름 아래 빈 출신 시설 칸을 바라봤다.",
+      "line": "근데 우리는 왜 여기 뽑힌 걸까? 추천서에 뭐라고 적혔는지 본 사람 있어?",
+      "background": "/play/assets/assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_day_2000_v1.png",
+      "character": "/play/assets/assets/images/production_soft_painted/yoon_chaea/06_worried_v1.png"
+    },
+    {
+      "id": "scene-dorm-awkward-silence",
+      "order": 88,
+      "chapter": "5장 · 열 명이 쓰는 한 방",
+      "date": "2000.01.02  ·  09:54",
+      "location": "국립 미래양성원 · 제6기 공용 생활실",
+      "speaker": "이야기",
+      "direction": "아무도 대답하지 않았다. 아는 아이도 없었고, 모른다고 먼저 인정하고 싶은 아이도 없었다.",
+      "line": "라디오 잡음만 길게 늘어졌다. 학준은 규정집을 덮었고, 나는 주머니 속 명찰 모서리를 더 세게 눌렀다.",
+      "background": "/play/assets/assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_day_2000_v1.png",
+      "character": ""
+    },
+    {
+      "id": "scene-dorm-night-rustle",
+      "order": 89,
+      "chapter": "5장 · 열 명이 쓰는 한 방",
+      "date": "2000.01.02  ·  21:34",
+      "location": "국립 미래양성원 · 제6기 공용 생활실",
+      "speaker": "이야기",
+      "direction": "소등 직전, 바지를 접어 사물함에 넣다가 쇳조각이 바닥에 닿았다.",
+      "line": "작은 금속음이 났다. 나는 급히 주웠지만 맞은편 아래층의 학준은 이미 몸을 일으킨 뒤였다.",
+      "background": "/play/assets/assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_night_2000_v1.png",
+      "character": ""
+    },
+    {
+      "id": "scene-dorm-badge-hakjun",
+      "order": 90,
+      "chapter": "5장 · 열 명이 쓰는 한 방",
+      "date": "2000.01.02  ·  21:35",
+      "location": "국립 미래양성원 · 제6기 공용 생활실",
+      "speaker": "김학준",
+      "direction": "학준이 다른 침상을 깨우지 않으려 입 모양만 크게 움직였다.",
+      "line": "그거 오늘 강당에서도 만졌지? 제5기 명찰 아니야? 규정집 부록에는 제5기 명단이 통째로 빠져 있어.",
+      "background": "/play/assets/assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_night_2000_v1.png",
+      "character": ""
+    },
+    {
+      "id": "scene-dorm-badge-sua",
+      "order": 91,
+      "chapter": "5장 · 열 명이 쓰는 한 방",
+      "date": "2000.01.02  ·  21:36",
+      "location": "국립 미래양성원 · 제6기 공용 생활실",
+      "speaker": "수아",
+      "direction": "바로 위 침상에서 수아의 얼굴이 거꾸로 내려왔다.",
+      "line": "둘이 비밀 얘기할 때는 목소리보다 이불이 더 시끄러워. 보여 주기 싫으면 안 보여 줘도 돼. 대신 위험한 거면 같이 알아야 해.",
+      "background": "/play/assets/assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_night_2000_v1.png",
+      "character": "/play/assets/assets/images/production_soft_painted/han_sua/05_worried_v1.png"
+    },
+    {
+      "id": "scene-dorm-badge-reveal",
+      "order": 92,
+      "chapter": "5장 · 열 명이 쓰는 한 방",
+      "date": "2000.01.02  ·  21:37",
+      "location": "국립 미래양성원 · 제6기 공용 생활실",
+      "speaker": "나",
+      "direction": "나는 손바닥을 아주 조금 펼쳐 「제5기 · 17번」과 긁혀 지워진 이름을 보여 줬다.",
+      "line": "보육원 가방 안감에서 나왔어. 뒤에는 ‘17번을 믿지 마’라고 적혀 있어. 아직 선생님한테는 말하지 않았어.",
+      "background": "/play/assets/assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_night_2000_v1.png",
+      "character": ""
+    },
+    {
+      "id": "scene-dorm-badge-record",
+      "order": 93,
+      "chapter": "5장 · 열 명이 쓰는 한 방",
+      "date": "2000.01.02  ·  21:38",
+      "location": "국립 미래양성원 · 제6기 공용 생활실",
+      "speaker": "김학준",
+      "direction": "학준은 규정집의 빈 뒷장을 찢지 않고 페이지 번호만 접어 표시했다.",
+      "line": "내일 기록실 위치부터 확인하자. 원본은 네가 가지고, 문구와 발견 장소만 따로 적어. 증거 하나를 셋이 들고 다니면 셋 다 잃어버릴 수 있어.",
+      "background": "/play/assets/assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_night_2000_v1.png",
+      "character": ""
+    },
+    {
+      "id": "scene-dorm-badge-pact",
+      "order": 94,
+      "chapter": "5장 · 열 명이 쓰는 한 방",
+      "date": "2000.01.02  ·  21:39",
+      "location": "국립 미래양성원 · 제6기 공용 생활실",
+      "speaker": "수아",
+      "direction": "수아가 손가락을 입술에 댄 뒤 빈 생활기록표 뒷면을 가리켰다.",
+      "line": "어른을 무조건 의심하지도 말고, 무조건 믿지도 말자. 우리 셋이 같은 걸 보고 같은 말로 적은 다음에 묻는 거야.",
+      "background": "/play/assets/assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_night_2000_v1.png",
+      "character": "/play/assets/assets/images/production_soft_painted/han_sua/07_determined_v1.png"
+    },
+    {
+      "id": "scene-66",
+      "order": 95,
       "chapter": "5장 · 열 명이 쓰는 한 방",
       "date": "2000.01.02  ·  21:40",
       "location": "국립 미래양성원 · 제6기 공용 생활실",
@@ -796,7 +1144,7 @@
     },
     {
       "id": "scene-67",
-      "order": 67,
+      "order": 96,
       "chapter": "6장 · PC 열 대가 켜지는 아침",
       "date": "2000.01.03  ·  08:40",
       "location": "국립 미래양성원 · 제6기 공용 생활실",
@@ -808,7 +1156,7 @@
     },
     {
       "id": "scene-68",
-      "order": 68,
+      "order": 97,
       "chapter": "6장 · PC 열 대가 켜지는 아침",
       "date": "2000.01.03  ·  08:55",
       "location": "국립 미래양성원 · 기숙사 중앙 복도",
@@ -820,7 +1168,7 @@
     },
     {
       "id": "scene-69",
-      "order": 69,
+      "order": 98,
       "chapter": "6장 · PC 열 대가 켜지는 아침",
       "date": "2000.01.03  ·  09:00",
       "location": "국립 미래양성원 · 주식 PC 실습실",
@@ -832,7 +1180,7 @@
     },
     {
       "id": "scene-70",
-      "order": 70,
+      "order": 99,
       "chapter": "6장 · PC 열 대가 켜지는 아침",
       "date": "2000.01.03  ·  09:00",
       "location": "국립 미래양성원 · 주식 PC 실습실",
@@ -844,7 +1192,7 @@
     },
     {
       "id": "scene-71",
-      "order": 71,
+      "order": 100,
       "chapter": "6장 · PC 열 대가 켜지는 아침",
       "date": "2000.01.03  ·  09:00",
       "location": "국립 미래양성원 · 주식 PC 실습실",
@@ -856,7 +1204,7 @@
     },
     {
       "id": "scene-72",
-      "order": 72,
+      "order": 101,
       "chapter": "6장 · PC 열 대가 켜지는 아침",
       "date": "2000.01.03  ·  09:00",
       "location": "국립 미래양성원 · 주식 PC 실습실",
@@ -868,7 +1216,7 @@
     },
     {
       "id": "scene-73",
-      "order": 73,
+      "order": 102,
       "chapter": "6장 · PC 열 대가 켜지는 아침",
       "date": "2000.01.03  ·  09:00",
       "location": "국립 미래양성원 · 주식 PC 실습실",
@@ -879,5 +1227,5 @@
       "character": "/play/assets/assets/images/주식선생님/26_포즈5_주인공그림체_공통슬롯_투명.png"
     }
   ],
-  "appearanceVersion": 8
+  "appearanceVersion": 11
 }

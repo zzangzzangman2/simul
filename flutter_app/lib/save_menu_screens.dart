@@ -59,7 +59,7 @@ class _GameTitleScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     const Text(
-                      '세뱃돈 1만원으로 시작하는 꼬마 투자왕의 꿈',
+                      '국가계좌 1만원으로 시작하는 제6기 운용자의 기록',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: Color(0xFFD4E8E3),

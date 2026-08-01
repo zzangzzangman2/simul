@@ -23,10 +23,15 @@
 | `DO_NOTS.md` | 반복하면 안 되는 구현·문서 패턴 |
 | `GAMEPLAY_GAPS.md` | 아직 연결되지 않은 기능 |
 | `ORPHANAGE_STORY_REBOOT.md` | 미래양성원 제6기 리부트 설정 |
+| `characters/cohort6_girls/README.md` | 제6기 여학생 8명 MBTI 배정과 인물별 대사·갈등·투자 성향 문서 인덱스 |
 | `PROTAGONIST_AGE_LINE.md` | 14~19살과 SEED 01~06 성장선 |
+| `RELATIONSHIP_SYSTEM.md` | 여학생 8명 호감도 1~100, 하루 종료 선택과 데이트 규칙 |
+| `COHORT_DAILY_INVESTMENT.md` | 제6기 10명 일일 투자 결과표, 하루 1회 대여와 자동 상환 규칙 |
+| `PHONE_MESSENGER_SYSTEM.md` | 미래톡 휴대폰 UI, 제6기 9명 자유 입력 대화와 MBTI 답장 규칙 |
 | `DIALOGUE_EDITOR_GUIDE.md` | 대사·장면·배경 편집과 빌드 규칙 |
 | `FIRST_DAY_DORMITORY.md` | 첫날 남녀 공용 기숙사와 둘째 날 PC 주식 수업 입실 장면 |
-| `ART_STYLE_GUIDE.md` | `cinematic soft-painted anime realism` 제작 규칙 |
+| `ART_STYLE_GUIDE.md` | `SIMUL production soft-painted VN anime v1` 제작 규칙 |
+| `IMAGE_GENERATION_STYLE_PROMPT.md` | 모든 채팅에서 사용하는 공식 캐릭터 화풍 앵커·복사용 생성 프롬프트 |
 | `ART_STYLE_AUDIT.md` | 런타임 자산 승인·보류·폐기 기록 |
 | `CONTENT_GUIDE.md` | 가상기업·사건·업종 문법 |
 | `DATA_SOURCES.md` | 출처·라이선스·현실 자료 경계 |

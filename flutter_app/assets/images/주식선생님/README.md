@@ -6,7 +6,7 @@
 
 - 나이: 23세 성인 여성
 - 역할: 주식 투자 학원 선생님 및 주식시장 튜토리얼 안내자
-- 최상위 그림체 기준: `art_references/simul_cinematic_soft_painted_style_v1.png`
+- 최상위 그림체 기준: `art_references/simul_production_soft_painted_vn_style_anchor_v1.png`
 - 얼굴·머리·눈 정체성 보조: `art_references/npc_canonical_style_teal_v1.png`
 - 체형: 키가 크고 굴곡이 있으면서도 자연스러운 성인 여성 비율
 - 얼굴: 보석처럼 여러 층의 하이라이트가 있는 보라색 눈, 작은 뷰티마크, 섬세하고 친근한 성인 인상

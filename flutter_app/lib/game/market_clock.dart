@@ -33,7 +33,7 @@ int marketLiquidityDayKey(DateTime date) =>
 const marketRealtimeTickDuration = Duration(seconds: 1);
 
 const decisionActionMinutes = 30;
-const familyHelpActionMinutes = 30;
+const academyHelpActionMinutes = 30;
 const workActionMinutes = 60;
 
 int advanceGameTime(int currentMinute, int elapsedMinutes) =>

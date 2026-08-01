@@ -252,7 +252,7 @@ void main() {
       8 * 60 + 30,
     );
     expect(
-      advanceGameTime(marketDayStartMinute, familyHelpActionMinutes),
+      advanceGameTime(marketDayStartMinute, academyHelpActionMinutes),
       8 * 60 + 30,
     );
     expect(advanceGameTime(marketDayStartMinute, workActionMinutes), 9 * 60);
