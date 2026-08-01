@@ -1,12 +1,12 @@
 # MILLENNIUM CAPITAL deployment manifest
 
-- Validated GitHub source commit: `c0a748de955b62f453364016021d3e665d702189`
-- Functional source commit: `a8f32e7a96f6432789e6b9bcf1a143a43ecc14b4`
-- GitHub cleanup commit: `2ca08794816689fb908e6261b8dea6225435beae`
-- Release archive SHA-256: `be2db3dc6c303b829fc06e8fc6070e8a64227b4e2c743b1a1fc5e891f58fdffd`
-- Release archive size: `212918026` bytes
+- Validated source commit: `13b56abcdbd4fcbd247c854bc78462c69b7e656a`
+- Release archive SHA-256: `7f2416f1ac9351eeaf9cff0886d3d2da140d869d0e36e4cbeb07622c806a55e3`
+- Release archive size: `333538231` bytes
 - Runtime: Vinext shell with Flutter Web under `/play/`
 - Dialogue editor scene count: `73`
+- Character update: Choi Iseo (`이서`) photorealistic summer-uniform full-body set, 12 dialogue poses
+- Uniform rule: short-sleeve full-length white shirt, white ankle socks, white low-top sneakers
 
 This lightweight Sites source branch identifies the exact validated release
 artifact without copying project-only image references into the hosting source
