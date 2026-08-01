@@ -785,37 +785,37 @@ void main() {
 
     expect(
       visibleBackgroundAsset(),
-      'assets/images/cinematic_soft_painted/policy_1981/backgrounds/bg_policy_room_night_v1.png',
+      'assets/images/photorealistic/prologue_1981_2000/bg_policy_room_night_photoreal_v1.png',
     );
 
     await advanceDialogue(tester, 5);
     expect(
       visibleBackgroundAsset(),
-      'assets/images/cinematic_soft_painted/policy_1981/backgrounds/bg_conference_night_v1.png',
+      'assets/images/photorealistic/prologue_1981_2000/bg_conference_night_photoreal_v1.png',
     );
 
     await advanceDialogue(tester, 11);
     expect(
       visibleBackgroundAsset(),
-      'assets/images/historical_prologue/bg_future_development_orphanage_1982_portrait_cartoon_v1.png',
+      'assets/images/photorealistic/prologue_1981_2000/bg_academy_opening_1982_photoreal_v1.png',
     );
 
     await advanceDialogue(tester, 1);
     expect(
       visibleBackgroundAsset(),
-      'assets/images/historical_prologue/bg_orphanage_departure_2000_portrait_v1.png',
+      'assets/images/photorealistic/prologue_1981_2000/bg_orphanage_departure_2000_photoreal_v1.png',
     );
 
     await advanceDialogue(tester, 6);
     expect(
       visibleBackgroundAsset(),
-      'assets/images/historical_prologue/bg_future_development_academy_gate_2000_portrait_v1.png',
+      'assets/images/photorealistic/prologue_1981_2000/bg_academy_gate_2000_photoreal_v1.png',
     );
 
     await advanceDialogue(tester, 9);
     expect(
       visibleBackgroundAsset(),
-      'assets/images/historical_prologue/bg_future_development_orientation_hall_2000_portrait_v1.png',
+      'assets/images/photorealistic/prologue_1981_2000/bg_orientation_hall_2000_photoreal_v1.png',
     );
     expect(find.byKey(const Key('orientation-light-flicker')), findsOneWidget);
     expect(find.byKey(const Key('orientation-dust-motes')), findsOneWidget);
@@ -1063,7 +1063,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('prologue skip stops at the locked orientation ending', (
+  testWidgets('prologue skip stops at the locked PC classroom ending', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
