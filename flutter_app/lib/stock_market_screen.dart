@@ -14,6 +14,18 @@ const _orderBookSweepMinimumStepDuration = Duration(milliseconds: 56);
 const _orderBookSweepMaximumStepDuration = Duration(milliseconds: 96);
 const _orderBookSweepFinalHoldDuration = Duration(milliseconds: 112);
 const _orderBookTapeCapacity = 50;
+const _stockTeacherPosePointer =
+    'assets/images/주식선생님/22_포즈1_주인공그림체_공통슬롯_투명.png';
+const _stockTeacherPoseExplain =
+    'assets/images/주식선생님/23_포즈2_주인공그림체_공통슬롯_투명.png';
+const _stockTeacherPoseCompare =
+    'assets/images/주식선생님/24_포즈3_주인공그림체_공통슬롯_투명.png';
+const _stockTeacherPoseBook =
+    'assets/images/주식선생님/25_포즈4_주인공그림체_공통슬롯_투명.png';
+const _stockTeacherPoseListen =
+    'assets/images/주식선생님/26_포즈5_주인공그림체_공통슬롯_투명.png';
+const _stockTeacherPoseEmphasize =
+    'assets/images/주식선생님/27_포즈6_주인공그림체_공통슬롯_투명.png';
 
 class OrderBookSweepIdentityLedger {
   OrderBookSweepIdentityLedger({required this.completedHistoryCapacity})
@@ -5009,21 +5021,34 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
         return;
       case 1:
         setState(() {
-          _detailTab = _StockDetailTab.quote;
+          _detailTab = _StockDetailTab.info;
           _tutorialStep = 2;
         });
         _scrollDetailTutorialTo(0);
         return;
       case 2:
-        setState(() => _tutorialStep = 3);
-        _scrollDetailTutorialTo(80);
+        setState(() {
+          _detailTab = _StockDetailTab.quote;
+          _tutorialStep = 3;
+        });
+        _scrollDetailTutorialTo(0);
         return;
       case 3:
+        setState(() => _tutorialStep = 4);
+        _scrollDetailTutorialTo(80);
+        return;
+      case 4:
+        final limitPrice = _tutorialBestAskPrice();
+        _showInlineOrder(true, limitPrice: limitPrice, quantity: 1);
+        setState(() => _tutorialStep = 5);
+        _scrollDetailTutorialTo(0);
+        return;
+      case 5:
         unawaited(
           _openOrderSheet(
             true,
             fromTutorial: true,
-            limitPrice: _tutorialBestAskPrice(),
+            limitPrice: _inlineOrderLimitPrice ?? _tutorialBestAskPrice(),
           ),
         );
         return;
@@ -5609,8 +5634,9 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
                 step: _tutorialStep!,
                 targetKey: switch (_tutorialStep) {
                   0 => _tutorialPriceKey,
-                  2 => _tutorialOrderBookHeaderKey,
-                  3 => _tutorialBestAskKey,
+                  1 => _tutorialChartKey,
+                  3 => _tutorialOrderBookHeaderKey,
+                  4 => _tutorialBestAskKey,
                   _ => null,
                 },
                 onAction: _handleDetailTutorialAction,
@@ -10109,6 +10135,7 @@ class _PracticalTradeTutorialSheetState
                       speaker: '한서윤 선생님',
                       message: '화면의 이익은 아직 평가액이에요. 한 주를 팔아 결과를 확정해 볼까요?',
                       teacher: true,
+                      characterAsset: _stockTeacherPoseEmphasize,
                     )
                   : _TutorialDialogueCard(
                       key: ValueKey<int>(_priceMoveStep),
@@ -10116,6 +10143,7 @@ class _PracticalTradeTutorialSheetState
                       message:
                           '${marketTimeLabel(currentMinute)}이에요. 아직 팔지 말고 내 계좌 숫자가 어떻게 달라지는지 조금 더 지켜봐요.',
                       teacher: true,
+                      characterAsset: _stockTeacherPoseListen,
                     ),
             ),
             const SizedBox(height: 14),
@@ -10514,6 +10542,7 @@ class _PracticalTradeTutorialSheetState
                     message:
                         '오늘은 여기까지. 다음에는 전자창고에서 본 한빛통신처럼 네가 궁금한 회사 하나를 골라 와요. 가격보다 먼저 무엇을 팔아 돈 버는지부터 봅니다.',
                     teacher: true,
+                    characterAsset: _stockTeacherPoseBook,
                   ),
                   const SizedBox(height: 10),
                   _TutorialDialogueCard(
@@ -10639,11 +10668,13 @@ class _TutorialDialogueCard extends StatelessWidget {
     required this.speaker,
     required this.message,
     this.teacher = false,
+    this.characterAsset,
   });
 
   final String speaker;
   final String message;
   final bool teacher;
+  final String? characterAsset;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -10658,17 +10689,30 @@ class _TutorialDialogueCard extends StatelessWidget {
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        CircleAvatar(
-          radius: 18,
-          backgroundColor: teacher
-              ? const Color(0xFFF18775)
-              : const Color(0xFF6688C7),
-          child: Icon(
-            teacher ? Icons.school_rounded : Icons.face_rounded,
-            size: 20,
-            color: Colors.white,
+        if (characterAsset case final asset?)
+          SizedBox(
+            key: ValueKey<String>('tutorial-dialogue-character-$asset'),
+            width: 62,
+            height: 94,
+            child: Image.asset(
+              asset,
+              fit: BoxFit.contain,
+              alignment: Alignment.bottomCenter,
+              filterQuality: FilterQuality.high,
+            ),
+          )
+        else
+          CircleAvatar(
+            radius: 18,
+            backgroundColor: teacher
+                ? const Color(0xFFF18775)
+                : const Color(0xFF6688C7),
+            child: Icon(
+              teacher ? Icons.school_rounded : Icons.face_rounded,
+              size: 20,
+              color: Colors.white,
+            ),
           ),
-        ),
         const SizedBox(width: 11),
         Expanded(
           child: Column(
@@ -14100,24 +14144,28 @@ class _MarketTutorialOverlay extends StatelessWidget {
     },
     messages: switch (step) {
       0 => const [
-        '마지막은 실제 화면에서 해 볼게요. 연습 계좌라 잘못 눌러도 진짜 돈은 움직이지 않아요.',
-        '그럼 제가 먼저 눌러 볼게요. 아래 ‘주식’ 탭부터 맞죠?',
+        '홈에는 시장 지수·뉴스·거래대금 순위가 모여 있어요. 아래에는 홈·주식·내 투자 세 메뉴가 있고요.',
+        '실제 국가계좌는 그대로 두고 10,000원 수업 계좌로 연습하는 거죠. 먼저 주식 메뉴로 갈게요.',
       ],
       1 => const [
-        '‘주식’ 탭은 거래할 회사를 모아 보는 곳이에요. 지금은 노란 테두리만 따라가요.',
-        '회사가 많아도 오늘은 한 곳씩. 노란 테두리를 누를게요.',
+        '주식 메뉴에서는 회사명·종목코드 검색, 시장별 보기, 신규 기업, 관심 종목과 정렬을 쓸 수 있어요.',
+        '오늘은 전체 목록에서 한빛통신만 찾아볼게요. 노란 테두리를 따라가면 되죠?',
       ],
       _ => const [
-        '종목은 회사 한 곳을 뜻해요. 오늘은 한빛통신의 가격과 회사 내용을 함께 봅시다.',
-        '가격만 보지 말랬죠. 한빛통신부터 열어 볼게요.',
+        '종목 한 줄에는 현재가·등락률·거래대금이 보여요. 별표를 켜면 관심 종목에도 모을 수 있습니다.',
+        '가격만 보지 말랬죠. 한빛통신을 열어서 호가·주문·차트·정보를 차례로 볼게요.',
       ],
     },
     actionLabel: switch (step) {
       0 => '주식 탭 눌러 보기',
-      1 => '노란 테두리 확인하기',
+      1 => '검색·분류 화면 열기',
       _ => '한빛통신 열기',
     },
-    poseAlignment: Alignment.topCenter,
+    teacherPoseAsset: switch (step) {
+      0 => _stockTeacherPosePointer,
+      1 => _stockTeacherPoseExplain,
+      _ => _stockTeacherPoseBook,
+    },
     onAction: onAction,
   );
 }
@@ -14144,6 +14192,8 @@ class _MarketDetailTutorialOverlay extends StatelessWidget {
       0 => const ['한서윤 선생님', '나'],
       1 => const ['한서윤 선생님', '나'],
       2 => const ['한서윤 선생님', '나'],
+      3 => const ['한서윤 선생님', '나'],
+      4 => const ['한서윤 선생님', '나'],
       _ => const ['한서윤 선생님', '나'],
     },
     messages: switch (step) {
@@ -14152,25 +14202,42 @@ class _MarketDetailTutorialOverlay extends StatelessWidget {
         '빨간색이라고 무조건 좋은 건 아니고, 왜 올랐는지도 봐야 하는 거죠. 두 숫자부터 확인할게요.',
       ],
       1 => const [
-        '차트는 가격이 지나온 길이에요. 모양 하나만 보고 서두르지 말고 기간을 바꿔 보세요.',
-        '올라간 그림만 믿지 말고 분봉이랑 일봉을 바꿔 볼게요.',
+        '차트 탭은 분봉·일봉·주봉·월봉·연봉을 바꿔 가격의 시간축을 비교하는 곳이에요.',
+        '짧게 오른 그림만 믿지 않고 긴 기간도 확인할게요. 다음은 회사 정보죠?',
       ],
       2 => const [
-        '파란 줄은 팔 사람, 빨간 줄은 살 사람이 기다리는 가격과 수량이에요.',
-        '그럼 가장 가까운 파란 줄의 가격과 남은 수량부터 볼게요.',
+        '정보 탭에는 투자자 흐름, 회사가 무엇으로 돈을 버는지, 재무지표와 내 지분율이 있어요. 투자노트도 여기서 씁니다.',
+        '가격보다 사업과 숫자를 먼저 적어 두고, 이제 실제 주문이 모이는 호가 탭으로 갈게요.',
       ],
-      _ => const [
+      3 => const [
+        '호가 탭의 파란 쪽은 매도잔량, 빨간 쪽은 매수잔량이에요. 가격·수량과 현재가 테두리를 함께 봅니다.',
+        'VI·거래정지·동시호가 표시도 이 화면에서 확인하고, 가장 가까운 매도호가부터 볼게요.',
+      ],
+      4 => const [
         '매도호가를 누르면 그 가격이 매수 지정가에 들어가요. 잔량이 모자라면 일부만 체결될 수도 있어요.',
         '제가 고른 가격에 주문이 줄 서는 거네요. 가장 가까운 매도호가를 눌러 볼게요.',
+      ],
+      _ => const [
+        '주문 탭에는 매수·매도뿐 아니라 정정/취소, 미체결, 잔고가 함께 있어요. 호가를 누르면 지정가도 연동됩니다.',
+        '지금은 수업 계좌로 한 주만 지정가 매수하고, 가격이 바뀐 뒤 매도까지 해 볼게요.',
       ],
     },
     actionLabel: switch (step) {
       0 => '현재가 확인하기',
-      1 => '차트 기간 바꿔 보기',
-      2 => '호가 가격과 수량 보기',
-      _ => '가장 가까운 매도호가 누르기',
+      1 => '정보 탭 확인하기',
+      2 => '호가 탭으로 돌아가기',
+      3 => '호가 가격과 수량 보기',
+      4 => '가장 가까운 매도호가 누르기',
+      _ => '1주 지정가 매수 연습 시작',
     },
-    poseAlignment: Alignment.topCenter,
+    teacherPoseAsset: switch (step) {
+      0 => _stockTeacherPoseEmphasize,
+      1 => _stockTeacherPoseExplain,
+      2 => _stockTeacherPoseBook,
+      3 => _stockTeacherPoseCompare,
+      4 => _stockTeacherPoseEmphasize,
+      _ => _stockTeacherPoseListen,
+    },
     onAction: onAction,
   );
 }
@@ -14194,7 +14261,7 @@ class _OrderTicketTutorialOverlay extends StatelessWidget {
     speakers: const ['한서윤 선생님', '나', '한서윤 선생님'],
     messages: limitPrice == null
         ? const [
-            '연습 화면에만 쓰는 가짜 돈 100만 원이에요. 실제 계좌의 돈은 움직이지 않아요.',
+            '연습 화면에만 쓰는 국가원금 10,000원이에요. 정식 국가계좌의 돈은 움직이지 않아요.',
             '한 주만 사고, 가격이 움직이면 다시 팔아 볼게요.',
             '좋아요. 주문 전에 가격·수량·수수료 세 가지만 직접 확인하세요.',
           ]
@@ -14204,7 +14271,9 @@ class _OrderTicketTutorialOverlay extends StatelessWidget {
             '잔량이 모자라면 일부만 체결돼요. 이제 가격·수량·수수료를 확인하고 주문해 봅시다.',
           ],
     actionLabel: '가격·수량·수수료 확인하기',
-    poseAlignment: Alignment.topCenter,
+    teacherPoseAsset: limitPrice == null
+        ? _stockTeacherPoseBook
+        : _stockTeacherPoseEmphasize,
     onAction: () => unawaited(onDone()),
   );
 }
@@ -14219,7 +14288,7 @@ class _StockTutorialGuideOverlay extends StatefulWidget {
     required this.speakers,
     required this.messages,
     required this.actionLabel,
-    required this.poseAlignment,
+    required this.teacherPoseAsset,
     required this.onAction,
   }) : assert(messages.length > 0),
        assert(speakers.length == messages.length);
@@ -14232,7 +14301,7 @@ class _StockTutorialGuideOverlay extends StatefulWidget {
   final List<String> speakers;
   final List<String> messages;
   final String actionLabel;
-  final Alignment poseAlignment;
+  final String teacherPoseAsset;
   final VoidCallback onAction;
   @override
   State<_StockTutorialGuideOverlay> createState() =>
@@ -14381,7 +14450,7 @@ class _StockTutorialGuideOverlayState
                 child: isStudentPage
                     ? _StockTutorialStudent(width: teacherWidth)
                     : _StockTutorialTeacher(
-                        poseAlignment: widget.poseAlignment,
+                        asset: widget.teacherPoseAsset,
                         width: teacherWidth,
                       ),
               ),
@@ -14438,28 +14507,20 @@ class _StockTutorialStudent extends StatelessWidget {
 }
 
 class _StockTutorialTeacher extends StatelessWidget {
-  const _StockTutorialTeacher({
-    required this.poseAlignment,
-    required this.width,
-  });
+  const _StockTutorialTeacher({required this.asset, required this.width});
 
-  final Alignment poseAlignment;
+  final String asset;
   final double width;
 
   @override
   Widget build(BuildContext context) {
     final height = width * 1.42;
-    final poseAsset = poseAlignment.x < -0.5
-        ? 'assets/images/주식선생님/23_포즈2_주인공그림체_공통슬롯_투명.png'
-        : poseAlignment.x > 0.5
-        ? 'assets/images/주식선생님/24_포즈3_주인공그림체_공통슬롯_투명.png'
-        : 'assets/images/주식선생님/22_포즈1_주인공그림체_공통슬롯_투명.png';
     return SizedBox(
       key: const Key('market-tutorial-teacher'),
       width: width,
       height: height,
       child: Image.asset(
-        poseAsset,
+        asset,
         key: const Key('market-tutorial-teacher-upper-body'),
         fit: BoxFit.contain,
         alignment: Alignment.bottomCenter,
