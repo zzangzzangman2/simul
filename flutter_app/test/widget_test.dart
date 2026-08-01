@@ -1714,6 +1714,18 @@ void main() {
         find.byKey(const Key('market-tutorial-teacher-upper-body')),
         findsOneWidget,
       );
+      expect(
+        (tester
+                    .widget<Image>(
+                      find.byKey(
+                        const Key('market-tutorial-teacher-upper-body'),
+                      ),
+                    )
+                    .image
+                as AssetImage)
+            .assetName,
+        'assets/images/주식선생님/22_포즈1_주인공그림체_공통슬롯_투명.png',
+      );
       final tutorialTeacherRect = tester.getRect(
         find.byKey(const Key('market-tutorial-teacher')),
       );
@@ -1732,7 +1744,7 @@ void main() {
 
       expect(find.text('1 / 2').hitTestable(), findsOneWidget);
       expect(
-        find.text('마지막은 실제 화면에서 해 볼게요. 연습 계좌라 잘못 눌러도 진짜 돈은 움직이지 않아요.'),
+        find.text('홈에는 시장 지수·뉴스·거래대금 순위가 모여 있어요. 아래에는 홈·주식·내 투자 세 메뉴가 있고요.'),
         findsOneWidget,
       );
       await tester.tap(find.byKey(const Key('market-tutorial-next')));
@@ -1756,7 +1768,10 @@ void main() {
         targetKey: const Key('market-tutorial-target'),
       );
       expect(find.byKey(const Key('market-tutorial-target')), findsOneWidget);
-      expect(find.text('가격만 보지 말랬죠. 한빛통신부터 열어 볼게요.'), findsOneWidget);
+      expect(
+        find.text('가격만 보지 말랬죠. 한빛통신을 열어서 호가·주문·차트·정보를 차례로 볼게요.'),
+        findsOneWidget,
+      );
       expect(
         find.byKey(const Key('market-tutorial-target')).hitTestable(),
         findsOneWidget,
@@ -1787,6 +1802,19 @@ void main() {
         find.byKey(const Key('market-detail-tutorial-next')),
         findsOneWidget,
       );
+      expect(find.byKey(const Key('stock-detail-tab-chart')), findsOneWidget);
+      expect(
+        (tester
+                    .widget<Image>(
+                      find.byKey(
+                        const Key('market-tutorial-teacher-upper-body'),
+                      ),
+                    )
+                    .image
+                as AssetImage)
+            .assetName,
+        'assets/images/주식선생님/23_포즈2_주인공그림체_공통슬롯_투명.png',
+      );
 
       await advanceTutorialPagesToTarget(
         tester,
@@ -1798,7 +1826,39 @@ void main() {
         findsOneWidget,
       );
 
-      expect(find.textContaining('가장 가까운 파란 줄의 가격과 남은 수량'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('market-detail-tutorial-target')));
+      await tester.pump(const Duration(milliseconds: 600));
+      expect(find.byKey(const Key('stock-detail-tab-info')), findsOneWidget);
+      expect(find.byKey(const Key('open-market-research-note')), findsOneWidget);
+      expect(
+        (tester
+                    .widget<Image>(
+                      find.byKey(
+                        const Key('market-tutorial-teacher-upper-body'),
+                      ),
+                    )
+                    .image
+                as AssetImage)
+            .assetName,
+        'assets/images/주식선생님/25_포즈4_주인공그림체_공통슬롯_투명.png',
+      );
+      expect(find.textContaining('투자노트도 여기서 씁니다'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('market-detail-tutorial-next')));
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('market-detail-tutorial-next')));
+      await tester.pump(const Duration(milliseconds: 600));
+
+      await advanceTutorialPagesToTarget(
+        tester,
+        actionKey: const Key('market-detail-tutorial-next'),
+        targetKey: const Key('market-detail-tutorial-target'),
+      );
+      expect(
+        find.byKey(const Key('market-detail-tutorial-target')),
+        findsOneWidget,
+      );
+
+      expect(find.textContaining('VI·거래정지·동시호가 표시'), findsOneWidget);
       await tester.tap(find.byKey(const Key('market-detail-tutorial-target')));
       await tester.pump(const Duration(milliseconds: 600));
       expect(
@@ -1822,9 +1882,31 @@ void main() {
         targetKey: const Key('market-detail-tutorial-target'),
       );
       await tester.tap(find.byKey(const Key('market-detail-tutorial-target')));
-      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 600));
+      expect(find.byKey(const Key('stock-detail-tab-order')), findsOneWidget);
+      expect(find.byKey(const Key('inline-order-workspace')), findsOneWidget);
+      expect(find.byKey(const Key('inline-amend-cancel-tab')), findsOneWidget);
+      expect(find.byKey(const Key('inline-open-orders-tab')), findsOneWidget);
+      expect(find.byKey(const Key('inline-balance-tab')), findsOneWidget);
+      expect(find.textContaining('정정/취소, 미체결, 잔고'), findsOneWidget);
+      expect(
+        (tester
+                    .widget<Image>(
+                      find.byKey(
+                        const Key('market-tutorial-teacher-upper-body'),
+                      ),
+                    )
+                    .image
+                as AssetImage)
+            .assetName,
+        'assets/images/주식선생님/26_포즈5_주인공그림체_공통슬롯_투명.png',
+      );
+      await advanceTutorialPagesUntilDismissed(
+        tester,
+        actionKey: const Key('market-detail-tutorial-next'),
+        overlayKey: const Key('market-detail-tutorial-overlay'),
+      );
       await tester.pump(const Duration(milliseconds: 700));
-      await tester.pump();
       expect(
         find.byKey(const Key('market-order-tutorial-overlay')),
         findsOneWidget,
@@ -1834,6 +1916,7 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('1 / 3'), findsOneWidget);
+      expect(find.textContaining('국가원금 10,000원'), findsOneWidget);
 
       await advanceTutorialPagesUntilDismissed(
         tester,

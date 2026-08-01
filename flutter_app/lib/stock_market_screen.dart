@@ -10551,6 +10551,46 @@ class _PracticalTradeTutorialSheetState
                   ),
                   const SizedBox(height: 14),
                   Container(
+                    key: const Key('tutorial-stock-feature-map'),
+                    padding: const EdgeInsets.all(15),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF2F6FF),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: const Color(0xFFB8C9EA)),
+                    ),
+                    child: const Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          '주식 앱 기능 지도',
+                          style: TextStyle(
+                            color: Color(0xFF315FAD),
+                            fontSize: 15,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        SizedBox(height: 10),
+                        _TutorialFeatureRow(
+                          label: '홈',
+                          detail: '시장 지수 · 뉴스 · 종목 순위',
+                        ),
+                        _TutorialFeatureRow(
+                          label: '주식',
+                          detail: '검색 · 시장 분류 · 신규/관심 종목',
+                        ),
+                        _TutorialFeatureRow(
+                          label: '종목',
+                          detail: '호가 · 주문 · 차트 · 회사 정보/투자노트',
+                        ),
+                        _TutorialFeatureRow(
+                          label: '내 투자',
+                          detail: '예수금 · 보유 · 미체결 · 매매일지 · 기업행동',
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Container(
                     padding: const EdgeInsets.all(15),
                     decoration: BoxDecoration(
                       color: const Color(0xFFFFF7DF),
@@ -10738,6 +10778,43 @@ class _TutorialDialogueCard extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _TutorialFeatureRow extends StatelessWidget {
+  const _TutorialFeatureRow({required this.label, required this.detail});
+
+  final String label;
+  final String detail;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 4),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 54,
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xFF315FAD),
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            detail,
+            style: const TextStyle(
+              color: _marketInk,
+              height: 1.4,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ),
       ],
