@@ -57,15 +57,26 @@ void main() {
       'assets/dialogue/dialogue-editor-override.json',
     ).readAsStringSync();
     final decoded = jsonDecode(raw) as Map<String, dynamic>;
-    expect(decoded['appearanceVersion'], 11);
+    expect(decoded['appearanceVersion'], 13);
 
     final scenes = (decoded['scenes'] as List<dynamic>)
         .cast<Map<String, dynamic>>()
         .where((scene) => scene['speaker'] == '윤채아')
         .toList();
-    expect(scenes.map((scene) => scene['order']), <int>[73, 87]);
+    expect(scenes.map((scene) => scene['order']), <int>[
+      81,
+      82,
+      84,
+      116,
+      118,
+      122,
+    ]);
     expect(scenes.map((scene) => scene['character']), <String>[
+      '/play/assets/assets/images/production_soft_painted/yoon_chaea/01_neutral_tie_v1.png',
+      '/play/assets/assets/images/production_soft_painted/yoon_chaea/04_shy_blush_v1.png',
+      '/play/assets/assets/images/production_soft_painted/yoon_chaea/07_sulky_pout_v1.png',
       '/play/assets/assets/images/production_soft_painted/yoon_chaea/09_explaining_v1.png',
+      '/play/assets/assets/images/production_soft_painted/yoon_chaea/08_determined_v1.png',
       '/play/assets/assets/images/production_soft_painted/yoon_chaea/06_worried_v1.png',
     ]);
   });

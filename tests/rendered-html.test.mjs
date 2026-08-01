@@ -64,7 +64,7 @@ test("opens the Flutter future-development orphanage prologue from the default r
   assert.match(onboarding, /bg_policy_room_night_v1\.png/);
   assert.match(onboarding, /bg_stock_academy_2000_portrait_cartoon_v4\.png/);
   assert.match(onboarding, /앞으로 주식 수업은 각자 자기 컴퓨터로 화면을 직접 보면서 배울 거예요/);
-  assert.match(onboarding, /production_soft_painted\/han_sua\/03_bright_laugh_v1\.png/);
+  assert.match(onboarding, /production_soft_painted\/han_sua\/03_bright_laugh_quality_v2\.png/);
   assert.match(onboarding, /cinematic_soft_painted\/policy_1981\/jeon_dugwang\/05_pressure_v1\.png/);
   assert.match(onboarding, /cinematic_soft_painted\/policy_1981\/baek_gihyeon\/03_warning_v2\.png/);
   assert.match(onboarding, /cinematic_soft_painted\/policy_1981\/kang_incheol\/02_explain_v2\.png/);
@@ -472,7 +472,7 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
   assert.doesNotMatch(editor, /이 장면을 저장하시겠습니까/);
   assert.doesNotMatch(editor, /저장하고 이동/);
   assert.match(editor, /새 장면 .*개 자동 추가/);
-  assert.equal((data.match(/"id": "scene-/g) ?? []).length, 102);
+  assert.equal((data.match(/"id": "scene-/g) ?? []).length, 140);
   for (const student of [
     "김서아",
     "이지안",
@@ -499,15 +499,15 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
   ]) {
     assert.match(mbtiGuide, new RegExp(`${student}.*${type}`));
   }
-  assert.match(data, /열어 보기 전엔 고장이라고 못 해/);
-  assert.match(data, /아직 말 안 한 사람, 더 필요한 규칙 있어/);
-  assert.match(data, /우리 첫 약속으로 남기자/);
-  assert.match(data, /어제 가격일 수도 있으니까/);
+  assert.match(data, /이거 소리 이상한 거 아까부터 나만 들었어/);
+  assert.match(data, /불편한 거 있는 사람/);
+  assert.match(data, /언제 다시 정할지/);
+  assert.match(data, /콘센트가 여기밖에 없었어/);
   assert.match(data, /침상/);
   assert.match(data, /사물함/);
-  assert.match(data, /사물함과 침상은 허락받기/);
+  assert.match(data, /침상과 사물함은 허락 없이 건드리지 않습니다/);
   assert.match(data, /제5기 (?:배지|명찰)/);
-  assert.match(data, /단팥빵 하나와 500원/);
+  assert.match(data, /단팥빵 얘기 들은 다음부터 계속 배고파/);
   assert.match(data, /설명서 학준아, 별명 붙이면 안 된다는 규정도 있어/);
   assert.doesNotMatch(data, /안내문에 별명 금지도 있어, 설명서 학준아/);
   assert.equal(data.includes("\\\\n"), false);
@@ -515,7 +515,7 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
   assert.match(data, /character_hakjun_orientation_v2\.png/);
   assert.match(generator, /_onboardingBeatCount/);
   assert.match(generator, /teacherPoseForBeat/);
-  assert.match(generator, /appearanceVersion !== 11/);
+  assert.match(generator, /appearanceVersion !== 13/);
   assert.match(generator, /Dialogue editor synced/);
   const protagonistCatalog = catalog.slice(
     catalog.indexOf("const protagonistPoses"),
@@ -532,7 +532,7 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
   assert.match(packageJson, /prebuild:flutter-web/);
   assert.match(packageJson, /dialogue:sync/);
   assert.match(buildRoute, /dialogue-editor-override\.json/);
-  assert.match(buildRoute, /appearanceVersion: 11/);
+  assert.match(buildRoute, /appearanceVersion: 13/);
   assert.match(catalog, /production_soft_painted\/park_haeun/);
   assert.match(catalog, /production_soft_painted\/yoon_chaea/);
   assert.match(catalog, /production_soft_painted\/han_sua/);
@@ -546,19 +546,19 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
   assert.match(catalog, /speaker: "최이서"[\s\S]*?poses: choiIseoPoses/);
   assert.match(catalog, /speaker: "오지우"[\s\S]*?poses: ohJiwooPoses/);
   assert.match(catalog, /09_explaining_v1\.png/);
-  assert.match(data, /scene-dorm-intro-haeun[\s\S]*?park_haeun\/02_warm_smile_v1\.png/);
-  assert.match(data, /scene-dorm-boundary-proposal[\s\S]*?park_haeun\/09_explaining_v1\.png/);
-  assert.match(data, /scene-dorm-intro-chaea[\s\S]*?yoon_chaea\/09_explaining_v1\.png/);
-  assert.match(data, /scene-dorm-awkward-question[\s\S]*?yoon_chaea\/06_worried_v1\.png/);
-  assert.match(data, /scene-dorm-intro-seoa[\s\S]*?kim_seoa\/09_explaining_ledger_v1\.png/);
-  assert.match(data, /scene-dorm-intro-jian[\s\S]*?lee_jian\/09_explaining_mechanism_v1\.png/);
-  assert.match(data, /scene-dorm-intro-iseo[\s\S]*?choi_iseo\/01_base_thread_v1\.png/);
-  assert.match(data, /scene-dorm-intro-jiwoo[\s\S]*?oh_jiwoo\/09_explaining_report_v1\.png/);
-  assert.match(data, /scene-dorm-intro-sua[\s\S]*?han_sua\/08_explaining_v1\.png/);
+  assert.match(data, /scene-78[\s\S]*?park_haeun\/09_explaining_v1\.png/);
+  assert.match(data, /scene-110[\s\S]*?park_haeun\/08_determined_v1\.png/);
+  assert.match(data, /scene-82[\s\S]*?yoon_chaea\/04_shy_blush_v1\.png/);
+  assert.match(data, /scene-122[\s\S]*?yoon_chaea\/06_worried_v1\.png/);
+  assert.match(data, /scene-70[\s\S]*?kim_seoa\/01_neutral_notebook_v1\.png/);
+  assert.match(data, /scene-72[\s\S]*?lee_jian\/01_neutral_screwdriver_v2\.png/);
+  assert.match(data, /scene-73[\s\S]*?choi_iseo\/01_base_thread_v1\.png/);
+  assert.match(data, /scene-85[\s\S]*?oh_jiwoo\/05_surprised_correction_v1\.png/);
+  assert.match(data, /scene-86[\s\S]*?han_sua\/08_explaining_quality_v2\.png/);
   assert.match(buildRoute, /dialogueTextValue/);
   assert.match(buildRoute, /scripts\/build-flutter-web\.mjs/);
   assert.match(onboarding, /_dialogueBundleAsset/);
-  assert.match(onboarding, /_dialogueAppearanceVersion = 11/);
+  assert.match(onboarding, /_dialogueAppearanceVersion = 13/);
   assert.match(onboarding, /_mergeCurrentAppearance/);
   assert.match(onboarding, /rootBundle\.loadString/);
   assert.match(onboarding, /character: asset\('character'\)/);

@@ -57,14 +57,14 @@ const teacherPoses = [
 );
 
 const suaPoses = [
-  ["01", "차분한 기본", "01_neutral_v1.png"],
-  ["02", "따뜻한 미소", "02_warm_smile_v1.png"],
-  ["03", "활짝 웃음", "03_bright_laugh_v1.png"],
-  ["04", "깜짝 놀람", "04_surprised_v1.png"],
-  ["05", "걱정", "05_worried_v1.png"],
-  ["06", "불만", "06_annoyed_v1.png"],
-  ["07", "단호한 결심", "07_determined_v1.png"],
-  ["08", "활기찬 설명", "08_explaining_v1.png"],
+  ["01", "차분한 기본", "01_neutral_quality_v2.png"],
+  ["02", "따뜻한 미소 · 선명도 개선", "02_warm_smile_quality_v2.png"],
+  ["03", "활짝 웃음", "03_bright_laugh_quality_v2.png"],
+  ["04", "깜짝 놀람", "04_surprised_quality_v2.png"],
+  ["05", "걱정", "05_worried_quality_v2.png"],
+  ["06", "불만", "06_annoyed_quality_v2.png"],
+  ["07", "단호한 결심", "07_determined_quality_v2.png"],
+  ["08", "활기찬 설명", "08_explaining_quality_v2.png"],
 ].map(([id, label, file]) =>
   pose(id, label, `assets/images/production_soft_painted/han_sua/${file}`),
 );
@@ -84,15 +84,15 @@ const kimSeoaPoses = [
 );
 
 const leeJianPoses = [
-  ["01", "드라이버 든 기본", "01_neutral_screwdriver_v1.png"],
-  ["02", "수리 완료 미소", "02_soft_smile_fixed_v1.png"],
-  ["03", "수리 집중", "03_focused_repair_v1.png"],
-  ["04", "고장 발견 놀람", "04_surprised_fault_v1.png"],
-  ["05", "진단 걱정", "05_worried_diagnosis_v1.png"],
-  ["06", "방해받은 불만", "06_annoyed_interrupted_v1.png"],
-  ["07", "책임지는 사과", "07_apologetic_boundary_v1.png"],
-  ["08", "수리 결심", "08_determined_repair_v1.png"],
-  ["09", "작동 원리 설명", "09_explaining_mechanism_v1.png"],
+  ["01", "드라이버 든 기본", "01_neutral_screwdriver_v2.png"],
+  ["02", "장난스러운 윙크", "02_playful_wink_v2.png"],
+  ["03", "수리 집중", "03_focused_repair_v2.png"],
+  ["04", "고장 발견 놀람", "04_surprised_fault_v2.png"],
+  ["05", "진단 걱정", "05_worried_diagnosis_v2.png"],
+  ["06", "방해받은 불만", "06_annoyed_interrupted_v2.png"],
+  ["07", "책임지는 사과", "07_apologetic_boundary_v2.png"],
+  ["08", "수리 결심", "08_determined_repair_v2.png"],
+  ["09", "작동 원리 설명", "09_explaining_mechanism_v2.png"],
 ].map(([id, label, file]) =>
   pose(id, label, `assets/images/production_soft_painted/lee_jian/${file}`),
 );

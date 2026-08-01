@@ -151,7 +151,7 @@ if (fs.existsSync(overridePath)) {
     const originalOverride = fs.readFileSync(overridePath, "utf8");
     const override = JSON.parse(originalOverride);
     if (Array.isArray(override.scenes) && override.scenes.length > 0) {
-      const upgradeAppearance = override.appearanceVersion !== 11;
+      const upgradeAppearance = override.appearanceVersion !== 13;
       const defaultById = new Map(scenes.map((scene) => [scene.id, scene]));
       override.scenes = override.scenes
         .map((scene) => ({
@@ -166,7 +166,7 @@ if (fs.existsSync(overridePath)) {
             : scene.character ?? "",
         }))
         .sort((left, right) => left.order - right.order);
-      override.appearanceVersion = 11;
+      override.appearanceVersion = 13;
       const normalizedOverride = `${JSON.stringify(override, null, 2)}\n`;
       if (normalizedOverride !== originalOverride) {
         fs.writeFileSync(overridePath, normalizedOverride, "utf8");

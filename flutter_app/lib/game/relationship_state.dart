@@ -187,7 +187,7 @@ const cohortGirlProfiles = <CohortGirlProfile>[
     role: '직접 시험해 원인을 찾는 수리 담당',
     accentValue: 0xFF77BCE8,
     portraitAsset:
-        'assets/images/production_soft_painted/lee_jian/01_neutral_screwdriver_v1.png',
+        'assets/images/production_soft_painted/lee_jian/01_neutral_screwdriver_v2.png',
     conversationScenes: <RelationshipSceneDefinition>[
       RelationshipSceneDefinition(
         id: 'jian_radio',
@@ -555,7 +555,7 @@ const cohortGirlProfiles = <CohortGirlProfile>[
     role: '사람 반응에서 가능성을 읽는 분위기 촉진자',
     accentValue: 0xFFE84F69,
     portraitAsset:
-        'assets/images/production_soft_painted/han_sua/01_neutral_v1.png',
+        'assets/images/production_soft_painted/han_sua/01_neutral_quality_v2.png',
     conversationScenes: <RelationshipSceneDefinition>[
       RelationshipSceneDefinition(
         id: 'sua_rumor',

@@ -6,6 +6,7 @@ enum _PracticalTradeTutorialPhase {
   priceMove,
   sell,
   summary,
+  recovery,
   review,
   dismissal,
 }
@@ -49,6 +50,7 @@ class _PracticalTradeTutorialSheetState
   List<double> _priceMovePath = const <double>[];
   int _priceMoveStep = 0;
   int _reviewBeat = 0;
+  int _recoveryBeat = 0;
   bool _insufficientBalanceTried = false;
   bool _partialFillTried = false;
   String? _reviewChoice;
@@ -223,6 +225,27 @@ class _PracticalTradeTutorialSheetState
     setState(() => _phase = _PracticalTradeTutorialPhase.summary);
   }
 
+  /// 확정손익에서 국가 환수 20%를 처음 떼는 장면. 제6기 리부트 저장에서만
+  /// 열리며, 정산 카드와 선택형 복기 사이에 들어간다.
+  void _showRecovery() {
+    if (!widget.sourceState.story.orphanageReboot) {
+      _showReview();
+      return;
+    }
+    setState(() {
+      _phase = _PracticalTradeTutorialPhase.recovery;
+      _recoveryBeat = 0;
+    });
+  }
+
+  void _advanceRecovery() {
+    if (_recoveryBeat >= _recoveryBeatCount - 1) {
+      _showReview();
+      return;
+    }
+    setState(() => _recoveryBeat += 1);
+  }
+
   void _showReview() {
     setState(() {
       _phase = _PracticalTradeTutorialPhase.review;
@@ -350,7 +373,7 @@ class _PracticalTradeTutorialSheetState
                   const _TutorialDialogueCard(
                     speaker: '김학준',
                     message:
-                        '오케이. 잔액 부족은 통째로 거절, 부분체결은 체결·미체결로 갈림. 이제 주문표 봐도 뇌정지 안 올 듯.',
+                        '돈이 없으면 아예 안 받고, 물건이 모자라면 있는 만큼만 사지는 거네. …두 개가 다른 거였구나.',
                     teacher: false,
                     characterAsset: _stockTutorialHakjunAsset,
                   ),
@@ -847,7 +870,7 @@ class _PracticalTradeTutorialSheetState
             width: double.infinity,
             child: FilledButton(
               key: const Key('tutorial-summary-continue'),
-              onPressed: _showReview,
+              onPressed: _showRecovery,
               style: FilledButton.styleFrom(
                 minimumSize: const Size.fromHeight(54),
                 backgroundColor: _marketAccent,
@@ -865,6 +888,219 @@ class _PracticalTradeTutorialSheetState
       ),
     ),
   );
+
+  /// 확정손익에서 국가가 20%를 떼는 순간의 대사. 여덟 명이 같은 숫자를 보고
+  /// 각자 다른 것을 발견한다. 선생님은 제도를 변호하지 않는다.
+  List<_RecoveryBeat> get _recoveryBeats {
+    final gained = _realizedPnl > 0;
+    final pnl = _money(_realizedPnl.abs());
+    final recovered = _money(_practiceState.story.stateRecoveryTotal);
+    final reserved = _money(_practiceState.story.selfRelianceReserve);
+    if (!gained) {
+      return <_RecoveryBeat>[
+        _RecoveryBeat('한서윤 선생님', _stockTeacherPoseListen, '이번엔 $pnl원 잃었어요. 그러면 숫자 하나만 확인할게요.'),
+        _RecoveryBeat('정아린', _stockTutorialArinAsset, '잃었으니까 국가가 떼 가는 것도 없는 거죠?'),
+        _RecoveryBeat('한서윤 선생님', _stockTeacherPoseCompare, '없어요. 환수는 벌었을 때만 해요.'),
+        _RecoveryBeat('이지안', _stockTutorialJianFocusAsset, '그럼 잃으면 국가도 20% 물어 줘요?'),
+        _RecoveryBeat('한서윤 선생님', _stockTeacherPoseCompare, '안 물어 줘요.'),
+        _RecoveryBeat('이지안', _stockTutorialJianAsset, '…그건 공평한 거예요?'),
+        _RecoveryBeat('한서윤 선생님', _stockTeacherPoseListen, '아니요.'),
+        _RecoveryBeat('최이서', _stockTutorialIseoAsset, '…선생님이 아니라고 하니까 더 이상해요.'),
+        _RecoveryBeat('김서아', _stockTutorialSeoaRecordAsset, '적어 둘게. 1월 3일, $pnl원 잃음. 환수 없음. 이유는 내가 쓴 노트에.'),
+        _RecoveryBeat('오지우', _stockTutorialJiwooCorrectAsset, '속보입니다. 제6기 첫 거래, 손실 $pnl원. …이건 방송 안 할게요.'),
+      ];
+    }
+    return <_RecoveryBeat>[
+      _RecoveryBeat('한서윤 선생님', _stockTeacherPoseListen, '$pnl원 벌었어요. 그럼 이제 숫자 하나만 더 볼게요.'),
+      _RecoveryBeat('정아린', _stockTutorialArinAsset, '$pnl원에서 $recovered원 떼면 $reserved원이요. 근데 그 $reserved원 지금 쓸 수 있어요?'),
+      _RecoveryBeat('한서윤 선생님', _stockTeacherPoseCompare, '못 써요. 열아홉 살에요.'),
+      _RecoveryBeat('정아린', _stockTutorialArinWorriedAsset, '…오 년이요?'),
+      _RecoveryBeat('한서윤 선생님', _stockTeacherPoseCompare, '오 년이요.'),
+      _RecoveryBeat('김학준', _stockTutorialHakjunAsset, '선생님, 이거 안내문 몇 쪽에 있어요?'),
+      _RecoveryBeat('한서윤 선생님', _stockTeacherPoseBook, '안내문엔 없어요. 특별법에 있어요.'),
+      _RecoveryBeat('김학준', _stockTutorialHakjunAsset, '…그건 제가 못 봤는데요.'),
+      _RecoveryBeat('한서윤 선생님', _stockTeacherPoseListen, '아직 아무도 안 보여 줬으니까요.'),
+      _RecoveryBeat('윤채아', _stockTutorialChaeaAsset, '왜 20%예요? 누가 정했어요?'),
+      _RecoveryBeat('한서윤 선생님', _stockTeacherPoseCompare, '1981년에 어른 여섯 명이요.'),
+      _RecoveryBeat('윤채아', _stockTutorialChaeaNeutralAsset, '…그 사람들 지금도 있어요?'),
+      _RecoveryBeat('한서윤 선생님', _stockTeacherPoseListen, '그건 오늘 대답 안 할게요.'),
+      _RecoveryBeat('이지안', _stockTutorialJianFocusAsset, '선생님. 그럼 잃으면요? 국가도 20% 물어 줘요?'),
+      _RecoveryBeat('한서윤 선생님', _stockTeacherPoseCompare, '안 물어 줘요.'),
+      _RecoveryBeat('이지안', _stockTutorialJianAsset, '그럼 벌 때만 나눠 가지는 거예요? …그건 공평한 거예요?'),
+      _RecoveryBeat('한서윤 선생님', _stockTeacherPoseListen, '아니요.'),
+      _RecoveryBeat('최이서', _stockTutorialIseoAsset, '…내가 벌었는데 내 돈이 아닌 거네요.'),
+      _RecoveryBeat('김서아', _stockTutorialSeoaRecordAsset, '적어 둘게. 1월 3일, $pnl원 벌었다. $recovered원 갔다. $reserved원은 오 년 뒤.'),
+      _RecoveryBeat('오지우', _stockTutorialJiwooCorrectAsset, '속보입니다. 제6기 첫 수익 $pnl원. 국가가 $recovered원 가져갔습니다. …이거 웃겨야 하는데 안 웃기네요.'),
+    ];
+  }
+
+  int get _recoveryBeatCount => _recoveryBeats.length;
+
+  Widget _recoveryView() {
+    final beats = _recoveryBeats;
+    final index = _recoveryBeat.clamp(0, beats.length - 1);
+    final beat = beats[index];
+    final isTeacherBeat = beat.speaker == '한서윤 선생님';
+    final isLast = index >= beats.length - 1;
+    return Stack(
+      key: const Key('tutorial-state-recovery'),
+      fit: StackFit.expand,
+      children: [
+        Image.asset(
+          'assets/images/historical_prologue/bg_orphanage_investment_room_2000_portrait_cartoon_v1.png',
+          fit: BoxFit.cover,
+          alignment: Alignment.center,
+          filterQuality: FilterQuality.high,
+        ),
+        const DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: <Color>[
+                Color(0xB3000000),
+                Color(0x12000000),
+                Color(0xD9000000),
+              ],
+              stops: <double>[0, 0.5, 1],
+            ),
+          ),
+        ),
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          child: SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xCC17233D),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: const Color(0x66FFFFFF)),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.account_balance_rounded,
+                          size: 17,
+                          color: Color(0xFFFFD36A),
+                        ),
+                        SizedBox(width: 6),
+                        Text(
+                          '확정손익과 국가 환수',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    '${index + 1} / ${beats.length}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        Positioned.fill(
+          top: -_storyCharacterBottomInset,
+          bottom: _storyCharacterBottomInset,
+          child: _OnboardingCharacterSlot(
+            key: ValueKey<String>('tutorial-recovery-slot-${beat.asset}'),
+            asset: beat.asset,
+            alignment: Alignment.bottomCenter,
+            characterKey: Key(
+              isTeacherBeat
+                  ? 'tutorial-recovery-teacher-character'
+                  : 'tutorial-recovery-peer-character',
+            ),
+          ),
+        ),
+        Positioned(
+          left: 12,
+          right: 12,
+          bottom: 10,
+          child: SafeArea(
+            top: false,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+              decoration: BoxDecoration(
+                color: const Color(0xF7FFFFFF),
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(
+                  color: isTeacherBeat
+                      ? const Color(0xFFF0A78E)
+                      : const Color(0xFF8CB1F2),
+                  width: 1.5,
+                ),
+                boxShadow: const <BoxShadow>[
+                  BoxShadow(
+                    color: Color(0x55000000),
+                    blurRadius: 18,
+                    offset: Offset(0, 7),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    beat.speaker,
+                    key: ValueKey<String>(
+                      'tutorial-recovery-speaker-${beat.speaker}',
+                    ),
+                    style: TextStyle(
+                      color: isTeacherBeat
+                          ? const Color(0xFFC35439)
+                          : const Color(0xFF315FAD),
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    beat.message,
+                    key: ValueKey<int>(index),
+                    style: const TextStyle(
+                      color: _marketInk,
+                      fontSize: 15,
+                      height: 1.45,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      key: const Key('tutorial-recovery-continue'),
+                      onPressed: _advanceRecovery,
+                      child: Text(isLast ? '첫 거래 복습으로' : '계속 듣기'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 
   Widget _reviewView() {
     final studentName = widget.sourceState.story.playerName.trim().isEmpty
@@ -891,7 +1127,7 @@ class _PracticalTradeTutorialSheetState
     final message = switch (_reviewBeat) {
       0 => '첫 거래를 다시 본다면 무엇을 가장 먼저 확인해야 할까요? 직접 골라 보세요.',
       1 => switch (_reviewChoice) {
-        'chase' => '솔직히 한 번 벌었는데, 다음엔 수량 키워도 되는 거 아님? 지금 좀 자신감 폼인데.',
+        'chase' => '한 번 벌었는데 다음엔 좀 더 크게 해도 되는 거 아니에요? 지금 될 것 같은 느낌인데.',
         'ledger' => '일단 투자노트부터 깔래요. 내가 매수 이유랑 매도 조건 말 바꿨는지 체크.',
         _ => '거래대금이랑 회전율 큰 종목만 타면 실패 확률 낮지 않아요?',
       },
@@ -902,9 +1138,9 @@ class _PracticalTradeTutorialSheetState
         _ => '거래대금과 회전율은 사람들이 활발히 손바꿈했다는 뜻이지, 회사가 이익을 냈거나 안전하다는 뜻이 아니에요.',
       },
       _ => switch (_reviewChoice) {
-        'chase' => '나도 수익 한 번이면 실력 인증인 줄. 결과만 보고 몰빵하면 개큰 사고겠네.',
-        'ledger' => '오, 수익 인증보다 노트 약속 지켰는지가 찐이네. 다음에도 핑계 못 바꾸겠다.',
-        _ => '아, 나 회전율 이름에 낚였네. 거래 활발함이랑 회사 실적은 다른 거. 오케이.',
+        'chase' => '나도 한 번 벌면 잘하는 줄 알았어. …운이었을 수도 있는 거네.',
+        'ledger' => '적어 놓은 걸 지켰는지 보는 거구나. 그럼 나중에 말 바꾸기 어렵겠다.',
+        _ => '아. 나 회전율이라는 이름한테 속았어. 많이 오간 거랑 잘 버는 건 다른 거였네.',
       },
     };
     return Stack(
@@ -1261,6 +1497,7 @@ class _PracticalTradeTutorialSheetState
         _PracticalTradeTutorialPhase.priceMove => _priceMoveView(),
         _PracticalTradeTutorialPhase.sell => _orderPractice(isBuy: false),
         _PracticalTradeTutorialPhase.summary => _summaryView(),
+        _PracticalTradeTutorialPhase.recovery => _recoveryView(),
         _PracticalTradeTutorialPhase.review => _reviewView(),
         _PracticalTradeTutorialPhase.dismissal => _dismissalView(),
       },
@@ -1555,4 +1792,14 @@ class _TutorialFeatureRow extends StatelessWidget {
       ],
     ),
   );
+}
+
+/// 확정손익·국가 환수 장면의 한 박자. 화자·전신 자산·대사를 함께 묶어
+/// 배열 길이가 어긋나는 실수를 구조적으로 막는다.
+class _RecoveryBeat {
+  const _RecoveryBeat(this.speaker, this.asset, this.message);
+
+  final String speaker;
+  final String asset;
+  final String message;
 }

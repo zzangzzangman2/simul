@@ -25,11 +25,50 @@ const _stockTeacherPoseListen = 'assets/images/주식선생님/26_포즈5_주인
 const _stockTeacherPoseEmphasize =
     'assets/images/주식선생님/27_포즈6_주인공그림체_공통슬롯_투명.png';
 const _stockTutorialSuaAsset =
-    'assets/images/production_soft_painted/han_sua/03_bright_laugh_v1.png';
+    'assets/images/production_soft_painted/han_sua/03_bright_laugh_quality_v2.png';
+const _stockTutorialSuaNeutralAsset =
+    'assets/images/production_soft_painted/han_sua/01_neutral_quality_v2.png';
+const _stockTutorialSuaSurprisedAsset =
+    'assets/images/production_soft_painted/han_sua/04_surprised_quality_v2.png';
+const _stockTutorialSuaAnnoyedAsset =
+    'assets/images/production_soft_painted/han_sua/06_annoyed_quality_v2.png';
 const _stockTutorialHakjunAsset =
     'assets/images/historical_prologue/character_hakjun_orientation_v2.png';
 const _stockTutorialPlayerAsset =
     'assets/images/protagonist_seed01/12_thinking.png';
+
+// 제6기 여학생 8명 튜토리얼 표정 슬롯. 승인된 9종 세트에서 수업 단계에 맞춰 고른다.
+const _stockTutorialSeoaAsset =
+    'assets/images/production_soft_painted/kim_seoa/09_explaining_ledger_v1.png';
+const _stockTutorialSeoaRecordAsset =
+    'assets/images/production_soft_painted/kim_seoa/08_determined_record_v1.png';
+const _stockTutorialJianAsset =
+    'assets/images/production_soft_painted/lee_jian/09_explaining_mechanism_v2.png';
+const _stockTutorialJianFocusAsset =
+    'assets/images/production_soft_painted/lee_jian/03_focused_repair_v2.png';
+const _stockTutorialIseoAsset =
+    'assets/images/production_soft_painted/choi_iseo/02_gentle_smile_v1.png';
+const _stockTutorialIseoBoundaryAsset =
+    'assets/images/production_soft_painted/choi_iseo/07_firm_boundary_v1.png';
+const _stockTutorialArinAsset =
+    'assets/images/production_soft_painted/jung_arin/09_counting_explain_v1.png';
+const _stockTutorialArinWorriedAsset =
+    'assets/images/production_soft_painted/jung_arin/06_schedule_worried_v1.png';
+const _stockTutorialHaeunAsset =
+    'assets/images/production_soft_painted/park_haeun/09_explaining_v1.png';
+const _stockTutorialHaeunWorriedAsset =
+    'assets/images/production_soft_painted/park_haeun/06_worried_v1.png';
+const _stockTutorialJiwooAsset =
+    'assets/images/production_soft_painted/oh_jiwoo/03_breaking_news_excited_v1.png';
+const _stockTutorialJiwooCorrectAsset =
+    'assets/images/production_soft_painted/oh_jiwoo/05_surprised_correction_v1.png';
+const _stockTutorialChaeaAsset =
+    'assets/images/production_soft_painted/yoon_chaea/09_explaining_v1.png';
+const _stockTutorialChaeaNeutralAsset =
+    'assets/images/production_soft_painted/yoon_chaea/01_neutral_tie_v1.png';
+
+/// 지문 전용 화자. 이 화자는 중앙 전신 슬롯을 비우고 대사창만 사용한다.
+const _stockTutorialNarrationSpeaker = '이야기';
 
 class OrderBookSweepIdentityLedger {
   OrderBookSweepIdentityLedger({required this.completedHistoryCapacity})
@@ -7188,36 +7227,167 @@ class _MarketTutorialOverlay extends StatelessWidget {
     targetKey: targetKey,
     messageId: 'market-$step',
     speakers: switch (step) {
-      0 => const ['한서윤 선생님', '수아', '김학준', '한서윤 선생님'],
-      1 => const ['한서윤 선생님', '수아', '김학준', '한서윤 선생님'],
-      _ => const ['한서윤 선생님', '수아', '김학준', '한서윤 선생님'],
+      0 => const [
+        '한서윤 선생님',
+        '정아린',
+        '한서윤 선생님',
+        '정아린',
+        '윤채아',
+        '한서윤 선생님',
+        '최이서',
+        '한서윤 선생님',
+        _stockTutorialNarrationSpeaker,
+        '한서윤 선생님',
+        '수아',
+        '한서윤 선생님',
+        '정아린',
+        '한서윤 선생님',
+        '김학준',
+        '오지우',
+        '한서윤 선생님',
+        '윤채아',
+        '한서윤 선생님',
+      ],
+      1 => const [
+        '한서윤 선생님',
+        '이지안',
+        '한서윤 선생님',
+        '이지안',
+        '수아',
+        '한서윤 선생님',
+        '수아',
+        '김학준',
+        '한서윤 선생님',
+        '최이서',
+        '한서윤 선생님',
+      ],
+      _ => const [
+        '한서윤 선생님',
+        _stockTutorialNarrationSpeaker,
+        '수아',
+        '정아린',
+        '수아',
+        '이지안',
+        '한서윤 선생님',
+        '김학준',
+        '윤채아',
+        '김학준',
+        '윤채아',
+        _stockTutorialNarrationSpeaker,
+        '김학준',
+        '한서윤 선생님',
+        '박하은',
+        '한서윤 선생님',
+      ],
     },
     messages: switch (step) {
       0 => const [
-        '홈에는 시장 지수·뉴스와 거래 순위가 모여 있어요. 거래대금은 오늘 주식을 사고판 돈의 합계, 회전율은 발행된 주식 가운데 오늘 손바뀜한 비율이에요.',
-        '와, 거래대금 1등이면 오늘 개큰 돈 번 회사 아님? 이름부터 센데.',
-        '잠깐. 회전율은 회사 돈이 빨리 도는 속도 같은데? 둘 다 높으면 그냥 좋은 거 아냐?',
-        '둘 다 그럴듯하게 틀렸어요. 거래가 활발했다는 뜻이지, 회사가 돈을 벌었거나 안전하다는 인증은 아니에요. 이제 주식 탭에서 직접 비교해 봅시다.',
+        '화면은 잠깐 두고, 여기 좀 볼게요. 이 교실이 회사라고 하죠.',
+        '교실이요?',
+        'PC 열 대, 의자 열 개, 칠판 하나, 창문 넷. 이 회사가 가진 게 이거 전부예요. 열 조각으로 나누면 한 조각에 뭐가 들어가요?',
+        'PC 한 대, 의자 한 개. …창문은 0.4개.',
+        '칠판은요? 하나인데 열로 안 나눠져요. 톱으로 자를 것도 아니고.',
+        '그래서 안 자릅니다. 열 명이 같이 가져요. 물건을 자르는 게 아니고, 물건에 대한 권리를 열로 나누는 거예요. 이게 주식이에요.',
+        '…그럼 종이가 교실이 된 거예요? 다들 안 정하면 그냥 종이예요?',
+        '네. 그냥 종이예요.',
+        '아무도 웃지 않았다. 이서도 웃지 않았다.',
+        '이게 홈이에요. 오늘 사람들이 많이 사고판 회사가 위에 있어요.',
+        '선생님, 이 「거래대금」이 뭐예요? 대금이면… 돈 받는 거요?',
+        '돈 받는 그 대금 맞아요. 오늘 이 회사 조각을 사고판 돈을 다 더한 거예요.',
+        '그럼 1등은 제일 많이 사고팔린 회사네요. 제일 돈 많이 번 회사가 아니고.',
+        '그거예요.',
+        '그럼 옆에 「회전율」은요? 회전이면 돌아가는 건데, 공장 돌아가는 속도요?',
+        '관람차 아니야?',
+        '아까 조각 열 개 있었죠. 오늘 그중 세 개가 주인이 바뀌면 30%. 그게 회전율이에요.',
+        '…이 표에는 회사가 돈을 벌었는지가 하나도 안 나와요.',
+        '네. 하나도 안 나와요. 그걸 알고 보는 게 오늘 첫 번째예요.',
       ],
       1 => const [
-        '주식 메뉴에서는 회사명·종목코드 검색, 시장별 보기, 신규·분사, 관심 종목과 정렬을 쓸 수 있어요.',
-        '신규 딱지 좀 느좋인데? 아직 덜 올랐을 테니까 오히려 안전한 거 아냐?',
-        '새로 나왔다고 안전 확정은 좀 억텐인데. 대신 사람 몰리면 빨리 오르긴 하려나?',
-        '수아는 새것을 안전으로, 학준은 사람 몰림을 상승으로 바로 연결했네요. 둘 다 보장은 없어요. 검색·분류 화면에서 같은 기준으로 확인해 봅시다.',
+        '회사를 찾는 방법이 네 가지예요. 이름, 번호, 시장별, 그리고 관심 목록.',
+        '번호요? 회사한테 번호가 있어요?',
+        '있어요. 이름은 바뀔 수 있는데 번호는 잘 안 바뀌어서요.',
+        '…아. 그럼 번호가 더 정확한 거네요.',
+        '선생님 이 「신규」 딱지 붙은 거요. 새 거니까 아직 안 오른 거죠? 그럼 지금 사면 싸게 사는 거 아니에요?',
+        '새로 나온 게 왜 싸다는 뜻이 돼요?',
+        '…어. 새 옷이 더 비싸긴 하네.',
+        '그리고 새 거면 지난 기록이 없잖아. 뭘 보고 판단해?',
+        '학준이 말이 오늘 핵심이에요. 새 회사는 싼 것도 비싼 것도 아니고, 아직 확인할 자료가 적은 회사예요.',
+        '…그럼 안 사면 되죠.',
+        '그것도 답이에요. 안 사는 것도 판단이니까 노트에 적으면 돼요.',
       ],
       _ => const [
-        '종목 한 줄에는 현재가·등락률·거래대금이 보여요. 별표를 켜면 관심 종목에도 모을 수 있습니다.',
-        '와, 빨간 숫자 폼 미쳤다. 오늘 이긴 회사면 그냥 타도 되는 거 아냐?',
-        '난 한 주 가격 싼 게 가성비 같은데. 제일 싼 거 고르면 안 돼?',
-        '둘 다 빨리 고르려고 숫자 하나만 잡았네요. 색은 오늘 움직임, 한 주 가격은 회사의 작은 조각 가격일 뿐이에요. 한빛통신을 열어 더 봅시다.',
+        '한 줄에 숫자가 세 개예요. 지금 값, 어제보다 얼마나 움직였는지, 그리고 오늘 오간 돈.',
+        '열 개의 화면에서 빨간 숫자와 파란 숫자가 섞여 깜빡였다. 교실이 빨갛다가 파래졌다.',
+        '빨간 게 오른 거예요? 파란 게 오른 건 줄 알았는데.',
+        '왜?',
+        '파란불이 가라는 거잖아.',
+        '말은 돼.',
+        '여기선 반대예요. 빨간 게 오른 것. 이건 이유가 없어요. 그냥 우리나라가 그렇게 정했어요. 외우는 수밖에 없어요.',
+        '선생님, 저는 이 조각 값이요. 제일 싼 걸 사면 제일 많이 살 수 있잖아요. 그게 유리한 거 아니에요?',
+        '…같은 값에 많이 사는 게 왜 유리해?',
+        '많으면 많이 오르니까.',
+        '한 조각이 백 원이면 백 조각 사도 만 원이야. 만 원짜리 한 조각이랑 같아.',
+        '학준이 화면을 다시 봤다. 계산하는 게 얼굴에 보였다. 입술이 조금 움직였다. 백 곱하기 백.',
+        '…아.',
+        '회사가 자기를 몇 조각으로 나눴는지에 따라 한 조각 값이 달라져요. 조각이 잘게 나뉘면 한 조각이 싼 거예요. 회사가 싼 게 아니고.',
+        '그럼 싼 거랑 작은 거는 다른 거네요.',
+        '네. 그 문장 그대로 적어 두세요. 말 바꾸지 말고.',
       ],
     },
-    characterAssets: const [
-      null,
-      _stockTutorialSuaAsset,
-      _stockTutorialHakjunAsset,
-      null,
-    ],
+    characterAssets: switch (step) {
+      0 => const [
+        null,
+        _stockTutorialArinAsset,
+        null,
+        _stockTutorialArinAsset,
+        _stockTutorialChaeaAsset,
+        null,
+        _stockTutorialIseoAsset,
+        null,
+        null,
+        null,
+        _stockTutorialSuaNeutralAsset,
+        null,
+        _stockTutorialArinAsset,
+        null,
+        _stockTutorialHakjunAsset,
+        _stockTutorialJiwooAsset,
+        null,
+        _stockTutorialChaeaAsset,
+        null,
+      ],
+      1 => const [
+        null,
+        _stockTutorialJianFocusAsset,
+        null,
+        _stockTutorialJianAsset,
+        _stockTutorialSuaNeutralAsset,
+        null,
+        _stockTutorialSuaSurprisedAsset,
+        _stockTutorialHakjunAsset,
+        null,
+        _stockTutorialIseoBoundaryAsset,
+        null,
+      ],
+      _ => const [
+        null,
+        null,
+        _stockTutorialSuaNeutralAsset,
+        _stockTutorialArinAsset,
+        _stockTutorialSuaAsset,
+        _stockTutorialJianAsset,
+        null,
+        _stockTutorialHakjunAsset,
+        _stockTutorialChaeaNeutralAsset,
+        _stockTutorialHakjunAsset,
+        _stockTutorialChaeaAsset,
+        null,
+        _stockTutorialHakjunAsset,
+        null,
+        _stockTutorialHaeunAsset,
+        null,
+      ],
+    },
     actionLabel: switch (step) {
       0 => '주식 탭 눌러 보기',
       1 => '검색·분류 화면 열기',
@@ -7251,57 +7421,347 @@ class _MarketDetailTutorialOverlay extends StatelessWidget {
     targetKey: targetKey,
     messageId: 'market-detail-$step',
     speakers: switch (step) {
-      0 => const ['한서윤 선생님', '수아', '김학준', '한서윤 선생님'],
-      1 => const ['한서윤 선생님', '수아', '김학준', '한서윤 선생님'],
-      2 => const ['한서윤 선생님', '수아', '김학준', '한서윤 선생님'],
-      3 => const ['한서윤 선생님', '수아', '김학준', '한서윤 선생님'],
-      4 => const ['한서윤 선생님', '수아', '김학준', '한서윤 선생님'],
-      _ => const ['한서윤 선생님', '수아', '김학준', '한서윤 선생님'],
+      0 => const [
+        '한서윤 선생님',
+        '한서윤 선생님',
+        '수아',
+        '한서윤 선생님',
+        '수아',
+        '한서윤 선생님',
+        _stockTutorialNarrationSpeaker,
+        '이지안',
+        '수아',
+        '이지안',
+        '한서윤 선생님',
+        '이지안',
+        _stockTutorialNarrationSpeaker,
+        '한서윤 선생님',
+        '오지우',
+        '이지안',
+      ],
+      1 => const [
+        _stockTutorialNarrationSpeaker,
+        '수아',
+        '한서윤 선생님',
+        '최이서',
+        _stockTutorialNarrationSpeaker,
+        '최이서',
+        '한서윤 선생님',
+        '최이서',
+        '정아린',
+        '한서윤 선생님',
+        '정아린',
+        '한서윤 선생님',
+        '정아린',
+        '한서윤 선생님',
+        '김학준',
+        '한서윤 선생님',
+      ],
+      2 => const [
+        '한서윤 선생님',
+        '수아',
+        '한서윤 선생님',
+        '김서아',
+        '한서윤 선생님',
+        '김서아',
+        _stockTutorialNarrationSpeaker,
+        '수아',
+        '한서윤 선생님',
+        '수아',
+        '한서윤 선생님',
+        '수아',
+        '윤채아',
+        '수아',
+        '윤채아',
+        '한서윤 선생님',
+      ],
+      3 => const [
+        '한서윤 선생님',
+        '수아',
+        '한서윤 선생님',
+        '수아',
+        '한서윤 선생님',
+        '이지안',
+        '한서윤 선생님',
+        '이지안',
+        '한서윤 선생님',
+        _stockTutorialNarrationSpeaker,
+        '수아',
+        '김학준',
+        '오지우',
+        '최이서',
+        '한서윤 선생님',
+        '박하은',
+        '한서윤 선생님',
+        '박하은',
+        '한서윤 선생님',
+        '정아린',
+        '한서윤 선생님',
+        '정아린',
+        '한서윤 선생님',
+        _stockTutorialNarrationSpeaker,
+      ],
+      4 => const [
+        '한서윤 선생님',
+        '한서윤 선생님',
+        '김학준',
+        '한서윤 선생님',
+        _stockTutorialNarrationSpeaker,
+        '김학준',
+        '한서윤 선생님',
+        '수아',
+        '한서윤 선생님',
+        '이지안',
+        '한서윤 선생님',
+        '이지안',
+        '한서윤 선생님',
+        '윤채아',
+        '한서윤 선생님',
+        '윤채아',
+        '한서윤 선생님',
+        '최이서',
+        '한서윤 선생님',
+        _stockTutorialNarrationSpeaker,
+      ],
+      _ => const [
+        '한서윤 선생님',
+        '김학준',
+        '한서윤 선생님',
+        '한서윤 선생님',
+        '오지우',
+        '정아린',
+        '오지우',
+        '한서윤 선생님',
+      ],
     },
     messages: switch (step) {
       0 => const [
-        '큰 숫자는 지금 한 주 가격, 그 아래는 어제 종가와 비교한 등락률이에요.',
-        '빨간색 떴네. 이거 오늘 이긴 종목 인증 아님? 지금 타도 안 떨어질 것 같은데.',
-        '그건 행복회로지. 이미 오른 뒤라 우리가 비싸게 사는 걸 수도 있잖아.',
-        '학준의 반박이 맞아요. 빨간색은 오늘 올랐다는 기록이지 다음 가격 보증서가 아니에요. 왜 움직였는지 보며 현재가 영역을 눌러 봅시다.',
+        '한빛통신이에요. 제일 큰 숫자가 지금 조각 하나 값.',
+        '그 아래 작은 숫자는, 어제 장이 끝났을 때랑 비교해서 얼마나 움직였는지예요.',
+        '빨간색이니까 오른 거죠? 그럼 지금 사면 계속 오르는 거 아니에요?',
+        '왜 계속 올라요?',
+        '…아까 올랐으니까요.',
+        '그게 이유가 되나요?',
+        '수아가 입을 다물었다. 대답 대신 옆자리를 봤다.',
+        '안 되지.',
+        '야. 너무 빨리 말했어.',
+        '미안.',
+        '지안이는 왜 안 된다고 생각했어요?',
+        '…어제 라디오 잘 나왔다고 오늘도 잘 나오는 건 아니잖아요. 왜 잘 나왔는지를 알아야 오늘도 될지 아는 거고요.',
+        '교실이 잠깐 조용해졌다.',
+        '그 말 그대로 적어 두세요. 오늘 배운 것 중에 제일 중요해요.',
+        '속보입니다. 이지안 선수, 라디오로 주식을 설명했습니다.',
+        '…시끄러워.',
       ],
       1 => const [
-        '차트 탭은 분봉·일봉·주봉·월봉·연봉을 바꿔 가격의 시간축을 비교하는 곳이에요.',
-        '마지막 봉 쭉 올랐네. 도파민 뭐야. 지금 매수 누르면 되는 각?',
-        '봉 하나로 미래 확정은 좀 뇌절 아냐? 근데 긴 차트가 계속 올랐으면 그건 믿어도 되지?',
-        '수아는 한 봉, 학준은 긴 상승을 미래 약속으로 바꿨어요. 차트는 지나온 길일 뿐이에요. 기간을 비교한 뒤 회사가 돈 버는 구조를 봅시다.',
+        '화면이 바뀌자 빨갛고 파란 막대기가 빽빽하게 늘어섰다.',
+        '우와. 이게 뭐예요?',
+        '가격이 지나온 길이에요. 막대기 하나가 하루.',
+        '…예쁘네요.',
+        '아무도 대꾸하지 않았다.',
+        '아니, 진짜로요. 색 겹치는 데가 예뻐요.',
+        '그렇게 봐도 돼요. 그런데 예쁜 게 이 회사가 좋다는 뜻은 아니에요.',
+        '그건 알아요.',
+        '선생님, 이거 누르면 하루가 일주일이 돼요. 근데 왜 여러 개 필요해요? 하나만 보면 안 돼요?',
+        '하루만 보면 올랐고, 일 년을 보면 계속 내렸을 수도 있어요. 둘 다 같은 회사고, 둘 다 사실이에요.',
+        '…둘 다 사실인데 답이 다르면 어떡해요?',
+        '그럼 자기가 어떤 기간으로 볼지 먼저 정해야죠. 그걸 정하는 게 투자예요.',
+        '…그거 정해 주는 규칙은 없어요?',
+        '없어요.',
+        '선생님. 긴 걸로 봤을 때 계속 올랐으면, 그건 믿어도 돼요?',
+        '믿을 이유는 되고, 보증은 아니에요. 왜 계속 올랐는지를 아직 안 봤으니까.',
       ],
       2 => const [
-        '정보 탭에는 투자자 흐름, 사업, 재무지표와 내 지분율이 있어요. 주문 전 투자노트에 매수 이유와 매도 조건을 실제로 적어야 합니다.',
-        '매도 조건은 “오르면 판다”면 끝 아님? 이 정도면 알잘딱이지.',
-        '좋은 회사면 그냥 계속 들고 버티는 게 답 아닌가? 굳이 팔 조건까지 먼저 써?',
-        '수아의 조건은 측정이 안 되고, 학준은 조건 자체가 없어요. 확인 가능한 사업 변화나 손실선을 적어야 나중에 핑계를 못 바꿉니다. 두 칸을 채워 봅시다.',
+        '주문 전에 두 칸을 채워야 해요. 왜 사는지, 그리고 언제 팔지.',
+        '지금요? 아직 안 샀는데요?',
+        '사기 전에 쓰는 거예요. 산 다음에 쓰면 이유가 바뀌어요.',
+        '…그래서 먼저 쓰는 거구나.',
+        '서아는 왜 그렇게 생각했어요?',
+        '어제 생활실에서요. 규칙 정하고 서명했잖아요. 그거 나중에 적었으면 다들 자기한테 유리하게 기억했을 것 같아서요.',
+        '한서윤이 잠깐 멈췄다. 그리고 칠판에 서아의 말을 그대로 적었다. 다듬지 않고, 말한 그대로.',
+        '선생님, 파는 조건은… 오르면 팔면 되는 거 아니에요?',
+        '얼마나요?',
+        '많이요?',
+        '많이가 얼마예요?',
+        '…아 진짜.',
+        '숫자로 안 쓰면 나중에 아무 말이나 할 수 있어.',
+        '채아 너 지금 나 저격했어?',
+        '아니. 나도 그럴 것 같아서.',
+        '두 칸 다 채워야 다음으로 갑니다. 빈칸으로는 못 넘어가요.',
       ],
       3 => const [
-        '호가의 파란 쪽은 팔겠다고 내놓은 수량, 빨간 쪽은 사려고 기다리는 수량이에요. VI는 가격이 너무 빨리 움직일 때 약 1분간 주문을 한 가격에 모아 진정시키는 장치예요.',
-        'VI? 회사 뭐 잘못해서 정지 먹은 거야? 갑자기 분위기 벌점?',
-        '거래정지랑 같은 말 아냐? 동시호가는 다 같이 누르는 선착순이고? 용어부터 뇌정지 오는데.',
-        '용어 셋이 비슷해 보여도 역할은 달라요. 거래정지는 매매 자체를 쉬고, 동시호가는 주문을 모아 15시에 한 가격으로 맞춰요. VI는 급한 가격만 잠깐 진정시키고요.',
+        '이 표가 호가예요.',
+        '오가요? 다섯 개?',
+        '호가. 부르는 값이라는 뜻이에요.',
+        '아 시장에서 깎는 거!',
+        '비슷해요. 여기는 소리 대신 숫자로 불러요.',
+        '위쪽이 팔 사람, 아래쪽이 살 사람이에요?',
+        '네. 위는 이 값 주면 팔겠다는 사람들, 아래는 이 값이면 사겠다는 사람들.',
+        '…그럼 둘이 안 만나는데 어떻게 사요? 파는 사람은 더 받고 싶고 사는 사람은 덜 내고 싶으니까 사이가 계속 남아 있어요.',
+        '그 사이가 값이 없는 자리예요. 둘 중 하나가 양보하면 만나요. 그때 거래가 돼요. 양보하는 쪽은 급한 사람이고요.',
+        '화면 위쪽에 노란 글씨가 떴다. VI.',
+        '어! 뭐예요 저거!',
+        '브이아이. …사람 이름은 아닐 것 같고.',
+        '브이 아이. 승리의 아이?',
+        '…브이는 왜 브이예요?',
+        '값이 너무 빨리 움직여서 잠깐 세운 거예요. 한 일 분쯤.',
+        '회사가 뭐 잘못한 거예요?',
+        '아니요. 회사는 아무것도 안 했어요. 사람들이 너무 급하게 움직인 거예요.',
+        '…사람들 때문에 멈춘 거네요. 그럼 급한 사람들 때문에 급하지 않은 사람도 못 사는 거예요?',
+        '…하은이 지금 오늘 두 번째로 좋은 질문 했어요.',
+        '선생님, 그럼 그 일 분 동안은 아무것도 못 해요?',
+        '주문은 넣을 수 있어요. 다만 바로 안 사지고 모아 뒀다가 한꺼번에 처리해요.',
+        '…줄 서는 거네요.',
+        '그것도 괜찮은 설명이에요.',
+        '노란 글씨가 사라졌다. 숫자가 다시 움직이기 시작했다. 아무도 환호하지 않았다. 일 분이 생각보다 길었다.',
       ],
       4 => const [
-        '매도호가를 누르면 그 가격이 매수 지정가에 들어가요. 지정가는 내가 정한 가격 이하에서만 사겠다는 주문입니다.',
-        '저 가격 눌렀으면 내가 쓴 수량 전부 바로 사지는 거지? 반만 사지면 좀 킹받는데.',
-        '앞사람이 다 사 가면 남은 주문은 순삭되는 거 아냐?',
-        '바로 전량 체결이 보장되진 않고, 남은 주문이 사라지지도 않아요. 일부만 거래되면 나머지는 미체결에 남아 정정하거나 취소할 수 있습니다.',
+        '위쪽 숫자 하나 눌러 보세요.',
+        '이게 지정가예요. 이 값까지만 내겠다는 뜻.',
+        '그러면 반드시 사지는 거예요?',
+        '아니요.',
+        '교실이 조용해졌다. 학준이 다시 물었다.',
+        '…안 사질 수도 있어요?',
+        '네. 그 값에 팔 사람이 없으면 안 사져요. 기다리는 거예요.',
+        '기다리다가 없어져요?',
+        '안 없어져요. 그날 장이 끝날 때까지 줄에 남아 있어요.',
+        '몇 개만 사질 수도 있어요?',
+        '네. 열 개 주문했는데 셋만 사질 수도 있어요.',
+        '…남은 일곱은요?',
+        '계속 줄에 있어요. 취소하거나 값을 바꿀 수도 있어요.',
+        '선생님. 그럼 값을 높게 쓰면 확실히 사지는 거예요?',
+        '확실해지죠. 대신 비싸게 사요.',
+        '…빨리 사는 값이랑 싸게 사는 값이 반대네요.',
+        '네. 그 문장이 오늘 두 번째로 중요해요.',
+        '…둘 다 갖고 싶으면요?',
+        '그건 못 가져요.',
+        '그건 못 가져요. 다섯 글자였다. 아무도 반박하지 않았다.',
       ],
       _ => const [
         '주문 탭에는 매수·매도뿐 아니라 정정/취소, 미체결, 잔고가 함께 있어요. 호가를 누르면 지정가도 연동됩니다.',
-        '매수랑 매도 잘못 누르면 내 돈 바로 순삭? 잔액 부족이어도 일단 빚으로 사지는 거고?',
-        '그럼 처음부터 몰빵이 제일 빨리 크는 거 아냐? 한 주씩은 좀 답답한데.',
-        '수아의 순삭 걱정은 주문 확인 단계가 막고, 학준의 몰빵은 수익보다 위험을 더 빨리 키워요. 실패 상황부터 확인한 뒤 한 주만 주문해 봅시다.',
+        '한 조각이요? 한 조각 사서 뭐가 돼요?',
+        '아무것도 안 돼요. 그래서 한 조각이에요.',
+        '이제 일부러 실패해 볼게요. 가진 돈보다 많이 주문해 보세요. 안 될 때 화면이 어떻게 생겼는지 지금 봐 두면, 나중에 급할 때 안 놀라요.',
+        '속보입니다. 제6기 열 명, 전원 첫 주문 실패 예정.',
+        '실패가 목표잖아.',
+        '정정합니다. 전원 첫 목표 달성 예정.',
+        '오늘 얻어야 하는 건 돈이 아니에요. 사고 팔았을 때 화면이 어떻게 변하는지에 대한 기억이에요.',
       ],
     },
-    characterAssets: const [
-      null,
-      _stockTutorialSuaAsset,
-      _stockTutorialHakjunAsset,
-      null,
-    ],
+    characterAssets: switch (step) {
+      0 => const [
+        null,
+        null,
+        _stockTutorialSuaNeutralAsset,
+        null,
+        _stockTutorialSuaSurprisedAsset,
+        null,
+        null,
+        _stockTutorialJianAsset,
+        _stockTutorialSuaAnnoyedAsset,
+        _stockTutorialJianFocusAsset,
+        null,
+        _stockTutorialJianAsset,
+        null,
+        null,
+        _stockTutorialJiwooAsset,
+        _stockTutorialJianFocusAsset,
+      ],
+      1 => const [
+        null,
+        _stockTutorialSuaSurprisedAsset,
+        null,
+        _stockTutorialIseoAsset,
+        null,
+        _stockTutorialIseoAsset,
+        null,
+        _stockTutorialIseoBoundaryAsset,
+        _stockTutorialArinAsset,
+        null,
+        _stockTutorialArinWorriedAsset,
+        null,
+        _stockTutorialArinWorriedAsset,
+        null,
+        _stockTutorialHakjunAsset,
+        null,
+      ],
+      2 => const [
+        null,
+        _stockTutorialSuaNeutralAsset,
+        null,
+        _stockTutorialSeoaAsset,
+        null,
+        _stockTutorialSeoaRecordAsset,
+        null,
+        _stockTutorialSuaNeutralAsset,
+        null,
+        _stockTutorialSuaSurprisedAsset,
+        null,
+        _stockTutorialSuaAnnoyedAsset,
+        _stockTutorialChaeaAsset,
+        _stockTutorialSuaAnnoyedAsset,
+        _stockTutorialChaeaNeutralAsset,
+        null,
+      ],
+      3 => const [
+        null,
+        _stockTutorialSuaSurprisedAsset,
+        null,
+        _stockTutorialSuaAsset,
+        null,
+        _stockTutorialJianFocusAsset,
+        null,
+        _stockTutorialJianAsset,
+        null,
+        null,
+        _stockTutorialSuaSurprisedAsset,
+        _stockTutorialHakjunAsset,
+        _stockTutorialJiwooAsset,
+        _stockTutorialIseoAsset,
+        null,
+        _stockTutorialHaeunWorriedAsset,
+        null,
+        _stockTutorialHaeunAsset,
+        null,
+        _stockTutorialArinAsset,
+        null,
+        _stockTutorialArinAsset,
+        null,
+        null,
+      ],
+      4 => const [
+        null,
+        null,
+        _stockTutorialHakjunAsset,
+        null,
+        null,
+        _stockTutorialHakjunAsset,
+        null,
+        _stockTutorialSuaNeutralAsset,
+        null,
+        _stockTutorialJianFocusAsset,
+        null,
+        _stockTutorialJianAsset,
+        null,
+        _stockTutorialChaeaNeutralAsset,
+        null,
+        _stockTutorialChaeaAsset,
+        null,
+        _stockTutorialIseoAsset,
+        null,
+        null,
+      ],
+      _ => const [
+        null,
+        _stockTutorialHakjunAsset,
+        null,
+        null,
+        _stockTutorialJiwooAsset,
+        _stockTutorialArinAsset,
+        _stockTutorialJiwooCorrectAsset,
+        null,
+      ],
+    },
     actionLabel: switch (step) {
       0 => '현재가 확인하기',
       1 => '정보 탭 확인하기',
@@ -7338,29 +7798,55 @@ class _OrderTicketTutorialOverlay extends StatelessWidget {
     targetActionKey: const Key('market-order-tutorial-target'),
     targetKey: null,
     messageId: 'market-order-${limitPrice?.round() ?? 'start'}',
-    speakers: const ['한서윤 선생님', '수아', '김학준', '한서윤 선생님', '나'],
+    speakers: limitPrice == null
+        ? const ['한서윤 선생님', '김학준', '한서윤 선생님', '이지안', '한서윤 선생님', '최이서', '나']
+        : const [
+            '한서윤 선생님',
+            '정아린',
+            '한서윤 선생님',
+            '정아린',
+            '한서윤 선생님',
+            '윤채아',
+            '한서윤 선생님',
+          ],
     messages: limitPrice == null
         ? const [
-            '연습 화면에만 쓰는 국가원금 10,000원이에요. 정식 국가계좌의 돈은 움직이지 않아요.',
-            '잔액 부족 눌렀다가 진짜 계좌까지 마이너스면 개큰 사고인데. 그건 아니지?',
-            '부분체결 뒤 남은 한 주가 미체결에 박제되는지도 직접 보면 기억나겠다.',
-            '좋아요. 실패 연습 뒤 주문 전에 가격·수량·수수료를 확인하고 한 주만 거래하세요.',
-            '오케이. 틀려도 계좌가 어떻게 반응하는지 보고 한 주를 사 볼게요.',
+            '이건 수업용 계좌예요. 여기서 잃어도 정식 국가계좌의 만 원은 그대로예요.',
+            '그럼 여기서 망해도 괜찮은 거예요?',
+            '괜찮아요. 그래서 여기서 먼저 망해 보는 거예요.',
+            '…잔액 부족은 그냥 거절만 되는 거죠? 빚 지는 건 아니고.',
+            '빚 안 져요. 돈이 없으면 주문 자체를 안 받아요.',
+            '…그럼 안 무섭네요.',
+            '한 번 틀려 보고 갈게요.',
           ]
         : [
-            '수업용 국가원금 10,000원에서 방금 누른 ${_money(limitPrice!.round())}원이 매수 지정가에 들어왔어요. 같은 가격이면 먼저 줄 선 주문부터 체결돼요.',
-            '잔액 부족은 거절되고 돈 그대로. 이거 직접 확인하고 싶다.',
-            '보이는 잔량보다 한 주 더 넣으면 일부 체결, 나머지는 미체결. 맞지?',
-            '맞아요. 두 실패 상황을 직접 눌러 확인한 뒤 가격·수량·수수료를 보고 한 주를 주문합시다.',
-            '실패 기록까지 봤으니 이제 진짜 한 주 주문 가 볼게요.',
+            '방금 누른 ${_money(limitPrice!.round())}원이 매수 지정가에 들어왔어요. 이 값까지만 내겠다는 뜻이에요.',
+            '같은 값 쓴 사람이 여러 명이면 누가 먼저 사요?',
+            '먼저 줄 선 사람이요. 값이 같으면 시간이 순서를 정해요.',
+            '…그럼 늦게 누른 사람은 못 살 수도 있네요.',
+            '네. 그래서 두 가지를 먼저 확인할게요. 돈이 부족할 때, 그리고 일부만 사질 때.',
+            '둘 다 실패인데 결과가 다른 거예요?',
+            '다릅니다. 그 차이를 직접 눌러서 보세요.',
           ],
-    characterAssets: const [
-      null,
-      _stockTutorialSuaAsset,
-      _stockTutorialHakjunAsset,
-      null,
-      _stockTutorialPlayerAsset,
-    ],
+    characterAssets: limitPrice == null
+        ? const [
+            null,
+            _stockTutorialHakjunAsset,
+            null,
+            _stockTutorialJianFocusAsset,
+            null,
+            _stockTutorialIseoAsset,
+            _stockTutorialPlayerAsset,
+          ]
+        : const [
+            null,
+            _stockTutorialArinAsset,
+            null,
+            _stockTutorialArinWorriedAsset,
+            null,
+            _stockTutorialChaeaNeutralAsset,
+            null,
+          ],
     actionLabel: '가격·수량·수수료 확인하기',
     teacherPoseAsset: limitPrice == null
         ? _stockTeacherPoseBook
@@ -7488,10 +7974,17 @@ class _StockTutorialGuideOverlayState
   }
 
   void _handleWrongTap() {
-    final feedback = switch (_wrongTapCount) {
-      0 => '수아: 어, 거기 아님. 나 지금 뇌정지 왔네. 노란 테두리부터 보자.',
-      1 => '김학준: 잘못 누른 것만으로 주문된 건 아니네. 확인 전이라 계좌도 멀쩡.',
-      _ => '한서윤 선생님: 실수한 위치를 확인하고 노란 테두리의 다음 행동으로 돌아오세요.',
+    // 같은 문구가 반복되면 실수가 창피해진다. 같이 틀려 주는 대사를 섞어
+    // 오조작이 교실의 일상으로 읽히게 한다.
+    final feedback = switch (_wrongTapCount % 8) {
+      0 => '수아: 어, 거기 아니야. 나도 방금 딴 데 눌렀어.',
+      1 => '이지안: 그거 눌러도 아무 일 안 나. 확인 누르기 전엔 안 사져.',
+      2 => '정아린: 노란 거. 노란 거 눌러.',
+      3 => '김서아: 괜찮아. 나도 두 번 잘못 눌렀어.',
+      4 => '오지우: 속보. 06번 학생, 화면 다른 데를 누름.',
+      5 => '박하은: 천천히 해도 돼. 아직 아무도 안 끝났어.',
+      6 => '윤채아: 지금 누른 데는 아무 기능 없어.',
+      _ => '한서윤 선생님: 노란 테두리로 돌아오세요.',
     };
     setState(() {
       _wrongTapCount += 1;
@@ -7503,10 +7996,16 @@ class _StockTutorialGuideOverlayState
   Widget build(BuildContext context) {
     final hasTarget = _activeTargetKey != null;
     final activeSpeaker = widget.speakers[_messageIndex];
+    final isNarration = activeSpeaker == _stockTutorialNarrationSpeaker;
     final isTeacherPage = activeSpeaker == '한서윤 선생님';
-    final activeCharacterAsset =
-        widget.characterAssets?[_messageIndex] ??
-        (isTeacherPage ? widget.teacherPoseAsset : _stockTutorialPlayerAsset);
+    // 지문 페이지는 중앙 전신 슬롯을 비운다. 화자 자산이 없다는 이유로
+    // 주인공 스프라이트를 대신 세우면 지문이 주인공 대사로 읽힌다.
+    final activeCharacterAsset = isNarration
+        ? ''
+        : widget.characterAssets?[_messageIndex] ??
+              (isTeacherPage
+                  ? widget.teacherPoseAsset
+                  : _stockTutorialPlayerAsset);
     return LayoutBuilder(
       builder: (context, constraints) {
         final guideWidth = constraints.maxWidth;
@@ -7562,23 +8061,24 @@ class _StockTutorialGuideOverlayState
                     ),
                   ),
                 ),
-              Positioned(
-                right: -6,
-                bottom: 54,
-                child: !isTeacherPage
-                    ? _StockTutorialStudent(
-                        asset: activeCharacterAsset,
-                        speaker: activeSpeaker,
-                        width: teacherWidth,
-                      )
-                    : _StockTutorialTeacher(
-                        asset: activeCharacterAsset,
-                        width: teacherWidth,
-                      ),
-              ),
+              if (!isNarration)
+                Positioned(
+                  right: -6,
+                  bottom: 54,
+                  child: !isTeacherPage
+                      ? _StockTutorialStudent(
+                          asset: activeCharacterAsset,
+                          speaker: activeSpeaker,
+                          width: teacherWidth,
+                        )
+                      : _StockTutorialTeacher(
+                          asset: activeCharacterAsset,
+                          width: teacherWidth,
+                        ),
+                ),
               Positioned(
                 left: 12,
-                right: speechRight,
+                right: isNarration ? 12 : speechRight,
                 top: speechAtTop ? 44 : null,
                 bottom: speechAtTop ? null : 185,
                 child: _StockTutorialSpeechBubble(
@@ -7589,6 +8089,8 @@ class _StockTutorialGuideOverlayState
                   actionKey: widget.actionKey,
                   actionLabel: _isLastMessage
                       ? widget.actionLabel
+                      : isNarration
+                      ? '계속 읽기'
                       : isTeacherPage
                       ? '학생 반응 듣기'
                       : '다음 말 듣기',

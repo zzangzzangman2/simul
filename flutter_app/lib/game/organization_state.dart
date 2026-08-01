@@ -460,7 +460,7 @@ class OrganizationState {
         specialty: '사람 · 소비 · 인터뷰',
         effect: '숫자 뒤에 있는 고객 표정과 실제 사용 반응을 확인합니다.',
         asset:
-            'assets/images/production_soft_painted/han_sua/02_warm_smile_v1.png',
+            'assets/images/production_soft_painted/han_sua/02_warm_smile_quality_v2.png',
         fatigue: 5,
         helpCount: 0,
         lastHelpDay: null,

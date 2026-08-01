@@ -2,7 +2,7 @@ part of 'main.dart';
 
 const _onboardingBeatCount = 73;
 const _maximumDialogueBeatCount = 240;
-const _dialogueAppearanceVersion = 11;
+const _dialogueAppearanceVersion = 13;
 const _dialogueRuntimeStorageKey = 'future-academy-dialogue-runtime-v1';
 const _dialogueBundleAsset = 'assets/dialogue/dialogue-editor-override.json';
 const _dialoguePanelOpacityStorageKey =
@@ -392,22 +392,25 @@ class _VisualNovelOnboardingScreenState
       22 =>
         'assets/images/historical_prologue/character_park_sunhee_farewell_v1.png',
       25 =>
-        'assets/images/production_soft_painted/han_sua/07_determined_v1.png',
-      27 => 'assets/images/production_soft_painted/han_sua/01_neutral_v1.png',
+        'assets/images/production_soft_painted/han_sua/07_determined_quality_v2.png',
+      27 =>
+        'assets/images/production_soft_painted/han_sua/01_neutral_quality_v2.png',
       29 =>
-        'assets/images/production_soft_painted/han_sua/02_warm_smile_v1.png',
+        'assets/images/production_soft_painted/han_sua/02_warm_smile_quality_v2.png',
       31 =>
-        'assets/images/production_soft_painted/han_sua/03_bright_laugh_v1.png',
-      36 => 'assets/images/production_soft_painted/han_sua/04_surprised_v1.png',
-      38 => 'assets/images/production_soft_painted/han_sua/05_worried_v1.png',
+        'assets/images/production_soft_painted/han_sua/03_bright_laugh_quality_v2.png',
+      36 =>
+        'assets/images/production_soft_painted/han_sua/04_surprised_quality_v2.png',
+      38 =>
+        'assets/images/production_soft_painted/han_sua/05_worried_quality_v2.png',
       47 =>
-        'assets/images/production_soft_painted/han_sua/02_warm_smile_v1.png',
+        'assets/images/production_soft_painted/han_sua/02_warm_smile_quality_v2.png',
       60 =>
-        'assets/images/production_soft_painted/han_sua/03_bright_laugh_v1.png',
+        'assets/images/production_soft_painted/han_sua/03_bright_laugh_quality_v2.png',
       66 =>
         'assets/images/production_soft_painted/kim_seoa/09_explaining_ledger_v1.png',
       67 =>
-        'assets/images/production_soft_painted/lee_jian/09_explaining_mechanism_v1.png',
+        'assets/images/production_soft_painted/lee_jian/09_explaining_mechanism_v2.png',
       68 =>
         'assets/images/production_soft_painted/choi_iseo/01_base_thread_v1.png',
       69 =>
@@ -419,26 +422,27 @@ class _VisualNovelOnboardingScreenState
       72 =>
         'assets/images/production_soft_painted/yoon_chaea/09_explaining_v1.png',
       73 =>
-        'assets/images/production_soft_painted/han_sua/08_explaining_v1.png',
+        'assets/images/production_soft_painted/han_sua/08_explaining_quality_v2.png',
       77 =>
         'assets/images/production_soft_painted/jung_arin/04_assigning_tasks_v1.png',
       79 =>
         'assets/images/production_soft_painted/choi_iseo/07_firm_boundary_v1.png',
       80 =>
-        'assets/images/production_soft_painted/lee_jian/07_apologetic_boundary_v1.png',
+        'assets/images/production_soft_painted/lee_jian/07_apologetic_boundary_v2.png',
       81 =>
         'assets/images/production_soft_painted/park_haeun/09_explaining_v1.png',
       82 =>
         'assets/images/production_soft_painted/kim_seoa/08_determined_record_v1.png',
       84 =>
-        'assets/images/production_soft_painted/han_sua/03_bright_laugh_v1.png',
+        'assets/images/production_soft_painted/han_sua/03_bright_laugh_quality_v2.png',
       85 =>
         'assets/images/production_soft_painted/oh_jiwoo/03_breaking_news_excited_v1.png',
       86 =>
         'assets/images/production_soft_painted/yoon_chaea/06_worried_v1.png',
-      90 => 'assets/images/production_soft_painted/han_sua/05_worried_v1.png',
+      90 =>
+        'assets/images/production_soft_painted/han_sua/05_worried_quality_v2.png',
       93 =>
-        'assets/images/production_soft_painted/han_sua/07_determined_v1.png',
+        'assets/images/production_soft_painted/han_sua/07_determined_quality_v2.png',
       56 =>
         'assets/images/historical_prologue/character_hakjun_orientation_v2.png',
       62 => 'assets/images/protagonist_seed01/04_curious_question.png',
@@ -1540,7 +1544,7 @@ class _LivingBackgroundState extends State<_LivingBackground>
   );
 }
 
-class _OnboardingCharacterSlot extends StatelessWidget {
+class _OnboardingCharacterSlot extends StatefulWidget {
   const _OnboardingCharacterSlot({
     super.key,
     required this.asset,
@@ -1553,77 +1557,185 @@ class _OnboardingCharacterSlot extends StatelessWidget {
   final Key characterKey;
 
   @override
-  Widget build(BuildContext context) => AnimatedOpacity(
-    duration: const Duration(milliseconds: 180),
-    opacity: 1,
-    child: AnimatedSwitcher(
-      duration: const Duration(milliseconds: 220),
-      switchInCurve: Curves.easeOut,
-      switchOutCurve: Curves.easeIn,
-      transitionBuilder: (child, animation) {
-        final horizontalOffset = alignment.x < 0
-            ? -0.08
-            : alignment.x > 0
-            ? 0.08
-            : 0.0;
-        final entrance = CurvedAnimation(
-          parent: animation,
-          curve: Curves.easeOutCubic,
-        );
-        return FadeTransition(
-          opacity: entrance,
-          child: SlideTransition(
-            position: Tween<Offset>(
-              begin: Offset(horizontalOffset, 0.02),
-              end: Offset.zero,
-            ).animate(entrance),
-            child: child,
+  State<_OnboardingCharacterSlot> createState() =>
+      _OnboardingCharacterSlotState();
+}
+
+class _OnboardingCharacterSlotState extends State<_OnboardingCharacterSlot>
+    with TickerProviderStateMixin {
+  late final AnimationController _idleController;
+  late final AnimationController _reactionController;
+  late final bool _motionEnabled;
+
+  @override
+  void initState() {
+    super.initState();
+    _idleController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 4800),
+    );
+    _reactionController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 520),
+    );
+    final isTestBinding = WidgetsBinding.instance.runtimeType
+        .toString()
+        .contains('TestWidgetsFlutterBinding');
+    _motionEnabled =
+        !const bool.fromEnvironment('FLUTTER_TEST') && !isTestBinding;
+    if (_motionEnabled) {
+      _idleController.repeat();
+      _reactionController.forward();
+    } else {
+      _reactionController.value = 1;
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _OnboardingCharacterSlot oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.asset == widget.asset &&
+        oldWidget.alignment == widget.alignment) {
+      return;
+    }
+    if (_motionEnabled) {
+      _reactionController.forward(from: 0);
+    } else {
+      _reactionController.value = 1;
+    }
+  }
+
+  @override
+  void dispose() {
+    _idleController.dispose();
+    _reactionController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final stage = AnimatedOpacity(
+      duration: const Duration(milliseconds: 180),
+      opacity: 1,
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 220),
+        switchInCurve: Curves.easeOut,
+        switchOutCurve: Curves.easeIn,
+        transitionBuilder: (child, animation) {
+          final horizontalOffset = widget.alignment.x < 0
+              ? -0.08
+              : widget.alignment.x > 0
+              ? 0.08
+              : 0.0;
+          final entrance = CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutCubic,
+          );
+          return FadeTransition(
+            opacity: entrance,
+            child: SlideTransition(
+              position: Tween<Offset>(
+                begin: Offset(horizontalOffset, 0.02),
+                end: Offset.zero,
+              ).animate(entrance),
+              child: child,
+            ),
+          );
+        },
+        child: LayoutBuilder(
+          key: ValueKey(
+            '${widget.asset}-${widget.alignment.x}-${widget.alignment.y}',
           ),
-        );
-      },
-      child: LayoutBuilder(
-        key: ValueKey('$asset-${alignment.x}-${alignment.y}'),
-        builder: (context, constraints) {
-          final characterHeight =
-              constraints.maxHeight * _storyCharacterHeightFactor;
-          final characterWidth = (characterHeight * _storyCharacterAspectRatio)
-              .clamp(0.0, constraints.maxWidth)
-              .toDouble();
-          final characterImageHeight = characterHeight
-              .clamp(0.0, constraints.maxHeight - _storyCharacterBottomInset)
-              .toDouble();
-          return Align(
-            alignment: alignment,
-            child: SizedBox(
-              key: characterKey,
-              width: characterWidth,
-              height: characterHeight,
-              child: Align(
-                alignment: Alignment.bottomCenter,
-                child: Transform.scale(
-                  key: const Key('story-character-scale'),
-                  scale: _storyCharacterScaleForAsset(asset),
+          builder: (context, constraints) {
+            final characterHeight =
+                constraints.maxHeight * _storyCharacterHeightFactor;
+            final characterWidth =
+                (characterHeight * _storyCharacterAspectRatio)
+                    .clamp(0.0, constraints.maxWidth)
+                    .toDouble();
+            final characterImageHeight = characterHeight
+                .clamp(0.0, constraints.maxHeight - _storyCharacterBottomInset)
+                .toDouble();
+            return Align(
+              alignment: widget.alignment,
+              child: SizedBox(
+                key: widget.characterKey,
+                width: characterWidth,
+                height: characterHeight,
+                child: Align(
                   alignment: Alignment.bottomCenter,
-                  child: SizedBox(
-                    width: characterWidth,
-                    height: characterImageHeight,
-                    child: Image.asset(
-                      key: const Key('story-character-image'),
-                      asset,
-                      fit: BoxFit.contain,
-                      alignment: Alignment.bottomCenter,
-                      filterQuality: FilterQuality.high,
-                      gaplessPlayback: true,
+                  child: Transform.scale(
+                    key: const Key('story-character-scale'),
+                    scale: _storyCharacterScaleForAsset(widget.asset),
+                    alignment: Alignment.bottomCenter,
+                    child: SizedBox(
+                      width: characterWidth,
+                      height: characterImageHeight,
+                      child: Image.asset(
+                        key: const Key('story-character-image'),
+                        widget.asset,
+                        fit: BoxFit.contain,
+                        alignment: Alignment.bottomCenter,
+                        filterQuality: FilterQuality.high,
+                        gaplessPlayback: true,
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
-    ),
-  );
+    );
+
+    return AnimatedBuilder(
+      animation: Listenable.merge(<Listenable>[
+        _idleController,
+        _reactionController,
+      ]),
+      child: stage,
+      builder: (context, child) {
+        final motionAllowed =
+            _motionEnabled && !MediaQuery.disableAnimationsOf(context);
+        final phaseSeed = widget.asset.codeUnits.fold<int>(
+          0,
+          (sum, value) => (sum + value) % 360,
+        );
+        final phase = phaseSeed / 180 * math.pi;
+        final idleAngle = _idleController.value * math.pi * 2;
+        final breathing = motionAllowed
+            ? math.sin(idleAngle + phase) * 0.0018
+            : 0.0;
+        final sway = motionAllowed
+            ? math.sin(idleAngle * 0.73 + phase) * 1.25
+            : 0.0;
+        final microLift = motionAllowed
+            ? math.sin(idleAngle * 1.31 + phase * 0.5) * 0.65
+            : 0.0;
+        final reaction = motionAllowed
+            ? math.sin(_reactionController.value * math.pi)
+            : 0.0;
+        final reactionSide = phaseSeed.isEven ? 1.0 : -1.0;
+        return Transform.translate(
+          key: const Key('story-character-living-motion'),
+          offset: Offset(
+            sway + reaction * reactionSide * 2.2,
+            microLift - reaction * 3.2,
+          ),
+          child: Transform.rotate(
+            angle: sway * 0.0014 + reaction * reactionSide * 0.0026,
+            alignment: Alignment.bottomCenter,
+            child: Transform.scale(
+              scale: 1 + breathing + reaction * 0.0045,
+              alignment: Alignment.bottomCenter,
+              child: child,
+            ),
+          ),
+        );
+      },
+    );
+  }
 }
 
 class _AcademyPcTerminal extends StatelessWidget {
@@ -2146,17 +2258,7 @@ class _NovelDialogueState extends State<_NovelDialogue>
     }
   }
 
-  void _revealLine() {
-    if (_typingComplete) return;
-    _playStoryFeedback();
-    _typingController.value = 1;
-  }
-
   void _handleExternalTap() {
-    if (!_typingComplete) {
-      _revealLine();
-      return;
-    }
     widget.onContinue?.call();
   }
 

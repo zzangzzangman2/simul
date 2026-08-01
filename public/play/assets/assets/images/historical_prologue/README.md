@@ -22,7 +22,7 @@
 
 ## cinematic soft-painted 교체 자산
 
-- 한수아 8종: `assets/images/production_soft_painted/han_sua/`
+- 한수아 16종(v1 8종 보존·v2 8종 런타임): `assets/images/production_soft_painted/han_sua/`
 - 민호: `assets/images/historical_prologue/character_minho_farewell_v3.png`
 - 학준: `assets/images/historical_prologue/character_hakjun_orientation_v2.png`
 - 1981년 전두광 6종: `assets/images/cinematic_soft_painted/policy_1981/jeon_dugwang/`
@@ -76,7 +76,7 @@
 ### 등장인물
 
 - `assets/images/cinematic_soft_painted/sua/`: 이전 수아 보관본. 런타임과 대사 편집기에서는 사용하지 않는다.
-- `assets/images/production_soft_painted/han_sua/`: 현재 승인 화풍의 한수아 표정·동작 8종. 런타임과 대사 편집기의 정식 자산이다.
+- `assets/images/production_soft_painted/han_sua/`: 현재 승인 화풍의 한수아 자산 16종. v1 8종은 보존하고, 런타임과 대사 편집기는 선명도 개선 v2 8종을 사용한다.
 - `character_hakjun_orientation_v2.png`: 수아와 같은 SIMUL production soft-painted VN anime v1 피부 명암으로 그린 규정집 든 제6기 라이벌 전신. 얼굴 정체성만 유지하고 14살 비율로 재생성한다.
 - `character_minho_farewell_v3.png`: 수아와 같은 부드러운 피부·눈가·머리카락 질감으로 다시 그린 7살 민호의 작별 전신. 긴 타원형 얼굴, 회청색 처진 눈, 주근깨와 잠옷·이불 정체성을 유지한다.
 

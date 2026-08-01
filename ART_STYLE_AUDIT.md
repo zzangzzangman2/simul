@@ -9,21 +9,21 @@
 - 새 채팅과 모든 캐릭터 생성은 `IMAGE_GENERATION_STYLE_PROMPT.md`의 고정 프롬프트를 사용한다.
 - 실사 인물·배경·후보·참조 사진은 프로젝트와 런타임에서 제거했다.
 - 1981년 청와대 정책실은 기존 `cinematic_soft_painted/policy_1981/` 인물·배경으로 복원했다.
-- 한수아는 승인된 `production_soft_painted/han_sua/` 8종을 사용하며 기존 `cinematic_soft_painted/sua/` 자산은 런타임과 편집기에서 사용하지 않는다.
+- 한수아는 `production_soft_painted/han_sua/` 16종(v1 8종 보존본·선명도 개선 v2 8종)을 보관하며, 런타임과 편집기는 표정·동작 전체 v2 8종만 사용한다. 기존 `cinematic_soft_painted/sua/` 자산은 사용하지 않는다.
 - 이서 실사 세트와 실사 수아 후보는 폐기했으며 런타임·편집기에서 사용하지 않는다.
 
 ## 승인 자산군
 
 | 자산군 | 화풍 | 상태 |
 | --- | --- | --- |
-| 공식 수아 제작 앵커 `simul_production_soft_painted_vn_style_anchor_v1.png` | 대량생산형 고품질 VN 애니 | 화풍 승인·한수아 8종 정식 연결 |
-| 박하은 정체성 앵커 `park_haeun_identity_anchor_v1.png` | 대량생산형 고품질 VN 애니 | 사용자 승인·표정 9종 정식 연결 |
+| 공식 수아 제작 앵커 `simul_production_soft_painted_vn_style_anchor_v1.png` | 대량생산형 고품질 VN 애니 | 화풍 승인·한수아 v2 8종 정식 연결 |
+| 박하은 정체성 앵커 `park_haeun_identity_anchor_v1.png` | 남색 하이 포니테일·보라색 눈·밝은 웜톤 피부의 고품질 VN 애니 | 2026-08-01 사용자 승인·고개/시선/머리 관성이 다른 동적 9종 정식 연결 |
 | 최이서 정체성 앵커 `choi_iseo_identity_anchor_v1.png` | 대량생산형 고품질 VN 애니 | 사용자 승인·표정/동작 9종 정식 연결 |
 | 정아린 정체성 앵커 `jung_arin_identity_anchor_v1.png` | 대량생산형 고품질 VN 애니 | 사용자 승인·표정/동작 9종 정식 연결 |
 | 윤채아 정체성 앵커 `yoon_chaea_identity_anchor_v1.png` | 대량생산형 고품질 VN 애니 | 사용자 승인·표정/동작 9종 정식 연결 |
 | 김서아 정체성 앵커 `kim_seoa_identity_anchor_v1.png` | 대량생산형 고품질 VN 애니 | 사용자 승인·표정/동작 9종 정식 연결 |
 | 오지우 정체성 앵커 `oh_jiwoo_identity_anchor_v1.png` | 대량생산형 고품질 VN 애니 | 사용자 승인·표정/동작 9종 정식 연결 |
-| 이지안 정체성 앵커 `lee_jian_identity_anchor_v1.png` | `SIMUL production soft-painted VN anime v1` | 사용자 승인·표정/동작 9종 정식 연결 |
+| 이지안 얼굴·전신 앵커 `lee_jian_face_identity_anchor_v2.png`·`lee_jian_identity_anchor_v2.png` | 밀크티 베이지 금발·금갈색 둥근 눈·흰 천 헤어밴드의 `SIMUL production soft-painted VN anime v1` | 2026-08-01 사용자 승인·윙크 포함 동적 v2 9종 정식 연결 |
 | 전두광 6종 `cinematic_soft_painted/policy_1981/jeon_dugwang/` | 카툰·소프트 페인터리 | 복원 |
 | 서문태 4종 `cinematic_soft_painted/policy_1981/seo_muntae/` | 카툰·소프트 페인터리 | 복원 |
 | 백기현 4종 `cinematic_soft_painted/policy_1981/baek_gihyeon/` | 카툰·소프트 페인터리 | 복원 |

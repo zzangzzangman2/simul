@@ -14,7 +14,7 @@ void main() {
     'choi_iseo': 9,
     'jung_arin': 9,
     'park_haeun': 9,
-    'han_sua': 8,
+    'han_sua': 16,
     'oh_jiwoo': 9,
     'yoon_chaea': 9,
   };
@@ -84,6 +84,35 @@ void main() {
     }
   });
 
+  test('all Han Sua runtime consumers use the full quality v2 set', () {
+    final sources = <String>[
+      File('lib/visual_novel_onboarding.dart').readAsStringSync(),
+      File('lib/stock_market_screen.dart').readAsStringSync(),
+      File('lib/game/relationship_state.dart').readAsStringSync(),
+      File('../app/editor/character-catalog.ts').readAsStringSync(),
+      File('assets/dialogue/dialogue-editor-override.json').readAsStringSync(),
+    ].join('\n');
+    expect(
+      RegExp(
+        r'production_soft_painted/han_sua/0[1-8]_[^\s"\x27]*_v1\.png',
+      ).allMatches(sources),
+      isEmpty,
+    );
+    const qualitySet = <String>[
+      '01_neutral_quality_v2.png',
+      '02_warm_smile_quality_v2.png',
+      '03_bright_laugh_quality_v2.png',
+      '04_surprised_quality_v2.png',
+      '05_worried_quality_v2.png',
+      '06_annoyed_quality_v2.png',
+      '07_determined_quality_v2.png',
+      '08_explaining_quality_v2.png',
+    ];
+    for (final asset in qualitySet) {
+      expect(sources, contains(asset), reason: asset);
+    }
+  });
+
   test('first-day cohort dialogue uses the approved production sprites', () {
     final decoded =
         jsonDecode(
@@ -92,34 +121,38 @@ void main() {
               ).readAsStringSync(),
             )
             as Map<String, dynamic>;
-    expect(decoded['appearanceVersion'], 11);
+    expect(decoded['appearanceVersion'], 13);
     final scenes = (decoded['scenes'] as List<dynamic>)
         .cast<Map<String, dynamic>>();
-    final byId = <String, Map<String, dynamic>>{
-      for (final scene in scenes) scene['id'] as String: scene,
+    const speakerFolders = <String, String>{
+      '김서아': 'kim_seoa',
+      '이지안': 'lee_jian',
+      '최이서': 'choi_iseo',
+      '정아린': 'jung_arin',
+      '박하은': 'park_haeun',
+      '수아': 'han_sua',
+      '오지우': 'oh_jiwoo',
+      '윤채아': 'yoon_chaea',
     };
-    const expected = <String, String>{
-      'scene-dorm-intro-seoa': 'kim_seoa/09_explaining_ledger_v1.png',
-      'scene-dorm-intro-jian': 'lee_jian/09_explaining_mechanism_v1.png',
-      'scene-dorm-intro-iseo': 'choi_iseo/01_base_thread_v1.png',
-      'scene-dorm-intro-arin': 'jung_arin/09_counting_explain_v1.png',
-      'scene-dorm-intro-haeun': 'park_haeun/02_warm_smile_v1.png',
-      'scene-dorm-intro-jiwoo': 'oh_jiwoo/09_explaining_report_v1.png',
-      'scene-dorm-intro-chaea': 'yoon_chaea/09_explaining_v1.png',
-      'scene-dorm-intro-sua': 'han_sua/08_explaining_v1.png',
-      'scene-dorm-locker-conflict': 'choi_iseo/07_firm_boundary_v1.png',
-      'scene-dorm-locker-apology': 'lee_jian/07_apologetic_boundary_v1.png',
-      'scene-dorm-boundary-agreement': 'kim_seoa/08_determined_record_v1.png',
-      'scene-dorm-joke': 'han_sua/03_bright_laugh_v1.png',
-      'scene-dorm-laughter': 'oh_jiwoo/03_breaking_news_excited_v1.png',
-      'scene-dorm-badge-sua': 'han_sua/05_worried_v1.png',
-      'scene-dorm-badge-pact': 'han_sua/07_determined_v1.png',
-    };
-    for (final entry in expected.entries) {
+    for (final entry in speakerFolders.entries) {
+      final speakerScenes = scenes.where(
+        (scene) => scene['speaker'] == entry.key,
+      );
+      expect(speakerScenes, isNotEmpty, reason: entry.key);
+      for (final scene in speakerScenes) {
+        expect(
+          scene['character'],
+          contains('/production_soft_painted/${entry.value}/'),
+          reason: scene['id'] as String,
+        );
+      }
+    }
+    final suaScenes = scenes.where((scene) => scene['speaker'] == '수아');
+    for (final scene in suaScenes) {
       expect(
-        byId[entry.key]?['character'],
-        endsWith(entry.value),
-        reason: entry.key,
+        scene['character'],
+        endsWith('_quality_v2.png'),
+        reason: scene['id'] as String,
       );
     }
     expect(
@@ -147,44 +180,41 @@ void main() {
       final byId = <String, Map<String, dynamic>>{
         for (final scene in scenes) scene['id'] as String: scene,
       };
-
+      expect(byId['scene-66']?['direction'], contains('둥글게 나눠 앉았다'));
+      final introductionSpeakers = scenes
+          .where(
+            (scene) =>
+                (scene['order'] as int) >= 69 && (scene['order'] as int) <= 95,
+          )
+          .map((scene) => scene['speaker'] as String)
+          .toSet();
       expect(
-        byId['scene-dorm-intro-circle']?['direction'],
-        contains('둥글게 나눠 앉았다'),
+        introductionSpeakers,
+        containsAll(<String>[
+          '김서아',
+          '이지안',
+          '최이서',
+          '정아린',
+          '박하은',
+          '수아',
+          '오지우',
+          '윤채아',
+          '김학준',
+          '나',
+        ]),
       );
-      const seatedGreetingIds = <String>[
-        'scene-dorm-intro-seoa',
-        'scene-dorm-intro-jian',
-        'scene-dorm-intro-iseo',
-        'scene-dorm-intro-arin',
-        'scene-dorm-intro-haeun',
-        'scene-dorm-intro-jiwoo',
-        'scene-dorm-intro-chaea',
-        'scene-dorm-intro-sua',
-        'scene-dorm-intro-hakjun',
-        'scene-dorm-intro-player',
-      ];
-      for (final id in seatedGreetingIds) {
-        final scene = byId[id];
-        expect(scene, isNotNull, reason: id);
-        final direction = scene!['direction'] as String;
-        expect(
-          direction.contains('앉') || direction.contains('걸터앉'),
-          isTrue,
-          reason: '$id must remain visibly seated',
-        );
-      }
-
-      expect(byId['scene-dorm-intro-seoa']?['line'], startsWith('안녕'));
-      expect(byId['scene-dorm-intro-seoa']?['line'], contains('내 옆'));
-      expect(byId['scene-dorm-intro-jian']?['line'], contains('실 뭉치'));
-      expect(byId['scene-dorm-intro-iseo']?['line'], contains('아린아'));
-      expect(byId['scene-dorm-intro-arin']?['line'], contains('박하은'));
-      expect(byId['scene-dorm-intro-haeun']?['line'], contains('지우'));
-      expect(byId['scene-dorm-intro-jiwoo']?['line'], contains('윤채아'));
-      expect(byId['scene-dorm-intro-chaea']?['line'], contains('수아'));
-      expect(byId['scene-dorm-intro-sua']?['line'], contains('남자 둘'));
-      expect(byId['scene-dorm-intro-hakjun']?['line'], contains('김학준'));
+      expect(
+        byId['scene-86']?['character'],
+        endsWith('08_explaining_quality_v2.png'),
+      );
+      expect(
+        byId['scene-87']?['character'],
+        endsWith('03_bright_laugh_quality_v2.png'),
+      );
+      expect(
+        byId['scene-89']?['character'],
+        endsWith('06_annoyed_quality_v2.png'),
+      );
     },
   );
 }

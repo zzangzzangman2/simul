@@ -523,6 +523,10 @@ void main() {
     expect(find.byKey(portraitKey), findsNothing);
 
     await advanceDialogue(tester, 1);
+    expect(
+      find.byKey(const Key('story-character-living-motion')),
+      findsOneWidget,
+    );
     expect(find.textContaining('이대로 가면 나라가 망한다'), findsOneWidget);
     expect(
       visiblePortraitAsset(),
@@ -622,7 +626,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('tapping anywhere on the stage advances completed dialogue', (
+  testWidgets('tapping anywhere advances even while dialogue is typing', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
@@ -633,15 +637,19 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await startNewGame(tester);
+    await tester.tap(find.byKey(const Key('new-game-button')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
 
     expect(find.text('이야기'), findsOneWidget);
     expect(find.byKey(const Key('story-stage-advance-area')), findsOneWidget);
+    expect(find.byKey(const Key('story-continue')), findsNothing);
 
     await tester.tapAt(const Offset(24, 420));
-    await tester.pumpAndSettle();
+    await tester.pump();
     expect(find.text('전두광'), findsOneWidget);
 
+    await tester.pumpAndSettle();
     await tester.tapAt(const Offset(195, 420));
     await tester.pumpAndSettle();
     expect(find.text('서문태 정책실장'), findsOneWidget);
@@ -856,7 +864,7 @@ void main() {
           'background':
               '/play/assets/assets/images/historical_prologue/bg_future_development_orientation_hall_2000_portrait_v1.png',
           'character':
-              '/play/assets/assets/images/production_soft_painted/han_sua/02_warm_smile_v1.png',
+              '/play/assets/assets/images/production_soft_painted/han_sua/02_warm_smile_quality_v2.png',
         };
       }
       return {
@@ -963,7 +971,7 @@ void main() {
                   .image
               as AssetImage)
           .assetName,
-      'assets/images/production_soft_painted/han_sua/07_determined_v1.png',
+      'assets/images/production_soft_painted/han_sua/07_determined_quality_v2.png',
     );
 
     await advanceDialogue(tester, 3);
@@ -1726,7 +1734,7 @@ void main() {
                     .image
                 as AssetImage)
             .assetName,
-        'assets/images/production_soft_painted/han_sua/03_bright_laugh_v1.png',
+        'assets/images/production_soft_painted/han_sua/03_bright_laugh_quality_v2.png',
       );
       expect(find.byKey(const Key('market-tutorial-teacher')), findsNothing);
       await advanceTutorialPagesToTarget(
