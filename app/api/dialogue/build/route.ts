@@ -127,7 +127,7 @@ async function persistAndBuild(
     {
       version: 2,
       contentVersion: 3,
-      appearanceVersion: 15,
+      appearanceVersion: 16,
       updatedAt: builtAt,
       scenes,
     },
@@ -252,7 +252,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       contentVersion: 3,
-      appearanceVersion: 15,
+      appearanceVersion: 16,
       ...result,
     });
   } catch (error) {

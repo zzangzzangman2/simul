@@ -874,6 +874,14 @@ void main() {
     expect(find.text('수아'), findsOneWidget);
     expect(find.text('(수아가 새 장면의 문을 열었다.)'), findsNothing);
     expect(find.text('이 대사는 편집기에서 새로 추가했어.'), findsOneWidget);
+    expect(
+      (tester
+                  .widget<Image>(find.byKey(const Key('story-character-image')))
+                  .image
+              as AssetImage)
+          .assetName,
+      'assets/images/production_soft_painted/han_sua/02_warm_smile_wave_v3.png',
+    );
     expect(find.byKey(const Key('orientation-complete-card')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
@@ -922,7 +930,7 @@ void main() {
       'project-decimal-dialogue-runtime-v2': jsonEncode({
         'version': 1,
         'contentVersion': 2,
-        'appearanceVersion': 15,
+        'appearanceVersion': 16,
         'updatedAt': '2026-08-01T00:00:00.000Z',
         'scenes': [
           {
@@ -964,7 +972,7 @@ void main() {
       final previewDraft = jsonEncode({
         'version': 1,
         'contentVersion': 2,
-        'appearanceVersion': 15,
+        'appearanceVersion': 16,
         'updatedAt': '2026-08-02T00:00:00.000Z',
         'scenes': [
           {

@@ -74,12 +74,15 @@
 | 최이서 | ISFP | `art_references/choi_iseo_identity_anchor_v1.png` |
 | 정아린 | ESTJ | `art_references/jung_arin_identity_anchor_v1.png` |
 | 박하은 | ENFJ | `art_references/park_haeun_face_identity_anchor_v2.png`, `park_haeun_identity_anchor_v2.png` |
-| 한수아 | ENFP | 공식 화풍 앵커와 현행 런타임 기본 포즈 |
+| 한수아 | ENFP | `art_references/han_sua_identity_anchor_v3.png`(1차 전신), `art_references/han_sua_face_identity_anchor_v3.png`(2차 얼굴 크롭) |
 | 오지우 | ENTP | `art_references/oh_jiwoo_identity_anchor_v1.png` |
 | 윤채아 | INTJ | `art_references/yoon_chaea_identity_anchor_v1.png` |
 | 김학준 | ISTJ | 현행 런타임 기본 포즈 |
 | 한서윤 | INFJ | `art_references/stock_teacher_outfit_reference_v1.png`와 현행 런타임 포즈 |
 
+- 한수아는 전신 앵커를 1차 정체성 기준으로 사용하고 얼굴 크롭 앵커는 얼굴 비율을
+  확인하는 2차 기준으로만 사용한다. 얼굴 크롭의 `1/2` UI, 보이는 손, 파란 천·레이스는
+  정체성 요소가 아니므로 생성·수정 결과에 복제하지 않는다.
 - 동기 10명은 14살, 한서윤은 23세다. 인물 UI와 대사에서는 한국식 나이 표기인
   `14살`을 사용한다.
 - 성격과 대사는 `DECIMAL_WORLD.md`, `characters/cohort6_girls/README.md`와 각 인물

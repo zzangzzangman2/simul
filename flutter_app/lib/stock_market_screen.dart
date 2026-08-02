@@ -30,7 +30,7 @@ const _stockTeacherPoseListen = 'assets/images/주식선생님/26_포즈5_주인
 const _stockTeacherPoseEmphasize =
     'assets/images/주식선생님/27_포즈6_주인공그림체_공통슬롯_투명.png';
 const _stockTutorialSuaAsset =
-    'assets/images/production_soft_painted/han_sua/03_bright_laugh_quality_v2.png';
+    'assets/images/production_soft_painted/han_sua/03_bright_laugh_v3.png';
 const _stockTutorialHakjunAsset =
     'assets/images/historical_prologue/character_hakjun_orientation_v2.png';
 const _stockTutorialPlayerAsset =
@@ -48,7 +48,7 @@ const _stockTutorialIseoAsset =
 const _stockTutorialHaeunAsset =
     'assets/images/production_soft_painted/park_haeun/09_explaining_v2.png';
 const _stockTutorialSuaExplainAsset =
-    'assets/images/production_soft_painted/han_sua/08_explaining_quality_v2.png';
+    'assets/images/production_soft_painted/han_sua/09_explaining_v3.png';
 const _stockTutorialArinAsset =
     'assets/images/production_soft_painted/jung_arin/09_counting_explain_v1.png';
 const _stockTutorialArinWorriedAsset =

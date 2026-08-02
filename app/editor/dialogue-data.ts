@@ -718,7 +718,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "저만 새 연필 받으면 제 점수도 믿을 수 없어요. 조건을 같이 말해 주세요.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_matrix_exam_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_base_wave_v1.png"
+    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_neutral_soft_v2.png"
   },
   {
     "id": "decimal-060",
@@ -742,7 +742,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "다들 51번에서 웃었어요. 어려워서가 아니라 너무 쉬워서. 거기부터 누가 우리 반응을 보고 있었죠?",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_matrix_exam_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_quality_v2.png"
+    "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png"
   },
   {
     "id": "decimal-062",
@@ -970,7 +970,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "그럼 누가 먼저 열었다고 몰아갈 수도 있어. 열 거면 열 명이 같이 보고 열자.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_unfair_game_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_base_wave_v1.png"
+    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_neutral_soft_v2.png"
   },
   {
     "id": "decimal-081",
@@ -1018,7 +1018,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "저쪽 관찰창 뒤에서 우리가 서로 뺏을 때만 펜이 빨리 움직여. 협력하면 감점이라고 믿게 만들려는 것 같아.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_unfair_game_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_quality_v2.png"
+    "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png"
   },
   {
     "id": "decimal-085",
@@ -1090,7 +1090,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "열둘 중 두 명은 아직 말을 못 했어. 공동 소유에 동의하는지 먼저 물어야 해.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_unfair_game_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_base_wave_v1.png"
+    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_neutral_soft_v2.png"
   },
   {
     "id": "decimal-091",
@@ -1330,7 +1330,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "그건 바로 골라도 돼. 필요한 걸 참는 게 훌륭한 건 아니잖아.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_desire_test_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_base_wave_v1.png"
+    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_neutral_soft_v2.png"
   },
   {
     "id": "decimal-111",
@@ -1366,7 +1366,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "나는 차표를 보고 싶어. 돌아가겠다는 게 아니라, 돌아갈 수 있는데 남는 거랑 못 가서 남는 건 다르니까.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_desire_test_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_quality_v2.png"
+    "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png"
   },
   {
     "id": "decimal-114",
@@ -1378,7 +1378,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "나도 차표 확인에 같이 갈게. 네가 혼자 설명하게 두면 남는 선택도 벌처럼 될 수 있어.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_desire_test_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_base_wave_v1.png"
+    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_neutral_soft_v2.png"
   },
   {
     "id": "decimal-115",
@@ -1510,7 +1510,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "여기 맞아? 비밀 아지트면 적어도 옥상에 안테나가 세 개쯤 있어야 하는 거 아니야?",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_gangnam_exterior_winter_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_quality_v2.png"
+    "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png"
   },
   {
     "id": "decimal-126",
@@ -1642,7 +1642,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "싫다고 말하면 멈출 수 있는 것도 포함돼요?",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_secure_entry_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_base_wave_v1.png"
+    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_neutral_soft_v2.png"
   },
   {
     "id": "decimal-137",
@@ -1798,7 +1798,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "둘 다 무서운 말을 아무렇지 않게 하네. 나는 일단 밥 냄새 나는 쪽 편.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_secure_entry_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_quality_v2.png"
+    "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png"
   },
   {
     "id": "decimal-150",
@@ -1822,7 +1822,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "봐. 내가 밥 냄새 쪽이 맞댔지? 이 정도면 첫 투자 성공으로 쳐 줘.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_living_lounge_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_quality_v2.png"
+    "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png"
   },
   {
     "id": "decimal-152",
@@ -1954,7 +1954,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "옆 사람들의 표정을 한 번씩 확인했다.",
     "line": "박하은. 괜찮냐고 물었을 때 바로 대답 안 해도 기다려 줘. 나도 도와주기 전에 어떤 도움이 필요한지 먼저 물을게.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_living_lounge_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/02_warm_smile_v1.png"
+    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/02_bright_smile_wave_v2.png"
   },
   {
     "id": "decimal-163",
@@ -1966,7 +1966,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "입술 앞에 손가락을 대고 웃었다.",
     "line": "한수아. 신나서 말을 먼저 꺼낼 때가 많아. 조용히 있고 싶은 날엔 손으로 이렇게 표시해 줘. 그럼 안 삐치고 멈출게.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_living_lounge_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/han_sua/03_bright_laugh_quality_v2.png"
+    "character": "/play/assets/assets/images/production_soft_painted/han_sua/03_bright_laugh_v3.png"
   },
   {
     "id": "decimal-164",
@@ -2038,7 +2038,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "누가 아프거나 도움이 필요할 때는요? 잠긴 문을 억지로 열지 않고 확인할 방법이 있어야 해요.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_sleeping_wing_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_base_wave_v1.png"
+    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_neutral_soft_v2.png"
   },
   {
     "id": "decimal-170",
@@ -2146,7 +2146,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "나는 가운데. 너무 조용하면 오히려 다른 사람 자는지 확인하느라 못 자.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_sleeping_wing_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_quality_v2.png"
+    "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png"
   },
   {
     "id": "decimal-179",
@@ -2206,7 +2206,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "나는 호출등이 잘 보이는 자리. 대신 누가 불 켜 둔다고 감시하지는 않을게.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_sleeping_wing_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_base_wave_v1.png"
+    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_neutral_soft_v2.png"
   },
   {
     "id": "decimal-184",
@@ -2302,7 +2302,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "라면 다섯 개 남으면 빨간 카드! 두 개 남으면 국가비상사태!",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_living_lounge_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_quality_v2.png"
+    "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png"
   },
   {
     "id": "decimal-192",
@@ -2434,7 +2434,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "이서 말은 수리하지 말라는 뜻이 아니라, 자기 물건에 먼저 물어봐 달라는 뜻 맞아?",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_living_lounge_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_base_wave_v1.png"
+    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_neutral_soft_v2.png"
   },
   {
     "id": "decimal-203",
@@ -2614,7 +2614,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "나는 44분! 사람들이 뚜껑 앞에서 구경하면 밥솥도 긴장할 수 있잖아.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_living_lounge_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/han_sua/03_bright_laugh_quality_v2.png"
+    "character": "/play/assets/assets/images/production_soft_painted/han_sua/03_bright_laugh_v3.png"
   },
   {
     "id": "decimal-218",
@@ -2650,7 +2650,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "졌다고 저녁을 굶는 내기는 금지. 설거지나 머그잔 정리 정도만 하자.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_living_lounge_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_base_wave_v1.png"
+    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_neutral_soft_v2.png"
   },
   {
     "id": "decimal-221",
@@ -2842,7 +2842,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "오늘 우리끼리 정한 것 중 내일 다시 확인할 건 세 개야. 자리 배치, 비상키 입회, 공동물품 알림선.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_sleeping_wing_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_base_wave_v1.png"
+    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_neutral_soft_v2.png"
   },
   {
     "id": "decimal-237",
@@ -2866,7 +2866,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "8시 20분은 너무 숫자 같아. 8시 23분은 어때? 기억에 남잖아.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_sleeping_wing_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_quality_v2.png"
+    "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png"
   },
   {
     "id": "decimal-239",
@@ -2890,7 +2890,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "방금 생각났어.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_sleeping_wing_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_quality_v2.png"
+    "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png"
   },
   {
     "id": "decimal-241",
@@ -2926,7 +2926,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "좋아. 카세트에서 제일 짧은 노래 앞부분만 틀게. 8시 20분 동의.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_sleeping_wing_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_quality_v2.png"
+    "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png"
   },
   {
     "id": "decimal-244",
@@ -3034,7 +3034,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "나는 회사 안에서 말 못 하는 사람이 생기는 구조인지 볼래. 좋은 소식만 위로 올라가면 숫자도 늦게 망가져.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_sleeping_wing_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_base_wave_v1.png"
+    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_neutral_soft_v2.png"
   },
   {
     "id": "decimal-253",
@@ -3046,7 +3046,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "나는 사람들이 어디서 그 회사 얘기를 시작하는지. 아직 매출표에 없는데 자꾸 같은 이름을 말할 때가 있거든.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_sleeping_wing_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_quality_v2.png"
+    "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png"
   },
   {
     "id": "decimal-254",
@@ -3394,7 +3394,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "그래도 6번 자리가 창문 빛 제일 예뻐. {{playerName}}, 네가 뽑았으면 좋은 건 맞아.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_trading_floor_dawn_2000_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_quality_v2.png"
+    "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png"
   },
   {
     "id": "decimal-283",
@@ -3442,7 +3442,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "그리고 질문했는데 모른다고 말하는 사람을 창피하게 만들지 않기. 그래야 위험한 정보도 올라와요.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_trading_floor_dawn_2000_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_base_wave_v1.png"
+    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_neutral_soft_v2.png"
   },
   {
     "id": "decimal-287",

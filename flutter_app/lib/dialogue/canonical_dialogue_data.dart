@@ -649,7 +649,7 @@ const canonicalDialogueScenes = <Map<String, Object>>[
     "date": "1999.04.17 · 10:00",
     "location": "전국 보호시설 · 장학 적성검사장",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_matrix_exam_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_base_wave_v1.png",
+    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_neutral_soft_v2.png",
   },
   <String, Object>{
     "order": 60,
@@ -671,7 +671,7 @@ const canonicalDialogueScenes = <Map<String, Object>>[
     "date": "1999.04.17 · 10:00",
     "location": "전국 보호시설 · 장학 적성검사장",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_matrix_exam_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_quality_v2.png",
+    "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png",
   },
   <String, Object>{
     "order": 62,
@@ -880,7 +880,7 @@ const canonicalDialogueScenes = <Map<String, Object>>[
     "date": "1999.08.09 · 14:20",
     "location": "정부 임시 관찰실 · 2차 선발",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_unfair_game_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_base_wave_v1.png",
+    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_neutral_soft_v2.png",
   },
   <String, Object>{
     "order": 81,
@@ -924,7 +924,7 @@ const canonicalDialogueScenes = <Map<String, Object>>[
     "date": "1999.08.09 · 14:20",
     "location": "정부 임시 관찰실 · 2차 선발",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_unfair_game_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_quality_v2.png",
+    "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png",
   },
   <String, Object>{
     "order": 85,
@@ -990,7 +990,7 @@ const canonicalDialogueScenes = <Map<String, Object>>[
     "date": "1999.08.09 · 14:20",
     "location": "정부 임시 관찰실 · 2차 선발",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_unfair_game_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_base_wave_v1.png",
+    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_neutral_soft_v2.png",
   },
   <String, Object>{
     "order": 91,
@@ -1210,7 +1210,7 @@ const canonicalDialogueScenes = <Map<String, Object>>[
     "date": "1999.10.23 · 18:10",
     "location": "비공개 식당 · 3차 선발",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_desire_test_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_base_wave_v1.png",
+    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_neutral_soft_v2.png",
   },
   <String, Object>{
     "order": 111,
@@ -1243,7 +1243,7 @@ const canonicalDialogueScenes = <Map<String, Object>>[
     "date": "1999.10.23 · 18:10",
     "location": "비공개 식당 · 3차 선발",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_desire_test_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_quality_v2.png",
+    "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png",
   },
   <String, Object>{
     "order": 114,
@@ -1254,7 +1254,7 @@ const canonicalDialogueScenes = <Map<String, Object>>[
     "date": "1999.10.23 · 18:10",
     "location": "비공개 식당 · 3차 선발",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_desire_test_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_base_wave_v1.png",
+    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_neutral_soft_v2.png",
   },
   <String, Object>{
     "order": 115,
@@ -1375,7 +1375,7 @@ const canonicalDialogueScenes = <Map<String, Object>>[
     "date": "1999.12.31 · 21:47",
     "location": "서울 강남 · 무표지 건물 앞",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_gangnam_exterior_winter_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_quality_v2.png",
+    "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png",
   },
   <String, Object>{
     "order": 126,
@@ -1496,7 +1496,7 @@ const canonicalDialogueScenes = <Map<String, Object>>[
     "date": "1999.12.31 · 21:55",
     "location": "데시멀 센터 · 보안 입구",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_secure_entry_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_base_wave_v1.png",
+    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_neutral_soft_v2.png",
   },
   <String, Object>{
     "order": 137,
@@ -1639,7 +1639,7 @@ const canonicalDialogueScenes = <Map<String, Object>>[
     "date": "1999.12.31 · 21:55",
     "location": "데시멀 센터 · 보안 입구",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_secure_entry_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_quality_v2.png",
+    "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png",
   },
   <String, Object>{
     "order": 150,
@@ -1661,7 +1661,7 @@ const canonicalDialogueScenes = <Map<String, Object>>[
     "date": "1999.12.31 · 22:08",
     "location": "데시멀 센터 · 생활 라운지",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_living_lounge_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_quality_v2.png",
+    "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png",
   },
   <String, Object>{
     "order": 152,
@@ -1782,7 +1782,7 @@ const canonicalDialogueScenes = <Map<String, Object>>[
     "date": "1999.12.31 · 22:08",
     "location": "데시멀 센터 · 생활 라운지",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_living_lounge_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/02_warm_smile_v1.png",
+    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/02_bright_smile_wave_v2.png",
   },
   <String, Object>{
     "order": 163,
@@ -1793,7 +1793,7 @@ const canonicalDialogueScenes = <Map<String, Object>>[
     "date": "1999.12.31 · 22:08",
     "location": "데시멀 센터 · 생활 라운지",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_living_lounge_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/han_sua/03_bright_laugh_quality_v2.png",
+    "character": "/play/assets/assets/images/production_soft_painted/han_sua/03_bright_laugh_v3.png",
   },
   <String, Object>{
     "order": 164,
@@ -1859,7 +1859,7 @@ const canonicalDialogueScenes = <Map<String, Object>>[
     "date": "1999.12.31 · 22:42",
     "location": "데시멀 센터 · 수면동",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_sleeping_wing_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_base_wave_v1.png",
+    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_neutral_soft_v2.png",
   },
   <String, Object>{
     "order": 170,
@@ -1958,7 +1958,7 @@ const canonicalDialogueScenes = <Map<String, Object>>[
     "date": "1999.12.31 · 22:42",
     "location": "데시멀 센터 · 수면동",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_sleeping_wing_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_quality_v2.png",
+    "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png",
   },
   <String, Object>{
     "order": 179,
@@ -2013,7 +2013,7 @@ const canonicalDialogueScenes = <Map<String, Object>>[
     "date": "1999.12.31 · 22:42",
     "location": "데시멀 센터 · 수면동",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_sleeping_wing_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_base_wave_v1.png",
+    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_neutral_soft_v2.png",
   },
   <String, Object>{
     "order": 184,
@@ -2101,7 +2101,7 @@ const canonicalDialogueScenes = <Map<String, Object>>[
     "date": "1999.12.31 · 23:06",
     "location": "데시멀 센터 · 생활 라운지",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_living_lounge_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_quality_v2.png",
+    "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png",
   },
   <String, Object>{
     "order": 192,
@@ -2222,7 +2222,7 @@ const canonicalDialogueScenes = <Map<String, Object>>[
     "date": "1999.12.31 · 23:06",
     "location": "데시멀 센터 · 생활 라운지",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_living_lounge_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_base_wave_v1.png",
+    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_neutral_soft_v2.png",
   },
   <String, Object>{
     "order": 203,
@@ -2387,7 +2387,7 @@ const canonicalDialogueScenes = <Map<String, Object>>[
     "date": "1999.12.31 · 23:38",
     "location": "데시멀 센터 · 생활 라운지",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_living_lounge_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/han_sua/03_bright_laugh_quality_v2.png",
+    "character": "/play/assets/assets/images/production_soft_painted/han_sua/03_bright_laugh_v3.png",
   },
   <String, Object>{
     "order": 218,
@@ -2420,7 +2420,7 @@ const canonicalDialogueScenes = <Map<String, Object>>[
     "date": "1999.12.31 · 23:38",
     "location": "데시멀 센터 · 생활 라운지",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_living_lounge_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_base_wave_v1.png",
+    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_neutral_soft_v2.png",
   },
   <String, Object>{
     "order": 221,
@@ -2596,7 +2596,7 @@ const canonicalDialogueScenes = <Map<String, Object>>[
     "date": "2000.01.01 · 00:07",
     "location": "데시멀 센터 · 수면동",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_sleeping_wing_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_base_wave_v1.png",
+    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_neutral_soft_v2.png",
   },
   <String, Object>{
     "order": 237,
@@ -2618,7 +2618,7 @@ const canonicalDialogueScenes = <Map<String, Object>>[
     "date": "2000.01.01 · 00:07",
     "location": "데시멀 센터 · 수면동",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_sleeping_wing_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_quality_v2.png",
+    "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png",
   },
   <String, Object>{
     "order": 239,
@@ -2640,7 +2640,7 @@ const canonicalDialogueScenes = <Map<String, Object>>[
     "date": "2000.01.01 · 00:07",
     "location": "데시멀 센터 · 수면동",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_sleeping_wing_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_quality_v2.png",
+    "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png",
   },
   <String, Object>{
     "order": 241,
@@ -2673,7 +2673,7 @@ const canonicalDialogueScenes = <Map<String, Object>>[
     "date": "2000.01.01 · 00:07",
     "location": "데시멀 센터 · 수면동",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_sleeping_wing_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_quality_v2.png",
+    "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png",
   },
   <String, Object>{
     "order": 244,
@@ -2772,7 +2772,7 @@ const canonicalDialogueScenes = <Map<String, Object>>[
     "date": "2000.01.01 · 00:07",
     "location": "데시멀 센터 · 수면동",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_sleeping_wing_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_base_wave_v1.png",
+    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_neutral_soft_v2.png",
   },
   <String, Object>{
     "order": 253,
@@ -2783,7 +2783,7 @@ const canonicalDialogueScenes = <Map<String, Object>>[
     "date": "2000.01.01 · 00:07",
     "location": "데시멀 센터 · 수면동",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_sleeping_wing_1999_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_quality_v2.png",
+    "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png",
   },
   <String, Object>{
     "order": 254,
@@ -3102,7 +3102,7 @@ const canonicalDialogueScenes = <Map<String, Object>>[
     "date": "2000.01.03 · 08:55",
     "location": "데시멀 센터 · 트레이딩 플로어",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_trading_floor_dawn_2000_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_quality_v2.png",
+    "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png",
   },
   <String, Object>{
     "order": 283,
@@ -3146,7 +3146,7 @@ const canonicalDialogueScenes = <Map<String, Object>>[
     "date": "2000.01.03 · 08:55",
     "location": "데시멀 센터 · 트레이딩 플로어",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_trading_floor_dawn_2000_v1.png",
-    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_base_wave_v1.png",
+    "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_neutral_soft_v2.png",
   },
   <String, Object>{
     "order": 287,

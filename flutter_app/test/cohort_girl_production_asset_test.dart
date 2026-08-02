@@ -8,13 +8,25 @@ import 'package:millennium_capital/game/relationship_state.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  const hanSuaV3Assets = <String>[
+    '01_neutral_wavy_v3.png',
+    '02_warm_smile_wave_v3.png',
+    '03_bright_laugh_v3.png',
+    '04_playful_wink_v3.png',
+    '05_surprised_v3.png',
+    '06_worried_v3.png',
+    '07_annoyed_v3.png',
+    '08_determined_v3.png',
+    '09_explaining_v3.png',
+  ];
+
   const expectedAssetCounts = <String, int>{
     'kim_seoa': 9,
     'lee_jian': 9,
     'choi_iseo': 9,
     'jung_arin': 9,
     'park_haeun': 9,
-    'han_sua': 8,
+    'han_sua': 9,
     'oh_jiwoo': 9,
     'yoon_chaea': 9,
   };
@@ -84,33 +96,58 @@ void main() {
     }
   });
 
-  test('all Han Sua runtime consumers use the full quality v2 set', () {
+  test('all Han Sua runtime consumers use the exact semantic v3 set', () {
     final sources = <String>[
       File('lib/visual_novel_onboarding.dart').readAsStringSync(),
       File('lib/stock_market_screen.dart').readAsStringSync(),
+      File('lib/game/character_profile.dart').readAsStringSync(),
       File('lib/game/relationship_state.dart').readAsStringSync(),
+      File('lib/game/organization_state.dart').readAsStringSync(),
       File('../app/editor/character-catalog.ts').readAsStringSync(),
+      File('../scripts/build-decimal-dialogue.mjs').readAsStringSync(),
       File('assets/dialogue/dialogue-editor-override.json').readAsStringSync(),
     ].join('\n');
+    final actualAssets =
+        Directory('assets/images/production_soft_painted/han_sua')
+            .listSync()
+            .whereType<File>()
+            .where((file) => file.path.endsWith('.png'))
+            .map((file) => file.path.split(Platform.pathSeparator).last)
+            .toList()
+          ..sort();
+    expect(actualAssets, orderedEquals(hanSuaV3Assets));
     expect(
       RegExp(
-        r'production_soft_painted/han_sua/0[1-8]_[^\s"\x27]*_v1\.png',
+        r'production_soft_painted/han_sua/0[1-9]_[^\s"\x27]*quality_v2\.png',
       ).allMatches(sources),
       isEmpty,
     );
-    const qualitySet = <String>[
-      '01_neutral_quality_v2.png',
-      '02_warm_smile_quality_v2.png',
-      '03_bright_laugh_quality_v2.png',
-      '04_surprised_quality_v2.png',
-      '05_worried_quality_v2.png',
-      '06_annoyed_quality_v2.png',
-      '07_determined_quality_v2.png',
-      '08_explaining_quality_v2.png',
-    ];
-    for (final asset in qualitySet) {
+    for (final asset in hanSuaV3Assets) {
       expect(sources, contains(asset), reason: asset);
     }
+  });
+
+  test('legacy Han Sua filenames migrate in both editor runtimes', () {
+    final editor = File('../app/editor/page.tsx').readAsStringSync();
+    final flutter = File('lib/visual_novel_onboarding.dart').readAsStringSync();
+    const migrations = <String, String>{
+      '01_neutral_quality_v2.png': '01_neutral_wavy_v3.png',
+      '02_warm_smile_quality_v2.png': '02_warm_smile_wave_v3.png',
+      '03_bright_laugh_quality_v2.png': '03_bright_laugh_v3.png',
+      '04_surprised_quality_v2.png': '05_surprised_v3.png',
+      '05_worried_quality_v2.png': '06_worried_v3.png',
+      '06_annoyed_quality_v2.png': '07_annoyed_v3.png',
+      '07_determined_quality_v2.png': '08_determined_v3.png',
+      '08_explaining_quality_v2.png': '09_explaining_v3.png',
+    };
+    for (final entry in migrations.entries) {
+      expect(editor, contains(entry.key), reason: entry.key);
+      expect(editor, contains(entry.value), reason: entry.value);
+      expect(flutter, contains(entry.key), reason: entry.key);
+      expect(flutter, contains(entry.value), reason: entry.value);
+    }
+    expect(editor, contains('character: migrateHanSuaCharacterAsset'));
+    expect(flutter, contains('_migrateHanSuaCharacterAsset(normalized)'));
   });
 
   test('Project Decimal dialogue keeps all eight approved identities', () {
@@ -121,7 +158,7 @@ void main() {
               ).readAsStringSync(),
             )
             as Map<String, dynamic>;
-    expect(decoded['appearanceVersion'], 15);
+    expect(decoded['appearanceVersion'], 16);
     expect(decoded['contentVersion'], 3);
     final scenes = (decoded['scenes'] as List<dynamic>)
         .cast<Map<String, dynamic>>();
@@ -161,7 +198,10 @@ void main() {
     for (final scene in suaScenes) {
       expect(
         scene['character'],
-        endsWith('_quality_v2.png'),
+        anyOf(
+          endsWith('01_neutral_wavy_v3.png'),
+          endsWith('03_bright_laugh_v3.png'),
+        ),
         reason: scene['id'] as String,
       );
     }

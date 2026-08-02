@@ -4,7 +4,7 @@
 
 `/editor`는 리부트 프롤로그의 장면 순서, 화자, 캐릭터 포즈, 지문, 대사와
 배경을 한 화면에서 관리하는 제작 도구다. 현행 정식 스키마는
-`contentVersion: 3`, `appearanceVersion: 15`이며 정규 편집본은 292장면이다.
+`contentVersion: 3`, `appearanceVersion: 16`이며 정규 편집본은 292장면이다.
 
 ## 편집 범위
 

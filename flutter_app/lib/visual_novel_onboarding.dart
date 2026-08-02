@@ -2,7 +2,7 @@ part of 'main.dart';
 
 const _onboardingBeatCount = 292;
 const _maximumDialogueBeatCount = 320;
-const _dialogueAppearanceVersion = 15;
+const _dialogueAppearanceVersion = 16;
 const _dialogueContentVersion = 3;
 const _dialogueRuntimeStorageKey = 'project-decimal-dialogue-runtime-v2';
 const _dialogueBundleAsset = 'assets/dialogue/dialogue-editor-override.json';
@@ -17,6 +17,18 @@ const _minhoCharacterAsset =
 const _minhoCharacterScale = 0.72;
 const _maximumWheelBackSteps = 12;
 const _wheelBackDebounce = Duration(milliseconds: 180);
+
+const _hanSuaV2FilenameMigrations = <String, String>{
+  '01_neutral_quality_v2.png': '01_neutral_wavy_v3.png',
+  '02_warm_smile_quality_v2.png': '02_warm_smile_wave_v3.png',
+  '03_bright_laugh_quality_v2.png': '03_bright_laugh_v3.png',
+  '04_surprised_quality_v2.png': '05_surprised_v3.png',
+  '05_worried_quality_v2.png': '06_worried_v3.png',
+  '06_annoyed_quality_v2.png': '07_annoyed_v3.png',
+  '07_determined_quality_v2.png': '08_determined_v3.png',
+  '08_explaining_quality_v2.png': '09_explaining_v3.png',
+};
+const _hanSuaAssetDirectory = 'production_soft_painted/han_sua/';
 
 typedef PrologueCheckpointSaver =
     Future<void> Function(
@@ -86,6 +98,16 @@ String _canonicalDialogueAsset(Object? value) {
   return asset.startsWith(webAssetPrefix)
       ? asset.substring(webAssetPrefix.length)
       : asset;
+}
+
+String _migrateHanSuaCharacterAsset(String asset) {
+  final directoryIndex = asset.lastIndexOf(_hanSuaAssetDirectory);
+  if (directoryIndex < 0) return asset;
+  final filenameIndex = directoryIndex + _hanSuaAssetDirectory.length;
+  final migrated = _hanSuaV2FilenameMigrations[asset.substring(filenameIndex)];
+  return migrated == null
+      ? asset
+      : '${asset.substring(0, filenameIndex)}$migrated';
 }
 
 Map<int, _DialogueOverride> _canonicalDialogueOverrides() =>
@@ -207,9 +229,12 @@ class _VisualNovelOnboardingScreenState
         if (!rawScene.containsKey(key)) return null;
         final value = text(key).trim();
         const webAssetPrefix = '/play/assets/';
-        return value.startsWith(webAssetPrefix)
+        final normalized = value.startsWith(webAssetPrefix)
             ? value.substring(webAssetPrefix.length)
             : value;
+        return key == 'character'
+            ? _migrateHanSuaCharacterAsset(normalized)
+            : normalized;
       }
 
       loaded[beat] = _DialogueOverride(

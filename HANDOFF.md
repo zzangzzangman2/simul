@@ -5,7 +5,7 @@
 - 제품명: `10대부터 건물주`
 - 세계관 정본: `DECIMAL_WORLD.md`
 - 대사 정본: `flutter_app/assets/dialogue/dialogue-editor-override.json`
-- 현재 대사 버전: content 2 / appearance 14 / 292장면
+- 현재 대사 버전: content 3 / appearance 16 / 292장면
 
 ## 프롤로그
 
@@ -31,6 +31,9 @@
   최우선 화풍 참조로 사용한다.
 - 박하은은 `park_haeun_face_identity_anchor_v2.png`와
   `park_haeun_identity_anchor_v2.png`, 런타임 v2 9종으로 연결돼 있다.
+- 한수아는 `han_sua_identity_anchor_v3.png` 전신을 1차, `han_sua_face_identity_anchor_v3.png`
+  얼굴 크롭을 2차 정체성 기준으로 사용하며 `production_soft_painted/han_sua/`의 런타임
+  v3 9종으로 연결돼 있다. 얼굴 크롭의 `1/2` UI·손·파란 천·레이스는 복제하지 않는다.
 - 신규 세로 배경은 `flutter_app/assets/images/cinematic_soft_painted/decimal/`과
   `flutter_app/assets/images/cinematic_soft_painted/decimal_nis_1999/`에 있다.
 - IMF 실패, 숨은 규칙 시험, 불공정 게임, 욕망 시험, 강남 외관, 보안 입구,

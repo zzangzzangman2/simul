@@ -84,7 +84,8 @@ test("opens the Flutter Project Decimal prologue from the default route", async 
   assert.match(dialogueBundleRaw, /bg_decimal_trading_floor_dawn_2000_v1\.png/);
   assert.match(dialogueBundleRaw, /bg_nis_economic_security_room_night_1999_v1\.png/);
   assert.match(dialogueBundleRaw, /bg_decimal_matrix_exam_1999_v1\.png/);
-  assert.match(dialogueBundleRaw, /production_soft_painted\/han_sua\/03_bright_laugh_quality_v2\.png/);
+  assert.match(dialogueBundleRaw, /production_soft_painted\/han_sua\/03_bright_laugh_v3\.png/);
+  assert.doesNotMatch(dialogueBundleRaw, /production_soft_painted\/han_sua\/[^"]*quality_v2\.png/);
   assert.match(dialogueBundleRaw, /decimal_nis_1999\/characters\/han_gyujin_nis_director_v1\.png/);
   assert.match(dialogueBundleRaw, /decimal_nis_1999\/characters\/lim_seohee_economic_security_chief_v1\.png/);
   assert.match(dialogueBundleRaw, /decimal_nis_1999\/characters\/jo_mingyeong_rights_auditor_v1\.png/);
@@ -518,6 +519,27 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
     readFile(new URL("../characters/cohort6_girls/README.md", import.meta.url), "utf8"),
   ]);
   const canonical = JSON.parse(canonicalRaw);
+  const hanSuaAssets = (
+    await readdir(
+      new URL(
+        "../flutter_app/assets/images/production_soft_painted/han_sua/",
+        import.meta.url,
+      ),
+    )
+  )
+    .filter((name) => name.endsWith(".png"))
+    .sort();
+  const expectedHanSuaAssets = [
+    "01_neutral_wavy_v3.png",
+    "02_warm_smile_wave_v3.png",
+    "03_bright_laugh_v3.png",
+    "04_playful_wink_v3.png",
+    "05_surprised_v3.png",
+    "06_worried_v3.png",
+    "07_annoyed_v3.png",
+    "08_determined_v3.png",
+    "09_explaining_v3.png",
+  ];
   const canonicalStoryText = canonical.scenes
     .map(({ chapter, date, location, speaker, direction, line }) =>
       [chapter, date, location, speaker, direction, line].join(" "),
@@ -549,7 +571,8 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
   assert.doesNotMatch(editor, /저장하고 이동/);
   assert.match(editor, /새 장면 .*개 자동 추가/);
   assert.equal(canonical.contentVersion, 3);
-  assert.equal(canonical.appearanceVersion, 15);
+  assert.equal(canonical.appearanceVersion, 16);
+  assert.deepEqual(hanSuaAssets, expectedHanSuaAssets);
   assert.equal(canonical.scenes.length, 292);
   assert.equal(new Set(canonical.scenes.map((scene) => scene.id)).size, 292);
   let previousSceneDate = 0;
@@ -626,13 +649,15 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
   assert.doesNotMatch(data, /단팥빵 얘기 들은 다음부터 계속 배고파/);
   assert.match(data, /bg_decimal_gangnam_exterior_winter_1999_v1\.png/);
   assert.match(editor, /const CONTENT_VERSION = 3/);
+  assert.match(editor, /const APPEARANCE_VERSION = 16/);
   assert.equal(data.includes("\\\\n"), false);
   assert.match(data, /character_hakjun_orientation_v2\.png/);
   assert.match(generator, /dialogue-editor-override\.json/);
   assert.match(generator, /loadCanonicalDialogue/);
   assert.doesNotMatch(generator, /_onboardingBeatCount/);
   assert.doesNotMatch(generator, /visual_novel_onboarding\.dart/);
-  assert.match(generator, /appearanceVersion !== 15/);
+  assert.match(generator, /appearanceVersion !== 16/);
+  assert.match(generator, /content 3 \/ appearance 16/);
   assert.match(generator, /Dialogue editor synced/);
   assert.match(validation, /DIALOGUE_MAX_TEXT_LENGTH = 6000/);
   assert.match(validation, /중복 장면 ID/);
@@ -646,13 +671,22 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
     catalog.indexOf("const teacherPoses"),
     catalog.indexOf("const suaPoses"),
   );
+  const suaCatalog = catalog.slice(
+    catalog.indexOf("const suaPoses"),
+    catalog.indexOf("const kimSeoaPoses"),
+  );
   assert.equal((protagonistCatalog.match(/\.png/g) ?? []).length, 24);
   assert.equal((teacherCatalog.match(/\.png/g) ?? []).length, 6);
+  assert.equal((suaCatalog.match(/\.png/g) ?? []).length, 9);
+  for (const asset of expectedHanSuaAssets) {
+    assert.ok(suaCatalog.includes(asset), asset);
+  }
+  assert.doesNotMatch(suaCatalog, /quality_v2/);
   assert.match(catalog, /speaker: "\{\{playerName\}\}"/);
   assert.match(packageJson, /prebuild:flutter-web/);
   assert.match(packageJson, /dialogue:sync/);
   assert.match(buildRoute, /dialogue-editor-override\.json/);
-  assert.match(buildRoute, /appearanceVersion: 15/);
+  assert.match(buildRoute, /appearanceVersion: 16/);
   assert.match(buildRoute, /validateDialogueScenes/);
   assert.match(buildRoute, /DIALOGUE_BUILD_TOKEN/);
   assert.match(buildRoute, /requiresToken:\s*true/);
@@ -685,11 +719,27 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
   assert.match(data, /lee_jian\/09_explaining_mechanism_v2\.png/);
   assert.match(data, /choi_iseo\/08_focused_mending_v1\.png/);
   assert.match(data, /oh_jiwoo\/09_explaining_report_v1\.png/);
-  assert.match(data, /han_sua\/03_bright_laugh_quality_v2\.png/);
+  assert.match(data, /han_sua\/03_bright_laugh_v3\.png/);
+  assert.doesNotMatch(data, /han_sua\/[^"]*quality_v2\.png/);
+  for (const [legacy, current] of [
+    ["01_neutral_quality_v2.png", "01_neutral_wavy_v3.png"],
+    ["02_warm_smile_quality_v2.png", "02_warm_smile_wave_v3.png"],
+    ["03_bright_laugh_quality_v2.png", "03_bright_laugh_v3.png"],
+    ["04_surprised_quality_v2.png", "05_surprised_v3.png"],
+    ["05_worried_quality_v2.png", "06_worried_v3.png"],
+    ["06_annoyed_quality_v2.png", "07_annoyed_v3.png"],
+    ["07_determined_quality_v2.png", "08_determined_v3.png"],
+    ["08_explaining_quality_v2.png", "09_explaining_v3.png"],
+  ]) {
+    assert.ok(editor.includes(`"${legacy}": "${current}"`), legacy);
+    assert.ok(onboarding.includes(`'${legacy}': '${current}'`), legacy);
+  }
+  assert.match(editor, /character: migrateHanSuaCharacterAsset\(scene\.character\)/);
+  assert.match(onboarding, /_migrateHanSuaCharacterAsset\(normalized\)/);
   assert.match(buildRoute, /persistAndBuild\(validation\.scenes\)/);
   assert.match(buildRoute, /scripts\/build-flutter-web\.mjs/);
   assert.match(onboarding, /_dialogueBundleAsset/);
-  assert.match(onboarding, /_dialogueAppearanceVersion = 15/);
+  assert.match(onboarding, /_dialogueAppearanceVersion = 16/);
   assert.match(onboarding, /_mergeCurrentAppearance/);
   assert.match(onboarding, /rootBundle\.loadString/);
   assert.match(

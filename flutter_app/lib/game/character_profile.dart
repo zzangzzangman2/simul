@@ -149,7 +149,7 @@ const cohortCharacterProfiles = <CohortCharacterProfile>[
     keywords: <String>['가능성', '관찰', '활기'],
     accentValue: 0xFFFF6F91,
     portraitAsset:
-        'assets/images/production_soft_painted/han_sua/01_neutral_quality_v2.png',
+        'assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png',
   ),
   CohortCharacterProfile(
     id: 'oh_jiwoo',

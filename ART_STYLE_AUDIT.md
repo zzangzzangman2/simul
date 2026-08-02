@@ -20,12 +20,15 @@
 | 최이서 | `choi_iseo_identity_anchor_v1.png` | `production_soft_painted/choi_iseo/` 9종 |
 | 정아린 | `jung_arin_identity_anchor_v1.png` | `production_soft_painted/jung_arin/` 9종 |
 | 박하은 | `park_haeun_face_identity_anchor_v2.png`, `park_haeun_identity_anchor_v2.png` | `production_soft_painted/park_haeun/` v2 9종 |
-| 한수아 | 공식 화풍 앵커와 런타임 중립 포즈 | `production_soft_painted/han_sua/` quality v2 8종 |
+| 한수아 | `han_sua_identity_anchor_v3.png`(1차 전신), `han_sua_face_identity_anchor_v3.png`(2차 얼굴 크롭) | `production_soft_painted/han_sua/` v3 9종 |
 | 오지우 | `oh_jiwoo_identity_anchor_v1.png` | `production_soft_painted/oh_jiwoo/` 9종 |
 | 윤채아 | `yoon_chaea_identity_anchor_v1.png` | `production_soft_painted/yoon_chaea/` 9종 |
 
 위 경로는 모두 `flutter_app/assets/images/` 기준이다. 편집기와 프롤로그는 이
 파일들만 인물별 승인 포즈로 사용한다.
+
+한수아의 얼굴 크롭은 얼굴 비율 확인용이다. 크롭에 보이는 `1/2` UI, 손, 파란
+천·레이스는 승인 정체성에 포함하지 않는다.
 
 ## 다른 현행 자산군
 

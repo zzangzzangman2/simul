@@ -555,7 +555,7 @@ const cohortGirlProfiles = <CohortGirlProfile>[
     role: '사람 반응에서 가능성을 읽는 분위기 촉진자',
     accentValue: 0xFFE84F69,
     portraitAsset:
-        'assets/images/production_soft_painted/han_sua/01_neutral_quality_v2.png',
+        'assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png',
     conversationScenes: <RelationshipSceneDefinition>[
       RelationshipSceneDefinition(
         id: 'sua_rumor',

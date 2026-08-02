@@ -27,7 +27,19 @@ const GAME_STORAGE_KEY = "project-decimal-dialogue-runtime-v2";
 const FLUTTER_GAME_STORAGE_KEY = `flutter.${GAME_STORAGE_KEY}`;
 const BUILD_STORAGE_KEY = "project-decimal-dialogue-built-v2";
 const CONTENT_VERSION = 3;
-const APPEARANCE_VERSION = 15;
+const APPEARANCE_VERSION = 16;
+
+const HAN_SUA_V2_FILENAME_MIGRATIONS = {
+  "01_neutral_quality_v2.png": "01_neutral_wavy_v3.png",
+  "02_warm_smile_quality_v2.png": "02_warm_smile_wave_v3.png",
+  "03_bright_laugh_quality_v2.png": "03_bright_laugh_v3.png",
+  "04_surprised_quality_v2.png": "05_surprised_v3.png",
+  "05_worried_quality_v2.png": "06_worried_v3.png",
+  "06_annoyed_quality_v2.png": "07_annoyed_v3.png",
+  "07_determined_quality_v2.png": "08_determined_v3.png",
+  "08_explaining_quality_v2.png": "09_explaining_v3.png",
+} as const;
+const HAN_SUA_ASSET_DIRECTORY = "production_soft_painted/han_sua/";
 
 type PublishStatus = "idle" | "building" | "success" | "error";
 
@@ -53,11 +65,24 @@ function normalizeDialogueText(value: string) {
     .replaceAll("\\r", "\n");
 }
 
+function migrateHanSuaCharacterAsset(asset: string) {
+  const directoryIndex = asset.lastIndexOf(HAN_SUA_ASSET_DIRECTORY);
+  if (directoryIndex < 0) return asset;
+  const filenameIndex = directoryIndex + HAN_SUA_ASSET_DIRECTORY.length;
+  const filename = asset.slice(filenameIndex);
+  const migrated =
+    HAN_SUA_V2_FILENAME_MIGRATIONS[
+      filename as keyof typeof HAN_SUA_V2_FILENAME_MIGRATIONS
+    ];
+  return migrated ? `${asset.slice(0, filenameIndex)}${migrated}` : asset;
+}
+
 function normalizeScene(scene: DialogueScene): DialogueScene {
   return {
     ...scene,
     direction: normalizeDialogueText(scene.direction),
     line: normalizeDialogueText(scene.line),
+    character: migrateHanSuaCharacterAsset(scene.character),
   };
 }
 
@@ -686,28 +711,30 @@ export default function DialogueEditorPage() {
       const appearanceVersion = Array.isArray(parsed) ? undefined : parsed.appearanceVersion;
       const importValidation = validateDialogueScenes(imported);
       if (!importValidation.ok) throw new Error(importValidation.message);
-      const normalized = importValidation.scenes.map((scene, index) => ({
-        ...scene,
-        id: scene.id || `scene-import-${index + 1}`,
-        order: index + 1,
-        chapter: scene.chapter || "새 장",
-        date: scene.date || "",
-        location: scene.location || "",
-        direction: normalizeDialogueText(scene.direction || ""),
-        line: normalizeDialogueText(scene.line || ""),
-        background:
-          appearanceVersion === APPEARANCE_VERSION
-            ? scene.background || ""
-            : initialDialogue.find((current) => current.id === scene.id)?.background ||
-              scene.background ||
-              "",
-        character:
-          appearanceVersion === APPEARANCE_VERSION
-            ? scene.character || ""
-            : initialDialogue.find((current) => current.id === scene.id)?.character ||
-              scene.character ||
-              "",
-      }));
+      const normalized = importValidation.scenes.map((scene, index) =>
+        normalizeScene({
+          ...scene,
+          id: scene.id || `scene-import-${index + 1}`,
+          order: index + 1,
+          chapter: scene.chapter || "새 장",
+          date: scene.date || "",
+          location: scene.location || "",
+          direction: scene.direction || "",
+          line: scene.line || "",
+          background:
+            appearanceVersion === APPEARANCE_VERSION
+              ? scene.background || ""
+              : initialDialogue.find((current) => current.id === scene.id)?.background ||
+                scene.background ||
+                "",
+          character:
+            appearanceVersion === APPEARANCE_VERSION
+              ? scene.character || ""
+              : initialDialogue.find((current) => current.id === scene.id)?.character ||
+                scene.character ||
+                "",
+        }),
+      );
       setScenes(normalized);
       setSelectedId(normalized[0].id);
       setNotice("편집본을 불러왔어요");

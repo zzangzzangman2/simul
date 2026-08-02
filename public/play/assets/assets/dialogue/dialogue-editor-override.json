@@ -1,7 +1,7 @@
 {
   "version": 2,
   "contentVersion": 3,
-  "appearanceVersion": 14,
+  "appearanceVersion": 16,
   "updatedAt": "2026-08-02T12:28:20.529Z",
   "scenes": [
     {
@@ -734,7 +734,7 @@
       "direction": "",
       "line": "다들 51번에서 웃었어요. 어려워서가 아니라 너무 쉬워서. 거기부터 누가 우리 반응을 보고 있었죠?",
       "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_matrix_exam_1999_v1.png",
-      "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_quality_v2.png"
+      "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png"
     },
     {
       "id": "decimal-062",
@@ -1010,7 +1010,7 @@
       "direction": "",
       "line": "저쪽 관찰창 뒤에서 우리가 서로 뺏을 때만 펜이 빨리 움직여. 협력하면 감점이라고 믿게 만들려는 것 같아.",
       "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_unfair_game_1999_v1.png",
-      "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_quality_v2.png"
+      "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png"
     },
     {
       "id": "decimal-085",
@@ -1358,7 +1358,7 @@
       "direction": "",
       "line": "나는 차표를 보고 싶어. 돌아가겠다는 게 아니라, 돌아갈 수 있는데 남는 거랑 못 가서 남는 건 다르니까.",
       "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_desire_test_1999_v1.png",
-      "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_quality_v2.png"
+      "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png"
     },
     {
       "id": "decimal-114",
@@ -1502,7 +1502,7 @@
       "direction": "",
       "line": "여기 맞아? 비밀 아지트면 적어도 옥상에 안테나가 세 개쯤 있어야 하는 거 아니야?",
       "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_gangnam_exterior_winter_1999_v1.png",
-      "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_quality_v2.png"
+      "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png"
     },
     {
       "id": "decimal-126",
@@ -1790,7 +1790,7 @@
       "direction": "",
       "line": "둘 다 무서운 말을 아무렇지 않게 하네. 나는 일단 밥 냄새 나는 쪽 편.",
       "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_secure_entry_1999_v1.png",
-      "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_quality_v2.png"
+      "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png"
     },
     {
       "id": "decimal-150",
@@ -1814,7 +1814,7 @@
       "direction": "",
       "line": "봐. 내가 밥 냄새 쪽이 맞댔지? 이 정도면 첫 투자 성공으로 쳐 줘.",
       "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_living_lounge_1999_v1.png",
-      "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_quality_v2.png"
+      "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png"
     },
     {
       "id": "decimal-152",
@@ -1958,7 +1958,7 @@
       "direction": "입술 앞에 손가락을 대고 웃었다.",
       "line": "한수아. 신나서 말을 먼저 꺼낼 때가 많아. 조용히 있고 싶은 날엔 손으로 이렇게 표시해 줘. 그럼 안 삐치고 멈출게.",
       "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_living_lounge_1999_v1.png",
-      "character": "/play/assets/assets/images/production_soft_painted/han_sua/03_bright_laugh_quality_v2.png"
+      "character": "/play/assets/assets/images/production_soft_painted/han_sua/03_bright_laugh_v3.png"
     },
     {
       "id": "decimal-164",
@@ -2138,7 +2138,7 @@
       "direction": "",
       "line": "나는 가운데. 너무 조용하면 오히려 다른 사람 자는지 확인하느라 못 자.",
       "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_sleeping_wing_1999_v1.png",
-      "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_quality_v2.png"
+      "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png"
     },
     {
       "id": "decimal-179",
@@ -2294,7 +2294,7 @@
       "direction": "",
       "line": "라면 다섯 개 남으면 빨간 카드! 두 개 남으면 국가비상사태!",
       "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_living_lounge_1999_v1.png",
-      "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_quality_v2.png"
+      "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png"
     },
     {
       "id": "decimal-192",
@@ -2606,7 +2606,7 @@
       "direction": "",
       "line": "나는 44분! 사람들이 뚜껑 앞에서 구경하면 밥솥도 긴장할 수 있잖아.",
       "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_living_lounge_1999_v1.png",
-      "character": "/play/assets/assets/images/production_soft_painted/han_sua/03_bright_laugh_quality_v2.png"
+      "character": "/play/assets/assets/images/production_soft_painted/han_sua/03_bright_laugh_v3.png"
     },
     {
       "id": "decimal-218",
@@ -2858,7 +2858,7 @@
       "direction": "",
       "line": "8시 20분은 너무 숫자 같아. 8시 23분은 어때? 기억에 남잖아.",
       "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_sleeping_wing_1999_v1.png",
-      "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_quality_v2.png"
+      "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png"
     },
     {
       "id": "decimal-239",
@@ -2882,7 +2882,7 @@
       "direction": "",
       "line": "방금 생각났어.",
       "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_sleeping_wing_1999_v1.png",
-      "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_quality_v2.png"
+      "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png"
     },
     {
       "id": "decimal-241",
@@ -2918,7 +2918,7 @@
       "direction": "",
       "line": "좋아. 카세트에서 제일 짧은 노래 앞부분만 틀게. 8시 20분 동의.",
       "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_sleeping_wing_1999_v1.png",
-      "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_quality_v2.png"
+      "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png"
     },
     {
       "id": "decimal-244",
@@ -3038,7 +3038,7 @@
       "direction": "",
       "line": "나는 사람들이 어디서 그 회사 얘기를 시작하는지. 아직 매출표에 없는데 자꾸 같은 이름을 말할 때가 있거든.",
       "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_sleeping_wing_1999_v1.png",
-      "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_quality_v2.png"
+      "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png"
     },
     {
       "id": "decimal-254",
@@ -3386,7 +3386,7 @@
       "direction": "",
       "line": "그래도 6번 자리가 창문 빛 제일 예뻐. {{playerName}}, 네가 뽑았으면 좋은 건 맞아.",
       "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_trading_floor_dawn_2000_v1.png",
-      "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_quality_v2.png"
+      "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png"
     },
     {
       "id": "decimal-283",

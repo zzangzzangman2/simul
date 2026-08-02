@@ -61,14 +61,15 @@ const teacherPoses = [
 );
 
 const suaPoses = [
-  ["01", "차분한 기본", "01_neutral_quality_v2.png"],
-  ["02", "따뜻한 미소 · 선명도 개선", "02_warm_smile_quality_v2.png"],
-  ["03", "활짝 웃음", "03_bright_laugh_quality_v2.png"],
-  ["04", "깜짝 놀람", "04_surprised_quality_v2.png"],
-  ["05", "걱정", "05_worried_quality_v2.png"],
-  ["06", "불만", "06_annoyed_quality_v2.png"],
-  ["07", "단호한 결심", "07_determined_quality_v2.png"],
-  ["08", "활기찬 설명", "08_explaining_quality_v2.png"],
+  ["01", "차분한 웨이브 기본", "01_neutral_wavy_v3.png"],
+  ["02", "따뜻한 미소와 손인사", "02_warm_smile_wave_v3.png"],
+  ["03", "활짝 웃음", "03_bright_laugh_v3.png"],
+  ["04", "장난스러운 윙크", "04_playful_wink_v3.png"],
+  ["05", "깜짝 놀람", "05_surprised_v3.png"],
+  ["06", "걱정", "06_worried_v3.png"],
+  ["07", "불만", "07_annoyed_v3.png"],
+  ["08", "단호한 결심", "08_determined_v3.png"],
+  ["09", "활기찬 설명", "09_explaining_v3.png"],
 ].map(([id, label, file]) =>
   pose(id, label, `assets/images/production_soft_painted/han_sua/${file}`),
 );
