@@ -27,7 +27,7 @@ const GAME_STORAGE_KEY = "project-decimal-dialogue-runtime-v2";
 const FLUTTER_GAME_STORAGE_KEY = `flutter.${GAME_STORAGE_KEY}`;
 const BUILD_STORAGE_KEY = "project-decimal-dialogue-built-v2";
 const CONTENT_VERSION = 3;
-const APPEARANCE_VERSION = 14;
+const APPEARANCE_VERSION = 15;
 
 type PublishStatus = "idle" | "building" | "success" | "error";
 
