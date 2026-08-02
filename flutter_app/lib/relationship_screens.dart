@@ -5,6 +5,20 @@ class RelationshipStatusScreen extends StatelessWidget {
 
   final GameState state;
 
+  void _openCard(BuildContext context, CohortCharacterProfile profile) {
+    final girlProfile = cohortGirlProfileById(profile.id);
+    Navigator.of(context).push(
+      _gameSceneRoute<void>(
+        _CharacterCardScreen(
+          profile: profile,
+          progress: girlProfile == null
+              ? null
+              : state.relationships.progressFor(profile.id),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: const Color(0xFFFFF5F0),
@@ -12,23 +26,30 @@ class RelationshipStatusScreen extends StatelessWidget {
       child: Column(
         children: [
           _RelationshipHeader(
-            title: '제6기 관계 기록',
-            subtitle: '여학생 8명 · 호감도 1~100',
+            title: '제6기 인물 카드',
+            subtitle: '여학생 8명 · 김학준 · 한서윤 선생님',
             onBack: () => Navigator.pop(context),
           ),
           Expanded(
-            child: ListView.separated(
-              key: const Key('relationship-status-list'),
+            child: GridView.builder(
+              key: const Key('character-card-grid'),
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
-              itemCount: cohortGirlProfiles.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 9),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 10,
+                mainAxisSpacing: 12,
+                childAspectRatio: 0.67,
+              ),
+              itemCount: cohortCharacterProfiles.length,
               itemBuilder: (context, index) {
-                final profile = cohortGirlProfiles[index];
-                final progress = state.relationships.progressFor(profile.id);
-                return _RelationshipGirlCard(
+                final profile = cohortCharacterProfiles[index];
+                final girlProfile = cohortGirlProfileById(profile.id);
+                return _CohortCharacterTile(
                   profile: profile,
-                  progress: progress,
-                  showCounts: true,
+                  progress: girlProfile == null
+                      ? null
+                      : state.relationships.progressFor(profile.id),
+                  onTap: () => _openCard(context, profile),
                 );
               },
             ),
@@ -37,6 +58,738 @@ class RelationshipStatusScreen extends StatelessWidget {
       ),
     ),
   );
+}
+
+class _CohortCharacterTile extends StatelessWidget {
+  const _CohortCharacterTile({
+    required this.profile,
+    required this.progress,
+    required this.onTap,
+  });
+
+  final CohortCharacterProfile profile;
+  final GirlRelationshipProgress? progress;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = Color(profile.accentValue);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        key: Key('character-card-${profile.id}'),
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(22),
+        child: Ink(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: <Color>[Colors.white, accent.withValues(alpha: 0.18)],
+            ),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: _ink, width: 1.8),
+            boxShadow: const <BoxShadow>[
+              BoxShadow(
+                color: Color(0x2833405F),
+                blurRadius: 0,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                Expanded(
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: <Widget>[
+                      ColoredBox(color: accent.withValues(alpha: 0.12)),
+                      Hero(
+                        tag: 'cohort-character-${profile.id}',
+                        child: _CharacterPortraitImage(
+                          profile: profile,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      Positioned(
+                        left: 8,
+                        top: 8,
+                        child: _CharacterBadge(
+                          label: profile.mbti,
+                          color: accent,
+                        ),
+                      ),
+                      Positioned(
+                        right: 8,
+                        top: 8,
+                        child: _CharacterBadge(
+                          label: profile.ageLabel,
+                          color: _ink,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(10, 9, 9, 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Row(
+                        children: <Widget>[
+                          Expanded(
+                            child: Text(
+                              profile.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: _ink,
+                                fontFamily: 'Maplestory',
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          Icon(
+                            Icons.arrow_forward_ios_rounded,
+                            size: 14,
+                            color: accent,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        profile.role,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFF68738B),
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        progress == null
+                            ? profile.keywords.join(' · ')
+                            : '호감도 ${progress!.affection} · ${progress!.stage.label}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: progress == null ? _ink : accent,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CharacterCardScreen extends StatelessWidget {
+  const _CharacterCardScreen({required this.profile, required this.progress});
+
+  final CohortCharacterProfile profile;
+  final GirlRelationshipProgress? progress;
+
+  void _openDetails(BuildContext context) {
+    Navigator.of(context).push(
+      _gameSceneRoute<void>(
+        _CharacterProfileDetailScreen(profile: profile, progress: progress),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = Color(profile.accentValue);
+    return Scaffold(
+      key: Key('character-card-screen-${profile.id}'),
+      backgroundColor: const Color(0xFFFFF5F0),
+      body: SafeArea(
+        child: Column(
+          children: <Widget>[
+            _RelationshipHeader(
+              title: profile.name,
+              subtitle:
+                  '${profile.ageLabel} · ${profile.mbti} · ${profile.group}',
+              onBack: () => Navigator.pop(context),
+            ),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(14, 8, 14, 24),
+                children: <Widget>[
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: <Color>[
+                          Colors.white,
+                          accent.withValues(alpha: 0.2),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(26),
+                      border: Border.all(color: _ink, width: 2),
+                      boxShadow: const <BoxShadow>[
+                        BoxShadow(
+                          color: Color(0x3033405F),
+                          blurRadius: 0,
+                          offset: Offset(0, 5),
+                        ),
+                      ],
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: Column(
+                      children: <Widget>[
+                        Semantics(
+                          button: true,
+                          label: '${profile.name} 상세 프로필 열기',
+                          child: InkWell(
+                            key: Key('character-card-portrait-${profile.id}'),
+                            onTap: () => _openDetails(context),
+                            child: SizedBox(
+                              height: 340,
+                              child: Stack(
+                                fit: StackFit.expand,
+                                children: <Widget>[
+                                  ColoredBox(
+                                    color: accent.withValues(alpha: 0.1),
+                                  ),
+                                  Hero(
+                                    tag: 'cohort-character-${profile.id}',
+                                    child: _CharacterPortraitImage(
+                                      profile: profile,
+                                      fit: BoxFit.contain,
+                                    ),
+                                  ),
+                                  Positioned(
+                                    left: 12,
+                                    right: 12,
+                                    bottom: 12,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 9,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xD933405F),
+                                        borderRadius: BorderRadius.circular(14),
+                                        border: Border.all(
+                                          color: Colors.white.withValues(
+                                            alpha: 0.75,
+                                          ),
+                                        ),
+                                      ),
+                                      child: const Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: <Widget>[
+                                          Icon(
+                                            Icons.touch_app_rounded,
+                                            color: Colors.white,
+                                            size: 18,
+                                          ),
+                                          SizedBox(width: 6),
+                                          Text(
+                                            '초상화를 눌러 상세 프로필 보기',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w900,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 15, 16, 17),
+                          child: Column(
+                            children: <Widget>[
+                              Text(
+                                profile.name,
+                                style: const TextStyle(
+                                  color: _ink,
+                                  fontFamily: 'Maplestory',
+                                  fontSize: 27,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                profile.role,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: accent,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                              const SizedBox(height: 11),
+                              Wrap(
+                                alignment: WrapAlignment.center,
+                                spacing: 7,
+                                runSpacing: 7,
+                                children: <Widget>[
+                                  _CharacterBadge(
+                                    label: profile.ageLabel,
+                                    color: _ink,
+                                  ),
+                                  _CharacterBadge(
+                                    label: profile.mbti,
+                                    color: accent,
+                                  ),
+                                  for (final keyword in profile.keywords)
+                                    _CharacterBadge(
+                                      label: keyword,
+                                      color: accent,
+                                      pale: true,
+                                    ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 15),
+                  _CharacterSummaryPanel(
+                    icon: Icons.auto_awesome_rounded,
+                    title: '한 줄 소개',
+                    body: profile.summary,
+                    accent: accent,
+                  ),
+                  if (progress != null) ...<Widget>[
+                    const SizedBox(height: 11),
+                    _CharacterAffectionSummary(
+                      profile: profile,
+                      progress: progress!,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CharacterProfileDetailScreen extends StatelessWidget {
+  const _CharacterProfileDetailScreen({
+    required this.profile,
+    required this.progress,
+  });
+
+  final CohortCharacterProfile profile;
+  final GirlRelationshipProgress? progress;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = Color(profile.accentValue);
+    return Scaffold(
+      key: Key('character-detail-screen-${profile.id}'),
+      backgroundColor: const Color(0xFFFFF5F0),
+      body: SafeArea(
+        child: Column(
+          children: <Widget>[
+            _RelationshipHeader(
+              title: '${profile.name} 프로필',
+              subtitle: '${profile.mbti} · ${profile.role}',
+              onBack: () => Navigator.pop(context),
+            ),
+            Expanded(
+              child: ListView(
+                key: Key('character-detail-list-${profile.id}'),
+                padding: const EdgeInsets.fromLTRB(14, 8, 14, 26),
+                children: <Widget>[
+                  Container(
+                    height: 265,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: <Color>[
+                          Colors.white,
+                          accent.withValues(alpha: 0.17),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: _ink, width: 2),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: Hero(
+                      tag: 'cohort-character-${profile.id}',
+                      child: _CharacterPortraitImage(
+                        profile: profile,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  _CharacterFactPanel(profile: profile),
+                  const SizedBox(height: 11),
+                  _CharacterSummaryPanel(
+                    icon: Icons.psychology_alt_rounded,
+                    title: '성격',
+                    body: profile.personality,
+                    accent: accent,
+                  ),
+                  const SizedBox(height: 11),
+                  _CharacterSummaryPanel(
+                    icon: Icons.favorite_outline_rounded,
+                    title: '좋아하는 것',
+                    body: profile.likes,
+                    accent: accent,
+                  ),
+                  const SizedBox(height: 11),
+                  _CharacterSummaryPanel(
+                    icon: Icons.workspace_premium_outlined,
+                    title: '잘하는 것',
+                    body: profile.strength,
+                    accent: accent,
+                  ),
+                  const SizedBox(height: 11),
+                  _CharacterSummaryPanel(
+                    icon: Icons.candlestick_chart_rounded,
+                    title: '투자를 보는 기준',
+                    body: profile.investmentView,
+                    accent: accent,
+                  ),
+                  const SizedBox(height: 11),
+                  _CharacterSummaryPanel(
+                    icon: Icons.forum_outlined,
+                    title: '사람과 가까워지는 방식',
+                    body: profile.relationshipStyle,
+                    accent: accent,
+                  ),
+                  if (progress != null) ...<Widget>[
+                    const SizedBox(height: 11),
+                    _CharacterAffectionSummary(
+                      profile: profile,
+                      progress: progress!,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CharacterPortraitImage extends StatelessWidget {
+  const _CharacterPortraitImage({required this.profile, required this.fit});
+
+  final CohortCharacterProfile profile;
+  final BoxFit fit;
+
+  @override
+  Widget build(BuildContext context) => Image.asset(
+    profile.portraitAsset,
+    fit: fit,
+    alignment: Alignment.topCenter,
+    errorBuilder: (_, _, _) => Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Icon(
+            Icons.person_rounded,
+            color: Color(profile.accentValue),
+            size: 54,
+          ),
+          const SizedBox(height: 7),
+          Text(
+            profile.name,
+            style: TextStyle(
+              color: Color(profile.accentValue),
+              fontFamily: 'Maplestory',
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _CharacterBadge extends StatelessWidget {
+  const _CharacterBadge({
+    required this.label,
+    required this.color,
+    this.pale = false,
+  });
+
+  final String label;
+  final Color color;
+  final bool pale;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+    decoration: BoxDecoration(
+      color: pale
+          ? color.withValues(alpha: 0.13)
+          : color.withValues(alpha: 0.91),
+      borderRadius: BorderRadius.circular(999),
+      border: Border.all(
+        color: pale ? color.withValues(alpha: 0.5) : Colors.white,
+        width: 1,
+      ),
+    ),
+    child: Text(
+      label,
+      style: TextStyle(
+        color: pale ? color : Colors.white,
+        fontSize: 9,
+        fontWeight: FontWeight.w900,
+      ),
+    ),
+  );
+}
+
+class _CharacterFactPanel extends StatelessWidget {
+  const _CharacterFactPanel({required this.profile});
+
+  final CohortCharacterProfile profile;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = Color(profile.accentValue);
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(19),
+        border: Border.all(color: _ink, width: 1.8),
+      ),
+      child: Column(
+        children: <Widget>[
+          _CharacterFactRow(label: '이름', value: profile.name, accent: accent),
+          _CharacterFactRow(
+            label: '나이',
+            value: profile.ageLabel,
+            accent: accent,
+          ),
+          _CharacterFactRow(label: 'MBTI', value: profile.mbti, accent: accent),
+          _CharacterFactRow(label: '소속', value: profile.group, accent: accent),
+          _CharacterFactRow(
+            label: '역할',
+            value: profile.role,
+            accent: accent,
+            last: true,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CharacterFactRow extends StatelessWidget {
+  const _CharacterFactRow({
+    required this.label,
+    required this.value,
+    required this.accent,
+    this.last = false,
+  });
+
+  final String label;
+  final String value;
+  final Color accent;
+  final bool last;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(vertical: 8),
+    decoration: BoxDecoration(
+      border: last
+          ? null
+          : const Border(bottom: BorderSide(color: Color(0xFFE9E2DF))),
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        SizedBox(
+          width: 54,
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xFF7A8294),
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: TextStyle(
+              color: label == 'MBTI' ? accent : _ink,
+              fontSize: 11,
+              height: 1.35,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _CharacterSummaryPanel extends StatelessWidget {
+  const _CharacterSummaryPanel({
+    required this.icon,
+    required this.title,
+    required this.body,
+    required this.accent,
+  });
+
+  final IconData icon;
+  final String title;
+  final String body;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(19),
+      border: Border.all(color: accent.withValues(alpha: 0.56), width: 1.6),
+      boxShadow: const <BoxShadow>[
+        BoxShadow(color: Color(0x1833405F), offset: Offset(0, 3)),
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Row(
+          children: <Widget>[
+            Container(
+              width: 30,
+              height: 30,
+              decoration: BoxDecoration(
+                color: accent.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: accent, size: 18),
+            ),
+            const SizedBox(width: 9),
+            Text(
+              title,
+              style: const TextStyle(
+                color: _ink,
+                fontFamily: 'Maplestory',
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 9),
+        Text(
+          body,
+          style: const TextStyle(
+            color: Color(0xFF59647C),
+            fontSize: 11,
+            height: 1.55,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _CharacterAffectionSummary extends StatelessWidget {
+  const _CharacterAffectionSummary({
+    required this.profile,
+    required this.progress,
+  });
+
+  final CohortCharacterProfile profile;
+  final GirlRelationshipProgress progress;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = Color(profile.accentValue);
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.11),
+        borderRadius: BorderRadius.circular(19),
+        border: Border.all(color: accent, width: 1.6),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Icon(Icons.favorite_rounded, color: accent, size: 20),
+              const SizedBox(width: 7),
+              Expanded(
+                child: Text(
+                  '현재 관계 · ${progress.stage.label}',
+                  style: const TextStyle(
+                    color: _ink,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              Text(
+                '${progress.affection} / $relationshipMaxAffection',
+                style: TextStyle(
+                  color: accent,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 9),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              key: Key('relationship-affection-${profile.id}'),
+              minHeight: 9,
+              value: progress.affection / relationshipMaxAffection,
+              backgroundColor: Colors.white,
+              valueColor: AlwaysStoppedAnimation<Color>(accent),
+            ),
+          ),
+          const SizedBox(height: 7),
+          Text(
+            '대화 ${progress.conversationCount}회 · 데이트 ${progress.dateCount}회',
+            style: const TextStyle(
+              color: Color(0xFF6D7892),
+              fontSize: 9,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class RelationshipEveningScreen extends StatefulWidget {
@@ -524,15 +1277,10 @@ class _RelationshipHeader extends StatelessWidget {
 }
 
 class _RelationshipGirlCard extends StatelessWidget {
-  const _RelationshipGirlCard({
-    required this.profile,
-    required this.progress,
-    this.showCounts = false,
-  });
+  const _RelationshipGirlCard({required this.profile, required this.progress});
 
   final CohortGirlProfile profile;
   final GirlRelationshipProgress progress;
-  final bool showCounts;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -593,17 +1341,6 @@ class _RelationshipGirlCard extends StatelessWidget {
                   fontWeight: FontWeight.w800,
                 ),
               ),
-              if (showCounts) ...[
-                const SizedBox(height: 3),
-                Text(
-                  '대화 ${progress.conversationCount}회 · 데이트 ${progress.dateCount}회',
-                  style: const TextStyle(
-                    color: Color(0xFF8A90A0),
-                    fontSize: 8,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
             ],
           ),
         ),

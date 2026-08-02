@@ -1701,7 +1701,7 @@ class _ApartmentActionRail extends StatelessWidget {
         const SizedBox(height: 7),
         _ApartmentRailButton(
           buttonKey: const Key('relationship-status-button'),
-          tooltip: '여학생 8명 호감도 확인',
+          tooltip: '제6기 인물 카드 10명',
           assetPath: 'assets/images/hud_clean_letter.png',
           onPressed: onOpenRelationships,
         ),

@@ -1,8 +1,9 @@
 part of 'main.dart';
 
-const _onboardingBeatCount = 73;
+const _onboardingBeatCount = 140;
 const _maximumDialogueBeatCount = 240;
 const _dialogueAppearanceVersion = 13;
+const _dialogueContentVersion = 1;
 const _dialogueRuntimeStorageKey = 'future-academy-dialogue-runtime-v1';
 const _dialogueBundleAsset = 'assets/dialogue/dialogue-editor-override.json';
 const _dialoguePanelOpacityStorageKey =
@@ -23,6 +24,18 @@ const _minhoCharacterAsset =
 const _minhoCharacterScale = 0.72;
 const _maximumWheelBackSteps = 12;
 const _wheelBackDebounce = Duration(milliseconds: 180);
+
+class _PrologueSkipStep {
+  const _PrologueSkipStep({
+    required this.sectionLabel,
+    required this.destinationLabel,
+    required this.targetBeat,
+  });
+
+  final String sectionLabel;
+  final String destinationLabel;
+  final int targetBeat;
+}
 
 double _storyCharacterScaleForAsset(String asset) =>
     asset == _minhoCharacterAsset ? _minhoCharacterScale : 1.0;
@@ -92,6 +105,29 @@ class _DialogueOverride {
   final String? character;
 }
 
+String _canonicalDialogueAsset(Object? value) {
+  final asset = value is String ? value : '';
+  const webAssetPrefix = '/play/assets/';
+  return asset.startsWith(webAssetPrefix)
+      ? asset.substring(webAssetPrefix.length)
+      : asset;
+}
+
+Map<int, _DialogueOverride> _canonicalDialogueOverrides() =>
+    <int, _DialogueOverride>{
+      for (final scene in canonicalDialogueScenes)
+        (scene['order']! as int) - 1: _DialogueOverride(
+          id: scene['id']! as String,
+          speaker: scene['speaker']! as String,
+          line: scene['line']! as String,
+          direction: scene['direction']! as String,
+          date: scene['date']! as String,
+          location: scene['location']! as String,
+          background: _canonicalDialogueAsset(scene['background']),
+          character: _canonicalDialogueAsset(scene['character']),
+        ),
+    };
+
 class VisualNovelOnboardingScreen extends StatefulWidget {
   const VisualNovelOnboardingScreen({
     super.key,
@@ -116,9 +152,9 @@ class _VisualNovelOnboardingScreenState
   final List<String> _dialogueHistory = <String>[];
   final List<int> _beatNavigationHistory = <int>[];
   Map<int, _DialogueOverride> _dialogueOverrides =
-      const <int, _DialogueOverride>{};
+      _canonicalDialogueOverrides();
   int _beat = 0;
-  int _dialogueEndBeat = _orientationCompleteBeat;
+  int _dialogueEndBeat = canonicalDialogueScenes.length - 1;
   bool _isCreating = false;
   String? _creationError;
   bool _academyPcPoweredOn = false;
@@ -207,6 +243,17 @@ class _VisualNovelOnboardingScreenState
     }
   }
 
+  int _decodeDialogueContentVersion(String raw) {
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map<String, dynamic>) return 0;
+      final version = decoded['contentVersion'];
+      return version is num ? version.toInt() : 0;
+    } catch (_) {
+      return 0;
+    }
+  }
+
   _DialogueOverride _mergeCurrentAppearance(
     _DialogueOverride draft,
     _DialogueOverride current,
@@ -247,6 +294,17 @@ class _VisualNovelOnboardingScreenState
         if (raw != null && raw.trim().isNotEmpty) {
           final browserDraft = _decodeDialogueOverrides(raw);
           if (browserDraft.isNotEmpty) {
+            if (_decodeDialogueContentVersion(raw) < _dialogueContentVersion) {
+              final customScenes = Map<int, _DialogueOverride>.fromEntries(
+                browserDraft.entries.where(
+                  (entry) => bundledAppearance[entry.key]?.id != entry.value.id,
+                ),
+              );
+              browserDraft
+                ..clear()
+                ..addAll(bundledAppearance)
+                ..addAll(customScenes);
+            }
             if (_decodeDialogueAppearanceVersion(raw) <
                 _dialogueAppearanceVersion) {
               for (final entry in browserDraft.entries.toList()) {
@@ -283,10 +341,10 @@ class _VisualNovelOnboardingScreenState
     super.dispose();
   }
 
-  String get _background {
-    final override = _dialogueOverrides[_beat]?.background?.trim();
+  String _backgroundForBeat(int beat) {
+    final override = _dialogueOverrides[beat]?.background?.trim();
     if (override != null && override.isNotEmpty) return override;
-    return switch (_beat) {
+    return switch (beat) {
       <= 4 =>
         'assets/images/cinematic_soft_painted/policy_1981/backgrounds/bg_policy_room_night_v1.png',
       <= 15 =>
@@ -314,6 +372,57 @@ class _VisualNovelOnboardingScreenState
       _ => 'assets/images/bg_stock_academy_2000_portrait_cartoon_v4.png',
     };
   }
+
+  String get _background => _backgroundForBeat(_beat);
+
+  int _firstBeatWithBackground(String token, int fallbackBeat) {
+    for (var beat = 0; beat <= _dialogueEndBeat; beat += 1) {
+      if (_backgroundForBeat(beat).contains(token)) return beat;
+    }
+    return math.min(fallbackBeat, _dialogueEndBeat);
+  }
+
+  _PrologueSkipStep _prologueSkipStepForBeat(int beat) {
+    final orphanageBeat = _firstBeatWithBackground(
+      'bg_future_development_orphanage_',
+      16,
+    );
+    final auditoriumBeat = _firstBeatWithBackground(
+      'bg_future_development_orientation_hall_',
+      32,
+    );
+    final dormitoryBeat = _firstBeatWithBackground('/dormitory_2000/', 54);
+
+    if (beat < orphanageBeat) {
+      return _PrologueSkipStep(
+        sectionLabel: '청와대 장면',
+        destinationLabel: '고아원 장면',
+        targetBeat: orphanageBeat,
+      );
+    }
+    if (beat < auditoriumBeat) {
+      return _PrologueSkipStep(
+        sectionLabel: '고아원 장면',
+        destinationLabel: '강당 장면',
+        targetBeat: auditoriumBeat,
+      );
+    }
+    if (beat < dormitoryBeat) {
+      return _PrologueSkipStep(
+        sectionLabel: '강당 장면',
+        destinationLabel: '기숙사 장면',
+        targetBeat: dormitoryBeat,
+      );
+    }
+    return _PrologueSkipStep(
+      sectionLabel: '기숙사 장면',
+      destinationLabel: '주식 PC 튜토리얼',
+      targetBeat: _dialogueEndBeat,
+    );
+  }
+
+  _PrologueSkipStep get _currentPrologueSkipStep =>
+      _prologueSkipStepForBeat(_beat);
 
   String get _location {
     final override = _dialogueOverrides[_beat]?.location.trim();
@@ -564,7 +673,7 @@ class _VisualNovelOnboardingScreenState
         9 => '먹이고 재우는 데서 끝내면 세금 낭비지. 스스로 돈을 벌게 만들면 투자가 되고.',
         10 => '핏덩이들에게 나랏돈을 줬다가 잃으면 혈세 낭비라 할 겁니다. 벌면 나라가 코 묻은 돈을 빼앗는다고 할 테고요.',
         11 =>
-          '열네 살, SEED 01부터 시작합니다. 원금은 만 원입니다. 작아서 우스워 보여도, 손실 이유를 감추기엔 충분히 큰 돈입니다.',
+          '열네 살, SEED 01부터 시작합니다. 원금은 오만 원입니다. 작아서 우스워 보여도, 손실 이유를 감추기엔 충분히 큰 돈입니다.',
         12 => '잃으면?',
         13 => '아이 빚으로 남기지 않습니다. 대신 다음 달 주문 한도를 깎습니다. 벌면 일부를 국가가 회수하고요.',
         14 =>
@@ -865,15 +974,17 @@ class _VisualNovelOnboardingScreenState
 
   Future<void> _showSkipDialog() async {
     _playStoryFeedback();
+    final startingBeat = _beat;
+    final skipStep = _currentPrologueSkipStep;
     final shouldSkip = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         key: const Key('story-skip-dialog'),
-        title: const Text('프롤로그를 건너뛸까요?'),
-        content: const Text(
-          '미래양성계획 창설과 수아·학준의 첫 만남을 건너뛰고 '
-          '제6기 주식 PC 실습실의 전원 실습으로 이동합니다. '
-          'PC를 켜고 주식실습 프로그램을 열기 전에는 저장이 만들어지지 않습니다.',
+        title: Text('${skipStep.sectionLabel}을 건너뛸까요?'),
+        content: Text(
+          '${skipStep.sectionLabel}만 건너뛰고 '
+          '${skipStep.destinationLabel}의 첫 장면으로 이동합니다.'
+          '${skipStep.targetBeat == _dialogueEndBeat ? ' PC를 켜고 주식실습 프로그램을 열기 전에는 저장이 만들어지지 않습니다.' : ''}',
         ),
         actions: [
           TextButton(
@@ -884,17 +995,22 @@ class _VisualNovelOnboardingScreenState
           FilledButton(
             key: const Key('story-skip-confirm'),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('마지막 안내로'),
+            child: Text('${skipStep.destinationLabel}으로'),
           ),
         ],
       ),
     );
     if (!mounted || shouldSkip != true) return;
     _playStoryFeedback(strong: true);
-    setState(() => _beat = _dialogueEndBeat);
+    setState(() {
+      _beatNavigationHistory.clear();
+      _beat = skipStep.targetBeat;
+    });
     await _dialogueLoadFuture;
-    if (!mounted || _beat == _dialogueEndBeat) return;
-    setState(() => _beat = _dialogueEndBeat);
+    if (!mounted) return;
+    final resolvedSkipStep = _prologueSkipStepForBeat(startingBeat);
+    if (_beat == resolvedSkipStep.targetBeat) return;
+    setState(() => _beat = resolvedSkipStep.targetBeat);
   }
 
   Future<void> _finish() async {
@@ -1075,7 +1191,8 @@ class _VisualNovelOnboardingScreenState
                             ),
                             IconButton(
                               key: const Key('story-skip-button'),
-                              tooltip: '프롤로그 건너뛰기',
+                              tooltip:
+                                  '${_currentPrologueSkipStep.sectionLabel} 건너뛰기',
                               visualDensity: VisualDensity.compact,
                               color: _yellow,
                               onPressed: _showSkipDialog,
@@ -1275,7 +1392,7 @@ class _VisualNovelOnboardingScreenState
     final endingOverride = _dialogueOverrides[_beat];
     final isCanonicalPcEnding = endingOverride == null
         ? _beat == _orientationCompleteBeat
-        : endingOverride.id == 'scene-73';
+        : endingOverride.id == canonicalDialogueScenes.last['id'];
     return _NovelDialogue(
       key: const ValueKey('orientation-complete'),
       speaker: isCanonicalPcEnding
@@ -2053,7 +2170,7 @@ class _AcademyPcTerminal extends StatelessWidget {
             border: Border.all(color: const Color(0xFFE4C779)),
           ),
           child: const Text(
-            '국가원금 10,000원 · 기록형 원칙 · 확정이익 20% 국가 환수 / 80% 자립적립',
+            '국가원금 50,000원 · 기록형 원칙 · 확정이익 20% 국가 환수 / 80% 자립적립',
             key: Key('academy-state-account-rule'),
             textAlign: TextAlign.center,
             style: TextStyle(

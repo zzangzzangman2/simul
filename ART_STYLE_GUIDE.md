@@ -8,10 +8,10 @@
 - 최상위 화풍 기준은 `art_references/simul_production_soft_painted_vn_style_anchor_v1.png`다.
 - 재사용 가능한 전체 생성 프롬프트는 `IMAGE_GENERATION_STYLE_PROMPT.md`에 있다.
 - 공식 앵커는 렌더링 문법과 수아 정체성을 함께 보여준다. 다른 여학생은 렌더링 문법과 여자 8명 공통 교복·맨발 클로그 규격을 사용하되 수아 얼굴·머리·체형을 복제하지 않는다.
-- 기존 수아 7종은 런타임 호환 자산으로 유지하되, 신규 표정·동작은 새 공식 앵커로 제작한다.
+- 한수아 런타임은 `production_soft_painted/han_sua/`의 `*_quality_v2.png` 8종만
+  사용한다.
 - 1981년 청와대 정책실 인물과 배경은 `flutter_app/assets/images/cinematic_soft_painted/policy_1981/`을 사용한다.
 - 역사 프롤로그의 다른 장면은 `flutter_app/assets/images/historical_prologue/`의 기존 카툰 자산을 사용한다.
-- 실사 전환 후보, 실사 얼굴 앵커, 사진형 배경은 폐기하며 다시 연결하지 않는다.
 
 ## 1. 대량생산형 고품질 고정 화풍
 
@@ -52,7 +52,12 @@
 
 ## 4. 교복과 포즈
 
-- 여자 SEED 교복은 기존 승인 카툰 자산의 빨강 체크 넥타이와 주름치마 구조를 유지한다.
+- 여자 교복 길이 앵커는
+  `art_references/future_development_uniform_length_reference_v1.png`, 남자 교복
+  길이 앵커는 `art_references/future_development_male_uniform_length_reference_v1.png`다.
+- 여자 SEED 교복은 배꼽과 복부를 완전히 가리는 정상 길이의 불투명 흰 반소매
+  단추 셔츠, 빨강 체크 넥타이와 주름치마 구조를 유지한다. 긴소매·크롭·배 노출은
+  금지한다.
 - 캐릭터 키에 맞춰 옷의 실제 크기는 달라지되 소매·허리선·넥타이 끝·치마 밑단의 몸 대비 위치는 일관되게 유지한다.
 - 전신 포즈는 머리부터 신발까지 모두 화면 안에 넣고, 표정뿐 아니라 팔·손·어깨·골반·발과 체중 이동도 대사에 맞게 바꾼다.
 - 손가락, 팔다리, 신발, 소품이 잘리거나 뒤틀린 결과는 폐기한다.

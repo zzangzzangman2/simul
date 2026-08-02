@@ -101,7 +101,13 @@ async function persistAndBuild(scenes: DialogueScenePayload[]): Promise<BuildRes
   await writeFile(
     assetPath,
     `${JSON.stringify(
-      { version: 1, appearanceVersion: 13, updatedAt: builtAt, scenes },
+      {
+        version: 1,
+        contentVersion: 1,
+        appearanceVersion: 13,
+        updatedAt: builtAt,
+        scenes,
+      },
       null,
       2,
     )}\n`,

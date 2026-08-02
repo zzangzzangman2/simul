@@ -25,6 +25,8 @@ const STORAGE_KEY = "future-academy-dialogue-editor-v1";
 const GAME_STORAGE_KEY = "future-academy-dialogue-runtime-v1";
 const FLUTTER_GAME_STORAGE_KEY = `flutter.${GAME_STORAGE_KEY}`;
 const BUILD_STORAGE_KEY = "future-academy-dialogue-built-v1";
+const CONTENT_VERSION = 1;
+const APPEARANCE_VERSION = 13;
 
 type PublishStatus = "idle" | "building" | "success" | "error";
 
@@ -37,7 +39,8 @@ const CHARACTER_GROUPS = [
 
 type SavedDraft = {
   version: 1;
-  appearanceVersion?: 11;
+  contentVersion?: number;
+  appearanceVersion?: number;
   updatedAt: string;
   scenes: DialogueScene[];
 };
@@ -73,9 +76,19 @@ function validScenes(value: unknown): value is DialogueScene[] {
   );
 }
 
-function mergeWithCurrentStory(saved: DialogueScene[], upgradeAppearance = false) {
+function mergeWithCurrentStory(
+  saved: DialogueScene[],
+  upgradeAppearance = false,
+  upgradeContent = false,
+) {
   const savedById = new Map(saved.map((scene) => [scene.id, scene]));
   const builtInIds = new Set(initialDialogue.map((scene) => scene.id));
+  if (upgradeContent) {
+    return [
+      ...initialDialogue,
+      ...saved.filter((scene) => !builtInIds.has(scene.id)),
+    ].map((scene, index) => normalizeScene({ ...scene, order: index + 1 }));
+  }
   return [
     ...initialDialogue.map((scene) => {
       const merged = { ...scene, ...(savedById.get(scene.id) ?? {}) };
@@ -298,7 +311,8 @@ export default function DialogueEditorPage() {
             const builtInIds = new Set(initialDialogue.map((scene) => scene.id));
             const merged = mergeWithCurrentStory(
               parsed.scenes,
-              parsed.appearanceVersion !== 11,
+              parsed.appearanceVersion !== APPEARANCE_VERSION,
+              parsed.contentVersion !== CONTENT_VERSION,
             );
             const addedCount = Math.max(
               0,
@@ -322,7 +336,8 @@ export default function DialogueEditorPage() {
             setAppliedScenes(
               mergeWithCurrentStory(
                 applied.scenes,
-                applied.appearanceVersion !== 11,
+                applied.appearanceVersion !== APPEARANCE_VERSION,
+                applied.contentVersion !== CONTENT_VERSION,
               ),
             );
             setLastBuiltAt(applied.updatedAt);
@@ -345,7 +360,8 @@ export default function DialogueEditorPage() {
     const timer = window.setTimeout(() => {
       const draft: SavedDraft = {
         version: 1,
-        appearanceVersion: 11,
+        contentVersion: CONTENT_VERSION,
+        appearanceVersion: APPEARANCE_VERSION,
         updatedAt: new Date().toISOString(),
         scenes,
       };
@@ -463,7 +479,8 @@ export default function DialogueEditorPage() {
     const snapshot = scenes.map((scene) => normalizeScene({ ...scene }));
     const payload: SavedDraft = {
       version: 1,
-      appearanceVersion: 11,
+      contentVersion: CONTENT_VERSION,
+      appearanceVersion: APPEARANCE_VERSION,
       updatedAt: new Date().toISOString(),
       scenes: snapshot,
     };
@@ -612,7 +629,8 @@ export default function DialogueEditorPage() {
   function exportJson() {
     const payload: SavedDraft = {
       version: 1,
-      appearanceVersion: 11,
+      contentVersion: CONTENT_VERSION,
+      appearanceVersion: APPEARANCE_VERSION,
       updatedAt: new Date().toISOString(),
       scenes,
     };
@@ -652,13 +670,13 @@ export default function DialogueEditorPage() {
         direction: normalizeDialogueText(scene.direction || ""),
         line: normalizeDialogueText(scene.line || ""),
         background:
-          appearanceVersion === 11
+          appearanceVersion === APPEARANCE_VERSION
             ? scene.background || ""
             : initialDialogue.find((current) => current.id === scene.id)?.background ||
               scene.background ||
               "",
         character:
-          appearanceVersion === 11
+          appearanceVersion === APPEARANCE_VERSION
             ? scene.character || ""
             : initialDialogue.find((current) => current.id === scene.id)?.character ||
               scene.character ||
@@ -679,7 +697,8 @@ export default function DialogueEditorPage() {
     setSelectedId(reset[0].id);
     const payload: SavedDraft = {
       version: 1,
-      appearanceVersion: 11,
+      contentVersion: CONTENT_VERSION,
+      appearanceVersion: APPEARANCE_VERSION,
       updatedAt: new Date().toISOString(),
       scenes: reset,
     };

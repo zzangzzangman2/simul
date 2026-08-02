@@ -856,7 +856,7 @@ class _PracticalTradeTutorialSheetState
           ),
           const SizedBox(height: 12),
           const Text(
-            '실제 한빛통신 시세·호가를 복제한 수업용 계좌입니다. 완료 뒤 정식 국가계좌 원금 10,000원은 그대로 유지됩니다.',
+            '실제 한빛통신 시세·호가를 복제한 수업용 계좌입니다. 완료 뒤 정식 국가계좌 원금 50,000원은 그대로 유지됩니다.',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Color(0xFF8B6F21),

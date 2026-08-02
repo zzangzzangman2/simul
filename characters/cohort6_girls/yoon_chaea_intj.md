@@ -11,7 +11,6 @@
 ## 정식 외형·이미지 연결
 
 - 정체성 앵커: `art_references/yoon_chaea_identity_anchor_v1.png`
-- 얼굴 보조 참조: `art_references/yoon_chaea_face_reference_v1.png`
 - 정식 표정·동작 세트: `flutter_app/assets/images/production_soft_painted/yoon_chaea/` 9종
 - 얼굴: 짧고 통통한 둥근 얼굴, 짧은 하안부, 작은 둥근 턱, 살짝 처진 짙은 갈색 큰 눈, 아주 작은 입.
 - 머리: 검푸른 풀뱅, 왼쪽 두 개 핀과 분홍 하트 장식, 귀 아래에서 묶은 물결 양갈래, 분홍·연청록 구슬끈.

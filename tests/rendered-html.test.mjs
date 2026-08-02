@@ -15,6 +15,18 @@ async function render() {
   );
 }
 
+test("redirects a static-server root request to the Flutter game", async () => {
+  const staticIndex = await readFile(
+    new URL("../public/index.html", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(staticIndex, /http-equiv="refresh" content="0; url=\/play\/index\.html"/);
+  assert.match(staticIndex, /window\.location\.replace\(target\)/);
+  assert.match(staticIndex, /`\/play\/index\.html\$\{window\.location\.search\}\$\{window\.location\.hash\}`/);
+  assert.doesNotMatch(staticIndex, /Directory listing/i);
+});
+
 test("opens the Flutter future-development orphanage prologue from the default route", async () => {
   const response = await render();
   assert.ok([307, 308].includes(response.status));
@@ -28,7 +40,6 @@ test("opens the Flutter future-development orphanage prologue from the default r
     stockMarket,
     stockOrderBook,
     layout,
-    socialCard,
   ] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../public/play/index.html", import.meta.url), "utf8"),
@@ -37,7 +48,6 @@ test("opens the Flutter future-development orphanage prologue from the default r
     readFile(new URL("../flutter_app/lib/stock_market_screen.dart", import.meta.url), "utf8"),
     readFile(new URL("../flutter_app/lib/stock_market_order_book.dart", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../public/og.png", import.meta.url)),
   ]);
   const protagonistPoses = await readdir(
     new URL("../flutter_app/assets/images/protagonist_seed01/", import.meta.url),
@@ -50,8 +60,8 @@ test("opens the Flutter future-development orphanage prologue from the default r
   assert.doesNotMatch(flutterIndex, /투자회사 설립/);
   assert.match(flutterIndex, /2000년 서울/);
   assert.match(flutterIndex, /모바일 세로형 생활·투자 시뮬레이션/);
-  assert.match(flutterIndex, /property="og:image" content="\/og\.png"/);
-  assert.match(flutterIndex, /name="twitter:card" content="summary_large_image"/);
+  assert.doesNotMatch(flutterIndex, /\/og\.png/);
+  assert.match(flutterIndex, /name="twitter:card" content="summary"/);
   assert.doesNotMatch(flutterIndex, /초기자본 100만원/);
   assert.match(onboarding, /1981\.01\.12\s+·\s+23:40/);
   assert.match(onboarding, /이대로 가면 나라가 망한다/);
@@ -92,10 +102,9 @@ test("opens the Flutter future-development orphanage prologue from the default r
   assert.match(stockOrderBook, /stock-order-book/);
   assert.match(stockOrderBook, /order-book-active-trade/);
   assert.match(layout, /초딩부터 건물주/);
-  assert.match(layout, /images: \[\{ url: `\$\{origin\}\/og\.png`, width: 1734, height: 907/);
+  assert.doesNotMatch(layout, /og\.png/);
   assert.match(layout, /themeColor: "#061F2A"/);
   assert.doesNotMatch(layout, /100만원으로 시작/);
-  assert.ok(socialCard.byteLength > 1_000_000);
 });
 
 test("bridges a legacy React save before Flutter starts without overwriting Flutter progress", async () => {
@@ -173,13 +182,14 @@ test("keeps Flutter launch metadata aligned with the current starting conditions
 
   assert.match(flutterTemplate, /초딩부터 건물주/);
   assert.match(flutterTemplate, /2000년 서울/);
-  assert.match(flutterTemplate, /국가계좌 1만원/);
-  assert.match(flutterTemplate, /property="og:image" content="\/og\.png"/);
-  assert.match(flutterTemplate, /name="twitter:image" content="\/og\.png"/);
+  assert.match(flutterTemplate, /국가원금 5만원/);
+  assert.doesNotMatch(flutterTemplate, /og:image/);
+  assert.doesNotMatch(flutterTemplate, /twitter:image/);
+  assert.match(flutterTemplate, /name="twitter:card" content="summary"/);
   assert.doesNotMatch(flutterTemplate, /초기자본 100만원/);
   assert.equal(parsedManifest.name, "초딩부터 건물주");
   assert.match(parsedManifest.description, /2000년 서울/);
-  assert.match(parsedManifest.description, /국가계좌 1만원/);
+  assert.match(parsedManifest.description, /국가원금 5만원/);
   assert.doesNotMatch(parsedManifest.description, /초기자본 100만원/);
 });
 
@@ -211,8 +221,8 @@ test("documents and preserves the portrait-mobile product contract", async () =>
     readFile(new URL("../public/office-room.png", import.meta.url)),
   ]);
 
-  assert.match(rules, /390×844px/);
-  assert.match(rules, /최소 360px/);
+  assert.match(rules, /390×844(?:px)?/);
+  assert.match(rules, /최소 너비 360px/);
   assert.match(guide, /처음하기.*이어하기/);
   assert.match(guide, /현재 상태 스키마는 `v24`/);
   assert.match(guide, /최대 5슬롯/);
@@ -264,10 +274,12 @@ test("uses the deterministic local news combinator without a remote API", async 
   assert.match(campaignScenes, /NewsCombinator\(\)/);
 });
 
-test("tracks mobile browser chrome and provides an exact desktop phone preview", async () => {
-  const [flutterTemplate, flutterBootstrap] = await Promise.all([
+test("fills the mobile viewport and provides an exact desktop phone preview", async () => {
+  const [flutterTemplate, flutterBootstrap, fontManifest, visualNovel] = await Promise.all([
     readFile(new URL("../flutter_app/web/index.html", import.meta.url), "utf8"),
     readFile(new URL("../flutter_app/web/flutter_bootstrap.js", import.meta.url), "utf8"),
+    readFile(new URL("../public/play/assets/FontManifest.json", import.meta.url), "utf8"),
+    readFile(new URL("../flutter_app/lib/visual_novel_onboarding.dart", import.meta.url), "utf8"),
   ]);
   const script = flutterTemplate.match(
     /<script id="mobile-viewport-lock">([\s\S]*?)<\/script>/,
@@ -279,14 +291,25 @@ test("tracks mobile browser chrome and provides an exact desktop phone preview",
   assert.match(flutterTemplate, /width:\s*390px/);
   assert.match(flutterTemplate, /height:\s*844px/);
   assert.match(flutterTemplate, /--desktop-preview-scale/);
-  assert.match(flutterTemplate, /@media \(hover: hover\)/);
-  assert.doesNotMatch(
+  assert.match(
     flutterTemplate,
-    /@media \(min-width:\s*700px\) and \(hover:\s*hover\)/,
+    /@media \(hover: hover\) and \(pointer: fine\) and \(min-width: 700px\)/,
   );
+  assert.doesNotMatch(flutterTemplate, /@media \(hover: hover\)\s*\{/);
   assert.match(
     flutterBootstrap,
     /hostElement:\s*document\.getElementById\('flutter_host'\)/,
+  );
+  assert.match(fontManifest, /"family":"Maplestory"/);
+  assert.match(fontManifest, /MaplestoryLight\.ttf/);
+  assert.match(fontManifest, /MaplestoryBold\.ttf/);
+  assert.match(
+    visualNovel,
+    /key: const Key\('story-line-text'\),[\s\S]*?fontFamily: 'Maplestory'/,
+  );
+  assert.match(
+    visualNovel,
+    /key: const Key\('story-speaker-chip'\),[\s\S]*?fontFamily: 'Maplestory'/,
   );
 
   const cssProperties = new Map();
@@ -351,7 +374,10 @@ test("tracks mobile browser chrome and provides an exact desktop phone preview",
 
   vm.runInNewContext(script, { document, window: fakeWindow });
   assert.equal(cssProperties.get("--app-height"), "860px");
-  assert.equal(desktopPreviewQuery, "(hover: hover)");
+  assert.equal(
+    desktopPreviewQuery,
+    "(hover: hover) and (pointer: fine) and (min-width: 700px)",
+  );
   assert.equal(host.style.height, "860px");
 
   fakeWindow.innerHeight = 940;
@@ -499,17 +525,19 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
   ]) {
     assert.match(mbtiGuide, new RegExp(`${student}.*${type}`));
   }
-  assert.match(data, /이거 소리 이상한 거 아까부터 나만 들었어/);
-  assert.match(data, /불편한 거 있는 사람/);
-  assert.match(data, /언제 다시 정할지/);
-  assert.match(data, /콘센트가 여기밖에 없었어/);
+  assert.match(data, /가방은 멀쩡해. 옆선을 잡아 주던 실만 끊어진 거야/);
+  assert.match(data, /불편한 사람 있어/);
+  assert.match(data, /다음엔 먼저 물어볼게/);
+  assert.match(data, /내 이름은 내일 말할게/);
   assert.match(data, /침상/);
   assert.match(data, /사물함/);
-  assert.match(data, /침상과 사물함은 허락 없이 건드리지 않습니다/);
+  assert.match(data, /침상은 서로 이야기해서 정하세요/);
   assert.match(data, /제5기 (?:배지|명찰)/);
-  assert.match(data, /단팥빵 얘기 들은 다음부터 계속 배고파/);
-  assert.match(data, /설명서 학준아, 별명 붙이면 안 된다는 규정도 있어/);
-  assert.doesNotMatch(data, /안내문에 별명 금지도 있어, 설명서 학준아/);
+  assert.match(data, /학준이는 자기소개에도 남은 시간을 붙이네/);
+  assert.match(data, /처음 보는 애한테 인사보다 시간부터 말해/);
+  assert.doesNotMatch(data, /단팥빵 얘기 들은 다음부터 계속 배고파/);
+  assert.match(data, /bg_bus_transition_seoul_outskirts_2000_portrait_v1\.png/);
+  assert.match(editor, /const CONTENT_VERSION = 1/);
   assert.equal(data.includes("\\\\n"), false);
   assert.match(data, /character_minho_farewell_v3\.png/);
   assert.match(data, /character_hakjun_orientation_v2\.png/);
@@ -546,14 +574,12 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
   assert.match(catalog, /speaker: "최이서"[\s\S]*?poses: choiIseoPoses/);
   assert.match(catalog, /speaker: "오지우"[\s\S]*?poses: ohJiwooPoses/);
   assert.match(catalog, /09_explaining_v1\.png/);
-  assert.match(data, /scene-78[\s\S]*?park_haeun\/09_explaining_v1\.png/);
-  assert.match(data, /scene-110[\s\S]*?park_haeun\/08_determined_v1\.png/);
-  assert.match(data, /scene-82[\s\S]*?yoon_chaea\/04_shy_blush_v1\.png/);
-  assert.match(data, /scene-122[\s\S]*?yoon_chaea\/06_worried_v1\.png/);
+  assert.match(data, /scene-104[\s\S]*?park_haeun\/09_explaining_v1\.png/);
+  assert.match(data, /scene-115[\s\S]*?yoon_chaea\/08_determined_v1\.png/);
   assert.match(data, /scene-70[\s\S]*?kim_seoa\/01_neutral_notebook_v1\.png/);
-  assert.match(data, /scene-72[\s\S]*?lee_jian\/01_neutral_screwdriver_v2\.png/);
-  assert.match(data, /scene-73[\s\S]*?choi_iseo\/01_base_thread_v1\.png/);
-  assert.match(data, /scene-85[\s\S]*?oh_jiwoo\/05_surprised_correction_v1\.png/);
+  assert.match(data, /scene-71[\s\S]*?lee_jian\/03_focused_repair_v2\.png/);
+  assert.match(data, /scene-73[\s\S]*?choi_iseo\/08_focused_mending_v1\.png/);
+  assert.match(data, /scene-117[\s\S]*?oh_jiwoo\/06_skeptical_thinking_v1\.png/);
   assert.match(data, /scene-86[\s\S]*?han_sua\/08_explaining_quality_v2\.png/);
   assert.match(buildRoute, /dialogueTextValue/);
   assert.match(buildRoute, /scripts\/build-flutter-web\.mjs/);

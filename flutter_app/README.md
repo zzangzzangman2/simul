@@ -23,8 +23,8 @@ flutter build web --release --base-href /play/
 
 27년 월드 생성 테스트는 메모리 점유가 크므로 테스트 파일을 하나씩 실행합니다.
 특정 테스트 개수, 번들 크기와 SHA-256은 빌드마다 달라지므로 영구 기준으로
-고정하지 않습니다. 가장 최근 실행 결과는 루트 `WORK_LOG.md`와 `HANDOFF.md`에
-기록하며, `flutter analyze`, 파일별 Flutter 테스트, `npm test`, `npm run lint`,
+고정하지 않습니다. 현재 구현 상태는 루트 `HANDOFF.md`, 미완성 범위는
+`GAMEPLAY_GAPS.md`에 기록하며, `flutter analyze`, 파일별 Flutter 테스트, `npm test`, `npm run lint`,
 `npm run build:release`, `git diff --check`가 모두 통과한 상태만 푸시합니다.
 
 ## 핵심 구조
@@ -158,7 +158,8 @@ flutter build web --release --base-href /play/
 
 ## 레이아웃
 
-기준은 390×844px, 최소 폭은 360px입니다. 데스크톱에서는 정확한 390×844
+기준은 390×844px, 최소 폭은 360px입니다. 실제 모바일 Web에서는 기기의 가용
+뷰포트 너비·높이를 여백 없이 100% 채웁니다. 데스크톱에서만 정확한 390×844
 세로 프레임을 가운데 표시하고 창이 작을 때만 프레임 전체를 비례 축소합니다.
 
 전체 규칙은 저장소 루트의 `AGENTS.md`, `PROJECT_GUIDE.md`, `HANDOFF.md`를 따릅니다.

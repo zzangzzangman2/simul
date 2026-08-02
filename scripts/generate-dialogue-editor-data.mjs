@@ -4,6 +4,10 @@ import path from "node:path";
 const project = process.cwd();
 const sourcePath = path.join(project, "flutter_app/lib/visual_novel_onboarding.dart");
 const outputPath = path.join(project, "app/editor/dialogue-data.ts");
+const dartOutputPath = path.join(
+  project,
+  "flutter_app/lib/dialogue/canonical_dialogue_data.dart",
+);
 const source = fs.readFileSync(sourcePath, "utf8");
 const stringConstants = new Map(
   Array.from(
@@ -196,4 +200,29 @@ export const initialDialogue: DialogueScene[] = ${JSON.stringify(scenes, null, 2
 
 fs.mkdirSync(path.dirname(outputPath), { recursive: true });
 fs.writeFileSync(outputPath, output, "utf8");
+const dartString = (value) => JSON.stringify(String(value)).replaceAll("$", "\\$");
+const dartScenes = scenes
+  .map(
+    (scene) => `  <String, Object>{
+    "order": ${scene.order},
+    "id": ${dartString(scene.id)},
+    "speaker": ${dartString(scene.speaker)},
+    "line": ${dartString(scene.line)},
+    "direction": ${dartString(scene.direction)},
+    "date": ${dartString(scene.date)},
+    "location": ${dartString(scene.location)},
+    "background": ${dartString(scene.background)},
+    "character": ${dartString(scene.character)},
+  }`,
+  )
+  .join(",\n");
+const dartOutput = `part of '../main.dart';
+
+// GENERATED FILE. Edit the canonical dialogue JSON, then run npm run dialogue:sync.
+const canonicalDialogueScenes = <Map<String, Object>>[
+${dartScenes},
+];
+`;
+fs.mkdirSync(path.dirname(dartOutputPath), { recursive: true });
+fs.writeFileSync(dartOutputPath, dartOutput, "utf8");
 console.log(`Dialogue editor synced: ${scenes.length} scenes`);

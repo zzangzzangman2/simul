@@ -28,7 +28,9 @@ import 'story_state.dart';
 part 'game_engine_corporate_actions.dart';
 part 'game_engine_story_decisions.dart';
 
-const initialCompanyCash = 10000;
+// 미래양성기금 국가원금. 출발 종목 중 가장 싼 한 주도 살 수 있어야 첫 실습이
+// 성립하므로, 한빛통신 28,400원을 기준으로 50,000원을 지급한다.
+const initialCompanyCash = 50000;
 const stateAccountSeedCapitalSourceId = 'state-account-seed-capital';
 const gameDividendWithholdingTaxRate = 0.154;
 const dailyMarketReportPrice = 1200;

@@ -111,11 +111,11 @@ ISFP는 조용하지만 자기 가치가 분명하고, 지금 눈앞의 색·재
 ## 정식 이미지 연결
 
 - 승인 정체성 앵커: `art_references/choi_iseo_identity_anchor_v1.png`
-- 승인 표정·동작 세트: `art_candidates/production_soft_painted_vn_v1/choi_iseo/expression_set_v1/`
+- 승인 표정·동작 세트: `flutter_app/assets/images/production_soft_painted/choi_iseo/`
 - 고정 외형은 좁은 타원·부드러운 다이아형 얼굴, 회회색의 길고 올라간 고양이 눈, 먹색 어깨선 단발, 일자 앞머리, 청록색 실 모양 핀이다.
 - 고정 체형은 제6기 평균 키, 조금 긴 몸통, 완만히 기운 좁은 편의 어깨, 곧고 가늘지만 건강한 14살 팔다리, 한쪽 다리에 자연스럽게 중심을 두는 자세다.
 - 9종은 기본 실꾸러미, 부드러운 미소, 기쁜 웃음, 수줍음, 놀람, 상처받아 물건 챙기기, 조용한 경계, 수선 집중, 재질 의심·검토로 구성한다.
-- 현재 세트는 승인 후보 보관 상태이며 Flutter 런타임에는 아직 연결하지 않았다.
+- 현재 9종 세트는 Flutter 런타임과 편집기의 정식 자산이다.
 
 ## 출처
 

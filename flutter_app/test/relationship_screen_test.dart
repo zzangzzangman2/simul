@@ -1,18 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:millennium_capital/game/character_profile.dart';
 import 'package:millennium_capital/game/game_engine.dart';
 import 'package:millennium_capital/main.dart';
 
 void main() {
   const engine = GameEngine();
 
-  Future<void> setPhoneSurface(WidgetTester tester) async {
+  Future<void> setPhoneSurface(
+    WidgetTester tester, {
+    Size size = const Size(390, 844),
+  }) async {
     tester.view.devicePixelRatio = 1;
-    tester.view.physicalSize = const Size(390, 844);
+    tester.view.physicalSize = size;
     addTearDown(tester.view.reset);
   }
 
-  testWidgets('status screen lists affection for the eight girls', (
+  test('character profiles keep ten distinct MBTI assignments', () {
+    expect(cohortCharacterProfiles, hasLength(10));
+    expect(
+      cohortCharacterProfiles.map((profile) => profile.mbti).toSet(),
+      hasLength(10),
+    );
+    expect(cohortCharacterProfileById('kim_hakjun')?.mbti, 'ISTJ');
+    expect(cohortCharacterProfileById('han_seoyoon')?.mbti, 'INFJ');
+    expect(cohortCharacterProfileById('kim_hakjun')?.age, 14);
+    expect(cohortCharacterProfileById('han_seoyoon')?.age, 23);
+  });
+
+  testWidgets('character directory opens a card and portrait detail', (
     tester,
   ) async {
     await setPhoneSurface(tester);
@@ -23,13 +39,107 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('제6기 관계 기록'), findsOneWidget);
-    expect(find.text('김서아 · ISFJ'), findsOneWidget);
-    expect(find.byKey(const Key('relationship-status-list')), findsOneWidget);
+    expect(find.text('제6기 인물 카드'), findsOneWidget);
+    expect(find.byKey(const Key('character-card-grid')), findsOneWidget);
+    expect(find.byKey(const Key('character-card-kim_seoa')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('character-card-kim_seoa')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('character-card-screen-kim_seoa')),
+      findsOneWidget,
+    );
+    expect(find.text('초상화를 눌러 상세 프로필 보기'), findsOneWidget);
     expect(
       find.byKey(const Key('relationship-affection-kim_seoa')),
       findsOneWidget,
     );
+
+    await tester.tap(find.byKey(const Key('character-card-portrait-kim_seoa')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('character-detail-screen-kim_seoa')),
+      findsOneWidget,
+    );
+    expect(find.text('성격'), findsOneWidget);
+    expect(find.text('좋아하는 것'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('투자를 보는 기준'),
+      260,
+      scrollable: find.descendant(
+        of: find.byKey(const Key('character-detail-list-kim_seoa')),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('투자를 보는 기준'), findsOneWidget);
+    expect(find.text('14살'), findsOneWidget);
+    expect(find.text('ISFJ'), findsWidgets);
+  });
+
+  testWidgets('directory exposes Hakjun and teacher cards', (tester) async {
+    await setPhoneSurface(tester);
+    final state = engine.createNewGame('인물 카드 UI', worldSeed: 'character-ui-1');
+
+    await tester.pumpWidget(
+      MaterialApp(home: RelationshipStatusScreen(state: state)),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('character-card-han_seoyoon')),
+      260,
+      scrollable: find.descendant(
+        of: find.byKey(const Key('character-card-grid')),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('character-card-kim_hakjun')), findsOneWidget);
+    expect(find.byKey(const Key('character-card-han_seoyoon')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('character-card-han_seoyoon')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('character-card-screen-han_seoyoon')),
+      findsOneWidget,
+    );
+    expect(find.text('INFJ'), findsWidgets);
+    expect(find.text('23세'), findsWidgets);
+  });
+
+  testWidgets('ten character cards fit the 360 by 800 mobile minimum', (
+    tester,
+  ) async {
+    await setPhoneSurface(tester, size: const Size(360, 800));
+    final state = engine.createNewGame(
+      '인물 카드 최소 화면',
+      worldSeed: 'character-ui-360',
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(home: RelationshipStatusScreen(state: state)),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('character-card-han_seoyoon')),
+      240,
+      scrollable: find.descendant(
+        of: find.byKey(const Key('character-card-grid')),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('character-card-han_seoyoon')), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('evening conversation applies choice and shows result', (

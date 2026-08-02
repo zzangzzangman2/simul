@@ -14,7 +14,7 @@ void main() {
     'choi_iseo': 9,
     'jung_arin': 9,
     'park_haeun': 9,
-    'han_sua': 16,
+    'han_sua': 8,
     'oh_jiwoo': 9,
     'yoon_chaea': 9,
   };
@@ -122,6 +122,7 @@ void main() {
             )
             as Map<String, dynamic>;
     expect(decoded['appearanceVersion'], 13);
+    expect(decoded['contentVersion'], 1);
     final scenes = (decoded['scenes'] as List<dynamic>)
         .cast<Map<String, dynamic>>();
     const speakerFolders = <String, String>{
@@ -165,56 +166,91 @@ void main() {
     );
   });
 
-  test(
-    'first dormitory greetings keep all ten students seated in one circle',
-    () {
-      final decoded =
-          jsonDecode(
-                File(
-                  'assets/dialogue/dialogue-editor-override.json',
-                ).readAsStringSync(),
-              )
-              as Map<String, dynamic>;
-      final scenes = (decoded['scenes'] as List<dynamic>)
-          .cast<Map<String, dynamic>>();
-      final byId = <String, Map<String, dynamic>>{
-        for (final scene in scenes) scene['id'] as String: scene,
-      };
-      expect(byId['scene-66']?['direction'], contains('둥글게 나눠 앉았다'));
-      final introductionSpeakers = scenes
-          .where(
-            (scene) =>
-                (scene['order'] as int) >= 69 && (scene['order'] as int) <= 95,
-          )
-          .map((scene) => scene['speaker'] as String)
-          .toSet();
-      expect(
-        introductionSpeakers,
-        containsAll(<String>[
-          '김서아',
-          '이지안',
-          '최이서',
-          '정아린',
-          '박하은',
-          '수아',
-          '오지우',
-          '윤채아',
-          '김학준',
-          '나',
-        ]),
-      );
-      expect(
-        byId['scene-86']?['character'],
-        endsWith('08_explaining_quality_v2.png'),
-      );
-      expect(
-        byId['scene-87']?['character'],
-        endsWith('03_bright_laugh_quality_v2.png'),
-      );
-      expect(
-        byId['scene-89']?['character'],
-        endsWith('06_annoyed_quality_v2.png'),
-      );
-    },
-  );
+  test('first dormitory introductions grow out of the torn bag cleanup', () {
+    final decoded =
+        jsonDecode(
+              File(
+                'assets/dialogue/dialogue-editor-override.json',
+              ).readAsStringSync(),
+            )
+            as Map<String, dynamic>;
+    final scenes = (decoded['scenes'] as List<dynamic>)
+        .cast<Map<String, dynamic>>();
+    final byId = <String, Map<String, dynamic>>{
+      for (final scene in scenes) scene['id'] as String: scene,
+    };
+    expect(byId['scene-66']?['line'], contains('옆선이 결국 터졌다'));
+    final introductionSpeakers = scenes
+        .where(
+          (scene) =>
+              (scene['order'] as int) >= 69 && (scene['order'] as int) <= 95,
+        )
+        .map((scene) => scene['speaker'] as String)
+        .toSet();
+    expect(
+      introductionSpeakers,
+      containsAll(<String>[
+        '김서아',
+        '이지안',
+        '최이서',
+        '정아린',
+        '박하은',
+        '수아',
+        '오지우',
+        '윤채아',
+        '김학준',
+        '나',
+      ]),
+    );
+    expect(
+      byId['scene-86']?['character'],
+      endsWith('08_explaining_quality_v2.png'),
+    );
+    expect(
+      byId['scene-87']?['character'],
+      endsWith('06_annoyed_quality_v2.png'),
+    );
+    expect(
+      byId['scene-89']?['character'],
+      endsWith('03_bright_laugh_quality_v2.png'),
+    );
+    expect(byId['scene-93']?['line'], '내 이름은 내일 말할게.');
+    expect(byId['scene-102']?['line'], contains('갑자기 잡아당기면 싫어'));
+    expect(
+      byId['scene-102']?['character'],
+      endsWith('07_firm_boundary_v1.png'),
+    );
+    expect(byId['scene-107']?['line'], contains('다음엔 먼저 물어볼게'));
+    expect(byId['scene-111']?['line'], contains('3에서 5로 건너뛰어'));
+    expect(byId['scene-125']?['line'], contains('5기 기록만 한 줄도 없어'));
+  });
+
+  test('scene 24 uses the generated bus transition background', () async {
+    final decoded =
+        jsonDecode(
+              File(
+                'assets/dialogue/dialogue-editor-override.json',
+              ).readAsStringSync(),
+            )
+            as Map<String, dynamic>;
+    final scenes = (decoded['scenes'] as List<dynamic>)
+        .cast<Map<String, dynamic>>();
+    final scene = scenes.singleWhere((scene) => scene['order'] == 24);
+    expect(scene['location'], contains('버스'));
+    expect(
+      scene['background'],
+      endsWith('bg_bus_transition_seoul_outskirts_2000_portrait_v1.png'),
+    );
+    final file = File(
+      'assets/images/historical_prologue/'
+      'bg_bus_transition_seoul_outskirts_2000_portrait_v1.png',
+    );
+    expect(file.existsSync(), isTrue);
+    final codec = await ui.instantiateImageCodec(await file.readAsBytes());
+    final frame = await codec.getNextFrame();
+    expect(frame.image.width, 1024);
+    expect(frame.image.height, 1536);
+    frame.image.dispose();
+    codec.dispose();
+  });
 }
