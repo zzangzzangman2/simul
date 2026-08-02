@@ -898,21 +898,53 @@ class _PracticalTradeTutorialSheetState
     final reserved = _money(_practiceState.story.selfRelianceReserve);
     if (!gained) {
       return <_RecoveryBeat>[
-        _RecoveryBeat('한서윤 선생님', _stockTeacherPoseListen, '이번엔 $pnl원 잃었어요. 그러면 숫자 하나만 확인할게요.'),
-        _RecoveryBeat('정아린', _stockTutorialArinAsset, '잃었으니까 국가가 떼 가는 것도 없는 거죠?'),
-        _RecoveryBeat('한서윤 선생님', _stockTeacherPoseCompare, '없어요. 환수는 벌었을 때만 해요.'),
-        _RecoveryBeat('이지안', _stockTutorialJianFocusAsset, '그럼 잃으면 국가도 20% 물어 줘요?'),
+        _RecoveryBeat(
+          '한서윤 선생님',
+          _stockTeacherPoseListen,
+          '이번엔 $pnl원 잃었어요. 그러면 숫자 하나만 확인할게요.',
+        ),
+        _RecoveryBeat(
+          '정아린',
+          _stockTutorialArinAsset,
+          '잃었으니까 국가가 떼 가는 것도 없는 거죠?',
+        ),
+        _RecoveryBeat(
+          '한서윤 선생님',
+          _stockTeacherPoseCompare,
+          '없어요. 환수는 벌었을 때만 해요.',
+        ),
+        _RecoveryBeat(
+          '이지안',
+          _stockTutorialJianFocusAsset,
+          '그럼 잃으면 국가도 20% 물어 줘요?',
+        ),
         _RecoveryBeat('한서윤 선생님', _stockTeacherPoseCompare, '안 물어 줘요.'),
         _RecoveryBeat('이지안', _stockTutorialJianAsset, '…그건 공평한 거예요?'),
         _RecoveryBeat('한서윤 선생님', _stockTeacherPoseListen, '아니요.'),
         _RecoveryBeat('최이서', _stockTutorialIseoAsset, '…선생님이 아니라고 하니까 더 이상해요.'),
-        _RecoveryBeat('김서아', _stockTutorialSeoaRecordAsset, '적어 둘게. 1월 3일, $pnl원 잃음. 환수 없음. 이유는 내가 쓴 노트에.'),
-        _RecoveryBeat('오지우', _stockTutorialJiwooCorrectAsset, '속보입니다. 제6기 첫 거래, 손실 $pnl원. …이건 방송 안 할게요.'),
+        _RecoveryBeat(
+          '김서아',
+          _stockTutorialSeoaRecordAsset,
+          '적어 둘게. 1월 3일, $pnl원 잃음. 환수 없음. 이유는 내가 쓴 노트에.',
+        ),
+        _RecoveryBeat(
+          '오지우',
+          _stockTutorialJiwooCorrectAsset,
+          '속보입니다. 제6기 첫 거래, 손실 $pnl원. …이건 방송 안 할게요.',
+        ),
       ];
     }
     return <_RecoveryBeat>[
-      _RecoveryBeat('한서윤 선생님', _stockTeacherPoseListen, '$pnl원 벌었어요. 그럼 이제 숫자 하나만 더 볼게요.'),
-      _RecoveryBeat('정아린', _stockTutorialArinAsset, '$pnl원에서 $recovered원 떼면 $reserved원이요. 근데 그 $reserved원 지금 쓸 수 있어요?'),
+      _RecoveryBeat(
+        '한서윤 선생님',
+        _stockTeacherPoseListen,
+        '$pnl원 벌었어요. 그럼 이제 숫자 하나만 더 볼게요.',
+      ),
+      _RecoveryBeat(
+        '정아린',
+        _stockTutorialArinAsset,
+        '$pnl원에서 $recovered원 떼면 $reserved원이요. 근데 그 $reserved원 지금 쓸 수 있어요?',
+      ),
       _RecoveryBeat('한서윤 선생님', _stockTeacherPoseCompare, '못 써요. 열아홉 살에요.'),
       _RecoveryBeat('정아린', _stockTutorialArinWorriedAsset, '…오 년이요?'),
       _RecoveryBeat('한서윤 선생님', _stockTeacherPoseCompare, '오 년이요.'),
@@ -924,13 +956,29 @@ class _PracticalTradeTutorialSheetState
       _RecoveryBeat('한서윤 선생님', _stockTeacherPoseCompare, '1981년에 어른 여섯 명이요.'),
       _RecoveryBeat('윤채아', _stockTutorialChaeaNeutralAsset, '…그 사람들 지금도 있어요?'),
       _RecoveryBeat('한서윤 선생님', _stockTeacherPoseListen, '그건 오늘 대답 안 할게요.'),
-      _RecoveryBeat('이지안', _stockTutorialJianFocusAsset, '선생님. 그럼 잃으면요? 국가도 20% 물어 줘요?'),
+      _RecoveryBeat(
+        '이지안',
+        _stockTutorialJianFocusAsset,
+        '선생님. 그럼 잃으면요? 국가도 20% 물어 줘요?',
+      ),
       _RecoveryBeat('한서윤 선생님', _stockTeacherPoseCompare, '안 물어 줘요.'),
-      _RecoveryBeat('이지안', _stockTutorialJianAsset, '그럼 벌 때만 나눠 가지는 거예요? …그건 공평한 거예요?'),
+      _RecoveryBeat(
+        '이지안',
+        _stockTutorialJianAsset,
+        '그럼 벌 때만 나눠 가지는 거예요? …그건 공평한 거예요?',
+      ),
       _RecoveryBeat('한서윤 선생님', _stockTeacherPoseListen, '아니요.'),
       _RecoveryBeat('최이서', _stockTutorialIseoAsset, '…내가 벌었는데 내 돈이 아닌 거네요.'),
-      _RecoveryBeat('김서아', _stockTutorialSeoaRecordAsset, '적어 둘게. 1월 3일, $pnl원 벌었다. $recovered원 갔다. $reserved원은 오 년 뒤.'),
-      _RecoveryBeat('오지우', _stockTutorialJiwooCorrectAsset, '속보입니다. 제6기 첫 수익 $pnl원. 국가가 $recovered원 가져갔습니다. …이거 웃겨야 하는데 안 웃기네요.'),
+      _RecoveryBeat(
+        '김서아',
+        _stockTutorialSeoaRecordAsset,
+        '적어 둘게. 1월 3일, $pnl원 벌었다. $recovered원 갔다. $reserved원은 오 년 뒤.',
+      ),
+      _RecoveryBeat(
+        '오지우',
+        _stockTutorialJiwooCorrectAsset,
+        '속보입니다. 제6기 첫 수익 $pnl원. 국가가 $recovered원 가져갔습니다. …이거 웃겨야 하는데 안 웃기네요.',
+      ),
     ];
   }
 
@@ -1038,63 +1086,13 @@ class _PracticalTradeTutorialSheetState
           bottom: 10,
           child: SafeArea(
             top: false,
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-              decoration: BoxDecoration(
-                color: const Color(0xF7FFFFFF),
-                borderRadius: BorderRadius.circular(22),
-                border: Border.all(
-                  color: isTeacherBeat
-                      ? const Color(0xFFF0A78E)
-                      : const Color(0xFF8CB1F2),
-                  width: 1.5,
-                ),
-                boxShadow: const <BoxShadow>[
-                  BoxShadow(
-                    color: Color(0x55000000),
-                    blurRadius: 18,
-                    offset: Offset(0, 7),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    beat.speaker,
-                    key: ValueKey<String>(
-                      'tutorial-recovery-speaker-${beat.speaker}',
-                    ),
-                    style: TextStyle(
-                      color: isTeacherBeat
-                          ? const Color(0xFFC35439)
-                          : const Color(0xFF315FAD),
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 5),
-                  Text(
-                    beat.message,
-                    key: ValueKey<int>(index),
-                    style: const TextStyle(
-                      color: _marketInk,
-                      fontSize: 15,
-                      height: 1.45,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton(
-                      key: const Key('tutorial-recovery-continue'),
-                      onPressed: _advanceRecovery,
-                      child: Text(isLast ? '첫 거래 복습으로' : '계속 듣기'),
-                    ),
-                  ),
-                ],
-              ),
+            child: _NovelDialogue(
+              key: ValueKey(('tutorial-recovery-dialogue', index)),
+              speaker: beat.speaker,
+              line: beat.message,
+              onContinue: _advanceRecovery,
+              continueKey: const Key('tutorial-recovery-continue'),
+              continueLabel: isLast ? '첫 거래 복습으로' : '계속 듣기',
             ),
           ),
         ),
@@ -1242,104 +1240,32 @@ class _PracticalTradeTutorialSheetState
           bottom: 10,
           child: SafeArea(
             top: false,
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-              decoration: BoxDecoration(
-                color: const Color(0xF7FFFFFF),
-                borderRadius: BorderRadius.circular(22),
-                border: Border.all(
-                  color: isTeacherBeat
-                      ? const Color(0xFFF0A78E)
-                      : const Color(0xFF8CB1F2),
-                  width: 1.5,
-                ),
-                boxShadow: const <BoxShadow>[
-                  BoxShadow(
-                    color: Color(0x55000000),
-                    blurRadius: 18,
-                    offset: Offset(0, 7),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    speaker,
-                    key: ValueKey<String>('tutorial-review-speaker-$speaker'),
-                    style: TextStyle(
-                      color: isTeacherBeat
-                          ? const Color(0xFFC35439)
-                          : const Color(0xFF315FAD),
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 5),
-                  Text(
-                    message,
-                    key: ValueKey<int>(_reviewBeat),
-                    style: const TextStyle(
-                      color: _marketInk,
-                      fontSize: 15,
-                      height: 1.45,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  if (_reviewBeat == 0) ...[
-                    _ReviewChoiceButton(
-                      key: const Key('tutorial-review-choice-chase'),
-                      label: '한 번 벌었으니 다음엔 수량 더 세게 간다',
-                      onPressed: () => _chooseReview('chase'),
-                    ),
-                    const SizedBox(height: 7),
-                    _ReviewChoiceButton(
-                      key: const Key('tutorial-review-choice-ledger'),
-                      label: '투자노트부터 깐다: 이유·조건 체크',
-                      onPressed: () => _chooseReview('ledger'),
-                    ),
-                    const SizedBox(height: 7),
-                    _ReviewChoiceButton(
-                      key: const Key('tutorial-review-choice-turnover'),
-                      label: '거래대금 큰 종목만 타면 된다',
-                      onPressed: () => _chooseReview('turnover'),
-                    ),
-                  ] else
-                    Row(
-                      children: [
-                        for (var index = 0; index < 4; index += 1)
-                          Container(
-                            width: index == _reviewBeat ? 18 : 7,
-                            height: 7,
-                            margin: const EdgeInsets.only(right: 5),
-                            decoration: BoxDecoration(
-                              color: index == _reviewBeat
-                                  ? _marketAccent
-                                  : const Color(0xFFD5DBE5),
-                              borderRadius: BorderRadius.circular(99),
-                            ),
-                          ),
-                        const Spacer(),
-                        FilledButton(
-                          key: const Key('tutorial-review-continue'),
-                          onPressed: _advanceReview,
-                          style: FilledButton.styleFrom(
-                            minimumSize: const Size(126, 46),
-                            backgroundColor: _marketAccent,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                          ),
-                          child: Text(
-                            _reviewBeat == 3 ? '수업 마치기' : '다음 이야기',
-                            style: const TextStyle(fontWeight: FontWeight.w900),
-                          ),
-                        ),
-                      ],
-                    ),
-                ],
-              ),
+            child: _NovelDialogue(
+              key: ValueKey(('tutorial-review-dialogue', _reviewBeat)),
+              speaker: speaker,
+              line: message,
+              choices: _reviewBeat == 0
+                  ? <_NovelChoice>[
+                      _NovelChoice(
+                        key: const Key('tutorial-review-choice-chase'),
+                        label: '한 번 벌었으니 다음엔 수량 더 세게 간다',
+                        onTap: () => _chooseReview('chase'),
+                      ),
+                      _NovelChoice(
+                        key: const Key('tutorial-review-choice-ledger'),
+                        label: '투자노트부터 깐다: 이유·조건 체크',
+                        onTap: () => _chooseReview('ledger'),
+                      ),
+                      _NovelChoice(
+                        key: const Key('tutorial-review-choice-turnover'),
+                        label: '거래대금 큰 종목만 타면 된다',
+                        onTap: () => _chooseReview('turnover'),
+                      ),
+                    ]
+                  : const <_NovelChoice>[],
+              onContinue: _reviewBeat == 0 ? null : _advanceReview,
+              continueKey: const Key('tutorial-review-continue'),
+              continueLabel: _reviewBeat == 3 ? '수업 마치기' : '다음 이야기',
             ),
           ),
         ),
@@ -1501,34 +1427,6 @@ class _PracticalTradeTutorialSheetState
         _PracticalTradeTutorialPhase.review => _reviewView(),
         _PracticalTradeTutorialPhase.dismissal => _dismissalView(),
       },
-    ),
-  );
-}
-
-class _ReviewChoiceButton extends StatelessWidget {
-  const _ReviewChoiceButton({
-    super.key,
-    required this.label,
-    required this.onPressed,
-  });
-
-  final String label;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) => OutlinedButton(
-    onPressed: onPressed,
-    style: OutlinedButton.styleFrom(
-      minimumSize: const Size.fromHeight(42),
-      foregroundColor: const Color(0xFF315FAD),
-      side: const BorderSide(color: Color(0xFF9DB9EB)),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-    ),
-    child: Text(
-      label,
-      textAlign: TextAlign.center,
-      style: const TextStyle(fontWeight: FontWeight.w900),
     ),
   );
 }

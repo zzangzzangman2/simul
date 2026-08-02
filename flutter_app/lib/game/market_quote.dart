@@ -467,10 +467,17 @@ MarketPreviousSessionSeries? marketPreviousSessionSeriesForAsset({
   required DateTime currentDate,
 }) {
   final history = asset.historyThrough(currentDate, count: 2);
-  if (history.length < 2 || history.last.date != marketDateKey(currentDate)) {
-    return null;
-  }
-  final previousPoint = history[history.length - 2];
+  if (history.isEmpty) return null;
+
+  // 장 시작 전·장중에는 오늘의 확정 종가가 아직 일별 시세에 없다.
+  // 이때는 가장 최근 확정치가 바로 전 거래일이므로 그 항목을 쓴다.
+  // 반대로 오늘 확정치까지 있는 장 마감 후에는 한 칸 앞을 쓴다.
+  final hasCurrentSessionClose =
+      history.last.date == marketDateKey(currentDate);
+  if (hasCurrentSessionClose && history.length < 2) return null;
+  final previousPoint = hasCurrentSessionClose
+      ? history[history.length - 2]
+      : history.last;
   final previousDate = previousPoint.parsedDate;
   final rawReferenceClose = asset.unadjustedReferenceCloseFor(
     previousPoint.date,

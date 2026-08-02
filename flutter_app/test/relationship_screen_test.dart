@@ -42,6 +42,18 @@ void main() {
     expect(find.text('제6기 인물 카드'), findsOneWidget);
     expect(find.byKey(const Key('character-card-grid')), findsOneWidget);
     expect(find.byKey(const Key('character-card-kim_seoa')), findsOneWidget);
+    final portraitZoom = tester.widget<Transform>(
+      find.byKey(const Key('character-card-portrait-zoom-kim_seoa')),
+    );
+    expect(portraitZoom.transform.entry(0, 0), closeTo(1.42, 0.001));
+    final portrait = tester.widget<Image>(
+      find.descendant(
+        of: find.byKey(const Key('character-card-portrait-zoom-kim_seoa')),
+        matching: find.byType(Image),
+      ),
+    );
+    expect(portrait.filterQuality, FilterQuality.high);
+    expect(portrait.isAntiAlias, isTrue);
 
     await tester.tap(find.byKey(const Key('character-card-kim_seoa')));
     await tester.pumpAndSettle();

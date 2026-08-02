@@ -6,7 +6,12 @@ enum _MarketSection { home, explore, account }
 
 enum _ChartPeriod { minute, day, week, month, year }
 
-const _visibleOrderBookSideRows = gameOrderBookLevelCount;
+/// 모바일 호가창은 최우선 가격에서 매도·매수 각각 7단계만 보여 준다.
+///
+/// 내부 주문장 깊이는 [gameOrderBookLevelCount]를 그대로 유지하므로 체결과
+/// 대기 주문 계산에는 영향을 주지 않는다.
+const stockOrderBookVisibleSideRows = 7;
+const _visibleOrderBookSideRows = stockOrderBookVisibleSideRows;
 const _orderBookMotionDuration = Duration(milliseconds: 144);
 const _inlineOrderSlideDuration = Duration(milliseconds: 320);
 const _orderBookSweepTotalDuration = Duration(milliseconds: 480);
@@ -7211,23 +7216,9 @@ class _MarketTutorialOverlay extends StatelessWidget {
     targetKey: targetKey,
     messageId: 'market-$step',
     speakers: switch (step) {
-      0 => const <String>[
-        '한서윤 선생님',
-        '한서윤 선생님',
-        '한서윤 선생님',
-        '한서윤 선생님',
-      ],
-      1 => const <String>[
-        '한서윤 선생님',
-        '한서윤 선생님',
-        '한서윤 선생님',
-      ],
-      _ => const <String>[
-        '한서윤 선생님',
-        '한서윤 선생님',
-        '한서윤 선생님',
-        '한서윤 선생님',
-      ],
+      0 => const <String>['한서윤 선생님', '한서윤 선생님', '한서윤 선생님', '한서윤 선생님'],
+      1 => const <String>['한서윤 선생님', '한서윤 선생님', '한서윤 선생님'],
+      _ => const <String>['한서윤 선생님', '한서윤 선생님', '한서윤 선생님', '한서윤 선생님'],
     },
     messages: switch (step) {
       0 => const [
@@ -7281,38 +7272,12 @@ class _MarketDetailTutorialOverlay extends StatelessWidget {
     targetKey: targetKey,
     messageId: 'market-detail-$step',
     speakers: switch (step) {
-      0 => const <String>[
-        '한서윤 선생님',
-        '한서윤 선생님',
-        '한서윤 선생님',
-      ],
-      1 => const <String>[
-        '한서윤 선생님',
-        '한서윤 선생님',
-        '한서윤 선생님',
-      ],
-      2 => const <String>[
-        '한서윤 선생님',
-        '한서윤 선생님',
-        '한서윤 선생님',
-      ],
-      3 => const <String>[
-        '한서윤 선생님',
-        '한서윤 선생님',
-        '한서윤 선생님',
-        '한서윤 선생님',
-      ],
-      4 => const <String>[
-        '한서윤 선생님',
-        '한서윤 선생님',
-        '한서윤 선생님',
-        '한서윤 선생님',
-      ],
-      _ => const <String>[
-        '한서윤 선생님',
-        '한서윤 선생님',
-        '한서윤 선생님',
-      ],
+      0 => const <String>['한서윤 선생님', '한서윤 선생님', '한서윤 선생님'],
+      1 => const <String>['한서윤 선생님', '한서윤 선생님', '한서윤 선생님'],
+      2 => const <String>['한서윤 선생님', '한서윤 선생님', '한서윤 선생님'],
+      3 => const <String>['한서윤 선생님', '한서윤 선생님', '한서윤 선생님', '한서윤 선생님'],
+      4 => const <String>['한서윤 선생님', '한서윤 선생님', '한서윤 선생님', '한서윤 선생님'],
+      _ => const <String>['한서윤 선생님', '한서윤 선생님', '한서윤 선생님'],
     },
     messages: switch (step) {
       0 => const [
@@ -10023,13 +9988,6 @@ class _MinuteChartPanelState extends State<_MinuteChartPanel> {
   }
 
   List<String> _minuteAxisLabels(List<MarketCandle> visibleCandles) {
-    if (widget.minute < krxOpenMinute) {
-      return <String>['', '', '개장 전 ${marketTimeLabel(widget.minute)}'];
-    }
-    if (visibleCandles.isEmpty) {
-      return <String>['', '', marketTimeLabel(widget.minute)];
-    }
-
     String labelForOffset(int offset) {
       if (offset >= 0) {
         return '오늘 ${marketTimeLabel((krxOpenMinute + offset).clamp(krxOpenMinute, krxCloseMinute))}';
@@ -10040,6 +9998,17 @@ class _MinuteChartPanelState extends State<_MinuteChartPanel> {
           : krxOpenMinute +
                 fullPointIndex.clamp(0, generatedContinuousTradingTicks - 1);
       return '전일 ${marketTimeLabel(minute)}';
+    }
+
+    if (visibleCandles.isEmpty) {
+      return <String>['', '', marketTimeLabel(widget.minute)];
+    }
+    if (widget.minute < krxOpenMinute) {
+      return <String>[
+        labelForOffset(visibleCandles.first.startMinute),
+        labelForOffset(visibleCandles[visibleCandles.length ~/ 2].startMinute),
+        '개장 전 ${marketTimeLabel(widget.minute)}',
+      ];
     }
 
     return <String>[
@@ -10123,10 +10092,7 @@ class _MinuteChartPanelState extends State<_MinuteChartPanel> {
             widget.throughDate,
           );
     MarketPreviousSessionSeries? previousSessionSeries;
-    if (period == _ChartPeriod.minute &&
-        widget.quote.isTradingDay &&
-        widget.minute >= krxOpenMinute &&
-        minuteSeries.startMinute == 0) {
+    if (period == _ChartPeriod.minute && minuteSeries.startMinute == 0) {
       final targetPoints = displayMinutes + 1;
       final missingPoints = math.min(
         math.max(0, targetPoints + 1 - minuteSeries.prices.length),

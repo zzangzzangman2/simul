@@ -145,6 +145,8 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
   int _activeSlot = 1;
   int? _newGameSlot;
   String? _newGameWorldSeed;
+  GameState? _newGameDraftState;
+  Future<void>? _prologueCheckpointQueue;
   DateTime? _lastSavedAt;
   int? _lastDurablySavedMarketDay;
   int? _lastDurablySavedMarketMinute;
@@ -166,11 +168,14 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     super.initState();
     _persistence = widget.persistence ?? GamePersistence();
     if (widget.stockTestMode) {
+      final testState = _engine.createNewGame(
+        '주식시장 테스트',
+        initialCash: 1000000,
+        worldSeed: 'stock-market-test-v1',
+      );
       _state = _firstPlayableMarketState(
-        _engine.createNewGame(
-          '주식시장 테스트',
-          initialCash: 1000000,
-          worldSeed: 'stock-market-test-v1',
+        testState.copyWith(
+          story: testState.story.copyWith(accountAuthorityLevel: 5),
         ),
       ).copyWith(marketMinute: krxOpenMinute);
       _view = _AppView.game;
@@ -261,9 +266,25 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
       '새 투자연구소',
       initialCash: initialCompanyCash,
     );
+    final checkpointState = draftState.copyWith(
+      companyName: '제6기 오리엔테이션',
+      story: draftState.story.copyWith(
+        storyFlags: {
+          ...draftState.story.storyFlags,
+          'prologueInProgress': true,
+          'prologueComplete': false,
+          'prologueBeat': 0,
+          'prologueAcademyPcPoweredOn': false,
+          'prologueAcademyStockAppOpen': false,
+          'prologuePlayerName': '',
+          'prologueCompanyName': '',
+        },
+      ),
+    );
     setState(() {
       _newGameSlot = slot;
       _newGameWorldSeed = draftState.simulationSeed;
+      _newGameDraftState = checkpointState;
       _worldLoadProgress = const WorldLoadProgress(
         0.03,
         '새 세계의 시드와 27년 시간축을 확정하는 중입니다…',
@@ -274,8 +295,11 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
       await _prepareCampaignWorld(draftState, (progress) {
         if (mounted) setState(() => _worldLoadProgress = progress);
       });
+      await _persistence.saveToSlot(checkpointState, slot);
+      final slots = await _persistence.listSlots();
       if (!mounted) return;
       setState(() {
+        _slots = slots;
         _isNewGameWorldPrepared = true;
         _worldLoadProgress = null;
         _view = _AppView.onboarding;
@@ -287,6 +311,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
       setState(() {
         _newGameSlot = null;
         _newGameWorldSeed = null;
+        _newGameDraftState = null;
         _isNewGameWorldPrepared = false;
         _worldLoadProgress = null;
         _view = _AppView.title;
@@ -315,6 +340,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
       _lastDurablySavedMarketMinute = null;
       _newGameSlot = null;
       _newGameWorldSeed = null;
+      _newGameDraftState = null;
       _view = _AppView.title;
     });
   }
@@ -332,27 +358,34 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     try {
       final state = await _persistence.loadSlot(slot, activate: false);
       if (state == null) throw StateError('Save slot $slot is empty');
+      final isPrologueDraft = state.story.flagBool('prologueInProgress');
       await _prepareCampaignWorld(state, (progress) {
         if (mounted) setState(() => _worldLoadProgress = progress);
       });
-      await _persistence.setActiveSlot(slot);
+      if (!isPrologueDraft) await _persistence.setActiveSlot(slot);
       final slots = await _persistence.listSlots();
       if (!mounted) return;
       setState(() {
-        _state = state;
-        _lastDurablySavedMarketDay = state.day;
-        _lastDurablySavedMarketMinute = state.marketMinute;
+        _state = isPrologueDraft ? null : state;
+        _lastDurablySavedMarketDay = isPrologueDraft ? null : state.day;
+        _lastDurablySavedMarketMinute = isPrologueDraft
+            ? null
+            : state.marketMinute;
         _slots = slots;
-        _activeSlot = slot;
+        if (!isPrologueDraft) _activeSlot = slot;
         _lastSavedAt = slots
             .where((item) => item.slot == slot)
             .firstOrNull
             ?.savedAt;
+        _newGameSlot = isPrologueDraft ? slot : null;
+        _newGameWorldSeed = isPrologueDraft ? state.simulationSeed : null;
+        _newGameDraftState = isPrologueDraft ? state : null;
+        _isNewGameWorldPrepared = isPrologueDraft;
         _worldLoadProgress = null;
-        _view = _AppView.game;
+        _view = isPrologueDraft ? _AppView.onboarding : _AppView.game;
         _isReady = true;
       });
-      _scheduleMarketTutorialLaunch();
+      if (!isPrologueDraft) _scheduleMarketTutorialLaunch();
     } catch (error) {
       debugPrint('Failed to load slot $slot: $error');
       if (!mounted) return;
@@ -415,6 +448,51 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     unawaited(_restoreGame(retry: true));
   }
 
+  Future<void> _savePrologueCheckpoint(
+    int beat,
+    bool academyPcPoweredOn,
+    bool academyStockAppOpen,
+    String playerName,
+    String companyName,
+  ) {
+    final slot = _newGameSlot;
+    final draft = _newGameDraftState;
+    if (slot == null || draft == null) return Future<void>.value();
+    final next = draft.copyWith(
+      story: draft.story.copyWith(
+        storyFlags: {
+          ...draft.story.storyFlags,
+          'prologueInProgress': true,
+          'prologueComplete': false,
+          'prologueBeat': beat,
+          'prologueAcademyPcPoweredOn': academyPcPoweredOn,
+          'prologueAcademyStockAppOpen': academyStockAppOpen,
+          'prologuePlayerName': playerName,
+          'prologueCompanyName': companyName,
+        },
+      ),
+    );
+    _newGameDraftState = next;
+    final previous = _prologueCheckpointQueue;
+    final task = () async {
+      try {
+        if (previous != null) await previous;
+        await _persistence.saveToSlot(next, slot);
+      } catch (error, stackTrace) {
+        debugPrint('Failed to save prologue checkpoint: $error\n$stackTrace');
+        if (mounted) {
+          _scaffoldMessengerKey.currentState
+            ?..hideCurrentSnackBar()
+            ..showSnackBar(
+              const SnackBar(content: Text('프롤로그 진행 상황을 자동 저장하지 못했어요.')),
+            );
+        }
+      }
+    }();
+    _prologueCheckpointQueue = task;
+    return task;
+  }
+
   Future<void> _createCompany(
     NewGameSetup setup,
     WorldLoadProgressCallback onProgress,
@@ -434,12 +512,14 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
       startingTrait: setup.startingTrait,
       operatingPrinciple: setup.operatingPrinciple,
     );
-    final state = _engine.createNewGame(
-      setup.companyName,
-      story: story,
-      initialCash: initialCompanyCash,
-      worldSeed: worldSeed,
-    );
+    final state = _engine
+        .createNewGame(
+          setup.companyName,
+          story: story,
+          initialCash: initialCompanyCash,
+          worldSeed: worldSeed,
+        )
+        .copyWith(day: 2, marketMinute: marketDayStartMinute);
     onProgress(
       const WorldLoadProgress(
         0.68,
@@ -448,6 +528,8 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     );
     await Future<void>.delayed(Duration.zero);
     try {
+      final pendingCheckpoint = _prologueCheckpointQueue;
+      if (pendingCheckpoint != null) await pendingCheckpoint;
       await _persistence.saveToSlot(state, slot);
       await _persistence.setActiveSlot(slot);
     } catch (error) {
@@ -478,6 +560,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
           ?.savedAt;
       _newGameSlot = null;
       _newGameWorldSeed = null;
+      _newGameDraftState = null;
       _isNewGameWorldPrepared = false;
       _view = _AppView.game;
     });
@@ -520,8 +603,8 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
               _gameSceneRoute<void>(
                 StockMarketScreen(
                   key: const Key('academy-market-tutorial-screen'),
-                  // The academy uses the next trading day's paper market while
-                  // the persisted campaign remains on Sunday 2000-01-02.
+                  // The prologue happens on Sunday; free play and the paper
+                  // market lesson begin on the first trading day, 2000-01-03.
                   state: _firstPlayableMarketState(current),
                   onSetMarketMinute: _setMarketMinute,
                   onSaveMarketNotebook: _saveMarketNotebook,
@@ -1355,7 +1438,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
       scaffoldMessengerKey: _scaffoldMessengerKey,
       navigatorKey: _navigatorKey,
       debugShowCheckedModeBanner: false,
-      title: '초딩부터 건물주',
+      title: '10대부터 건물주',
       theme: ThemeData(
         useMaterial3: true,
         fontFamily: 'Pretendard',
@@ -1416,6 +1499,29 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
                 _AppView.onboarding => VisualNovelOnboardingScreen(
                   onCreate: _createCompany,
                   onExit: _showTitle,
+                  onCheckpoint: _savePrologueCheckpoint,
+                  initialBeat:
+                      _newGameDraftState?.story.flagInt('prologueBeat') ?? 0,
+                  initialAcademyPcPoweredOn:
+                      _newGameDraftState?.story.flagBool(
+                        'prologueAcademyPcPoweredOn',
+                      ) ??
+                      false,
+                  initialAcademyStockAppOpen:
+                      _newGameDraftState?.story.flagBool(
+                        'prologueAcademyStockAppOpen',
+                      ) ??
+                      false,
+                  initialPlayerName:
+                      _newGameDraftState?.story.storyFlags['prologuePlayerName']
+                          as String? ??
+                      '',
+                  initialCompanyName:
+                      _newGameDraftState
+                              ?.story
+                              .storyFlags['prologueCompanyName']
+                          as String? ??
+                      '',
                   dialogueOverrideJson: widget.dialogueOverrideJson,
                 ),
                 _AppView.game when _state != null => OfficeScreen(

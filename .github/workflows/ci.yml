@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.44.7
+          cache: true
+
+      - name: Install web dependencies
+        run: npm ci
+
+      - name: Install Flutter dependencies
+        working-directory: flutter_app
+        run: flutter pub get
+
+      - name: Verify generated dialogue is synchronized
+        run: |
+          npm run dialogue:sync
+          git diff --exit-code -- \
+            flutter_app/assets/dialogue/dialogue-editor-override.json \
+            flutter_app/lib/dialogue/canonical_dialogue_data.dart \
+            app/editor/dialogue-data.ts
+
+      - name: Lint web sources
+        run: npm run lint
+
+      - name: Analyze Flutter sources
+        working-directory: flutter_app
+        run: flutter analyze
+
+      - name: Run Flutter tests one file at a time
+        working-directory: flutter_app
+        shell: bash
+        run: |
+          for test_file in test/*_test.dart; do
+            flutter test "$test_file"
+          done
+
+      - name: Run web tests
+        run: npm test
+
+      - name: Build the deployable Flutter and Vinext release
+        run: npm run build:release
+
+      - name: Verify committed Flutter Web output and dialogue hash
+        run: |
+          cmp \
+            flutter_app/assets/dialogue/dialogue-editor-override.json \
+            public/play/assets/assets/dialogue/dialogue-editor-override.json
+          git diff --exit-code -- public/play

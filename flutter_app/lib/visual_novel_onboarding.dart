@@ -14,7 +14,6 @@ const _dialoguePanelOpacityDefault = _dialoguePanelOpacityMin;
 final ValueNotifier<double> _dialoguePanelOpacity = ValueNotifier<double>(
   _dialoguePanelOpacityDefault,
 );
-const _orientationRosterBeat = 43;
 const _orientationCompleteBeat = _onboardingBeatCount - 1;
 const _storyCharacterBottomInset = 104.0;
 const _storyCharacterHeightFactor = 0.9;
@@ -24,6 +23,15 @@ const _minhoCharacterAsset =
 const _minhoCharacterScale = 0.72;
 const _maximumWheelBackSteps = 12;
 const _wheelBackDebounce = Duration(milliseconds: 180);
+
+typedef PrologueCheckpointSaver =
+    Future<void> Function(
+      int beat,
+      bool academyPcPoweredOn,
+      bool academyStockAppOpen,
+      String playerName,
+      String companyName,
+    );
 
 class _PrologueSkipStep {
   const _PrologueSkipStep({
@@ -133,11 +141,23 @@ class VisualNovelOnboardingScreen extends StatefulWidget {
     super.key,
     required this.onCreate,
     this.onExit,
+    this.onCheckpoint,
+    this.initialBeat = 0,
+    this.initialAcademyPcPoweredOn = false,
+    this.initialAcademyStockAppOpen = false,
+    this.initialPlayerName = '',
+    this.initialCompanyName = '',
     this.dialogueOverrideJson,
   });
 
   final NewGameCreator onCreate;
   final VoidCallback? onExit;
+  final PrologueCheckpointSaver? onCheckpoint;
+  final int initialBeat;
+  final bool initialAcademyPcPoweredOn;
+  final bool initialAcademyStockAppOpen;
+  final String initialPlayerName;
+  final String initialCompanyName;
   final String? dialogueOverrideJson;
 
   @override
@@ -153,12 +173,12 @@ class _VisualNovelOnboardingScreenState
   final List<int> _beatNavigationHistory = <int>[];
   Map<int, _DialogueOverride> _dialogueOverrides =
       _canonicalDialogueOverrides();
-  int _beat = 0;
+  late int _beat;
   int _dialogueEndBeat = canonicalDialogueScenes.length - 1;
   bool _isCreating = false;
   String? _creationError;
-  bool _academyPcPoweredOn = false;
-  bool _academyStockAppOpen = false;
+  late bool _academyPcPoweredOn;
+  late bool _academyStockAppOpen;
   DateTime? _lastWheelBackAt;
   late final Future<void> _dialogueLoadFuture;
   WorldLoadProgress _creationProgress = const WorldLoadProgress(
@@ -169,6 +189,12 @@ class _VisualNovelOnboardingScreenState
   @override
   void initState() {
     super.initState();
+    _beat = widget.initialBeat.clamp(0, canonicalDialogueScenes.length - 1);
+    _academyPcPoweredOn = widget.initialAcademyPcPoweredOn;
+    _academyStockAppOpen =
+        widget.initialAcademyPcPoweredOn && widget.initialAcademyStockAppOpen;
+    _playerController.text = widget.initialPlayerName;
+    _companyController.text = widget.initialCompanyName;
     _dialogueLoadFuture = _loadDialogueOverrides();
     unawaited(_dialogueLoadFuture);
     unawaited(_loadDialoguePanelOpacity());
@@ -317,9 +343,10 @@ class _VisualNovelOnboardingScreenState
                 }
               }
             }
-            loaded
-              ..clear()
-              ..addAll(browserDraft);
+            // A browser draft may contain only edited/custom scenes. Keep the
+            // generated canonical map underneath it so a partial cache can
+            // never resurrect the handwritten legacy switch fallbacks.
+            loaded.addAll(browserDraft);
           }
         }
       } catch (_) {
@@ -342,35 +369,10 @@ class _VisualNovelOnboardingScreenState
   }
 
   String _backgroundForBeat(int beat) {
-    final override = _dialogueOverrides[beat]?.background?.trim();
-    if (override != null && override.isNotEmpty) return override;
-    return switch (beat) {
-      <= 4 =>
-        'assets/images/cinematic_soft_painted/policy_1981/backgrounds/bg_policy_room_night_v1.png',
-      <= 15 =>
-        'assets/images/cinematic_soft_painted/policy_1981/backgrounds/bg_conference_night_v1.png',
-      16 =>
-        'assets/images/historical_prologue/bg_future_development_orphanage_1982_portrait_cartoon_v1.png',
-      <= 22 =>
-        'assets/images/historical_prologue/bg_orphanage_departure_2000_portrait_v1.png',
-      <= 31 =>
-        'assets/images/historical_prologue/bg_future_development_academy_gate_2000_portrait_v1.png',
-      <= 53 =>
-        'assets/images/historical_prologue/bg_future_development_orientation_hall_2000_portrait_v1.png',
-      <= 57 =>
-        'assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_corridor_2000_v1.png',
-      <= 63 =>
-        'assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_day_2000_v1.png',
-      64 =>
-        'assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_washroom_2000_v1.png',
-      65 =>
-        'assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_night_2000_v1.png',
-      66 =>
-        'assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_day_2000_v1.png',
-      67 =>
-        'assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_corridor_2000_v1.png',
-      _ => 'assets/images/bg_stock_academy_2000_portrait_cartoon_v4.png',
-    };
+    final background = _dialogueOverrides[beat]?.background?.trim();
+    return background == null || background.isEmpty
+        ? 'assets/images/bg_stock_academy_2000_portrait_cartoon_v4.png'
+        : background;
   }
 
   String get _background => _backgroundForBeat(_beat);
@@ -424,423 +426,28 @@ class _VisualNovelOnboardingScreenState
   _PrologueSkipStep get _currentPrologueSkipStep =>
       _prologueSkipStepForBeat(_beat);
 
-  String get _location {
-    final override = _dialogueOverrides[_beat]?.location.trim();
-    if (override != null && override.isNotEmpty) return override;
-    return switch (_beat) {
-      <= 4 => '청와대 · 정책실',
-      <= 15 => '청와대 · 미래전략 심야회의',
-      16 => '국립 미래양성원 · 개원 기록',
-      <= 22 => '새봄보육원 · 2층 다섯 번째 방',
-      <= 31 => '국립 미래양성원 · 투자전문과정 정문',
-      <= 53 => '국립 미래양성원 · 제6기 오리엔테이션 강당',
-      <= 57 => '국립 미래양성원 · 기숙사 중앙 복도',
-      <= 63 => '국립 미래양성원 · 제6기 공용 생활실',
-      64 => '국립 미래양성원 · 기숙사 세면실',
-      65 || 66 => '국립 미래양성원 · 제6기 공용 생활실',
-      67 => '국립 미래양성원 · 기숙사 중앙 복도',
-      _ => '국립 미래양성원 · 주식 PC 실습실',
-    };
-  }
+  String get _location =>
+      _dialogueOverrides[_beat]?.location.trim() ?? '국립 미래양성원';
 
-  String get _dateLabel {
-    final override = _dialogueOverrides[_beat]?.date.trim();
-    if (override != null && override.isNotEmpty) return override;
-    return switch (_beat) {
-      <= 15 => '1981.01.12  ·  23:40',
-      16 => '1982년  ·  미래양성계획 출범',
-      <= 22 => '2000.01.02  ·  06:42',
-      <= 31 => '2000.01.02  ·  07:31',
-      <= 53 => '2000.01.02  ·  08:00',
-      <= 57 => '2000.01.02  ·  09:05',
-      <= 64 => '2000.01.02  ·  09:10',
-      65 => '2000.01.02  ·  21:40',
-      66 => '2000.01.03  ·  08:40',
-      67 => '2000.01.03  ·  08:55',
-      _ => '2000.01.03  ·  09:00',
-    };
-  }
+  String get _dateLabel => _dialogueOverrides[_beat]?.date.trim() ?? '';
 
   String? get _character {
-    return switch (_beat) {
-      1 =>
-        'assets/images/cinematic_soft_painted/policy_1981/jeon_dugwang/02_listening_v1.png',
-      5 =>
-        'assets/images/cinematic_soft_painted/policy_1981/jeon_dugwang/05_pressure_v1.png',
-      9 =>
-        'assets/images/cinematic_soft_painted/policy_1981/jeon_dugwang/04_cold_laugh_v1.png',
-      12 =>
-        'assets/images/cinematic_soft_painted/policy_1981/jeon_dugwang/03_calculating_v1.png',
-      14 =>
-        'assets/images/cinematic_soft_painted/policy_1981/jeon_dugwang/01_signing_v1.png',
-      2 =>
-        'assets/images/cinematic_soft_painted/policy_1981/seo_muntae/01_policy_pitch_v1.png',
-      7 =>
-        'assets/images/cinematic_soft_painted/policy_1981/seo_muntae/04_exhausted_concession_v1.png',
-      11 =>
-        'assets/images/cinematic_soft_painted/policy_1981/seo_muntae/02_searching_chart_v1.png',
-      13 =>
-        'assets/images/cinematic_soft_painted/policy_1981/seo_muntae/03_rebuttal_v1.png',
-      3 =>
-        'assets/images/cinematic_soft_painted/policy_1981/baek_gihyeon/03_warning_v2.png',
-      10 =>
-        'assets/images/cinematic_soft_painted/policy_1981/baek_gihyeon/02_advice_v2.png',
-      4 =>
-        'assets/images/cinematic_soft_painted/policy_1981/kang_incheol/02_explain_v2.png',
-      8 =>
-        'assets/images/cinematic_soft_painted/policy_1981/yoon_mira/03_objection_v1.png',
-      15 =>
-        'assets/images/cinematic_soft_painted/policy_1981/yoon_mira/04_solution_v1.png',
-      18 => _minhoCharacterAsset,
-      19 => 'assets/images/protagonist_seed01/03_playful_grin.png',
-      21 => 'assets/images/protagonist_seed01/17_holding_badge.png',
-      26 => 'assets/images/protagonist_seed01/02_cheerful_laugh.png',
-      40 => 'assets/images/protagonist_seed01/04_curious_question.png',
-      48 => 'assets/images/protagonist_seed01/16_hands_on_hips.png',
-      50 => 'assets/images/protagonist_seed01/22_victory_fist.png',
-      22 =>
-        'assets/images/historical_prologue/character_park_sunhee_farewell_v1.png',
-      25 =>
-        'assets/images/production_soft_painted/han_sua/07_determined_quality_v2.png',
-      27 =>
-        'assets/images/production_soft_painted/han_sua/01_neutral_quality_v2.png',
-      29 =>
-        'assets/images/production_soft_painted/han_sua/02_warm_smile_quality_v2.png',
-      31 =>
-        'assets/images/production_soft_painted/han_sua/03_bright_laugh_quality_v2.png',
-      36 =>
-        'assets/images/production_soft_painted/han_sua/04_surprised_quality_v2.png',
-      38 =>
-        'assets/images/production_soft_painted/han_sua/05_worried_quality_v2.png',
-      47 =>
-        'assets/images/production_soft_painted/han_sua/02_warm_smile_quality_v2.png',
-      60 =>
-        'assets/images/production_soft_painted/han_sua/03_bright_laugh_quality_v2.png',
-      66 =>
-        'assets/images/production_soft_painted/kim_seoa/09_explaining_ledger_v1.png',
-      67 =>
-        'assets/images/production_soft_painted/lee_jian/09_explaining_mechanism_v2.png',
-      68 =>
-        'assets/images/production_soft_painted/choi_iseo/01_base_thread_v1.png',
-      69 =>
-        'assets/images/production_soft_painted/jung_arin/09_counting_explain_v1.png',
-      70 =>
-        'assets/images/production_soft_painted/park_haeun/02_warm_smile_v1.png',
-      71 =>
-        'assets/images/production_soft_painted/oh_jiwoo/09_explaining_report_v1.png',
-      72 =>
-        'assets/images/production_soft_painted/yoon_chaea/09_explaining_v1.png',
-      73 =>
-        'assets/images/production_soft_painted/han_sua/08_explaining_quality_v2.png',
-      77 =>
-        'assets/images/production_soft_painted/jung_arin/04_assigning_tasks_v1.png',
-      79 =>
-        'assets/images/production_soft_painted/choi_iseo/07_firm_boundary_v1.png',
-      80 =>
-        'assets/images/production_soft_painted/lee_jian/07_apologetic_boundary_v2.png',
-      81 =>
-        'assets/images/production_soft_painted/park_haeun/09_explaining_v1.png',
-      82 =>
-        'assets/images/production_soft_painted/kim_seoa/08_determined_record_v1.png',
-      84 =>
-        'assets/images/production_soft_painted/han_sua/03_bright_laugh_quality_v2.png',
-      85 =>
-        'assets/images/production_soft_painted/oh_jiwoo/03_breaking_news_excited_v1.png',
-      86 =>
-        'assets/images/production_soft_painted/yoon_chaea/06_worried_v1.png',
-      90 =>
-        'assets/images/production_soft_painted/han_sua/05_worried_quality_v2.png',
-      93 =>
-        'assets/images/production_soft_painted/han_sua/07_determined_quality_v2.png',
-      56 =>
-        'assets/images/historical_prologue/character_hakjun_orientation_v2.png',
-      62 => 'assets/images/protagonist_seed01/04_curious_question.png',
-      28 || 30 || 39 || 46 =>
-        'assets/images/historical_prologue/character_hakjun_orientation_v2.png',
-      _ => null,
-    };
+    final character = _dialogueOverrides[_beat]?.character?.trim();
+    return character == null || character.isEmpty ? null : character;
   }
-
-  bool get _isAcademyTeacherBeat =>
-      _beat == 34 ||
-      _beat == 35 ||
-      _beat == 37 ||
-      _beat == 42 ||
-      _beat == 43 ||
-      _beat == 44 ||
-      _beat == 45 ||
-      _beat == 49 ||
-      _beat == 51 ||
-      _beat == 53 ||
-      _beat == 55 ||
-      _beat == 57 ||
-      _beat == 59 ||
-      _beat == 61 ||
-      _beat == 63 ||
-      _beat == 64 ||
-      _beat == 67 ||
-      _beat == 69 ||
-      _beat == 71 ||
-      _beat == 72;
-
-  String get _teacherPoseAsset => switch (_beat) {
-    34 || 42 || 51 => 'assets/images/주식선생님/22_포즈1_주인공그림체_공통슬롯_투명.png',
-    35 || 43 || 49 => 'assets/images/주식선생님/24_포즈3_주인공그림체_공통슬롯_투명.png',
-    37 || 44 => 'assets/images/주식선생님/23_포즈2_주인공그림체_공통슬롯_투명.png',
-    45 || 53 || 64 || 72 => 'assets/images/주식선생님/26_포즈5_주인공그림체_공통슬롯_투명.png',
-    55 || 63 || 67 => 'assets/images/주식선생님/22_포즈1_주인공그림체_공통슬롯_투명.png',
-    57 || 61 || 69 => 'assets/images/주식선생님/24_포즈3_주인공그림체_공통슬롯_투명.png',
-    59 || 71 => 'assets/images/주식선생님/23_포즈2_주인공그림체_공통슬롯_투명.png',
-    _ => 'assets/images/주식선생님/22_포즈1_주인공그림체_공통슬롯_투명.png',
-  };
 
   bool get _isNarration => _speaker == '이야기';
 
   bool get _isOrientationRosterScene =>
-      _dialogueOverrides[_beat]?.id == 'scene-44' ||
-      (_dialogueOverrides[_beat] == null && _beat == _orientationRosterBeat);
+      _dialogueOverrides[_beat]?.id == 'scene-44';
 
-  String get _speaker =>
-      _dialogueOverrides[_beat]?.speaker ??
-      switch (_beat) {
-        0 ||
-        6 ||
-        16 ||
-        17 ||
-        20 ||
-        23 ||
-        27 ||
-        32 ||
-        41 ||
-        52 ||
-        54 ||
-        58 ||
-        65 ||
-        66 ||
-        68 => '이야기',
-        1 || 9 || 12 || 14 => '전두광',
-        2 || 7 || 11 || 13 => '서문태 정책실장',
-        3 || 10 => '백기현 비서실장',
-        4 => '강인철 경제수석',
-        5 => '전두광',
-        8 || 15 => '윤미라 사회교육수석',
-        18 => '민호',
-        19 || 21 || 26 || 40 || 48 || 50 => '나',
-        22 => '박선희 원장',
-        24 || 33 => '아이들',
-        25 || 29 || 31 || 36 || 38 || 47 => '수아',
-        28 => '김학준',
-        30 || 39 || 46 || 56 || 70 => '학준',
-        60 => '수아',
-        62 => '나',
-        34 ||
-        35 ||
-        37 ||
-        42 ||
-        43 ||
-        44 ||
-        45 ||
-        49 ||
-        51 ||
-        53 ||
-        55 ||
-        57 ||
-        59 ||
-        61 ||
-        63 ||
-        64 ||
-        67 ||
-        69 ||
-        71 ||
-        72 => '한서윤 선생님',
-        _ => '이야기',
-      };
+  String get _speaker => _dialogueOverrides[_beat]?.speaker ?? '이야기';
 
-  String get _line =>
-      _dialogueOverrides[_beat]?.line ??
-      switch (_beat) {
-        0 =>
-          '1981년 1월 12일 밤 11시 40분. 청와대 정책실의 불은 자정이 가까워져도 꺼지지 않았다. 보고서 다섯 권 가운데 하나만, 이상할 만큼 얇았다.',
-        1 => '그래서. 당장은 멀쩡한데, 이대로 가면 나라가 망한다?',
-        2 => '당장은 아닙니다. 하지만 지금만 보고 달리면 이십 년 뒤에는 남의 기술과 남의 돈에 나라의 목줄이 잡힙니다.',
-        3 => '각하 앞에서 나라 앞날이 어둡다고 했으니, 자네 앞날도 같이 어두워질 수 있겠어.',
-        4 =>
-          '지금은 공장 세우고 물건을 찍는 쪽이 이깁니다. 하지만 미래에는 어떤 기술에 돈을 넣고, 어떤 회사를 살릴지 정하는 사람이 공장 몇 개보다 더 큰 힘을 갖게 됩니다.',
-        5 => '공장도, 인구도, 법도 두꺼운데 아이들 보고서만 이 모양이군. 미래를 말하면서, 미래에 살 아이들은 뺐나?',
-        6 => '수출산업, 인구전망, 국가계좌, 특별법. 네 권은 벽돌처럼 두꺼웠다. 「요보호아동 시설 현황」만 종잇장처럼 얇았다.',
-        7 => '국가는 이미 아이들에게 밥과 잠자리를 줍니다. 이제는 내일을 고를 힘도 줘야 합니다.',
-        8 => '미치셨습니까? 아이들을 국가가 키우는 자본이나 실험쥐로 보겠다는 겁니까? 실패하면 그 아이 인생은 누가 책임집니까!',
-        9 => '먹이고 재우는 데서 끝내면 세금 낭비지. 스스로 돈을 벌게 만들면 투자가 되고.',
-        10 => '핏덩이들에게 나랏돈을 줬다가 잃으면 혈세 낭비라 할 겁니다. 벌면 나라가 코 묻은 돈을 빼앗는다고 할 테고요.',
-        11 =>
-          '열네 살, SEED 01부터 시작합니다. 원금은 오만 원입니다. 작아서 우스워 보여도, 손실 이유를 감추기엔 충분히 큰 돈입니다.',
-        12 => '잃으면?',
-        13 => '아이 빚으로 남기지 않습니다. 대신 다음 달 주문 한도를 깎습니다. 벌면 일부를 국가가 회수하고요.',
-        14 =>
-          '이십 퍼센트. 나머지는 아이 몫. 대신 왜 샀고 왜 팔았는지 전부 쓰게 해. 잘한 이야기만 말고, 손실로 바닥까지 내려간 기록도.',
-        15 => '그 80퍼센트는 시설 돈이 아닙니다. 아이 이름으로 묶어두고, 열아홉에 1원도 빠짐없이 넘기십시오.',
-        16 => '이듬해, 국립 미래양성원이 문을 열었다. 환영 문구 대신 정문에는 한 줄이 걸렸다. 「기록 없는 판단은 우연이다」',
-        17 =>
-          '2000년 1월 2일 오전 6시 42분. 눈을 뜨자 천장의 누런 물자국이 먼저 보였다. 여섯 살 때부터 귀 잘린 토끼 같다고 생각했던 얼룩. 마지막 날인데도 물자국은 그냥 물자국이었다.',
-        18 => '형아… 진짜 가?',
-        19 => '응. 돈 세는 학교래. 그냥 주면 더 좋을 텐데, 세기만 시키면 손가락만 아프잖아.',
-        20 =>
-          '민호가 웃다가 낡은 가방을 보고 입을 다물었다. 나는 왕딱지 한 장만 챙기고 나머지는 민호 이불 위에 던졌다. 가방 안감을 들추자 낯선 쇳조각이 손끝에 걸렸다. 「제5기 · 17번」.',
-        21 =>
-          '이름은 칼로 긁어 지워져 있었다. 뒷면에는 더 이상한 말이 파여 있었다. 「17번을 믿지 마.」 …이게 17번 명찰인데, 누구를 믿지 말라는 거야?',
-        22 =>
-          '짐이 가볍다고 주눅 들지 마. 앞으로 채울 게 많다는 뜻이니까. 가서도 이상한 말은 그냥 넘기지 말고 두 번 물어. 그래도 이상하면 장부에 적어 둬. 말은 날아가도 글은 남으니까.',
-        23 =>
-          '버스는 서울을 벗어나 한참을 덜컹거렸다. 눈발 너머로 붉은 벽돌 건물이 나타났다. 학교치고는 담장이 길었고, 공장치고는 창문이 많았다.',
-        24 => '“여기가 그 유명한 데래.”\n“고아원에서 추천받은 애들만 온다던데?”\n“입학식인데 왜 면접장보다 조용해?”',
-        25 => '야, 가방 바퀴 하나가 눈을 계속 끌고 다녀.',
-        26 => '일부러 눈사람 만드는 중이야. 본관 도착할 때쯤 머리까지 붙이려고.',
-        27 =>
-          '여자아이는 대꾸 대신 쪼그려 앉아 연필로 바퀴의 눈을 긁어냈다. 처음 보는 사이인데도 망설임이 없었다. 이름은 수아라고 했다.',
-        28 => '정문에서 본관까지 420미터. 6분 안에 도착해야 하고, 뛰면 감점이야. 안내문 7쪽에 있어.',
-        29 => '설명서 학준아, 별명 붙이면 안 된다는 규정도 있어?',
-        30 => '…없어. 그리고 그렇게 부르지 마.',
-        31 => '그럼 합법이네.',
-        32 =>
-          '강당에는 내빈석도 부모 자리도 없었다. 열 개의 의자만 반원으로 놓여 있었다. 무대 위 나무상자 하나가 더 수상해 보였다.',
-        33 => '“남자 둘, 여자 여덟이래.”\n“자리도 성적순일까?”\n“아직 시험도 안 봤는데 무슨 성적이 있어.”',
-        34 => '제6기 교육을 맡은 한서윤입니다. 인사는 조금 뒤에 하죠. 여러분 배에서 나는 소리가 더 급해 보이니까.',
-        35 => '이 상자 안에는 단팥빵 하나와 500원짜리 동전이 있어요. 식당에서 빵은 300원입니다. 하나만 고르세요.',
-        36 => '동전이요! 빵 사고도 200원 남잖아요.',
-        37 => '좋아요. 그런데 식당 문은 두 시간 뒤, 열 시에 열립니다.',
-        38 => '두 시간이요? …참을 수 있어요. 아마도.',
-        39 =>
-          '빵이 얼마나 남았는지, 열 시에 새 빵이 들어오는지부터 알아야 해요. 동전만 보고 고르기엔 모르는 게 너무 많아요.',
-        40 => '그 전에 상자부터 열어봐야 하는 거 아니에요? 선생님이 단팥빵을 벌써 드셨을 수도 있잖아요.',
-        41 => '아이들 사이에서 웃음이 터졌다. 한서윤은 화내지 않았다. 오히려 상자 뚜껑 위에 손을 얹고 나를 다시 보았다.',
-        42 =>
-          '그래요. 아는 게 달라지면 답도 달라집니다. 여기서 제일 먼저 배울 건 돈 버는 법이 아니라, 모르는 걸 모른다고 말하는 법이에요.',
-        43 =>
-          '여기 온 아이는 열 명, 남학생 두 명과 여학생 여덟 명입니다. 이번 기수는 여학생이 유난히 많네요. 모두 전국 보호시설의 추천을 받고, 오랫동안 생활 기록을 살핀 끝에 선발됐어요.',
-        44 =>
-          '여긴 간판만 바꾼 고아원도, 부자 흉내를 내는 학원도 아니에요. 숫자 뒤에 있는 사람과 거짓말을 보고, 자기 판단에 책임지는 법을 배우는 곳입니다.',
-        45 => '그럼 첫 기록부터 남겨 볼까요? 자기가 왜 뽑혔다고 생각해요?',
-        46 => '규칙을 빨리 외우고, 계산을 잘해서요.',
-        47 => '사람 얼굴 보면 뭘 좋아하고 싫어하는지 금방 알아서요.',
-        48 => '돈을 많이 벌 것 같아서 뽑은 거 아니에요?',
-        49 => '지금 가진 돈은 얼마인데요?',
-        50 => '왕딱지 한 장이요. 용 그려진 제일 센 거.',
-        51 => '돈은 빵점. 솔직함은 합격. 뽑힌 이유는 내일부터 직접 찾아보죠.',
-        52 =>
-          '가장 어둡던 형광등이 한 번 떨리고 안정됐다. 열 개의 이름표가 같은 빛을 받았다. 주머니 속 5기 명찰만 혼자 차갑게 식어 있었다.',
-        53 => '자, 이제 오늘은 첫날이니 기숙사 소개를 해줄게요. 짐 챙기고 모두 따라오세요.',
-        54 =>
-          '열 명의 의자가 한꺼번에 밀렸다. 강당 문 너머로 이어진 복도에는 젖은 운동화 자국과 낯선 방문들이 줄지어 있었다.',
-        55 =>
-          '복도 끝이 제6기 생활실이에요. 남학생 둘과 여학생 여덟이 방 하나를 함께 씁니다. 침상과 사물함은 한 사람에게 하나씩 돌아가요.',
-        56 => '남학생하고 여학생이 정말 같은 방에서 잔다고요?',
-        57 =>
-          '같은 방에서 자지만 남의 침상과 사물함은 허락 없이 건드리지 않습니다. 옷을 갈아입거나 씻을 때는 잠금 칸막이실을 쓰고요. 불편한 일이 생기면 참지 말고 바로 말하세요.',
-        58 => '한서윤이 가장 가까운 방문을 밀었다. 양쪽 벽의 이층침대와 열 개의 사물함, 길쭉한 공용 책상이 한눈에 들어왔다.',
-        59 =>
-          '아래층과 위층 중 원하는 자리를 먼저 골라 보세요. 자리를 바꾸고 싶을 때는 둘이 합의하고 생활기록표에 적으면 됩니다.',
-        60 => '그럼 코 고는 사람은 남자든 여자든 창가 자리로 보내도 돼요?',
-        61 => '보내는 건 안 되고, 본인에게 먼저 말하는 건 됩니다. 첫 생활 회의 안건으로 올려도 좋고요.',
-        62 => '맨 위 침대는 먼저 올라가는 사람이 임자예요?',
-        63 =>
-          '오늘만 선착순이에요. 짐을 풀고 서로 이름부터 외우세요. 주식 수업은 내일 시작합니다. 주식이 뭔지도 모른다고 생각하고, 회사와 주식 한 주가 무엇인지부터 천천히 배울 거예요.',
-        64 =>
-          '세면대와 바구니도 한 사람당 하나씩입니다. 씻는 칸과 갈아입는 칸은 문을 잠그고 사용하세요. 같은 방을 쓴다는 말이 서로의 경계까지 없어진다는 뜻은 아니에요.',
-        65 =>
-          '밤 아홉 시 사십 분. 열 개의 침상에서 이불이 차례로 부풀었다. 남자 둘과 여자 여덟이 한 방을 쓰는 첫날, 낯선 숨소리 사이로 내일 배울 ‘주식’이라는 말만 오래 잠들지 않았다.',
-        66 =>
-          '다음 날 아침 여덟 시 사십 분. 창문으로 들어온 겨울 햇빛이 침상과 사물함을 환하게 훑었다. 세수를 마친 열 명은 공책 한 권씩 챙겼다.',
-        67 =>
-          '첫 수업은 교실이 아니라 PC 실습실에서 합니다. 앞으로 주식 수업은 각자 자기 컴퓨터로 화면을 직접 보면서 배울 거예요.',
-        68 =>
-          '문이 열리자 베이지색 모니터와 본체가 두 줄로 늘어서 있었다. 학생 자리마다 키보드와 줄 달린 마우스가 하나씩 놓여 있었다.',
-        69 =>
-          '자, 여기가 주식 PC 실습실이에요. 오늘부터 한 사람당 컴퓨터 한 대를 맡습니다. 하지만 아직 아무 버튼도 누르지 마세요.',
-        70 => '컴퓨터를 켜면 바로 주식을 살 수 있는 건가요?',
-        71 =>
-          '아니요. 먼저 회사가 무엇인지, 주식 한 주가 그 회사의 얼마나 작은 소유 조각인지부터 배웁니다. 모르는 말은 그 자리에서 바로 풀어 설명할게요.',
-        _ =>
-          '이제 자기 번호가 붙은 PC 앞에 앉으세요. 오늘 목표는 돈을 버는 게 아니라, 화면에 무엇이 있고 왜 숫자가 움직이는지 이해하는 겁니다.',
-      };
+  String get _line => _dialogueOverrides[_beat]?.line ?? '대사 정본을 불러오지 못했습니다.';
 
   String? get _stageDirection {
-    final override = _dialogueOverrides[_beat];
-    if (override != null) {
-      final direction = override.direction.trim();
-      return direction.isEmpty ? null : direction;
-    }
-    return switch (_beat) {
-      1 => '전두광이 가장 얇은 보고서를 탁자 가운데로 밀었다.',
-      2 => '밤샘으로 충혈된 서문태의 눈이 잠깐 흔들렸다.',
-      3 => '백기현은 안경을 벗어 천천히 닦았다.',
-      4 => '강인철의 연필이 1981년에서 2000년으로 긴 선을 그었다.',
-      5 => '전두광이 「요보호아동 시설 현황」 표지를 손가락으로 두 번 두드렸다.',
-      7 => '서문태의 손이 가장 얇은 보고서 위에서 멈췄다.',
-      8 => '윤미라가 손바닥으로 탁자를 내리쳤다.',
-      9 => '전두광은 대답 대신 보고서 표지를 두 번 두드렸다.',
-      10 => '백기현이 안경을 다시 쓰며 정치적 손익을 셌다.',
-      11 => '서문태가 기다렸다는 듯 새 계좌 양식을 펼쳤다.',
-      12 => '만년필 끝이 손실 처리 칸 위에서 멈췄다.',
-      13 => '서문태가 다음 달 주문 한도 칸을 손가락으로 짚었다.',
-      14 => '전두광은 20%에 동그라미를 치고 「미래양성원」 네 글자를 갈겨썼다.',
-      15 => '윤미라는 80% 아래에 ‘아이 명의’라고 힘주어 적었다.',
-      18 => '옆 침대 이불이 꿈틀거리더니 민호가 코만 내밀었다.',
-      19 => '나는 지퍼가 잘 닫히지 않는 가방을 무릎으로 눌렀다.',
-      20 => '모서리가 닳은 왕딱지 두 장이 민호의 이불 위로 날아갔다.',
-      21 => '나는 쇳조각 명찰을 재빨리 바지 주머니에 쑤셔 넣었다.',
-      22 => '박선희 원장이 목도리를 한 번 더 단단히 매어주었다.',
-      23 => '정문의 돌 표어가 눈발 사이로 드러났다. 「기록 없는 판단은 우연이다」.',
-      24 => '종이상자와 비닐봉지를 든 아이들의 속삭임이 겹쳤다.',
-      25 => '수아가 내 가방이 남긴 삐뚤어진 바퀴 자국을 가리켰다.',
-      26 => '나는 한쪽으로 기운 가방을 태연하게 세웠다.',
-      27 => '연필 끝에서 굳은 눈덩이가 후두둑 떨어졌다.',
-      28 => '남색 규정집을 낀 김학준이 우리 옆에 바짝 붙었다.',
-      29 => '수아가 눈을 가늘게 뜨고 김학준의 명찰을 읽었다.',
-      30 => '학준의 귀끝이 규정집 표지보다 먼저 붉어졌다.',
-      31 => '수아가 깔깔 웃으며 먼저 언덕을 뛰어올랐다.',
-      32 => '오래된 형광등 아래, 이름표 열 장이 빈 의자를 지키고 있었다.',
-      33 => '앞자리와 뒷자리에서 서로 다른 소문이 동시에 튀어나왔다.',
-      34 => '구두 소리가 무대에 닿자 웅성거림이 절반쯤 줄었다.',
-      35 => '한서윤이 나무상자 위에 손바닥을 올렸다.',
-      36 => '수아의 손이 누구보다 먼저 천장을 찔렀다.',
-      37 => '한서윤이 벽시계를 턱으로 가리켰다.',
-      38 => '말이 끝나자마자 수아의 배에서 작은 소리가 났다.',
-      39 => '학준은 규정집 모서리를 만지며 상자를 노려봤다.',
-      40 => '나는 열리지 않은 상자 뚜껑을 손가락으로 가리켰다.',
-      41 => '한서윤의 입꼬리가 처음으로 아주 조금 올라갔다.',
-      42 => '칠판에 네 칸이 그어졌다. 아는 것, 모르는 것, 고른 이유, 생각을 바꿀 조건.',
-      43 => '출석부가 펼쳐지고 남학생 두 칸, 여학생 여덟 칸이 차례로 확인됐다.',
-      44 => '지시봉이 숫자, 사람, 판단 세 단어를 천천히 지나갔다.',
-      45 => '한서윤의 시선이 반원으로 앉은 아이들을 훑었다.',
-      46 => '학준은 기다렸다는 듯 허리를 곧게 폈다.',
-      47 => '수아는 옆자리 아이들의 표정을 한번 훑고 대답했다.',
-      48 => '나는 이유를 찾는 대신 가장 그럴듯한 답부터 꺼냈다.',
-      49 => '한서윤이 웃음을 누르며 되물었다.',
-      50 => '주머니 속 왕딱지가 손끝에 걸렸다.',
-      51 => '한서윤이 출석부 내 이름 옆에 짧은 표시를 남겼다.',
-      52 => '낡은 명찰의 모서리가 주머니 안에서 허벅지를 찔렀다.',
-      53 => '강당 문이 열리고 차가운 복도 공기가 발끝으로 밀려왔다.',
-      54 => '한서윤이 출석부를 덮고 복도 쪽으로 먼저 걸음을 옮겼다.',
-      55 => '한서윤이 복도 끝 열린 방문을 가리켰다.',
-      56 => '학준의 규정집이 가슴팍에서 조금 내려갔다.',
-      57 => '한서윤은 열린 방문보다 먼저 복도 안쪽 칸막이실을 가리켰다.',
-      58 => '낡은 경첩이 낮게 울리고 생활실의 따뜻한 공기가 복도로 흘러나왔다.',
-      59 => '한서윤이 양쪽 이층침대와 사물함을 차례로 짚었다.',
-      60 => '수아가 가장 안쪽 침대를 보며 코끝을 찡긋했다.',
-      61 => '한서윤이 웃음을 참듯 출석부로 입가를 가렸다.',
-      62 => '나는 창가 쪽 위층 침대 사다리에 손을 얹었다.',
-      63 => '한서윤이 공용 책상 위 빈 장부를 펼쳐 보였다.',
-      64 => '세면실 문 안쪽의 잠금쇠가 또각 소리를 냈다.',
-      65 => '소등 뒤에도 창밖의 눈빛이 이층침대 난간에 가늘게 남아 있었다.',
-      66 => '알람시계가 울리기 전부터 침상 사다리와 사물함 문이 차례로 움직였다.',
-      67 => '한서윤이 출석부 대신 얇은 PC 좌석표를 들고 복도 끝으로 걸었다.',
-      68 => 'CRT 모니터 열 대가 꺼진 유리 화면으로 아이들을 비췄다.',
-      69 => '한서윤이 중앙 통로에 서서 양쪽 컴퓨터 줄을 펼친 손으로 가리켰다.',
-      70 => '학준의 시선이 전원 버튼과 키보드 사이를 빠르게 오갔다.',
-      71 => '한서윤이 칠판에 회사, 한 주, 가격 세 단어를 크게 적었다.',
-      72 => '교실 앞의 큰 CRT 화면 두 대에 아직 이름 없는 차트 선만 떠올랐다.',
-      _ => null,
-    };
+    final direction = _dialogueOverrides[_beat]?.direction.trim();
+    return direction == null || direction.isEmpty ? null : direction;
   }
 
   String get _historyLine {
@@ -874,6 +481,7 @@ class _VisualNovelOnboardingScreenState
     FocusManager.instance.primaryFocus?.unfocus();
     _playStoryFeedback();
     setState(() => _beat = previousBeat);
+    unawaited(_saveCheckpoint());
   }
 
   void _handlePointerSignal(PointerSignalEvent event) {
@@ -897,6 +505,22 @@ class _VisualNovelOnboardingScreenState
         _beat = math.min(currentBeat + 1, _dialogueEndBeat);
       }
     });
+    unawaited(_saveCheckpoint());
+  }
+
+  Future<void> _saveCheckpoint() =>
+      widget.onCheckpoint?.call(
+        _beat,
+        _academyPcPoweredOn,
+        _academyStockAppOpen,
+        _playerController.text,
+        _companyController.text,
+      ) ??
+      Future<void>.value();
+
+  void _exitOnboarding() {
+    unawaited(_saveCheckpoint());
+    widget.onExit?.call();
   }
 
   Future<void> _showBacklog() async {
@@ -984,7 +608,7 @@ class _VisualNovelOnboardingScreenState
         content: Text(
           '${skipStep.sectionLabel}만 건너뛰고 '
           '${skipStep.destinationLabel}의 첫 장면으로 이동합니다.'
-          '${skipStep.targetBeat == _dialogueEndBeat ? ' PC를 켜고 주식실습 프로그램을 열기 전에는 저장이 만들어지지 않습니다.' : ''}',
+          '${skipStep.targetBeat == _dialogueEndBeat ? ' 이동한 위치와 PC 진행 상태는 자동 저장됩니다.' : ''}',
         ),
         actions: [
           TextButton(
@@ -1006,11 +630,13 @@ class _VisualNovelOnboardingScreenState
       _beatNavigationHistory.clear();
       _beat = skipStep.targetBeat;
     });
+    unawaited(_saveCheckpoint());
     await _dialogueLoadFuture;
     if (!mounted) return;
     final resolvedSkipStep = _prologueSkipStepForBeat(startingBeat);
     if (_beat == resolvedSkipStep.targetBeat) return;
     setState(() => _beat = resolvedSkipStep.targetBeat);
+    unawaited(_saveCheckpoint());
   }
 
   Future<void> _finish() async {
@@ -1066,6 +692,7 @@ class _VisualNovelOnboardingScreenState
       if (!_academyPcPoweredOn) _academyStockAppOpen = false;
       _creationError = null;
     });
+    unawaited(_saveCheckpoint());
   }
 
   void _openAcademyStockApp() {
@@ -1075,6 +702,7 @@ class _VisualNovelOnboardingScreenState
       _academyStockAppOpen = true;
       _creationError = null;
     });
+    unawaited(_saveCheckpoint());
   }
 
   void _closeAcademyStockApp() {
@@ -1085,6 +713,7 @@ class _VisualNovelOnboardingScreenState
       _academyStockAppOpen = false;
       _creationError = null;
     });
+    unawaited(_saveCheckpoint());
   }
 
   Future<void> _startAcademyMarketTutorial() async {
@@ -1113,12 +742,8 @@ class _VisualNovelOnboardingScreenState
         resizeToAvoidBottomInset: false,
         body: LayoutBuilder(
           builder: (context, constraints) {
-            final characterOverride = _dialogueOverrides[_beat]?.character;
-            final sceneCharacterAsset = characterOverride != null
-                ? (characterOverride.isEmpty ? null : characterOverride)
-                : _isAcademyTeacherBeat
-                ? _teacherPoseAsset
-                : _character;
+            final sceneCharacterAsset = _character;
+            final isTeacherScene = _speaker == '한서윤 선생님';
             return Stack(
               key: const Key('onboarding-stage'),
               fit: StackFit.expand,
@@ -1216,7 +841,7 @@ class _VisualNovelOnboardingScreenState
                         key: const Key('story-character-stage-slot'),
                         asset: sceneCharacterAsset,
                         alignment: Alignment.bottomCenter,
-                        characterKey: _isAcademyTeacherBeat
+                        characterKey: isTeacherScene
                             ? const Key('academy-teacher-character')
                             : const Key('story-character-character'),
                       ),
@@ -1423,9 +1048,12 @@ class _VisualNovelOnboardingScreenState
         onTogglePower: _toggleAcademyPcPower,
         onOpenStockApp: _openAcademyStockApp,
         onCloseStockApp: _closeAcademyStockApp,
-        onChanged: () => setState(() => _creationError = null),
+        onChanged: () {
+          setState(() => _creationError = null);
+          unawaited(_saveCheckpoint());
+        },
         onStartTutorial: () => unawaited(_startAcademyMarketTutorial()),
-        onExit: widget.onExit ?? () {},
+        onExit: _exitOnboarding,
       ),
     );
   }
@@ -2326,6 +1954,8 @@ class _NovelDialogue extends StatefulWidget {
     this.narration = false,
     this.stageDirection,
     this.onContinue,
+    this.continueKey,
+    this.continueLabel = '다음',
     this.choices = const [],
     this.child,
   });
@@ -2335,6 +1965,8 @@ class _NovelDialogue extends StatefulWidget {
   final bool narration;
   final String? stageDirection;
   final VoidCallback? onContinue;
+  final Key? continueKey;
+  final String continueLabel;
   final List<_NovelChoice> choices;
   final Widget? child;
 
@@ -2572,9 +2204,11 @@ class _NovelDialogueState extends State<_NovelDialogue>
                         Align(
                           alignment: Alignment.centerRight,
                           child: TextButton.icon(
-                            key: const Key('story-continue'),
+                            key:
+                                widget.continueKey ??
+                                const Key('story-continue'),
                             onPressed: widget.onContinue,
-                            label: const Text('다음'),
+                            label: Text(widget.continueLabel),
                             iconAlignment: IconAlignment.end,
                             icon: const Icon(
                               Icons.keyboard_double_arrow_down_rounded,

@@ -19,7 +19,7 @@ export const viewport: Viewport = {
   themeColor: "#061F2A",
 };
 
-const title = "초딩부터 건물주 — 미래양성원 제6기 투자 생활 게임";
+const title = "10대부터 건물주 — 미래양성원 제6기 투자 생활 게임";
 const description =
   "2000년 서울, 미래양성원 제6기 교육생이 국가원금 5만원으로 투자와 장부를 배우며 성장하는 모바일 세로형 생활·투자 시뮬레이션";
 

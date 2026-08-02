@@ -142,45 +142,19 @@ async function validateBuild() {
   }
 }
 
-async function syncDirectoryContents(source, destination) {
-  await mkdir(destination, { recursive: true });
-
-  const [sourceEntries, destinationEntries] = await Promise.all([
-    readdir(source, { withFileTypes: true }),
-    readdir(destination, { withFileTypes: true }),
-  ]);
-  const sourceNames = new Set(sourceEntries.map((entry) => entry.name));
-
-  for (const entry of destinationEntries) {
-    if (!sourceNames.has(entry.name)) {
-      await rm(resolve(destination, entry.name), {
-        recursive: true,
-        force: true,
-      });
+async function renameWithRetry(source, destination) {
+  let lastError;
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    try {
+      await rename(source, destination);
+      return;
+    } catch (error) {
+      lastError = error;
+      if (error?.code !== "EPERM" && error?.code !== "EACCES") throw error;
+      await new Promise((resolveWait) => setTimeout(resolveWait, 200));
     }
   }
-
-  const destinationKinds = new Map(
-    destinationEntries.map((entry) => [entry.name, entry.isDirectory()]),
-  );
-  for (const entry of sourceEntries) {
-    const sourcePath = resolve(source, entry.name);
-    const destinationPath = resolve(destination, entry.name);
-    const destinationIsDirectory = destinationKinds.get(entry.name);
-
-    if (entry.isDirectory()) {
-      if (destinationIsDirectory === false) {
-        await rm(destinationPath, { recursive: true, force: true });
-      }
-      await syncDirectoryContents(sourcePath, destinationPath);
-      continue;
-    }
-
-    if (destinationIsDirectory === true) {
-      await rm(destinationPath, { recursive: true, force: true });
-    }
-    await cp(sourcePath, destinationPath, { force: true });
-  }
+  throw lastError;
 }
 
 async function syncBuild() {
@@ -190,28 +164,13 @@ async function syncBuild() {
 
   const hadTarget = await exists(target);
   try {
-    if (hadTarget) await rename(target, backup);
-    await rename(staging, target);
+    if (hadTarget) await renameWithRetry(target, backup);
+    await renameWithRetry(staging, target);
     if (hadTarget) await rm(backup, { recursive: true, force: true });
   } catch (error) {
-    const targetWasNotMoved =
-      hadTarget &&
-      (error?.code === "EPERM" || error?.code === "EACCES") &&
-      (await exists(target)) &&
-      !(await exists(backup));
-    if (targetWasNotMoved) {
-      // Windows development servers can keep a directory handle open, which
-      // prevents renaming the root even though replacing its files is safe.
-      await syncDirectoryContents(staging, target);
-      console.warn(
-        "public/play was locked; synced its contents without renaming the directory.",
-      );
-      return;
-    }
-
     await rm(staging, { recursive: true, force: true });
     if (hadTarget && (await exists(backup)) && !(await exists(target))) {
-      await rename(backup, target);
+      await renameWithRetry(backup, target);
     }
     throw error;
   }

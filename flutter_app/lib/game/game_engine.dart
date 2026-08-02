@@ -6297,7 +6297,8 @@ class GameEngine {
           )
         : state;
     final settled = replayed.copyWith(marketMinute: krxCloseMinute);
-    var next = settled.copyWith(
+    final accrued = const LocalBusinessEngine().accrueCurrentDay(settled).state;
+    var next = accrued.copyWith(
       day: state.day + 1,
       marketMinute: marketDayStartMinute,
       progression: state.progression.record('days_advanced'),

@@ -1,6 +1,6 @@
 {
-  "name": "초딩부터 건물주",
-  "short_name": "초딩부터 건물주",
+  "name": "10대부터 건물주",
+  "short_name": "10대부터 건물주",
   "start_url": "./",
   "display": "fullscreen",
   "display_override": ["fullscreen", "standalone"],

@@ -1393,6 +1393,31 @@ BusinessMonthSimulation simulateBusinessMonth({
     ),
     growable: false,
   );
+  return summarizeBusinessDays(
+    business: business,
+    year: year,
+    month: safeMonth,
+    dailyResults: results,
+  );
+}
+
+BusinessMonthSimulation summarizeBusinessDays({
+  required OwnedBusiness business,
+  required int year,
+  required int month,
+  required List<BusinessDailyResult> dailyResults,
+}) {
+  final safeMonth = month.clamp(1, 12).toInt();
+  final monthPrefix = '$year-${safeMonth.toString().padLeft(2, '0')}-';
+  final results =
+      dailyResults
+          .where(
+            (result) =>
+                result.businessId == business.id &&
+                result.dateIso.startsWith(monthPrefix),
+          )
+          .toList(growable: false)
+        ..sort((left, right) => left.dateIso.compareTo(right.dateIso));
   int sum(int Function(BusinessDailyResult result) select) =>
       results.fold<int>(0, (total, result) => total + select(result));
   final statement = BusinessMonthlyStatement(
@@ -1413,7 +1438,8 @@ BusinessMonthSimulation simulateBusinessMonth({
     netProfit: sum((result) => result.netProfit),
     policySnapshot: business.policy,
     sourceId:
-        'business-month-${business.id}-$year-${safeMonth.toString().padLeft(2, '0')}',
+        'business-month-${business.id}-$year-'
+        '${safeMonth.toString().padLeft(2, '0')}',
   );
   return BusinessMonthSimulation(statement: statement, dailyResults: results);
 }

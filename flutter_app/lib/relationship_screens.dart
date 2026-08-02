@@ -112,6 +112,7 @@ class _CohortCharacterTile extends StatelessWidget {
                         child: _CharacterPortraitImage(
                           profile: profile,
                           fit: BoxFit.cover,
+                          scale: 1.42,
                         ),
                       ),
                       Positioned(
@@ -497,39 +498,55 @@ class _CharacterProfileDetailScreen extends StatelessWidget {
 }
 
 class _CharacterPortraitImage extends StatelessWidget {
-  const _CharacterPortraitImage({required this.profile, required this.fit});
+  const _CharacterPortraitImage({
+    required this.profile,
+    required this.fit,
+    this.scale = 1,
+  });
 
   final CohortCharacterProfile profile;
   final BoxFit fit;
+  final double scale;
 
   @override
-  Widget build(BuildContext context) => Image.asset(
-    profile.portraitAsset,
-    fit: fit,
-    alignment: Alignment.topCenter,
-    errorBuilder: (_, _, _) => Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Icon(
-            Icons.person_rounded,
-            color: Color(profile.accentValue),
-            size: 54,
-          ),
-          const SizedBox(height: 7),
-          Text(
-            profile.name,
-            style: TextStyle(
+  Widget build(BuildContext context) {
+    final portrait = Image.asset(
+      profile.portraitAsset,
+      fit: fit,
+      alignment: Alignment.topCenter,
+      filterQuality: FilterQuality.high,
+      isAntiAlias: true,
+      errorBuilder: (_, _, _) => Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Icon(
+              Icons.person_rounded,
               color: Color(profile.accentValue),
-              fontFamily: 'Maplestory',
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
+              size: 54,
             ),
-          ),
-        ],
+            const SizedBox(height: 7),
+            Text(
+              profile.name,
+              style: TextStyle(
+                color: Color(profile.accentValue),
+                fontFamily: 'Maplestory',
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
       ),
-    ),
-  );
+    );
+    if (scale == 1) return portrait;
+    return Transform.scale(
+      key: Key('character-card-portrait-zoom-${profile.id}'),
+      scale: scale,
+      alignment: Alignment.topCenter,
+      child: portrait,
+    );
+  }
 }
 
 class _CharacterBadge extends StatelessWidget {

@@ -1,6 +1,6 @@
 # Flutter 주 구현
 
-초딩부터 건물주의 Android·Web 기준 구현입니다.
+10대부터 건물주의 Android·Web 기준 구현입니다.
 
 ## 실행
 

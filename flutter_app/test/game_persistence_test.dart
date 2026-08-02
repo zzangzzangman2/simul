@@ -457,21 +457,27 @@ void main() {
 
     expect(find.byKey(const Key('campaign-loading-screen')), findsNothing);
     expect(find.byType(VisualNovelOnboardingScreen), findsOneWidget);
+    final checkpoint = await persistence.loadSlot(1, activate: false);
+    expect(checkpoint, isNotNull);
+    expect(checkpoint!.simulationSeed, preparedSeed);
+    expect(checkpoint.story.flagBool('prologueInProgress'), isTrue);
 
     final onboarding = tester.widget<VisualNovelOnboardingScreen>(
       find.byType(VisualNovelOnboardingScreen),
     );
     await tester.runAsync(
-      () => onboarding.onCreate(
-        const NewGameSetup(
-          playerName: '민재',
-          companyName: '시드 유지 연구소',
-          introChoice: 'stocks',
-          startingTrait: StoryTrait.analysis,
-          operatingPrinciple: OperatingPrinciple.reportLosses,
-        ),
-        (_) {},
-      ),
+      () => onboarding
+          .onCreate(
+            const NewGameSetup(
+              playerName: '민재',
+              companyName: '시드 유지 연구소',
+              introChoice: 'stocks',
+              startingTrait: StoryTrait.analysis,
+              operatingPrinciple: OperatingPrinciple.reportLosses,
+            ),
+            (_) {},
+          )
+          .timeout(const Duration(seconds: 15)),
     );
     final saved = await persistence.loadSlot(1, activate: false);
 

@@ -26,19 +26,34 @@
 
 `저장하고 게임 빌드`를 누르면 다음 작업을 한 번에 수행한다.
 
-1. 장면을 순서대로 정규화한다.
-2. `flutter_app/assets/dialogue/dialogue-editor-override.json`을 기록한다.
-3. Flutter Web release를 빌드한다.
-4. 결과물을 `public/play/`에 동기화한다.
+1. 장면 수·필드 형식·중복 ID·6,000자 제한·실제 에셋 경로를 검증한다.
+2. 단일 정본 `flutter_app/assets/dialogue/dialogue-editor-override.json`을 기록한다.
+3. 정본에서 `app/editor/dialogue-data.ts`와 Flutter Dart 데이터를 생성한다.
+4. Flutter Web release를 빌드한다.
+5. 완성된 디렉터리만 `public/play/`와 교체한다.
 
-로컬 빌드 API는 저장소가 있는 개발 PC에서만 동작한다. 정적 호스팅에 올라간
-`/editor`는 UI 확인용이며 서버 파일을 직접 수정할 수 없다.
+다섯 단계가 모두 성공한 뒤에만 브라우저 런타임 캐시를 새 내용으로 바꾼다.
+중간에 실패하면 JSON·TypeScript·Dart 세 소스 파일을 이전 내용으로 복원하며,
+긴 대사를 몰래 자르거나 일부 파일만 반영하지 않는다.
+
+로컬 빌드 API는 저장소가 있는 개발 PC에서만 동작한다. 기본값은 비활성화며,
+시작 전 `DIALOGUE_BUILD_ENABLED=1`을 명시해야 한다. 같은 LAN의 다른 기기에서
+빌드하려면 `DIALOGUE_BUILD_TOKEN`과 편집기에 입력할 동일 토큰도 필요하다. 정적 호스팅에
+올라간 `/editor`는 UI 확인용이며 서버 파일을 직접 수정할 수 없다.
+
+PowerShell 로컬 실행 예:
+
+```powershell
+$env:DIALOGUE_BUILD_ENABLED = '1'
+pnpm dev
+```
 
 ## 런타임 규칙
 
 - Flutter는 편집본의 `order`를 기준으로 장면을 재생한다. 현재 정규본은
   140장면이며 마지막 장면을 동적으로 종료점으로 사용한다.
-- 비정상 초안으로 인한 무한 진행을 막기 위해 최대 240장면까지만 읽는다.
+- 비정상 초안으로 인한 무한 진행을 막기 위해 240장면을 넘는 입력은 저장 전에
+  명시적으로 거부한다.
 - 추가·삭제·재정렬된 장면과 각 장면의 배경·화자·포즈·지문·대사를 모두
   적용한다.
 - 진행률, 다음 대사, 빠른 넘김과 완료 카드는 편집본의 실제 장면 수를 따른다.
@@ -47,7 +62,7 @@
   이후 장면은 중앙 복도·공용 생활실·세면실, 전원이 의자와 아래층 침상에
   둥글게 앉아 서로의 말을 받아 이어 가는 열 명의 첫인사, 침상·사물함
   배정, 경계 합의, 첫 갈등, 제5기 배지 비밀 대화로 이어진다.
-- 마지막 `scene-73`은 재정렬 뒤에도 PC 단말 완료 장면의 정규 ID로 유지한다.
+- 마지막 `scene-140`은 재정렬 뒤에도 PC 단말 완료 장면의 정규 ID로 유지한다.
 
 ## 관련 파일
 
@@ -55,10 +70,10 @@
 - 편집 화면 스타일: `app/editor/editor.module.css`
 - 인물·포즈 목록: `app/editor/character-catalog.ts`
 - 배경 목록: `app/editor/background-catalog.ts`
-- 기본 대사: `app/editor/dialogue-data.ts`
+- 단일 대사 정본: `flutter_app/assets/dialogue/dialogue-editor-override.json`
+- 편집기 파생 데이터: `app/editor/dialogue-data.ts`
 - 저장·빌드 API: `app/api/dialogue/build/route.ts`
 - Flutter 적용: `flutter_app/lib/visual_novel_onboarding.dart`
-- 빌드된 초안: `flutter_app/assets/dialogue/dialogue-editor-override.json`
 
 ## 변경 후 검증
 

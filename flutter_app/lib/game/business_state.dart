@@ -715,6 +715,7 @@ class OwnedBusiness {
     this.totalProfit = 0,
     this.totalInvested = 0,
     this.lastSettledMonth = '',
+    this.unsettledDailyResults = const [],
     this.statements = const [],
   }) : assert(acquisitionPrice >= 0),
        assert(districtRentIndexAtOpenBps > 0),
@@ -771,6 +772,7 @@ class OwnedBusiness {
   final int totalProfit;
   final int totalInvested;
   final String lastSettledMonth;
+  final List<BusinessDailyResult> unsettledDailyResults;
   final List<BusinessMonthlyStatement> statements;
 
   bool get isActive =>
@@ -832,6 +834,7 @@ class OwnedBusiness {
     int? totalProfit,
     int? totalInvested,
     String? lastSettledMonth,
+    List<BusinessDailyResult>? unsettledDailyResults,
     List<BusinessMonthlyStatement>? statements,
   }) => OwnedBusiness(
     id: id,
@@ -890,6 +893,7 @@ class OwnedBusiness {
     totalProfit: totalProfit ?? this.totalProfit,
     totalInvested: _nonNegative(totalInvested ?? this.totalInvested),
     lastSettledMonth: lastSettledMonth ?? this.lastSettledMonth,
+    unsettledDailyResults: unsettledDailyResults ?? this.unsettledDailyResults,
     statements: statements ?? this.statements,
   );
 
@@ -931,6 +935,9 @@ class OwnedBusiness {
     'totalProfit': totalProfit,
     'totalInvested': totalInvested,
     'lastSettledMonth': lastSettledMonth,
+    'unsettledDailyResults': unsettledDailyResults
+        .map((result) => result.toJson())
+        .toList(),
     'statements': statements.map((statement) => statement.toJson()).toList(),
   };
 
@@ -995,6 +1002,15 @@ class OwnedBusiness {
     totalProfit: (json['totalProfit'] as num?)?.toInt() ?? 0,
     totalInvested: _nonNegativeInt(json['totalInvested']),
     lastSettledMonth: json['lastSettledMonth'] as String? ?? '',
+    unsettledDailyResults:
+        ((json['unsettledDailyResults'] as List?) ?? const [])
+            .whereType<Map>()
+            .map(
+              (result) =>
+                  BusinessDailyResult.fromJson(result.cast<String, dynamic>()),
+            )
+            .where((result) => result.dateIso.isNotEmpty)
+            .toList(growable: false),
     statements: ((json['statements'] as List?) ?? const [])
         .whereType<Map>()
         .map(

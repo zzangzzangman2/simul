@@ -19,6 +19,7 @@ import {
   dialogueBackgrounds,
 } from "./background-catalog";
 import { DialogueScene, initialDialogue } from "./dialogue-data";
+import { validateDialogueScenes } from "./dialogue-validation";
 import styles from "./editor.module.css";
 
 const STORAGE_KEY = "future-academy-dialogue-editor-v1";
@@ -65,15 +66,7 @@ function cloneInitial() {
 }
 
 function validScenes(value: unknown): value is DialogueScene[] {
-  if (!Array.isArray(value) || value.length === 0) return false;
-  return value.every(
-    (scene) =>
-      scene &&
-      typeof scene === "object" &&
-      typeof scene.id === "string" &&
-      typeof scene.speaker === "string" &&
-      typeof scene.line === "string",
-  );
+  return validateDialogueScenes(value).ok;
 }
 
 function mergeWithCurrentStory(
@@ -477,45 +470,83 @@ export default function DialogueEditorPage() {
   async function saveAndBuild() {
     if (publishStatus === "building") return;
     const snapshot = scenes.map((scene) => normalizeScene({ ...scene }));
+    const validation = validateDialogueScenes(snapshot);
+    if (!validation.ok) {
+      setPublishStatus("error");
+      setPublishMessage(validation.message);
+      setNotice("장면 검증에 실패했습니다");
+      return;
+    }
     const payload: SavedDraft = {
       version: 1,
       contentVersion: CONTENT_VERSION,
       appearanceVersion: APPEARANCE_VERSION,
       updatedAt: new Date().toISOString(),
-      scenes: snapshot,
+      scenes: validation.scenes,
     };
     const raw = JSON.stringify(payload);
 
-    // shared_preferences_web stores Dart strings as a JSON-encoded localStorage value.
-    localStorage.setItem(GAME_STORAGE_KEY, raw);
-    localStorage.setItem(FLUTTER_GAME_STORAGE_KEY, JSON.stringify(raw));
     localStorage.setItem(STORAGE_KEY, raw);
     setSaveLabel("초안 저장됨");
     setPublishStatus("building");
     setPublishMessage("Flutter 게임을 다시 만드는 중이에요. 보통 20~60초 걸립니다.");
 
     try {
+      const loopback = ["localhost", "127.0.0.1", "::1"].includes(
+        window.location.hostname,
+      );
+      let buildToken = "";
+      if (!loopback) {
+        buildToken = sessionStorage.getItem("dialogue-build-token") || "";
+        if (!buildToken) {
+          buildToken = window.prompt("개발 PC에 설정한 LAN 대사 빌드 토큰을 입력하세요.") || "";
+          if (!buildToken) throw new Error("LAN 빌드 토큰이 필요합니다.");
+          sessionStorage.setItem("dialogue-build-token", buildToken);
+        }
+      }
       const response = await fetch("/api/dialogue/build", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scenes: snapshot }),
+        headers: {
+          "Content-Type": "application/json",
+          ...(buildToken ? { "X-Dialogue-Build-Token": buildToken } : {}),
+        },
+        body: JSON.stringify({ scenes: validation.scenes }),
       });
       const result = (await response.json()) as {
         ok?: boolean;
         builtAt?: string;
         durationMs?: number;
         message?: string;
+        contentVersion?: number;
+        appearanceVersion?: number;
+        sha256?: string;
+        scenes?: DialogueScene[];
       };
-      if (!response.ok || !result.ok || !result.builtAt) {
+      const builtValidation = validateDialogueScenes(result.scenes);
+      if (
+        !response.ok ||
+        !result.ok ||
+        !result.builtAt ||
+        !result.sha256 ||
+        !builtValidation.ok
+      ) {
         throw new Error(result.message || "게임 빌드에 실패했습니다.");
       }
 
       const builtPayload: SavedDraft = {
-        ...payload,
+        version: 1,
+        contentVersion: result.contentVersion ?? CONTENT_VERSION,
+        appearanceVersion: result.appearanceVersion ?? APPEARANCE_VERSION,
         updatedAt: result.builtAt,
+        scenes: builtValidation.scenes,
       };
-      localStorage.setItem(BUILD_STORAGE_KEY, JSON.stringify(builtPayload));
-      setAppliedScenes(snapshot);
+      const builtRaw = JSON.stringify(builtPayload);
+      // shared_preferences_web stores Dart strings as a JSON-encoded value.
+      localStorage.setItem(GAME_STORAGE_KEY, builtRaw);
+      localStorage.setItem(FLUTTER_GAME_STORAGE_KEY, JSON.stringify(builtRaw));
+      localStorage.setItem(BUILD_STORAGE_KEY, builtRaw);
+      setScenes(builtValidation.scenes);
+      setAppliedScenes(builtValidation.scenes);
       setLastBuiltAt(result.builtAt);
       setPublishStatus("success");
       setPublishMessage(
@@ -659,8 +690,9 @@ export default function DialogueEditorPage() {
       const parsed = JSON.parse(await file.text()) as SavedDraft | DialogueScene[];
       const imported = Array.isArray(parsed) ? parsed : parsed.scenes;
       const appearanceVersion = Array.isArray(parsed) ? undefined : parsed.appearanceVersion;
-      if (!validScenes(imported)) throw new Error("invalid");
-      const normalized = imported.map((scene, index) => ({
+      const importValidation = validateDialogueScenes(imported);
+      if (!importValidation.ok) throw new Error(importValidation.message);
+      const normalized = importValidation.scenes.map((scene, index) => ({
         ...scene,
         id: scene.id || `scene-import-${index + 1}`,
         order: index + 1,
@@ -704,8 +736,6 @@ export default function DialogueEditorPage() {
     };
     const raw = JSON.stringify(payload);
     localStorage.setItem(STORAGE_KEY, raw);
-    localStorage.setItem(GAME_STORAGE_KEY, raw);
-    localStorage.setItem(FLUTTER_GAME_STORAGE_KEY, JSON.stringify(raw));
     setPublishStatus("idle");
     setPublishMessage("원본을 초안에 불러왔어요. 저장·빌드하면 게임 파일도 바뀝니다.");
     setNotice("원본을 초안에 불러왔어요 · 저장·빌드하면 반영됩니다");
