@@ -559,7 +559,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('borderless dialogue keeps a fixed translucent backdrop', (
+  testWidgets('dialogue uses a full-stage scrim without a panel fill', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
@@ -572,24 +572,17 @@ void main() {
     await tester.pumpAndSettle();
     await startNewGame(tester);
 
-    Color visiblePanelColor() {
-      final panel = tester.widget<Container>(
-        find.byKey(const Key('story-dialogue-panel')),
-      );
-      final decoration = panel.decoration! as BoxDecoration;
-      return decoration.color!;
-    }
-
     final panel = tester.widget<Container>(
       find.byKey(const Key('story-dialogue-panel')),
     );
-    final panelDecoration = panel.decoration! as BoxDecoration;
-    expect(panelDecoration.border, isNull);
-    expect(panelDecoration.borderRadius, isNull);
-    expect(panelDecoration.boxShadow, isNull);
-    expect(panelDecoration.gradient, isNull);
+    expect(panel.decoration, isNull);
+    final scrim = tester.widget<DecoratedBox>(
+      find.byKey(const Key('story-stage-reading-scrim')),
+    );
+    final scrimDecoration = scrim.decoration as BoxDecoration;
+    final scrimGradient = scrimDecoration.gradient! as LinearGradient;
+    expect(scrimGradient.colors.last, const Color(0x70000000));
     expect(find.byKey(const Key('story-moving-light-beam')), findsNothing);
-    expect(visiblePanelColor(), const Color(0x66081728));
     expect(find.byType(BackdropFilter), findsNothing);
     expect(
       find.byKey(const Key('story-dialogue-opacity-control')),
@@ -598,7 +591,10 @@ void main() {
     expect(find.byKey(const Key('story-dialogue-divider')), findsOneWidget);
 
     await advanceDialogue(tester, 1);
-    expect(visiblePanelColor(), const Color(0x66081728));
+    final nextPanel = tester.widget<Container>(
+      find.byKey(const Key('story-dialogue-panel')),
+    );
+    expect(nextPanel.decoration, isNull);
     expect(tester.takeException(), isNull);
   });
 

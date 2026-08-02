@@ -322,8 +322,9 @@ test("fills the mobile viewport and provides an exact desktop phone preview", as
   );
   assert.match(visualNovel, /key: const Key\('story-speaker-affiliation'\)/);
   assert.match(visualNovel, /key: Key\('story-dialogue-divider'\)/);
-  assert.match(visualNovel, /const _dialoguePanelColor = Color\(0x66081728\)/);
-  assert.match(visualNovel, /Color\(0x18000000\)/);
+  assert.match(visualNovel, /key: Key\('story-stage-reading-scrim'\)/);
+  assert.match(visualNovel, /Color\(0x70000000\)/);
+  assert.doesNotMatch(visualNovel, /_dialoguePanelColor/);
   assert.doesNotMatch(visualNovel, /BackdropFilter/);
   assert.doesNotMatch(visualNovel, /story-moving-light-beam/);
   assert.doesNotMatch(visualNovel, /story-dialogue-opacity-control/);

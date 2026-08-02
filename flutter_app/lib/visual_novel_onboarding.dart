@@ -6,7 +6,6 @@ const _dialogueAppearanceVersion = 15;
 const _dialogueContentVersion = 3;
 const _dialogueRuntimeStorageKey = 'project-decimal-dialogue-runtime-v2';
 const _dialogueBundleAsset = 'assets/dialogue/dialogue-editor-override.json';
-const _dialoguePanelColor = Color(0x66081728);
 const _orientationCompleteBeat = _onboardingBeatCount - 1;
 const _storyCharacterBottomInset = 104.0;
 const _storyCharacterHeightFactor = 0.9;
@@ -820,6 +819,7 @@ class _VisualNovelOnboardingScreenState
                   ),
                 ),
                 const DecoratedBox(
+                  key: Key('story-stage-reading-scrim'),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
@@ -827,7 +827,7 @@ class _VisualNovelOnboardingScreenState
                       colors: [
                         Color(0x33000000),
                         Colors.transparent,
-                        Color(0x18000000),
+                        Color(0x70000000),
                       ],
                       stops: [0, 0.52, 1],
                     ),
@@ -2390,7 +2390,6 @@ class _NovelDialogueState extends State<_NovelDialogue>
       onTap: _handleExternalTap,
       child: Container(
         key: const Key('story-dialogue-panel'),
-        decoration: const BoxDecoration(color: _dialoguePanelColor),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(18, 13, 18, 14),
           child: Column(
