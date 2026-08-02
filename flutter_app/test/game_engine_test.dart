@@ -378,7 +378,7 @@ void main() {
     expect(state.day, 17);
     expect(state.cash, 765432);
     expect(state.team, 2);
-    expect(state.story.playerName, '성준');
+    expect(state.story.playerName, '운용자');
     expect(state.story.stateAccountHolder, 'project_decimal_fund');
   });
 

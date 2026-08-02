@@ -1014,7 +1014,6 @@ class _PracticalTradeTutorialSheetState
     final index = _recoveryBeat.clamp(0, beats.length - 1);
     final beat = beats[index];
     final isTeacherBeat = beat.speaker == '한서윤 운영관';
-    final isLast = index >= beats.length - 1;
     return GestureDetector(
       key: const Key('tutorial-state-recovery'),
       behavior: HitTestBehavior.opaque,
@@ -1120,7 +1119,6 @@ class _PracticalTradeTutorialSheetState
                 line: beat.message,
                 onContinue: _advanceRecovery,
                 continueKey: const Key('tutorial-recovery-continue'),
-                continueLabel: isLast ? '첫 거래 복습으로' : '다음',
               ),
             ),
           ),
@@ -1294,7 +1292,6 @@ class _PracticalTradeTutorialSheetState
                   : const <_NovelChoice>[],
               onContinue: _reviewBeat == 0 ? null : _advanceReview,
               continueKey: const Key('tutorial-review-continue'),
-              continueLabel: _reviewBeat == 3 ? '실습 마치기' : '다음 이야기',
             ),
           ),
         ),

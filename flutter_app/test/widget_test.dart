@@ -317,6 +317,17 @@ void main() {
     if (find.byKey(const Key('game-title-screen')).evaluate().isEmpty) return;
     await tester.tap(find.byKey(const Key('new-game-button')));
     await tester.pumpAndSettle();
+    if (find
+        .byKey(const Key('prologue-player-name-input'))
+        .evaluate()
+        .isNotEmpty) {
+      await tester.enterText(
+        find.byKey(const Key('prologue-player-name-input')),
+        '테스트운용자',
+      );
+      await tester.tap(find.byKey(const Key('prologue-player-name-confirm')));
+      await tester.pumpAndSettle();
+    }
   }
 
   Future<void> skipCurrentPrologueSection(WidgetTester tester) async {
@@ -517,33 +528,32 @@ void main() {
     expect(find.byKey(const Key('orientation-complete-card')), findsOneWidget);
   }
 
-  testWidgets(
-    'opening dialogue establishes the Project Decimal policy conflict',
-    (tester) async {
-      await tester.binding.setSurfaceSize(const Size(390, 844));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
-      await tester.pumpWidget(
-        const MillenniumCapitalApp(
-          campaignWorldPreparer: _skipCampaignWorldPreparation,
-        ),
-      );
-      await tester.pumpAndSettle();
-      await startNewGame(tester);
+  testWidgets('opening dialogue establishes the NIS Project Decimal restart', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      const MillenniumCapitalApp(
+        campaignWorldPreparer: _skipCampaignWorldPreparation,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await startNewGame(tester);
 
-      expect(find.textContaining('자정을 스무 분 남긴'), findsOneWidget);
-      await advanceDialogue(tester, 1);
-      expect(find.text('전두광'), findsOneWidget);
-      expect(find.textContaining('다음 전쟁은'), findsOneWidget);
-      await advanceDialogue(tester, 1);
-      expect(find.text('강인철 경제수석'), findsOneWidget);
-      await advanceDialogue(tester, 2);
-      expect(find.text('백기현 비서실장'), findsOneWidget);
-      await advanceDialogue(tester, 2);
-      expect(find.text('윤미라 아동보호수석'), findsOneWidget);
-      expect(find.textContaining('생활권, 중단권'), findsOneWidget);
-      expect(tester.takeException(), isNull);
-    },
-  );
+    expect(find.textContaining('비가 자정의 유리창을'), findsOneWidget);
+    await advanceDialogue(tester, 1);
+    expect(find.text('한규진 국정원장'), findsOneWidget);
+    expect(find.textContaining('결정권이 넘어가는 순간'), findsOneWidget);
+    await advanceDialogue(tester, 1);
+    expect(find.text('임서희 경제안보국장'), findsOneWidget);
+    await advanceDialogue(tester, 1);
+    expect(find.text('도윤석 기획조정관'), findsOneWidget);
+    await advanceDialogue(tester, 1);
+    expect(find.text('조민경 권익감사관'), findsOneWidget);
+    expect(find.textContaining('거부권'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('dialogue opacity control persists across the next line', (
     tester,
@@ -607,21 +617,29 @@ void main() {
     );
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('new-game-button')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('prologue-player-name-input')),
+      '민수',
+    );
+    await tester.tap(find.byKey(const Key('prologue-player-name-confirm')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
 
     expect(find.text('이야기'), findsOneWidget);
     expect(find.byKey(const Key('story-stage-advance-area')), findsOneWidget);
-    expect(find.byKey(const Key('story-continue')), findsNothing);
+    expect(find.byKey(const Key('story-continue')), findsOneWidget);
+    expect(find.text('다음'), findsNothing);
+    expect(find.byIcon(Icons.keyboard_double_arrow_down_rounded), findsNothing);
 
     await tester.tapAt(const Offset(24, 420));
     await tester.pump();
-    expect(find.text('전두광'), findsOneWidget);
+    expect(find.text('한규진 국정원장'), findsOneWidget);
 
     await tester.pumpAndSettle();
     await tester.tapAt(const Offset(195, 420));
     await tester.pumpAndSettle();
-    expect(find.text('강인철 경제수석'), findsOneWidget);
+    expect(find.text('임서희 경제안보국장'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -666,7 +684,7 @@ void main() {
     await startNewGame(tester);
     await advanceDialogue(tester, 2);
 
-    expect(find.text('강인철 경제수석'), findsOneWidget);
+    expect(find.text('임서희 경제안보국장'), findsOneWidget);
     expect(
       find.byKey(const Key('story-wheel-navigation-listener')),
       findsOneWidget,
@@ -681,8 +699,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('전두광'), findsOneWidget);
-    expect(find.textContaining('다음 전쟁은'), findsOneWidget);
+    expect(find.text('한규진 국정원장'), findsOneWidget);
+    expect(find.textContaining('결정권이 넘어가는 순간'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -729,7 +747,7 @@ void main() {
     await startNewGame(tester);
 
     const expected = <String>[
-      'assets/images/cinematic_soft_painted/decimal/bg_decimal_imf_failure_1997_v1.png',
+      'assets/images/cinematic_soft_painted/decimal_nis_1999/backgrounds/bg_nis_decimal_archive_predawn_1999_v1.png',
       'assets/images/cinematic_soft_painted/decimal/bg_decimal_matrix_exam_1999_v1.png',
       'assets/images/cinematic_soft_painted/decimal/bg_decimal_unfair_game_1999_v1.png',
       'assets/images/cinematic_soft_painted/decimal/bg_decimal_desire_test_1999_v1.png',
@@ -885,7 +903,7 @@ void main() {
       final playerNameInput = tester.widget<TextField>(
         find.byKey(const Key('academy-player-name-input')),
       );
-      expect(playerNameInput.controller?.text, '성준');
+      expect(playerNameInput.controller?.text, '테스트운용자');
       expect(find.text('데시멀 주식실습'), findsOneWidget);
       expect(find.textContaining('국가원금 50,000원'), findsOneWidget);
       expect(tester.takeException(), isNull);
@@ -899,7 +917,7 @@ void main() {
       'project-decimal-dialogue-runtime-v2': jsonEncode({
         'version': 1,
         'contentVersion': 2,
-        'appearanceVersion': 14,
+        'appearanceVersion': 15,
         'updatedAt': '2026-08-01T00:00:00.000Z',
         'scenes': [
           {
@@ -931,7 +949,7 @@ void main() {
 
     expect(find.text('구형 화자'), findsNothing);
     expect(find.textContaining('교체되기 전의 오래된 대사'), findsNothing);
-    expect(find.textContaining('자정을 스무 분 남긴'), findsOneWidget);
+    expect(find.textContaining('비가 자정의 유리창을'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -941,7 +959,7 @@ void main() {
       final previewDraft = jsonEncode({
         'version': 1,
         'contentVersion': 2,
-        'appearanceVersion': 14,
+        'appearanceVersion': 15,
         'updatedAt': '2026-08-02T00:00:00.000Z',
         'scenes': [
           {
@@ -1014,8 +1032,8 @@ void main() {
     await startNewGame(tester);
 
     const labels = <String>[
-      '자본전 선언을 건너뛸까요?',
-      '유리상자의 실패를 건너뛸까요?',
+      '데시멀 재가동을 건너뛸까요?',
+      '봉인된 실패 기록을 건너뛸까요?',
       '행렬 시험을 건너뛸까요?',
       '불공정 게임을 건너뛸까요?',
       '욕망 검증을 건너뛸까요?',
@@ -1235,7 +1253,7 @@ void main() {
         find.byKey(const Key('academy-player-name-input')),
       );
       expect(lockedPlayerName.readOnly, isTrue);
-      expect(lockedPlayerName.controller?.text, '성준');
+      expect(lockedPlayerName.controller?.text, '테스트운용자');
       await tester.enterText(
         find.byKey(const Key('academy-company-name-input')),
         '첫빛 투자연구소',
@@ -1259,7 +1277,7 @@ void main() {
 
       final saved = await persistence.loadSlot(1);
       expect(saved, isNotNull);
-      expect(saved!.story.playerName, '성준');
+      expect(saved!.story.playerName, '테스트운용자');
       expect(saved.companyName, '첫빛 투자연구소');
       expect(saved.story.orphanageReboot, isTrue);
       expect(saved.story.marketTutorialSeen, isFalse);

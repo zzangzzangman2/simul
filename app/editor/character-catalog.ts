@@ -6,7 +6,11 @@ export type DialoguePose = {
 
 export type DialogueCharacter = {
   speaker: string;
-  group: "주요 인물" | "1981년 정책실" | "프로젝트 데시멀" | "화면 인물 없음";
+  group:
+    | "주요 인물"
+    | "1999년 국정원"
+    | "프로젝트 데시멀"
+    | "화면 인물 없음";
   poses: DialoguePose[];
 };
 
@@ -126,15 +130,15 @@ const ohJiwooPoses = [
 );
 
 const parkHaeunPoses = [
-  ["01", "기본 인사", "01_base_wave_v1.png"],
-  ["02", "따뜻한 미소", "02_warm_smile_v1.png"],
-  ["03", "신나는 웃음", "03_delighted_laugh_v1.png"],
-  ["04", "수줍은 미소", "04_shy_blush_v1.png"],
-  ["05", "깜짝 놀람", "05_surprised_v1.png"],
-  ["06", "걱정", "06_worried_v1.png"],
-  ["07", "삐친 표정", "07_sulky_pout_v1.png"],
-  ["08", "단호한 결심", "08_determined_v1.png"],
-  ["09", "차분한 설명", "09_explaining_v1.png"],
+  ["01", "차분한 기본", "01_neutral_soft_v2.png"],
+  ["02", "밝은 미소와 인사", "02_bright_smile_wave_v2.png"],
+  ["03", "활짝 웃으며 인사", "03_bright_laugh_v2.png"],
+  ["04", "장난스러운 윙크", "04_playful_wink_v2.png"],
+  ["05", "깜짝 놀람", "05_surprised_v2.png"],
+  ["06", "조용한 걱정", "06_worried_v2.png"],
+  ["07", "살짝 삐친 표정", "07_sulky_pout_v2.png"],
+  ["08", "단단한 결심", "08_determined_v2.png"],
+  ["09", "차분한 설명", "09_explaining_v2.png"],
 ].map(([id, label, file]) =>
   pose(id, label, `assets/images/production_soft_painted/park_haeun/${file}`),
 );
@@ -167,60 +171,10 @@ const yoonChaeaPoses = [
   pose(id, label, `assets/images/production_soft_painted/yoon_chaea/${file}`),
 );
 
-function policyPoses(
-  character: string,
-  entries: [string, string, string][],
-) {
-  return entries.map(([id, label, file]) =>
-    pose(
-      id,
-      label,
-      `assets/images/cinematic_soft_painted/policy_1981/${character}/${file}`,
-    ),
-  );
-}
-
-const jeonDugwangPoses = policyPoses("jeon_dugwang", [
-  ["01", "결재 서명", "01_signing_v1.png"],
-  ["02", "냉정한 경청", "02_listening_v1.png"],
-  ["03", "손익 계산", "03_calculating_v1.png"],
-  ["04", "차가운 웃음", "04_cold_laugh_v1.png"],
-  ["05", "압박 지시", "05_pressure_v1.png"],
-  ["06", "최종 결정", "06_final_decision_v1.png"],
-]);
-
-const seoMuntaePoses = policyPoses("seo_muntae", [
-  ["01", "정책 제안", "01_policy_pitch_v1.png"],
-  ["02", "괘도 검토", "02_searching_chart_v1.png"],
-  ["03", "격한 반박", "03_rebuttal_v1.png"],
-  ["04", "지친 양보", "04_exhausted_concession_v1.png"],
-]);
-
-const baekGihyeonPoses = policyPoses("baek_gihyeon", [
-  ["01", "장부 보고", "01_report_v2.png"],
-  ["02", "조용한 조언", "02_advice_v2.png"],
-  ["03", "단호한 경고", "03_warning_v2.png"],
-  ["04", "확인과 승인", "04_confirmation_v2.png"],
-]);
-
-const kangIncheolPoses = policyPoses("kang_incheol", [
-  ["01", "수치 계산", "01_calculation_v2.png"],
-  ["02", "계산표 설명", "02_explain_v2.png"],
-  ["03", "위험 경고", "03_warning_v2.png"],
-  ["04", "수정안 제시", "04_revision_v2.png"],
-]);
-
-const yoonMiraPoses = policyPoses("yoon_mira", [
-  ["01", "복지 보고", "01_report_v1.png"],
-  ["02", "걱정", "02_concern_v1.png"],
-  ["03", "단호한 반대", "03_objection_v1.png"],
-  ["04", "해결안 제시", "04_solution_v1.png"],
-]);
-
 const noPortrait = [pose("00", "인물 없음", "")];
 
 export const dialogueCharacters: DialogueCharacter[] = [
-  { speaker: "성준", group: "주요 인물", poses: protagonistPoses },
+  { speaker: "{{playerName}}", group: "주요 인물", poses: protagonistPoses },
   {
     speaker: "민호",
     group: "주요 인물",
@@ -296,38 +250,46 @@ export const dialogueCharacters: DialogueCharacter[] = [
   },
   { speaker: "한서윤 운영관", group: "주요 인물", poses: teacherPoses },
   {
-    speaker: "전두광",
-    group: "1981년 정책실",
-    poses: jeonDugwangPoses,
-  },
-  {
-    speaker: "서문태 정책실장",
-    group: "1981년 정책실",
-    poses: seoMuntaePoses,
-  },
-  {
-    speaker: "백기현 비서실장",
-    group: "1981년 정책실",
-    poses: baekGihyeonPoses,
-  },
-  {
-    speaker: "강인철 경제수석",
-    group: "1981년 정책실",
-    poses: kangIncheolPoses,
-  },
-  {
-    speaker: "윤미라 아동보호수석",
-    group: "1981년 정책실",
-    poses: yoonMiraPoses,
-  },
-  {
-    speaker: "장대식 법무수석",
-    group: "1981년 정책실",
+    speaker: "한규진 국정원장",
+    group: "1999년 국정원",
     poses: [
       pose(
         "01",
-        "법률수첩 반박",
-        "assets/images/historical_prologue/character_jang_daesik_v1.png",
+        "재가동 승인",
+        "assets/images/cinematic_soft_painted/decimal_nis_1999/characters/han_gyujin_nis_director_v1.png",
+      ),
+    ],
+  },
+  {
+    speaker: "임서희 경제안보국장",
+    group: "1999년 국정원",
+    poses: [
+      pose(
+        "01",
+        "시장 위험 분석",
+        "assets/images/cinematic_soft_painted/decimal_nis_1999/characters/lim_seohee_economic_security_chief_v1.png",
+      ),
+    ],
+  },
+  {
+    speaker: "도윤석 기획조정관",
+    group: "1999년 국정원",
+    poses: [
+      pose(
+        "01",
+        "작전 기록 검토",
+        "assets/images/cinematic_soft_painted/decimal_nis_1999/characters/do_yunseok_planning_coordinator_v1.png",
+      ),
+    ],
+  },
+  {
+    speaker: "조민경 권익감사관",
+    group: "1999년 국정원",
+    poses: [
+      pose(
+        "01",
+        "중단권 감사",
+        "assets/images/cinematic_soft_painted/decimal_nis_1999/characters/jo_mingyeong_rights_auditor_v1.png",
       ),
     ],
   },
@@ -338,7 +300,7 @@ export const dialogueCharacters: DialogueCharacter[] = [
       pose(
         "01",
         "점검표 지시",
-        "assets/images/historical_prologue/character_living_guide_oh_gyeongtae_v1.png",
+        "assets/images/cinematic_soft_painted/decimal_nis_1999/characters/oh_gyeongtae_facilities_manager_v2.png",
       ),
     ],
   },
@@ -348,8 +310,8 @@ export const dialogueCharacters: DialogueCharacter[] = [
     poses: [
       pose(
         "01",
-        "국가계좌 안내",
-        "assets/images/historical_prologue/character_state_account_officer_cha_eunjoo_v1.png",
+        "선발 기록 확인",
+        "assets/images/cinematic_soft_painted/decimal_nis_1999/characters/cha_eunjoo_selection_officer_v2.png",
       ),
     ],
   },

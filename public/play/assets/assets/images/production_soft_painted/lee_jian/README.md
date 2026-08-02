@@ -2,7 +2,7 @@
 
 - 얼굴 앵커: `art_references/lee_jian_face_identity_anchor_v2.png`
 - 전신 앵커: `art_references/lee_jian_identity_anchor_v2.png`
-- 화풍: `SIMUL production soft-painted VN anime v1`
+- 화풍: `SIMUL luminous soft-painted VN anime v2`
 - 규격: 1024×1536 RGBA 투명 전신, 배경·그림자 없음
 
 ## 런타임 파일

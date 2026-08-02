@@ -75,21 +75,22 @@ test("opens the Flutter Project Decimal prologue from the default route", async 
   assert.doesNotMatch(flutterIndex, /\/og\.png/);
   assert.match(flutterIndex, /name="twitter:card" content="summary"/);
   assert.doesNotMatch(flutterIndex, /초기자본 100만원/);
-  assert.match(dialogueBundleRaw, /1981\.01\.12\s+·\s+23:40/);
-  assert.match(dialogueText, /다음 전쟁은 상대 나라의 공장과 은행을 우리 계산표 안으로 끌고 오는 쪽이 이겨/);
+  assert.match(dialogueBundleRaw, /1999\.04\.16\s+·\s+23:40/);
+  assert.match(dialogueText, /우리가 놓친 건 주가가 아니라, 결정권이 넘어가는 순간이야/);
   assert.match(dialogueText, /트레이딩 플로어 시계 다섯 개 중 하나가 1990년으로 돌아갔어/);
   assert.match(dialogueText, /사적인 행동을 공간으로 지킵니다/);
   assert.match(dialogueBundleRaw, /bg_decimal_living_lounge_1999_v1\.png/);
   assert.match(dialogueBundleRaw, /bg_decimal_sleeping_wing_1999_v1\.png/);
   assert.match(dialogueBundleRaw, /bg_decimal_trading_floor_dawn_2000_v1\.png/);
-  assert.match(dialogueBundleRaw, /bg_policy_room_night_v1\.png/);
+  assert.match(dialogueBundleRaw, /bg_nis_economic_security_room_night_1999_v1\.png/);
   assert.match(dialogueBundleRaw, /bg_decimal_matrix_exam_1999_v1\.png/);
   assert.match(dialogueBundleRaw, /production_soft_painted\/han_sua\/03_bright_laugh_quality_v2\.png/);
-  assert.match(dialogueBundleRaw, /cinematic_soft_painted\/policy_1981\/jeon_dugwang\/02_listening_v1\.png/);
-  assert.match(dialogueBundleRaw, /cinematic_soft_painted\/policy_1981\/baek_gihyeon\/03_warning_v2\.png/);
-  assert.match(dialogueBundleRaw, /cinematic_soft_painted\/policy_1981\/kang_incheol\/02_explain_v2\.png/);
-  assert.doesNotMatch(dialogueBundleRaw, /baek_gihyeon\/\w+_v1\.png/);
-  assert.doesNotMatch(dialogueBundleRaw, /kang_incheol\/\w+_v1\.png/);
+  assert.match(dialogueBundleRaw, /decimal_nis_1999\/characters\/han_gyujin_nis_director_v1\.png/);
+  assert.match(dialogueBundleRaw, /decimal_nis_1999\/characters\/lim_seohee_economic_security_chief_v1\.png/);
+  assert.match(dialogueBundleRaw, /decimal_nis_1999\/characters\/jo_mingyeong_rights_auditor_v1\.png/);
+  assert.match(dialogueBundleRaw, /decimal_nis_1999\/characters\/cha_eunjoo_selection_officer_v2\.png/);
+  assert.match(dialogueBundleRaw, /decimal_nis_1999\/characters\/oh_gyeongtae_facilities_manager_v2\.png/);
+  assert.doesNotMatch(dialogueBundleRaw, /cinematic_soft_painted\/policy_1981\//);
   assert.match(dialogueBundleRaw, /bg_decimal_gangnam_exterior_winter_1999_v1\.png/);
   assert.match(dialogueBundleRaw, /bg_decimal_secure_entry_1999_v1\.png/);
   assert.doesNotMatch(onboarding, /policy-file-\$\{entry\.key\}/);
@@ -538,8 +539,8 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
   assert.doesNotMatch(editor, /이 장면을 저장하시겠습니까/);
   assert.doesNotMatch(editor, /저장하고 이동/);
   assert.match(editor, /새 장면 .*개 자동 추가/);
-  assert.equal(canonical.contentVersion, 2);
-  assert.equal(canonical.appearanceVersion, 14);
+  assert.equal(canonical.contentVersion, 3);
+  assert.equal(canonical.appearanceVersion, 15);
   assert.equal(canonical.scenes.length, 292);
   assert.equal(new Set(canonical.scenes.map((scene) => scene.id)).size, 292);
   let previousSceneDate = 0;
@@ -582,7 +583,7 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
     "윤채아",
     "한수아",
     "김학준",
-    "성준",
+    "\\{\\{playerName\\}\\}",
   ]) {
     assert.match(data, new RegExp(`"speaker": "${student}"`));
   }
@@ -598,7 +599,9 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
   ]) {
     assert.match(mbtiGuide, new RegExp(`${student}.*${type}`));
   }
-  assert.match(data, /생활권, 중단권, 외부 감사, 판단 기록/);
+  assert.match(data, /생활권과 안전/);
+  assert.match(data, /수익률보다 중단권/);
+  assert.match(data, /외부 감사 기록 분리 보관/);
   assert.match(data, /공동 소유/);
   assert.match(data, /다음엔 먼저 물어볼게/);
   assert.match(data, /생활 내기는 돈·식사·잠자리 금지/);
@@ -613,14 +616,14 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
   );
   assert.doesNotMatch(data, /단팥빵 얘기 들은 다음부터 계속 배고파/);
   assert.match(data, /bg_decimal_gangnam_exterior_winter_1999_v1\.png/);
-  assert.match(editor, /const CONTENT_VERSION = 2/);
+  assert.match(editor, /const CONTENT_VERSION = 3/);
   assert.equal(data.includes("\\\\n"), false);
   assert.match(data, /character_hakjun_orientation_v2\.png/);
   assert.match(generator, /dialogue-editor-override\.json/);
   assert.match(generator, /loadCanonicalDialogue/);
   assert.doesNotMatch(generator, /_onboardingBeatCount/);
   assert.doesNotMatch(generator, /visual_novel_onboarding\.dart/);
-  assert.match(generator, /appearanceVersion !== 14/);
+  assert.match(generator, /appearanceVersion !== 15/);
   assert.match(generator, /Dialogue editor synced/);
   assert.match(validation, /DIALOGUE_MAX_TEXT_LENGTH = 6000/);
   assert.match(validation, /중복 장면 ID/);
@@ -636,11 +639,11 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
   );
   assert.equal((protagonistCatalog.match(/\.png/g) ?? []).length, 24);
   assert.equal((teacherCatalog.match(/\.png/g) ?? []).length, 6);
-  assert.match(catalog, /speaker: "성준"/);
+  assert.match(catalog, /speaker: "\{\{playerName\}\}"/);
   assert.match(packageJson, /prebuild:flutter-web/);
   assert.match(packageJson, /dialogue:sync/);
   assert.match(buildRoute, /dialogue-editor-override\.json/);
-  assert.match(buildRoute, /appearanceVersion: 14/);
+  assert.match(buildRoute, /appearanceVersion: 15/);
   assert.match(buildRoute, /validateDialogueScenes/);
   assert.match(buildRoute, /DIALOGUE_BUILD_TOKEN/);
   assert.match(buildRoute, /requiresToken:\s*true/);
@@ -663,8 +666,8 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
   assert.match(catalog, /speaker: "이지안"[\s\S]*?poses: leeJianPoses/);
   assert.match(catalog, /speaker: "최이서"[\s\S]*?poses: choiIseoPoses/);
   assert.match(catalog, /speaker: "오지우"[\s\S]*?poses: ohJiwooPoses/);
-  assert.match(catalog, /09_explaining_v1\.png/);
-  assert.match(data, /park_haeun\/02_warm_smile_v1\.png/);
+  assert.match(catalog, /park_haeun\/[\s\S]*09_explaining_v2\.png/);
+  assert.match(data, /park_haeun\/02_bright_smile_wave_v2\.png/);
   assert.match(data, /yoon_chaea\/09_explaining_v1\.png/);
   assert.match(data, /kim_seoa\/01_neutral_notebook_v1\.png/);
   assert.match(data, /lee_jian\/09_explaining_mechanism_v2\.png/);

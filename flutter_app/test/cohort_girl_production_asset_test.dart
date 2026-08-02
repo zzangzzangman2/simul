@@ -121,8 +121,8 @@ void main() {
               ).readAsStringSync(),
             )
             as Map<String, dynamic>;
-    expect(decoded['appearanceVersion'], 14);
-    expect(decoded['contentVersion'], 2);
+    expect(decoded['appearanceVersion'], 15);
+    expect(decoded['contentVersion'], 3);
     final scenes = (decoded['scenes'] as List<dynamic>)
         .cast<Map<String, dynamic>>();
     expect(scenes.length, 292);
@@ -218,7 +218,7 @@ void main() {
         speakerCounts[speaker] = (speakerCounts[speaker] ?? 0) + 1;
       }
       for (final name in <String>[
-        '성준',
+        '{{playerName}}',
         '김학준',
         '김서아',
         '이지안',
@@ -262,9 +262,12 @@ void main() {
           .cast<Map<String, dynamic>>();
       final decimalBackgrounds = scenes
           .map((scene) => scene['background'] as String)
-          .where((asset) => asset.contains('/decimal/'))
+          .where(
+            (asset) =>
+                asset.contains('/cinematic_soft_painted/decimal'),
+          )
           .toSet();
-      expect(decimalBackgrounds.length, greaterThanOrEqualTo(9));
+      expect(decimalBackgrounds.length, greaterThanOrEqualTo(10));
       for (final asset in decimalBackgrounds) {
         final relative = asset.replaceFirst('/play/assets/', '');
         final file = File(relative);

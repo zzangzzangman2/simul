@@ -46,7 +46,7 @@ const _stockTutorialJianFocusAsset =
 const _stockTutorialIseoAsset =
     'assets/images/production_soft_painted/choi_iseo/02_gentle_smile_v1.png';
 const _stockTutorialHaeunAsset =
-    'assets/images/production_soft_painted/park_haeun/09_explaining_v1.png';
+    'assets/images/production_soft_painted/park_haeun/09_explaining_v2.png';
 const _stockTutorialSuaExplainAsset =
     'assets/images/production_soft_painted/han_sua/08_explaining_quality_v2.png';
 const _stockTutorialArinAsset =

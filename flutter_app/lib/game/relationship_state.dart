@@ -463,7 +463,7 @@ const cohortGirlProfiles = <CohortGirlProfile>[
     role: '말 못 한 불편을 합의로 바꾸는 조정자',
     accentValue: 0xFFFF7F9B,
     portraitAsset:
-        'assets/images/production_soft_painted/park_haeun/01_base_wave_v1.png',
+        'assets/images/production_soft_painted/park_haeun/01_neutral_soft_v2.png',
     conversationScenes: <RelationshipSceneDefinition>[
       RelationshipSceneDefinition(
         id: 'haeun_medicine',

@@ -620,6 +620,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: VisualNovelOnboardingScreen(
+          initialPlayerName: '테스트운용자',
           onCreate: (_, onProgress) async {
             created = true;
             onProgress(const WorldLoadProgress(0.18, '테스트 시장 준비 중…'));
@@ -695,7 +696,10 @@ void main() {
     addTearDown(tester.view.resetViewInsets);
     await tester.pumpWidget(
       MaterialApp(
-        home: VisualNovelOnboardingScreen(onCreate: (_, onProgress) async {}),
+        home: VisualNovelOnboardingScreen(
+          initialPlayerName: '테스트운용자',
+          onCreate: (_, onProgress) async {},
+        ),
       ),
     );
     await tester.pumpAndSettle();

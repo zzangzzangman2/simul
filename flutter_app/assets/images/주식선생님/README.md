@@ -3,7 +3,7 @@
 - 인물: 한서윤, 23세, INFJ
 - 정체성: 긴 물결형 청록 머리, 보라색 눈, 작은 뷰티마크
 - 의상 기준: `art_references/stock_teacher_outfit_reference_v1.png`
-- 화풍: `SIMUL production soft-painted VN anime v1`
+- 화풍: `SIMUL luminous soft-painted VN anime v2`
 
 ## 정식 파일
 

@@ -17,8 +17,8 @@ const maximumTextLength = 6000;
 function loadCanonicalDialogue() {
   const raw = fs.readFileSync(canonicalPath, "utf8");
   const decoded = JSON.parse(raw);
-  if (decoded.contentVersion !== 2 || decoded.appearanceVersion !== 14) {
-    throw new Error("Canonical dialogue versions must be content 2 / appearance 14.");
+  if (decoded.contentVersion !== 3 || decoded.appearanceVersion !== 15) {
+    throw new Error("Canonical dialogue versions must be content 3 / appearance 14.");
   }
   if (
     !Array.isArray(decoded.scenes) ||

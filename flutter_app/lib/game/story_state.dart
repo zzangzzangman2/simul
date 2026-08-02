@@ -203,14 +203,14 @@ class StoryState {
 
   factory StoryState.migratedDefault(String companyName) {
     return StoryState.newDecimalPlayer(
-      playerName: '성준',
+      playerName: '운용자',
       introChoice: 'migrated_save',
       startingTrait: StoryTrait.analysis,
       operatingPrinciple: OperatingPrinciple.reportLosses,
     ).copyWith(
       storyFlags: {
         ...StoryState.newDecimalPlayer(
-          playerName: '성준',
+          playerName: '운용자',
           introChoice: 'migrated_save',
           startingTrait: StoryTrait.analysis,
           operatingPrinciple: OperatingPrinciple.reportLosses,
@@ -333,7 +333,7 @@ class StoryState {
   }) {
     if (json.isEmpty) return StoryState.migratedDefault(companyName);
     return StoryState(
-      playerName: json['playerName'] as String? ?? '성준',
+      playerName: json['playerName'] as String? ?? '운용자',
       playerBirthYear: _migratedPlayerBirthYear(json),
       introChoice: json['introChoice'] as String? ?? 'migrated_save',
       startingTrait: StoryTrait.values.firstWhere(

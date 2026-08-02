@@ -26,14 +26,14 @@ const STORAGE_KEY = "project-decimal-dialogue-editor-v2";
 const GAME_STORAGE_KEY = "project-decimal-dialogue-runtime-v2";
 const FLUTTER_GAME_STORAGE_KEY = `flutter.${GAME_STORAGE_KEY}`;
 const BUILD_STORAGE_KEY = "project-decimal-dialogue-built-v2";
-const CONTENT_VERSION = 2;
+const CONTENT_VERSION = 3;
 const APPEARANCE_VERSION = 14;
 
 type PublishStatus = "idle" | "building" | "success" | "error";
 
 const CHARACTER_GROUPS = [
   "주요 인물",
-  "1981년 정책실",
+  "1999년 국정원",
   "프로젝트 데시멀",
   "화면 인물 없음",
 ] as const;

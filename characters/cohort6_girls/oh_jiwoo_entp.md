@@ -3,7 +3,7 @@
 ## 이미지 제작 고정 규칙
 
 - 승인 앵커: `art_references/oh_jiwoo_identity_anchor_v1.png`
-- 화풍: `SIMUL production soft-painted VN anime v1`
+- 화풍: `SIMUL luminous soft-painted VN anime v2`
 - 얼굴: 넓고 둥글게 드러난 이마, 둥근 관자와 볼, 짧은 하관, 작고 부드러운 V자형 턱.
 - 눈: 좌우 간격이 조금 넓고 가로로 긴 황금빛 호박색 눈, 낮은 안쪽 눈꼬리와 확실히 올라간 바깥 눈꼬리, 진한 윗속눈썹과 큰 원형 하이라이트.
 - 코·입: 아주 작은 코 표시, 짧은 코-입 거리, 밝게 올라간 작은 입꼬리.

@@ -57,7 +57,7 @@ void main() {
       'assets/dialogue/dialogue-editor-override.json',
     ).readAsStringSync();
     final decoded = jsonDecode(raw) as Map<String, dynamic>;
-    expect(decoded['appearanceVersion'], 14);
+    expect(decoded['appearanceVersion'], 15);
 
     final scenes = (decoded['scenes'] as List<dynamic>)
         .cast<Map<String, dynamic>>()

@@ -26,5 +26,5 @@
 - `character_state_account_officer_cha_eunjoo_v1.png`
 
 배경은 2000년 한국 시설의 시대 소품과 모바일 세로 구도를 유지한다. 신규 자산은
-`SIMUL production soft-painted VN anime v1`과 어울리는 카툰·소프트 페인터리
+`SIMUL luminous soft-painted VN anime v2`와 어울리는 카툰·소프트 페인터리
 밀도로 만들고, 읽을 수 있는 글자·로고·현대 기기·실사·3D를 넣지 않는다.

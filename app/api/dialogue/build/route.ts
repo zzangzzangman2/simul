@@ -126,8 +126,8 @@ async function persistAndBuild(
   const payload = `${JSON.stringify(
     {
       version: 2,
-      contentVersion: 2,
-      appearanceVersion: 14,
+      contentVersion: 3,
+      appearanceVersion: 15,
       updatedAt: builtAt,
       scenes,
     },
@@ -251,8 +251,8 @@ export async function POST(request: Request) {
     buildGlobal.__dialogueBuildCompletedAt = Date.now();
     return NextResponse.json({
       ok: true,
-      contentVersion: 2,
-      appearanceVersion: 14,
+      contentVersion: 3,
+      appearanceVersion: 15,
       ...result,
     });
   } catch (error) {

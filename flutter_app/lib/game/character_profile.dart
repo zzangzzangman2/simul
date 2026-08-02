@@ -130,7 +130,7 @@ const cohortCharacterProfiles = <CohortCharacterProfile>[
     keywords: <String>['배려', '합의', '응원'],
     accentValue: 0xFFFF7F9B,
     portraitAsset:
-        'assets/images/production_soft_painted/park_haeun/01_base_wave_v1.png',
+        'assets/images/production_soft_painted/park_haeun/01_neutral_soft_v2.png',
   ),
   CohortCharacterProfile(
     id: 'han_sua',

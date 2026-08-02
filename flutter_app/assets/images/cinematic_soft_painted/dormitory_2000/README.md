@@ -12,7 +12,7 @@
 
 ## 실제 참조 입력
 
-- `art_references/simul_production_soft_painted_vn_style_anchor_v1.png`: 렌더링 문법
+- `art_references/simul_luminous_soft_painted_vn_style_anchor_v2.png`: 렌더링 문법
 - `historical_prologue/bg_orphanage_dormitory_1999_portrait_cartoon_v1.png`:
   2000년 전후 공동생활 시설의 공간·소재 정체성
 - `historical_prologue/bg_future_development_orientation_hall_2000_portrait_v1.png`:

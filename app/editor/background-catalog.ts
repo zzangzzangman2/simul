@@ -18,16 +18,16 @@ function background(
 
 export const dialogueBackgrounds: DialogueBackground[] = [
   background(
-    "policy-room",
-    "1981년 청와대 · 지하 정책실",
+    "nis-economic-security-room",
+    "1999년 국정원 · 경제안보상황실",
     "프롤로그",
-    "assets/images/cinematic_soft_painted/policy_1981/backgrounds/bg_policy_room_night_v1.png",
+    "assets/images/cinematic_soft_painted/decimal_nis_1999/backgrounds/bg_nis_economic_security_room_night_1999_v1.png",
   ),
   background(
-    "conference-night",
-    "1981년 자본전 심야회의",
+    "nis-decimal-archive",
+    "1999년 국정원 · 데시멀 봉인기록실",
     "프롤로그",
-    "assets/images/cinematic_soft_painted/policy_1981/backgrounds/bg_conference_night_v1.png",
+    "assets/images/cinematic_soft_painted/decimal_nis_1999/backgrounds/bg_nis_decimal_archive_predawn_1999_v1.png",
   ),
   background(
     "decimal-imf-failure",

@@ -3,7 +3,7 @@ part of 'main.dart';
 const _onboardingBeatCount = 292;
 const _maximumDialogueBeatCount = 320;
 const _dialogueAppearanceVersion = 14;
-const _dialogueContentVersion = 2;
+const _dialogueContentVersion = 3;
 const _dialogueRuntimeStorageKey = 'project-decimal-dialogue-runtime-v2';
 const _dialogueBundleAsset = 'assets/dialogue/dialogue-editor-override.json';
 const _dialoguePanelOpacityStorageKey =
@@ -178,6 +178,7 @@ class _VisualNovelOnboardingScreenState
   late int _beat;
   int _dialogueEndBeat = canonicalDialogueScenes.length - 1;
   bool _isCreating = false;
+  late bool _playerNameConfirmed;
   String? _creationError;
   late bool _academyPcPoweredOn;
   late bool _academyStockAppOpen;
@@ -195,9 +196,8 @@ class _VisualNovelOnboardingScreenState
     _academyPcPoweredOn = widget.initialAcademyPcPoweredOn;
     _academyStockAppOpen =
         widget.initialAcademyPcPoweredOn && widget.initialAcademyStockAppOpen;
-    _playerController.text = widget.initialPlayerName.trim().isEmpty
-        ? '성준'
-        : widget.initialPlayerName;
+    _playerController.text = widget.initialPlayerName.trim();
+    _playerNameConfirmed = _playerController.text.isNotEmpty;
     _companyController.text = widget.initialCompanyName;
     _dialogueLoadFuture = _loadDialogueOverrides();
     unawaited(_dialogueLoadFuture);
@@ -406,7 +406,7 @@ class _VisualNovelOnboardingScreenState
   }
 
   _PrologueSkipStep _prologueSkipStepForBeat(int beat) {
-    final imfBeat = _firstBeatWithBackground('bg_decimal_imf_failure_', 20);
+    final archiveBeat = _firstBeatWithBackground('bg_nis_decimal_archive_', 20);
     final matrixBeat = _firstBeatWithBackground('bg_decimal_matrix_exam_', 38);
     final unfairBeat = _firstBeatWithBackground('bg_decimal_unfair_game_', 68);
     final desireBeat = _firstBeatWithBackground('bg_decimal_desire_test_', 99);
@@ -423,16 +423,16 @@ class _VisualNovelOnboardingScreenState
       269,
     );
 
-    if (beat < imfBeat) {
+    if (beat < archiveBeat) {
       return _PrologueSkipStep(
-        sectionLabel: '자본전 선언',
-        destinationLabel: '1997년 실패 기록',
-        targetBeat: imfBeat,
+        sectionLabel: '데시멀 재가동',
+        destinationLabel: '봉인된 실패 기록',
+        targetBeat: archiveBeat,
       );
     }
     if (beat < matrixBeat) {
       return _PrologueSkipStep(
-        sectionLabel: '유리상자의 실패',
+        sectionLabel: '봉인된 실패 기록',
         destinationLabel: '행렬 시험',
         targetBeat: matrixBeat,
       );
@@ -497,13 +497,35 @@ class _VisualNovelOnboardingScreenState
   bool get _isOrientationRosterScene =>
       _dialogueOverrides[_beat]?.id == 'decimal-final-ten-roster';
 
-  String get _speaker => _dialogueOverrides[_beat]?.speaker ?? '이야기';
+  bool _hasBatchim(String value) {
+    if (value.isEmpty) return false;
+    final last = value.runes.last;
+    return last >= 0xAC00 && last <= 0xD7A3 ? (last - 0xAC00) % 28 != 0 : false;
+  }
 
-  String get _line => _dialogueOverrides[_beat]?.line ?? '대사 정본을 불러오지 못했습니다.';
+  String _resolvePlayerName(String source) {
+    final name = _playerController.text.trim();
+    if (name.isEmpty || !source.contains('{{playerName}}')) return source;
+    final hasBatchim = _hasBatchim(name);
+    return source
+        .replaceAll('{{playerName}}은', '$name${hasBatchim ? '은' : '는'}')
+        .replaceAll('{{playerName}}이', '$name${hasBatchim ? '이' : '가'}')
+        .replaceAll('{{playerName}}과', '$name${hasBatchim ? '과' : '와'}')
+        .replaceAll('{{playerName}}', name);
+  }
+
+  String get _speaker =>
+      _resolvePlayerName(_dialogueOverrides[_beat]?.speaker ?? '이야기');
+
+  String get _line => _resolvePlayerName(
+    _dialogueOverrides[_beat]?.line ?? '대사 정본을 불러오지 못했습니다.',
+  );
 
   String? get _stageDirection {
     final direction = _dialogueOverrides[_beat]?.direction.trim();
-    return direction == null || direction.isEmpty ? null : direction;
+    return direction == null || direction.isEmpty
+        ? null
+        : _resolvePlayerName(direction);
   }
 
   String get _historyLine {
@@ -573,6 +595,29 @@ class _VisualNovelOnboardingScreenState
         _companyController.text,
       ) ??
       Future<void>.value();
+
+  void _confirmPlayerName() {
+    final playerName = _playerController.text.trim().replaceAll(
+      RegExp(r'\s+'),
+      ' ',
+    );
+    if (playerName.isEmpty) {
+      setState(() => _creationError = '플레이할 이름을 입력해 주세요.');
+      return;
+    }
+    if (playerName.length > 12) {
+      setState(() => _creationError = '이름은 12자 이내로 입력해 주세요.');
+      return;
+    }
+    FocusManager.instance.primaryFocus?.unfocus();
+    _playStoryFeedback(strong: true);
+    setState(() {
+      _playerController.text = playerName;
+      _playerNameConfirmed = true;
+      _creationError = null;
+    });
+    unawaited(_saveCheckpoint());
+  }
 
   void _exitOnboarding() {
     unawaited(_saveCheckpoint());
@@ -793,9 +838,10 @@ class _VisualNovelOnboardingScreenState
     final viewInsets = MediaQuery.viewInsetsOf(context);
     final isKeyboardOpen = viewInsets.bottom > 0;
     final isNameEntry =
-        _beat >= _dialogueEndBeat &&
-        _academyPcPoweredOn &&
-        _academyStockAppOpen;
+        !_playerNameConfirmed ||
+        (_beat >= _dialogueEndBeat &&
+            _academyPcPoweredOn &&
+            _academyStockAppOpen);
     final keyboardLift = isKeyboardOpen && isNameEntry
         ? viewInsets.bottom
         : 0.0;
@@ -818,7 +864,8 @@ class _VisualNovelOnboardingScreenState
                   child: _LivingBackground(
                     key: ValueKey(_background),
                     asset: _background,
-                    ambientFlicker: _beat >= 32,
+                    sceneBeat: _beat,
+                    ambientFlicker: true,
                   ),
                 ),
                 const DecoratedBox(
@@ -839,7 +886,7 @@ class _VisualNovelOnboardingScreenState
                   child: GestureDetector(
                     key: const Key('story-stage-advance-area'),
                     behavior: HitTestBehavior.translucent,
-                    onTap: _isCreating
+                    onTap: _isCreating || !_playerNameConfirmed
                         ? null
                         : () => _activeNovelDialogueState?._handleExternalTap(),
                   ),
@@ -857,47 +904,51 @@ class _VisualNovelOnboardingScreenState
                   ),
                 ),
 
-                SafeArea(
-                  child: Align(
-                    alignment: Alignment.topRight,
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 54, right: 10),
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: const Color(0xB8292B3A),
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: const Color(0x55FFFFFF)),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              key: const Key('story-backlog-button'),
-                              tooltip: '지난 대사',
-                              visualDensity: VisualDensity.compact,
-                              color: Colors.white,
-                              onPressed: _showBacklog,
-                              icon: const Icon(Icons.history_rounded, size: 19),
-                            ),
-                            IconButton(
-                              key: const Key('story-skip-button'),
-                              tooltip:
-                                  '${_currentPrologueSkipStep.sectionLabel} 건너뛰기',
-                              visualDensity: VisualDensity.compact,
-                              color: _yellow,
-                              onPressed: _showSkipDialog,
-                              icon: const Icon(
-                                Icons.fast_forward_rounded,
-                                size: 19,
+                if (_playerNameConfirmed)
+                  SafeArea(
+                    child: Align(
+                      alignment: Alignment.topRight,
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 54, right: 10),
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: const Color(0xB8292B3A),
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(color: const Color(0x55FFFFFF)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                key: const Key('story-backlog-button'),
+                                tooltip: '지난 대사',
+                                visualDensity: VisualDensity.compact,
+                                color: Colors.white,
+                                onPressed: _showBacklog,
+                                icon: const Icon(
+                                  Icons.history_rounded,
+                                  size: 19,
+                                ),
                               ),
-                            ),
-                          ],
+                              IconButton(
+                                key: const Key('story-skip-button'),
+                                tooltip:
+                                    '${_currentPrologueSkipStep.sectionLabel} 건너뛰기',
+                                visualDensity: VisualDensity.compact,
+                                color: _yellow,
+                                onPressed: _showSkipDialog,
+                                icon: const Icon(
+                                  Icons.fast_forward_rounded,
+                                  size: 19,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-                if (sceneCharacterAsset != null)
+                if (_playerNameConfirmed && sceneCharacterAsset != null)
                   Positioned.fill(
                     top: -_storyCharacterBottomInset,
                     bottom: _storyCharacterBottomInset,
@@ -958,6 +1009,14 @@ class _VisualNovelOnboardingScreenState
   }
 
   Widget _buildDialogue(BuildContext context) {
+    if (!_playerNameConfirmed) {
+      return _PlayerNameSetup(
+        controller: _playerController,
+        error: _creationError,
+        onChanged: () => setState(() => _creationError = null),
+        onConfirm: _confirmPlayerName,
+      );
+    }
     if (_beat >= _dialogueEndBeat) return _orientationComplete();
     if (_isOrientationRosterScene) return _orientationRoster();
     return _NovelDialogue(
@@ -1124,6 +1183,144 @@ class _VisualNovelOnboardingScreenState
   }
 }
 
+class _PlayerNameSetup extends StatelessWidget {
+  const _PlayerNameSetup({
+    required this.controller,
+    required this.error,
+    required this.onChanged,
+    required this.onConfirm,
+  });
+
+  final TextEditingController controller;
+  final String? error;
+  final VoidCallback onChanged;
+  final VoidCallback onConfirm;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    key: const Key('prologue-player-name-card'),
+    width: double.infinity,
+    padding: const EdgeInsets.fromLTRB(18, 17, 18, 16),
+    decoration: BoxDecoration(
+      gradient: const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color(0xF51B2A40), Color(0xF50B1423)],
+      ),
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: const Color(0xB883E5FF), width: 1.2),
+      boxShadow: const [
+        BoxShadow(
+          color: Color(0x85000000),
+          blurRadius: 24,
+          offset: Offset(0, 10),
+        ),
+      ],
+    ),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Row(
+          children: [
+            Icon(Icons.badge_outlined, color: Color(0xFF83E5FF), size: 20),
+            SizedBox(width: 8),
+            Text(
+              '기록에 남길 이름',
+              style: TextStyle(
+                color: Colors.white,
+                fontFamily: 'Maplestory',
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 7),
+        const Text(
+          '지금 정한 이름으로 프롤로그의 주인공이 되고, 이후 저장과 모든 대사에도 그대로 표시됩니다.',
+          style: TextStyle(
+            color: Color(0xFFD9E9F5),
+            fontFamily: 'Pretendard',
+            fontSize: 11.5,
+            height: 1.4,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          key: const Key('prologue-player-name-input'),
+          controller: controller,
+          autofocus: true,
+          maxLength: 12,
+          textInputAction: TextInputAction.done,
+          onChanged: (_) => onChanged(),
+          onSubmitted: (_) => onConfirm(),
+          style: const TextStyle(
+            color: Color(0xFF17243A),
+            fontFamily: 'Maplestory',
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+          ),
+          decoration: InputDecoration(
+            counterText: '',
+            hintText: '플레이할 이름을 입력하세요',
+            filled: true,
+            fillColor: const Color(0xFFF7FBFF),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 12,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(11),
+              borderSide: const BorderSide(color: Color(0xFF9DC7DC)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(11),
+              borderSide: const BorderSide(color: Color(0xFF4FD7FF), width: 2),
+            ),
+          ),
+        ),
+        if (error != null) ...[
+          const SizedBox(height: 7),
+          Text(
+            error!,
+            key: const Key('prologue-player-name-error'),
+            style: const TextStyle(
+              color: Color(0xFFFFB0A8),
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+        const SizedBox(height: 10),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            key: const Key('prologue-player-name-confirm'),
+            onPressed: onConfirm,
+            icon: const Icon(Icons.login_rounded, size: 19),
+            label: const Text('이 이름으로 시작'),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(45),
+              foregroundColor: const Color(0xFF092033),
+              backgroundColor: const Color(0xFF83E5FF),
+              textStyle: const TextStyle(
+                fontFamily: 'Pretendard',
+                fontSize: 13,
+                fontWeight: FontWeight.w900,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(11),
+              ),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 class _NewGamePreparationOverlay extends StatelessWidget {
   const _NewGamePreparationOverlay({required this.progress});
 
@@ -1230,10 +1427,12 @@ class _LivingBackground extends StatefulWidget {
   const _LivingBackground({
     super.key,
     required this.asset,
+    this.sceneBeat = 0,
     this.ambientFlicker = false,
   });
 
   final String asset;
+  final int sceneBeat;
   final bool ambientFlicker;
 
   @override
@@ -1241,41 +1440,71 @@ class _LivingBackground extends StatefulWidget {
 }
 
 class _LivingBackgroundState extends State<_LivingBackground>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late final AnimationController _ambientController;
+  late final AnimationController _scenePulseController;
 
   @override
   void initState() {
     super.initState();
     _ambientController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 12),
+      duration: const Duration(seconds: 14),
+    );
+    _scenePulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 620),
     );
     final isTestBinding = WidgetsBinding.instance.runtimeType
         .toString()
         .contains('TestWidgetsFlutterBinding');
     if (const bool.fromEnvironment('FLUTTER_TEST') || isTestBinding) {
       _ambientController.value = 0.25;
+      _scenePulseController.value = 1;
     } else {
       _ambientController.repeat();
+      _scenePulseController.forward();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _LivingBackground oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.sceneBeat == widget.sceneBeat) return;
+    final isTestBinding = WidgetsBinding.instance.runtimeType
+        .toString()
+        .contains('TestWidgetsFlutterBinding');
+    if (const bool.fromEnvironment('FLUTTER_TEST') || isTestBinding) {
+      _scenePulseController.value = 1;
+    } else {
+      _scenePulseController.forward(from: 0);
     }
   }
 
   @override
   void dispose() {
     _ambientController.dispose();
+    _scenePulseController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
-    animation: _ambientController,
+    animation: Listenable.merge([_ambientController, _scenePulseController]),
     builder: (context, child) => LayoutBuilder(
       builder: (context, constraints) {
         final t = _ambientController.value;
         final wave = math.sin(t * math.pi * 2);
-        final driftX = wave * 1.8;
-        final driftY = math.cos(t * math.pi * 2) * 1.1;
+        final slowZoom = 1.032 + (wave + 1) * 0.0035;
+        final scenePulse = math.sin(_scenePulseController.value * math.pi);
+        final isExterior =
+            widget.asset.contains('exterior') || widget.asset.contains('bus_');
+        final isTechScene =
+            widget.asset.contains('nis_') ||
+            widget.asset.contains('trading_') ||
+            widget.asset.contains('imf_') ||
+            widget.asset.contains('matrix_') ||
+            widget.asset.contains('electronics_');
         final fluorescentPulse =
             0.025 +
             (math.sin(t * math.pi * 14) + 1) * 0.012 +
@@ -1283,16 +1512,38 @@ class _LivingBackgroundState extends State<_LivingBackground>
         return Stack(
           fit: StackFit.expand,
           children: [
-            Transform.translate(
-              offset: Offset(driftX, driftY),
-              child: Transform.scale(
-                scale: 1.025,
-                child: Image.asset(
-                  widget.asset,
-                  key: const Key('story-background-image'),
-                  fit: BoxFit.cover,
-                  alignment: Alignment.center,
-                  filterQuality: FilterQuality.high,
+            Transform.scale(
+              scale: slowZoom,
+              alignment: Alignment(0, -0.08 + wave * 0.015),
+              child: Image.asset(
+                widget.asset,
+                key: const Key('story-background-image'),
+                fit: BoxFit.cover,
+                alignment: Alignment.center,
+                filterQuality: FilterQuality.high,
+              ),
+            ),
+            IgnorePointer(
+              child: Transform.translate(
+                offset: Offset((t * 2 - 1) * constraints.maxWidth * 1.35, 0),
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  child: Container(
+                    key: const Key('story-moving-light-beam'),
+                    width: constraints.maxWidth * 0.55,
+                    height: constraints.maxHeight * 0.8,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          const Color(0xFFBCEAFF).withValues(alpha: 0.12),
+                          const Color(0xFF8FD9FF).withValues(alpha: 0.035),
+                          Colors.transparent,
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -1317,36 +1568,73 @@ class _LivingBackgroundState extends State<_LivingBackground>
                   ),
                 ),
               ),
-            if (widget.ambientFlicker)
-              for (var index = 0; index < 12; index++)
+            if (isTechScene)
+              for (var index = 0; index < 11; index++)
                 Positioned(
-                  left:
-                      ((index * 37) % 101) / 101 * constraints.maxWidth +
-                      math.sin(t * math.pi * 2 + index) * 2,
                   top:
-                      ((((index * 61) % 97) / 97 * constraints.maxHeight) +
-                          t * 42) %
-                      (constraints.maxHeight * 0.76),
+                      (((index * 83) % 101) / 101 * constraints.maxHeight +
+                          t * constraints.maxHeight * 0.24) %
+                      constraints.maxHeight,
+                  left: 0,
+                  right: 0,
                   child: IgnorePointer(
-                    child: Opacity(
-                      opacity:
-                          0.11 +
-                          ((math.sin(t * math.pi * 2 + index * 0.8) + 1) *
-                              0.045),
-                      child: Container(
-                        key: index == 0
-                            ? const Key('orientation-dust-motes')
-                            : null,
-                        width: index.isEven ? 2.2 : 1.4,
-                        height: index.isEven ? 2.2 : 1.4,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFFFEDB5),
-                          shape: BoxShape.circle,
-                        ),
+                    child: Container(
+                      key: index == 0 ? const Key('story-crt-scanline') : null,
+                      height: 1,
+                      color: const Color(0xFF9CEBFF).withValues(alpha: 0.024),
+                    ),
+                  ),
+                ),
+            for (var index = 0; index < (isExterior ? 26 : 18); index++)
+              Positioned(
+                left:
+                    ((index * 37) % 101) / 101 * constraints.maxWidth +
+                    math.sin(t * math.pi * 2 + index) * (isExterior ? 10 : 3),
+                top:
+                    ((((index * 61) % 97) / 97 * constraints.maxHeight) +
+                        t * (isExterior ? 180 : 54)) %
+                    constraints.maxHeight,
+                child: IgnorePointer(
+                  child: Opacity(
+                    opacity:
+                        (isExterior ? 0.34 : 0.1) +
+                        ((math.sin(t * math.pi * 2 + index * 0.8) + 1) *
+                            (isExterior ? 0.12 : 0.05)),
+                    child: Container(
+                      key: index == 0
+                          ? const Key('orientation-dust-motes')
+                          : null,
+                      width: isExterior
+                          ? (index.isEven ? 3.8 : 2.4)
+                          : (index.isEven ? 2.2 : 1.4),
+                      height: isExterior
+                          ? (index.isEven ? 6.4 : 4.2)
+                          : (index.isEven ? 2.2 : 1.4),
+                      decoration: BoxDecoration(
+                        color: isExterior
+                            ? const Color(0xFFEAF7FF)
+                            : const Color(0xFFFFEDB5),
+                        borderRadius: BorderRadius.circular(99),
                       ),
                     ),
                   ),
                 ),
+              ),
+            IgnorePointer(
+              child: Opacity(
+                key: const Key('story-scene-reaction-glow'),
+                opacity: (scenePulse * 0.13).clamp(0.0, 0.13),
+                child: const DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: RadialGradient(
+                      center: Alignment(0, -0.25),
+                      radius: 0.95,
+                      colors: [Color(0x6686DFFF), Colors.transparent],
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ],
         );
       },
@@ -1862,7 +2150,7 @@ class _AcademyPcTerminal extends StatelessWidget {
           maxLength: 12,
           textInputAction: TextInputAction.next,
           onChanged: (_) => onChanged(),
-          decoration: _inputDecoration('운용자', '성준'),
+          decoration: _inputDecoration('운용자', '프롤로그에서 정한 이름'),
         ),
         const SizedBox(height: 7),
         TextField(
@@ -2043,7 +2331,6 @@ class _NovelDialogue extends StatefulWidget {
     this.stageDirection,
     this.onContinue,
     this.continueKey,
-    this.continueLabel = '다음',
     this.choices = const [],
     this.child,
   });
@@ -2054,7 +2341,6 @@ class _NovelDialogue extends StatefulWidget {
   final String? stageDirection;
   final VoidCallback? onContinue;
   final Key? continueKey;
-  final String continueLabel;
   final List<_NovelChoice> choices;
   final Widget? child;
 
@@ -2155,6 +2441,9 @@ class _NovelDialogueState extends State<_NovelDialogue>
         : const Color(0xFFEAF4FF);
 
     return GestureDetector(
+      key: widget.onContinue == null
+          ? null
+          : widget.continueKey ?? const Key('story-continue'),
       behavior: HitTestBehavior.opaque,
       onTap: _handleExternalTap,
       child: Stack(
@@ -2194,7 +2483,7 @@ class _NovelDialogueState extends State<_NovelDialogue>
                   sigmaY: backdropBlurSigma,
                 ),
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(17, 23, 14, 10),
+                  padding: const EdgeInsets.fromLTRB(17, 23, 14, 8),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -2286,39 +2575,6 @@ class _NovelDialogueState extends State<_NovelDialogue>
                       if (_typingComplete && widget.child != null) ...[
                         const SizedBox(height: 10),
                         widget.child!,
-                      ],
-                      if (_typingComplete && widget.onContinue != null) ...[
-                        const SizedBox(height: 2),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton.icon(
-                            key:
-                                widget.continueKey ??
-                                const Key('story-continue'),
-                            onPressed: widget.onContinue,
-                            label: Text(widget.continueLabel),
-                            iconAlignment: IconAlignment.end,
-                            icon: const Icon(
-                              Icons.keyboard_double_arrow_down_rounded,
-                              size: 20,
-                            ),
-                            style: TextButton.styleFrom(
-                              minimumSize: const Size(96, 40),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                              ),
-                              foregroundColor: const Color(0xFF83E5FF),
-                              backgroundColor: const Color(0x243DB9E9),
-                              side: const BorderSide(color: Color(0x6683E5FF)),
-                              shape: const StadiumBorder(),
-                              textStyle: const TextStyle(
-                                fontFamily: 'Pretendard',
-                                fontSize: 12,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                          ),
-                        ),
                       ],
                     ],
                   ),

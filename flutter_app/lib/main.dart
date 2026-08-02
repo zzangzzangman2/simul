@@ -510,7 +510,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
       throw StateError('The prepared new-game world is unavailable');
     }
     final story = StoryState.newDecimalPlayer(
-      playerName: '성준',
+      playerName: setup.playerName,
       introChoice: setup.introChoice,
       startingTrait: setup.startingTrait,
       operatingPrinciple: setup.operatingPrinciple,

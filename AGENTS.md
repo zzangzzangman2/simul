@@ -36,7 +36,7 @@
 ## 세계관과 시작 상태
 
 - 유일한 세계관 정본은 `DECIMAL_WORLD.md`다.
-- 주인공 성준과 김학준, 여학생 8명은 1987년생 동갑이며 1999년 프로젝트 데시멀의
+- 주인공 플레이어와 김학준, 여학생 8명은 1987년생 동갑이며 1999년 프로젝트 데시멀의
   비밀 선발을 통과한 최종 열 명이다. 보호자·가족·용돈·가정 계좌를 새로 붙이지 않는다.
 - 학교, 입학, 학년, 선배·후배, 미래양성원, 기수, SEED 설정은 폐기됐다. 열 명은
   `동기`, 생활 공간은 `강남 아지트` 또는 `데시멀 센터`로 부른다.
@@ -49,7 +49,7 @@
 
 ## 프롤로그와 생활 흐름
 
-- 시작 순서는 `1981년 청와대 자본전 선언 → 1980년대 실험 → 1997년 IMF 실패 →
+- 시작 순서는 `플레이어 이름 확정 → 1999년 국정원 데시멀 재가동 → 봉인된 실패 기록 →
   1999년 행렬 시험 → 불공정 게임 → 결핍·욕망 검증 → 1999년 12월 강남 아지트 →
   첫날 공동생활 → 2000년 1월 3일 주식 PC 실습`이다.
 - 정규 대사본과 버전 번호는 정본 JSON을 기준으로 하며 장면 상한은 320이다.
@@ -57,8 +57,9 @@
   건너뛰기도 PC 전원, 앱 실행, 저장 생성을 대신 수행하지 않는다.
 - 열 명은 생활 라운지를 공유하되 개인 수면칸·사물함과 잠금 가능한 탈의·세면
   칸막이로 경계를 지킨다.
-- 1월 3일 각자 꺼진 CRT PC 한 대를 배정한다. 플레이어가 전원을 켜고 `주식실습`을
-  연 뒤 성준의 운용장부 이름을 확정해야 프롤로그 체크포인트가 정식 국가계좌
+- 프롤로그 첫 화면에서 사용자가 플레이어 이름을 확정한다. 1월 3일 각자 꺼진 CRT
+  PC 한 대를 배정하고, 플레이어가 전원을 켜서 `주식실습`을 연 뒤 운용장부 이름을
+  확정해야 프롤로그 체크포인트가 정식 국가계좌
   저장으로 전환되고 한빛통신 매수·가격 변화·매도 튜토리얼이 시작된다.
 
 ## 인물 정본
@@ -72,7 +73,7 @@
 | 이지안 | ISTP | `art_references/lee_jian_face_identity_anchor_v2.png`, `lee_jian_identity_anchor_v2.png` |
 | 최이서 | ISFP | `art_references/choi_iseo_identity_anchor_v1.png` |
 | 정아린 | ESTJ | `art_references/jung_arin_identity_anchor_v1.png` |
-| 박하은 | ENFJ | `art_references/park_haeun_identity_anchor_v1.png` |
+| 박하은 | ENFJ | `art_references/park_haeun_face_identity_anchor_v2.png`, `park_haeun_identity_anchor_v2.png` |
 | 한수아 | ENFP | 공식 화풍 앵커와 현행 런타임 기본 포즈 |
 | 오지우 | ENTP | `art_references/oh_jiwoo_identity_anchor_v1.png` |
 | 윤채아 | INTJ | `art_references/yoon_chaea_identity_anchor_v1.png` |
@@ -91,17 +92,18 @@
 
 ## 캐릭터 이미지 규칙
 
-공식 화풍은 오직 `SIMUL production soft-painted VN anime v1`이다. 생성·수정 전
+공식 화풍은 오직 `SIMUL luminous soft-painted VN anime v2`다. 생성·수정 전
 다음을 직접 연다.
 
 1. `IMAGE_GENERATION_STYLE_PROMPT.md`
 2. `ART_STYLE_GUIDE.md`
 3. `ART_STYLE_AUDIT.md`
-4. `art_references/simul_production_soft_painted_vn_style_anchor_v1.png`
+4. `art_references/simul_luminous_soft_painted_vn_style_anchor_v2.png`
 5. 해당 인물의 승인 정체성 앵커와 `flutter_app/assets/images/production_soft_painted/<인물>/`
 
-- 공식 화풍 앵커는 렌더링 문법만 전달한다. 앵커 속 수아의 얼굴·머리·체형을 다른
-  인물에게 복제하지 않는다.
+- 공식 화풍 앵커는 가는 유색선, 유리 같은 다층 홍채, 투명한 피부색 층, 진주빛
+  머리 하이라이트와 통제된 잔머리 등 렌더링 문법만 전달한다. 앵커 속 박하은의
+  얼굴·회청색 눈·낮은 양갈래·체형을 다른 인물에게 복제하지 않는다.
 - 실사·사진 합성·3D·치비·굵은 검은 선·흐린 페인터리 번짐은 금지한다.
 - 후보·아카이브·`draft`·`discarded` 경로는 신규 생성 참조가 아니다.
 - 여자 8명은 머리와 교복을 가린 얼굴만 보아도, 얼굴을 가린 전신 실루엣만 보아도

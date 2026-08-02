@@ -6,8 +6,8 @@
 
 ## 단일 화풍
 
-- 공식명: `SIMUL production soft-painted VN anime v1`
-- 화풍 앵커: `art_references/simul_production_soft_painted_vn_style_anchor_v1.png`
+- 공식명: `SIMUL luminous soft-painted VN anime v2`
+- 화풍 앵커: `art_references/simul_luminous_soft_painted_vn_style_anchor_v2.png`
 - 생성 규칙: `IMAGE_GENERATION_STYLE_PROMPT.md`, `ART_STYLE_GUIDE.md`
 - 신규 캐릭터는 실사·사진 합성·3D·치비가 아니라 위 화풍을 사용한다.
 
@@ -19,7 +19,7 @@
 | 이지안 | `lee_jian_face_identity_anchor_v2.png`, `lee_jian_identity_anchor_v2.png` | `production_soft_painted/lee_jian/` v2 9종 |
 | 최이서 | `choi_iseo_identity_anchor_v1.png` | `production_soft_painted/choi_iseo/` 9종 |
 | 정아린 | `jung_arin_identity_anchor_v1.png` | `production_soft_painted/jung_arin/` 9종 |
-| 박하은 | `park_haeun_identity_anchor_v1.png` | `production_soft_painted/park_haeun/` 9종 |
+| 박하은 | `park_haeun_face_identity_anchor_v2.png`, `park_haeun_identity_anchor_v2.png` | `production_soft_painted/park_haeun/` v2 9종 |
 | 한수아 | 공식 화풍 앵커와 런타임 중립 포즈 | `production_soft_painted/han_sua/` quality v2 8종 |
 | 오지우 | `oh_jiwoo_identity_anchor_v1.png` | `production_soft_painted/oh_jiwoo/` 9종 |
 | 윤채아 | `yoon_chaea_identity_anchor_v1.png` | `production_soft_painted/yoon_chaea/` 9종 |
@@ -31,9 +31,9 @@
 
 | 자산군 | 경로·기준 |
 | --- | --- |
-| 주인공 성준 | `flutter_app/assets/images/protagonist_seed01/` 24종(호환 경로) |
+| 주인공 플레이어 | `flutter_app/assets/images/protagonist_seed01/` 24종(호환 경로) |
 | 한서윤 운영관 | `flutter_app/assets/images/주식선생님/`의 코드 연결 포즈(호환 경로) |
-| 1981년 정책실 | `cinematic_soft_painted/policy_1981/` |
+| 1999년 국정원 | `cinematic_soft_painted/decimal_nis_1999/` 신규 인물 6명·배경 2종 |
 | 데시멀 센터 | `cinematic_soft_painted/decimal/` 신규 배경 11종 |
 | 역사 프롤로그 | `historical_prologue/`의 코드 연결 자산 |
 | 서하늘 공인중개사 | `character_realtor_*_v1.png` 6종 |
