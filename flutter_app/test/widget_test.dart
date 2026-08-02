@@ -583,12 +583,18 @@ void main() {
     final scrimGradient = scrimDecoration.gradient! as LinearGradient;
     expect(scrimGradient.colors.last, const Color(0x70000000));
     expect(find.byKey(const Key('story-moving-light-beam')), findsNothing);
+    expect(find.byKey(const Key('story-crt-scanline')), findsNothing);
+    expect(find.byKey(const Key('orientation-dust-motes')), findsNothing);
     expect(find.byType(BackdropFilter), findsNothing);
     expect(
       find.byKey(const Key('story-dialogue-opacity-control')),
       findsNothing,
     );
     expect(find.byKey(const Key('story-dialogue-divider')), findsOneWidget);
+    final dialoguePosition = tester.widget<AnimatedPositioned>(
+      find.byKey(const Key('keyboard-name-panel')),
+    );
+    expect(dialoguePosition.bottom, 28);
 
     await advanceDialogue(tester, 1);
     final nextPanel = tester.widget<Container>(

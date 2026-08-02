@@ -656,7 +656,7 @@ void main() {
         final teacherRect = tester.getRect(teacher);
         expect(teacherRect.center.dx, closeTo(stageRect.center.dx, 0.01));
         expect(teacherRect.height, closeTo(stageRect.height * 0.9, 0.01));
-        expect(teacherRect.bottom, closeTo(stageRect.bottom - 104, 0.01));
+        expect(teacherRect.bottom, closeTo(stageRect.bottom - 76, 0.01));
       }
       expect(tester.takeException(), isNull);
     }

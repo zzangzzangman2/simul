@@ -7,7 +7,8 @@ const _dialogueContentVersion = 3;
 const _dialogueRuntimeStorageKey = 'project-decimal-dialogue-runtime-v2';
 const _dialogueBundleAsset = 'assets/dialogue/dialogue-editor-override.json';
 const _orientationCompleteBeat = _onboardingBeatCount - 1;
-const _storyCharacterBottomInset = 104.0;
+const _storyCharacterBottomInset = 76.0;
+const _storyDialogueBottomInset = 28.0;
 const _storyCharacterHeightFactor = 0.9;
 const _storyCharacterAspectRatio = 2 / 3;
 const _minhoCharacterAsset =
@@ -795,6 +796,9 @@ class _VisualNovelOnboardingScreenState
     final keyboardLift = isKeyboardOpen && isNameEntry
         ? viewInsets.bottom
         : 0.0;
+    final panelBottomInset = _playerNameConfirmed && _beat < _dialogueEndBeat
+        ? _storyDialogueBottomInset
+        : 10.0;
     return Listener(
       key: const Key('story-wheel-navigation-listener'),
       onPointerSignal: _handlePointerSignal,
@@ -818,6 +822,21 @@ class _VisualNovelOnboardingScreenState
                     ambientFlicker: true,
                   ),
                 ),
+                if (_playerNameConfirmed && sceneCharacterAsset != null)
+                  Positioned.fill(
+                    top: -_storyCharacterBottomInset,
+                    bottom: _storyCharacterBottomInset,
+                    child: IgnorePointer(
+                      child: _OnboardingCharacterSlot(
+                        key: const Key('story-character-stage-slot'),
+                        asset: sceneCharacterAsset,
+                        alignment: Alignment.bottomCenter,
+                        characterKey: isTeacherScene
+                            ? const Key('academy-teacher-character')
+                            : const Key('story-character-character'),
+                      ),
+                    ),
+                  ),
                 const DecoratedBox(
                   key: Key('story-stage-reading-scrim'),
                   decoration: BoxDecoration(
@@ -899,28 +918,13 @@ class _VisualNovelOnboardingScreenState
                       ),
                     ),
                   ),
-                if (_playerNameConfirmed && sceneCharacterAsset != null)
-                  Positioned.fill(
-                    top: -_storyCharacterBottomInset,
-                    bottom: _storyCharacterBottomInset,
-                    child: IgnorePointer(
-                      child: _OnboardingCharacterSlot(
-                        key: const Key('story-character-stage-slot'),
-                        asset: sceneCharacterAsset,
-                        alignment: Alignment.bottomCenter,
-                        characterKey: isTeacherScene
-                            ? const Key('academy-teacher-character')
-                            : const Key('story-character-character'),
-                      ),
-                    ),
-                  ),
                 AnimatedPositioned(
                   key: const Key('keyboard-name-panel'),
                   duration: const Duration(milliseconds: 180),
                   curve: Curves.easeOutCubic,
                   left: 12,
                   right: 12,
-                  bottom: keyboardLift + 10,
+                  bottom: keyboardLift + panelBottomInset,
                   child: SafeArea(
                     top: false,
                     child: Align(
@@ -1446,19 +1450,11 @@ class _LivingBackgroundState extends State<_LivingBackground>
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: Listenable.merge([_ambientController, _scenePulseController]),
     builder: (context, child) => LayoutBuilder(
-      builder: (context, constraints) {
+      builder: (context, _) {
         final t = _ambientController.value;
         final wave = math.sin(t * math.pi * 2);
         final slowZoom = 1.032 + (wave + 1) * 0.0035;
         final scenePulse = math.sin(_scenePulseController.value * math.pi);
-        final isExterior =
-            widget.asset.contains('exterior') || widget.asset.contains('bus_');
-        final isTechScene =
-            widget.asset.contains('nis_') ||
-            widget.asset.contains('trading_') ||
-            widget.asset.contains('imf_') ||
-            widget.asset.contains('matrix_') ||
-            widget.asset.contains('electronics_');
         final fluorescentPulse =
             0.025 +
             (math.sin(t * math.pi * 14) + 1) * 0.012 +
@@ -1493,58 +1489,6 @@ class _LivingBackgroundState extends State<_LivingBackground>
                           Colors.transparent,
                         ],
                         stops: [0, 0.28, 0.66],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            if (isTechScene)
-              for (var index = 0; index < 11; index++)
-                Positioned(
-                  top:
-                      (((index * 83) % 101) / 101 * constraints.maxHeight +
-                          t * constraints.maxHeight * 0.24) %
-                      constraints.maxHeight,
-                  left: 0,
-                  right: 0,
-                  child: IgnorePointer(
-                    child: Container(
-                      key: index == 0 ? const Key('story-crt-scanline') : null,
-                      height: 1,
-                      color: const Color(0xFF9CEBFF).withValues(alpha: 0.024),
-                    ),
-                  ),
-                ),
-            for (var index = 0; index < (isExterior ? 26 : 18); index++)
-              Positioned(
-                left:
-                    ((index * 37) % 101) / 101 * constraints.maxWidth +
-                    math.sin(t * math.pi * 2 + index) * (isExterior ? 10 : 3),
-                top:
-                    ((((index * 61) % 97) / 97 * constraints.maxHeight) +
-                        t * (isExterior ? 180 : 54)) %
-                    constraints.maxHeight,
-                child: IgnorePointer(
-                  child: Opacity(
-                    opacity:
-                        (isExterior ? 0.34 : 0.1) +
-                        ((math.sin(t * math.pi * 2 + index * 0.8) + 1) *
-                            (isExterior ? 0.12 : 0.05)),
-                    child: Container(
-                      key: index == 0
-                          ? const Key('orientation-dust-motes')
-                          : null,
-                      width: isExterior
-                          ? (index.isEven ? 3.8 : 2.4)
-                          : (index.isEven ? 2.2 : 1.4),
-                      height: isExterior
-                          ? (index.isEven ? 6.4 : 4.2)
-                          : (index.isEven ? 2.2 : 1.4),
-                      decoration: BoxDecoration(
-                        color: isExterior
-                            ? const Color(0xFFEAF7FF)
-                            : const Color(0xFFFFEDB5),
-                        borderRadius: BorderRadius.circular(99),
                       ),
                     ),
                   ),

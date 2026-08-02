@@ -701,7 +701,10 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
   assert.match(onboarding, /character: asset\('character'\)/);
   assert.match(onboarding, /background: asset\('background'\)/);
   assert.match(onboarding, /_dialogueEndBeat = loaded\.keys\.reduce\(math\.max\)/);
-  assert.match(onboarding, /_storyCharacterBottomInset = 104\.0/);
+  assert.match(onboarding, /_storyCharacterBottomInset = 76\.0/);
+  assert.match(onboarding, /_storyDialogueBottomInset = 28\.0/);
+  assert.doesNotMatch(onboarding, /story-crt-scanline/);
+  assert.doesNotMatch(onboarding, /orientation-dust-motes/);
   assert.match(onboarding, /_minhoCharacterScale = 0\.72/);
   assert.doesNotMatch(onboarding, /왼쪽으로 움직여 대화창 배경을 더 투명하게 조절/);
   assert.match(pubspec, /assets\/dialogue\//);
