@@ -118588,7 +118588,7 @@ s.x=1
 s.z=B.j4},
 $S:0}
 A.aG1.prototype={
-$2(a,b){var s=null,r=Math.max(326,b.d*0.42),q=this.a,p=t.p,o=A.hv(76,new A.bX(B.ag,s,B.bB,B.w,A.a([new A.u5(q.gakk(),B.ay,B.bl0,B.bmn),new A.c7(B.ca,s,s,new A.a6(0,0,s,new A.j("bank-clerk-"+q.z.b,t.O)),s)],p),s),-76),n=q.ga1(),m=q.ga1()
+$2(a,b){var s=null,r=Math.max(326,b.d*0.42),q=this.a,p=t.p,o=A.hv(-280,new A.bX(B.ag,s,B.bB,B.w,A.a([new A.u5(q.gakk(),B.ay,B.bl0,B.bmn),new A.c7(B.ca,s,s,new A.a6(0,0,s,new A.j("bank-clerk-"+q.z.b,t.O)),s)],p),s),280),n=q.ga1(),m=q.ga1()
 p=A.a([B.buS,B.aaZ,o,A.d4(s,A.c4(!1,new A.mO("\uc0c8\ucc9c\ub144\uc740\ud589 \xb7 \uac1c\uc778\uae08\uc735 \ucc3d\uad6c","\uc608\uae08\uacfc \uc2e0\uc6a9\uc744 \uc22b\uc790\ub85c \ud655\uc778\ud558\ub294 \uacf3",n.d,"\ud1b5\uc7a5 "+A.P(Math.max(0,m.f-m.r))+"\uc6d0",new A.aFV(a),!0,s),B.H,!0),s,s,0,0,0,s)],p)
 if(q.w){o=q.x===0
 n=o?"\uc5b4\uc11c \uc624\uc138\uc694. \uc608\uae08\uacfc \uc2e0\uc6a9 \uc0c1\ub2f4\uc744 \ub9e1\uc740 \uc724\ud558\ub9b0\uc774\uc5d0\uc694.":"\ub3c8\uc744 \uae30\uac04\ubcc4\ub85c \ub9e1\uae30\uac70\ub098, \uc2e0\uc6a9\uc810\uc218\uc640 \uc0c1\ud658\ub2a5\ub825\uc5d0 \ub9de\ucdb0 \ub300\ucd9c\uc744 \ubc1b\uc744 \uc218 \uc788\uc5b4\uc694."
@@ -131324,7 +131324,7 @@ axi(){var s,r,q=this,p=null,o=q.ga_W(),n=B.e.q(q.ch,0,o.length-1),m=o[n],l=m.a,k
 j=A.d4(p,A.c4(!1,new A.ac(B.zS,A.a2(A.a([A.E(p,B.aZG,B.j,p,p,new A.B(B.xO,p,A.ap(B.hR,1),j,p,p,B.l),p,p,p,p,B.mk,p,p,p),B.bb,A.h(""+(n+1)+" / "+o.length,p,p,p,p,p,B.o8,p,p)],i),B.k,p,B.f,B.h,0,p),p),B.H,!0),p,p,0,0,0,p)
 s=m.b
 r=t.O
-return A.m3(B.b0,new A.bX(B.ag,p,B.bB,B.w,A.a([k,B.zb,j,A.hv(76,new A.u5(s,B.ay,new A.j(l==="\ud55c\uc11c\uc724 \uc6b4\uc601\uad00"?"tutorial-recovery-teacher-character":"tutorial-recovery-peer-character",r),new A.j("tutorial-recovery-slot-"+s,r)),-76),A.d4(10,A.c4(!0,A.Ot(p,B.kc,B.bpK,new A.j(new A.aj("tutorial-recovery-dialogue",n),t.nA),m.c,!1,q.gai3(),q.a.e.ax.a,l,p),B.H,!1),p,p,12,12,p,p)],i),p),B.a5,!1,B.bqz,p,p,p,p,p,p,p,p,p,p,p,p,p,new A.aTJ(),p,p,p,p,p,p)},
+return A.m3(B.b0,new A.bX(B.ag,p,B.bB,B.w,A.a([k,B.zb,j,A.hv(-280,new A.u5(s,B.ay,new A.j(l==="\ud55c\uc11c\uc724 \uc6b4\uc601\uad00"?"tutorial-recovery-teacher-character":"tutorial-recovery-peer-character",r),new A.j("tutorial-recovery-slot-"+s,r)),280),A.d4(10,A.c4(!0,A.Ot(p,B.kc,B.bpK,new A.j(new A.aj("tutorial-recovery-dialogue",n),t.nA),m.c,!1,q.gai3(),q.a.e.ax.a,l,p),B.H,!1),p,p,12,12,p,p)],i),p),B.a5,!1,B.bqz,p,p,p,p,p,p,p,p,p,p,p,p,p,new A.aTJ(),p,p,p,p,p,p)},
 ayq(){var s,r,q,p,o,n,m,l,k,j,i,h,g,f,e=this,d=null,c=B.i.bc(e.a.e.ax.a)
 if(c.length===0)c="\ub098"
 s=e.ay
@@ -131357,7 +131357,7 @@ s=A.d4(d,A.c4(!1,new A.ac(B.zS,A.a2(A.a([A.E(d,B.aZX,B.j,d,d,new A.B(B.xO,d,A.ap
 j=t.O
 if(r)h="tutorial-review-teacher-character"
 else h=e.ay===1?"tutorial-review-protagonist-character":"tutorial-review-peer-character"
-j=A.hv(76,new A.u5(o,B.ay,new A.j(h,j),new A.j("tutorial-review-slot-"+o,j)),-76)
+j=A.hv(-280,new A.u5(o,B.ay,new A.j(h,j),new A.j("tutorial-review-slot-"+o,j)),280)
 o=e.ay
 h=e.a.e
 g=o===0?A.a([new A.lH("\ud55c \ubc88 \ubc8c\uc5c8\uc73c\ub2c8 \ub2e4\uc74c\uc5d4 \uc218\ub7c9 \ub354 \uc138\uac8c \uac04\ub2e4",new A.aTK(e),B.bpN),new A.lH("\ud22c\uc790\ub178\ud2b8\ubd80\ud130 \uae50\ub2e4: \uc774\uc720\xb7\uc870\uac74 \uccb4\ud06c",new A.aTL(e),B.bpa),new A.lH("\uac70\ub798\ub300\uae08 \ud070 \uc885\ubaa9\ub9cc \ud0c0\uba74 \ub41c\ub2e4",new A.aTM(e),B.bkU)],t.lo):B.kc
@@ -132094,7 +132094,7 @@ q=t.p
 l=A.a([new A.iE(new A.Di(n.JZ(n.x),n.x,!0,new A.j(l,t.O)),B.abZ,o,B.T,B.T,A.qK(),A.ov(),o)],q)
 p=n.Q
 p===$&&A.b()
-if(p&&r!=null)l.push(A.hv(76,A.fL(new A.u5(r,B.ay,m==="\ud55c\uc11c\uc724 \uc6b4\uc601\uad00"?B.bnV:B.bpI,B.bnb),!0,o),-76))
+if(p&&r!=null)l.push(A.hv(-280,A.fL(new A.u5(r,B.ay,m==="\ud55c\uc11c\uc724 \uc6b4\uc601\uad00"?B.bnV:B.bpI,B.bnb),!0,o),280))
 l.push(B.ab9)
 l.push(A.hv(0,A.m3(B.dU,o,B.a5,!1,B.bol,o,o,o,o,o,o,o,o,o,o,o,o,o,n.z||!n.Q?o:new A.b34(),o,o,o,o,o,o),0))
 m=n.w.h(0,n.x)
@@ -132266,13 +132266,13 @@ q=t.Ni
 return new A.cW(r,!1,A.ts(a,new A.aV(r,new A.b0(new A.n(s,0.02),B.t,q),q.i("aV<aT.T>")),null,!0),null)},
 $S:321}
 A.aQm.prototype={
-$2(a,b){var s,r,q,p=null,o=b.d,n=o*0.9,m=B.b.q(n*0.6666666666666666,0,b.b),l=B.b.q(n,0,o-76)
+$2(a,b){var s,r,q,p=null,o=b.d,n=o*0.9,m=B.b.q(n*0.6666666666666666,0,b.b),l=B.b.q(n,0,o- -280)
 o=this.a.a
 s=o.d
 r=o.e
 o=o.c
 q=o==="assets/images/historical_prologue/character_minho_farewell_v3.png"?0.72:1
-return new A.c7(s,p,p,new A.a6(m,n,new A.c7(B.ay,p,p,A.C5(B.ay,new A.a6(m,l,A.dK(o,B.ay,p,B.bP,B.cL,!0,p,!1,B.bnl,p),p),B.bnm,q),p),r),p)},
+return new A.c7(s,p,p,new A.a6(m,n,new A.c7(B.ay,p,p,A.C5(B.ay,new A.a6(m,l,A.dK(o,B.ay,p,B.bP,B.cL,!0,p,!1,B.bnl,p),p),B.bnm,2*q),p),r),p)},
 $S:1058}
 A.aQo.prototype={
 $2(a,b){var s,r,q,p,o,n,m=this.a,l=m.f

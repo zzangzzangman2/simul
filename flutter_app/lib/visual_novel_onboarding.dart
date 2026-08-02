@@ -7,10 +7,11 @@ const _dialogueContentVersion = 3;
 const _dialogueRuntimeStorageKey = 'project-decimal-dialogue-runtime-v2';
 const _dialogueBundleAsset = 'assets/dialogue/dialogue-editor-override.json';
 const _orientationCompleteBeat = _onboardingBeatCount - 1;
-const _storyCharacterBottomInset = 76.0;
+const _storyCharacterBottomInset = -280.0;
 const _storyDialogueBottomInset = 28.0;
 const _storyCharacterHeightFactor = 0.9;
 const _storyCharacterAspectRatio = 2 / 3;
+const _storyCharacterSceneScale = 2.0;
 const _minhoCharacterAsset =
     'assets/images/historical_prologue/character_minho_farewell_v3.png';
 const _minhoCharacterScale = 0.72;
@@ -39,7 +40,8 @@ class _PrologueSkipStep {
 }
 
 double _storyCharacterScaleForAsset(String asset) =>
-    asset == _minhoCharacterAsset ? _minhoCharacterScale : 1.0;
+    _storyCharacterSceneScale *
+    (asset == _minhoCharacterAsset ? _minhoCharacterScale : 1.0);
 
 void _playStoryFeedback({bool strong = false}) {
   if (strong) {

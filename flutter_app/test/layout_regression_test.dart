@@ -611,7 +611,7 @@ void main() {
     expect(find.text('새천년경제'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
-  testWidgets('360px visual novel portraits stay inside through all scenes', (
+  testWidgets('360px visual novel portraits keep a centered close-up crop', (
     tester,
   ) async {
     await usePhoneSurface(tester);
@@ -645,8 +645,10 @@ void main() {
         );
         expect(rect.right, greaterThan(stageRect.left));
         expect(rect.left, lessThan(stageRect.right));
-        expect(rect.top, greaterThanOrEqualTo(stageRect.top));
-        expect(rect.bottom, lessThanOrEqualTo(stageRect.bottom));
+        expect(rect.center.dx, closeTo(stageRect.center.dx, 0.01));
+        expect(rect.height, greaterThan(stageRect.height * 0.8));
+        expect(rect.top, lessThan(stageRect.top + stageRect.height * 0.25));
+        expect(rect.bottom, greaterThan(stageRect.bottom));
       }
       final teacher = find.byKey(const Key('academy-teacher-character'));
       if (teacher.evaluate().isNotEmpty) {
@@ -656,7 +658,7 @@ void main() {
         final teacherRect = tester.getRect(teacher);
         expect(teacherRect.center.dx, closeTo(stageRect.center.dx, 0.01));
         expect(teacherRect.height, closeTo(stageRect.height * 0.9, 0.01));
-        expect(teacherRect.bottom, closeTo(stageRect.bottom - 76, 0.01));
+        expect(teacherRect.bottom, closeTo(stageRect.bottom + 280, 0.01));
       }
       expect(tester.takeException(), isNull);
     }
