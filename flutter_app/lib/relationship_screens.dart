@@ -26,8 +26,8 @@ class RelationshipStatusScreen extends StatelessWidget {
       child: Column(
         children: [
           _RelationshipHeader(
-            title: '제6기 인물 카드',
-            subtitle: '여학생 8명 · 김학준 · 한서윤 선생님',
+            title: '캐릭터',
+            subtitle: '여자 동기 8명 · 김학준 · 한서윤 운영관',
             onBack: () => Navigator.pop(context),
           ),
           Expanded(
@@ -85,15 +85,26 @@ class _CohortCharacterTile extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: <Color>[Colors.white, accent.withValues(alpha: 0.18)],
+              colors: <Color>[
+                const Color(0xFFFFFEFD),
+                accent.withValues(alpha: 0.2),
+              ],
             ),
             borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: _ink, width: 1.8),
-            boxShadow: const <BoxShadow>[
+            border: Border.all(
+              color: accent.withValues(alpha: 0.72),
+              width: 1.6,
+            ),
+            boxShadow: <BoxShadow>[
               BoxShadow(
-                color: Color(0x2833405F),
-                blurRadius: 0,
-                offset: Offset(0, 4),
+                color: accent.withValues(alpha: 0.16),
+                blurRadius: 12,
+                offset: const Offset(0, 6),
+              ),
+              const BoxShadow(
+                color: Color(0x1733405F),
+                blurRadius: 4,
+                offset: Offset(0, 2),
               ),
             ],
           ),
@@ -104,15 +115,47 @@ class _CohortCharacterTile extends StatelessWidget {
               children: <Widget>[
                 Expanded(
                   child: Stack(
+                    key: Key('character-card-portrait-region-${profile.id}'),
                     fit: StackFit.expand,
                     children: <Widget>[
-                      ColoredBox(color: accent.withValues(alpha: 0.12)),
-                      Hero(
-                        tag: 'cohort-character-${profile.id}',
-                        child: _CharacterPortraitImage(
-                          profile: profile,
-                          fit: BoxFit.cover,
-                          scale: 1.42,
+                      DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: <Color>[
+                              Colors.white.withValues(alpha: 0.88),
+                              accent.withValues(alpha: 0.2),
+                            ],
+                          ),
+                        ),
+                      ),
+                      ClipRect(
+                        child: Hero(
+                          tag: 'cohort-character-${profile.id}',
+                          child: _CharacterPortraitImage(
+                            profile: profile,
+                            fit: BoxFit.cover,
+                            scale: 1.42,
+                          ),
+                        ),
+                      ),
+                      const Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        height: 34,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: <Color>[
+                                Colors.transparent,
+                                Color(0x66FFFFFF),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                       Positioned(
@@ -134,8 +177,13 @@ class _CohortCharacterTile extends StatelessWidget {
                     ],
                   ),
                 ),
-                Padding(
+                Container(
+                  key: Key('character-card-info-${profile.id}'),
                   padding: const EdgeInsets.fromLTRB(10, 9, 9, 10),
+                  decoration: const BoxDecoration(
+                    color: Color(0xF7FFFFFF),
+                    border: Border(top: BorderSide(color: Color(0xFFDDE3EC))),
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
@@ -155,34 +203,45 @@ class _CohortCharacterTile extends StatelessWidget {
                             ),
                           ),
                           Icon(
-                            Icons.arrow_forward_ios_rounded,
-                            size: 14,
-                            color: accent,
+                            Icons.arrow_circle_right_rounded,
+                            size: 19,
+                            color: accent.withValues(alpha: 0.92),
                           ),
                         ],
                       ),
                       const SizedBox(height: 3),
                       Text(
                         profile.role,
-                        maxLines: 1,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           color: Color(0xFF68738B),
-                          fontSize: 9,
+                          fontSize: 9.5,
+                          height: 1.25,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
                       const SizedBox(height: 5),
-                      Text(
-                        progress == null
-                            ? profile.keywords.join(' · ')
-                            : '호감도 ${progress!.affection} · ${progress!.stage.label}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: progress == null ? _ink : accent,
-                          fontSize: 9,
-                          fontWeight: FontWeight.w900,
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: accent.withValues(alpha: 0.11),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          progress == null
+                              ? profile.keywords.join(' · ')
+                              : '호감도 ${progress!.affection} · ${progress!.stage.label}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: accent,
+                            fontSize: 8.7,
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
                       ),
                     ],

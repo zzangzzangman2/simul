@@ -84,7 +84,7 @@ class _PhoneMessengerScreenState extends State<PhoneMessengerScreen> {
                   const SizedBox(width: 2),
                   const Expanded(
                     child: Text(
-                      '미래톡',
+                      '데시멀톡',
                       style: TextStyle(
                         color: _messengerDark,
                         fontSize: 21,
@@ -120,7 +120,7 @@ class _PhoneMessengerScreenState extends State<PhoneMessengerScreen> {
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 9),
               color: Colors.white,
               child: const Text(
-                '제6기 채팅 · 답장은 하루에 친구별 3번',
+                '데시멀 동기 채팅 · 답장은 하루에 친구별 3번',
                 style: TextStyle(
                   color: Color(0xFF777777),
                   fontSize: 10,
@@ -432,7 +432,7 @@ class _PhoneChatScreenState extends State<PhoneChatScreen> {
                             borderRadius: BorderRadius.circular(999),
                           ),
                           child: Text(
-                            '${_state.currentDate.month}월 ${_state.currentDate.day}일 · 제6기 연락망',
+                            '${_state.currentDate.month}월 ${_state.currentDate.day}일 · 데시멀 연락망',
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 8,

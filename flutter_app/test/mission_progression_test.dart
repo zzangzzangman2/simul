@@ -85,7 +85,7 @@ void main() {
     },
   );
 
-  test('academy campaign uses the Korean year-age convention', () {
+  test('Decimal peers use the Korean year-age convention', () {
     final story = engine.createNewGame('나이 기준 테스트').story;
 
     expect(story.ageOn(DateTime(2000, 1, 2)), 14);
@@ -95,7 +95,7 @@ void main() {
   test('level skills change work rewards and trading fees', () {
     final base = engine
         .createNewGame('스킬 효과 테스트', initialCash: 200000)
-        .copyWith(day: 4, marketMinute: 9 * 60, decisions: const []);
+        .copyWith(day: 5, marketMinute: 9 * 60, decisions: const []);
     final skilledWork = base.copyWith(
       progression: base.progression.copyWith(experience: 120),
     );

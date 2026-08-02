@@ -53,7 +53,6 @@ function sameOriginRequest(request: Request) {
 
 async function authorizedForBuild(request: Request) {
   if (!sameOriginRequest(request)) return false;
-  if (requestIsLoopback(request)) return true;
   const expected = process.env.DIALOGUE_BUILD_TOKEN ?? "";
   const supplied = request.headers.get("x-dialogue-build-token") ?? "";
   if (!expected || !supplied) return false;
@@ -126,9 +125,9 @@ async function persistAndBuild(
   const builtAt = new Date().toISOString();
   const payload = `${JSON.stringify(
     {
-      version: 1,
-      contentVersion: 1,
-      appearanceVersion: 13,
+      version: 2,
+      contentVersion: 2,
+      appearanceVersion: 14,
       updatedAt: builtAt,
       scenes,
     },
@@ -191,13 +190,12 @@ async function persistAndBuild(
   };
 }
 
-export async function GET(request: Request) {
-  const loopback = requestIsLoopback(request);
+export async function GET() {
   const tokenConfigured = Boolean(process.env.DIALOGUE_BUILD_TOKEN);
   return NextResponse.json({
-    available: localBuildAvailable() && (loopback || tokenConfigured),
+    available: localBuildAvailable() && tokenConfigured,
     building: Boolean(buildGlobal.__dialogueBuildPromise),
-    requiresToken: !loopback,
+    requiresToken: true,
   });
 }
 
@@ -210,7 +208,7 @@ export async function POST(request: Request) {
   }
   if (!(await authorizedForBuild(request))) {
     return NextResponse.json(
-      { ok: false, message: "빌드 요청의 출처 또는 LAN 빌드 토큰을 확인해 주세요." },
+      { ok: false, message: "빌드 요청의 출처 또는 대사 빌드 토큰을 확인해 주세요." },
       { status: 403 },
     );
   }
@@ -253,8 +251,8 @@ export async function POST(request: Request) {
     buildGlobal.__dialogueBuildCompletedAt = Date.now();
     return NextResponse.json({
       ok: true,
-      contentVersion: 1,
-      appearanceVersion: 13,
+      contentVersion: 2,
+      appearanceVersion: 14,
       ...result,
     });
   } catch (error) {

@@ -5,7 +5,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:millennium_capital/game/game_engine.dart';
 import 'package:millennium_capital/game/game_state.dart';
 import 'package:millennium_capital/game/market_news.dart';
-import 'package:millennium_capital/game/order_book.dart';
 import 'package:millennium_capital/game/seed_money_content.dart';
 import 'package:millennium_capital/main.dart';
 
@@ -94,8 +93,8 @@ void main() {
     final inlineBidRows = find.byKey(
       const ValueKey('inline-order-book-bid-row'),
     );
-    expect(inlineAskRows, findsNWidgets(gameOrderBookLevelCount));
-    expect(inlineBidRows, findsNWidgets(gameOrderBookLevelCount));
+    expect(inlineAskRows, findsNWidgets(stockOrderBookVisibleSideRows));
+    expect(inlineBidRows, findsNWidgets(stockOrderBookVisibleSideRows));
     final bestAskY = tester.getCenter(inlineAskRows.last).dy;
     final bestBidY = tester.getCenter(inlineBidRows.first).dy;
     expect(bestAskY, lessThan(bestBidY));
@@ -661,30 +660,25 @@ void main() {
       expect(tester.takeException(), isNull);
     }
 
-    for (var index = 0; index < 5; index++) {
+    var sawRosterCard = false;
+    for (var index = 0; index < 400; index++) {
+      sawRosterCard =
+          sawRosterCard ||
+          find
+              .byKey(const Key('orientation-roster-card'))
+              .evaluate()
+              .isNotEmpty;
+      if (find
+          .byKey(const Key('orientation-complete-card'))
+          .evaluate()
+          .isNotEmpty) {
+        break;
+      }
       await tester.tap(find.byKey(const Key('story-continue')));
       await tester.pumpAndSettle();
       expectPortraitInside();
     }
-    expect(find.byKey(const Key('policy-file-children')), findsNothing);
-    await tester.tap(find.byKey(const Key('story-continue')));
-    await tester.pumpAndSettle();
-    expectPortraitInside();
-
-    for (var index = 0; index < 37; index++) {
-      await tester.tap(find.byKey(const Key('story-continue')));
-      await tester.pumpAndSettle();
-      expectPortraitInside();
-    }
-    expect(find.byKey(const Key('orientation-roster-card')), findsOneWidget);
-    await tester.tap(find.byKey(const Key('story-continue')));
-    await tester.pumpAndSettle();
-    expectPortraitInside();
-    for (var index = 0; index < 28; index++) {
-      await tester.tap(find.byKey(const Key('story-continue')));
-      await tester.pumpAndSettle();
-      expectPortraitInside();
-    }
+    expect(sawRosterCard, isTrue);
     expect(find.byKey(const Key('orientation-complete-card')), findsOneWidget);
     expect(find.byKey(const Key('academy-pc-powered-off')), findsOneWidget);
     expect(find.byKey(const Key('academy-pc-power-toggle')), findsOneWidget);
@@ -696,7 +690,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('story skip opens the powered-off classroom PC', (tester) async {
+  testWidgets('story skip opens the powered-off Decimal PC', (tester) async {
     await usePhoneSurface(tester);
     addTearDown(tester.view.resetViewInsets);
     await tester.pumpWidget(
@@ -706,10 +700,12 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('story-skip-button')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('story-skip-confirm')));
-    await tester.pumpAndSettle();
+    for (var section = 0; section < 8; section++) {
+      await tester.tap(find.byKey(const Key('story-skip-button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('story-skip-confirm')));
+      await tester.pumpAndSettle();
+    }
     expect(find.byKey(const Key('orientation-complete-card')), findsOneWidget);
     expect(find.byKey(const Key('academy-pc-powered-off')), findsOneWidget);
     expect(find.byKey(const Key('academy-pc-power-toggle')), findsOneWidget);

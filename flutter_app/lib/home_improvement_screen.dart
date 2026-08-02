@@ -47,7 +47,7 @@ String _homeCommunityLabel(HomeCommunityMember member) => switch (member) {
   HomeCommunityMember.sua => '한수아',
   HomeCommunityMember.seoa => '김서아',
   HomeCommunityMember.jian => '이지안',
-  HomeCommunityMember.cohort => '제6기',
+  HomeCommunityMember.cohort => '데시멀 동기',
 };
 
 class HomeImprovementScreen extends StatefulWidget {
@@ -218,7 +218,7 @@ class _HomeImprovementHeader extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '미래양성원 시설 장부',
+                '데시멀 센터 시설 장부',
                 style: TextStyle(
                   fontFamily: _hubDisplayFont,
                   color: Colors.white,
@@ -229,7 +229,7 @@ class _HomeImprovementHeader extends StatelessWidget {
               ),
               SizedBox(height: 5),
               Text(
-                '운용 수익으로 제6기 공동생활 시설을 개선합니다',
+                '운용 수익으로 데시멀 공동생활 시설을 개선합니다',
                 style: TextStyle(
                   color: Color(0xFFC7D4E8),
                   fontSize: 9.5,
@@ -650,7 +650,7 @@ class _HomeEpisodeDialog extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        '제6기 공동생활 기록',
+                        '데시멀 공동생활 기록',
                         style: TextStyle(
                           color: Color(0xFFC7D4E8),
                           fontSize: 9,

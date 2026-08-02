@@ -123,8 +123,8 @@ class _OrganizationScreenState extends State<OrganizationScreen> {
               children: [
                 _OrganizationHeader(onBack: () => Navigator.of(context).pop()),
                 _SceneClockStrip(
-                  location: '국립 미래양성원 · 제6기 연구회의',
-                  caption: '동기와 담당 교사에게 교차검토를 부탁한다.',
+                  location: '프로젝트 데시멀 · 데시멀 전략회의',
+                  caption: '동기와 담당 운영관에게 교차검토를 부탁한다.',
                   minute: _state.marketMinute,
                   costLabel: '도움 요청 +30분',
                   dark: false,
@@ -382,7 +382,7 @@ class _ControlledCompanyGovernanceCard extends StatelessWidget {
 
   String get _leadershipLabel => switch (company.leadershipModel) {
     CompanyLeadershipModel.incumbent => '기존 대표 유임',
-    CompanyLeadershipModel.academyAdvisor => '미래양성원 운영자문',
+    CompanyLeadershipModel.academyAdvisor => '데시멀 센터 운영자문',
     CompanyLeadershipModel.professional => '전문경영인',
     CompanyLeadershipModel.unassigned => '이사회 구성 중',
   };
@@ -500,7 +500,7 @@ class _ControlledCompanyGovernanceCard extends StatelessWidget {
             CompanyLeadershipModel.academyAdvisor) ...[
           const SizedBox(height: 9),
           const Text(
-            '미래양성원 운영자문은 정식 직원 수와 월급 인원에 포함되지 않습니다.',
+            '데시멀 센터 운영자문은 정식 직원 수와 월급 인원에 포함되지 않습니다.',
             style: TextStyle(
               color: Color(0xFF8B5A42),
               fontSize: 9,
@@ -948,7 +948,7 @@ class _HiringSection extends StatelessWidget {
           Text(
             unlocked
                 ? '후보의 능력·윤리·월 급여를 비교하세요. 계약금은 월 급여의 절반이며 급여와 사무실 임대료는 매월 원장에 반영됩니다.'
-                : '그전에는 제6기 조사팀과 함께 국가계좌 기록과 평판을 쌓습니다.',
+                : '그전에는 데시멀 조사팀과 함께 국가계좌 기록과 평판을 쌓습니다.',
             style: const TextStyle(
               color: Color(0xFF626A76),
               fontSize: 11,

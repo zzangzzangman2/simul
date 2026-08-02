@@ -6,7 +6,7 @@ export type DialoguePose = {
 
 export type DialogueCharacter = {
   speaker: string;
-  group: "주요 인물" | "1981년 정책실" | "미래양성원" | "화면 인물 없음";
+  group: "주요 인물" | "1981년 정책실" | "프로젝트 데시멀" | "화면 인물 없음";
   poses: DialoguePose[];
 };
 
@@ -220,7 +220,7 @@ const yoonMiraPoses = policyPoses("yoon_mira", [
 const noPortrait = [pose("00", "인물 없음", "")];
 
 export const dialogueCharacters: DialogueCharacter[] = [
-  { speaker: "나", group: "주요 인물", poses: protagonistPoses },
+  { speaker: "성준", group: "주요 인물", poses: protagonistPoses },
   {
     speaker: "민호",
     group: "주요 인물",
@@ -244,7 +244,7 @@ export const dialogueCharacters: DialogueCharacter[] = [
     ],
   },
   {
-    speaker: "수아",
+    speaker: "한수아",
     group: "주요 인물",
     poses: suaPoses,
   },
@@ -284,7 +284,7 @@ export const dialogueCharacters: DialogueCharacter[] = [
     poses: ohJiwooPoses,
   },
   {
-    speaker: "학준",
+    speaker: "김학준",
     group: "주요 인물",
     poses: [
       pose(
@@ -294,7 +294,7 @@ export const dialogueCharacters: DialogueCharacter[] = [
       ),
     ],
   },
-  { speaker: "한서윤 선생님", group: "주요 인물", poses: teacherPoses },
+  { speaker: "한서윤 운영관", group: "주요 인물", poses: teacherPoses },
   {
     speaker: "전두광",
     group: "1981년 정책실",
@@ -316,7 +316,7 @@ export const dialogueCharacters: DialogueCharacter[] = [
     poses: kangIncheolPoses,
   },
   {
-    speaker: "윤미라 사회교육수석",
+    speaker: "윤미라 아동보호수석",
     group: "1981년 정책실",
     poses: yoonMiraPoses,
   },
@@ -332,8 +332,8 @@ export const dialogueCharacters: DialogueCharacter[] = [
     ],
   },
   {
-    speaker: "오경태 생활지도관",
-    group: "미래양성원",
+    speaker: "오경태 시설관리관",
+    group: "프로젝트 데시멀",
     poses: [
       pose(
         "01",
@@ -343,8 +343,8 @@ export const dialogueCharacters: DialogueCharacter[] = [
     ],
   },
   {
-    speaker: "차은주 국가계좌 담당관",
-    group: "미래양성원",
+    speaker: "차은주 선발관",
+    group: "프로젝트 데시멀",
     poses: [
       pose(
         "01",
@@ -355,6 +355,7 @@ export const dialogueCharacters: DialogueCharacter[] = [
   },
   { speaker: "이야기", group: "화면 인물 없음", poses: noPortrait },
   { speaker: "아이들", group: "화면 인물 없음", poses: noPortrait },
+  { speaker: "거절한 후보", group: "화면 인물 없음", poses: noPortrait },
 ];
 
 export const dialogueCharacterBySpeaker = new Map(

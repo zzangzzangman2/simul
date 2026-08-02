@@ -957,7 +957,7 @@ void main() {
         profitable: false,
       ).copyWith(lastSettledMonth: '2000-01');
       var state = _newState(
-        cash: 1000000000,
+        cash: 0,
         seed: 'partial-month-close-ledger',
       ).copyWith(businesses: _portfolioOf(business));
       for (var day = 1; day <= 24; day += 1) {
@@ -993,6 +993,14 @@ void main() {
         result.state.processedEventIds,
         contains('business-month-${business.id}-2000-02'),
       );
+      final payableEntry = result.state.ledger.singleWhere(
+        (entry) => entry.id == 'business-month-${business.id}-2000-02-payable',
+      );
+      expect(payableEntry.amount, 0);
+      expect(payableEntry.notional, greaterThan(0));
+      expect(payableEntry.account, 'business_operating_expense');
+      expect(payableEntry.counterAccount, 'business_accounts_payable');
+      expect(payableEntry.description, contains('월 운영비 미지급'));
     });
 
     test('월중 일일 원장은 저장 복원 뒤 같은 폐업 결과를 만든다', () {

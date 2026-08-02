@@ -56,7 +56,7 @@ void main() {
     return engine.advanceOneDay(ready);
   }
 
-  test('new game always starts with the sixth-cohort state account', () {
+  test('new game always starts with the Project Decimal state account', () {
     final story = StoryState.newPlayer(
       playerName: '민준',
       introChoice: 'computer',
@@ -67,34 +67,32 @@ void main() {
 
     expect(state.version, GameState.schemaVersion);
     expect(state.story.playerName, '민준');
-    expect(state.cash, 10000);
-    expect(state.brokerageCash, 10000);
-    expect(state.story.startingSeedMoney, 10000);
+    expect(state.cash, initialCompanyCash);
+    expect(state.brokerageCash, initialCompanyCash);
+    expect(state.story.startingSeedMoney, initialCompanyCash);
     expect(state.story.earnedSeedMoney, 0);
-    expect(state.story.seedMoneyTotal, 10000);
+    expect(state.story.seedMoneyTotal, initialCompanyCash);
     expect(state.story.accountAuthorityLevel, 1);
-    expect(state.story.stateAccountHolder, 'future_development_fund');
+    expect(state.story.stateAccountHolder, 'project_decimal_fund');
+    expect(state.story.decimalProject, isTrue);
     expect(state.story.orphanageReboot, isTrue);
     expect(state.story.storyFlags['isLegalCompany'], isFalse);
     expect(state.story.marketTutorialEligible, isTrue);
     expect(state.story.marketTutorialSeen, isFalse);
-    expect(
-      state.story.storyFlags['seedMoneySource'],
-      'future_development_fund',
-    );
+    expect(state.story.storyFlags['seedMoneySource'], 'project_decimal_fund');
     expect(state.story.toJson(), isNot(contains('academyTuitionDebt')));
     expect(state.story.toJson(), isNot(contains('motherAffinity')));
     expect(state.story.toJson(), isNot(contains('fatherAffinity')));
     expect(state.ledger, hasLength(1));
-    expect(state.ledger.single.amount, 10000);
+    expect(state.ledger.single.amount, initialCompanyCash);
     expect(state.ledger.single.account, 'brokerage_cash');
     expect(state.ledger.single.counterAccount, 'state_seed_capital');
-    expect(state.ledger.single.description, contains('미래양성기금'));
+    expect(state.ledger.single.description, contains('데시멀 기금'));
     expect(state.pendingDecisions.first.id, 'first-research-note');
   });
 
-  test('orphanage reboot starts with an active sixth-cohort state account', () {
-    final story = StoryState.newOrphanagePlayer(
+  test('Project Decimal starts with ten peers and an active state account', () {
+    final story = StoryState.newDecimalPlayer(
       playerName: '명박',
       introChoice: 'stocks',
       startingTrait: StoryTrait.analysis,
@@ -105,33 +103,30 @@ void main() {
     expect(state.story.orphanageReboot, isTrue);
     expect(state.story.playerBirthYear, 1987);
     expect(state.story.ageOn(state.currentDate), 14);
-    expect(state.story.stateAccountHolder, 'future_development_fund');
-    expect(state.story.flagInt('futureDevelopmentCohort'), 6);
-    expect(state.story.academyLevel, 1);
-    expect(state.story.academyMaxLevel, 6);
-    expect(state.story.expectedSeedAge, 14);
-    expect(state.story.storyFlags['academyLevelTitle'], '첫빛');
-    expect(state.story.academyLevelOn(DateTime(2005, 1, 2)), 6);
-    expect(state.story.academyLevelTitleOn(DateTime(2005, 1, 2)), '내 이름');
+    expect(state.story.stateAccountHolder, 'project_decimal_fund');
+    expect(state.story.decimalProject, isTrue);
+    expect(state.story.flagInt('finalCandidateCount'), 10);
+    expect(state.story.flagInt('maleCandidateCount'), 2);
+    expect(state.story.flagInt('femaleCandidateCount'), 8);
+    expect(state.story.storyFlags['facility'], 'gangnam_hideout');
+    expect(state.story.storyFlags, isNot(contains('futureDevelopmentCohort')));
+    expect(state.story.storyFlags, isNot(contains('academyProgram')));
     expect(state.story.ageOn(DateTime(2005, 1, 2)), 19);
     expect(state.story.flagBool('stateAccountActive'), isTrue);
     expect(state.story.stateRecoveryRateBps, 2000);
     expect(state.story.stateRecoveryTotal, 0);
     expect(state.story.selfRelianceReserve, 0);
-    expect(state.cash, 10000);
-    expect(state.brokerageCash, 10000);
-    expect(state.story.startingSeedMoney, 10000);
-    expect(
-      state.story.storyFlags['seedMoneySource'],
-      'future_development_fund',
-    );
+    expect(state.cash, initialCompanyCash);
+    expect(state.brokerageCash, initialCompanyCash);
+    expect(state.story.startingSeedMoney, initialCompanyCash);
+    expect(state.story.storyFlags['seedMoneySource'], 'project_decimal_fund');
     expect(state.ledger, hasLength(1));
     expect(state.ledger.single.counterAccount, 'state_seed_capital');
     expect(state.processedEventIds, contains(stateAccountSeedCapitalSourceId));
   });
 
   test(
-    'old ten-year-old reboot saves migrate to the fourteen-year-old track',
+    'old reboot saves migrate to Project Decimal without academy tracks',
     () {
       final oldStory = StoryState.newOrphanagePlayer(
         playerName: '명박',
@@ -152,10 +147,11 @@ void main() {
 
       expect(migrated.playerBirthYear, 1987);
       expect(migrated.ageOn(DateTime(2000, 1, 2)), 14);
-      expect(migrated.academyLevel, 1);
-      expect(migrated.academyMaxLevel, 6);
-      expect(migrated.expectedSeedAge, 14);
-      expect(migrated.storyFlags['seedTrackCompletionAge'], 19);
+      expect(migrated.decimalProject, isTrue);
+      expect(migrated.stateAccountHolder, 'project_decimal_fund');
+      expect(migrated.storyFlags, isNot(contains('academyLevel')));
+      expect(migrated.storyFlags, isNot(contains('academyMaxLevel')));
+      expect(migrated.storyFlags, isNot(contains('seedTrackCompletionAge')));
     },
   );
 
@@ -382,8 +378,8 @@ void main() {
     expect(state.day, 17);
     expect(state.cash, 765432);
     expect(state.team, 2);
-    expect(state.story.playerName, '소년');
-    expect(state.story.stateAccountHolder, 'future_development_fund');
+    expect(state.story.playerName, '성준');
+    expect(state.story.stateAccountHolder, 'project_decimal_fund');
   });
 
   TradeOrder hanbitOrder({
@@ -1076,18 +1072,32 @@ void main() {
     expect(result.success, isTrue);
     expect(result.fee, tradingFee);
     expect(result.transactionTax, transactionTax);
-    expect(result.state.cash, cashBeforeSale + proceeds);
-    expect(result.state.brokerageCash, cashBeforeSale + proceeds);
+    final realizedProfit = math.max(0, proceeds - disposedCost);
+    expect(result.state.cash, cashBeforeSale + proceeds - realizedProfit);
+    expect(
+      result.state.brokerageCash,
+      cashBeforeSale + proceeds - realizedProfit,
+    );
+    expect(
+      result.state.story.stateRecoveryTotal +
+          result.state.story.selfRelianceReserve,
+      realizedProfit,
+    );
     expect(result.state.positions.single.units, 6);
     expect(
       result.state.positions.single.totalCost,
       costBeforeSale - disposedCost,
     );
-    expect(result.state.ledger.last.amount, proceeds);
-    expect(result.state.ledger.last.transactionTax, transactionTax);
+    final sellLedger = result.state.ledger.firstWhere(
+      (entry) =>
+          entry.counterAccount == 'market_security' &&
+          entry.tradeSide == TradeSide.sell.name,
+    );
+    expect(sellLedger.amount, proceeds);
+    expect(sellLedger.transactionTax, transactionTax);
     expect(result.realizedPnl, proceeds - disposedCost);
-    expect(result.state.ledger.last.disposedCost, disposedCost);
-    expect(result.state.ledger.last.realizedPnl, proceeds - disposedCost);
+    expect(sellLedger.disposedCost, disposedCost);
+    expect(sellLedger.realizedPnl, proceeds - disposedCost);
   });
 
   test('orphanage profitable sale splits profit into recovery and reserve', () {
@@ -2555,16 +2565,25 @@ void main() {
     expect(result.notional, expectedNotional);
     expect(result.fee, expectedFee);
     expect(result.transactionTax, expectedTax);
+    final expectedProceeds = expectedNotional - expectedFee - expectedTax;
+    final expectedRealizedProfit = expectedProceeds - 15000;
+    expect(result.state.cash, 1000 + 15000);
     expect(
-      result.state.cash,
-      1000 + expectedNotional - expectedFee - expectedTax,
+      result.state.story.stateRecoveryTotal +
+          result.state.story.selfRelianceReserve,
+      expectedRealizedProfit,
     );
     expect(result.state.positions, isEmpty);
-    expect(result.state.ledger.last.description, contains('2.5주 매도'));
-    expect(result.state.ledger.last.orderBookSide, 'bid');
-    expect(result.state.ledger.last.orderBookFills, isNotEmpty);
+    final sellLedger = result.state.ledger.firstWhere(
+      (entry) =>
+          entry.counterAccount == 'market_security' &&
+          entry.tradeSide == TradeSide.sell.name,
+    );
+    expect(sellLedger.description, contains('2.5주 매도'));
+    expect(sellLedger.orderBookSide, 'bid');
+    expect(sellLedger.orderBookFills, isNotEmpty);
     expect(
-      result.state.ledger.last.orderBookFills.fold<double>(
+      sellLedger.orderBookFills.fold<double>(
         0,
         (sum, fill) => sum + fill.quantity,
       ),
@@ -3434,34 +3453,35 @@ void main() {
     },
   );
 
-  test(
-    'new games start Sunday and day advance always opens at 08:00 Monday',
-    () {
-      final story = StoryState.newPlayer(
-        playerName: '민준',
-        introChoice: 'computer',
-        startingTrait: StoryTrait.analysis,
-        operatingPrinciple: OperatingPrinciple.reportLosses,
-      );
-      final initial = engine.createNewGame('일요일 시작 연구소', story: story);
+  test('simulation epoch precedes the Monday account opening at 08:00', () {
+    final story = StoryState.newPlayer(
+      playerName: '민준',
+      introChoice: 'computer',
+      startingTrait: StoryTrait.analysis,
+      operatingPrinciple: OperatingPrinciple.reportLosses,
+    );
+    final initial = engine.createNewGame('일요일 시작 연구소', story: story);
 
-      expect(initial.cash, initialCompanyCash);
-      expect(initial.currentDate, DateTime(2000, 1, 2));
-      expect(initial.currentDate.weekday, DateTime.sunday);
-      expect(initial.marketMinute, marketDayStartMinute);
+    expect(initial.cash, initialCompanyCash);
+    expect(initial.currentDate, DateTime(2000, 1, 1));
+    expect(initial.currentDate.weekday, DateTime.saturday);
+    expect(initial.marketMinute, marketDayStartMinute);
 
-      final closed = initial.copyWith(
-        decisions: const [],
-        marketMinute: marketDayEndMinute,
-      );
-      final monday = engine.advanceOneDay(closed);
+    final closed = initial.copyWith(
+      decisions: const [],
+      marketMinute: marketDayEndMinute,
+    );
+    final sunday = engine.advanceOneDay(closed);
+    final monday = engine.advanceOneDay(
+      sunday.copyWith(decisions: const [], marketMinute: marketDayEndMinute),
+    );
 
-      expect(monday.currentDate, DateTime(2000, 1, 3));
-      expect(monday.currentDate.weekday, DateTime.monday);
-      expect(isMarketTradingDay(monday.currentDate), isTrue);
-      expect(monday.marketMinute, marketDayStartMinute);
-    },
-  );
+    expect(sunday.currentDate, DateTime(2000, 1, 2));
+    expect(monday.currentDate, DateTime(2000, 1, 3));
+    expect(monday.currentDate.weekday, DateTime.monday);
+    expect(isMarketTradingDay(monday.currentDate), isTrue);
+    expect(monday.marketMinute, marketDayStartMinute);
+  });
 
   test('market reports use bank cash and never drain brokerage cash', () {
     final funded = engine

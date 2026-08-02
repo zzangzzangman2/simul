@@ -343,10 +343,16 @@ class GameState {
   int balanceSheetNetWorth({Map<String, double>? prices}) =>
       balanceSheetGrossAssets(prices: prices) - totalKnownLiabilities;
 
-  DateTime get campaignStartDate =>
-      story.storyFlags['campaignStartDate'] == '2000-01-02'
-      ? DateTime(2000, 1, 2)
-      : DateTime(2000, 1, 1);
+  DateTime get campaignStartDate {
+    final encoded = story.storyFlags['campaignStartDate'];
+    if (encoded is String) {
+      final parsed = DateTime.tryParse(encoded);
+      if (parsed != null) {
+        return DateTime(parsed.year, parsed.month, parsed.day);
+      }
+    }
+    return DateTime(2000, 1, 1);
+  }
 
   DateTime dateForDay(int value) =>
       campaignStartDate.add(Duration(days: value - 1));

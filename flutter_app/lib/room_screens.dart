@@ -1420,7 +1420,7 @@ _LedgerGrade _ledgerGradeFor(int aum, int holdingCount) {
   if (aum >= 100000 || holdingCount >= 3) {
     return const _LedgerGrade(
       rank: 'C',
-      title: 'SEED 01 국가계좌 운용자',
+      title: 'DECIMAL 10 국가계좌 운용자',
       caption: '첫 분산투자 원칙을 세우기 시작했어요.',
       color: Color(0xFF4C78B8),
     );

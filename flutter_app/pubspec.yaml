@@ -1,5 +1,5 @@
 name: millennium_capital
-description: "A bright academy cohort investment and life simulation set in Seoul in 2000."
+description: "Project Decimal, a financial survival and life simulation set in Seoul in 2000."
 publish_to: "none"
 version: 0.1.0+1
 
@@ -33,6 +33,7 @@ flutter:
     - assets/images/production_soft_painted/oh_jiwoo/
     - assets/images/production_soft_painted/yoon_chaea/
     - assets/images/cinematic_soft_painted/dormitory_2000/
+    - assets/images/cinematic_soft_painted/decimal/
     - assets/images/cinematic_soft_painted/policy_1981/backgrounds/
     - assets/images/cinematic_soft_painted/policy_1981/jeon_dugwang/
     - assets/images/cinematic_soft_painted/policy_1981/seo_muntae/

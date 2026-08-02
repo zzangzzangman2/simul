@@ -4,7 +4,7 @@ DecisionCardData _firstResearchNote(int day) => DecisionCardData(
   id: 'first-research-note',
   category: '처음 배우기',
   title: '첫 미션: 회사 하나를 구경해 보자',
-  proposer: '한서윤 선생님',
+  proposer: '한서윤 운영관',
   body:
       '아직 돈을 쓰지 않아도 괜찮아. 눈에 익은 회사 하나를 고르고, 무엇을 파는지부터 같이 살펴보자. 아래 네 가지 중 가장 쉬워 보이는 방법을 하나 고르면 돼.',
   createdDay: day,
@@ -151,15 +151,13 @@ DecisionCardData _controlStakeFollowUp(int day, CompanyState company) {
   );
 }
 
-DecisionCardData _controlTransitionDecision(
-  int day,
-) => DecisionCardData(
+DecisionCardData _controlTransitionDecision(int day) => DecisionCardData(
   id: 'control-transition-$day',
   category: '첫 이사회',
   title: '한빛전자부품을 누가 이끌어야 할까?',
   proposer: '한빛전자부품 이사회',
   body:
-      '경영권 인수는 끝났지만 회사를 바로 바꿀 수는 없습니다. 기존 대표, 미래양성원 운영자문단, 외부 전문경영인 중 첫 운영 체계를 정해야 합니다.',
+      '경영권 인수는 끝났지만 회사를 바로 바꿀 수는 없습니다. 기존 대표, 데시멀 센터 운영자문단, 외부 전문경영인 중 첫 운영 체계를 정해야 합니다.',
   createdDay: day,
   dueDay: day + 7,
   requestedFunds: 0,
@@ -178,7 +176,7 @@ DecisionCardData _controlTransitionDecision(
     ),
     DecisionOptionData(
       id: 'appoint_academy_advisor',
-      label: '미래양성원 운영자문단',
+      label: '데시멀 센터 운영자문단',
       description: '정식 직원 수에는 넣지 않고 현장 실사와 준법 자문만 맡깁니다.',
     ),
     DecisionOptionData(
@@ -328,24 +326,23 @@ DecisionCardData _launchReview(int day, {required bool finalReview}) =>
             ],
     );
 
-DecisionCardData _endingCard(int day, String message) =>
-    DecisionCardData(
-      id: 'story-result-$day-${GameEngine._stableHash(message)}',
-      category: '결과 보고',
-      title: '선택의 결과가 도착했어요',
-      proposer: '시뮬레이션 기록실',
-      body: message,
-      createdDay: day,
-      dueDay: day + 30,
-      requestedFunds: 0,
-      benefit: '이번 선택의 변화가 저장됩니다.',
-      risk: '다음 선택에도 누적 영향을 줍니다.',
-      advisorOpinions: const ['기록: 모든 회사명·수치·의견·결과는 게임용 가상 시나리오입니다.'],
-      options: const [
-        DecisionOptionData(
-          id: 'acknowledge',
-          label: '결과 확인',
-          description: '가상 세계 기록을 닫고 사무실로 돌아갑니다.',
-        ),
-      ],
-    );
+DecisionCardData _endingCard(int day, String message) => DecisionCardData(
+  id: 'story-result-$day-${GameEngine._stableHash(message)}',
+  category: '결과 보고',
+  title: '선택의 결과가 도착했어요',
+  proposer: '시뮬레이션 기록실',
+  body: message,
+  createdDay: day,
+  dueDay: day + 30,
+  requestedFunds: 0,
+  benefit: '이번 선택의 변화가 저장됩니다.',
+  risk: '다음 선택에도 누적 영향을 줍니다.',
+  advisorOpinions: const ['기록: 모든 회사명·수치·의견·결과는 게임용 가상 시나리오입니다.'],
+  options: const [
+    DecisionOptionData(
+      id: 'acknowledge',
+      label: '결과 확인',
+      description: '가상 세계 기록을 닫고 사무실로 돌아갑니다.',
+    ),
+  ],
+);

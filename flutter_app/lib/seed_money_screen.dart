@@ -83,7 +83,7 @@ class _SeedMoneyHubScreenState extends State<SeedMoneyHubScreen> {
               onBack: () => Navigator.of(context).pop(),
             ),
             _SceneClockStrip(
-              location: '국립 미래양성원 · 실기 훈련장',
+              location: '프로젝트 데시멀 · 실기 훈련장',
               caption: '실습을 마치면 활동 수당과 함께 한 시간이 흐른다.',
               minute: _state.marketMinute,
               costLabel: '완료 +60분',
@@ -133,7 +133,7 @@ class _SeedMoneyHubScreenState extends State<SeedMoneyHubScreen> {
                         ],
                       ),
                       child: const Text(
-                        '오늘 할 수 있는 실습은 충분히 했어요. 수업과 공동생활 시간을 지키려면 하루를 보낸 뒤 다시 선택하세요.',
+                        '오늘 할 수 있는 현장 실습은 충분히 했어요. 시장 준비와 공동생활 시간을 지키려면 하루를 보낸 뒤 다시 선택하세요.',
                         style: TextStyle(
                           color: _ink,
                           fontSize: 11,
@@ -233,7 +233,7 @@ class _SeedMoneyIllustratedSummary extends StatelessWidget {
                     Icon(Icons.savings_rounded, color: _coral, size: 16),
                     SizedBox(width: 6),
                     Text(
-                      '미래양성기금 · 국가계좌 원금',
+                      '프로젝트 데시멀 기금 · 국가계좌 원금',
                       style: TextStyle(
                         color: _ink,
                         fontSize: 11,
@@ -436,7 +436,7 @@ class _ChorePeriodNotice extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '미래양성원 실기 활동 규정',
+                '데시멀 센터 실기 활동 규정',
                 style: TextStyle(
                   color: _ink,
                   fontSize: 10.5,

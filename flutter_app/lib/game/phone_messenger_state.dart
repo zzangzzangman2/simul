@@ -43,7 +43,7 @@ const phoneMessengerContacts = <PhoneContactDefinition>[
     casualReply: '지금 장부 정리 중. 다 하면 탁구 한 판은 가능.',
     fallbackReply: '무슨 뜻인지는 알겠어. 근데 기준 하나만 더 정확히 말해 봐.',
     boundaryReply: '그 말은 별로다. 장난이어도 선은 지키자.',
-    suggestions: ['오늘 뭐 샀어?', '수업 이해됐어?', '지금 뭐 해?'],
+    suggestions: ['오늘 뭐 샀어?', '실습 이해됐어?', '지금 뭐 해?'],
   ),
   PhoneContactDefinition(
     id: 'kim_seoa',
@@ -52,11 +52,11 @@ const phoneMessengerContacts = <PhoneContactDefinition>[
     accentValue: 0xFFF38B96,
     openingMessage: '단톡 공지 놓친 거 있으면 말해 줘. 내가 오늘 날짜로 적어 둘게.',
     stockReply: '오늘 오른 것보다 전에 한 약속을 계속 지킨 회사인지 먼저 보고 있어.',
-    classReply: '아까 선생님이 말한 순서 적어 뒀어. 필요한 부분만 사진처럼 다시 써 줄까?',
+    classReply: '아까 운영관이 말한 순서 적어 뒀어. 필요한 부분만 사진처럼 다시 써 줄까?',
     casualReply: '공용 컵 채워 두고 있었어. 너 밥은 먹었어?',
     fallbackReply: '응, 기억해 둘게. 그런데 이건 오늘만 그런 건지 계속 그런 건지도 알려 줘.',
     boundaryReply: '그런 말은 기록으로 남겨도 괜찮은 말인지 한 번 생각해 줬으면 해.',
-    suggestions: ['오늘 종목 어땠어?', '수업 필기 보여 줘', '밥 먹었어?'],
+    suggestions: ['오늘 종목 어땠어?', '실습 기록 보여 줘', '밥 먹었어?'],
   ),
   PhoneContactDefinition(
     id: 'lee_jian',
@@ -82,7 +82,7 @@ const phoneMessengerContacts = <PhoneContactDefinition>[
     casualReply: '실 정리하고 있어. 조용해서 지금은 좀 좋다.',
     fallbackReply: '음… 나는 그건 별로야. 네가 좋아하는 이유는 듣고 싶어.',
     boundaryReply: '그 말 불편해. 내 선은 내가 정할게.',
-    suggestions: ['어떤 회사가 좋아?', '수업 어땠어?', '이름표 고마워'],
+    suggestions: ['어떤 회사가 좋아?', '실습 어땠어?', '이름표 고마워'],
   ),
   PhoneContactDefinition(
     id: 'jung_arin',
@@ -95,7 +95,7 @@ const phoneMessengerContacts = <PhoneContactDefinition>[
     casualReply: '내일 시간표 짜는 중. 놀 거면 몇 시까지인지 먼저 정해.',
     fallbackReply: '그래서 지금 할 건 뭐야? 하나만 정하면 바로 도와줄게.',
     boundaryReply: '그 말 취소해. 장난이어도 안 되는 건 안 되는 거야.',
-    suggestions: ['오늘 투자 평가해 줘', '수업 복습 같이 해', '잠깐 놀자'],
+    suggestions: ['오늘 투자 평가해 줘', '실습 복기 같이 해', '잠깐 놀자'],
   ),
   PhoneContactDefinition(
     id: 'park_haeun',
@@ -108,7 +108,7 @@ const phoneMessengerContacts = <PhoneContactDefinition>[
     casualReply: '다들 저녁 먹었는지 보고 있었어. 근데 나도 이제 좀 쉬려고.',
     fallbackReply: '네가 원하는 게 조언인지 그냥 들어 주는 건지 먼저 말해 줄래?',
     boundaryReply: '나는 그 말 듣기 불편해. 서로 싫다는 말은 멈춰 주자.',
-    suggestions: ['오늘 투자 어땠어?', '나 수업 막혔어', '하은이는 괜찮아?'],
+    suggestions: ['오늘 투자 어땠어?', '나 실습 막혔어', '하은이는 괜찮아?'],
   ),
   PhoneContactDefinition(
     id: 'han_sua',
@@ -121,7 +121,7 @@ const phoneMessengerContacts = <PhoneContactDefinition>[
     casualReply: '나 간식 뭐 먹을지 다섯 개째 고민 중. 이게 오늘 제일 어려운 선택임.',
     fallbackReply: '오, 그러면 반대 가능성도 있지 않아? 잠깐만, 생각 하나 더 났어.',
     boundaryReply: '그건 안 웃겨. 장난 말고 다른 얘기하자.',
-    suggestions: ['오늘 종목 느낌 어때?', '나도 수업 헷갈려', '뭐 먹을래?'],
+    suggestions: ['오늘 종목 느낌 어때?', '나도 실습 헷갈려', '뭐 먹을래?'],
   ),
   PhoneContactDefinition(
     id: 'oh_jiwoo',
@@ -134,7 +134,7 @@ const phoneMessengerContacts = <PhoneContactDefinition>[
     casualReply: '라디오 주파수 잡는 중. 지금은 잡음 80, 음악 20. 꽤 힙함.',
     fallbackReply: '반대로 생각하면? 네 말이 맞으려면 틀려야 하는 조건부터 찾아보자.',
     boundaryReply: '방송 중단. 그건 토론거리도 장난도 아니야.',
-    suggestions: ['오늘 종목 반론해 봐', '수업 설명 이상하지?', '방송국 뭐 해?'],
+    suggestions: ['오늘 종목 반론해 봐', '실습 설명 이상하지?', '방송국 뭐 해?'],
   ),
   PhoneContactDefinition(
     id: 'yoon_chaea',
@@ -147,7 +147,7 @@ const phoneMessengerContacts = <PhoneContactDefinition>[
     casualReply: '영수증 날짜별로 정리 중. 끝나면 잠깐은 이야기할 수 있어.',
     fallbackReply: '결론은 이해했어. 그 결론에 쓴 가정을 하나만 더 말해 줘.',
     boundaryReply: '그 말에는 답하지 않을게. 서로 지켜야 할 기준이 있어.',
-    suggestions: ['오늘 가격 분석해 줘', '수업 핵심이 뭐야?', '잠깐 얘기할래?'],
+    suggestions: ['오늘 가격 분석해 줘', '실습 핵심이 뭐야?', '잠깐 얘기할래?'],
   ),
 ];
 
@@ -178,7 +178,7 @@ String phoneReplyFor(PhoneContactDefinition contact, String rawText) {
   if (stockKeywords.any(text.contains)) return contact.stockReply;
 
   const classKeywords = <String>[
-    '수업',
+    '실습',
     '선생',
     '공부',
     '복습',

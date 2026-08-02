@@ -1,13 +1,13 @@
 part of 'main.dart';
 
-const _onboardingBeatCount = 140;
-const _maximumDialogueBeatCount = 240;
-const _dialogueAppearanceVersion = 13;
-const _dialogueContentVersion = 1;
-const _dialogueRuntimeStorageKey = 'future-academy-dialogue-runtime-v1';
+const _onboardingBeatCount = 292;
+const _maximumDialogueBeatCount = 320;
+const _dialogueAppearanceVersion = 14;
+const _dialogueContentVersion = 2;
+const _dialogueRuntimeStorageKey = 'project-decimal-dialogue-runtime-v2';
 const _dialogueBundleAsset = 'assets/dialogue/dialogue-editor-override.json';
 const _dialoguePanelOpacityStorageKey =
-    'future-academy-dialogue-panel-opacity-v2';
+    'project-decimal-dialogue-panel-opacity-v1';
 const _dialoguePanelOpacityMin = 0.0;
 const _dialoguePanelOpacityMax = 0.74;
 const _dialoguePanelOpacityDefault = _dialoguePanelOpacityMin;
@@ -147,6 +147,7 @@ class VisualNovelOnboardingScreen extends StatefulWidget {
     this.initialAcademyStockAppOpen = false,
     this.initialPlayerName = '',
     this.initialCompanyName = '',
+    this.allowRuntimeDialoguePreview = false,
     this.dialogueOverrideJson,
   });
 
@@ -158,6 +159,7 @@ class VisualNovelOnboardingScreen extends StatefulWidget {
   final bool initialAcademyStockAppOpen;
   final String initialPlayerName;
   final String initialCompanyName;
+  final bool allowRuntimeDialoguePreview;
   final String? dialogueOverrideJson;
 
   @override
@@ -180,10 +182,10 @@ class _VisualNovelOnboardingScreenState
   late bool _academyPcPoweredOn;
   late bool _academyStockAppOpen;
   DateTime? _lastWheelBackAt;
-  late final Future<void> _dialogueLoadFuture;
+  late Future<void> _dialogueLoadFuture;
   WorldLoadProgress _creationProgress = const WorldLoadProgress(
     0.02,
-    '제6기 국가계좌 정보를 정리하는 중…',
+    '데시멀 국가계좌 정보를 정리하는 중…',
   );
 
   @override
@@ -193,11 +195,24 @@ class _VisualNovelOnboardingScreenState
     _academyPcPoweredOn = widget.initialAcademyPcPoweredOn;
     _academyStockAppOpen =
         widget.initialAcademyPcPoweredOn && widget.initialAcademyStockAppOpen;
-    _playerController.text = widget.initialPlayerName;
+    _playerController.text = widget.initialPlayerName.trim().isEmpty
+        ? '성준'
+        : widget.initialPlayerName;
     _companyController.text = widget.initialCompanyName;
     _dialogueLoadFuture = _loadDialogueOverrides();
     unawaited(_dialogueLoadFuture);
     unawaited(_loadDialoguePanelOpacity());
+  }
+
+  @override
+  void didUpdateWidget(covariant VisualNovelOnboardingScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.allowRuntimeDialoguePreview !=
+            widget.allowRuntimeDialoguePreview ||
+        oldWidget.dialogueOverrideJson != widget.dialogueOverrideJson) {
+      _dialogueLoadFuture = _loadDialogueOverrides();
+      unawaited(_dialogueLoadFuture);
+    }
   }
 
   Future<void> _loadDialoguePanelOpacity() async {
@@ -301,7 +316,12 @@ class _VisualNovelOnboardingScreenState
       loaded.addAll(_decodeDialogueOverrides(injectedRaw));
     }
 
-    if (injectedRaw == null) {
+    if (injectedRaw == null && widget.allowRuntimeDialoguePreview) {
+      // Preview mode must be immediately usable even when an earlier asset
+      // request is still being torn down in the browser. The generated Dart
+      // map and bundled JSON come from the same canonical source.
+      loaded.addAll(_canonicalDialogueOverrides());
+    } else if (injectedRaw == null) {
       try {
         final bundledRaw = await rootBundle.loadString(_dialogueBundleAsset);
         loaded.addAll(_decodeDialogueOverrides(bundledRaw));
@@ -313,9 +333,10 @@ class _VisualNovelOnboardingScreenState
 
     final bundledAppearance = Map<int, _DialogueOverride>.of(loaded);
 
-    if (injectedRaw == null) {
+    if (injectedRaw == null && widget.allowRuntimeDialoguePreview) {
       try {
         final preferences = await SharedPreferences.getInstance();
+        await preferences.reload();
         final raw = preferences.getString(_dialogueRuntimeStorageKey);
         if (raw != null && raw.trim().isNotEmpty) {
           final browserDraft = _decodeDialogueOverrides(raw);
@@ -385,39 +406,74 @@ class _VisualNovelOnboardingScreenState
   }
 
   _PrologueSkipStep _prologueSkipStepForBeat(int beat) {
-    final orphanageBeat = _firstBeatWithBackground(
-      'bg_future_development_orphanage_',
-      16,
+    final imfBeat = _firstBeatWithBackground('bg_decimal_imf_failure_', 20);
+    final matrixBeat = _firstBeatWithBackground('bg_decimal_matrix_exam_', 38);
+    final unfairBeat = _firstBeatWithBackground('bg_decimal_unfair_game_', 68);
+    final desireBeat = _firstBeatWithBackground('bg_decimal_desire_test_', 99);
+    final gangnamBeat = _firstBeatWithBackground(
+      'bg_decimal_gangnam_exterior_',
+      123,
     );
-    final auditoriumBeat = _firstBeatWithBackground(
-      'bg_future_development_orientation_hall_',
-      32,
+    final loungeBeat = _firstBeatWithBackground(
+      'bg_decimal_living_lounge_',
+      149,
     );
-    final dormitoryBeat = _firstBeatWithBackground('/dormitory_2000/', 54);
+    final tradingBeat = _firstBeatWithBackground(
+      'bg_decimal_trading_floor_',
+      269,
+    );
 
-    if (beat < orphanageBeat) {
+    if (beat < imfBeat) {
       return _PrologueSkipStep(
-        sectionLabel: '청와대 장면',
-        destinationLabel: '고아원 장면',
-        targetBeat: orphanageBeat,
+        sectionLabel: '자본전 선언',
+        destinationLabel: '1997년 실패 기록',
+        targetBeat: imfBeat,
       );
     }
-    if (beat < auditoriumBeat) {
+    if (beat < matrixBeat) {
       return _PrologueSkipStep(
-        sectionLabel: '고아원 장면',
-        destinationLabel: '강당 장면',
-        targetBeat: auditoriumBeat,
+        sectionLabel: '유리상자의 실패',
+        destinationLabel: '행렬 시험',
+        targetBeat: matrixBeat,
       );
     }
-    if (beat < dormitoryBeat) {
+    if (beat < unfairBeat) {
       return _PrologueSkipStep(
-        sectionLabel: '강당 장면',
-        destinationLabel: '기숙사 장면',
-        targetBeat: dormitoryBeat,
+        sectionLabel: '행렬 시험',
+        destinationLabel: '불공정 게임',
+        targetBeat: unfairBeat,
+      );
+    }
+    if (beat < desireBeat) {
+      return _PrologueSkipStep(
+        sectionLabel: '불공정 게임',
+        destinationLabel: '욕망 검증',
+        targetBeat: desireBeat,
+      );
+    }
+    if (beat < gangnamBeat) {
+      return _PrologueSkipStep(
+        sectionLabel: '욕망 검증',
+        destinationLabel: '강남 아지트 도착',
+        targetBeat: gangnamBeat,
+      );
+    }
+    if (beat < loungeBeat) {
+      return _PrologueSkipStep(
+        sectionLabel: '강남 아지트 도착',
+        destinationLabel: '최종 열 명 소개',
+        targetBeat: loungeBeat,
+      );
+    }
+    if (beat < tradingBeat) {
+      return _PrologueSkipStep(
+        sectionLabel: '첫날 공동생활',
+        destinationLabel: '트레이딩 플로어',
+        targetBeat: tradingBeat,
       );
     }
     return _PrologueSkipStep(
-      sectionLabel: '기숙사 장면',
+      sectionLabel: '첫 주문 브리핑',
       destinationLabel: '주식 PC 튜토리얼',
       targetBeat: _dialogueEndBeat,
     );
@@ -427,7 +483,7 @@ class _VisualNovelOnboardingScreenState
       _prologueSkipStepForBeat(_beat);
 
   String get _location =>
-      _dialogueOverrides[_beat]?.location.trim() ?? '국립 미래양성원';
+      _dialogueOverrides[_beat]?.location.trim() ?? '프로젝트 데시멀';
 
   String get _dateLabel => _dialogueOverrides[_beat]?.date.trim() ?? '';
 
@@ -439,7 +495,7 @@ class _VisualNovelOnboardingScreenState
   bool get _isNarration => _speaker == '이야기';
 
   bool get _isOrientationRosterScene =>
-      _dialogueOverrides[_beat]?.id == 'scene-44';
+      _dialogueOverrides[_beat]?.id == 'decimal-final-ten-roster';
 
   String get _speaker => _dialogueOverrides[_beat]?.speaker ?? '이야기';
 
@@ -604,9 +660,9 @@ class _VisualNovelOnboardingScreenState
       context: context,
       builder: (context) => AlertDialog(
         key: const Key('story-skip-dialog'),
-        title: Text('${skipStep.sectionLabel}을 건너뛸까요?'),
+        title: Text('${_withObjectParticle(skipStep.sectionLabel)} 건너뛸까요?'),
         content: Text(
-          '${skipStep.sectionLabel}만 건너뛰고 '
+          '${skipStep.sectionLabel} 구간만 건너뛰고 '
           '${skipStep.destinationLabel}의 첫 장면으로 이동합니다.'
           '${skipStep.targetBeat == _dialogueEndBeat ? ' 이동한 위치와 PC 진행 상태는 자동 저장됩니다.' : ''}',
         ),
@@ -639,6 +695,15 @@ class _VisualNovelOnboardingScreenState
     unawaited(_saveCheckpoint());
   }
 
+  String _withObjectParticle(String value) {
+    if (value.isEmpty) return value;
+    final last = value.runes.last;
+    final hasBatchim = last >= 0xAC00 && last <= 0xD7A3
+        ? (last - 0xAC00) % 28 != 0
+        : true;
+    return '$value${hasBatchim ? '을' : '를'}';
+  }
+
   Future<void> _finish() async {
     if (_isCreating) return;
     final playerName = _playerController.text.trim();
@@ -656,7 +721,7 @@ class _VisualNovelOnboardingScreenState
     setState(() {
       _isCreating = true;
       _creationError = null;
-      _creationProgress = const WorldLoadProgress(0.02, '제6기 국가계좌 정보를 정리하는 중…');
+      _creationProgress = const WorldLoadProgress(0.02, '데시멀 국가계좌 정보를 정리하는 중…');
     });
     await WidgetsBinding.instance.endOfFrame;
     try {
@@ -743,7 +808,7 @@ class _VisualNovelOnboardingScreenState
         body: LayoutBuilder(
           builder: (context, constraints) {
             final sceneCharacterAsset = _character;
-            final isTeacherScene = _speaker == '한서윤 선생님';
+            final isTeacherScene = _speaker == '한서윤 운영관';
             return Stack(
               key: const Key('onboarding-stage'),
               fit: StackFit.expand,
@@ -923,7 +988,7 @@ class _VisualNovelOnboardingScreenState
       child: Column(
         children: [
           const Text(
-            '제6기 오리엔테이션 명단',
+            '프로젝트 데시멀 · 최종 열 명',
             style: TextStyle(
               color: _ink,
               fontSize: 13,
@@ -945,7 +1010,7 @@ class _VisualNovelOnboardingScreenState
               Expanded(
                 child: _orientationStat(
                   key: const Key('orientation-male-count'),
-                  label: '남학생',
+                  label: '남자 동기',
                   value: '2명',
                   color: const Color(0xFF3F72A5),
                 ),
@@ -954,7 +1019,7 @@ class _VisualNovelOnboardingScreenState
               Expanded(
                 child: _orientationStat(
                   key: const Key('orientation-female-count'),
-                  label: '여학생',
+                  label: '여자 동기',
                   value: '8명',
                   color: const Color(0xFFC85C72),
                 ),
@@ -963,7 +1028,7 @@ class _VisualNovelOnboardingScreenState
           ),
           const SizedBox(height: 9),
           const Text(
-            '전국 보호시설 추천 · 제6기 투자전문과정',
+            '전국 보호시설 비공개 선발 · 남자 2명 · 여자 8명',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Color(0xFF697386),
@@ -1022,7 +1087,7 @@ class _VisualNovelOnboardingScreenState
       key: const ValueKey('orientation-complete'),
       speaker: isCanonicalPcEnding
           ? _academyPcPoweredOn
-                ? '미래양성원 실습 PC'
+                ? '데시멀 실습 PC'
                 : _speaker
           : _speaker,
       line: !isCanonicalPcEnding
@@ -1038,7 +1103,7 @@ class _VisualNovelOnboardingScreenState
           ? '06번 좌석의 베이지색 CRT와 본체는 아직 꺼져 있다.'
           : _academyStockAppOpen
           ? '주식실습 프로그램이 국가계좌 개통 정보를 기다리고 있다.'
-          : '본체 팬이 돌고 CRT 화면에 미래양성원 바탕화면이 떠올랐다.',
+          : '본체 팬이 돌고 CRT 화면에 데시멀 전용 바탕화면이 떠올랐다.',
       child: _AcademyPcTerminal(
         poweredOn: _academyPcPoweredOn,
         stockAppOpen: _academyStockAppOpen,
@@ -1317,7 +1382,7 @@ class _OnboardingCharacterSlotState extends State<_OnboardingCharacterSlot>
     super.initState();
     _idleController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 4800),
+      duration: const Duration(milliseconds: 8200),
     );
     _reactionController = AnimationController(
       vsync: this,
@@ -1450,29 +1515,28 @@ class _OnboardingCharacterSlotState extends State<_OnboardingCharacterSlot>
         final phase = phaseSeed / 180 * math.pi;
         final idleAngle = _idleController.value * math.pi * 2;
         final breathing = motionAllowed
-            ? math.sin(idleAngle + phase) * 0.0018
+            ? (math.sin(idleAngle + phase) + 1) * 0.5
             : 0.0;
-        final sway = motionAllowed
-            ? math.sin(idleAngle * 0.73 + phase) * 1.25
-            : 0.0;
-        final microLift = motionAllowed
-            ? math.sin(idleAngle * 1.31 + phase * 0.5) * 0.65
-            : 0.0;
-        final reaction = motionAllowed
+        final reactionProgress = motionAllowed
+            ? Curves.easeOutCubic.transform(_reactionController.value)
+            : 1.0;
+        final reactionEmphasis = motionAllowed
             ? math.sin(_reactionController.value * math.pi)
             : 0.0;
         final reactionSide = phaseSeed.isEven ? 1.0 : -1.0;
         return Transform.translate(
           key: const Key('story-character-living-motion'),
-          offset: Offset(
-            sway + reaction * reactionSide * 2.2,
-            microLift - reaction * 3.2,
-          ),
+          offset: Offset((1 - reactionProgress) * reactionSide * 7, 0),
           child: Transform.rotate(
-            angle: sway * 0.0014 + reaction * reactionSide * 0.0026,
+            angle: reactionEmphasis * reactionSide * 0.0018,
             alignment: Alignment.bottomCenter,
-            child: Transform.scale(
-              scale: 1 + breathing + reaction * 0.0045,
+            child: Transform(
+              key: const Key('story-character-breathing-motion'),
+              transform: Matrix4.diagonal3Values(
+                1 - breathing * 0.0007,
+                1 + breathing * 0.0022 + reactionEmphasis * 0.004,
+                1,
+              ),
               alignment: Alignment.bottomCenter,
               child: child,
             ),
@@ -1664,7 +1728,7 @@ class _AcademyPcTerminal extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          '국립 미래양성원 · 제6기 실습 PC',
+          '프로젝트 데시멀 · 06번 실습 PC',
           style: TextStyle(
             color: Colors.white,
             fontSize: 10,
@@ -1680,22 +1744,45 @@ class _AcademyPcTerminal extends StatelessWidget {
             onTap: onOpenStockApp,
             borderRadius: BorderRadius.circular(12),
             child: Container(
-              width: 112,
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+              width: 122,
+              padding: const EdgeInsets.fromLTRB(8, 6, 8, 5),
               decoration: BoxDecoration(
-                color: const Color(0xEFFFFFFF),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFDFE9F2)),
-              ),
-              child: const Column(
-                children: [
-                  Icon(
-                    Icons.candlestick_chart_rounded,
-                    color: Color(0xFFCE3E4E),
-                    size: 30,
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: <Color>[Color(0xFFF8FCFF), Color(0xFFE2F2F3)],
+                ),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFBFD7E1)),
+                boxShadow: const <BoxShadow>[
+                  BoxShadow(
+                    color: Color(0x4D0C2338),
+                    blurRadius: 10,
+                    offset: Offset(0, 4),
                   ),
-                  SizedBox(height: 4),
-                  Text(
+                  BoxShadow(
+                    color: Color(0x4DFFFFFF),
+                    blurRadius: 2,
+                    offset: Offset(0, -1),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(11),
+                    child: Image.asset(
+                      'assets/images/stock_practice_app_icon_v1.png',
+                      key: const Key('academy-stock-app-icon-image'),
+                      width: 48,
+                      height: 48,
+                      fit: BoxFit.cover,
+                      filterQuality: FilterQuality.high,
+                      isAntiAlias: true,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  const Text(
                     '주식실습',
                     style: TextStyle(
                       color: _ink,
@@ -1746,7 +1833,7 @@ class _AcademyPcTerminal extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '제6기 주식실습',
+                    '데시멀 주식실습',
                     style: TextStyle(
                       color: _ink,
                       fontSize: 12,
@@ -1771,10 +1858,11 @@ class _AcademyPcTerminal extends StatelessWidget {
         TextField(
           key: const Key('academy-player-name-input'),
           controller: playerController,
+          readOnly: true,
           maxLength: 12,
           textInputAction: TextInputAction.next,
           onChanged: (_) => onChanged(),
-          decoration: _inputDecoration('운용자 이름', '예: 민준'),
+          decoration: _inputDecoration('운용자', '성준'),
         ),
         const SizedBox(height: 7),
         TextField(
@@ -1786,7 +1874,7 @@ class _AcademyPcTerminal extends StatelessWidget {
           onSubmitted: (_) {
             if (_canStart) onStartTutorial();
           },
-          decoration: _inputDecoration('투자장부 이름', '예: 첫빛 투자연구소'),
+          decoration: _inputDecoration('투자장부 이름', '예: 데시멀 첫 장부'),
         ),
         const SizedBox(height: 8),
         Container(
@@ -2176,7 +2264,7 @@ class _NovelDialogueState extends State<_NovelDialogue>
                       if (!_typingComplete) ...[
                         const SizedBox(height: 7),
                         Text(
-                          '화면을 누르면 문장이 한 번에 표시됩니다',
+                          '화면을 누르면 다음 대사로 넘어갑니다',
                           key: const Key('story-typewriter-hint'),
                           style: TextStyle(
                             color: secondaryText.withValues(alpha: 0.78),
@@ -2215,11 +2303,14 @@ class _NovelDialogueState extends State<_NovelDialogue>
                               size: 20,
                             ),
                             style: TextButton.styleFrom(
-                              minimumSize: const Size(70, 36),
+                              minimumSize: const Size(96, 40),
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 9,
+                                horizontal: 14,
                               ),
                               foregroundColor: const Color(0xFF83E5FF),
+                              backgroundColor: const Color(0x243DB9E9),
+                              side: const BorderSide(color: Color(0x6683E5FF)),
+                              shape: const StadiumBorder(),
                               textStyle: const TextStyle(
                                 fontFamily: 'Pretendard',
                                 fontSize: 12,

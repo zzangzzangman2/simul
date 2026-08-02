@@ -36,7 +36,7 @@ const _stockTutorialHakjunAsset =
 const _stockTutorialPlayerAsset =
     'assets/images/protagonist_seed01/12_thinking.png';
 
-// 제6기 여학생 8명 튜토리얼 표정 슬롯. 승인된 9종 세트에서 수업 단계에 맞춰 고른다.
+// 여자 동기 8명 튜토리얼 표정 슬롯. 승인된 9종 세트에서 실습 단계에 맞춰 고른다.
 const _stockTutorialSeoaRecordAsset =
     'assets/images/production_soft_painted/kim_seoa/08_determined_record_v1.png';
 const _stockTutorialJianAsset =
@@ -45,6 +45,10 @@ const _stockTutorialJianFocusAsset =
     'assets/images/production_soft_painted/lee_jian/03_focused_repair_v2.png';
 const _stockTutorialIseoAsset =
     'assets/images/production_soft_painted/choi_iseo/02_gentle_smile_v1.png';
+const _stockTutorialHaeunAsset =
+    'assets/images/production_soft_painted/park_haeun/09_explaining_v1.png';
+const _stockTutorialSuaExplainAsset =
+    'assets/images/production_soft_painted/han_sua/08_explaining_quality_v2.png';
 const _stockTutorialArinAsset =
     'assets/images/production_soft_painted/jung_arin/09_counting_explain_v1.png';
 const _stockTutorialArinWorriedAsset =
@@ -878,7 +882,7 @@ class _MarketPreparingScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 const Text(
-                  '화면은 멈춘 것이 아니며, 준비가 끝나면 자동으로 첫 주식 수업이 열립니다.',
+                  '화면은 멈춘 것이 아니며, 준비가 끝나면 자동으로 첫 주문 실습이 열립니다.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: Color(0xFF8A94A8),
@@ -2012,7 +2016,7 @@ class _StockMarketScreenState extends State<StockMarketScreen>
         _dailyMarketCaps = dailyMarketCaps.values;
         _dailyMarketCapRankings = dailyMarketCaps.rankings;
         _loadProgress = 0.99;
-        _loadStage = '주식 수업 화면을 여는 중…';
+        _loadStage = '주식 실습 화면을 여는 중…';
       });
       await WidgetsBinding.instance.endOfFrame;
       if (!mounted) return;
@@ -5727,51 +5731,42 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
       );
     }
     var showingTutorial = tutorialEnabled;
-    return showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: !tutorialEnabled,
-      isScrollControlled: true,
-      isDismissible: !tutorialEnabled,
-      enableDrag: !tutorialEnabled,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (sheetContext) {
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            final Widget orderSheet = tutorialEnabled
-                ? _PracticalTradeTutorialSheet(
-                    definition: definition,
-                    sourceLive: live,
-                    sourceState: marketState.value,
-                    initialBuyLimitPrice: initialLimitPrice,
-                    onCompleteTutorial: onCompleteTutorial,
-                  )
-                : const SizedBox.shrink();
-            return SizedBox(
-              height: MediaQuery.sizeOf(context).height * 0.92,
-              child: PopScope<void>(
-                canPop: !showingTutorial,
-                child: Stack(
-                  children: [
-                    Positioned.fill(child: orderSheet),
-                    if (showingTutorial)
-                      Positioned.fill(
-                        child: _OrderTicketTutorialOverlay(
+    return Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (routeContext) {
+          return StatefulBuilder(
+            builder: (context, setSheetState) {
+              final orderSheet = _PracticalTradeTutorialSheet(
+                definition: definition,
+                sourceLive: live,
+                sourceState: marketState.value,
+                initialBuyLimitPrice: initialLimitPrice,
+                onCompleteTutorial: onCompleteTutorial,
+              );
+              return Scaffold(
+                key: const Key('market-practical-tutorial-page'),
+                backgroundColor: Colors.white,
+                body: PopScope<void>(
+                  canPop: !showingTutorial,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      orderSheet,
+                      if (showingTutorial)
+                        _OrderTicketTutorialOverlay(
                           limitPrice: initialLimitPrice,
                           onDone: () async {
                             setSheetState(() => showingTutorial = false);
                           },
                         ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            );
-          },
-        );
-      },
+              );
+            },
+          );
+        },
+      ),
     );
   }
 
@@ -7216,9 +7211,9 @@ class _MarketTutorialOverlay extends StatelessWidget {
     targetKey: targetKey,
     messageId: 'market-$step',
     speakers: switch (step) {
-      0 => const <String>['한서윤 선생님', '한서윤 선생님', '한서윤 선생님', '한서윤 선생님'],
-      1 => const <String>['한서윤 선생님', '한서윤 선생님', '한서윤 선생님'],
-      _ => const <String>['한서윤 선생님', '한서윤 선생님', '한서윤 선생님', '한서윤 선생님'],
+      0 => const <String>['한서윤 운영관', '한서윤 운영관', '한서윤 운영관', '한서윤 운영관'],
+      1 => const <String>['한서윤 운영관', '한서윤 운영관', '한서윤 운영관'],
+      _ => const <String>['한서윤 운영관', '한서윤 운영관', '한서윤 운영관', '한서윤 운영관'],
     },
     messages: switch (step) {
       0 => const [
@@ -7272,12 +7267,12 @@ class _MarketDetailTutorialOverlay extends StatelessWidget {
     targetKey: targetKey,
     messageId: 'market-detail-$step',
     speakers: switch (step) {
-      0 => const <String>['한서윤 선생님', '한서윤 선생님', '한서윤 선생님'],
-      1 => const <String>['한서윤 선생님', '한서윤 선생님', '한서윤 선생님'],
-      2 => const <String>['한서윤 선생님', '한서윤 선생님', '한서윤 선생님'],
-      3 => const <String>['한서윤 선생님', '한서윤 선생님', '한서윤 선생님', '한서윤 선생님'],
-      4 => const <String>['한서윤 선생님', '한서윤 선생님', '한서윤 선생님', '한서윤 선생님'],
-      _ => const <String>['한서윤 선생님', '한서윤 선생님', '한서윤 선생님'],
+      0 => const <String>['한서윤 운영관', '한서윤 운영관', '한서윤 운영관'],
+      1 => const <String>['한서윤 운영관', '한서윤 운영관', '한서윤 운영관'],
+      2 => const <String>['한서윤 운영관', '한서윤 운영관', '한서윤 운영관'],
+      3 => const <String>['한서윤 운영관', '한서윤 운영관', '한서윤 운영관', '한서윤 운영관'],
+      4 => const <String>['한서윤 운영관', '한서윤 운영관', '한서윤 운영관', '한서윤 운영관'],
+      _ => const <String>['한서윤 운영관', '한서윤 운영관', '한서윤 운영관'],
     },
     messages: switch (step) {
       0 => const [
@@ -7349,10 +7344,10 @@ class _OrderTicketTutorialOverlay extends StatelessWidget {
     targetActionKey: const Key('market-order-tutorial-target'),
     targetKey: null,
     messageId: 'market-order-${limitPrice?.round() ?? 'start'}',
-    speakers: const <String>['한서윤 선생님', '한서윤 선생님', '한서윤 선생님'],
+    speakers: const <String>['한서윤 운영관', '한서윤 운영관', '한서윤 운영관'],
     messages: limitPrice == null
         ? const [
-            '이건 수업용 계좌예요. 여기서 잃어도 정식 국가계좌의 원금은 그대로 남습니다.',
+            '이건 주문 리허설 계좌예요. 여기서 잃어도 정식 국가계좌의 원금은 그대로 남습니다.',
             '잔액이 부족하면 빚을 지는 게 아니라 주문 자체를 안 받아요. 그것부터 직접 눌러 확인할게요.',
             '보이는 잔량보다 많이 주문하면 있는 만큼만 사지고 나머지는 미체결로 남습니다. 그 차이도 봐 두세요.',
           ]
@@ -7495,10 +7490,10 @@ class _StockTutorialGuideOverlayState
       1 => '이지안: 그거 눌러도 아무 일 안 나. 확인 누르기 전엔 안 사져.',
       2 => '정아린: 노란 거. 노란 거 눌러.',
       3 => '김서아: 괜찮아. 나도 두 번 잘못 눌렀어.',
-      4 => '오지우: 속보. 06번 학생, 화면 다른 데를 누름.',
+      4 => '오지우: 속보. 06번 동기, 화면 다른 데를 누름.',
       5 => '박하은: 천천히 해도 돼. 아직 아무도 안 끝났어.',
       6 => '윤채아: 지금 누른 데는 아무 기능 없어.',
-      _ => '한서윤 선생님: 노란 테두리로 돌아오세요.',
+      _ => '한서윤 운영관: 노란 테두리로 돌아오세요.',
     };
     setState(() {
       _wrongTapCount += 1;
@@ -7511,7 +7506,7 @@ class _StockTutorialGuideOverlayState
     final hasTarget = _activeTargetKey != null;
     final activeSpeaker = widget.speakers[_messageIndex];
     final isNarration = activeSpeaker == _stockTutorialNarrationSpeaker;
-    final isTeacherPage = activeSpeaker == '한서윤 선생님';
+    final isTeacherPage = activeSpeaker == '한서윤 운영관';
     // 지문 페이지는 중앙 전신 슬롯을 비운다. 화자 자산이 없다는 이유로
     // 주인공 스프라이트를 대신 세우면 지문이 주인공 대사로 읽힌다.
     final activeCharacterAsset = isNarration
@@ -7606,7 +7601,7 @@ class _StockTutorialGuideOverlayState
                       : isNarration
                       ? '계속 읽기'
                       : isTeacherPage
-                      ? '학생 반응 듣기'
+                      ? '동기 반응 듣기'
                       : '다음 말 듣기',
                   showAction: !hasTarget,
                   waitingForTarget: hasTarget && _targetRect == null,
@@ -8843,7 +8838,7 @@ class _BrokerageAccountCard extends StatelessWidget {
         children: [
           Text(
             state.story.orphanageReboot
-                ? '${state.companyName} · 제6기 국가계좌'
+                ? '${state.companyName} · 데시멀 동기 국가계좌'
                 : '${state.companyName} 증권계좌',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -9362,13 +9357,24 @@ class _ResearchNoteEditor extends StatefulWidget {
 }
 
 class _ResearchNoteEditorState extends State<_ResearchNoteEditor> {
+  static const List<String> _tutorialBuyReasons = <String>[
+    '가입자 증가와 통신 수요 확대를 확인했다.',
+    '가격뿐 아니라 회사의 재무와 현금흐름을 함께 확인했다.',
+    '뉴스 한 줄이 아니라 사업·가격·위험을 함께 비교했다.',
+  ];
+  static const List<String> _tutorialSellRules = <String>[
+    '가입자 증가가 꺾이거나 사업 근거가 무너지면 판다.',
+    '정해 둔 손실선에 닿으면 감정 없이 다시 판단한다.',
+    '목표 가격에 닿으면 일부 매도하고 남은 근거를 점검한다.',
+  ];
+
   late final TextEditingController _controller;
-  late final TextEditingController _buyReasonController;
-  late final TextEditingController _sellRuleController;
+  String? _selectedBuyReason;
+  String? _selectedSellRule;
 
   bool get _tutorialReady =>
-      _buyReasonController.text.trim().isNotEmpty &&
-      _sellRuleController.text.trim().isNotEmpty;
+      _selectedBuyReason?.trim().isNotEmpty == true &&
+      _selectedSellRule?.trim().isNotEmpty == true;
 
   @override
   void initState() {
@@ -9380,21 +9386,29 @@ class _ResearchNoteEditorState extends State<_ResearchNoteEditor> {
     final sellMatch = RegExp(
       r'(?:^|\n)매도 조건:\s*(.*)',
     ).firstMatch(widget.initialValue);
-    _buyReasonController = TextEditingController(
-      text: buyMatch?.group(1) ?? '',
-    );
-    _sellRuleController = TextEditingController(
-      text: sellMatch?.group(1) ?? '',
-    );
+    final existingBuyReason = buyMatch?.group(1)?.trim();
+    final existingSellRule = sellMatch?.group(1)?.trim();
+    _selectedBuyReason = existingBuyReason?.isNotEmpty == true
+        ? existingBuyReason
+        : null;
+    _selectedSellRule = existingSellRule?.isNotEmpty == true
+        ? existingSellRule
+        : null;
   }
 
   @override
   void dispose() {
     _controller.dispose();
-    _buyReasonController.dispose();
-    _sellRuleController.dispose();
     super.dispose();
   }
+
+  List<String> _choicesWithLegacyValue(
+    List<String> choices,
+    String? selected,
+  ) => <String>[
+    if (selected != null && !choices.contains(selected)) selected,
+    ...choices,
+  ];
 
   @override
   Widget build(BuildContext context) => AnimatedPadding(
@@ -9422,44 +9436,42 @@ class _ResearchNoteEditorState extends State<_ResearchNoteEditor> {
             const SizedBox(height: 5),
             Text(
               widget.tutorialRequired
-                  ? '${widget.companyName}을 왜 사는지와 언제 생각을 바꿀지 둘 다 적어야 첫 주문으로 넘어갑니다.'
+                  ? '${widget.companyName}을 왜 사는지와 언제 생각을 바꿀지 한 가지씩 골라 첫 투자 원칙을 만드세요.'
                   : '${widget.companyName}의 근거와 다음 행동을 직접 적어 두세요.',
               style: const TextStyle(color: Color(0xFF68717E), height: 1.4),
             ),
             const SizedBox(height: 14),
             if (widget.tutorialRequired) ...[
-              TextField(
-                key: const Key('tutorial-buy-reason-input'),
-                controller: _buyReasonController,
-                autofocus: true,
-                minLines: 2,
-                maxLines: 3,
-                maxLength: 120,
-                textInputAction: TextInputAction.next,
-                onChanged: (_) => setState(() {}),
-                decoration: const InputDecoration(
-                  labelText: '매수 이유',
-                  hintText: '예: 통신 가입자가 늘고 있지만 재무도 함께 확인한다.',
-                  border: OutlineInputBorder(),
+              _TutorialResearchChoiceGroup(
+                title: '1. 매수 이유',
+                hint: '지금 이 회사를 살 근거를 고르세요.',
+                icon: Icons.fact_check_outlined,
+                options: _choicesWithLegacyValue(
+                  _tutorialBuyReasons,
+                  _selectedBuyReason,
                 ),
+                selectedValue: _selectedBuyReason,
+                keyPrefix: 'tutorial-buy-reason-choice',
+                onSelected: (value) =>
+                    setState(() => _selectedBuyReason = value),
+              ),
+              const SizedBox(height: 14),
+              _TutorialResearchChoiceGroup(
+                title: '2. 매도 조건',
+                hint: '생각을 바꾸거나 이익을 확정할 기준을 고르세요.',
+                icon: Icons.rule_rounded,
+                options: _choicesWithLegacyValue(
+                  _tutorialSellRules,
+                  _selectedSellRule,
+                ),
+                selectedValue: _selectedSellRule,
+                keyPrefix: 'tutorial-sell-rule-choice',
+                onSelected: (value) =>
+                    setState(() => _selectedSellRule = value),
               ),
               const SizedBox(height: 10),
-              TextField(
-                key: const Key('tutorial-sell-rule-input'),
-                controller: _sellRuleController,
-                minLines: 2,
-                maxLines: 3,
-                maxLength: 120,
-                textInputAction: TextInputAction.done,
-                onChanged: (_) => setState(() {}),
-                decoration: const InputDecoration(
-                  labelText: '매도 조건',
-                  hintText: '예: 가입자 증가가 꺾이거나 정한 손실선에 닿으면 판다.',
-                  border: OutlineInputBorder(),
-                ),
-              ),
               const Text(
-                '수익이 났다는 이유만으로 매도 조건을 바꾸지 않습니다.',
+                '정답 맞히기가 아니라, 고른 이유와 조건을 실제 주문 뒤에도 지키는 연습입니다.',
                 style: TextStyle(
                   color: Color(0xFF8B6F21),
                   fontSize: 11,
@@ -9488,8 +9500,8 @@ class _ResearchNoteEditorState extends State<_ResearchNoteEditor> {
                   ? null
                   : () => Navigator.of(context).pop(
                       widget.tutorialRequired
-                          ? '매수 이유: ${_buyReasonController.text.trim()}\n'
-                                '매도 조건: ${_sellRuleController.text.trim()}'
+                          ? '매수 이유: ${_selectedBuyReason!.trim()}\n'
+                                '매도 조건: ${_selectedSellRule!.trim()}'
                           : _controller.text,
                     ),
               icon: const Icon(Icons.save_rounded),
@@ -9502,6 +9514,144 @@ class _ResearchNoteEditorState extends State<_ResearchNoteEditor> {
         ),
       ),
     ),
+  );
+}
+
+class _TutorialResearchChoiceGroup extends StatelessWidget {
+  const _TutorialResearchChoiceGroup({
+    required this.title,
+    required this.hint,
+    required this.icon,
+    required this.options,
+    required this.selectedValue,
+    required this.keyPrefix,
+    required this.onSelected,
+  });
+
+  final String title;
+  final String hint;
+  final IconData icon;
+  final List<String> options;
+  final String? selectedValue;
+  final String keyPrefix;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: <Widget>[
+      Row(
+        children: <Widget>[
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: _marketAccent.withValues(alpha: 0.11),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: _marketAccent, size: 19),
+          ),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: _marketInk,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                Text(
+                  hint,
+                  style: const TextStyle(
+                    color: _marketMuted,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 8),
+      for (var index = 0; index < options.length; index += 1)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 7),
+          child: Semantics(
+            button: true,
+            selected: options[index] == selectedValue,
+            child: InkWell(
+              key: Key('$keyPrefix-$index'),
+              onTap: () => onSelected(options[index]),
+              borderRadius: BorderRadius.circular(14),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 160),
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(12, 11, 11, 11),
+                decoration: BoxDecoration(
+                  color: options[index] == selectedValue
+                      ? _marketAccent.withValues(alpha: 0.1)
+                      : const Color(0xFFF5F7FA),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: options[index] == selectedValue
+                        ? _marketAccent
+                        : const Color(0xFFDDE2E8),
+                    width: options[index] == selectedValue ? 1.8 : 1,
+                  ),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 160),
+                      width: 21,
+                      height: 21,
+                      margin: const EdgeInsets.only(top: 1),
+                      decoration: BoxDecoration(
+                        color: options[index] == selectedValue
+                            ? _marketAccent
+                            : Colors.white,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: options[index] == selectedValue
+                              ? _marketAccent
+                              : const Color(0xFFA9B2BF),
+                        ),
+                      ),
+                      child: options[index] == selectedValue
+                          ? const Icon(
+                              Icons.check_rounded,
+                              color: Colors.white,
+                              size: 15,
+                            )
+                          : null,
+                    ),
+                    const SizedBox(width: 9),
+                    Expanded(
+                      child: Text(
+                        options[index],
+                        style: TextStyle(
+                          color: _marketInk,
+                          fontSize: 12,
+                          height: 1.35,
+                          fontWeight: options[index] == selectedValue
+                              ? FontWeight.w900
+                              : FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+    ],
   );
 }
 

@@ -996,6 +996,23 @@ class LocalBusinessEngine {
               '순이익 ${settlement.statement.netProfit}원',
           sourceId: sourceId,
         ),
+        if (settlement.payableChange != 0)
+          LedgerEntry(
+            id: '$sourceId-payable',
+            day: state.day,
+            amount: 0,
+            notional: settlement.payableChange.abs(),
+            account: settlement.payableChange > 0
+                ? 'business_operating_expense'
+                : 'business_accounts_payable',
+            counterAccount: settlement.payableChange > 0
+                ? 'business_accounts_payable'
+                : 'company_bank',
+            description: settlement.payableChange > 0
+                ? '${business.name} 월 운영비 미지급'
+                : '${business.name} 기존 미지급금 상환',
+            sourceId: sourceId,
+          ),
       ],
       processedEventIds: _appendProcessed(state.processedEventIds, sourceId),
     );

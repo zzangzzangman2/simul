@@ -328,7 +328,7 @@ void main() {
   }
 
   Future<void> skipAllPrologueSections(WidgetTester tester) async {
-    for (var section = 0; section < 4; section += 1) {
+    for (var section = 0; section < 8; section += 1) {
       await skipCurrentPrologueSection(tester);
     }
   }
@@ -513,87 +513,37 @@ void main() {
 
   Future<void> completeOrientationPreview(WidgetTester tester) async {
     await startNewGame(tester);
-    await advanceDialogue(tester, 43);
-    expect(find.byKey(const Key('orientation-roster-card')), findsOneWidget);
-    await advanceDialogue(tester, 1);
-    await advanceDialogue(tester, 95);
+    await skipAllPrologueSections(tester);
     expect(find.byKey(const Key('orientation-complete-card')), findsOneWidget);
   }
 
-  testWidgets('opening dialogue shows the future-development policy cast', (
-    tester,
-  ) async {
-    await tester.binding.setSurfaceSize(const Size(390, 844));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-    await tester.pumpWidget(
-      const MillenniumCapitalApp(
-        campaignWorldPreparer: _skipCampaignWorldPreparation,
-      ),
-    );
-    await tester.pumpAndSettle();
-    await startNewGame(tester);
+  testWidgets(
+    'opening dialogue establishes the Project Decimal policy conflict',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(
+        const MillenniumCapitalApp(
+          campaignWorldPreparer: _skipCampaignWorldPreparation,
+        ),
+      );
+      await tester.pumpAndSettle();
+      await startNewGame(tester);
 
-    const portraitKey = Key('story-character-image');
-    String visiblePortraitAsset() {
-      final portrait = tester.widget<Image>(find.byKey(portraitKey));
-      return (portrait.image as AssetImage).assetName;
-    }
-
-    expect(find.byKey(portraitKey), findsNothing);
-
-    await advanceDialogue(tester, 1);
-    expect(
-      find.byKey(const Key('story-character-living-motion')),
-      findsOneWidget,
-    );
-    expect(find.textContaining('결론만 말해'), findsOneWidget);
-    expect(
-      visiblePortraitAsset(),
-      'assets/images/cinematic_soft_painted/policy_1981/jeon_dugwang/02_listening_v1.png',
-    );
-    expect(
-      tester
-          .getBottomRight(find.byKey(const Key('story-character-character')))
-          .dy,
-      closeTo(740, 0.1),
-    );
-
-    await advanceDialogue(tester, 1);
-    expect(find.textContaining('그럴 가능성이 큽니다'), findsOneWidget);
-    expect(
-      visiblePortraitAsset(),
-      'assets/images/cinematic_soft_painted/policy_1981/seo_muntae/01_policy_pitch_v1.png',
-    );
-
-    await advanceDialogue(tester, 1);
-    expect(find.textContaining('그 말을 밖에서 그대로 했다간'), findsOneWidget);
-    expect(
-      visiblePortraitAsset(),
-      'assets/images/cinematic_soft_painted/policy_1981/baek_gihyeon/03_warning_v2.png',
-    );
-
-    await advanceDialogue(tester, 1);
-    expect(find.textContaining('지금은 공장을 많이 가진 쪽'), findsOneWidget);
-    expect(
-      visiblePortraitAsset(),
-      'assets/images/cinematic_soft_painted/policy_1981/kang_incheol/02_explain_v2.png',
-    );
-
-    await advanceDialogue(tester, 1);
-    expect(find.textContaining('그런데 이건 왜 이렇게 얇아'), findsOneWidget);
-    expect(
-      visiblePortraitAsset(),
-      'assets/images/cinematic_soft_painted/policy_1981/jeon_dugwang/05_pressure_v1.png',
-    );
-    expect(find.byKey(const Key('policy-file-children')), findsNothing);
-    expect(find.byKey(const Key('policy-briefing-finish')), findsNothing);
-    await advanceDialogue(tester, 3);
-    expect(
-      visiblePortraitAsset(),
-      'assets/images/cinematic_soft_painted/policy_1981/yoon_mira/03_objection_v1.png',
-    );
-    expect(tester.takeException(), isNull);
-  });
+      expect(find.textContaining('자정을 스무 분 남긴'), findsOneWidget);
+      await advanceDialogue(tester, 1);
+      expect(find.text('전두광'), findsOneWidget);
+      expect(find.textContaining('다음 전쟁은'), findsOneWidget);
+      await advanceDialogue(tester, 1);
+      expect(find.text('강인철 경제수석'), findsOneWidget);
+      await advanceDialogue(tester, 2);
+      expect(find.text('백기현 비서실장'), findsOneWidget);
+      await advanceDialogue(tester, 2);
+      expect(find.text('윤미라 아동보호수석'), findsOneWidget);
+      expect(find.textContaining('생활권, 중단권'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('dialogue opacity control persists across the next line', (
     tester,
@@ -639,7 +589,7 @@ void main() {
     final preferences = await SharedPreferences.getInstance();
     await preferences.reload();
     expect(
-      preferences.getDouble('future-academy-dialogue-panel-opacity-v2'),
+      preferences.getDouble('project-decimal-dialogue-panel-opacity-v1'),
       closeTo(adjustedOpacity, 0.01),
     );
     expect(tester.takeException(), isNull);
@@ -671,34 +621,36 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tapAt(const Offset(195, 420));
     await tester.pumpAndSettle();
-    expect(find.text('서문태 정책실장'), findsOneWidget);
+    expect(find.text('강인철 경제수석'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('academy character area also advances on any click', (
-    tester,
-  ) async {
-    await tester.binding.setSurfaceSize(const Size(390, 844));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-    await tester.pumpWidget(
-      const MillenniumCapitalApp(
-        campaignWorldPreparer: _skipCampaignWorldPreparation,
-      ),
-    );
-    await tester.pumpAndSettle();
-    await startNewGame(tester);
-    await advanceDialogue(tester, 34);
+  testWidgets(
+    'Decimal operator scene advances when the character area is tapped',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(
+        const MillenniumCapitalApp(
+          campaignWorldPreparer: _skipCampaignWorldPreparation,
+        ),
+      );
+      await tester.pumpAndSettle();
+      await startNewGame(tester);
+      await advanceDialogue(tester, 134);
 
-    expect(find.text('한서윤 선생님'), findsOneWidget);
-    expect(find.textContaining('제6기 교육을 맡은'), findsOneWidget);
-    expect(find.byKey(const Key('academy-teacher-character')), findsOneWidget);
-
-    await tester.tapAt(const Offset(195, 390));
-    await tester.pumpAndSettle();
-
-    expect(find.textContaining('잔액란에는 오만 원'), findsOneWidget);
-    expect(tester.takeException(), isNull);
-  });
+      expect(find.text('한서윤 운영관'), findsOneWidget);
+      expect(find.textContaining('감당하지 않아도 될 위험'), findsOneWidget);
+      expect(
+        find.byKey(const Key('academy-teacher-character')),
+        findsOneWidget,
+      );
+      await tester.tapAt(const Offset(195, 390));
+      await tester.pumpAndSettle();
+      expect(find.text('박하은'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('mouse wheel up returns to a recent previous dialogue beat', (
     tester,
@@ -714,7 +666,7 @@ void main() {
     await startNewGame(tester);
     await advanceDialogue(tester, 2);
 
-    expect(find.text('서문태 정책실장'), findsOneWidget);
+    expect(find.text('강인철 경제수석'), findsOneWidget);
     expect(
       find.byKey(const Key('story-wheel-navigation-listener')),
       findsOneWidget,
@@ -730,11 +682,40 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('전두광'), findsOneWidget);
-    expect(find.textContaining('결론만 말해'), findsOneWidget);
+    expect(find.textContaining('다음 전쟁은'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('departure dialogue shows Minho, the hero, and Park Sunhee', (
+  testWidgets('selection montage withholds center uniforms until final arrival', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      const MillenniumCapitalApp(
+        campaignWorldPreparer: _skipCampaignWorldPreparation,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await startNewGame(tester);
+    await skipCurrentPrologueSection(tester);
+    await skipCurrentPrologueSection(tester);
+
+    expect(
+      (tester
+                  .widget<Image>(
+                    find.byKey(const Key('story-background-image')),
+                  )
+                  .image
+              as AssetImage)
+          .assetName,
+      'assets/images/cinematic_soft_painted/decimal/bg_decimal_matrix_exam_1999_v1.png',
+    );
+    expect(find.byKey(const Key('story-character-image')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('prologue skip visits every Project Decimal visual act', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
@@ -747,111 +728,28 @@ void main() {
     await tester.pumpAndSettle();
     await startNewGame(tester);
 
-    String visiblePortraitAsset() {
-      final portrait = tester.widget<Image>(
-        find.byKey(const Key('story-character-image')),
+    const expected = <String>[
+      'assets/images/cinematic_soft_painted/decimal/bg_decimal_imf_failure_1997_v1.png',
+      'assets/images/cinematic_soft_painted/decimal/bg_decimal_matrix_exam_1999_v1.png',
+      'assets/images/cinematic_soft_painted/decimal/bg_decimal_unfair_game_1999_v1.png',
+      'assets/images/cinematic_soft_painted/decimal/bg_decimal_desire_test_1999_v1.png',
+      'assets/images/cinematic_soft_painted/decimal/bg_decimal_gangnam_exterior_winter_1999_v1.png',
+      'assets/images/cinematic_soft_painted/decimal/bg_decimal_living_lounge_1999_v1.png',
+      'assets/images/cinematic_soft_painted/decimal/bg_decimal_trading_floor_dawn_2000_v1.png',
+    ];
+    for (final asset in expected) {
+      await skipCurrentPrologueSection(tester);
+      expect(
+        (tester
+                    .widget<Image>(
+                      find.byKey(const Key('story-background-image')),
+                    )
+                    .image
+                as AssetImage)
+            .assetName,
+        asset,
       );
-      return (portrait.image as AssetImage).assetName;
     }
-
-    await advanceDialogue(tester, 18);
-    expect(find.text('민호'), findsOneWidget);
-    expect(
-      visiblePortraitAsset(),
-      'assets/images/historical_prologue/character_minho_farewell_v3.png',
-    );
-    expect(
-      tester
-          .widget<Transform>(find.byKey(const Key('story-character-scale')))
-          .transform
-          .entry(0, 0),
-      closeTo(0.72, 0.001),
-    );
-
-    await advanceDialogue(tester, 1);
-    expect(find.text('나'), findsOneWidget);
-    expect(
-      visiblePortraitAsset(),
-      'assets/images/protagonist_seed01/03_playful_grin.png',
-    );
-
-    await advanceDialogue(tester, 2);
-    expect(find.textContaining('17번을 믿지 마'), findsOneWidget);
-    expect(
-      visiblePortraitAsset(),
-      'assets/images/protagonist_seed01/17_holding_badge.png',
-    );
-
-    await advanceDialogue(tester, 1);
-    expect(find.text('박선희 원장'), findsOneWidget);
-    expect(
-      visiblePortraitAsset(),
-      'assets/images/historical_prologue/character_park_sunhee_farewell_v1.png',
-    );
-    expect(tester.takeException(), isNull);
-  });
-
-  testWidgets('prologue switches through the departure, gate, and hall backgrounds', (
-    tester,
-  ) async {
-    await tester.binding.setSurfaceSize(const Size(390, 844));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-    await tester.pumpWidget(
-      const MillenniumCapitalApp(
-        campaignWorldPreparer: _skipCampaignWorldPreparation,
-      ),
-    );
-    await tester.pumpAndSettle();
-    await startNewGame(tester);
-
-    const backgroundKey = Key('story-background-image');
-    String visibleBackgroundAsset() {
-      final background = tester.widget<Image>(find.byKey(backgroundKey));
-      return (background.image as AssetImage).assetName;
-    }
-
-    expect(
-      visibleBackgroundAsset(),
-      'assets/images/cinematic_soft_painted/policy_1981/backgrounds/bg_policy_room_night_v1.png',
-    );
-
-    await advanceDialogue(tester, 5);
-    expect(
-      visibleBackgroundAsset(),
-      'assets/images/cinematic_soft_painted/policy_1981/backgrounds/bg_conference_night_v1.png',
-    );
-
-    await advanceDialogue(tester, 11);
-    expect(
-      visibleBackgroundAsset(),
-      'assets/images/historical_prologue/bg_future_development_orphanage_1982_portrait_cartoon_v1.png',
-    );
-
-    await advanceDialogue(tester, 1);
-    expect(
-      visibleBackgroundAsset(),
-      'assets/images/historical_prologue/bg_orphanage_departure_2000_portrait_v1.png',
-    );
-
-    await advanceDialogue(tester, 6);
-    expect(
-      visibleBackgroundAsset(),
-      'assets/images/historical_prologue/bg_bus_transition_seoul_outskirts_2000_portrait_v1.png',
-    );
-
-    await advanceDialogue(tester, 1);
-    expect(
-      visibleBackgroundAsset(),
-      'assets/images/historical_prologue/bg_future_development_academy_gate_2000_portrait_v1.png',
-    );
-
-    await advanceDialogue(tester, 8);
-    expect(
-      visibleBackgroundAsset(),
-      'assets/images/historical_prologue/bg_future_development_orientation_hall_2000_portrait_v1.png',
-    );
-    expect(find.byKey(const Key('orientation-light-flicker')), findsOneWidget);
-    expect(find.byKey(const Key('orientation-dust-motes')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -957,154 +855,51 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('prologue introduces Sua, Hak-jun, and the ten-student cohort', (
-    tester,
-  ) async {
-    await tester.binding.setSurfaceSize(const Size(390, 844));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-    await tester.pumpWidget(
-      const MillenniumCapitalApp(
-        campaignWorldPreparer: _skipCampaignWorldPreparation,
-      ),
-    );
-    await tester.pumpAndSettle();
-    await startNewGame(tester);
+  testWidgets(
+    'Project Decimal prologue connects the final ten to the stock PC',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(
+        const MillenniumCapitalApp(
+          campaignWorldPreparer: _skipCampaignWorldPreparation,
+        ),
+      );
+      await tester.pumpAndSettle();
+      await startNewGame(tester);
+      await skipAllPrologueSections(tester);
 
-    expect(find.textContaining('1981년 1월 12일'), findsOneWidget);
-    await advanceDialogue(tester, 5);
-    expect(find.textContaining('그런데 이건 왜 이렇게 얇아'), findsOneWidget);
-    expect(find.byKey(const Key('policy-file-industry')), findsNothing);
-    expect(find.byKey(const Key('policy-file-children')), findsNothing);
-    await advanceDialogue(tester, 1);
-
-    expect(find.textContaining('요보호아동 시설 현황'), findsOneWidget);
-    await tester.tap(find.byKey(const Key('story-backlog-button')));
-    await tester.pumpAndSettle();
-    expect(find.textContaining('그럴 가능성이 큽니다'), findsOneWidget);
-    Navigator.of(
-      tester.element(find.byKey(const Key('story-backlog-sheet'))),
-    ).pop();
-    await tester.pumpAndSettle();
-
-    await advanceDialogue(tester, 11);
-    expect(find.textContaining('천장의 누런 물자국'), findsOneWidget);
-    await advanceDialogue(tester, 8);
-    expect(find.text('수아'), findsOneWidget);
-    expect(
-      (tester
-                  .widget<Image>(find.byKey(const Key('story-character-image')))
-                  .image
-              as AssetImage)
-          .assetName,
-      'assets/images/production_soft_painted/han_sua/05_worried_quality_v2.png',
-    );
-
-    await advanceDialogue(tester, 3);
-    expect(find.text('김학준'), findsOneWidget);
-    expect(
-      (tester
-                  .widget<Image>(find.byKey(const Key('story-character-image')))
-                  .image
-              as AssetImage)
-          .assetName,
-      'assets/images/historical_prologue/character_hakjun_orientation_v2.png',
-    );
-
-    await advanceDialogue(tester, 6);
-    expect(find.text('한서윤 선생님'), findsOneWidget);
-    expect(find.byKey(const Key('academy-teacher-character')), findsOneWidget);
-    await advanceDialogue(tester, 1);
-    expect(find.textContaining('잔액란에는 오만 원'), findsOneWidget);
-    await advanceDialogue(tester, 8);
-    expect(find.byKey(const Key('orientation-roster-card')), findsOneWidget);
-    expect(find.byKey(const Key('orientation-total-count')), findsOneWidget);
-    expect(find.text('10명'), findsOneWidget);
-    expect(find.text('2명'), findsOneWidget);
-    expect(find.text('8명'), findsOneWidget);
-    expect(find.textContaining('몇 년 동안 쌓인 생활기록'), findsOneWidget);
-    expect(find.byKey(const Key('orientation-roster-continue')), findsNothing);
-    await advanceDialogue(tester, 1);
-    expect(find.textContaining('추천서와 선발 의견은 공개되지 않았습니다'), findsOneWidget);
-    await advanceDialogue(tester, 9);
-    expect(find.textContaining('처음 온 곳을 눈에 익히는 것만으로도'), findsOneWidget);
-    await advanceDialogue(tester, 1);
-    expect(
-      (tester
-                  .widget<Image>(
-                    find.byKey(const Key('story-background-image')),
-                  )
-                  .image
-              as AssetImage)
-          .assetName,
-      'assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_corridor_2000_v1.png',
-    );
-    await advanceDialogue(tester, 4);
-    expect(
-      (tester
-                  .widget<Image>(
-                    find.byKey(const Key('story-background-image')),
-                  )
-                  .image
-              as AssetImage)
-          .assetName,
-      'assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_day_2000_v1.png',
-    );
-    expect(find.textContaining('이층침대 다섯 개와 사물함 열 개'), findsOneWidget);
-    await advanceDialogue(tester, 6);
-    expect(
-      (tester
-                  .widget<Image>(
-                    find.byKey(const Key('story-background-image')),
-                  )
-                  .image
-              as AssetImage)
-          .assetName,
-      'assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_day_2000_v1.png',
-    );
-    await advanceDialogue(tester, 1);
-    expect(
-      (tester
-                  .widget<Image>(
-                    find.byKey(const Key('story-background-image')),
-                  )
-                  .image
-              as AssetImage)
-          .assetName,
-      'assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_day_2000_v1.png',
-    );
-    expect(find.textContaining('옆선이 결국 터졌다'), findsOneWidget);
-    await advanceDialogue(tester, 67);
-    expect(
-      (tester
-                  .widget<Image>(
-                    find.byKey(const Key('story-background-image')),
-                  )
-                  .image
-              as AssetImage)
-          .assetName,
-      'assets/images/bg_stock_academy_2000_portrait_cartoon_v4.png',
-    );
-    await advanceDialogue(tester, 1);
-    expect(find.textContaining('한 사람당 컴퓨터 한 대'), findsOneWidget);
-    await advanceDialogue(tester, 6);
-    expect(find.byKey(const Key('orientation-complete-card')), findsOneWidget);
-    expect(find.byKey(const Key('academy-pc-powered-off')), findsOneWidget);
-    expect(find.byKey(const Key('academy-pc-power-toggle')), findsOneWidget);
-    expect(find.text('전원 OFF'), findsOneWidget);
-    expect(
-      find.byKey(const Key('academy-market-tutorial-screen')),
-      findsNothing,
-    );
-    expect(tester.takeException(), isNull);
-  });
+      expect(
+        find.byKey(const Key('orientation-complete-card')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('academy-pc-powered-off')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('academy-pc-power-toggle')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('academy-stock-app-icon')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('academy-stock-setup-screen')),
+        findsOneWidget,
+      );
+      final playerNameInput = tester.widget<TextField>(
+        find.byKey(const Key('academy-player-name-input')),
+      );
+      expect(playerNameInput.controller?.text, '성준');
+      expect(find.text('데시멀 주식실습'), findsOneWidget);
+      expect(find.textContaining('국가원금 50,000원'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('pre-rewrite browser draft cannot restore obsolete dialogue', (
     tester,
   ) async {
     SharedPreferences.setMockInitialValues({
-      'future-academy-dialogue-runtime-v1': jsonEncode({
+      'project-decimal-dialogue-runtime-v2': jsonEncode({
         'version': 1,
-        'appearanceVersion': 13,
+        'contentVersion': 2,
+        'appearanceVersion': 14,
         'updatedAt': '2026-08-01T00:00:00.000Z',
         'scenes': [
           {
@@ -1136,11 +931,78 @@ void main() {
 
     expect(find.text('구형 화자'), findsNothing);
     expect(find.textContaining('교체되기 전의 오래된 대사'), findsNothing);
-    expect(find.textContaining('보고서가 쌓여 있었다'), findsOneWidget);
+    expect(find.textContaining('자정을 스무 분 남긴'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('prologue skip advances one section at a time', (tester) async {
+  testWidgets(
+    'browser draft is applied only in explicit dialogue preview mode',
+    (tester) async {
+      final previewDraft = jsonEncode({
+        'version': 1,
+        'contentVersion': 2,
+        'appearanceVersion': 14,
+        'updatedAt': '2026-08-02T00:00:00.000Z',
+        'scenes': [
+          {
+            'id': 'scene-01',
+            'order': 1,
+            'chapter': '명시적 미리보기',
+            'date': '미리보기 날짜',
+            'location': '미리보기 장소',
+            'speaker': '미리보기 화자',
+            'direction': '',
+            'line': '편집기 브라우저 초안 미리보기',
+            'background': '',
+            'character': '',
+          },
+        ],
+      });
+      SharedPreferences.setMockInitialValues({
+        'project-decimal-dialogue-runtime-v2': previewDraft,
+      });
+      final preferences = await SharedPreferences.getInstance();
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(
+        const MillenniumCapitalApp(
+          campaignWorldPreparer: _skipCampaignWorldPreparation,
+          dialoguePreviewMode: true,
+        ),
+      );
+      await tester.pumpAndSettle();
+      await startNewGame(tester);
+      for (var attempt = 0; attempt < 40; attempt += 1) {
+        await tester.pump(const Duration(milliseconds: 50));
+        if (find.text('미리보기 화자').evaluate().isNotEmpty) break;
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 25)),
+        );
+      }
+      await tester.pumpAndSettle();
+
+      expect(
+        tester
+            .widget<VisualNovelOnboardingScreen>(
+              find.byType(VisualNovelOnboardingScreen),
+            )
+            .allowRuntimeDialoguePreview,
+        isTrue,
+      );
+      await preferences.reload();
+      expect(
+        preferences.getString('project-decimal-dialogue-runtime-v2'),
+        isNotNull,
+      );
+      expect(find.text('미리보기 화자'), findsOneWidget);
+      expect(find.textContaining('편집기 브라우저 초안 미리보기'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('prologue skip advances through eight Decimal sections', (
+    tester,
+  ) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
@@ -1151,67 +1013,25 @@ void main() {
     await tester.pumpAndSettle();
     await startNewGame(tester);
 
-    await tester.tap(find.byKey(const Key('story-skip-button')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('story-skip-dialog')), findsOneWidget);
-    expect(find.text('청와대 장면을 건너뛸까요?'), findsOneWidget);
-    await tester.tap(find.byKey(const Key('story-skip-confirm')));
-    await tester.pumpAndSettle();
-
-    expect(
-      (tester
-                  .widget<Image>(
-                    find.byKey(const Key('story-background-image')),
-                  )
-                  .image
-              as AssetImage)
-          .assetName,
-      'assets/images/historical_prologue/bg_future_development_orphanage_1982_portrait_cartoon_v1.png',
-    );
-
-    await tester.tap(find.byKey(const Key('story-skip-button')));
-    await tester.pumpAndSettle();
-    expect(find.text('고아원 장면을 건너뛸까요?'), findsOneWidget);
-    await tester.tap(find.byKey(const Key('story-skip-confirm')));
-    await tester.pumpAndSettle();
-    expect(
-      (tester
-                  .widget<Image>(
-                    find.byKey(const Key('story-background-image')),
-                  )
-                  .image
-              as AssetImage)
-          .assetName,
-      'assets/images/historical_prologue/bg_future_development_orientation_hall_2000_portrait_v1.png',
-    );
-
-    await tester.tap(find.byKey(const Key('story-skip-button')));
-    await tester.pumpAndSettle();
-    expect(find.text('강당 장면을 건너뛸까요?'), findsOneWidget);
-    await tester.tap(find.byKey(const Key('story-skip-confirm')));
-    await tester.pumpAndSettle();
-    expect(
-      (tester
-                  .widget<Image>(
-                    find.byKey(const Key('story-background-image')),
-                  )
-                  .image
-              as AssetImage)
-          .assetName,
-      'assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_corridor_2000_v1.png',
-    );
-
-    await tester.tap(find.byKey(const Key('story-skip-button')));
-    await tester.pumpAndSettle();
-    expect(find.text('기숙사 장면을 건너뛸까요?'), findsOneWidget);
-    await tester.tap(find.byKey(const Key('story-skip-confirm')));
-    await tester.pumpAndSettle();
-
+    const labels = <String>[
+      '자본전 선언을 건너뛸까요?',
+      '유리상자의 실패를 건너뛸까요?',
+      '행렬 시험을 건너뛸까요?',
+      '불공정 게임을 건너뛸까요?',
+      '욕망 검증을 건너뛸까요?',
+      '강남 아지트 도착을 건너뛸까요?',
+      '첫날 공동생활을 건너뛸까요?',
+      '첫 주문 브리핑을 건너뛸까요?',
+    ];
+    for (final label in labels) {
+      await tester.tap(find.byKey(const Key('story-skip-button')));
+      await tester.pumpAndSettle();
+      expect(find.text(label), findsOneWidget);
+      await tester.tap(find.byKey(const Key('story-skip-confirm')));
+      await tester.pumpAndSettle();
+    }
     expect(find.byKey(const Key('orientation-complete-card')), findsOneWidget);
     expect(find.byKey(const Key('academy-pc-powered-off')), findsOneWidget);
-    expect(find.byKey(const Key('academy-pc-power-toggle')), findsOneWidget);
-    expect(find.byKey(const Key('academy-player-name-input')), findsNothing);
-    expect(find.byKey(const Key('academy-company-name-input')), findsNothing);
     expect(
       find.byKey(const Key('academy-market-tutorial-screen')),
       findsNothing,
@@ -1233,7 +1053,7 @@ void main() {
           persistence: persistence,
           campaignWorldPreparer: (state, onProgress) async {
             prepareCalls += 1;
-            onProgress(const WorldLoadProgress(0.96, '오리엔테이션 세계 계산 완료'));
+            onProgress(const WorldLoadProgress(0.96, '데시멀 세계 계산 완료'));
             await Future<void>.delayed(Duration.zero);
           },
         ),
@@ -1294,7 +1114,7 @@ void main() {
     expect(find.byKey(const Key('story-typewriter-hint')), findsWidgets);
     await tester.tap(find.byKey(const ValueKey(1)));
     await tester.pumpAndSettle();
-    expect(find.textContaining('그럴 가능성이 큽니다'), findsOneWidget);
+    expect(find.byKey(const Key('story-line-text')), findsOneWidget);
     expect(find.byKey(const Key('story-typewriter-hint')), findsNothing);
     expect(find.byKey(const Key('story-continue')), findsWidgets);
     await tester.pumpAndSettle();
@@ -1305,7 +1125,7 @@ void main() {
     expect(tester.getTopLeft(continueButton).dx, greaterThanOrEqualTo(0));
     expect(tester.getBottomRight(continueButton).dx, lessThanOrEqualTo(360));
     expect(tester.getBottomRight(continueButton).dy, lessThanOrEqualTo(800));
-    expect(find.textContaining('그런데 이건 왜 이렇게 얇아'), findsOneWidget);
+    expect(find.byKey(const Key('story-line-text')), findsOneWidget);
     expect(find.byKey(const Key('policy-file-children')), findsNothing);
     expect(find.byKey(const Key('policy-file-capital')), findsNothing);
     expect(tester.takeException(), isNull);
@@ -1393,6 +1213,14 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('academy-pc-desktop')), findsOneWidget);
       expect(find.text('전원 ON'), findsOneWidget);
+      final stockAppIcon = tester.widget<Image>(
+        find.byKey(const Key('academy-stock-app-icon-image')),
+      );
+      expect(
+        (stockAppIcon.image as AssetImage).assetName,
+        'assets/images/stock_practice_app_icon_v1.png',
+      );
+      expect(stockAppIcon.filterQuality, FilterQuality.high);
 
       await tester.tap(find.byKey(const Key('academy-stock-app-icon')));
       await tester.pumpAndSettle();
@@ -1403,10 +1231,11 @@ void main() {
       expect(find.textContaining('한빛통신 · 거래일 시세'), findsOneWidget);
       expect(find.textContaining('국가원금 50,000원'), findsOneWidget);
 
-      await tester.enterText(
+      final lockedPlayerName = tester.widget<TextField>(
         find.byKey(const Key('academy-player-name-input')),
-        '민준',
       );
+      expect(lockedPlayerName.readOnly, isTrue);
+      expect(lockedPlayerName.controller?.text, '성준');
       await tester.enterText(
         find.byKey(const Key('academy-company-name-input')),
         '첫빛 투자연구소',
@@ -1430,13 +1259,14 @@ void main() {
 
       final saved = await persistence.loadSlot(1);
       expect(saved, isNotNull);
-      expect(saved!.story.playerName, '민준');
+      expect(saved!.story.playerName, '성준');
       expect(saved.companyName, '첫빛 투자연구소');
       expect(saved.story.orphanageReboot, isTrue);
       expect(saved.story.marketTutorialSeen, isFalse);
       expect(saved.story.flagBool('prologueInProgress'), isFalse);
       expect(saved.brokerageCash, initialCompanyCash);
       expect(saved.currentDate, DateTime(2000, 1, 3));
+      expect(saved.marketMinute, krxOpenMinute);
       expect(tester.takeException(), isNull);
     },
   );
@@ -1466,7 +1296,7 @@ void main() {
       find.byKey(const Key('company-header-title')),
     );
     expect(companyHeader.data, '이어하기 연구소');
-    expect(find.textContaining('1월 9일 일'), findsWidgets);
+    expect(find.textContaining('1월 8일 토'), findsWidgets);
     expect(find.byKey(const Key('room-company-name')), findsOneWidget);
   });
 
@@ -1508,7 +1338,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('decision-inbox-screen')), findsNothing);
     expect(find.byKey(const Key('open-decisions-button')), findsOneWidget);
-    expect(find.text('1월 2일 일 · 08:30'), findsOneWidget);
+    expect(find.text('1월 1일 토 · 08:30'), findsOneWidget);
     expect(find.byKey(const Key('hub-claim-mission-reward')), findsOneWidget);
     expect(
       find.descendant(
@@ -1946,10 +1776,13 @@ void main() {
       }
       await tester.pump(const Duration(milliseconds: 500));
       expect(
-        find.byKey(const Key('tutorial-buy-reason-input')),
+        find.byKey(const Key('tutorial-buy-reason-choice-0')),
         findsOneWidget,
       );
-      expect(find.byKey(const Key('tutorial-sell-rule-input')), findsOneWidget);
+      expect(
+        find.byKey(const Key('tutorial-sell-rule-choice-0')),
+        findsOneWidget,
+      );
       expect(
         tester
             .widget<FilledButton>(
@@ -1958,14 +1791,21 @@ void main() {
             .onPressed,
         isNull,
       );
-      await tester.enterText(
-        find.byKey(const Key('tutorial-buy-reason-input')),
-        '통신 가입자와 재무 흐름을 함께 확인했다.',
+      await tester.tap(find.byKey(const Key('tutorial-buy-reason-choice-0')));
+      await tester.pump();
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.byKey(const Key('save-market-research-note')),
+            )
+            .onPressed,
+        isNull,
       );
-      await tester.enterText(
-        find.byKey(const Key('tutorial-sell-rule-input')),
-        '가입자 증가가 꺾이거나 손실선에 닿으면 판다.',
+      await tester.ensureVisible(
+        find.byKey(const Key('tutorial-sell-rule-choice-0')),
       );
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('tutorial-sell-rule-choice-0')));
       await tester.pump();
       await tester.ensureVisible(
         find.byKey(const Key('save-market-research-note')),
@@ -2036,6 +1876,10 @@ void main() {
         find.byKey(const Key('market-order-tutorial-overlay')),
         findsOneWidget,
       );
+      final tutorialPageRect = tester.getRect(
+        find.byKey(const Key('market-practical-tutorial-page')),
+      );
+      expect(tutorialPageRect, const Rect.fromLTWH(0, 0, 360, 800));
       expect(
         find.byKey(const Key('market-order-tutorial-done')),
         findsOneWidget,
@@ -2310,7 +2154,7 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('호가 · 주문 · 차트 · 회사 정보/투자노트'), findsOneWidget);
-      expect(find.textContaining('기숙사와 투자실을 오가며'), findsOneWidget);
+      expect(find.textContaining('생활 라운지와 트레이딩 플로어를 오가며'), findsOneWidget);
       await tester.tap(
         find.byKey(const Key('market-practical-tutorial-complete')),
       );
@@ -3010,7 +2854,7 @@ void main() {
     await verifyDay(day: 3, expectedMarketCap: '59.2억원');
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pumpAndSettle();
-    await verifyDay(day: 4, expectedMarketCap: '60.4억원');
+    await verifyDay(day: 5, expectedMarketCap: '60.4억원');
   });
 
   testWidgets(
@@ -3890,7 +3734,7 @@ void main() {
     }
     expect(backgroundEvent, isNotNull);
     final event = backgroundEvent!;
-    final day = eventDate!.difference(DateTime(2000, 1, 2)).inDays + 1;
+    final day = eventDate!.difference(DateTime(2000, 1, 1)).inDays + 1;
     final state = const GameEngine()
         .createNewGame('Background News Test', initialCash: 1000000)
         .copyWith(
@@ -3945,7 +3789,7 @@ void main() {
     }
     expect(watchedEvent, isNotNull);
     final event = watchedEvent!;
-    final day = eventDate!.difference(DateTime(2000, 1, 2)).inDays + 1;
+    final day = eventDate!.difference(DateTime(2000, 1, 1)).inDays + 1;
     final state = const GameEngine()
         .createNewGame('Watched News Test', initialCash: 1000000)
         .copyWith(
@@ -7297,7 +7141,7 @@ void main() {
       final sortedDepth = quantitiesBeforePulse.values.toList(growable: false)
         ..sort((left, right) => right.compareTo(left));
       final largeDepthThreshold =
-          sortedDepth[math.min(5, sortedDepth.length - 1)];
+          sortedDepth[math.min(7, sortedDepth.length - 1)];
 
       expect(
         changedQuantities.any((key) {

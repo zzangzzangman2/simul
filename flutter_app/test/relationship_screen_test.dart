@@ -39,7 +39,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('제6기 인물 카드'), findsOneWidget);
+    expect(find.text('캐릭터'), findsOneWidget);
     expect(find.byKey(const Key('character-card-grid')), findsOneWidget);
     expect(find.byKey(const Key('character-card-kim_seoa')), findsOneWidget);
     final portraitZoom = tester.widget<Transform>(
@@ -54,6 +54,13 @@ void main() {
     );
     expect(portrait.filterQuality, FilterQuality.high);
     expect(portrait.isAntiAlias, isTrue);
+    final portraitRegion = tester.getRect(
+      find.byKey(const Key('character-card-portrait-region-kim_seoa')),
+    );
+    final infoRegion = tester.getRect(
+      find.byKey(const Key('character-card-info-kim_seoa')),
+    );
+    expect(portraitRegion.bottom, lessThanOrEqualTo(infoRegion.top));
 
     await tester.tap(find.byKey(const Key('character-card-kim_seoa')));
     await tester.pumpAndSettle();

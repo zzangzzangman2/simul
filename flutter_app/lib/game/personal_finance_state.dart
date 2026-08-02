@@ -63,7 +63,7 @@ class SpendingOption {
 final spendingCatalog = <SpendingOption>[
   SpendingOption(
     id: 'cohort_field_day',
-    title: '제6기 현장조사 하루',
+    title: '데시멀 동기 현장조사 하루',
     description: '동기들과 상권과 제품을 직접 관찰합니다. 같은 달에는 한 번만 선택해 공동체 신뢰를 높입니다.',
     category: SpendingCategory.community,
     unlockYear: 2000,
@@ -132,7 +132,7 @@ final spendingCatalog = <SpendingOption>[
   SpendingOption(
     id: 'scholarship',
     title: '청소년 금융교육 장학금',
-    description: '지역 학생을 지원합니다. 한 해에 한 번 평판과 공동체 신뢰를 높입니다.',
+    description: '지역 동기을 지원합니다. 한 해에 한 번 평판과 공동체 신뢰를 높입니다.',
     category: SpendingCategory.social,
     unlockYear: 2008,
     cost: 1000000,
@@ -143,7 +143,7 @@ final spendingCatalog = <SpendingOption>[
   SpendingOption(
     id: 'alumni_housing_trust',
     title: '수료생 공동주거 신탁',
-    description: '미래양성원 수료생이 공동 관리하는 게임용 주거자산입니다. 월 관리비 8만원이 듭니다.',
+    description: '데시멀 센터 수료생이 공동 관리하는 게임용 주거자산입니다. 월 관리비 8만원이 듭니다.',
     category: SpendingCategory.realEstate,
     unlockYear: 2009,
     cost: 25000000,

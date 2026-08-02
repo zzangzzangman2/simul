@@ -1,21 +1,22 @@
-# 제6기 기숙사 배경 4종 · 현행 런타임
+# 레거시 생활동 배경 4종 · 호환 자산
 
-1024×1536 PNG 카툰·소프트 페인터리 배경이며 현재 런타임에 연결되어 있다.
+1024×1536 PNG 카툰·소프트 페인터리 배경이다. 신규 캠페인은 `../decimal/`을 쓰며,
+이 폴더는 구형 저장과 시각 비교를 위한 호환 자산으로만 남긴다.
 
 | 파일 | 장면 | 상태 |
 | --- | --- | --- |
-| `bg_future_academy_dorm_corridor_2000_v1.png` | 강당에서 생활실로 이어지는 중앙 복도 | 현행 연결 |
-| `bg_future_academy_dorm_shared_room_day_2000_v1.png` | 남학생 2명·여학생 8명의 한 방 공용 생활실 | 현행 연결 |
-| `bg_future_academy_dorm_washroom_2000_v1.png` | 잠금 칸막이가 있는 세면·탈의 공간 | 현행 연결 |
-| `bg_future_academy_dorm_shared_room_night_2000_v1.png` | 같은 생활실의 첫날 소등 뒤 | 현행 연결 |
+| `bg_future_academy_dorm_corridor_2000_v1.png` | 이전 중앙 복도 | 레거시 |
+| `bg_future_academy_dorm_shared_room_day_2000_v1.png` | 이전 공용 생활실 | 레거시 |
+| `bg_future_academy_dorm_washroom_2000_v1.png` | 이전 세면·탈의 공간 | 레거시 |
+| `bg_future_academy_dorm_shared_room_night_2000_v1.png` | 이전 첫날 소등 뒤 | 레거시 |
 
 ## 실제 참조 입력
 
 - `art_references/simul_production_soft_painted_vn_style_anchor_v1.png`: 렌더링 문법
 - `historical_prologue/bg_orphanage_dormitory_1999_portrait_cartoon_v1.png`:
-  2000년 전후 시설 기숙사의 공간·소재 정체성
+  2000년 전후 공동생활 시설의 공간·소재 정체성
 - `historical_prologue/bg_future_development_orientation_hall_2000_portrait_v1.png`:
-  미래양성원 건축·시대 정체성
+  이전 세계관의 건축·시대 정체성(신규 데시멀 배경에는 사용하지 않음)
 
 ## 승인 기준
 

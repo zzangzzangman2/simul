@@ -59,7 +59,7 @@ class _GameTitleScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     const Text(
-                      '국가원금 5만원으로 시작하는 제6기 운용자의 기록',
+                      '국가원금 5만원으로 시작하는 데시멀 동기 운용자의 기록',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: Color(0xFFD4E8E3),

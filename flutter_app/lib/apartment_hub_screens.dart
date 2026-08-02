@@ -783,16 +783,16 @@ class _HubTutorialOverlay extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                '미래양성원 6기 생활 안내',
+                '데시멀 센터 데시멀 생활 안내',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
               ),
               const SizedBox(height: 12),
               const Text(
-                '• 6기 기숙사 단말기: 시장·부동산·상권 앱\n'
+                '• 데시멀 생활동 단말기: 시장·부동산·상권 앱\n'
                 '• 개인 장부함: 거래 근거·성과\n'
-                '• 투자실: 6기 동기·지도관·운용 조직\n'
-                '• 전자창고: 조사 자료와 생활환경\n'
-                '• 제3기록실: 새 안건과 사라진 5기 기록\n'
+                '• 트레이딩 플로어: 동기·운영관·운용 조직\n'
+                '• 기기 정비실: 단말기·통신 장비와 생활 설비\n'
+                '• 기록 보관실: 국가 회수금과 선발 과정의 봉인 기록\n'
                 '• 본관 앞: 국가계좌 창구·원내 실습',
                 style: TextStyle(
                   fontSize: 13,
@@ -871,7 +871,7 @@ class _ApartmentPlaceScene extends StatelessWidget {
             width: 118,
             height: 112,
             eyebrow: '공용 단말기 켜기',
-            label: '6기 홈 PC',
+            label: '데시멀 홈 PC',
             icon: Icons.computer_rounded,
             accent: const Color(0xFF80D8FF),
             onTap: onOpenMarket,
@@ -895,7 +895,7 @@ class _ApartmentPlaceScene extends StatelessWidget {
             width: 124,
             height: 148,
             eyebrow: '동기·지도관과 회의',
-            label: '6기·운용조직',
+            label: '데시멀·운용조직',
             icon: Icons.groups_2_rounded,
             accent: const Color(0xFFFFD27A),
             onTap: onOpenOrganization,
@@ -920,7 +920,7 @@ class _ApartmentPlaceScene extends StatelessWidget {
             height: 126,
             eyebrow: '봉인 기록함 열기',
             label: state.pendingDecisions.isEmpty
-                ? '제3기록실'
+                ? '기록 보관실'
                 : '새 기록 ${state.pendingDecisions.length}건',
             icon: Icons.markunread_mailbox_rounded,
             accent: state.pendingDecisions.isEmpty
@@ -947,7 +947,7 @@ class _ApartmentPlaceScene extends StatelessWidget {
             width: 122,
             height: 148,
             eyebrow: '원내 실습 확인',
-            label: '6기 실습 게시판',
+            label: '데시멀 실습 게시판',
             icon: Icons.sports_esports_rounded,
             accent: const Color(0xFF98E5C1),
             onTap: onOpenWork,
@@ -1692,8 +1692,8 @@ class _ApartmentActionRail extends StatelessWidget {
         _ApartmentRailButton(
           buttonKey: const Key('phone-messenger-button'),
           tooltip: messengerUnread > 0
-              ? '미래톡 · 새 메시지 $messengerUnread개'
-              : '미래톡 · 제6기 친구들과 대화',
+              ? '데시멀톡 · 새 메시지 $messengerUnread개'
+              : '데시멀톡 · 동기들과 대화',
           icon: Icons.smartphone_rounded,
           badgeCount: messengerUnread,
           onPressed: onOpenMessenger,
@@ -1701,7 +1701,7 @@ class _ApartmentActionRail extends StatelessWidget {
         const SizedBox(height: 7),
         _ApartmentRailButton(
           buttonKey: const Key('relationship-status-button'),
-          tooltip: '제6기 인물 카드 10명',
+          tooltip: '캐릭터 10명',
           assetPath: 'assets/images/hud_clean_letter.png',
           onPressed: onOpenRelationships,
         ),
@@ -1970,47 +1970,47 @@ class _ApartmentPlaceDetails {
   ) => switch (place) {
     _ApartmentPlace.bedroom => const _ApartmentPlaceDetails(
       id: 'bedroom',
-      title: '국립 미래양성원 · 6기 기숙사',
-      shortTitle: '6기 기숙사',
+      title: '프로젝트 데시멀 · 생활 라운지',
+      shortTitle: '생활 라운지',
       hint: '공용 단말기 · 국가계좌 장부',
       assetPath:
-          'assets/images/historical_prologue/bg_orphanage_dormitory_1999_portrait_cartoon_v1.png',
+          'assets/images/cinematic_soft_painted/decimal/bg_decimal_living_lounge_1999_v1.png',
       icon: Icons.bed_rounded,
       accent: Color(0xFF82D7FF),
     ),
     _ApartmentPlace.livingRoom => const _ApartmentPlaceDetails(
       id: 'living-room',
-      title: '국립 미래양성원 · 제6기 투자실',
+      title: '프로젝트 데시멀 · 트레이딩 플로어',
       shortTitle: '투자실',
-      hint: '6기 동기 · 지도관 · 운용조직',
+      hint: '동기 10명 · 운영관 · 운용 조직',
       assetPath:
-          'assets/images/historical_prologue/bg_orphanage_investment_room_2000_portrait_cartoon_v1.png',
+          'assets/images/cinematic_soft_painted/decimal/bg_decimal_trading_floor_dawn_2000_v1.png',
       icon: Icons.monitor_heart_rounded,
       accent: Color(0xFFFFCB78),
     ),
     _ApartmentPlace.kitchen => const _ApartmentPlaceDetails(
       id: 'kitchen',
-      title: '국립 미래양성원 · 전자창고',
-      shortTitle: '전자창고',
-      hint: '제품 조사 · 공용 시설',
+      title: '프로젝트 데시멀 · 기기 정비실',
+      shortTitle: '기기 정비실',
+      hint: '단말기 정비 · 통신 장비 · 공용 설비',
       assetPath:
-          'assets/images/historical_prologue/bg_orphanage_electronics_storage_2000_portrait_cartoon_v1.png',
+          'assets/images/cinematic_soft_painted/decimal/bg_decimal_electronics_workshop_2000_v1.png',
       icon: Icons.inventory_2_rounded,
       accent: Color(0xFF8CE3BE),
     ),
     _ApartmentPlace.corridor => const _ApartmentPlaceDetails(
       id: 'corridor',
-      title: '국립 미래양성원 · 제3기록실',
-      shortTitle: '제3기록실',
-      hint: '새 안건 · 사라진 5기 장부',
+      title: '프로젝트 데시멀 · 기록 보관실',
+      shortTitle: '기록 보관실',
+      hint: '국가 회수금 · 선발 과정 · 봉인 안건',
       assetPath:
-          'assets/images/historical_prologue/bg_orphanage_records_room_1999_portrait_cartoon_v1.png',
+          'assets/images/cinematic_soft_painted/decimal/bg_decimal_records_archive_2000_v1.png',
       icon: Icons.folder_copy_rounded,
       accent: Color(0xFF9ED9EF),
     ),
     _ApartmentPlace.neighborhood => const _ApartmentPlaceDetails(
       id: 'neighborhood',
-      title: '국립 미래양성원 · 본관 앞',
+      title: '프로젝트 데시멀 · 본관 앞',
       shortTitle: '본관 앞',
       hint: '국가계좌 창구 · 원내 실습',
       assetPath:

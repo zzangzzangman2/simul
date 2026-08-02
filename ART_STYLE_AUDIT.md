@@ -31,10 +31,10 @@
 
 | 자산군 | 경로·기준 |
 | --- | --- |
-| 주인공 SEED 01 | `flutter_app/assets/images/protagonist_seed01/` 24종 |
-| 한서윤 선생님 | `flutter_app/assets/images/주식선생님/`의 코드 연결 포즈 |
+| 주인공 성준 | `flutter_app/assets/images/protagonist_seed01/` 24종(호환 경로) |
+| 한서윤 운영관 | `flutter_app/assets/images/주식선생님/`의 코드 연결 포즈(호환 경로) |
 | 1981년 정책실 | `cinematic_soft_painted/policy_1981/` |
-| 2000년 기숙사 | `cinematic_soft_painted/dormitory_2000/` |
+| 데시멀 센터 | `cinematic_soft_painted/decimal/` 신규 배경 11종 |
 | 역사 프롤로그 | `historical_prologue/`의 코드 연결 자산 |
 | 서하늘 공인중개사 | `character_realtor_*_v1.png` 6종 |
 

@@ -22,19 +22,19 @@ import { DialogueScene, initialDialogue } from "./dialogue-data";
 import { validateDialogueScenes } from "./dialogue-validation";
 import styles from "./editor.module.css";
 
-const STORAGE_KEY = "future-academy-dialogue-editor-v1";
-const GAME_STORAGE_KEY = "future-academy-dialogue-runtime-v1";
+const STORAGE_KEY = "project-decimal-dialogue-editor-v2";
+const GAME_STORAGE_KEY = "project-decimal-dialogue-runtime-v2";
 const FLUTTER_GAME_STORAGE_KEY = `flutter.${GAME_STORAGE_KEY}`;
-const BUILD_STORAGE_KEY = "future-academy-dialogue-built-v1";
-const CONTENT_VERSION = 1;
-const APPEARANCE_VERSION = 13;
+const BUILD_STORAGE_KEY = "project-decimal-dialogue-built-v2";
+const CONTENT_VERSION = 2;
+const APPEARANCE_VERSION = 14;
 
 type PublishStatus = "idle" | "building" | "success" | "error";
 
 const CHARACTER_GROUPS = [
   "주요 인물",
   "1981년 정책실",
-  "미래양성원",
+  "프로젝트 데시멀",
   "화면 인물 없음",
 ] as const;
 
@@ -216,7 +216,7 @@ function BackgroundPicker({
           aria-label="장면 배경 선택"
         >
           {!current ? <option value={value}>직접 지정한 배경</option> : null}
-          {(["프롤로그", "미래양성원", "생활·투자"] as const).map((group) => (
+          {(["프롤로그", "데시멀 센터", "생활·투자"] as const).map((group) => (
             <optgroup key={group} label={group}>
               {dialogueBackgrounds
                 .filter((entry) => entry.group === group)
@@ -492,17 +492,11 @@ export default function DialogueEditorPage() {
     setPublishMessage("Flutter 게임을 다시 만드는 중이에요. 보통 20~60초 걸립니다.");
 
     try {
-      const loopback = ["localhost", "127.0.0.1", "::1"].includes(
-        window.location.hostname,
-      );
-      let buildToken = "";
-      if (!loopback) {
-        buildToken = sessionStorage.getItem("dialogue-build-token") || "";
-        if (!buildToken) {
-          buildToken = window.prompt("개발 PC에 설정한 LAN 대사 빌드 토큰을 입력하세요.") || "";
-          if (!buildToken) throw new Error("LAN 빌드 토큰이 필요합니다.");
-          sessionStorage.setItem("dialogue-build-token", buildToken);
-        }
+      let buildToken = sessionStorage.getItem("dialogue-build-token") || "";
+      if (!buildToken) {
+        buildToken = window.prompt("개발 PC에 설정한 대사 빌드 토큰을 입력하세요.") || "";
+        if (!buildToken) throw new Error("대사 빌드 토큰이 필요합니다.");
+        sessionStorage.setItem("dialogue-build-token", buildToken);
       }
       const response = await fetch("/api/dialogue/build", {
         method: "POST",
@@ -666,7 +660,7 @@ export default function DialogueEditorPage() {
       scenes,
     };
     downloadFile(
-      "미래양성원6기_대사편집본.json",
+      "프로젝트데시멀_대사편집본.json",
       JSON.stringify(payload, null, 2),
       "application/json;charset=utf-8",
     );
@@ -675,7 +669,7 @@ export default function DialogueEditorPage() {
 
   function exportTxt() {
     downloadFile(
-      "미래양성원6기_대사편집본.txt",
+      "프로젝트데시멀_대사편집본.txt",
       makeTxt(scenes),
       "text/plain;charset=utf-8",
     );
@@ -774,7 +768,7 @@ export default function DialogueEditorPage() {
           <span className={styles.logo}>台本</span>
           <div>
             <h1>대사 편집기</h1>
-            <p>미래양성원 제6기 · {scenes.length}개 장면</p>
+            <p>프로젝트 데시멀 · {scenes.length}개 장면</p>
           </div>
         </div>
         <div
@@ -790,8 +784,12 @@ export default function DialogueEditorPage() {
               : `게임 반영 완료 · ${saveLabel}`}
         </div>
         <nav className={styles.actions} aria-label="파일 메뉴">
-          <a href="/play/index.html" target="_blank" rel="noreferrer">
-            게임 열기
+          <a
+            href="/play/index.html?dialoguePreview=1"
+            target="_blank"
+            rel="noreferrer"
+          >
+            대사 미리보기
           </a>
           <button type="button" onClick={() => importRef.current?.click()}>
             불러오기

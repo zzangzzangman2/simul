@@ -113,7 +113,7 @@ void main() {
     }
   });
 
-  test('first-day cohort dialogue uses the approved production sprites', () {
+  test('Project Decimal dialogue keeps all eight approved identities', () {
     final decoded =
         jsonDecode(
               File(
@@ -121,17 +121,18 @@ void main() {
               ).readAsStringSync(),
             )
             as Map<String, dynamic>;
-    expect(decoded['appearanceVersion'], 13);
-    expect(decoded['contentVersion'], 1);
+    expect(decoded['appearanceVersion'], 14);
+    expect(decoded['contentVersion'], 2);
     final scenes = (decoded['scenes'] as List<dynamic>)
         .cast<Map<String, dynamic>>();
+    expect(scenes.length, 292);
     const speakerFolders = <String, String>{
       '김서아': 'kim_seoa',
       '이지안': 'lee_jian',
       '최이서': 'choi_iseo',
       '정아린': 'jung_arin',
       '박하은': 'park_haeun',
-      '수아': 'han_sua',
+      '한수아': 'han_sua',
       '오지우': 'oh_jiwoo',
       '윤채아': 'yoon_chaea',
     };
@@ -140,7 +141,11 @@ void main() {
         (scene) => scene['speaker'] == entry.key,
       );
       expect(speakerScenes, isNotEmpty, reason: entry.key);
-      for (final scene in speakerScenes) {
+      final portraitScenes = speakerScenes.where(
+        (scene) => (scene['character'] as String).isNotEmpty,
+      );
+      expect(portraitScenes, isNotEmpty, reason: entry.key);
+      for (final scene in portraitScenes) {
         expect(
           scene['character'],
           contains('/production_soft_painted/${entry.value}/'),
@@ -148,7 +153,11 @@ void main() {
         );
       }
     }
-    final suaScenes = scenes.where((scene) => scene['speaker'] == '수아');
+    final suaScenes = scenes.where(
+      (scene) =>
+          scene['speaker'] == '한수아' &&
+          (scene['character'] as String).isNotEmpty,
+    );
     for (final scene in suaScenes) {
       expect(
         scene['character'],
@@ -166,91 +175,116 @@ void main() {
     );
   });
 
-  test('first dormitory introductions grow out of the torn bag cleanup', () {
-    final decoded =
-        jsonDecode(
-              File(
-                'assets/dialogue/dialogue-editor-override.json',
-              ).readAsStringSync(),
-            )
-            as Map<String, dynamic>;
-    final scenes = (decoded['scenes'] as List<dynamic>)
-        .cast<Map<String, dynamic>>();
-    final byId = <String, Map<String, dynamic>>{
-      for (final scene in scenes) scene['id'] as String: scene,
-    };
-    expect(byId['scene-66']?['line'], contains('옆선이 결국 터졌다'));
-    final introductionSpeakers = scenes
-        .where(
-          (scene) =>
-              (scene['order'] as int) >= 69 && (scene['order'] as int) <= 95,
-        )
-        .map((scene) => scene['speaker'] as String)
-        .toSet();
-    expect(
-      introductionSpeakers,
-      containsAll(<String>[
+  test(
+    'Project Decimal canon covers selection, boundaries, and first order',
+    () {
+      final decoded =
+          jsonDecode(
+                File(
+                  'assets/dialogue/dialogue-editor-override.json',
+                ).readAsStringSync(),
+              )
+              as Map<String, dynamic>;
+      final scenes = (decoded['scenes'] as List<dynamic>)
+          .cast<Map<String, dynamic>>();
+      final joinedText = scenes
+          .map(
+            (scene) => <Object?>[
+              scene['chapter'],
+              scene['location'],
+              scene['speaker'],
+              scene['direction'],
+              scene['line'],
+            ].join('\n'),
+          )
+          .join('\n');
+      for (final forbidden in <String>[
+        '미래양성원',
+        '제6기',
+        'SEED',
+        '선배',
+        '후배',
+        '선생님',
+        '학생',
+        '기숙사',
+        '오리엔테이션',
+      ]) {
+        expect(joinedText, isNot(contains(forbidden)), reason: forbidden);
+      }
+
+      final speakerCounts = <String, int>{};
+      for (final scene in scenes) {
+        final speaker = scene['speaker'] as String;
+        speakerCounts[speaker] = (speakerCounts[speaker] ?? 0) + 1;
+      }
+      for (final name in <String>[
+        '성준',
+        '김학준',
         '김서아',
         '이지안',
         '최이서',
         '정아린',
         '박하은',
-        '수아',
+        '한수아',
         '오지우',
         '윤채아',
-        '김학준',
-        '나',
-      ]),
-    );
-    expect(
-      byId['scene-86']?['character'],
-      endsWith('08_explaining_quality_v2.png'),
-    );
-    expect(
-      byId['scene-87']?['character'],
-      endsWith('06_annoyed_quality_v2.png'),
-    );
-    expect(
-      byId['scene-89']?['character'],
-      endsWith('03_bright_laugh_quality_v2.png'),
-    );
-    expect(byId['scene-93']?['line'], '내 이름은 내일 말할게.');
-    expect(byId['scene-102']?['line'], contains('갑자기 잡아당기면 싫어'));
-    expect(
-      byId['scene-102']?['character'],
-      endsWith('07_firm_boundary_v1.png'),
-    );
-    expect(byId['scene-107']?['line'], contains('다음엔 먼저 물어볼게'));
-    expect(byId['scene-111']?['line'], contains('3에서 5로 건너뛰어'));
-    expect(byId['scene-125']?['line'], contains('5기 기록만 한 줄도 없어'));
-  });
+      ]) {
+        expect(speakerCounts[name], greaterThanOrEqualTo(5), reason: name);
+      }
 
-  test('scene 24 uses the generated bus transition background', () async {
-    final decoded =
-        jsonDecode(
-              File(
-                'assets/dialogue/dialogue-editor-override.json',
-              ).readAsStringSync(),
-            )
-            as Map<String, dynamic>;
-    final scenes = (decoded['scenes'] as List<dynamic>)
-        .cast<Map<String, dynamic>>();
-    final scene = scenes.singleWhere((scene) => scene['order'] == 24);
-    expect(scene['location'], contains('버스'));
-    expect(
-      scene['background'],
-      endsWith('bg_bus_transition_seoul_outskirts_2000_portrait_v1.png'),
-    );
-    final file = File(
-      'assets/images/historical_prologue/'
-      'bg_bus_transition_seoul_outskirts_2000_portrait_v1.png',
-    );
-    expect(file.existsSync(), isTrue);
-    final codec = await ui.instantiateImageCodec(await file.readAsBytes());
-    final frame = await codec.getNextFrame();
-    expect(frame.image.width, 1024);
-    expect(frame.image.height, 1536);
-    frame.image.dispose();
-    codec.dispose();
-  });
+      expect(
+        scenes.singleWhere(
+          (scene) => scene['id'] == 'decimal-final-ten-roster',
+        )['line'],
+        contains('함부로 넘지 말아야 할 선'),
+      );
+      expect(joinedText, contains('다음엔 먼저 물어볼게'));
+      expect(joinedText, contains('생활 내기는 돈·식사·잠자리 금지'));
+      expect(joinedText, contains('50,000원'));
+      expect(
+        scenes.last['background'],
+        endsWith('bg_decimal_trading_floor_dawn_2000_v1.png'),
+      );
+    },
+  );
+
+  test(
+    'all generated Decimal backgrounds are production portrait assets',
+    () async {
+      final decoded =
+          jsonDecode(
+                File(
+                  'assets/dialogue/dialogue-editor-override.json',
+                ).readAsStringSync(),
+              )
+              as Map<String, dynamic>;
+      final scenes = (decoded['scenes'] as List<dynamic>)
+          .cast<Map<String, dynamic>>();
+      final decimalBackgrounds = scenes
+          .map((scene) => scene['background'] as String)
+          .where((asset) => asset.contains('/decimal/'))
+          .toSet();
+      expect(decimalBackgrounds.length, greaterThanOrEqualTo(9));
+      for (final asset in decimalBackgrounds) {
+        final relative = asset.replaceFirst('/play/assets/', '');
+        final file = File(relative);
+        expect(file.existsSync(), isTrue, reason: relative);
+        final codec = await ui.instantiateImageCodec(await file.readAsBytes());
+        final frame = await codec.getNextFrame();
+        expect(frame.image.width, greaterThanOrEqualTo(900), reason: relative);
+        expect(
+          frame.image.height,
+          greaterThanOrEqualTo(1600),
+          reason: relative,
+        );
+        expect(
+          frame.image.height / frame.image.width,
+          closeTo(16 / 9, 0.01),
+          reason: relative,
+        );
+        frame.image.dispose();
+        codec.dispose();
+      }
+    },
+  );
 }

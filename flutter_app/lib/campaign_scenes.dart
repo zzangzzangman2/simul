@@ -1116,7 +1116,7 @@ class _AcademyDecisionSceneState extends State<AcademyDecisionScene> {
         children: [
           Positioned.fill(
             child: Image.asset(
-              'assets/images/historical_prologue/bg_orphanage_investment_room_2000_portrait_cartoon_v1.png',
+              'assets/images/cinematic_soft_painted/decimal/bg_decimal_trading_floor_dawn_2000_v1.png',
               fit: BoxFit.cover,
             ),
           ),
@@ -1128,10 +1128,10 @@ class _AcademyDecisionSceneState extends State<AcademyDecisionScene> {
                 child: Column(
                   children: [
                     _SceneClockStrip(
-                      location: '국립 미래양성원 · 제6기 연구회의',
+                      location: '프로젝트 데시멀 · 데시멀 전략회의',
                       caption: _isSubmitting
                           ? '선택을 투자노트에 저장하고 있다.'
-                          : '제6기 동기와 담당 교사가 함께 검토합니다.',
+                          : '데시멀 동기와 담당 운영관이 함께 검토합니다.',
                       minute: widget.state.marketMinute,
                       costLabel: _isSubmitting ? '저장 중' : '함께 고르기 · 30분',
                       onBack: _isSubmitting
@@ -1224,7 +1224,7 @@ class NewsGeneratingScene extends StatelessWidget {
                 child: Column(
                   children: [
                     const _SceneClockStrip(
-                      location: '국립 미래양성원 · 투자실 · 오전 08:00',
+                      location: '프로젝트 데시멀 · 투자실 · 오전 08:00',
                       caption: '전날 공개된 시장 기록으로 조간신문을 조합하고 있다.',
                       minute: marketDayStartMinute,
                       costLabel: '로컬 조합',
@@ -1338,8 +1338,8 @@ class KoreaEconomicNewspaperScene extends StatelessWidget {
               child: Column(
                 children: [
                   _SceneClockStrip(
-                    location: '국립 미래양성원 · 투자실 · 조간신문',
-                    caption: '제6기 연구회의가 전날 시장을 읽고 오늘의 선택을 준비한다.',
+                    location: '프로젝트 데시멀 · 투자실 · 조간신문',
+                    caption: '데시멀 전략회의가 전날 시장을 읽고 오늘의 선택을 준비한다.',
                     minute: marketDayStartMinute,
                     costLabel: '하루 결산',
                     onBack: () => Navigator.of(context).pop(true),
@@ -1549,7 +1549,7 @@ class DecisionSheet extends StatelessWidget {
                 tilePadding: EdgeInsets.zero,
                 childrenPadding: const EdgeInsets.only(bottom: 6),
                 title: const Text(
-                  '제6기 의견 더 보기',
+                  '동기 의견 더 보기',
                   style: TextStyle(
                     color: _ink,
                     fontSize: 13,
@@ -1640,7 +1640,7 @@ class _OfficeStatusCard extends StatelessWidget {
                 child: Text(
                   hasCompanyStake
                       ? '${state.company.controlTierLabel} · ${state.company.name}'
-                      : 'SEED 01 RESEARCH DESK',
+                      : 'DECIMAL 10 RESEARCH DESK',
                   style: const TextStyle(
                     color: _ink,
                     fontSize: 8,
@@ -1673,7 +1673,7 @@ class _OfficeStatusCard extends StatelessWidget {
           Text(
             hasCompanyStake
                 ? '${state.company.name} · DAY ${state.company.acquiredAtDay} 취득 · ${state.company.worldPremise}'
-                : '계좌 명의: 대한민국 미래양성기금 · 생활비와 분리 · 대출·미수·신용 금지',
+                : '계좌 명의: 대한민국 프로젝트 데시멀 기금 · 생활비와 분리 · 대출·미수·신용 금지',
             style: const TextStyle(
               color: Color(0xFF7B849A),
               fontSize: 8,
@@ -2553,7 +2553,7 @@ class CampaignEndingScreen extends StatelessWidget {
                 : state.story.fundLaunched
                 ? '엔딩: 첫 고객과 함께 성장한 운용사'
                 : state.story.flagInt('cohortTrust', 30) >= 60
-                ? '엔딩: 제6기와 원칙을 지킨 운용자'
+                ? '엔딩: 동기들과 원칙을 지킨 운용자'
                 : '엔딩: 시장에서 배움을 이어가는 투자자',
             textAlign: TextAlign.center,
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),

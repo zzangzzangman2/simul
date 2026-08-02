@@ -11,14 +11,14 @@ const dartOutputPath = path.join(
   project,
   "flutter_app/lib/dialogue/canonical_dialogue_data.dart",
 );
-const maximumScenes = 240;
+const maximumScenes = 320;
 const maximumTextLength = 6000;
 
 function loadCanonicalDialogue() {
   const raw = fs.readFileSync(canonicalPath, "utf8");
   const decoded = JSON.parse(raw);
-  if (decoded.contentVersion !== 1 || decoded.appearanceVersion !== 13) {
-    throw new Error("Canonical dialogue versions must be content 1 / appearance 13.");
+  if (decoded.contentVersion !== 2 || decoded.appearanceVersion !== 14) {
+    throw new Error("Canonical dialogue versions must be content 2 / appearance 14.");
   }
   if (
     !Array.isArray(decoded.scenes) ||

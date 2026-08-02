@@ -118,18 +118,21 @@ void main() {
     'authoritative quote resolves the exact asset, date, minute, and price',
     () async {
       const engine = GameEngine();
+      final quoteDate = DateTime(2000, 1, 4);
       final universe = await FictionalMarketUniverse.load(
-        throughDate: DateTime(2000, 1, 4),
+        throughDate: quoteDate,
       );
-      final state = engine
-          .createNewGame('시세 서비스 테스트')
-          .copyWith(day: 4, marketMinute: 9 * 60);
+      final initial = engine.createNewGame('시세 서비스 테스트');
+      final state = initial.copyWith(
+        day: quoteDate.difference(initial.campaignStartDate).inDays + 1,
+        marketMinute: 9 * 60,
+      );
 
       final quote = resolveMarketTradeQuote(universe, state, 'hanbit_telecom');
 
       expect(quote, isNotNull);
       expect(quote!.asset.code, '1001');
-      expect(quote.quoteDate, '2000-01-04');
+      expect(quote.quoteDate, marketDateKey(quoteDate));
       expect(quote.marketMinute, 9 * 60);
       expect(quote.unitPrice, greaterThan(0));
       expect(quote.isTradingDay, isTrue);

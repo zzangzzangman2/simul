@@ -87,7 +87,7 @@ void main() {
       'dorm_shared_study_desks',
     );
     expect(locked.success, isFalse);
-    expect(locked.message, contains('기숙사 공용 수리함'));
+    expect(locked.message, contains(homeImprovementCatalog.first.title));
 
     final first = engine.purchaseHomeImprovement(state, 'dorm_repair_tools');
     final second = engine.purchaseHomeImprovement(

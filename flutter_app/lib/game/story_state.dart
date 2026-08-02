@@ -50,8 +50,8 @@ class StoryState {
   final List<String> seenStoryEventIds;
   final List<String> companyCultureTags;
 
-  /// Academy students use Korean year-age: a 1987-born sixth-cohort student is
-  /// fourteen in 2000.
+  /// The ten Decimal peers are born in 1987 and are fourteen by Korean
+  /// year-age in 2000.
   int ageOn(DateTime date) =>
       (date.year - playerBirthYear + 1).clamp(0, 200).toInt();
 
@@ -62,7 +62,8 @@ class StoryState {
   int get startingSeedMoney => flagInt('startingSeedMoney');
   int get earnedSeedMoney => flagInt('earnedSeedMoney');
   int get seedMoneyTotal => startingSeedMoney + earnedSeedMoney;
-  bool get orphanageReboot => flagBool('orphanageReboot');
+  bool get decimalProject => flagBool('decimalProject');
+  bool get orphanageReboot => decimalProject || flagBool('orphanageReboot');
   int get academyLevel => flagInt('academyLevel', orphanageReboot ? 1 : 0);
   int get academyMaxLevel =>
       flagInt('academyMaxLevel', orphanageReboot ? 6 : 0);
@@ -98,7 +99,7 @@ class StoryState {
     required String introChoice,
     required StoryTrait startingTrait,
     required OperatingPrinciple operatingPrinciple,
-  }) => StoryState.newOrphanagePlayer(
+  }) => StoryState.newDecimalPlayer(
     playerName: playerName,
     introChoice: introChoice,
     startingTrait: startingTrait,
@@ -110,6 +111,18 @@ class StoryState {
     required String introChoice,
     required StoryTrait startingTrait,
     required OperatingPrinciple operatingPrinciple,
+  }) => StoryState.newDecimalPlayer(
+    playerName: playerName,
+    introChoice: introChoice,
+    startingTrait: startingTrait,
+    operatingPrinciple: operatingPrinciple,
+  );
+
+  factory StoryState.newDecimalPlayer({
+    required String playerName,
+    required String introChoice,
+    required StoryTrait startingTrait,
+    required OperatingPrinciple operatingPrinciple,
   }) {
     final traitTrust = switch (startingTrait) {
       StoryTrait.stability => 2,
@@ -117,7 +130,7 @@ class StoryState {
       StoryTrait.innovation => 0,
       StoryTrait.control => -1,
     };
-    final traitSchool = switch (startingTrait) {
+    final traitRoutine = switch (startingTrait) {
       StoryTrait.analysis => 4,
       StoryTrait.stability => 2,
       StoryTrait.innovation => 1,
@@ -130,32 +143,32 @@ class StoryState {
       startingTrait: startingTrait,
       operatingPrinciple: operatingPrinciple,
       householdStability: 55,
-      schoolBalance: 60 + traitSchool,
+      schoolBalance: 60 + traitRoutine,
       roomLevel: 0,
       accountAuthorityLevel: 1,
-      stateAccountHolder: 'future_development_fund',
+      stateAccountHolder: 'project_decimal_fund',
       storyFlags: {
         'prologueComplete': true,
-        'orphanageReboot': true,
-        'futureDevelopmentCohort': 6,
+        'decimalProject': true,
+        'projectId': 'project_decimal',
+        'finalCandidateCount': 10,
+        'maleCandidateCount': 2,
+        'femaleCandidateCount': 8,
+        'facility': 'gangnam_hideout',
         'storyAgeMode': 'koreanYearAge',
-        'academyProgram': 'seedTrack',
-        'academyLevel': 1,
-        'academyMaxLevel': 6,
-        'academyLevelKey': 'firstLight',
-        'academyLevelTitle': '첫빛',
-        'seedTrackStartAge': 14,
-        'seedTrackCompletionAge': 19,
-        'campaignStartDate': '2000-01-02',
+        // The simulation keeps 1–2 January as its deterministic pre-open
+        // epoch. The playable account opens on Monday, 3 January.
+        'campaignStartDate': '2000-01-01',
+        'formalTradingStartDate': '2000-01-03',
         'stateAccountActive': true,
-        'stateAccountOwner': '대한민국 미래양성기금',
+        'stateAccountOwner': '대한민국 데시멀 기금',
         'stateRecoveryRateBps': 2000,
         'stateRecoveryTotal': 0,
         'selfRelianceReserve': 0,
         'selfRelianceUnlockAge': 19,
         'isLegalCompany': false,
         'startingSeedMoney': 0,
-        'seedMoneySource': '',
+        'seedMoneySource': 'project_decimal_fund',
         'earnedSeedMoney': 0,
         'cohortTrust': 30 + traitTrust,
         'hakjunAffinity': 30,
@@ -176,11 +189,11 @@ class StoryState {
         'newsArchive': <Map<String, dynamic>>[],
       },
       seenStoryEventIds: const [
-        'PROLOGUE_FUTURE_DEVELOPMENT_PLAN',
-        'COHORT_6_STATE_ACCOUNT_ACTIVATED',
+        'PROLOGUE_PROJECT_DECIMAL_SELECTION',
+        'DECIMAL_STATE_ACCOUNT_ACTIVATED',
       ],
       companyCultureTags: [
-        'futureDevelopmentCohort6',
+        'projectDecimalFinalTen',
         operatingPrinciple.name,
         startingTrait.name,
         introChoice,
@@ -189,15 +202,15 @@ class StoryState {
   }
 
   factory StoryState.migratedDefault(String companyName) {
-    return StoryState.newOrphanagePlayer(
-      playerName: '소년',
+    return StoryState.newDecimalPlayer(
+      playerName: '성준',
       introChoice: 'migrated_save',
       startingTrait: StoryTrait.analysis,
       operatingPrinciple: OperatingPrinciple.reportLosses,
     ).copyWith(
       storyFlags: {
-        ...StoryState.newOrphanagePlayer(
-          playerName: '소년',
+        ...StoryState.newDecimalPlayer(
+          playerName: '성준',
           introChoice: 'migrated_save',
           startingTrait: StoryTrait.analysis,
           operatingPrinciple: OperatingPrinciple.reportLosses,
@@ -265,23 +278,18 @@ class StoryState {
     final stored =
         (json['storyFlags'] as Map?)?.cast<String, dynamic>() ?? const {};
     final migrated = Map<String, dynamic>.from(stored);
-    final storedLevel = (migrated['academyLevel'] as num?)?.toInt() ?? 1;
-    final academyLevel = storedLevel.clamp(1, 6).toInt();
     migrated
-      ..['futureDevelopmentCohort'] = 6
-      ..['orphanageReboot'] = true
+      ..['decimalProject'] = true
+      ..['projectId'] = 'project_decimal'
+      ..['finalCandidateCount'] = 10
+      ..['maleCandidateCount'] = 2
+      ..['femaleCandidateCount'] = 8
+      ..['facility'] = 'gangnam_hideout'
       ..['storyAgeMode'] = 'koreanYearAge'
-      ..['academyProgram'] = 'seedTrack'
-      ..['academyLevel'] = academyLevel
-      ..['academyMaxLevel'] = 6
-      ..['academyLevelKey'] = academyLevelKeys[academyLevel]
-      ..['academyLevelTitle'] = academyLevelTitles[academyLevel]
-      ..['seedTrackStartAge'] = 14
-      ..['seedTrackCompletionAge'] = 19
       ..['selfRelianceUnlockAge'] = 19
       ..['stateAccountActive'] = true
-      ..['stateAccountOwner'] = '대한민국 미래양성기금'
-      ..['seedMoneySource'] = 'future_development_fund'
+      ..['stateAccountOwner'] = '대한민국 데시멀 기금'
+      ..['seedMoneySource'] = 'project_decimal_fund'
       ..putIfAbsent('stateRecoveryRateBps', () => 2000)
       ..putIfAbsent('stateRecoveryTotal', () => 0)
       ..putIfAbsent('selfRelianceReserve', () => 0)
@@ -293,6 +301,15 @@ class StoryState {
       ..remove('academyTuitionOriginal')
       ..remove('academyTuitionPaidByFather')
       ..remove('academyTuitionRepaidDay')
+      ..remove('futureDevelopmentCohort')
+      ..remove('orphanageReboot')
+      ..remove('academyProgram')
+      ..remove('academyLevel')
+      ..remove('academyMaxLevel')
+      ..remove('academyLevelKey')
+      ..remove('academyLevelTitle')
+      ..remove('seedTrackStartAge')
+      ..remove('seedTrackCompletionAge')
       ..remove('guardianConsent')
       ..remove('fatherOperationsAdvisor')
       ..remove('seedMoneySourceLegacy');
@@ -316,7 +333,7 @@ class StoryState {
   }) {
     if (json.isEmpty) return StoryState.migratedDefault(companyName);
     return StoryState(
-      playerName: json['playerName'] as String? ?? '소년',
+      playerName: json['playerName'] as String? ?? '성준',
       playerBirthYear: _migratedPlayerBirthYear(json),
       introChoice: json['introChoice'] as String? ?? 'migrated_save',
       startingTrait: StoryTrait.values.firstWhere(
@@ -332,7 +349,7 @@ class StoryState {
       roomLevel: (json['roomLevel'] as num?)?.toInt() ?? 0,
       accountAuthorityLevel:
           (json['accountAuthorityLevel'] as num?)?.toInt() ?? 0,
-      stateAccountHolder: 'future_development_fund',
+      stateAccountHolder: 'project_decimal_fund',
       storyFlags: _migratedStoryFlags(json),
       seenStoryEventIds: ((json['seenStoryEventIds'] as List?) ?? const [])
           .whereType<String>()

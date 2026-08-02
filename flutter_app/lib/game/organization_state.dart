@@ -374,8 +374,8 @@ class AcademyHelperStatus {
   factory AcademyHelperStatus.fromJson(Map<String, dynamic> json) =>
       AcademyHelperStatus(
         id: json['id'] as String? ?? 'academy-helper',
-        name: json['name'] as String? ?? '제6기 조언자',
-        relation: json['relation'] as String? ?? '미래양성원 공동체',
+        name: json['name'] as String? ?? '데시멀 동기 조언자',
+        relation: json['relation'] as String? ?? '데시멀 센터 공동체',
         role: json['role'] as String? ?? '도움',
         specialty: json['specialty'] as String? ?? '생활 경험',
         effect: json['effect'] as String? ?? '조사에 도움을 줍니다.',
@@ -442,7 +442,7 @@ class OrganizationState {
       AcademyHelperStatus(
         id: 'hakjun',
         name: '김학준',
-        relation: '제6기 동기',
+        relation: '데시멀 동기',
         role: '규정과 공시 교차검토',
         specialty: '규정 · 위험 · 기록',
         effect: '규정집과 공시를 대조해 빠뜨린 위험 조건을 찾아냅니다.',
@@ -455,7 +455,7 @@ class OrganizationState {
       AcademyHelperStatus(
         id: 'sua',
         name: '한수아',
-        relation: '제6기 동기',
+        relation: '데시멀 동기',
         role: '고객과 생활 반응 조사',
         specialty: '사람 · 소비 · 인터뷰',
         effect: '숫자 뒤에 있는 고객 표정과 실제 사용 반응을 확인합니다.',
@@ -468,7 +468,7 @@ class OrganizationState {
       AcademyHelperStatus(
         id: 'seoyoon',
         name: '한서윤',
-        relation: '제6기 담당 교사',
+        relation: '데시멀 담당 운영관',
         role: '투자노트 점검',
         specialty: '기업분석 · 손실복기 · 준법',
         effect: '매수 이유와 매도 조건이 실제 기록으로 남았는지 점검합니다.',

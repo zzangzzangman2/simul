@@ -1,4 +1,4 @@
-export const DIALOGUE_MAX_SCENES = 240;
+export const DIALOGUE_MAX_SCENES = 320;
 export const DIALOGUE_MAX_TEXT_LENGTH = 6000;
 
 export type ValidatedDialogueScene = {

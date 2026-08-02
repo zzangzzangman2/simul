@@ -36,10 +36,7 @@ void main() {
       );
 
       final parsed = FictionalMarketAsset.fromJson(asset.toJson());
-      expect(
-        parsed.initialSharesOutstanding,
-        asset.initialSharesOutstanding,
-      );
+      expect(parsed.initialSharesOutstanding, asset.initialSharesOutstanding);
       expect(
         parsed.sharesOutstandingAtOrBefore(firstDate),
         asset.initialSharesOutstanding,
@@ -67,20 +64,15 @@ void main() {
     const discounts = <double>[12, 25, 40];
     const yields = <double>[0.005, 0.017, 0.03];
 
-    for (final market in <String>[
-      fictionalMainMarket,
-      fictionalGrowthMarket,
-    ]) {
+    for (final market in <String>[fictionalMainMarket, fictionalGrowthMarket]) {
       for (final referencePrice in referencePrices) {
         for (final announcedDiscount in discounts) {
-          final subscriptionPrice =
-              fictionalRightsIssueSubscriptionPrice(
-                referencePrice: referencePrice,
-                announcedDiscountPct: announcedDiscount,
-                market: market,
-              );
-          final actualDiscount =
-              (1 - subscriptionPrice / referencePrice) * 100;
+          final subscriptionPrice = fictionalRightsIssueSubscriptionPrice(
+            referencePrice: referencePrice,
+            announcedDiscountPct: announcedDiscount,
+            market: market,
+          );
+          final actualDiscount = (1 - subscriptionPrice / referencePrice) * 100;
           final subscriptionTick = marketTickSize(
             referencePrice * (1 - announcedDiscount / 100),
             market: market,
@@ -104,19 +96,14 @@ void main() {
             market: market,
           );
           final actualYield = dividend / referencePrice;
-          final referenceTick = marketTickSize(
-            referencePrice,
-            market: market,
-          );
+          final referenceTick = marketTickSize(referencePrice, market: market);
 
           expect(dividend, greaterThan(0));
           expect(dividend, lessThan(referencePrice));
           expect(actualYield, lessThanOrEqualTo(0.04));
           expect(
             (actualYield - targetYield).abs(),
-            lessThanOrEqualTo(
-              referenceTick / referencePrice + 0.000001,
-            ),
+            lessThanOrEqualTo(referenceTick / referencePrice + 0.000001),
           );
         }
       }
@@ -299,9 +286,7 @@ void main() {
         seed,
         DateTime.parse(action.date),
       ).singleWhere((candidate) => candidate.id == action.id);
-      final discountMatch = RegExp(
-        r'목표 할인율 약 (\d+)%',
-      ).firstMatch(event.body);
+      final discountMatch = RegExp(r'목표 할인율 약 (\d+)%').firstMatch(event.body);
       expect(discountMatch, isNotNull);
       final announcedDiscount = double.parse(discountMatch!.group(1)!);
       final market = assetsById[action.assetId]!.market;
@@ -313,8 +298,7 @@ void main() {
           market: market,
         ),
       );
-      final actualDiscountPct =
-          (1 - action.amount / referencePrice) * 100;
+      final actualDiscountPct = (1 - action.amount / referencePrice) * 100;
       final subscriptionTick = marketTickSize(
         referencePrice * (1 - announcedDiscount / 100),
         market: market,
@@ -325,15 +309,12 @@ void main() {
       );
       expect(
         actualDiscountPct - announcedDiscount,
-        lessThanOrEqualTo(
-          subscriptionTick / referencePrice * 100 + 0.000001,
-        ),
+        lessThanOrEqualTo(subscriptionTick / referencePrice * 100 + 0.000001),
       );
       expect(event.revealMinute, marketDayStartMinute);
       expect(
         event.title.contains('제3자배정'),
-        action.allocationMethod ==
-            MarketRightsIssueAllocationMethod.thirdParty,
+        action.allocationMethod == MarketRightsIssueAllocationMethod.thirdParty,
       );
 
       final parsed = MarketCorporateAction.fromJson(
@@ -715,9 +696,7 @@ void main() {
       var checkedRightsIssues = 0;
       for (final parent in universe.assets) {
         final personnelSpinoffDates = parent.corporateActions
-            .where(
-              (action) => action.type == MarketCorporateActionType.spinoff,
-            )
+            .where((action) => action.type == MarketCorporateActionType.spinoff)
             .map((action) => action.date)
             .toList(growable: false);
         if (personnelSpinoffDates.isEmpty) continue;
@@ -744,8 +723,7 @@ void main() {
               expect(action.amount / reference, lessThanOrEqualTo(0.10));
               reference = math.max(1, reference - action.amount);
               checkedDividends += 1;
-            } else if (action.type ==
-                MarketCorporateActionType.rightsIssue) {
+            } else if (action.type == MarketCorporateActionType.rightsIssue) {
               final declaredReference = action.referencePrice;
               expect(declaredReference, isNotNull);
               expect(action.amount, lessThanOrEqualTo(declaredReference!));
@@ -837,15 +815,9 @@ void main() {
       () => MarketCorporateAction.fromJson('sample', malformed),
       throwsA(isA<FormatException>()),
     );
-    final legacy = <String, dynamic>{
-      ...malformed,
-      'sharesIssued': 80000,
-    };
+    final legacy = <String, dynamic>{...malformed, 'sharesIssued': 80000};
     expect(
-      MarketCorporateAction.fromJson(
-        'sample',
-        legacy,
-      ).allocationMethod,
+      MarketCorporateAction.fromJson('sample', legacy).allocationMethod,
       MarketRightsIssueAllocationMethod.shareholder,
     );
     expect(

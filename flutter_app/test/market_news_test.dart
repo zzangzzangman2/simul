@@ -10,15 +10,18 @@ void main() {
   const engine = GameEngine();
   const seed = 'news-test-world';
 
-  int dayFor(DateTime date) => date.difference(DateTime(2000, 1, 1)).inDays + 1;
-
   GameState at(
     DateTime date, {
     int cash = 1000000,
     int marketMinute = marketDayStartMinute,
-  }) => engine
-      .createNewGame('테스트', worldSeed: seed)
-      .copyWith(day: dayFor(date), cash: cash, marketMinute: marketMinute);
+  }) {
+    final initial = engine.createNewGame('테스트', worldSeed: seed);
+    return initial.copyWith(
+      day: date.difference(initial.campaignStartDate).inDays + 1,
+      cash: cash,
+      marketMinute: marketMinute,
+    );
+  }
 
   group('가상 시장 사건', () {
     test('시작 상장사는 고정된 가상 기업 50개다', () {

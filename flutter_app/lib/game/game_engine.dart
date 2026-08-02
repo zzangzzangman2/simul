@@ -28,7 +28,7 @@ import 'story_state.dart';
 part 'game_engine_corporate_actions.dart';
 part 'game_engine_story_decisions.dart';
 
-// 미래양성기금 국가원금. 출발 종목 중 가장 싼 한 주도 살 수 있어야 첫 실습이
+// 프로젝트 데시멀 국가원금. 출발 종목 중 가장 싼 한 주도 살 수 있어야 첫 실습이
 // 성립하므로, 한빛통신 28,400원을 기준으로 50,000원을 지급한다.
 const initialCompanyCash = 50000;
 const stateAccountSeedCapitalSourceId = 'state-account-seed-capital';
@@ -664,7 +664,7 @@ class GameEngine {
       return PhoneMessengerActionResult(
         state: state,
         success: false,
-        message: '제6기 연락처에 없는 학생입니다.',
+        message: '데시멀 연락처에 없는 동기입니다.',
       );
     }
     var changed = false;
@@ -706,7 +706,7 @@ class GameEngine {
       return PhoneMessengerActionResult(
         state: state,
         success: false,
-        message: '제6기 연락처에 없는 학생입니다.',
+        message: '데시멀 연락처에 없는 동기입니다.',
       );
     }
     final content = text.trim();
@@ -794,7 +794,7 @@ class GameEngine {
       return CohortInvestmentActionResult(
         state: state,
         success: true,
-        message: '오늘의 제6기 투자 결과는 이미 확정됐습니다.',
+        message: '오늘의 데시멀 투자 결과는 이미 확정됐습니다.',
         report: existing,
       );
     }
@@ -921,7 +921,7 @@ class GameEngine {
           account: 'brokerage_cash',
           counterAccount: 'cohort_loan_receivable',
           description:
-              '${loan.borrowerName} 제6기 대여금 ${updatedLoan.isRepaid ? '상환 완료' : '일부 상환'}',
+              '${loan.borrowerName} 동기 대여금 ${updatedLoan.isRepaid ? '상환 완료' : '일부 상환'}',
           sourceId: '${loan.id}-repay-${state.day}',
           notional: repayment,
           marketMinute: krxCloseMinute,
@@ -1035,7 +1035,7 @@ class GameEngine {
     return CohortInvestmentActionResult(
       state: next,
       success: true,
-      message: '제6기 10명의 오늘 투자 결과가 확정됐습니다.',
+      message: '데시멀 동기 10명의 오늘 투자 결과가 확정됐습니다.',
       report: report,
     );
   }
@@ -1076,7 +1076,7 @@ class GameEngine {
       return CohortInvestmentActionResult(
         state: state,
         success: false,
-        message: '제6기 결과표에 없는 학생입니다.',
+        message: '데시멀 결과표에 없는 동기입니다.',
         report: report,
       );
     }
@@ -1084,7 +1084,7 @@ class GameEngine {
       return CohortInvestmentActionResult(
         state: state,
         success: false,
-        message: '현재 총금액이 나보다 적은 학생에게만 빌려줄 수 있습니다.',
+        message: '현재 총금액이 나보다 적은 동기에게만 빌려줄 수 있습니다.',
         report: report,
       );
     }
@@ -1156,8 +1156,7 @@ class GameEngine {
           amount: -amount,
           account: 'cohort_loan_receivable',
           counterAccount: 'brokerage_cash',
-          description:
-              '${profile.name} 제6기 대여금 · $cohortLoanTermDays일 뒤 무이자 상환',
+          description: '${profile.name} 동기 대여금 · $cohortLoanTermDays일 뒤 무이자 상환',
           sourceId: sourceId,
           notional: amount,
           marketMinute: krxCloseMinute,
@@ -1215,7 +1214,7 @@ class GameEngine {
       return RelationshipActionResult(
         state: state,
         success: false,
-        message: '제6기 여학생 명단에 없는 인물입니다.',
+        message: '여자 동기 명단에 없는 인물입니다.',
       );
     }
     final progress = state.relationships.progressFor(girlId);
@@ -1347,7 +1346,7 @@ class GameEngine {
     final baseStory = story ?? StoryState.migratedDefault(companyName);
     final isStandardSeedStart =
         initialCompanyCash > 0 && initialCash == initialCompanyCash;
-    final seedMoneySource = 'future_development_fund';
+    final seedMoneySource = 'project_decimal_fund';
     const seedMoneySourceId = stateAccountSeedCapitalSourceId;
     final storyState = isStandardSeedStart
         ? baseStory.copyWith(
@@ -1359,10 +1358,22 @@ class GameEngine {
               'firstSeedGoalReached': true,
             },
           )
-        : initialCash > initialCompanyCash &&
-              baseStory.accountAuthorityLevel == 0
-        ? baseStory.copyWith(accountAuthorityLevel: 5)
-        : baseStory;
+        : initialCash > initialCompanyCash
+        ? baseStory.copyWith(
+            accountAuthorityLevel: math.max(5, baseStory.accountAuthorityLevel),
+            storyFlags: {
+              ...baseStory.storyFlags,
+              'firstSeedGoalReached': initialCash >= 10000,
+            },
+          )
+        : baseStory.copyWith(
+            storyFlags: {
+              ...baseStory.storyFlags,
+              'firstSeedGoalReached':
+                  baseStory.startingSeedMoney + baseStory.earnedSeedMoney >=
+                  10000,
+            },
+          );
     final company = const CompanyState(
       id: 'hanbit_telecom',
       name: '한빛통신',
@@ -1405,7 +1416,7 @@ class GameEngine {
                 amount: initialCompanyCash,
                 account: 'brokerage_cash',
                 counterAccount: 'state_seed_capital',
-                description: '대한민국 미래양성기금 · 제6기 국가계좌 원금',
+                description: '대한민국 데시멀 기금 · 국가계좌 원금',
                 sourceId: seedMoneySourceId,
               ),
             ]
@@ -3786,10 +3797,10 @@ class GameEngine {
     if (reward <= 0) return state;
 
     final activityLabel = switch (result.activityId) {
-      'rider' => '미래양성원 킥보드 실기 코스',
+      'rider' => '데시멀 센터 킥보드 실기 코스',
       'dishes' => '식당 당번 실습',
       'stationery' => '교육자료 창고 정리',
-      'flea_market' => '제6기 교환장터',
+      'flea_market' => '데시멀 교환장터',
       _ => '원내 실습',
     };
     final sessionNumber = (flags['workSessions'] as num?)?.toInt() ?? 0;
@@ -7380,7 +7391,7 @@ class GameEngine {
             advisorOpinions: const [
               '기술자: 작은 시제품으로 먼저 검증하면 실패 비용을 줄일 수 있습니다.',
               '회계사: 협력비는 반드시 은행 잔고 안에서 집행해야 합니다.',
-              '제6기 연구회의: 유행 이름보다 고객과 현금흐름을 함께 확인하자.',
+              '데시멀 전략회의: 유행 이름보다 고객과 현금흐름을 함께 확인하자.',
             ],
             options: [
               DecisionOptionData(
@@ -7417,7 +7428,7 @@ class GameEngine {
             id: 'dotcom-reckoning',
             date: DateTime(2001, 3, 12),
             title: '닷컴 열풍 뒤의 첫 원칙 시험',
-            body: '유행보다 현금흐름을 볼지, 기술의 장기 가능성을 더 조사할지 제6기 연구회의에서 설명해야 합니다.',
+            body: '유행보다 현금흐름을 볼지, 기술의 장기 가능성을 더 조사할지 데시멀 전략회의에서 설명해야 합니다.',
           ),
           (
             id: 'september-eleven',
@@ -7434,7 +7445,7 @@ class GameEngine {
           (
             id: 'office-year',
             date: DateTime(2004, 1, 2),
-            title: '미래양성원 밖 첫 사무실',
+            title: '데시멀 센터 밖 첫 사무실',
             body: '작은 사무실을 얻으면 신뢰가 오르지만 매달 임대료가 생깁니다.',
           ),
           (
@@ -7475,7 +7486,7 @@ class GameEngine {
             id: eventId,
             category: 'milestone',
             title: milestone.title,
-            proposer: '제6기 연구회의',
+            proposer: '데시멀 전략회의',
             body: milestone.body,
             createdDay: next.day,
             dueDay: next.day + 7,
@@ -7505,7 +7516,7 @@ class GameEngine {
                     DecisionOptionData(
                       id: 'milestone_cohort',
                       label: '공동시설부터 정비',
-                      description: '제6기 생활환경을 개선하고 공동체 신뢰를 우선합니다.',
+                      description: '데시멀 생활환경을 개선하고 공동체 신뢰를 우선합니다.',
                     ),
                   ]
                 : milestone.id == 'incorporation-year'
@@ -7522,7 +7533,7 @@ class GameEngine {
                     ),
                     DecisionOptionData(
                       id: 'milestone_cohort',
-                      label: '제6기 회계 약속 후 전환',
+                      label: '공동 회계 약속 후 전환',
                       description: '현재 공간을 유지하며 공동체와 법인 원칙을 정합니다.',
                     ),
                   ]
@@ -7539,7 +7550,7 @@ class GameEngine {
                     ),
                     DecisionOptionData(
                       id: 'milestone_cohort',
-                      label: '제6기와 함께 결정',
+                      label: '동기들과 함께 결정',
                       description: '관계와 장기 신뢰를 우선합니다.',
                     ),
                   ],

@@ -187,7 +187,7 @@ class _CohortDailyResultScreenState extends State<CohortDailyResultScreen> {
                       ),
                       SizedBox(height: 2),
                       Text(
-                        '15:00 종가 기준 · 제6기 10명',
+                        '15:00 종가 기준 · 데시멀 동기 10명',
                         style: TextStyle(
                           color: Color(0xFF675A42),
                           fontSize: 10,

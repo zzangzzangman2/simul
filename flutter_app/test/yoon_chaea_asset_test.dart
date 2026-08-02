@@ -57,19 +57,23 @@ void main() {
       'assets/dialogue/dialogue-editor-override.json',
     ).readAsStringSync();
     final decoded = jsonDecode(raw) as Map<String, dynamic>;
-    expect(decoded['appearanceVersion'], 13);
+    expect(decoded['appearanceVersion'], 14);
 
     final scenes = (decoded['scenes'] as List<dynamic>)
         .cast<Map<String, dynamic>>()
         .where((scene) => scene['speaker'] == '윤채아')
         .toList();
-    expect(scenes.map((scene) => scene['order']), <int>[81, 82, 84, 115, 122]);
-    expect(scenes.map((scene) => scene['character']), <String>[
-      '/play/assets/assets/images/production_soft_painted/yoon_chaea/01_neutral_tie_v1.png',
-      '/play/assets/assets/images/production_soft_painted/yoon_chaea/09_explaining_v1.png',
-      '/play/assets/assets/images/production_soft_painted/yoon_chaea/08_determined_v1.png',
-      '/play/assets/assets/images/production_soft_painted/yoon_chaea/08_determined_v1.png',
-      '/play/assets/assets/images/production_soft_painted/yoon_chaea/09_explaining_v1.png',
-    ]);
+    expect(scenes.length, greaterThanOrEqualTo(10));
+    final portraitScenes = scenes.where(
+      (scene) => (scene['character'] as String).isNotEmpty,
+    );
+    expect(portraitScenes, isNotEmpty);
+    for (final scene in portraitScenes) {
+      expect(
+        scene['character'],
+        contains('/production_soft_painted/yoon_chaea/'),
+        reason: scene['id'] as String,
+      );
+    }
   });
 }

@@ -31,10 +31,10 @@ flutter build web --release --base-href /play/
 
 - `lib/main.dart`: 앱 상태·저장·신문·화면 연결
 - `lib/visual_novel_onboarding.dart`: 편집본 장면·배경·화자·포즈와 동적 종료점을 적용하는 리부트 프롤로그
-- `lib/game/game_state.dart`: 저장 스키마 v24와 관계·미래톡·일일 투자·대여채권·사업 자산·미지급금 합산
-- `lib/game/phone_messenger_state.dart`: 제6기 9명 연락처·MBTI 답장·읽음·하루 제한 저장
-- `lib/phone_messenger_screens.dart`: 미래톡 채팅 목록·읽지 않음·자유 입력·좌우 말풍선 UI
-- `lib/game/cohort_investment_state.dart`: 제6기 9명 NPC 계좌·10명 일일 결과·대여·자동 상환 저장
+- `lib/game/game_state.dart`: 저장 스키마 v24와 관계·데시멀톡·일일 투자·대여채권·사업 자산·미지급금 합산
+- `lib/game/phone_messenger_state.dart`: 데시멀 동기 9명 연락처·MBTI 답장·읽음·하루 제한 저장
+- `lib/phone_messenger_screens.dart`: 데시멀톡 채팅 목록·읽지 않음·자유 입력·좌우 말풍선 UI
+- `lib/game/cohort_investment_state.dart`: 데시멀 동기 9명 NPC 계좌·10인 일일 결과·대여·자동 상환 저장
 - `lib/cohort_investment_screens.dart`: 15:00 `오늘의 투자 결과` 10행 표와 하루 1회 대여 UI
 - `lib/game/relationship_state.dart`: 여학생 8명 프로필·호감도·단계·장면·최근 선택 저장
 - `lib/relationship_screens.dart`: 관계 목록과 하루 종료 대화·데이트 UI

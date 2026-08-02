@@ -127,7 +127,7 @@ const cohortGirlProfiles = <CohortGirlProfile>[
       RelationshipSceneDefinition(
         id: 'seoa_promise',
         activity: RelationshipActivity.conversation,
-        location: '기숙사',
+        location: '생활동',
         title: '잊힌 청소 약속',
         prompt: '서아가 비어 있는 청소 담당 칸을 가리킨다. 누군가 구두로 맡았지만 이름을 안 적었다.',
         choices: <RelationshipChoiceDefinition>[
@@ -155,7 +155,7 @@ const cohortGirlProfiles = <CohortGirlProfile>[
     dateScene: RelationshipSceneDefinition(
       id: 'seoa_stationery_date',
       activity: RelationshipActivity.date,
-      location: '학교 앞 문구점',
+      location: '아지트 근처 문구점',
       title: '둘이 고르는 새 장부',
       prompt: '서아가 종이 두께가 다른 공책을 번갈아 만져 본다. “오래 쓸 거면 뭘 골라야 할까?”',
       choices: <RelationshipChoiceDefinition>[
@@ -225,7 +225,7 @@ const cohortGirlProfiles = <CohortGirlProfile>[
         choices: <RelationshipChoiceDefinition>[
           RelationshipChoiceDefinition(
             id: 'guard_and_report',
-            label: '아무도 못 쓰게 내가 보고 있을게. 선생님께 같이 말하자.',
+            label: '아무도 못 쓰게 내가 보고 있을게. 운영관께 같이 말하자.',
             response: '“그럼 안전하게 확인할 수 있겠다.” 지안이 처음으로 고개를 편하게 든다.',
             affectionDelta: 5,
           ),
@@ -284,7 +284,7 @@ const cohortGirlProfiles = <CohortGirlProfile>[
       RelationshipSceneDefinition(
         id: 'iseo_name_tag',
         activity: RelationshipActivity.conversation,
-        location: '기숙사',
+        location: '생활동',
         title: '색실 이름표',
         prompt: '이서가 네 이름표 위에 실 세 가지를 올려놓는다. “너는 어떤 색이 편해?”',
         choices: <RelationshipChoiceDefinition>[
@@ -403,7 +403,7 @@ const cohortGirlProfiles = <CohortGirlProfile>[
       RelationshipSceneDefinition(
         id: 'arin_morning',
         activity: RelationshipActivity.conversation,
-        location: '미래양성원 본관 앞',
+        location: '데시멀 센터 본관 앞',
         title: '아침 운동 약속',
         prompt: '아린이 운동화 끈을 다시 묶으며 묻는다. “내일도 같이 뛸 거면 몇 시?”',
         choices: <RelationshipChoiceDefinition>[
@@ -431,7 +431,7 @@ const cohortGirlProfiles = <CohortGirlProfile>[
     dateScene: RelationshipSceneDefinition(
       id: 'arin_snack_date',
       activity: RelationshipActivity.date,
-      location: '학교 앞 분식집',
+      location: '아지트 근처 분식집',
       title: '계획 없는 한 시간',
       prompt: '주문을 마친 아린이 빈 종이를 꺼내려다 멈춘다. “오늘도 계획표 만들면 좀 이상하겠지?”',
       choices: <RelationshipChoiceDefinition>[
@@ -468,7 +468,7 @@ const cohortGirlProfiles = <CohortGirlProfile>[
       RelationshipSceneDefinition(
         id: 'haeun_medicine',
         activity: RelationshipActivity.conversation,
-        location: '기숙사',
+        location: '생활동',
         title: '남은 감기약',
         prompt: '하은이 아픈 친구를 챙기고 돌아와 약 봉투를 정리한다. 정작 자기 저녁은 못 먹었다.',
         choices: <RelationshipChoiceDefinition>[
@@ -587,9 +587,9 @@ const cohortGirlProfiles = <CohortGirlProfile>[
       RelationshipSceneDefinition(
         id: 'sua_idea',
         activity: RelationshipActivity.conversation,
-        location: '미래양성원 본관 앞',
+        location: '데시멀 센터 본관 앞',
         title: '갑자기 떠오른 장터',
-        prompt: '수아가 학생들이 직접 만든 물건을 파는 하루 장터를 열자며 말을 쏟아낸다.',
+        prompt: '수아가 동기들이 직접 만든 물건을 파는 하루 장터를 열자며 말을 쏟아낸다.',
         choices: <RelationshipChoiceDefinition>[
           RelationshipChoiceDefinition(
             id: 'pick_one_step',
@@ -773,7 +773,7 @@ const cohortGirlProfiles = <CohortGirlProfile>[
         activity: RelationshipActivity.conversation,
         location: '중앙 복도',
         title: '우리 열 명을 뽑은 이유',
-        prompt: '채아가 제6기 선발표를 보며 말한다. “점수만으로 뽑은 명단 같지는 않아.”',
+        prompt: '채아가 데시멀 동기 선발표를 보며 말한다. “점수만으로 뽑은 명단 같지는 않아.”',
         choices: <RelationshipChoiceDefinition>[
           RelationshipChoiceDefinition(
             id: 'map_patterns',

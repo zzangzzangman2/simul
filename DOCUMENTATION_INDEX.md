@@ -31,12 +31,12 @@
 
 | 분야 | 문서 |
 | --- | --- |
-| 제6기 세계관·프롤로그 | `ORPHANAGE_STORY_REBOOT.md` |
-| 14~19살 SEED 성장선 | `PROTAGONIST_AGE_LINE.md` |
+| 프로젝트 데시멀 세계관·프롤로그 | `DECIMAL_WORLD.md` |
+| 폐기된 미래양성원 설정 | `ORPHANAGE_STORY_REBOOT.md`, `PROTAGONIST_AGE_LINE.md` — 이전 저장 호환 조사에만 사용 |
 | 여학생 8명 성격·대사 | `characters/cohort6_girls/README.md`와 인물별 문서 |
 | 관계 시스템 | `RELATIONSHIP_SYSTEM.md` |
-| 제6기 일일 투자·대여 | `COHORT_DAILY_INVESTMENT.md` |
-| 미래톡 | `PHONE_MESSENGER_SYSTEM.md` |
+| 데시멀 동기 일일 투자·대여 | `COHORT_DAILY_INVESTMENT.md` |
+| 데시멀톡 | `PHONE_MESSENGER_SYSTEM.md` |
 | 대사 편집기 | `DIALOGUE_EDITOR_GUIDE.md` |
 | 시장·경제 수치 | `BALANCE_NOTES.md` |
 | 부동산 | `REAL_ESTATE_SYSTEM.md` |

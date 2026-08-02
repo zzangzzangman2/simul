@@ -98,6 +98,7 @@ void main() {
   runApp(
     MillenniumCapitalApp(
       stockTestMode: Uri.base.queryParameters['stockTest'] == '1',
+      dialoguePreviewMode: Uri.base.queryParameters['dialoguePreview'] == '1',
     ),
   );
 }
@@ -121,12 +122,14 @@ class MillenniumCapitalApp extends StatefulWidget {
     this.persistence,
     this.campaignWorldPreparer,
     this.stockTestMode = false,
+    this.dialoguePreviewMode = false,
     this.dialogueOverrideJson,
   });
 
   final GamePersistence? persistence;
   final CampaignWorldPreparer? campaignWorldPreparer;
   final bool stockTestMode;
+  final bool dialoguePreviewMode;
   final String? dialogueOverrideJson;
 
   @override
@@ -267,7 +270,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
       initialCash: initialCompanyCash,
     );
     final checkpointState = draftState.copyWith(
-      companyName: '제6기 오리엔테이션',
+      companyName: '프로젝트 데시멀',
       story: draftState.story.copyWith(
         storyFlags: {
           ...draftState.story.storyFlags,
@@ -498,7 +501,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     WorldLoadProgressCallback onProgress,
   ) async {
     onProgress(
-      const WorldLoadProgress(0.18, '처음하기에서 준비한 시장과 제6기 국가계좌를 연결하는 중입니다…'),
+      const WorldLoadProgress(0.18, '처음하기에서 준비한 시장과 데시멀 국가계좌를 연결하는 중입니다…'),
     );
     await Future<void>.delayed(Duration.zero);
     final slot = _newGameSlot;
@@ -506,8 +509,8 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     if (slot == null || worldSeed == null || !_isNewGameWorldPrepared) {
       throw StateError('The prepared new-game world is unavailable');
     }
-    final story = StoryState.newOrphanagePlayer(
-      playerName: setup.playerName,
+    final story = StoryState.newDecimalPlayer(
+      playerName: '성준',
       introChoice: setup.introChoice,
       startingTrait: setup.startingTrait,
       operatingPrinciple: setup.operatingPrinciple,
@@ -519,7 +522,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
           initialCash: initialCompanyCash,
           worldSeed: worldSeed,
         )
-        .copyWith(day: 2, marketMinute: marketDayStartMinute);
+        .copyWith(day: 3, marketMinute: krxOpenMinute);
     onProgress(
       const WorldLoadProgress(
         0.68,
@@ -546,7 +549,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     await Future<void>.delayed(Duration.zero);
     final slots = await _persistence.listSlots();
     if (!mounted) return;
-    onProgress(const WorldLoadProgress(1, '준비 완료. 제6기 첫 주문을 시작합니다.'));
+    onProgress(const WorldLoadProgress(1, '준비 완료. 데시멀의 첫 주문을 시작합니다.'));
     await Future<void>.delayed(Duration.zero);
     setState(() {
       _state = state;
@@ -1522,6 +1525,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
                               .storyFlags['prologueCompanyName']
                           as String? ??
                       '',
+                  allowRuntimeDialoguePreview: widget.dialoguePreviewMode,
                   dialogueOverrideJson: widget.dialogueOverrideJson,
                 ),
                 _AppView.game when _state != null => OfficeScreen(
