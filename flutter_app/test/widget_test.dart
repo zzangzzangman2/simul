@@ -572,13 +572,12 @@ void main() {
     await tester.pumpAndSettle();
     await startNewGame(tester);
 
-    double visiblePanelOpacity() {
+    Color visiblePanelColor() {
       final panel = tester.widget<Container>(
         find.byKey(const Key('story-dialogue-panel')),
       );
       final decoration = panel.decoration! as BoxDecoration;
-      final gradient = decoration.gradient! as LinearGradient;
-      return gradient.colors[1].a;
+      return decoration.color!;
     }
 
     final panel = tester.widget<Container>(
@@ -588,12 +587,10 @@ void main() {
     expect(panelDecoration.border, isNull);
     expect(panelDecoration.borderRadius, isNull);
     expect(panelDecoration.boxShadow, isNull);
+    expect(panelDecoration.gradient, isNull);
     expect(find.byKey(const Key('story-moving-light-beam')), findsNothing);
-    expect(visiblePanelOpacity(), closeTo(0.58, 0.01));
-    expect(
-      find.byKey(const ValueKey('story-dialogue-backdrop-blur-4.30')),
-      findsOneWidget,
-    );
+    expect(visiblePanelColor(), const Color(0x66081728));
+    expect(find.byType(BackdropFilter), findsNothing);
     expect(
       find.byKey(const Key('story-dialogue-opacity-control')),
       findsNothing,
@@ -601,7 +598,7 @@ void main() {
     expect(find.byKey(const Key('story-dialogue-divider')), findsOneWidget);
 
     await advanceDialogue(tester, 1);
-    expect(visiblePanelOpacity(), closeTo(0.58, 0.01));
+    expect(visiblePanelColor(), const Color(0x66081728));
     expect(tester.takeException(), isNull);
   });
 
@@ -846,7 +843,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('편집기 화자'), findsOneWidget);
-    expect(find.text('(편집기에서 고친 지문이다.)'), findsOneWidget);
+    expect(find.text('(편집기에서 고친 지문이다.)'), findsNothing);
+    expect(find.byKey(const Key('story-stage-direction')), findsNothing);
     expect(find.text('편집기에서 고친 대사다.\n두 번째 줄도 적용됐다.'), findsOneWidget);
     expect(find.textContaining(r'\n'), findsNothing);
     expect(find.textContaining('편집기 장소'), findsOneWidget);
@@ -872,7 +870,7 @@ void main() {
     await advanceDialogue(tester, 54);
 
     expect(find.text('수아'), findsOneWidget);
-    expect(find.text('(수아가 새 장면의 문을 열었다.)'), findsOneWidget);
+    expect(find.text('(수아가 새 장면의 문을 열었다.)'), findsNothing);
     expect(find.text('이 대사는 편집기에서 새로 추가했어.'), findsOneWidget);
     expect(find.byKey(const Key('orientation-complete-card')), findsOneWidget);
     expect(tester.takeException(), isNull);
