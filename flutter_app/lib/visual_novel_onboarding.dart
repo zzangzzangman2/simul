@@ -2,18 +2,12 @@ part of 'main.dart';
 
 const _onboardingBeatCount = 292;
 const _maximumDialogueBeatCount = 320;
-const _dialogueAppearanceVersion = 14;
+const _dialogueAppearanceVersion = 15;
 const _dialogueContentVersion = 3;
 const _dialogueRuntimeStorageKey = 'project-decimal-dialogue-runtime-v2';
 const _dialogueBundleAsset = 'assets/dialogue/dialogue-editor-override.json';
-const _dialoguePanelOpacityStorageKey =
-    'project-decimal-dialogue-panel-opacity-v1';
-const _dialoguePanelOpacityMin = 0.0;
-const _dialoguePanelOpacityMax = 0.74;
-const _dialoguePanelOpacityDefault = _dialoguePanelOpacityMin;
-final ValueNotifier<double> _dialoguePanelOpacity = ValueNotifier<double>(
-  _dialoguePanelOpacityDefault,
-);
+const _dialoguePanelOpacity = 0.58;
+const _dialogueBackdropBlur = 4.3;
 const _orientationCompleteBeat = _onboardingBeatCount - 1;
 const _storyCharacterBottomInset = 104.0;
 const _storyCharacterHeightFactor = 0.9;
@@ -55,34 +49,6 @@ void _playStoryFeedback({bool strong = false}) {
     unawaited(HapticFeedback.selectionClick());
   }
   unawaited(SystemSound.play(SystemSoundType.click));
-}
-
-double _clampDialoguePanelOpacity(double value) =>
-    value.clamp(_dialoguePanelOpacityMin, _dialoguePanelOpacityMax).toDouble();
-
-double _dialogueBackdropBlurSigma(double panelOpacity) {
-  final progress =
-      ((panelOpacity - _dialoguePanelOpacityMin) /
-              (_dialoguePanelOpacityMax - _dialoguePanelOpacityMin))
-          .clamp(0.0, 1.0)
-          .toDouble();
-  return 7 * progress * progress;
-}
-
-void _setDialoguePanelOpacity(double value) {
-  _dialoguePanelOpacity.value = _clampDialoguePanelOpacity(value);
-}
-
-Future<void> _saveDialoguePanelOpacity() async {
-  try {
-    final preferences = await SharedPreferences.getInstance();
-    await preferences.setDouble(
-      _dialoguePanelOpacityStorageKey,
-      _dialoguePanelOpacity.value,
-    );
-  } catch (_) {
-    // The control must remain usable even when browser storage is unavailable.
-  }
 }
 
 typedef NewGameCreator =
@@ -201,7 +167,6 @@ class _VisualNovelOnboardingScreenState
     _companyController.text = widget.initialCompanyName;
     _dialogueLoadFuture = _loadDialogueOverrides();
     unawaited(_dialogueLoadFuture);
-    unawaited(_loadDialoguePanelOpacity());
   }
 
   @override
@@ -212,19 +177,6 @@ class _VisualNovelOnboardingScreenState
         oldWidget.dialogueOverrideJson != widget.dialogueOverrideJson) {
       _dialogueLoadFuture = _loadDialogueOverrides();
       unawaited(_dialogueLoadFuture);
-    }
-  }
-
-  Future<void> _loadDialoguePanelOpacity() async {
-    try {
-      final preferences = await SharedPreferences.getInstance();
-      await preferences.reload();
-      _setDialoguePanelOpacity(
-        preferences.getDouble(_dialoguePanelOpacityStorageKey) ??
-            _dialoguePanelOpacityDefault,
-      );
-    } catch (_) {
-      _setDialoguePanelOpacity(_dialoguePanelOpacityDefault);
     }
   }
 
@@ -1022,6 +974,7 @@ class _VisualNovelOnboardingScreenState
     return _NovelDialogue(
       key: ValueKey(_beat),
       speaker: _speaker,
+      playerName: _playerController.text.trim(),
       line: _line,
       stageDirection: _stageDirection,
       narration: _isNarration,
@@ -1032,6 +985,7 @@ class _VisualNovelOnboardingScreenState
   Widget _orientationRoster() => _NovelDialogue(
     key: const ValueKey('orientation-roster'),
     speaker: _speaker,
+    playerName: _playerController.text.trim(),
     line: _line,
     stageDirection: _stageDirection,
     onContinue: _next,
@@ -1149,6 +1103,7 @@ class _VisualNovelOnboardingScreenState
                 ? '데시멀 실습 PC'
                 : _speaker
           : _speaker,
+      playerName: _playerController.text.trim(),
       line: !isCanonicalPcEnding
           ? _line
           : !_academyPcPoweredOn
@@ -1521,30 +1476,6 @@ class _LivingBackgroundState extends State<_LivingBackground>
                 fit: BoxFit.cover,
                 alignment: Alignment.center,
                 filterQuality: FilterQuality.high,
-              ),
-            ),
-            IgnorePointer(
-              child: Transform.translate(
-                offset: Offset((t * 2 - 1) * constraints.maxWidth * 1.35, 0),
-                child: Align(
-                  alignment: Alignment.topCenter,
-                  child: Container(
-                    key: const Key('story-moving-light-beam'),
-                    width: constraints.maxWidth * 0.55,
-                    height: constraints.maxHeight * 0.8,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          const Color(0xFFBCEAFF).withValues(alpha: 0.12),
-                          const Color(0xFF8FD9FF).withValues(alpha: 0.035),
-                          Colors.transparent,
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
               ),
             ),
             if (widget.ambientFlicker)
@@ -2322,10 +2253,54 @@ class _SceneLabel extends StatelessWidget {
 
 _NovelDialogueState? _activeNovelDialogueState;
 
+const _decimalCohortSpeakers = <String>{
+  '김학준',
+  '김서아',
+  '이지안',
+  '최이서',
+  '정아린',
+  '박하은',
+  '한수아',
+  '오지우',
+  '윤채아',
+};
+
+String _dialogueSpeakerName(String speaker) => switch (speaker) {
+  '한규진 국정원장' => '한규진',
+  '임서희 경제안보국장' => '임서희',
+  '도윤석 기획조정관' => '도윤석',
+  '조민경 권익감사관' => '조민경',
+  '차은주 선발관' => '차은주',
+  '오경태 시설관리관' => '오경태',
+  '한서윤 운영관' => '한서윤',
+  '윤하린 은행원' => '윤하린',
+  _ => speaker,
+};
+
+String _dialogueSpeakerAffiliation(String speaker, String playerName) {
+  if (speaker == '이야기') return 'PROJECT DECIMAL';
+  if (speaker == '한규진 국정원장') return '국가정보원';
+  if (speaker == '임서희 경제안보국장') return '국가정보원 · 경제안보국';
+  if (speaker == '도윤석 기획조정관') return '국가정보원 · 기획조정실';
+  if (speaker == '조민경 권익감사관') return '국가정보원 · 권익감사실';
+  if (speaker == '차은주 선발관') return '프로젝트 데시멀 · 선발팀';
+  if (speaker == '오경태 시설관리관') return '프로젝트 데시멀 · 시설관리';
+  if (speaker == '한서윤 운영관') return '프로젝트 데시멀 · 운영관';
+  if (speaker == '윤하린 은행원') return '새천년은행 · 개인금융';
+  if (speaker == '데시멀 실습 PC') return '프로젝트 데시멀';
+  if (speaker == '거절한 후보') return '장학 적성검사 응시자';
+  if (_decimalCohortSpeakers.contains(speaker) ||
+      (playerName.isNotEmpty && speaker == playerName)) {
+    return '프로젝트 데시멀 · 제6기';
+  }
+  return '';
+}
+
 class _NovelDialogue extends StatefulWidget {
   const _NovelDialogue({
     super.key,
     required this.speaker,
+    this.playerName = '',
     required this.line,
     this.narration = false,
     this.stageDirection,
@@ -2336,6 +2311,7 @@ class _NovelDialogue extends StatefulWidget {
   });
 
   final String speaker;
+  final String playerName;
   final String line;
   final bool narration;
   final String? stageDirection;
@@ -2362,7 +2338,6 @@ class _NovelDialogueState extends State<_NovelDialogue>
   void initState() {
     super.initState();
     _activeNovelDialogueState = this;
-    _dialoguePanelOpacity.addListener(_handlePanelOpacityChanged);
     _typingController = AnimationController(
       vsync: this,
       duration: _typingDuration(widget.line),
@@ -2385,30 +2360,11 @@ class _NovelDialogueState extends State<_NovelDialogue>
     widget.onContinue?.call();
   }
 
-  void _handlePanelOpacityChanged() {
-    if (mounted) setState(() {});
-  }
-
-  void _updatePanelOpacity(double localX, double width) {
-    if (width <= 0) return;
-    final normalized = (localX / width).clamp(0.0, 1.0).toDouble();
-    _setDialoguePanelOpacity(
-      _dialoguePanelOpacityMin +
-          ((_dialoguePanelOpacityMax - _dialoguePanelOpacityMin) * normalized),
-    );
-  }
-
-  void _adjustPanelOpacity(double delta) {
-    _setDialoguePanelOpacity(_dialoguePanelOpacity.value + delta);
-    unawaited(_saveDialoguePanelOpacity());
-  }
-
   @override
   void dispose() {
     if (identical(_activeNovelDialogueState, this)) {
       _activeNovelDialogueState = null;
     }
-    _dialoguePanelOpacity.removeListener(_handlePanelOpacityChanged);
     _typingController.dispose();
     super.dispose();
   }
@@ -2422,23 +2378,18 @@ class _NovelDialogueState extends State<_NovelDialogue>
       0,
       math.min(visibleCharacters, widget.line.length),
     );
-    final panelOpacity = _dialoguePanelOpacity.value;
-    final panelStrength = (panelOpacity / _dialoguePanelOpacityMax)
-        .clamp(0.0, 1.0)
-        .toDouble();
-    final backdropBlurSigma = _dialogueBackdropBlurSigma(panelOpacity);
-    final panelGradient = widget.narration
-        ? [
-            const Color(0xFF1B2436).withValues(alpha: panelOpacity),
-            const Color(0xFF111A2A).withValues(alpha: panelOpacity * 0.9),
-          ]
-        : [
-            const Color(0xFF172A42).withValues(alpha: panelOpacity),
-            const Color(0xFF111E31).withValues(alpha: panelOpacity * 0.9),
-          ];
-    final secondaryText = widget.narration
-        ? const Color(0xFFE1ECFA)
-        : const Color(0xFFEAF4FF);
+    const panelOpacity = _dialoguePanelOpacity;
+    const backdropBlurSigma = _dialogueBackdropBlur;
+    final speakerName = _dialogueSpeakerName(widget.speaker);
+    final affiliation = _dialogueSpeakerAffiliation(
+      widget.speaker,
+      widget.playerName.trim(),
+    );
+    final panelGradient = [
+      const Color(0xFF10283A).withValues(alpha: panelOpacity * 0.82),
+      const Color(0xFF071723).withValues(alpha: panelOpacity),
+      const Color(0xFF06131F).withValues(alpha: panelOpacity * 0.94),
+    ];
 
     return GestureDetector(
       key: widget.onContinue == null
@@ -2446,268 +2397,175 @@ class _NovelDialogueState extends State<_NovelDialogue>
           : widget.continueKey ?? const Key('story-continue'),
       behavior: HitTestBehavior.opaque,
       onTap: _handleExternalTap,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Container(
-            key: const Key('story-dialogue-panel'),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: panelGradient,
-              ),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xB8C8EDFF), width: 1.15),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x5C020814),
-                  blurRadius: 22,
-                  offset: Offset(0, 8),
-                ),
-                BoxShadow(
-                  color: Color(0x344BC7F1),
-                  blurRadius: 12,
-                  spreadRadius: -5,
-                ),
-              ],
+      child: Container(
+        key: const Key('story-dialogue-panel'),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: panelGradient,
+            stops: const [0, 0.58, 1],
+          ),
+        ),
+        child: ClipRect(
+          child: BackdropFilter(
+            key: ValueKey(
+              'story-dialogue-backdrop-blur-${backdropBlurSigma.toStringAsFixed(2)}',
             ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(11),
-              child: BackdropFilter(
-                key: ValueKey(
-                  'story-dialogue-backdrop-blur-${backdropBlurSigma.toStringAsFixed(2)}',
-                ),
-                filter: ui.ImageFilter.blur(
-                  sigmaX: backdropBlurSigma,
-                  sigmaY: backdropBlurSigma,
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(17, 23, 14, 8),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (widget.stageDirection?.trim().isNotEmpty ??
-                          false) ...[
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.fromLTRB(10, 6, 9, 6),
-                          decoration: BoxDecoration(
-                            color: const Color(
-                              0xFF4FD7FF,
-                            ).withValues(alpha: 0.19 * panelStrength),
-                            border: const Border(
-                              left: BorderSide(
-                                color: Color(0xFF72DEFF),
-                                width: 3,
-                              ),
-                            ),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            widget.stageDirection!,
-                            key: const Key('story-stage-direction'),
+            filter: ui.ImageFilter.blur(
+              sigmaX: backdropBlurSigma,
+              sigmaY: backdropBlurSigma,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(18, 13, 18, 14),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Semantics(
+                    key: const Key('story-speaker-chip'),
+                    label: affiliation.isEmpty
+                        ? widget.speaker
+                        : '${widget.speaker}, $affiliation',
+                    child: ExcludeSemantics(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Text(
+                            speakerName,
+                            key: const Key('story-speaker-name'),
                             style: const TextStyle(
-                              color: Color(0xFFF2FAFF),
+                              color: Color(0xFFF8FBFF),
                               fontFamily: 'Pretendard',
-                              fontSize: 12.5,
-                              height: 1.38,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: -0.15,
+                              fontSize: 18,
+                              height: 1.1,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: -0.45,
                               shadows: [
                                 Shadow(
-                                  color: Color(0xCC000000),
+                                  color: Color(0xB8000000),
                                   blurRadius: 4,
                                   offset: Offset(0, 1),
                                 ),
                               ],
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 7),
-                      ],
-                      Semantics(
-                        liveRegion: true,
-                        label: widget.line,
-                        child: Text(
-                          visibleLine,
-                          key: const Key('story-line-text'),
-                          style: const TextStyle(
-                            color: Color(0xFFF9FCFF),
-                            fontFamily: 'Maplestory',
-                            fontSize: 15,
-                            height: 1.5,
-                            fontWeight: FontWeight.w400,
-                            letterSpacing: -0.2,
-                            shadows: [
-                              Shadow(
-                                color: Color(0xE6000000),
-                                blurRadius: 5,
-                                offset: Offset(0, 1.4),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      if (!_typingComplete) ...[
-                        const SizedBox(height: 7),
-                        Text(
-                          '화면을 누르면 다음 대사로 넘어갑니다',
-                          key: const Key('story-typewriter-hint'),
-                          style: TextStyle(
-                            color: secondaryText.withValues(alpha: 0.78),
-                            fontFamily: 'Pretendard',
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                      if (_typingComplete && widget.choices.isNotEmpty) ...[
-                        const SizedBox(height: 10),
-                        ...widget.choices.map(
-                          (choice) => Padding(
-                            padding: const EdgeInsets.only(bottom: 7),
-                            child: choice,
-                          ),
-                        ),
-                      ],
-                      if (_typingComplete && widget.child != null) ...[
-                        const SizedBox(height: 10),
-                        widget.child!,
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            left: 14,
-            top: -15,
-            child: Container(
-              key: const Key('story-speaker-chip'),
-              padding: const EdgeInsets.fromLTRB(13, 6, 16, 6),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xF03DB9E9), Color(0xE92D79C7)],
-                ),
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(5),
-                  topRight: Radius.circular(15),
-                  bottomRight: Radius.circular(5),
-                  bottomLeft: Radius.circular(5),
-                ),
-                border: Border.all(color: const Color(0xD9E6F9FF)),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x66020A18),
-                    blurRadius: 8,
-                    offset: Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: Text(
-                widget.speaker,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontFamily: 'Maplestory',
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: -0.1,
-                  shadows: [Shadow(color: Color(0x99000000), blurRadius: 3)],
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            right: 10,
-            top: 0,
-            child: Semantics(
-              slider: true,
-              label: '대화창 배경 농도',
-              value: '${(panelOpacity * 100).round()}%',
-              increasedValue:
-                  '${((_clampDialoguePanelOpacity(panelOpacity + 0.08)) * 100).round()}%',
-              decreasedValue:
-                  '${((_clampDialoguePanelOpacity(panelOpacity - 0.08)) * 100).round()}%',
-              onIncrease: () => _adjustPanelOpacity(0.08),
-              onDecrease: () => _adjustPanelOpacity(-0.08),
-              child: SizedBox(
-                key: const Key('story-dialogue-opacity-control'),
-                width: 72,
-                height: 28,
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    const thumbSize = 8.0;
-                    const horizontalInset = 5.0;
-                    final trackWidth =
-                        constraints.maxWidth - (horizontalInset * 2);
-                    final normalized =
-                        (panelOpacity - _dialoguePanelOpacityMin) /
-                        (_dialoguePanelOpacityMax - _dialoguePanelOpacityMin);
-                    final thumbLeft =
-                        horizontalInset +
-                        ((trackWidth - thumbSize) * normalized);
-                    return GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTapUp: (details) {
-                        _updatePanelOpacity(
-                          details.localPosition.dx - horizontalInset,
-                          trackWidth,
-                        );
-                        unawaited(_saveDialoguePanelOpacity());
-                      },
-                      onHorizontalDragUpdate: (details) => _updatePanelOpacity(
-                        details.localPosition.dx - horizontalInset,
-                        trackWidth,
-                      ),
-                      onHorizontalDragEnd: (_) =>
-                          unawaited(_saveDialoguePanelOpacity()),
-                      child: Stack(
-                        alignment: Alignment.centerLeft,
-                        children: [
-                          Positioned(
-                            left: horizontalInset,
-                            right: horizontalInset,
-                            child: Container(
-                              height: 2,
-                              decoration: BoxDecoration(
-                                color: const Color(0x996FDCFF),
-                                borderRadius: BorderRadius.circular(99),
-                              ),
-                            ),
-                          ),
-                          Positioned(
-                            left: thumbLeft,
-                            child: Transform.rotate(
-                              angle: math.pi / 4,
-                              child: Container(
-                                key: const Key('story-dialogue-opacity-thumb'),
-                                width: thumbSize,
-                                height: thumbSize,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF8BE6FF),
-                                  border: Border.all(color: Colors.white70),
-                                  boxShadow: const [
-                                    BoxShadow(
-                                      color: Color(0xAA39CFFF),
-                                      blurRadius: 5,
+                          if (affiliation.isNotEmpty) ...[
+                            const SizedBox(width: 7),
+                            Flexible(
+                              child: Text(
+                                affiliation,
+                                key: const Key('story-speaker-affiliation'),
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Color(0xFF62C9F6),
+                                  fontFamily: 'Pretendard',
+                                  fontSize: 11.5,
+                                  height: 1.1,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -0.25,
+                                  shadows: [
+                                    Shadow(
+                                      color: Color(0xB8000000),
+                                      blurRadius: 3,
+                                      offset: Offset(0, 1),
                                     ),
                                   ],
                                 ),
                               ),
                             ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  const SizedBox(
+                    key: Key('story-dialogue-divider'),
+                    width: double.infinity,
+                    height: 9,
+                    child: Align(
+                      alignment: Alignment.topCenter,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Color(0xAA9CB5C5),
+                              Color(0x668AA8BC),
+                              Color(0x009CB5C5),
+                            ],
+                            stops: [0, 0.7, 1],
+                          ),
+                        ),
+                        child: SizedBox(width: double.infinity, height: 1),
+                      ),
+                    ),
+                  ),
+                  if (widget.stageDirection?.trim().isNotEmpty ?? false) ...[
+                    Text(
+                      '(${widget.stageDirection!.trim()})',
+                      key: const Key('story-stage-direction'),
+                      style: const TextStyle(
+                        color: Color(0xFFB6D1E3),
+                        fontFamily: 'Pretendard',
+                        fontSize: 11.5,
+                        height: 1.35,
+                        fontWeight: FontWeight.w600,
+                        fontStyle: FontStyle.italic,
+                        letterSpacing: -0.15,
+                        shadows: [
+                          Shadow(
+                            color: Color(0xCC000000),
+                            blurRadius: 4,
+                            offset: Offset(0, 1),
                           ),
                         ],
                       ),
-                    );
-                  },
-                ),
+                    ),
+                    const SizedBox(height: 4),
+                  ],
+                  Semantics(
+                    liveRegion: true,
+                    label: widget.line,
+                    child: Text(
+                      visibleLine,
+                      key: const Key('story-line-text'),
+                      style: const TextStyle(
+                        color: Color(0xFFF9FCFF),
+                        fontFamily: 'Pretendard',
+                        fontSize: 15.5,
+                        height: 1.48,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: -0.3,
+                        shadows: [
+                          Shadow(
+                            color: Color(0xE8000000),
+                            blurRadius: 5,
+                            offset: Offset(0, 1.4),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (_typingComplete && widget.choices.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    ...widget.choices.map(
+                      (choice) => Padding(
+                        padding: const EdgeInsets.only(bottom: 7),
+                        child: choice,
+                      ),
+                    ),
+                  ],
+                  if (_typingComplete && widget.child != null) ...[
+                    const SizedBox(height: 10),
+                    widget.child!,
+                  ],
+                ],
               ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }

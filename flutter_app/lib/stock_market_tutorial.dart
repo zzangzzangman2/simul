@@ -1116,6 +1116,7 @@ class _PracticalTradeTutorialSheetState
               child: _NovelDialogue(
                 key: ValueKey(('tutorial-recovery-dialogue', index)),
                 speaker: beat.speaker,
+                playerName: widget.sourceState.story.playerName,
                 line: beat.message,
                 onContinue: _advanceRecovery,
                 continueKey: const Key('tutorial-recovery-continue'),
@@ -1270,6 +1271,7 @@ class _PracticalTradeTutorialSheetState
             child: _NovelDialogue(
               key: ValueKey(('tutorial-review-dialogue', _reviewBeat)),
               speaker: speaker,
+              playerName: widget.sourceState.story.playerName,
               line: message,
               choices: _reviewBeat == 0
                   ? <_NovelChoice>[

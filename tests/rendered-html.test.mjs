@@ -314,12 +314,17 @@ test("fills the mobile viewport and provides an exact desktop phone preview", as
   assert.match(fontManifest, /MaplestoryBold\.ttf/);
   assert.match(
     visualNovel,
-    /key: const Key\('story-line-text'\),[\s\S]*?fontFamily: 'Maplestory'/,
+    /key: const Key\('story-line-text'\),[\s\S]*?fontFamily: 'Pretendard'/,
   );
   assert.match(
     visualNovel,
-    /key: const Key\('story-speaker-chip'\),[\s\S]*?fontFamily: 'Maplestory'/,
+    /key: const Key\('story-speaker-name'\),[\s\S]*?fontFamily: 'Pretendard'/,
   );
+  assert.match(visualNovel, /key: const Key\('story-speaker-affiliation'\)/);
+  assert.match(visualNovel, /key: Key\('story-dialogue-divider'\)/);
+  assert.doesNotMatch(visualNovel, /story-moving-light-beam/);
+  assert.doesNotMatch(visualNovel, /story-dialogue-opacity-control/);
+  assert.doesNotMatch(visualNovel, /project-decimal-dialogue-panel-opacity/);
 
   const cssProperties = new Map();
   const viewportListeners = new Map();
@@ -666,7 +671,10 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
   assert.match(catalog, /speaker: "이지안"[\s\S]*?poses: leeJianPoses/);
   assert.match(catalog, /speaker: "최이서"[\s\S]*?poses: choiIseoPoses/);
   assert.match(catalog, /speaker: "오지우"[\s\S]*?poses: ohJiwooPoses/);
-  assert.match(catalog, /park_haeun\/[\s\S]*09_explaining_v2\.png/);
+  assert.match(
+    catalog,
+    /const parkHaeunPoses[\s\S]*09_explaining_v2\.png[\s\S]*production_soft_painted\/park_haeun/,
+  );
   assert.match(data, /park_haeun\/02_bright_smile_wave_v2\.png/);
   assert.match(data, /yoon_chaea\/09_explaining_v1\.png/);
   assert.match(data, /kim_seoa\/01_neutral_notebook_v1\.png/);
@@ -677,7 +685,7 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
   assert.match(buildRoute, /persistAndBuild\(validation\.scenes\)/);
   assert.match(buildRoute, /scripts\/build-flutter-web\.mjs/);
   assert.match(onboarding, /_dialogueBundleAsset/);
-  assert.match(onboarding, /_dialogueAppearanceVersion = 14/);
+  assert.match(onboarding, /_dialogueAppearanceVersion = 15/);
   assert.match(onboarding, /_mergeCurrentAppearance/);
   assert.match(onboarding, /rootBundle\.loadString/);
   assert.match(

@@ -543,19 +543,23 @@ void main() {
 
     expect(find.textContaining('비가 자정의 유리창을'), findsOneWidget);
     await advanceDialogue(tester, 1);
-    expect(find.text('한규진 국정원장'), findsOneWidget);
+    expect(find.text('한규진'), findsOneWidget);
+    expect(find.text('국가정보원'), findsOneWidget);
     expect(find.textContaining('결정권이 넘어가는 순간'), findsOneWidget);
     await advanceDialogue(tester, 1);
-    expect(find.text('임서희 경제안보국장'), findsOneWidget);
+    expect(find.text('임서희'), findsOneWidget);
+    expect(find.text('국가정보원 · 경제안보국'), findsOneWidget);
     await advanceDialogue(tester, 1);
-    expect(find.text('도윤석 기획조정관'), findsOneWidget);
+    expect(find.text('도윤석'), findsOneWidget);
+    expect(find.text('국가정보원 · 기획조정실'), findsOneWidget);
     await advanceDialogue(tester, 1);
-    expect(find.text('조민경 권익감사관'), findsOneWidget);
+    expect(find.text('조민경'), findsOneWidget);
+    expect(find.text('국가정보원 · 권익감사실'), findsOneWidget);
     expect(find.textContaining('거부권'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('dialogue opacity control persists across the next line', (
+  testWidgets('borderless dialogue keeps a fixed translucent backdrop', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
@@ -574,34 +578,30 @@ void main() {
       );
       final decoration = panel.decoration! as BoxDecoration;
       final gradient = decoration.gradient! as LinearGradient;
-      return gradient.colors.first.a;
+      return gradient.colors[1].a;
     }
 
-    expect(visiblePanelOpacity(), lessThan(0.01));
+    final panel = tester.widget<Container>(
+      find.byKey(const Key('story-dialogue-panel')),
+    );
+    final panelDecoration = panel.decoration! as BoxDecoration;
+    expect(panelDecoration.border, isNull);
+    expect(panelDecoration.borderRadius, isNull);
+    expect(panelDecoration.boxShadow, isNull);
+    expect(find.byKey(const Key('story-moving-light-beam')), findsNothing);
+    expect(visiblePanelOpacity(), closeTo(0.58, 0.01));
     expect(
-      find.byKey(const ValueKey('story-dialogue-backdrop-blur-0.00')),
+      find.byKey(const ValueKey('story-dialogue-backdrop-blur-4.30')),
       findsOneWidget,
     );
-    final control = find.byKey(const Key('story-dialogue-opacity-control'));
-    expect(control, findsOneWidget);
-    await tester.tapAt(tester.getTopRight(control) + const Offset(-5, 14));
-    await tester.pumpAndSettle();
-    final adjustedOpacity = visiblePanelOpacity();
-    expect(adjustedOpacity, greaterThan(0.7));
     expect(
-      find.byKey(const ValueKey('story-dialogue-backdrop-blur-7.00')),
-      findsOneWidget,
+      find.byKey(const Key('story-dialogue-opacity-control')),
+      findsNothing,
     );
+    expect(find.byKey(const Key('story-dialogue-divider')), findsOneWidget);
 
     await advanceDialogue(tester, 1);
-    expect(visiblePanelOpacity(), closeTo(adjustedOpacity, 0.01));
-
-    final preferences = await SharedPreferences.getInstance();
-    await preferences.reload();
-    expect(
-      preferences.getDouble('project-decimal-dialogue-panel-opacity-v1'),
-      closeTo(adjustedOpacity, 0.01),
-    );
+    expect(visiblePanelOpacity(), closeTo(0.58, 0.01));
     expect(tester.takeException(), isNull);
   });
 
@@ -634,12 +634,14 @@ void main() {
 
     await tester.tapAt(const Offset(24, 420));
     await tester.pump();
-    expect(find.text('한규진 국정원장'), findsOneWidget);
+    expect(find.text('한규진'), findsOneWidget);
+    expect(find.text('국가정보원'), findsOneWidget);
 
     await tester.pumpAndSettle();
     await tester.tapAt(const Offset(195, 420));
     await tester.pumpAndSettle();
-    expect(find.text('임서희 경제안보국장'), findsOneWidget);
+    expect(find.text('임서희'), findsOneWidget);
+    expect(find.text('국가정보원 · 경제안보국'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -657,7 +659,8 @@ void main() {
       await startNewGame(tester);
       await advanceDialogue(tester, 134);
 
-      expect(find.text('한서윤 운영관'), findsOneWidget);
+      expect(find.text('한서윤'), findsOneWidget);
+      expect(find.text('프로젝트 데시멀 · 운영관'), findsOneWidget);
       expect(find.textContaining('감당하지 않아도 될 위험'), findsOneWidget);
       expect(
         find.byKey(const Key('academy-teacher-character')),
@@ -684,7 +687,8 @@ void main() {
     await startNewGame(tester);
     await advanceDialogue(tester, 2);
 
-    expect(find.text('임서희 경제안보국장'), findsOneWidget);
+    expect(find.text('임서희'), findsOneWidget);
+    expect(find.text('국가정보원 · 경제안보국'), findsOneWidget);
     expect(
       find.byKey(const Key('story-wheel-navigation-listener')),
       findsOneWidget,
@@ -699,7 +703,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('한규진 국정원장'), findsOneWidget);
+    expect(find.text('한규진'), findsOneWidget);
+    expect(find.text('국가정보원'), findsOneWidget);
     expect(find.textContaining('결정권이 넘어가는 순간'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
@@ -841,7 +846,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('편집기 화자'), findsOneWidget);
-    expect(find.text('편집기에서 고친 지문이다.'), findsOneWidget);
+    expect(find.text('(편집기에서 고친 지문이다.)'), findsOneWidget);
     expect(find.text('편집기에서 고친 대사다.\n두 번째 줄도 적용됐다.'), findsOneWidget);
     expect(find.textContaining(r'\n'), findsNothing);
     expect(find.textContaining('편집기 장소'), findsOneWidget);
@@ -867,7 +872,7 @@ void main() {
     await advanceDialogue(tester, 54);
 
     expect(find.text('수아'), findsOneWidget);
-    expect(find.text('수아가 새 장면의 문을 열었다.'), findsOneWidget);
+    expect(find.text('(수아가 새 장면의 문을 열었다.)'), findsOneWidget);
     expect(find.text('이 대사는 편집기에서 새로 추가했어.'), findsOneWidget);
     expect(find.byKey(const Key('orientation-complete-card')), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -1129,7 +1134,7 @@ void main() {
     await startNewGame(tester);
     await tester.tap(find.byKey(const Key('story-continue')));
     await tester.pump();
-    expect(find.byKey(const Key('story-typewriter-hint')), findsWidgets);
+    expect(find.byKey(const Key('story-typewriter-hint')), findsNothing);
     await tester.tap(find.byKey(const ValueKey(1)));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('story-line-text')), findsOneWidget);
