@@ -2,6 +2,7 @@ const phoneMessengerPlayerId = 'player';
 const phoneMessengerDailySendLimit = 3;
 const phoneMessengerMaxMessageLength = 80;
 const phoneMessengerHistoryLimit = 256;
+const phoneConversationMemoryLimit = 512;
 
 class PhoneContactDefinition {
   const PhoneContactDefinition({
@@ -158,55 +159,6 @@ PhoneContactDefinition? phoneContactById(String id) {
   return null;
 }
 
-String phoneReplyFor(PhoneContactDefinition contact, String rawText) {
-  final text = rawText.toLowerCase();
-  const boundaryKeywords = <String>['야한', '벗어', '키스', '몸매', '죽어', '꺼져', '멍청'];
-  if (boundaryKeywords.any(text.contains)) return contact.boundaryReply;
-
-  const stockKeywords = <String>[
-    '주식',
-    '종목',
-    '투자',
-    '매수',
-    '매도',
-    '수익',
-    '손해',
-    '손익',
-    '가격',
-    '회사',
-  ];
-  if (stockKeywords.any(text.contains)) return contact.stockReply;
-
-  const classKeywords = <String>[
-    '실습',
-    '선생',
-    '공부',
-    '복습',
-    '숙제',
-    '컴퓨터',
-    'pc',
-    '헷갈',
-    '모르',
-  ];
-  if (classKeywords.any(text.contains)) return contact.classReply;
-
-  const casualKeywords = <String>[
-    '안녕',
-    '뭐 해',
-    '뭐해',
-    '심심',
-    '밥',
-    '먹',
-    '놀',
-    '자냐',
-    '잘 자',
-    '고마워',
-    '괜찮',
-  ];
-  if (casualKeywords.any(text.contains)) return contact.casualReply;
-  return contact.fallbackReply;
-}
-
 class PhoneMessage {
   const PhoneMessage({
     required this.id,
@@ -262,38 +214,123 @@ class PhoneMessage {
   );
 }
 
+class PhoneConversationMemory {
+  const PhoneConversationMemory({
+    required this.id,
+    required this.contactId,
+    required this.day,
+    required this.intent,
+    required this.investmentSituation,
+    required this.playerText,
+    required this.replyText,
+    this.playerDailyProfitLoss = 0,
+    this.playerCumulativeProfitLoss = 0,
+    this.contactDailyProfitLoss = 0,
+    this.affectionDelta = 0,
+    this.trustDelta = 0,
+    this.closenessDelta = 0,
+    this.investmentRespectDelta = 0,
+  });
+
+  final String id;
+  final String contactId;
+  final int day;
+  final String intent;
+  final String investmentSituation;
+  final String playerText;
+  final String replyText;
+  final int playerDailyProfitLoss;
+  final int playerCumulativeProfitLoss;
+  final int contactDailyProfitLoss;
+  final int affectionDelta;
+  final int trustDelta;
+  final int closenessDelta;
+  final int investmentRespectDelta;
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'contactId': contactId,
+    'day': day,
+    'intent': intent,
+    'investmentSituation': investmentSituation,
+    'playerText': playerText,
+    'replyText': replyText,
+    'playerDailyProfitLoss': playerDailyProfitLoss,
+    'playerCumulativeProfitLoss': playerCumulativeProfitLoss,
+    'contactDailyProfitLoss': contactDailyProfitLoss,
+    'affectionDelta': affectionDelta,
+    'trustDelta': trustDelta,
+    'closenessDelta': closenessDelta,
+    'investmentRespectDelta': investmentRespectDelta,
+  };
+
+  factory PhoneConversationMemory.fromJson(Map<String, dynamic> json) =>
+      PhoneConversationMemory(
+        id: json['id'] as String? ?? '',
+        contactId: json['contactId'] as String? ?? '',
+        day: ((json['day'] as num?)?.toInt() ?? 1).clamp(1, 0x7fffffff),
+        intent: json['intent'] as String? ?? 'unknown',
+        investmentSituation:
+            json['investmentSituation'] as String? ?? 'unavailable',
+        playerText: json['playerText'] as String? ?? '',
+        replyText: json['replyText'] as String? ?? '',
+        playerDailyProfitLoss:
+            (json['playerDailyProfitLoss'] as num?)?.toInt() ?? 0,
+        playerCumulativeProfitLoss:
+            (json['playerCumulativeProfitLoss'] as num?)?.toInt() ?? 0,
+        contactDailyProfitLoss:
+            (json['contactDailyProfitLoss'] as num?)?.toInt() ?? 0,
+        affectionDelta: (json['affectionDelta'] as num?)?.toInt() ?? 0,
+        trustDelta: (json['trustDelta'] as num?)?.toInt() ?? 0,
+        closenessDelta: (json['closenessDelta'] as num?)?.toInt() ?? 0,
+        investmentRespectDelta:
+            (json['investmentRespectDelta'] as num?)?.toInt() ?? 0,
+      );
+}
+
 class PhoneThreadProgress {
   const PhoneThreadProgress({
     required this.contactId,
     this.lastExchangeDay = -1,
     this.exchangesOnLastDay = 0,
     this.totalExchanges = 0,
+    this.lastIntent = '',
+    this.sameIntentStreak = 0,
   });
 
   final String contactId;
   final int lastExchangeDay;
   final int exchangesOnLastDay;
   final int totalExchanges;
+  final String lastIntent;
+  final int sameIntentStreak;
 
   int exchangesForDay(int day) => lastExchangeDay == day
       ? exchangesOnLastDay.clamp(0, phoneMessengerDailySendLimit)
       : 0;
 
-  PhoneThreadProgress recordExchange(int day) => PhoneThreadProgress(
-    contactId: contactId,
-    lastExchangeDay: day,
-    exchangesOnLastDay: (exchangesForDay(day) + 1).clamp(
-      0,
-      phoneMessengerDailySendLimit,
-    ),
-    totalExchanges: (totalExchanges + 1).clamp(0, 0x7fffffff),
-  );
+  PhoneThreadProgress recordExchange(int day, {required String intent}) =>
+      PhoneThreadProgress(
+        contactId: contactId,
+        lastExchangeDay: day,
+        exchangesOnLastDay: (exchangesForDay(day) + 1).clamp(
+          0,
+          phoneMessengerDailySendLimit,
+        ),
+        totalExchanges: (totalExchanges + 1).clamp(0, 0x7fffffff),
+        lastIntent: intent,
+        sameIntentStreak: lastIntent == intent
+            ? (sameIntentStreak + 1).clamp(1, 0x7fffffff)
+            : 1,
+      );
 
   Map<String, dynamic> toJson() => {
     'contactId': contactId,
     'lastExchangeDay': lastExchangeDay,
     'exchangesOnLastDay': exchangesOnLastDay,
     'totalExchanges': totalExchanges,
+    'lastIntent': lastIntent,
+    'sameIntentStreak': sameIntentStreak,
   };
 
   factory PhoneThreadProgress.fromJson(Map<String, dynamic> json) =>
@@ -306,6 +343,9 @@ class PhoneThreadProgress {
           0,
           0x7fffffff,
         ),
+        lastIntent: json['lastIntent'] as String? ?? '',
+        sameIntentStreak: ((json['sameIntentStreak'] as num?)?.toInt() ?? 0)
+            .clamp(0, 0x7fffffff),
       );
 }
 
@@ -313,6 +353,7 @@ class PhoneMessengerState {
   const PhoneMessengerState({
     required this.messages,
     required this.progressByContact,
+    this.memories = const <PhoneConversationMemory>[],
   });
 
   factory PhoneMessengerState.initial() => PhoneMessengerState(
@@ -336,6 +377,7 @@ class PhoneMessengerState {
 
   final List<PhoneMessage> messages;
   final Map<String, PhoneThreadProgress> progressByContact;
+  final List<PhoneConversationMemory> memories;
 
   List<PhoneMessage> messagesFor(String contactId) => messages
       .where((message) => message.contactId == contactId)
@@ -364,12 +406,18 @@ class PhoneMessengerState {
   PhoneThreadProgress progressFor(String contactId) =>
       progressByContact[contactId] ?? PhoneThreadProgress(contactId: contactId);
 
+  List<PhoneConversationMemory> memoriesFor(String contactId) => memories
+      .where((memory) => memory.contactId == contactId)
+      .toList(growable: false);
+
   PhoneMessengerState copyWith({
     List<PhoneMessage>? messages,
     Map<String, PhoneThreadProgress>? progressByContact,
+    List<PhoneConversationMemory>? memories,
   }) => PhoneMessengerState(
     messages: messages ?? this.messages,
     progressByContact: progressByContact ?? this.progressByContact,
+    memories: memories ?? this.memories,
   );
 
   Map<String, dynamic> toJson() => {
@@ -378,6 +426,7 @@ class PhoneMessengerState {
       for (final entry in progressByContact.entries)
         entry.key: entry.value.toJson(),
     },
+    'memories': memories.map((memory) => memory.toJson()).toList(),
   };
 
   factory PhoneMessengerState.fromJson(Map<String, dynamic> json) {
@@ -422,11 +471,31 @@ class PhoneMessengerState {
         () => PhoneThreadProgress(contactId: contact.id),
       );
     }
+    final parsedMemories = ((json['memories'] as List?) ?? const [])
+        .whereType<Map>()
+        .map(
+          (memory) =>
+              PhoneConversationMemory.fromJson(memory.cast<String, dynamic>()),
+        )
+        .where(
+          (memory) =>
+              memory.id.isNotEmpty &&
+              memory.playerText.isNotEmpty &&
+              memory.replyText.isNotEmpty &&
+              validIds.contains(memory.contactId),
+        )
+        .toList(growable: false);
+    final memories = parsedMemories.length <= phoneConversationMemoryLimit
+        ? parsedMemories
+        : parsedMemories.sublist(
+            parsedMemories.length - phoneConversationMemoryLimit,
+          );
     return PhoneMessengerState(
       messages: List<PhoneMessage>.unmodifiable(messages),
       progressByContact: Map<String, PhoneThreadProgress>.unmodifiable(
         progress,
       ),
+      memories: List<PhoneConversationMemory>.unmodifiable(memories),
     );
   }
 }

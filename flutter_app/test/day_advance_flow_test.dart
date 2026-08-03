@@ -80,7 +80,11 @@ void main() {
             initialCash: 50000,
             worldSeed: 'cohort-day-flow',
           )
-          .copyWith(decisions: const [], marketMinute: marketDayStartMinute);
+          .copyWith(
+            day: 3,
+            decisions: const [],
+            marketMinute: marketDayStartMinute,
+          );
       late StateSetter updateHarness;
 
       await tester.pumpWidget(
@@ -280,6 +284,17 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.byType(RelationshipEveningScreen), findsOneWidget);
         await tester.tap(find.byKey(const Key('relationship-rest-button')));
+        await tester.pumpAndSettle();
+        expect(find.byType(LifeCalendarScreen), findsOneWidget);
+        expect(currentState.day, initialDay);
+        expect(
+          find.byKey(const Key('life-calendar-continue-button')),
+          findsOneWidget,
+        );
+        await tester.tap(
+          find.byKey(const Key('life-calendar-continue-button')),
+        );
+
         for (
           var attempt = 0;
           attempt < 30 &&
@@ -317,4 +332,89 @@ void main() {
       },
     );
   }
+  testWidgets('weekend day end skips the closed-market result screen', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    const engine = GameEngine();
+    final base = engine
+        .createNewGame(
+          '주말 하루 종료',
+          initialCash: 50000,
+          worldSeed: 'weekend-day-flow',
+        )
+        .copyWith(decisions: const [], marketMinute: marketDayStartMinute);
+    var weekendDay = base.day;
+    while (base.dateForDay(weekendDay).weekday < DateTime.saturday) {
+      weekendDay += 1;
+    }
+    var currentState = base.copyWith(day: weekendDay);
+    var settlementCalls = 0;
+    late StateSetter updateHarness;
+
+    await tester.pumpWidget(
+      StatefulBuilder(
+        builder: (context, setState) {
+          updateHarness = setState;
+          return MaterialApp(
+            home: OfficeScreen(
+              state: currentState,
+              engine: engine,
+              activeSaveSlot: 1,
+              lastSavedAt: null,
+              onManualSave: () async {},
+              onReturnToTitle: () {},
+              onAdvanceDay: () async => currentState,
+              onSetMarketMinute: (minute) async {
+                currentState = currentState.copyWith(marketMinute: minute);
+                updateHarness(() {});
+                return currentState;
+              },
+              onSaveMarketNotebook: (_, _) async => currentState,
+              onResolveDecision: (_, _) async {},
+              onRequestAcademyHelp: (_) async => currentState,
+              onSettleCohortInvestmentDay: () async {
+                settlementCalls += 1;
+                return CohortInvestmentActionResult(
+                  state: currentState,
+                  success: false,
+                  message: '주말에는 호출되면 안 됨',
+                );
+              },
+              onLendToCohortInvestor: (_, _) async =>
+                  CohortInvestmentActionResult(
+                    state: currentState,
+                    success: false,
+                    message: '주말에는 호출되면 안 됨',
+                  ),
+              onAcknowledgeCohortInvestmentReport: () async =>
+                  CohortInvestmentActionResult(
+                    state: currentState,
+                    success: false,
+                    message: '주말에는 호출되면 안 됨',
+                  ),
+              onCompleteWork: (_) async => currentState,
+              onExecuteTrade: (_) async => TradeExecutionResult(
+                state: currentState,
+                success: false,
+                message: 'test',
+              ),
+            ),
+          );
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('advance-day-button')));
+    await tester.pumpAndSettle();
+
+    expect(settlementCalls, 0);
+    expect(find.byType(CohortDailyResultScreen), findsNothing);
+    expect(find.byType(RelationshipEveningScreen), findsOneWidget);
+    expect(find.textContaining('주식시장이 쉬는 주말'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }

@@ -6,11 +6,14 @@ import {
 
 export const dynamic = "force-dynamic";
 
+type PublishMode = "quick" | "full";
+
 type BuildResult = {
   builtAt: string;
   durationMs: number;
   logTail: string;
   sha256: string;
+  mode: PublishMode;
   scenes: ValidatedDialogueScene[];
 };
 
@@ -65,10 +68,11 @@ async function authorizedForBuild(request: Request) {
   );
 }
 
-async function persistAndBuild(
+async function persistDialogue(
   scenes: ValidatedDialogueScene[],
+  mode: PublishMode,
 ): Promise<BuildResult> {
-  const [{ access, readFile, writeFile }, { spawn }, path, { createHash }] =
+  const [{ access, copyFile, readFile, writeFile }, { spawn }, path, { createHash }] =
     await Promise.all([
       import("node:fs/promises"),
       import("node:child_process"),
@@ -86,6 +90,10 @@ async function persistAndBuild(
     flutterRoot,
     "lib/dialogue/canonical_dialogue_data.dart",
   );
+  const runtimeDialoguePath = path.resolve(
+    projectRoot,
+    "public/play/assets/assets/dialogue/dialogue-editor-override.json",
+  );
   const generatorScript = path.resolve(
     projectRoot,
     "scripts/generate-dialogue-editor-data.mjs",
@@ -97,6 +105,7 @@ async function persistAndBuild(
     dartDataPath,
     generatorScript,
     buildScript,
+    runtimeDialoguePath,
   ]) {
     const relative = path.relative(projectRoot, target);
     if (!relative || relative.startsWith("..")) {
@@ -105,8 +114,17 @@ async function persistAndBuild(
   }
 
   for (const scene of scenes) {
-    for (const field of ["background", "character"] as const) {
-      const asset = scene[field];
+    const sceneAssets = [
+      ["background", scene.background],
+      ["character", scene.character],
+      ["bgm", scene.bgm],
+      ["soundEffect", scene.soundEffect],
+      ["voice", scene.voice],
+      ...(scene.characters ?? []).map(
+        (character, index) => [`characters[${index}].asset`, character.asset] as const,
+      ),
+    ] as const;
+    for (const [field, asset] of sceneAssets) {
       if (!asset) continue;
       const relativeAsset = asset.slice("/play/assets/".length);
       const resolvedAsset = path.resolve(flutterRoot, relativeAsset);
@@ -119,6 +137,22 @@ async function persistAndBuild(
       } catch {
         throw new Error(`${scene.id} 장면의 ${field} 에셋을 찾을 수 없습니다: ${asset}`);
       }
+      if (mode === "quick") {
+        const runtimeAsset = path.resolve(
+          projectRoot,
+          "public/play",
+          encodeURI(asset.slice("/play/".length)),
+        );
+        const runtimeRelative = path.relative(path.resolve(projectRoot, "public/play"), runtimeAsset);
+        if (!runtimeRelative || runtimeRelative.startsWith("..")) {
+          throw new Error(`${scene.id} 장면의 ${field} 런타임 경로가 올바르지 않습니다.`);
+        }
+        try {
+          await access(runtimeAsset);
+        } catch {
+          throw new Error(`새 에셋은 전체 빌드가 필요합니다: ${asset}`);
+        }
+      }
     }
   }
 
@@ -127,7 +161,7 @@ async function persistAndBuild(
     {
       version: 2,
       contentVersion: 3,
-      appearanceVersion: 16,
+      appearanceVersion: 17,
       updatedAt: builtAt,
       scenes,
     },
@@ -135,7 +169,19 @@ async function persistAndBuild(
     2,
   )}\n`;
   const sha256 = createHash("sha256").update(payload).digest("hex");
-  const sourcePaths = [assetPath, editorDataPath, dartDataPath] as const;
+  if (mode === "quick") {
+    try {
+      await access(runtimeDialoguePath);
+    } catch {
+      throw new Error("빠른 적용 대상이 없습니다. 먼저 전체 빌드를 실행해 주세요.");
+    }
+  }
+  const sourcePaths = [
+    assetPath,
+    editorDataPath,
+    dartDataPath,
+    ...(mode === "quick" ? [runtimeDialoguePath] : []),
+  ] as const;
   const backups = await Promise.all(
     sourcePaths.map((target) => readFile(target, "utf8")),
   );
@@ -172,7 +218,11 @@ async function persistAndBuild(
   try {
     await writeFile(assetPath, payload, "utf8");
     await runNodeScript(generatorScript, "대사 생성");
-    await runNodeScript(buildScript, "Flutter 게임 빌드");
+    if (mode === "quick") {
+      await copyFile(assetPath, runtimeDialoguePath);
+    } else {
+      await runNodeScript(buildScript, "Flutter 게임 빌드");
+    }
   } catch (error) {
     await Promise.all(
       sourcePaths.map((target, index) => writeFile(target, backups[index], "utf8")),
@@ -186,6 +236,7 @@ async function persistAndBuild(
     durationMs: Date.now() - startedAt,
     logTail: output.trim(),
     sha256,
+    mode,
     scenes,
   };
 }
@@ -218,14 +269,6 @@ export async function POST(request: Request) {
       { status: 409 },
     );
   }
-  const completedAt = buildGlobal.__dialogueBuildCompletedAt ?? 0;
-  if (Date.now() - completedAt < BUILD_COOLDOWN_MS) {
-    return NextResponse.json(
-      { ok: false, message: "연속 빌드를 막기 위해 5초 뒤 다시 시도해 주세요." },
-      { status: 429 },
-    );
-  }
-
   let body: unknown;
   try {
     body = await request.json();
@@ -235,8 +278,18 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
+  const bodyRecord =
+    body && typeof body === "object" ? (body as Record<string, unknown>) : null;
+  const mode: PublishMode = bodyRecord?.mode === "full" ? "full" : "quick";
+  const completedAt = buildGlobal.__dialogueBuildCompletedAt ?? 0;
+  if (mode === "full" && Date.now() - completedAt < BUILD_COOLDOWN_MS) {
+    return NextResponse.json(
+      { ok: false, message: "연속 전체 빌드를 막기 위해 5초 뒤 다시 시도해 주세요." },
+      { status: 429 },
+    );
+  }
   const validation = validateDialogueScenes(
-    body && typeof body === "object" ? (body as Record<string, unknown>).scenes : null,
+    bodyRecord?.scenes,
   );
   if (!validation.ok) {
     return NextResponse.json(
@@ -245,14 +298,16 @@ export async function POST(request: Request) {
     );
   }
 
-  buildGlobal.__dialogueBuildPromise = persistAndBuild(validation.scenes);
+  buildGlobal.__dialogueBuildPromise = persistDialogue(validation.scenes, mode);
   try {
     const result = await buildGlobal.__dialogueBuildPromise;
-    buildGlobal.__dialogueBuildCompletedAt = Date.now();
+    if (result.mode === "full") {
+      buildGlobal.__dialogueBuildCompletedAt = Date.now();
+    }
     return NextResponse.json({
       ok: true,
       contentVersion: 3,
-      appearanceVersion: 16,
+      appearanceVersion: 17,
       ...result,
     });
   } catch (error) {

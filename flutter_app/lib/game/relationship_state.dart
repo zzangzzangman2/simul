@@ -32,6 +32,11 @@ RelationshipStage relationshipStageFor(int affection) => switch (affection) {
 const relationshipDateUnlockAffection = 20;
 const relationshipMinAffection = 1;
 const relationshipMaxAffection = 100;
+const relationshipDimensionMin = 1;
+const relationshipDimensionMax = 100;
+
+bool relationshipOutingAvailableOn(DateTime date) =>
+    date.weekday == DateTime.saturday || date.weekday == DateTime.sunday;
 
 class RelationshipChoiceDefinition {
   const RelationshipChoiceDefinition({
@@ -846,55 +851,108 @@ RelationshipSceneDefinition relationshipSceneFor({
 class GirlRelationshipProgress {
   const GirlRelationshipProgress({
     this.affection = relationshipMinAffection,
+    this.trust = relationshipDimensionMin,
+    this.closeness = relationshipDimensionMin,
+    this.investmentRespect = relationshipDimensionMin,
     this.lastInteractionDay = 0,
+    this.lastMeaningfulMessageDay = 0,
     this.conversationCount = 0,
     this.dateCount = 0,
+    this.meaningfulMessageCount = 0,
   });
 
   final int affection;
+  final int trust;
+  final int closeness;
+  final int investmentRespect;
   final int lastInteractionDay;
+  final int lastMeaningfulMessageDay;
   final int conversationCount;
   final int dateCount;
+  final int meaningfulMessageCount;
 
   RelationshipStage get stage => relationshipStageFor(affection);
   bool get dateUnlocked => affection >= relationshipDateUnlockAffection;
 
   GirlRelationshipProgress copyWith({
     int? affection,
+    int? trust,
+    int? closeness,
+    int? investmentRespect,
     int? lastInteractionDay,
+    int? lastMeaningfulMessageDay,
     int? conversationCount,
     int? dateCount,
+    int? meaningfulMessageCount,
   }) => GirlRelationshipProgress(
     affection: (affection ?? this.affection).clamp(
       relationshipMinAffection,
       relationshipMaxAffection,
     ),
+    trust: (trust ?? this.trust).clamp(
+      relationshipDimensionMin,
+      relationshipDimensionMax,
+    ),
+    closeness: (closeness ?? this.closeness).clamp(
+      relationshipDimensionMin,
+      relationshipDimensionMax,
+    ),
+    investmentRespect: (investmentRespect ?? this.investmentRespect).clamp(
+      relationshipDimensionMin,
+      relationshipDimensionMax,
+    ),
     lastInteractionDay: lastInteractionDay ?? this.lastInteractionDay,
+    lastMeaningfulMessageDay:
+        lastMeaningfulMessageDay ?? this.lastMeaningfulMessageDay,
     conversationCount: conversationCount ?? this.conversationCount,
     dateCount: dateCount ?? this.dateCount,
+    meaningfulMessageCount:
+        meaningfulMessageCount ?? this.meaningfulMessageCount,
   );
 
   Map<String, dynamic> toJson() => <String, dynamic>{
     'affection': affection,
+    'trust': trust,
+    'closeness': closeness,
+    'investmentRespect': investmentRespect,
     'lastInteractionDay': lastInteractionDay,
+    'lastMeaningfulMessageDay': lastMeaningfulMessageDay,
     'conversationCount': conversationCount,
     'dateCount': dateCount,
+    'meaningfulMessageCount': meaningfulMessageCount,
   };
 
-  factory GirlRelationshipProgress.fromJson(Map<String, dynamic> json) =>
-      GirlRelationshipProgress(
-        affection:
-            ((json['affection'] as num?)?.toInt() ?? relationshipMinAffection)
-                .clamp(relationshipMinAffection, relationshipMaxAffection),
-        lastInteractionDay: ((json['lastInteractionDay'] as num?)?.toInt() ?? 0)
-            .clamp(0, 0x7fffffff),
-        conversationCount: ((json['conversationCount'] as num?)?.toInt() ?? 0)
-            .clamp(0, 0x7fffffff),
-        dateCount: ((json['dateCount'] as num?)?.toInt() ?? 0).clamp(
-          0,
-          0x7fffffff,
-        ),
-      );
+  factory GirlRelationshipProgress.fromJson(Map<String, dynamic> json) {
+    final affection =
+        ((json['affection'] as num?)?.toInt() ?? relationshipMinAffection)
+            .clamp(relationshipMinAffection, relationshipMaxAffection);
+    int dimension(String key) => ((json[key] as num?)?.toInt() ?? affection)
+        .clamp(relationshipDimensionMin, relationshipDimensionMax);
+    return GirlRelationshipProgress(
+      affection: affection,
+      trust: dimension('trust'),
+      closeness: dimension('closeness'),
+      investmentRespect: dimension('investmentRespect'),
+      lastInteractionDay: ((json['lastInteractionDay'] as num?)?.toInt() ?? 0)
+          .clamp(0, 0x7fffffff),
+      lastMeaningfulMessageDay:
+          ((json['lastMeaningfulMessageDay'] as num?)?.toInt() ?? 0).clamp(
+            0,
+            0x7fffffff,
+          ),
+      conversationCount: ((json['conversationCount'] as num?)?.toInt() ?? 0)
+          .clamp(0, 0x7fffffff),
+      dateCount: ((json['dateCount'] as num?)?.toInt() ?? 0).clamp(
+        0,
+        0x7fffffff,
+      ),
+      meaningfulMessageCount:
+          ((json['meaningfulMessageCount'] as num?)?.toInt() ?? 0).clamp(
+            0,
+            0x7fffffff,
+          ),
+    );
+  }
 }
 
 class RelationshipMemory {
@@ -906,6 +964,9 @@ class RelationshipMemory {
     required this.choiceId,
     required this.affectionDelta,
     required this.affectionAfter,
+    this.trustDelta = 0,
+    this.closenessDelta = 0,
+    this.investmentRespectDelta = 0,
   });
 
   final int day;
@@ -915,6 +976,9 @@ class RelationshipMemory {
   final String choiceId;
   final int affectionDelta;
   final int affectionAfter;
+  final int trustDelta;
+  final int closenessDelta;
+  final int investmentRespectDelta;
 
   Map<String, dynamic> toJson() => <String, dynamic>{
     'day': day,
@@ -924,6 +988,9 @@ class RelationshipMemory {
     'choiceId': choiceId,
     'affectionDelta': affectionDelta,
     'affectionAfter': affectionAfter,
+    'trustDelta': trustDelta,
+    'closenessDelta': closenessDelta,
+    'investmentRespectDelta': investmentRespectDelta,
   };
 
   factory RelationshipMemory.fromJson(Map<String, dynamic> json) =>
@@ -944,6 +1011,19 @@ class RelationshipMemory {
             ((json['affectionAfter'] as num?)?.toInt() ??
                     relationshipMinAffection)
                 .clamp(relationshipMinAffection, relationshipMaxAffection),
+        trustDelta: ((json['trustDelta'] as num?)?.toInt() ?? 0).clamp(
+          -relationshipDimensionMax,
+          relationshipDimensionMax,
+        ),
+        closenessDelta: ((json['closenessDelta'] as num?)?.toInt() ?? 0).clamp(
+          -relationshipDimensionMax,
+          relationshipDimensionMax,
+        ),
+        investmentRespectDelta:
+            ((json['investmentRespectDelta'] as num?)?.toInt() ?? 0).clamp(
+              -relationshipDimensionMax,
+              relationshipDimensionMax,
+            ),
       );
 }
 

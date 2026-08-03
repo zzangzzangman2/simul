@@ -57,7 +57,7 @@ export const dialogueBackgrounds: DialogueBackground[] = [
     "bus-transition",
     "서울행 승합차 · 겨울",
     "프롤로그",
-    "assets/images/historical_prologue/bg_bus_transition_seoul_outskirts_2000_portrait_v1.png",
+    "assets/images/cinematic_soft_painted/decimal/bg_decimal_gangnam_exterior_winter_1999_v1.png",
   ),
   background(
     "decimal-gangnam-exterior",

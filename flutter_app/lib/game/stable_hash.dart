@@ -9,3 +9,12 @@ int multiplyFnvPrime31Exact(int value) {
   final crossProduct = low * 0x0100 + high * 0x0193;
   return (lowProduct + (crossProduct & 0x7fff) * 0x10000) & 0x7fffffff;
 }
+
+int stableHash31(String value) {
+  var hash = 0x811c9dc5 & 0x7fffffff;
+  for (final unit in value.codeUnits) {
+    hash ^= unit;
+    hash = multiplyFnvPrime31Exact(hash);
+  }
+  return hash & 0x7fffffff;
+}

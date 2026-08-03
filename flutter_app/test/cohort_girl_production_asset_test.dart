@@ -158,7 +158,7 @@ void main() {
               ).readAsStringSync(),
             )
             as Map<String, dynamic>;
-    expect(decoded['appearanceVersion'], 16);
+    expect(decoded['appearanceVersion'], 17);
     expect(decoded['contentVersion'], 3);
     final scenes = (decoded['scenes'] as List<dynamic>)
         .cast<Map<String, dynamic>>();

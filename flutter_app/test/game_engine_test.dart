@@ -2502,7 +2502,7 @@ void main() {
       });
 
       expect(state.version, GameState.schemaVersion);
-      expect(GameState.schemaVersion, 24);
+      expect(GameState.schemaVersion, 25);
       expect(state.businesses.businesses, isEmpty);
       expect(state.day, 5);
       expect(state.cash, 765432);

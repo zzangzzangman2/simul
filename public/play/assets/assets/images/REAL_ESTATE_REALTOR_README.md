@@ -1,41 +1,35 @@
 # 서하늘 공인중개사 자산 규격
 
-이 문서는 부동산 전용 화면에 반복 등장하는 **서하늘 공인중개사**의 고정 정체성, 복장, 6개 런타임 포즈와 생성 규칙을 정의한다. 다른 에이전트가 자산을 수정·추가할 때 `ART_STYLE_GUIDE.md`와 함께 반드시 읽는다.
+이 문서는 부동산 전용 화면에 반복 등장하는 **서하늘 공인중개사**의 역할, 6개
+런타임 상태와 v3 전면 재설계 규칙을 정의한다. 서하늘은 여자 동기 8명이 아니므로
+기존 얼굴·헤어·체형·의상·장신구는 보존 대상이 아니다.
 
 ## 기준 참조의 역할
 
-- 최상위 렌더링 화풍: `art_references/simul_luminous_soft_painted_vn_style_anchor_v2.png`
-- 서하늘 정체성·복장·장신구:
+- 최상위 목표 화풍: `SIMUL polished soft-render VN anime v3`
+- 화풍 참조: `art_references/simul_polished_soft_render_vn_style_anchor_v3.png`의 렌더링 문법만 사용
+- 아래 파일은 구형 외형 기록이며 새 정체성 앵커가 아니다.
   - `art_references/realtor_identity_pose_reference_01.jpg`
   - `art_references/realtor_identity_pose_reference_02.jpg`
   - `art_references/realtor_identity_pose_reference_03.jpg`
-- 화풍 참조에서는 거의 보이지 않는 유색 경계선, 자연스러운 다층 홍채,
-  섬세한 머리카락, 부드러운 페인터리 명암과 은은한 광학 조명만 가져온다.
-- 정체성 참조에서는 얼굴·머리·장신구·의상·샌들만 가져온다. 야외 배경, 내려다보는 카메라, 앉거나 무릎 꿇은 자세와 햇빛 방향은 가져오지 않는다.
-- 화풍 참조의 청록 머리·보라 눈·뷰티마크는 한서윤의 정체성이므로 서하늘에게 섞지 않는다.
+- 구형 참고 이미지의 얼굴·머리·장신구·의상·샌들을 복제하지 않는다. 역할과 포즈
+  기능을 이해하는 자료로만 제한하고 생성 입력에는 넣지 않는다.
+- 새 대표 디자인은 정식 앵커 속 한수아나 여자 동기 8명의 얼굴·머리·체형·의상을 복제하지 않는다.
 
-## 변경 금지 정체성
+## 유지할 서사 정체성
 
 - 이름과 직업: 서하늘 공인중개사
 - 연령: 만 24세 성인 여성
-- 얼굴: 둥근 턱선의 성인 얼굴, 차분한 옅은 청회색 눈
-- 머리: 눈썹을 덮는 일자 앞머리, 정수리의 짙은 남청·보라색에서 턱선의 밝은 시안색으로 이어지는 둥근 단발, 양옆의 바깥 뻗침
-- 머리 장식: 한쪽의 검은 삼각 핀, 반대쪽의 흰색·검은색 겹삼각 핀과 파란 물방울 장식
-- 나머지 장신구: 턱선 옆 흰색 네 꽃잎 장식, 작은 은색 마름모가 달린 검은 초커
-- 체형: 여섯 컷에서 동일한 성인 키와 체형. 교복풍 얼굴·미성년 체형으로 줄이지 않는다.
+- 전문적이고 신뢰감 있는 성인 부동산 안내자
+- 여섯 상태에서 같은 새 인물로 읽히는 얼굴·헤어·체형·의상
+- 교복풍 얼굴·미성년 체형으로 줄이지 않는다.
 
-## 변경 금지 복장
+## 새 대표 디자인 승인
 
-- 흰색·아주 옅은 하늘색의 짧은 오프숄더 프릴 원피스
-- 가는 어깨끈과 어깨의 작은 흰 리본
-- 쇄골 아래의 이중 프릴과 중앙 파란 리본
-- 잘록한 허리 묶음
-- 파란 작은 리본이 달린 이중 프릴 밑단
-- 흰 프릴 손목 장식
-- 오른쪽 허벅지의 가는 검은 가터
-- 흰 꽃 장식이 있는 파랑·검정 리본 플랫폼 샌들
-
-포즈가 바뀌어도 원피스 길이, 프릴 층수, 리본의 수·색·위치, 가터 위치와 신발을 바꾸지 않는다. 정장, 재킷, 분리형 치마, 구두, 스타킹으로 재해석하지 않는다.
+기존 오프숄더 프릴 원피스·가터·플랫폼 샌들·장식 과밀 디자인은 보존하지 않는다.
+1999~2000년 한국의 24세 공인중개사 역할과 화면 가독성에 맞는 새 얼굴·헤어·체형·
+복장·신발을 대표 전신 한 장으로 먼저 제안하고 사용자 승인을 받는다. 승인 뒤에는
+그 새 디자인을 6개 상태에서 동일하게 유지한다.
 
 ## 런타임 자산과 상태 매핑
 
@@ -68,26 +62,26 @@
 ## 생성 프롬프트 고정 블록
 
 ```text
-Canonical rendering reference: art_references/simul_luminous_soft_painted_vn_style_anchor_v2.png.
-Identity references: art_references/realtor_identity_pose_reference_01.jpg,
-art_references/realtor_identity_pose_reference_02.jpg,
-art_references/realtor_identity_pose_reference_03.jpg.
+Canonical rendering reference: art_references/simul_polished_soft_render_vn_style_anchor_v3.png.
+Use it for SIMUL polished soft-render VN anime v3 rendering only.
+Do not copy Sua's face, black wavy hair, body, uniform, pose or expression.
 
-Draw the same 24-year-old adult Korean realtor, Seo Haneul:
-the same rounded indigo-to-cyan bob, pale blue-gray eyes, geometric hair clips,
-blue teardrop ornament, white four-petal ornament, and black choker.
-Keep exactly the same white and pale-blue short off-shoulder frilled dress,
-fixed blue bows, right-thigh black garter, white wrist frill,
-and blue-black ribbon platform sandals in every pose.
+Design a new 24-year-old adult Korean realtor, Seo Haneul, for her first
+representative full-body approval image. Keep only her name, occupation,
+professional and trustworthy role, age, and 1999-2000 Korean setting.
+Do not preserve the legacy face, indigo-to-cyan bob, ornaments, frilled dress,
+garter, or platform sandals. Do not reuse any of the eight cohort girls.
 
-Match the SIMUL luminous soft-painted VN anime v2: fine colored edges,
-natural layered irises, delicate hair strands, smooth painterly skin and cloth shading,
-and subtle optical light. Do not copy Sua's face, black hair, body, or uniform.
+Use thin controlled dark colored linework, polished soft volume shading,
+layered irises, dense but controlled hair rendering, clean skin volume,
+crisp clothing seams and restrained material highlights.
 Standing full-body transparent sprite, 1024x1536, common baseline,
 no background, no cast shadow, no text, no logo, no watermark.
 ```
 
-포즈별 마지막 문장에 이 파일의 6개 표에서 지정한 표정·손동작·업무 소품 하나만 추가한다. 얼굴 골격, 머리, 복장과 장신구를 새로 해석하는 문장을 추가하면 안 된다.
+대표 디자인 한 장이 승인되기 전에는 6개 상태를 대량 생성하지 않는다. 승인 뒤에는
+프롬프트를 `Design the same newly approved Seo Haneul`로 바꾸고 표의 표정·손동작·업무
+소품만 상태별로 추가한다.
 
 ## 적용 전 회귀 확인
 

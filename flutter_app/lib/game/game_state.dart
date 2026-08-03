@@ -196,7 +196,7 @@ class GameState {
        cohortInvestments = cohortInvestments ?? CohortInvestmentState.initial(),
        phoneMessenger = phoneMessenger ?? PhoneMessengerState.initial();
 
-  static const schemaVersion = 24;
+  static const schemaVersion = 25;
   static const maxCampaignDay = 9862;
 
   final int version;

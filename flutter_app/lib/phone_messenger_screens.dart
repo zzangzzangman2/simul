@@ -330,8 +330,22 @@ class _PhoneChatScreenState extends State<PhoneChatScreen> {
       _state = result.state;
       _sending = false;
     });
+    if (result.relationshipChanged) {
+      final changes = <String>[
+        if (result.affectionDelta != 0) '호감 ${_signed(result.affectionDelta)}',
+        if (result.trustDelta != 0) '신뢰 ${_signed(result.trustDelta)}',
+        if (result.closenessDelta != 0) '친밀 ${_signed(result.closenessDelta)}',
+        if (result.investmentRespectDelta != 0)
+          '투자존중 ${_signed(result.investmentRespectDelta)}',
+      ];
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(changes.join(' · '))));
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
   }
+
+  String _signed(int value) => value > 0 ? '+$value' : '$value';
 
   void _closeChat() {
     if (_allowPop) return;
@@ -344,6 +358,9 @@ class _PhoneChatScreenState extends State<PhoneChatScreen> {
   @override
   Widget build(BuildContext context) {
     final messages = _state.phoneMessenger.messagesFor(widget.contact.id);
+    final relationship = cohortGirlProfileById(widget.contact.id) == null
+        ? null
+        : _state.relationships.progressFor(widget.contact.id);
     final used = _state.phoneMessenger
         .progressFor(widget.contact.id)
         .exchangesForDay(_state.day);
@@ -388,7 +405,13 @@ class _PhoneChatScreenState extends State<PhoneChatScreen> {
                             ),
                           ),
                           Text(
-                            widget.contact.personalityLabel,
+                            relationship == null
+                                ? widget.contact.personalityLabel
+                                : '${widget.contact.personalityLabel} · '
+                                      '호감 ${relationship.affection} · '
+                                      '신뢰 ${relationship.trust}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               color: Color(0xFF6E6532),
                               fontSize: 8,

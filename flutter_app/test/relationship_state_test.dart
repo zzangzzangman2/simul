@@ -89,8 +89,29 @@ void main() {
     expect(unlocked.dateJustUnlocked, isTrue);
     expect(unlocked.affectionAfter, 24);
 
+    var weekdayDay = unlocked.state.day + 1;
+    while (relationshipOutingAvailableOn(
+      unlocked.state.dateForDay(weekdayDay),
+    )) {
+      weekdayDay += 1;
+    }
+    final weekdayResult = engine.completeRelationshipEvening(
+      unlocked.state.copyWith(day: weekdayDay),
+      girlId: 'kim_seoa',
+      activity: RelationshipActivity.date,
+      choiceId: 'choose_together',
+    );
+    expect(weekdayResult.success, isFalse);
+    expect(weekdayResult.message, contains('토·일요일'));
+
+    var weekendDay = weekdayDay + 1;
+    while (!relationshipOutingAvailableOn(
+      unlocked.state.dateForDay(weekendDay),
+    )) {
+      weekendDay += 1;
+    }
     final dateResult = engine.completeRelationshipEvening(
-      unlocked.state.copyWith(day: 2),
+      unlocked.state.copyWith(day: weekendDay),
       girlId: 'kim_seoa',
       activity: RelationshipActivity.date,
       choiceId: 'choose_together',
@@ -127,6 +148,19 @@ void main() {
       expect(migrated.version, GameState.schemaVersion);
       expect(migrated.relationships.girls.length, 8);
       expect(migrated.relationships.progressFor('park_haeun').affection, 1);
+
+      final legacyProgress = base.toJson()
+        ..['version'] = 24
+        ..['relationships'] = <String, dynamic>{
+          'girls': <String, dynamic>{
+            'park_haeun': <String, dynamic>{'affection': 42},
+          },
+        };
+      final migratedDetailed = GameState.fromJson(legacyProgress);
+      final progress = migratedDetailed.relationships.progressFor('park_haeun');
+      expect(progress.trust, 42);
+      expect(progress.closeness, 42);
+      expect(progress.investmentRespect, 42);
     },
   );
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:millennium_capital/game/character_profile.dart';
 import 'package:millennium_capital/game/game_engine.dart';
+import 'package:millennium_capital/game/relationship_state.dart';
 import 'package:millennium_capital/main.dart';
 
 void main() {
@@ -84,6 +85,8 @@ void main() {
     );
     expect(find.text('성격'), findsOneWidget);
     expect(find.text('좋아하는 것'), findsOneWidget);
+    expect(find.text('14살'), findsOneWidget);
+    expect(find.text('ISFJ'), findsWidgets);
 
     await tester.scrollUntilVisible(
       find.text('투자를 보는 기준'),
@@ -96,8 +99,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('투자를 보는 기준'), findsOneWidget);
-    expect(find.text('14살'), findsOneWidget);
-    expect(find.text('ISFJ'), findsWidgets);
   });
 
   testWidgets('directory exposes Hakjun and teacher cards', (tester) async {
@@ -211,5 +212,107 @@ void main() {
     expect(find.textContaining('말보다 이게 빠르지'), findsOneWidget);
     expect(state.relationships.progressFor('lee_jian').affection, 6);
     expect(find.byKey(const Key('relationship-finish-button')), findsOneWidget);
+  });
+  testWidgets('messenger returns without consuming relationship time', (
+    tester,
+  ) async {
+    await setPhoneSurface(tester);
+    final state = engine.createNewGame(
+      '메신저 관계 UI',
+      worldSeed: 'relationship-messenger-ui',
+    );
+    var messengerOpens = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RelationshipEveningScreen(
+          state: state,
+          onOpenMessenger: () async {
+            messengerOpens += 1;
+            return state;
+          },
+          onComplete: (girlId, activity, choiceId) async =>
+              engine.completeRelationshipEvening(
+                state,
+                girlId: girlId,
+                activity: activity,
+                choiceId: choiceId,
+              ),
+          onRest: () async => engine.restDuringRelationshipEvening(state),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.byKey(const Key('relationship-open-messenger-button')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(messengerOpens, 1);
+    expect(state.relationships.completedEveningForDay(state.day), isFalse);
+    expect(find.byType(RelationshipEveningScreen), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('affection 20 opens a public outing only on weekends', (
+    tester,
+  ) async {
+    await setPhoneSurface(tester);
+    final base = engine.createNewGame(
+      '주말 외출 UI',
+      worldSeed: 'relationship-weekend-ui',
+    );
+    var weekendDay = base.day;
+    while (!relationshipOutingAvailableOn(base.dateForDay(weekendDay))) {
+      weekendDay += 1;
+    }
+    var state = base.copyWith(
+      day: weekendDay,
+      relationships: base.relationships.copyWith(
+        girls: <String, GirlRelationshipProgress>{
+          ...base.relationships.girls,
+          'kim_seoa': const GirlRelationshipProgress(affection: 20),
+        },
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RelationshipEveningScreen(
+          state: state,
+          onComplete: (girlId, activity, choiceId) async {
+            final result = engine.completeRelationshipEvening(
+              state,
+              girlId: girlId,
+              activity: activity,
+              choiceId: choiceId,
+            );
+            state = result.state;
+            return result;
+          },
+          onRest: () async {
+            final result = engine.restDuringRelationshipEvening(state);
+            state = result.state;
+            return result;
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('주식시장이 쉬는 주말'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('relationship-select-kim_seoa')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('주말 외출하기'), findsOneWidget);
+    final outing = tester.widget<InkWell>(
+      find.descendant(
+        of: find.byKey(const Key('relationship-date-button')),
+        matching: find.byType(InkWell),
+      ),
+    );
+    expect(outing.onTap, isNotNull);
+    expect(tester.takeException(), isNull);
   });
 }

@@ -9,13 +9,13 @@ import 'support/market_fixture.dart';
 void main() {
   const engine = GameEngine();
 
-  test('new and migrated games have nine NPC accounts and schema v24', () {
+  test('new and migrated games have nine NPC accounts and schema v25', () {
     final state = engine.createNewGame(
       '제6기 결과 테스트',
       worldSeed: 'cohort-result-1',
     );
 
-    expect(GameState.schemaVersion, 24);
+    expect(GameState.schemaVersion, 25);
     expect(state.cohortInvestments.accounts.length, 9);
     expect(
       state.cohortInvestments.accounts.values

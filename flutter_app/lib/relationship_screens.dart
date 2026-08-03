@@ -854,8 +854,22 @@ class _CharacterAffectionSummary extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 7),
+          Wrap(
+            spacing: 6,
+            runSpacing: 5,
+            children: [
+              _RelationshipAxisChip(label: '신뢰', value: progress.trust),
+              _RelationshipAxisChip(label: '친밀', value: progress.closeness),
+              _RelationshipAxisChip(
+                label: '투자존중',
+                value: progress.investmentRespect,
+              ),
+            ],
+          ),
+          const SizedBox(height: 7),
           Text(
-            '대화 ${progress.conversationCount}회 · 데이트 ${progress.dateCount}회',
+            '대화 ${progress.conversationCount}회 · 데이트 ${progress.dateCount}회 · '
+            '의미 있는 톡 ${progress.meaningfulMessageCount}회',
             style: const TextStyle(
               color: Color(0xFF6D7892),
               fontSize: 9,
@@ -874,6 +888,7 @@ class RelationshipEveningScreen extends StatefulWidget {
     required this.state,
     required this.onComplete,
     required this.onRest,
+    this.onOpenMessenger,
   });
 
   final GameState state;
@@ -884,6 +899,7 @@ class RelationshipEveningScreen extends StatefulWidget {
   )
   onComplete;
   final Future<RelationshipActionResult> Function() onRest;
+  final Future<GameState> Function()? onOpenMessenger;
 
   @override
   State<RelationshipEveningScreen> createState() =>
@@ -921,6 +937,19 @@ class _RelationshipEveningScreenState extends State<RelationshipEveningScreen> {
         return;
       }
       Navigator.pop(context, true);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _openMessenger() async {
+    final open = widget.onOpenMessenger;
+    if (_busy || open == null) return;
+    setState(() => _busy = true);
+    try {
+      final next = await open();
+      if (!mounted) return;
+      setState(() => _state = next);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -1019,10 +1048,12 @@ class _RelationshipEveningScreenState extends State<RelationshipEveningScreen> {
 
   Widget _buildGirlSelection() => Column(
     children: [
-      const Padding(
+      Padding(
         padding: EdgeInsets.fromLTRB(16, 10, 16, 8),
         child: Text(
-          '한 명을 골라 이야기하거나, 친해진 동기에게 데이트를 신청할 수 있어.',
+          isWeekendOutingDay(_state.currentDate)
+              ? '주식시장이 쉬는 주말이야. 한 명과 이야기하거나 친해진 동기와 외출할 수 있어.'
+              : '평일 저녁이야. 데시멀톡을 확인하거나 한 명과 차분히 이야기할 수 있어.',
           style: TextStyle(
             color: Color(0xFF626C84),
             fontSize: 11,
@@ -1051,6 +1082,20 @@ class _RelationshipEveningScreenState extends State<RelationshipEveningScreen> {
           },
         ),
       ),
+      if (widget.onOpenMessenger != null)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+          child: SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: FilledButton.icon(
+              key: const Key('relationship-open-messenger-button'),
+              onPressed: _busy ? null : _openMessenger,
+              icon: const Icon(Icons.smartphone_rounded),
+              label: const Text('데시멀톡 · 하루 첫 의미 있는 톡은 관계에 반영'),
+            ),
+          ),
+        ),
       Padding(
         padding: const EdgeInsets.fromLTRB(12, 4, 12, 14),
         child: SizedBox(
@@ -1069,6 +1114,8 @@ class _RelationshipEveningScreenState extends State<RelationshipEveningScreen> {
 
   Widget _buildActivitySelection(CohortGirlProfile profile) {
     final progress = _state.relationships.progressFor(profile.id);
+    final weekend = isWeekendOutingDay(_state.currentDate);
+    final outingAvailable = weekend && progress.dateUnlocked;
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
       child: Column(
@@ -1091,14 +1138,20 @@ class _RelationshipEveningScreenState extends State<RelationshipEveningScreen> {
           _RelationshipActivityButton(
             key: const Key('relationship-date-button'),
             color: const Color(0xFFFFB8C1),
-            icon: progress.dateUnlocked
+            icon: outingAvailable
                 ? Icons.favorite_rounded
                 : Icons.lock_outline_rounded,
-            title: progress.dateUnlocked ? '데이트 신청하기' : '데이트 잠김',
-            subtitle: progress.dateUnlocked
-                ? '${profile.dateScene.location} · 결과에 따라 -3~+8'
-                : '호감도 $relationshipDateUnlockAffection부터 가능 · 현재 ${progress.affection}',
-            onTap: progress.dateUnlocked
+            title: outingAvailable
+                ? '주말 외출하기'
+                : weekend
+                ? '주말 외출 잠김'
+                : '주말 외출은 토·일요일',
+            subtitle: outingAvailable
+                ? '${profile.dateScene.location} · 공개 장소 · 결과 -3~+8'
+                : weekend
+                ? '호감도 $relationshipDateUnlockAffection부터 가능 · 현재 ${progress.affection}'
+                : '주식시장이 쉬는 주말에만 외출할 수 있어',
+            onTap: outingAvailable
                 ? () => setState(() => _activity = RelationshipActivity.date)
                 : null,
           ),
@@ -1595,7 +1648,45 @@ class _AffectionPanel extends StatelessWidget {
           profile: profile,
           affection: progress.affection,
         ),
+        const SizedBox(height: 9),
+        Wrap(
+          spacing: 6,
+          runSpacing: 5,
+          children: [
+            _RelationshipAxisChip(label: '신뢰', value: progress.trust),
+            _RelationshipAxisChip(label: '친밀', value: progress.closeness),
+            _RelationshipAxisChip(
+              label: '투자존중',
+              value: progress.investmentRespect,
+            ),
+          ],
+        ),
       ],
+    ),
+  );
+}
+
+class _RelationshipAxisChip extends StatelessWidget {
+  const _RelationshipAxisChip({required this.label, required this.value});
+
+  final String label;
+  final int value;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    decoration: BoxDecoration(
+      color: const Color(0xFFF1F4FA),
+      borderRadius: BorderRadius.circular(999),
+      border: Border.all(color: const Color(0xFFD5DCEB)),
+    ),
+    child: Text(
+      '$label $value',
+      style: const TextStyle(
+        color: _ink,
+        fontSize: 9,
+        fontWeight: FontWeight.w900,
+      ),
     ),
   );
 }

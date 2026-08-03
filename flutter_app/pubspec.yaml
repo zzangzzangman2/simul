@@ -22,7 +22,7 @@ flutter:
   assets:
     - assets/dialogue/
     - assets/images/
-    - assets/images/historical_prologue/
+    - assets/images/legacy_quarantine/
     - assets/images/protagonist_seed01/
     - assets/images/production_soft_painted/kim_seoa/
     - assets/images/production_soft_painted/lee_jian/
@@ -32,16 +32,9 @@ flutter:
     - assets/images/production_soft_painted/han_sua/
     - assets/images/production_soft_painted/oh_jiwoo/
     - assets/images/production_soft_painted/yoon_chaea/
-    - assets/images/cinematic_soft_painted/dormitory_2000/
     - assets/images/cinematic_soft_painted/decimal/
     - assets/images/cinematic_soft_painted/decimal_nis_1999/backgrounds/
     - assets/images/cinematic_soft_painted/decimal_nis_1999/characters/
-    - assets/images/cinematic_soft_painted/policy_1981/backgrounds/
-    - assets/images/cinematic_soft_painted/policy_1981/jeon_dugwang/
-    - assets/images/cinematic_soft_painted/policy_1981/seo_muntae/
-    - assets/images/cinematic_soft_painted/policy_1981/baek_gihyeon/
-    - assets/images/cinematic_soft_painted/policy_1981/kang_incheol/
-    - assets/images/cinematic_soft_painted/policy_1981/yoon_mira/
     - assets/images/minigames/
     - assets/images/gameplay_map/
     - assets/images/gameplay_ambient/

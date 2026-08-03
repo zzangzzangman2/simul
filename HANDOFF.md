@@ -5,7 +5,7 @@
 - 제품명: `10대부터 건물주`
 - 세계관 정본: `DECIMAL_WORLD.md`
 - 대사 정본: `flutter_app/assets/dialogue/dialogue-editor-override.json`
-- 현재 대사 버전: content 3 / appearance 16 / 292장면
+- 현재 대사 버전: content 3 / appearance 17 / 292장면
 
 ## 프롤로그
 
@@ -26,20 +26,34 @@
 
 ## 이미지
 
-- 공식 캐릭터 화풍은 `SIMUL luminous soft-painted VN anime v2`로 전환됐고,
-  `art_references/simul_luminous_soft_painted_vn_style_anchor_v2.png`를 새 채팅의
-  최우선 화풍 참조로 사용한다.
+- 공식 목표 화풍은 `SIMUL polished soft-render VN anime v3`이며,
+  `art_references/simul_polished_soft_render_vn_style_anchor_v3.png`를 새 채팅의 최우선
+  화풍 전용 참조로 사용한다. 2026-08-03 한수아 9종 런타임을 승인본으로 교체했고,
+  승인된 한수아 중립 전신과 동일한 픽셀을 정식 v3 앵커로 승격했다.
+- 정아린은 2026-08-03 동일한 v3 화풍으로 9종 후보 생성까지 완료했다. 사용자 승인
+  전이므로 `production_soft_painted/jung_arin/`의 기존 런타임 9종은 덮어쓰지 않았다.
 - 박하은은 `park_haeun_face_identity_anchor_v2.png`와
   `park_haeun_identity_anchor_v2.png`, 런타임 v2 9종으로 연결돼 있다.
 - 한수아는 `han_sua_identity_anchor_v3.png` 전신을 1차, `han_sua_face_identity_anchor_v3.png`
   얼굴 크롭을 2차 정체성 기준으로 사용하며 `production_soft_painted/han_sua/`의 런타임
   v3 9종으로 연결돼 있다. 얼굴 크롭의 `1/2` UI·손·파란 천·레이스는 복제하지 않는다.
-- 신규 세로 배경은 `flutter_app/assets/images/cinematic_soft_painted/decimal/`과
-  `flutter_app/assets/images/cinematic_soft_painted/decimal_nis_1999/`에 있다.
+- 기존 얼굴·정체성·헤어·의상 보존 대상은 여자 동기 8명뿐이다. 이들은 현행 얼굴과
+  헤어·체형·의상·표정·포즈·구도를 그대로 두고 렌더링만 v3로 재생성한다.
+- 주인공·김학준·한서윤·국정원/정부/청와대 관계자·은행원·공인중개사 등 나머지
+  부적합 인물은 기존 외형을 보존하지 않고 역할·나이·성격·장면 기능만 이어받아
+  전면 재설계한다. 삭제·격리한 구형 정부·정책실 자산은 되살리지 않는다.
+- 현재 세로 배경은 `flutter_app/assets/images/cinematic_soft_painted/decimal/`과
+  `flutter_app/assets/images/cinematic_soft_painted/decimal_nis_1999/`에 연결돼 있다.
 - IMF 실패, 숨은 규칙 시험, 불공정 게임, 욕망 시험, 강남 외관, 보안 입구,
   생활 라운지, 수면동, 트레이딩 플로어, 기록 보관실, 기기 정비실을 포함한다.
-- 전부 ImageGen 생성 9:16 자산이며 실제 크기는 941×1672다.
-- 여자 동기 8명은 기존 승인 정체성 자산을 그대로 사용한다.
+- 2026-08-03 재검수에서 해당 13개 배경은 9:16 구도는 맞지만 사진·3D형 질감이
+  강해 별도 v3 배경 앵커 확정 뒤 재검수할 예정이다.
+- 여자 동기 8명의 정체성 앵커는 유지한다. 기존 박하은 v2·한수아 v3의 과거 화풍
+  통과 판정도 새 v3 전환으로 종료됐으며 전원 `ART_STYLE_AUDIT.md`의 재제작 순서를 따른다.
+- 한수아 `production_soft_painted/han_sua/` 9종은 2026-08-03 사용자 승인 후 새 v3로
+  교체·적용했다. 구형 한수아 세트와 구형 v2 공통 화풍 앵커는 삭제했다.
+- 다음 이미지 작업 대상은 정아린 9종이다. 중립 1장부터 같은 얼굴·헤어·체형·의상·
+  포즈를 유지하고 렌더링만 v3로 전환한다.
 
 ## 런타임 연결
 
@@ -48,22 +62,55 @@
 - 프롤로그 완료 후 PC 전원 → 데시멀 주식실습 앱 → 선택형 투자노트 → 모의 주문
   리허설 → 정식 50,000원 자유 플레이로 이어진다.
 - 생활 허브의 라운지·트레이딩 플로어·기기 정비실·기록 보관실은 새 배경을 쓴다.
+- 직접 하루 보내기는 거래일 결과표(휴장일 생략) → 20:00 관계 시간 → 월간 성장 달력 → 다음 날 08:00 조간신문 순서다.
+- 성장 달력은 2000년 14살부터 2006년 20살까지의 진행선, 주말 외출·휴장 표식, 관계 기억과 선택형 사건 그림 슬롯을 제공한다.
+- 저장 스키마는 v25다. 여자 동기 8명은 호감도·신뢰·친밀·투자존중을 저장한다.
+- 데시멀톡은 외부 AI 없이 9명 성격·6단계 관계·7종 투자 상황·12종 입력 의도·과거 기억을 조합하며, 구조화 기억은 최대 512개를 보존한다.
+- 여자 동기는 하루 첫 의미 있는 톡만 관계에 반영되고 같은 날 반복 전송은 점수를 더 주지 않는다.
+
+## 대사·장면 편집기
+
+- `/editor`는 대사뿐 아니라 장면 메타데이터, 배경, 최대 6개 캐릭터 레이어,
+  카메라·조명·전환·환경 효과, 대사 모드·타이핑·자동 진행, 최대 6개 선택지 분기,
+  오디오 큐·태그·제작 메모를 편집한다.
+- 캐릭터는 무대에서 직접 선택·드래그하고 휠·슬라이더·프리셋으로 조정한다.
+  드래그 핸들과 파란 테두리는 몸 중심의 작은 영역만 사용해 상단 메뉴를 가리지 않는다.
+- 단일 캐릭터 배치는 현재 장면만 또는 같은 화자의 모든 장면에 적용할 수 있고,
+  다중 레이어는 장면별 X/Y·크기·투명도·반전·순서·등장·퇴장·유휴 동작을 가진다.
+- 체크한 여러 장면에 태그·전환을 일괄 적용하고 복제·삭제·찾아바꾸기를 실행한다.
+  템플릿과 전체 편집본 버전은 로컬에 보관하며 흐름 검사가 도달 불가·빈 대사·누락
+  인물 자산을 표시한다.
+- `Ctrl/⌘+Z` 실행 취소와 `Ctrl/⌘+Shift+Z`, `Ctrl/⌘+Y` 다시 실행을 지원하며,
+  연속 타이핑과 위치 조정은 짧은 단위로 묶어 기록한다.
+- 자동저장 초안은 `dialoguePreview=1`에서 즉시 확인한다. `게임에 즉시 적용`은
+  재컴파일 없이 정본·파생 데이터·현재 Web 런타임 JSON을 갱신하며, 새 에셋이나
+  코드 반영에는 `전체 빌드`를 사용한다.
 
 ## 호환
 
 옛 세계관 파일명과 `academy`, `orientation`, `cohort`, `seed` 같은 내부 식별자 일부는
 구형 저장·테스트 호환 때문에 남아 있다. 사용자 화면과 새 데이터에는 옛 설정을
-노출하지 않는다. `ORPHANAGE_STORY_REBOOT.md`와 `PROTAGONIST_AGE_LINE.md`는 폐기 안내
-문서이며 새 구현 근거로 사용하지 않는다.
+노출하지 않는다. 플레이어·동기 연령과 장기 성장은 `PROTAGONIST_AGE_LINE.md`를
+따르며, 폐기된 미래양성원 원고는 정본·호환 문서로 보존하지 않는다.
 
 ## 검증
 
 ```powershell
-pnpm run dialogue:sync
-pnpm run lint
-pnpm test
-pnpm run build:release
+npm run dialogue:sync
+npm run lint
+npm test
+npm run build:release
 ```
 
 Flutter는 analyze와 `flutter_app/test/*.dart` 파일별 테스트를 실행한다. 대사 편집기
 빌드는 `DIALOGUE_BUILD_ENABLED=1`과 `DIALOGUE_BUILD_TOKEN`이 모두 있어야 한다.
+
+## 문서 진입점
+
+- 루트 `README.md`는 현재 데시멀 정사, 8장 292장면, 구현 시스템, npm 실행법,
+  대사 편집기와 CI 검증 흐름을 한 페이지에서 안내한다.
+
+## 다음 한 가지 작업
+
+- 실제 BGM·효과음·음성 자산을 확정하면 현재 편집기가 저장·검증하는 오디오 큐를
+  전용 재생 엔진과 연결한다.

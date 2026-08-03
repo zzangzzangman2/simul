@@ -137,6 +137,7 @@ class CohortDailyInvestmentResult {
     required this.totalAmount,
     required this.traded,
     required this.isPlayer,
+    this.cumulativeProfitLoss = 0,
   });
 
   final String investorId;
@@ -148,6 +149,7 @@ class CohortDailyInvestmentResult {
   final int totalAmount;
   final bool traded;
   final bool isPlayer;
+  final int cumulativeProfitLoss;
 
   CohortDailyInvestmentResult copyWith({int? totalAmount}) =>
       CohortDailyInvestmentResult(
@@ -163,6 +165,7 @@ class CohortDailyInvestmentResult {
         ),
         traded: traded,
         isPlayer: isPlayer,
+        cumulativeProfitLoss: cumulativeProfitLoss,
       );
 
   Map<String, dynamic> toJson() => {
@@ -175,6 +178,7 @@ class CohortDailyInvestmentResult {
     'totalAmount': totalAmount,
     'traded': traded,
     'isPlayer': isPlayer,
+    'cumulativeProfitLoss': cumulativeProfitLoss,
   };
 
   factory CohortDailyInvestmentResult.fromJson(Map<String, dynamic> json) =>
@@ -197,6 +201,14 @@ class CohortDailyInvestmentResult {
         ),
         traded: json['traded'] == true,
         isPlayer: json['isPlayer'] == true,
+        cumulativeProfitLoss:
+            ((json['cumulativeProfitLoss'] as num?)?.toInt() ??
+                    (json['isPlayer'] == true
+                        ? 0
+                        : ((json['totalAmount'] as num?)?.toInt() ??
+                                  cohortInvestmentInitialBalance) -
+                              cohortInvestmentInitialBalance))
+                .clamp(-cohortInvestmentMaxMoney, cohortInvestmentMaxMoney),
       );
 }
 
@@ -337,6 +349,7 @@ class CohortInvestmentState {
     required this.lastAcknowledgedDay,
     required this.lastLoanDay,
     this.previousPlayerCloseTotal,
+    this.playerCumulativeProfitLoss = 0,
   });
 
   factory CohortInvestmentState.initial() => CohortInvestmentState(
@@ -361,6 +374,7 @@ class CohortInvestmentState {
   final int lastAcknowledgedDay;
   final int lastLoanDay;
   final int? previousPlayerCloseTotal;
+  final int playerCumulativeProfitLoss;
 
   bool settledForDay(int day) => lastSettledDay == day;
   bool acknowledgedForDay(int day) => lastAcknowledgedDay == day;
@@ -393,6 +407,7 @@ class CohortInvestmentState {
     int? lastAcknowledgedDay,
     int? lastLoanDay,
     int? previousPlayerCloseTotal,
+    int? playerCumulativeProfitLoss,
   }) => CohortInvestmentState(
     accounts: accounts ?? this.accounts,
     reports: reports ?? this.reports,
@@ -402,6 +417,8 @@ class CohortInvestmentState {
     lastLoanDay: lastLoanDay ?? this.lastLoanDay,
     previousPlayerCloseTotal:
         previousPlayerCloseTotal ?? this.previousPlayerCloseTotal,
+    playerCumulativeProfitLoss:
+        playerCumulativeProfitLoss ?? this.playerCumulativeProfitLoss,
   );
 
   Map<String, dynamic> toJson() => {
@@ -415,6 +432,7 @@ class CohortInvestmentState {
     'lastLoanDay': lastLoanDay,
     if (previousPlayerCloseTotal != null)
       'previousPlayerCloseTotal': previousPlayerCloseTotal,
+    'playerCumulativeProfitLoss': playerCumulativeProfitLoss,
   };
 
   factory CohortInvestmentState.fromJson(Map<String, dynamic> json) {
@@ -464,6 +482,10 @@ class CohortInvestmentState {
         .toList(growable: false);
     final previousPlayerCloseTotal = (json['previousPlayerCloseTotal'] as num?)
         ?.toInt();
+    final migratedPlayerCumulativeProfitLoss = trimmedReports.fold<int>(
+      0,
+      (sum, report) => sum + (report.resultFor('player')?.profitLoss ?? 0),
+    );
     return CohortInvestmentState(
       accounts: Map<String, CohortInvestorAccount>.unmodifiable(parsedAccounts),
       reports: List<CohortDailyInvestmentReport>.unmodifiable(trimmedReports),
@@ -475,6 +497,10 @@ class CohortInvestmentState {
         0,
         cohortInvestmentMaxMoney,
       ),
+      playerCumulativeProfitLoss:
+          ((json['playerCumulativeProfitLoss'] as num?)?.toInt() ??
+                  migratedPlayerCumulativeProfitLoss)
+              .clamp(-cohortInvestmentMaxMoney, cohortInvestmentMaxMoney),
     );
   }
 }

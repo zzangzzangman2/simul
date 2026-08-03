@@ -1,6 +1,6 @@
 # 문서 기준표
 
-최종 갱신: 2026-08-02
+최종 갱신: 2026-08-03
 
 이 저장소에는 현재 구현을 설명하는 문서만 둔다. 작업 일지, 후보 제작 보고서,
 폐기된 서사 원고는 정본과 함께 보관하지 않는다.
@@ -32,18 +32,19 @@
 | 분야 | 문서 |
 | --- | --- |
 | 프로젝트 데시멀 세계관·프롤로그 | `DECIMAL_WORLD.md` |
-| 폐기된 미래양성원 설정 | `ORPHANAGE_STORY_REBOOT.md`, `PROTAGONIST_AGE_LINE.md` — 이전 저장 호환 조사에만 사용 |
+| 플레이어·동기 연령과 장기 성장 | `PROTAGONIST_AGE_LINE.md` |
+| 월간 성장 달력·주말 외출·날짜 사건 | `CALENDAR_SYSTEM.md` |
 | 여학생 8명 성격·대사 | `characters/cohort6_girls/README.md`와 인물별 문서 |
-| 관계 시스템 | `RELATIONSHIP_SYSTEM.md` |
+| 관계 시스템 | `RELATIONSHIP_SYSTEM.md` — 호감도·신뢰·친밀·투자존중·주말 외출 |
 | 데시멀 동기 일일 투자·대여 | `COHORT_DAILY_INVESTMENT.md` |
-| 데시멀톡 | `PHONE_MESSENGER_SYSTEM.md` |
+| 데시멀톡 | `PHONE_MESSENGER_SYSTEM.md` — 성격별 조합 대화·투자 반응·장기기억 |
 | 대사 편집기 | `DIALOGUE_EDITOR_GUIDE.md` |
 | 시장·경제 수치 | `BALANCE_NOTES.md` |
 | 부동산 | `REAL_ESTATE_SYSTEM.md` |
 | 가상기업·사건 문법 | `CONTENT_GUIDE.md` |
 | 데이터·라이선스 | `DATA_SOURCES.md` |
 | 제품 방향 | `PRODUCT_VISION.md` |
-| 이미지 제작 | `ART_STYLE_GUIDE.md`, `IMAGE_GENERATION_STYLE_PROMPT.md` |
+| 이미지 제작·v3 전환 규칙 | `ART_STYLE_GUIDE.md`, `IMAGE_GENERATION_STYLE_PROMPT.md` |
 | 런타임 이미지 승인표 | `ART_STYLE_AUDIT.md` |
 | 주인공 포즈 | `PROTAGONIST_POSE_LIBRARY.md` |
 
@@ -52,6 +53,11 @@
 `flutter_app/assets/images/` 아래 README는 그 폴더의 현재 런타임 자산 규격만
 설명한다. 인물 후보나 폐기 이력을 기록하지 않는다. `public/play/` 안의 파일은
 릴리스 빌드 산출물이므로 문서 정본으로 읽지 않는다.
+
+2026-08-03 사용자 승인 v3 화풍 정식 앵커는
+`art_references/simul_polished_soft_render_vn_style_anchor_v3.png`다. 여자 동기 8명만
+기존 외형을 보존하고 나머지 부적합 인물은 전면
+재설계한다는 범위는 `ART_STYLE_GUIDE.md`와 `ART_STYLE_AUDIT.md`가 정본이다.
 
 ## 문서로 취급하지 않는 것
 

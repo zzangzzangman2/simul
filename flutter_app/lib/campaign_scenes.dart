@@ -438,6 +438,9 @@ class OfficeScreen extends StatelessWidget {
         onOpenRelationships: () => Navigator.of(context).push(
           _gameSceneRoute<void>(RelationshipStatusScreen(state: _latestState)),
         ),
+        onOpenCalendar: () => Navigator.of(
+          context,
+        ).push(_gameSceneRoute<void>(LifeCalendarScreen(state: _latestState))),
         onOpenMessenger: () {
           final markRead = onMarkPhoneThreadRead;
           final send = onSendPhoneMessage;
@@ -762,7 +765,8 @@ class OfficeScreen extends StatelessWidget {
     final settleCohort = onSettleCohortInvestmentDay;
     final lendToCohort = onLendToCohortInvestor;
     final acknowledgeCohort = onAcknowledgeCohortInvestmentReport;
-    if (settleCohort != null &&
+    if (isMarketTradingDay(closingState.currentDate) &&
+        settleCohort != null &&
         lendToCohort != null &&
         acknowledgeCohort != null) {
       if (!closingState.cohortInvestments.settledForDay(closingState.day)) {
@@ -794,11 +798,27 @@ class OfficeScreen extends StatelessWidget {
     }
     if (!context.mounted) return;
 
+    final markPhoneRead = onMarkPhoneThreadRead;
+    final sendPhone = onSendPhoneMessage;
     if (!closingState.relationships.completedEveningForDay(closingState.day)) {
       final completed = await navigator.push<bool>(
         _gameSceneRoute<bool>(
           RelationshipEveningScreen(
             state: closingState,
+            onOpenMessenger: markPhoneRead == null || sendPhone == null
+                ? null
+                : () async {
+                    await navigator.push<void>(
+                      _gameSceneRoute<void>(
+                        PhoneMessengerScreen(
+                          state: _latestState,
+                          onMarkRead: markPhoneRead,
+                          onSend: sendPhone,
+                        ),
+                      ),
+                    );
+                    return _latestState;
+                  },
             onComplete:
                 onCompleteRelationshipEvening ??
                 (girlId, activity, choiceId) async => RelationshipActionResult(
@@ -821,6 +841,14 @@ class OfficeScreen extends StatelessWidget {
     }
 
     final morningDate = closingState.currentDate.add(const Duration(days: 1));
+    final calendarCompleted = await navigator.push<bool>(
+      _gameSceneRoute<bool>(
+        LifeCalendarScreen(state: closingState, transitionTo: morningDate),
+      ),
+    );
+    if (calendarCompleted != true || !context.mounted) return;
+    closingState = _latestState;
+
     final loadingRoute = _gameSceneRoute<void>(
       NewsGeneratingScene(date: morningDate),
     );
@@ -1212,7 +1240,7 @@ class NewsGeneratingScene extends StatelessWidget {
         children: [
           Positioned.fill(
             child: Image.asset(
-              'assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_night_2000_v1.png',
+              'assets/images/cinematic_soft_painted/decimal/bg_decimal_trading_floor_dawn_2000_v1.png',
               fit: BoxFit.cover,
             ),
           ),
@@ -1326,7 +1354,7 @@ class KoreaEconomicNewspaperScene extends StatelessWidget {
       children: [
         Positioned.fill(
           child: Image.asset(
-            'assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_day_2000_v1.png',
+            'assets/images/cinematic_soft_painted/decimal/bg_decimal_trading_floor_dawn_2000_v1.png',
             fit: BoxFit.cover,
           ),
         ),

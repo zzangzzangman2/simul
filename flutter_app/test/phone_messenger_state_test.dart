@@ -6,10 +6,10 @@ import 'package:millennium_capital/game/phone_messenger_state.dart';
 void main() {
   const engine = GameEngine();
 
-  test('new and migrated saves have nine distinct phone contacts in v24', () {
+  test('new and migrated saves have nine distinct phone contacts in v25', () {
     final state = engine.createNewGame('미래톡 테스트', worldSeed: 'phone-initial');
 
-    expect(GameState.schemaVersion, 24);
+    expect(GameState.schemaVersion, 25);
     expect(phoneMessengerContacts.length, 9);
     expect(state.phoneMessenger.messages.length, 9);
     expect(state.phoneMessenger.totalUnread, 9);
@@ -89,6 +89,56 @@ void main() {
     );
     expect(reopened.success, isTrue);
   });
+
+  test(
+    'first meaningful talk changes detailed relationship only once a day',
+    () {
+      var state = engine.createNewGame('관계 톡 테스트', worldSeed: 'phone-relation');
+      final first = engine.sendPhoneMessage(
+        state,
+        contactId: 'kim_seoa',
+        text: '오늘 도와줘서 고마워',
+      );
+      expect(first.success, isTrue);
+      expect(first.affectionDelta, 1);
+      expect(first.trustDelta, 1);
+      expect(first.closenessDelta, 2);
+      final firstProgress = first.state.relationships.progressFor('kim_seoa');
+      expect(firstProgress.affection, 2);
+      expect(firstProgress.meaningfulMessageCount, 1);
+      expect(first.state.phoneMessenger.memoriesFor('kim_seoa'), hasLength(1));
+
+      state = first.state;
+      final second = engine.sendPhoneMessage(
+        state,
+        contactId: 'kim_seoa',
+        text: '정말 고마워',
+      );
+      expect(second.success, isTrue);
+      expect(second.relationshipChanged, isFalse);
+      expect(
+        second.state.relationships
+            .progressFor('kim_seoa')
+            .meaningfulMessageCount,
+        1,
+      );
+      expect(second.state.phoneMessenger.memoriesFor('kim_seoa'), hasLength(2));
+
+      final tomorrow = second.state.copyWith(day: second.state.day + 1);
+      final nextDay = engine.sendPhoneMessage(
+        tomorrow,
+        contactId: 'kim_seoa',
+        text: '어제는 내가 미안했어',
+      );
+      expect(nextDay.relationshipChanged, isTrue);
+      expect(
+        nextDay.state.relationships
+            .progressFor('kim_seoa')
+            .meaningfulMessageCount,
+        2,
+      );
+    },
+  );
 
   test(
     'unsafe boundary text gets a distinct refusal and state round-trips',

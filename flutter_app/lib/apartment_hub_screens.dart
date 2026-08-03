@@ -25,6 +25,7 @@ class ApartmentHubScreen extends StatefulWidget {
     required this.onOpenOrganization,
     required this.onOpenRelationships,
     required this.onOpenMessenger,
+    required this.onOpenCalendar,
     required this.onOpenHomeImprovements,
     required this.onOpenWork,
     required this.activeSaveSlot,
@@ -46,6 +47,7 @@ class ApartmentHubScreen extends StatefulWidget {
   final VoidCallback onOpenOrganization;
   final VoidCallback onOpenRelationships;
   final VoidCallback onOpenMessenger;
+  final VoidCallback onOpenCalendar;
   final VoidCallback onOpenHomeImprovements;
   final VoidCallback onOpenWork;
   final int activeSaveSlot;
@@ -172,6 +174,7 @@ class _ApartmentHubScreenState extends State<ApartmentHubScreen> {
               messengerUnread: widget.state.phoneMessenger.totalUnread,
               onOpenMessenger: widget.onOpenMessenger,
               onOpenRelationships: widget.onOpenRelationships,
+              onOpenCalendar: widget.onOpenCalendar,
               onAdvanceHour: widget.onAdvanceHour,
               onAdvanceDay: widget.onAdvanceDay,
               onAdvanceBatch: widget.onAdvanceBatch,
@@ -1664,6 +1667,7 @@ class _ApartmentActionRail extends StatelessWidget {
     required this.messengerUnread,
     required this.onOpenMessenger,
     required this.onOpenRelationships,
+    required this.onOpenCalendar,
     required this.onAdvanceHour,
     required this.onAdvanceDay,
     required this.onAdvanceBatch,
@@ -1677,6 +1681,7 @@ class _ApartmentActionRail extends StatelessWidget {
   final int messengerUnread;
   final VoidCallback onOpenMessenger;
   final VoidCallback onOpenRelationships;
+  final VoidCallback onOpenCalendar;
   final VoidCallback onAdvanceHour;
   final VoidCallback onAdvanceDay;
   final VoidCallback onAdvanceBatch;
@@ -1704,6 +1709,13 @@ class _ApartmentActionRail extends StatelessWidget {
           tooltip: '캐릭터 10명',
           assetPath: 'assets/images/hud_clean_letter.png',
           onPressed: onOpenRelationships,
+        ),
+        const SizedBox(height: 7),
+        _ApartmentRailButton(
+          buttonKey: const Key('life-calendar-button'),
+          tooltip: '성장 달력 · 날짜와 지난 사건 기록',
+          icon: Icons.calendar_month_rounded,
+          onPressed: onOpenCalendar,
         ),
         const SizedBox(height: 7),
         _ApartmentRailButton(
@@ -2014,7 +2026,7 @@ class _ApartmentPlaceDetails {
       shortTitle: '본관 앞',
       hint: '국가계좌 창구 · 원내 실습',
       assetPath:
-          'assets/images/historical_prologue/bg_future_development_orphanage_1982_portrait_cartoon_v1.png',
+          'assets/images/cinematic_soft_painted/decimal/bg_decimal_gangnam_exterior_winter_1999_v1.png',
       icon: Icons.account_balance_rounded,
       accent: Color(0xFF98E5C1),
     ),

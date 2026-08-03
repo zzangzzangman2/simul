@@ -2,7 +2,7 @@ part of 'main.dart';
 
 const _onboardingBeatCount = 292;
 const _maximumDialogueBeatCount = 320;
-const _dialogueAppearanceVersion = 16;
+const _dialogueAppearanceVersion = 17;
 const _dialogueContentVersion = 3;
 const _dialogueRuntimeStorageKey = 'project-decimal-dialogue-runtime-v2';
 const _dialogueBundleAsset = 'assets/dialogue/dialogue-editor-override.json';
@@ -12,9 +12,6 @@ const _storyDialogueBottomInset = 28.0;
 const _storyCharacterHeightFactor = 0.9;
 const _storyCharacterAspectRatio = 2 / 3;
 const _storyCharacterSceneScale = 2.0;
-const _minhoCharacterAsset =
-    'assets/images/historical_prologue/character_minho_farewell_v3.png';
-const _minhoCharacterScale = 0.72;
 const _maximumWheelBackSteps = 12;
 const _wheelBackDebounce = Duration(milliseconds: 180);
 
@@ -51,9 +48,7 @@ class _PrologueSkipStep {
   final int targetBeat;
 }
 
-double _storyCharacterScaleForAsset(String asset) =>
-    _storyCharacterSceneScale *
-    (asset == _minhoCharacterAsset ? _minhoCharacterScale : 1.0);
+double _storyCharacterScaleForAsset(String _) => _storyCharacterSceneScale;
 
 void _playStoryFeedback({bool strong = false}) {
   if (strong) {
@@ -64,11 +59,88 @@ void _playStoryFeedback({bool strong = false}) {
   unawaited(SystemSound.play(SystemSoundType.click));
 }
 
+Widget _storySceneTransition(
+  String transition,
+  Widget child,
+  Animation<double> animation,
+) {
+  if (transition == 'cut') return child;
+  final curved = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
+  if (transition == 'slide-left' || transition == 'slide-right') {
+    final begin = transition == 'slide-left'
+        ? const Offset(0.12, 0)
+        : const Offset(-0.12, 0);
+    return FadeTransition(
+      opacity: curved,
+      child: SlideTransition(
+        position: Tween<Offset>(begin: begin, end: Offset.zero).animate(curved),
+        child: child,
+      ),
+    );
+  }
+  if (transition == 'flash') {
+    return FadeTransition(
+      opacity: curved,
+      child: ScaleTransition(
+        scale: Tween<double>(begin: 1.025, end: 1).animate(curved),
+        child: child,
+      ),
+    );
+  }
+  return FadeTransition(opacity: curved, child: child);
+}
+
 typedef NewGameCreator =
     Future<void> Function(
       NewGameSetup setup,
       WorldLoadProgressCallback onProgress,
     );
+
+class _StageCharacterOverride {
+  const _StageCharacterOverride({
+    required this.id,
+    required this.speaker,
+    required this.asset,
+    this.x = 0,
+    this.y = 0,
+    this.scale = 1,
+    this.opacity = 1,
+    this.flipX = false,
+    this.zIndex = 0,
+    this.enter = 'fade',
+    this.exit = 'fade',
+    this.motion = 'idle',
+  });
+
+  final String id;
+  final String speaker;
+  final String asset;
+  final double x;
+  final double y;
+  final double scale;
+  final double opacity;
+  final bool flipX;
+  final int zIndex;
+  final String enter;
+  final String exit;
+  final String motion;
+}
+
+class _DialogueChoiceOverride {
+  const _DialogueChoiceOverride({
+    required this.id,
+    required this.label,
+    required this.targetSceneId,
+    this.condition = '',
+    this.effects = '',
+  });
+
+  final String id;
+  final String label;
+  final String targetSceneId;
+  final String condition;
+  final String effects;
+}
 
 class _DialogueOverride {
   const _DialogueOverride({
@@ -80,6 +152,29 @@ class _DialogueOverride {
     required this.location,
     this.background,
     this.character,
+    this.characterX = 0,
+    this.characterY = 0,
+    this.characterScale = 1,
+    this.characters = const <_StageCharacterOverride>[],
+    this.dialogueMode = 'dialogue',
+    this.textSpeed = 32,
+    this.autoAdvanceMs = 0,
+    this.transition = 'fade',
+    this.transitionDurationMs = 700,
+    this.cameraX = 0,
+    this.cameraY = 0,
+    this.cameraZoom = 1,
+    this.cameraShake = 0,
+    this.ambientEffect = 'none',
+    this.lighting = 1,
+    this.bgm = '',
+    this.soundEffect = '',
+    this.voice = '',
+    this.audioVolume = 0.8,
+    this.nextSceneId = '',
+    this.condition = '',
+    this.effects = '',
+    this.choices = const <_DialogueChoiceOverride>[],
   });
 
   final String id;
@@ -90,6 +185,29 @@ class _DialogueOverride {
   final String location;
   final String? background;
   final String? character;
+  final double characterX;
+  final double characterY;
+  final double characterScale;
+  final List<_StageCharacterOverride> characters;
+  final String dialogueMode;
+  final double textSpeed;
+  final int autoAdvanceMs;
+  final String transition;
+  final int transitionDurationMs;
+  final double cameraX;
+  final double cameraY;
+  final double cameraZoom;
+  final double cameraShake;
+  final String ambientEffect;
+  final double lighting;
+  final String bgm;
+  final String soundEffect;
+  final String voice;
+  final double audioVolume;
+  final String nextSceneId;
+  final String condition;
+  final String effects;
+  final List<_DialogueChoiceOverride> choices;
 }
 
 String _canonicalDialogueAsset(Object? value) {
@@ -110,6 +228,72 @@ String _migrateHanSuaCharacterAsset(String asset) {
       : '${asset.substring(0, filenameIndex)}$migrated';
 }
 
+String _dialogueMapText(Map<dynamic, dynamic> source, String key) =>
+    source[key] is String ? source[key] as String : '';
+
+double _dialogueMapNumber(
+  Map<dynamic, dynamic> source,
+  String key,
+  double fallback,
+) => (source[key] as num?)?.toDouble() ?? fallback;
+
+List<_StageCharacterOverride> _dialogueMapCharacters(
+  Map<dynamic, dynamic> source,
+) {
+  final rawCharacters = source['characters'];
+  if (rawCharacters is! List) return const <_StageCharacterOverride>[];
+  final characters = <_StageCharacterOverride>[];
+  for (final raw in rawCharacters) {
+    if (raw is! Map) continue;
+    final asset = _migrateHanSuaCharacterAsset(
+      _canonicalDialogueAsset(raw['asset']),
+    );
+    if (asset.trim().isEmpty) continue;
+    characters.add(
+      _StageCharacterOverride(
+        id: _dialogueMapText(raw, 'id'),
+        speaker: _dialogueMapText(raw, 'speaker'),
+        asset: asset,
+        x: _dialogueMapNumber(raw, 'x', 0),
+        y: _dialogueMapNumber(raw, 'y', 0),
+        scale: _dialogueMapNumber(raw, 'scale', 1),
+        opacity: _dialogueMapNumber(raw, 'opacity', 1),
+        flipX: raw['flipX'] == true,
+        zIndex: (raw['zIndex'] as num?)?.toInt() ?? characters.length,
+        enter: _dialogueMapText(raw, 'enter').isEmpty
+            ? 'fade'
+            : _dialogueMapText(raw, 'enter'),
+        exit: _dialogueMapText(raw, 'exit').isEmpty
+            ? 'fade'
+            : _dialogueMapText(raw, 'exit'),
+        motion: _dialogueMapText(raw, 'motion').isEmpty
+            ? 'idle'
+            : _dialogueMapText(raw, 'motion'),
+      ),
+    );
+  }
+  characters.sort((a, b) => a.zIndex.compareTo(b.zIndex));
+  return List<_StageCharacterOverride>.unmodifiable(characters);
+}
+
+List<_DialogueChoiceOverride> _dialogueMapChoices(
+  Map<dynamic, dynamic> source,
+) {
+  final rawChoices = source['choices'];
+  if (rawChoices is! List) return const <_DialogueChoiceOverride>[];
+  return <_DialogueChoiceOverride>[
+    for (final raw in rawChoices)
+      if (raw is Map && _dialogueMapText(raw, 'label').trim().isNotEmpty)
+        _DialogueChoiceOverride(
+          id: _dialogueMapText(raw, 'id'),
+          label: _dialogueMapText(raw, 'label'),
+          targetSceneId: _dialogueMapText(raw, 'targetSceneId'),
+          condition: _dialogueMapText(raw, 'condition'),
+          effects: _dialogueMapText(raw, 'effects'),
+        ),
+  ];
+}
+
 Map<int, _DialogueOverride> _canonicalDialogueOverrides() =>
     <int, _DialogueOverride>{
       for (final scene in canonicalDialogueScenes)
@@ -122,6 +306,36 @@ Map<int, _DialogueOverride> _canonicalDialogueOverrides() =>
           location: scene['location']! as String,
           background: _canonicalDialogueAsset(scene['background']),
           character: _canonicalDialogueAsset(scene['character']),
+          characterX: (scene['characterX'] as num?)?.toDouble() ?? 0,
+          characterY: (scene['characterY'] as num?)?.toDouble() ?? 0,
+          characterScale: (scene['characterScale'] as num?)?.toDouble() ?? 1,
+          characters: _dialogueMapCharacters(scene),
+          dialogueMode: _dialogueMapText(scene, 'dialogueMode').isEmpty
+              ? 'dialogue'
+              : _dialogueMapText(scene, 'dialogueMode'),
+          textSpeed: _dialogueMapNumber(scene, 'textSpeed', 32),
+          autoAdvanceMs: (scene['autoAdvanceMs'] as num?)?.toInt() ?? 0,
+          transition: _dialogueMapText(scene, 'transition').isEmpty
+              ? 'fade'
+              : _dialogueMapText(scene, 'transition'),
+          transitionDurationMs:
+              (scene['transitionDurationMs'] as num?)?.toInt() ?? 700,
+          cameraX: _dialogueMapNumber(scene, 'cameraX', 0),
+          cameraY: _dialogueMapNumber(scene, 'cameraY', 0),
+          cameraZoom: _dialogueMapNumber(scene, 'cameraZoom', 1),
+          cameraShake: _dialogueMapNumber(scene, 'cameraShake', 0),
+          ambientEffect: _dialogueMapText(scene, 'ambientEffect').isEmpty
+              ? 'none'
+              : _dialogueMapText(scene, 'ambientEffect'),
+          lighting: _dialogueMapNumber(scene, 'lighting', 1),
+          bgm: _dialogueMapText(scene, 'bgm'),
+          soundEffect: _dialogueMapText(scene, 'soundEffect'),
+          voice: _dialogueMapText(scene, 'voice'),
+          audioVolume: _dialogueMapNumber(scene, 'audioVolume', 0.8),
+          nextSceneId: _dialogueMapText(scene, 'nextSceneId'),
+          condition: _dialogueMapText(scene, 'condition'),
+          effects: _dialogueMapText(scene, 'effects'),
+          choices: _dialogueMapChoices(scene),
         ),
     };
 
@@ -162,6 +376,7 @@ class _VisualNovelOnboardingScreenState
   final _companyController = TextEditingController();
   final List<String> _dialogueHistory = <String>[];
   final List<int> _beatNavigationHistory = <int>[];
+  final Map<String, Object> _storyVariables = <String, Object>{};
   Map<int, _DialogueOverride> _dialogueOverrides =
       _canonicalDialogueOverrides();
   late int _beat;
@@ -225,16 +440,105 @@ class _VisualNovelOnboardingScreenState
             .replaceAll(r'\r', '\n');
       }
 
-      String? asset(String key) {
-        if (!rawScene.containsKey(key)) return null;
-        final value = text(key).trim();
+      double number(
+        String key,
+        double fallback,
+        double minimum,
+        double maximum,
+      ) {
+        final value = rawScene[key];
+        if (value is! num) return fallback;
+        return value.toDouble().clamp(minimum, maximum).toDouble();
+      }
+
+      String normalizeAsset(Object? raw, {bool character = false}) {
+        final value = raw is String ? raw.trim() : '';
         const webAssetPrefix = '/play/assets/';
         final normalized = value.startsWith(webAssetPrefix)
             ? value.substring(webAssetPrefix.length)
             : value;
-        return key == 'character'
+        return character
             ? _migrateHanSuaCharacterAsset(normalized)
             : normalized;
+      }
+
+      String? asset(String key) {
+        if (!rawScene.containsKey(key)) return null;
+        return normalizeAsset(rawScene[key], character: key == 'character');
+      }
+
+      final characters = <_StageCharacterOverride>[];
+      final rawCharacters = rawScene['characters'];
+      if (rawCharacters is List) {
+        for (final rawCharacter in rawCharacters) {
+          if (rawCharacter is! Map) continue;
+          final characterAsset = normalizeAsset(
+            rawCharacter['asset'],
+            character: true,
+          );
+          if (characterAsset.isEmpty) continue;
+          double characterNumber(
+            String key,
+            double fallback,
+            double minimum,
+            double maximum,
+          ) {
+            final value = rawCharacter[key];
+            return value is num
+                ? value.toDouble().clamp(minimum, maximum).toDouble()
+                : fallback;
+          }
+
+          characters.add(
+            _StageCharacterOverride(
+              id: rawCharacter['id'] is String
+                  ? rawCharacter['id'] as String
+                  : 'character-${characters.length + 1}',
+              speaker: rawCharacter['speaker'] is String
+                  ? rawCharacter['speaker'] as String
+                  : '',
+              asset: characterAsset,
+              x: characterNumber('x', 0, -60, 60),
+              y: characterNumber('y', 0, -40, 80),
+              scale: characterNumber('scale', 1, 0.35, 2.5),
+              opacity: characterNumber('opacity', 1, 0, 1),
+              flipX: rawCharacter['flipX'] == true,
+              zIndex:
+                  (rawCharacter['zIndex'] as num?)?.toInt() ??
+                  characters.length,
+              enter: rawCharacter['enter'] is String
+                  ? rawCharacter['enter'] as String
+                  : 'fade',
+              exit: rawCharacter['exit'] is String
+                  ? rawCharacter['exit'] as String
+                  : 'fade',
+              motion: rawCharacter['motion'] is String
+                  ? rawCharacter['motion'] as String
+                  : 'idle',
+            ),
+          );
+        }
+        characters.sort((a, b) => a.zIndex.compareTo(b.zIndex));
+      }
+
+      final choices = <_DialogueChoiceOverride>[];
+      final rawChoices = rawScene['choices'];
+      if (rawChoices is List) {
+        for (final rawChoice in rawChoices) {
+          if (rawChoice is! Map) continue;
+          String choiceText(String key) =>
+              rawChoice[key] is String ? rawChoice[key] as String : '';
+          if (choiceText('label').trim().isEmpty) continue;
+          choices.add(
+            _DialogueChoiceOverride(
+              id: choiceText('id'),
+              label: choiceText('label'),
+              targetSceneId: choiceText('targetSceneId'),
+              condition: choiceText('condition'),
+              effects: choiceText('effects'),
+            ),
+          );
+        }
       }
 
       loaded[beat] = _DialogueOverride(
@@ -246,6 +550,38 @@ class _VisualNovelOnboardingScreenState
         location: text('location'),
         background: asset('background'),
         character: asset('character'),
+        characterX: number('characterX', 0, -60, 60),
+        characterY: number('characterY', 0, -40, 80),
+        characterScale: number('characterScale', 1, 0.45, 1.8),
+        characters: List<_StageCharacterOverride>.unmodifiable(characters),
+        dialogueMode: text('dialogueMode').isEmpty
+            ? 'dialogue'
+            : text('dialogueMode'),
+        textSpeed: number('textSpeed', 32, 8, 120),
+        autoAdvanceMs: number('autoAdvanceMs', 0, 0, 30000).toInt(),
+        transition: text('transition').isEmpty ? 'fade' : text('transition'),
+        transitionDurationMs: number(
+          'transitionDurationMs',
+          700,
+          0,
+          5000,
+        ).toInt(),
+        cameraX: number('cameraX', 0, -50, 50),
+        cameraY: number('cameraY', 0, -50, 50),
+        cameraZoom: number('cameraZoom', 1, 0.5, 2.5),
+        cameraShake: number('cameraShake', 0, 0, 1),
+        ambientEffect: text('ambientEffect').isEmpty
+            ? 'none'
+            : text('ambientEffect'),
+        lighting: number('lighting', 1, 0.2, 1.5),
+        bgm: normalizeAsset(rawScene['bgm']),
+        soundEffect: normalizeAsset(rawScene['soundEffect']),
+        voice: normalizeAsset(rawScene['voice']),
+        audioVolume: number('audioVolume', 0.8, 0, 1),
+        nextSceneId: text('nextSceneId'),
+        condition: text('condition'),
+        effects: text('effects'),
+        choices: List<_DialogueChoiceOverride>.unmodifiable(choices),
       );
     }
     return loaded;
@@ -285,6 +621,29 @@ class _VisualNovelOnboardingScreenState
     location: draft.location,
     background: current.background,
     character: current.character,
+    characterX: current.characterX,
+    characterY: current.characterY,
+    characterScale: current.characterScale,
+    characters: current.characters,
+    dialogueMode: draft.dialogueMode,
+    textSpeed: draft.textSpeed,
+    autoAdvanceMs: draft.autoAdvanceMs,
+    transition: current.transition,
+    transitionDurationMs: current.transitionDurationMs,
+    cameraX: current.cameraX,
+    cameraY: current.cameraY,
+    cameraZoom: current.cameraZoom,
+    cameraShake: current.cameraShake,
+    ambientEffect: current.ambientEffect,
+    lighting: current.lighting,
+    bgm: current.bgm,
+    soundEffect: current.soundEffect,
+    voice: current.voice,
+    audioVolume: current.audioVolume,
+    nextSceneId: draft.nextSceneId,
+    condition: draft.condition,
+    effects: draft.effects,
+    choices: draft.choices,
   );
 
   Future<void> _loadDialogueOverrides() async {
@@ -465,10 +824,35 @@ class _VisualNovelOnboardingScreenState
 
   String get _dateLabel => _dialogueOverrides[_beat]?.date.trim() ?? '';
 
-  String? get _character {
-    final character = _dialogueOverrides[_beat]?.character?.trim();
-    return character == null || character.isEmpty ? null : character;
+  _DialogueOverride? get _currentDialogue => _dialogueOverrides[_beat];
+
+  List<_StageCharacterOverride> get _stageCharacters {
+    final current = _currentDialogue;
+    if (current == null) return const <_StageCharacterOverride>[];
+    if (current.characters.isNotEmpty) return current.characters;
+    final asset = current.character?.trim() ?? '';
+    if (asset.isEmpty) return const <_StageCharacterOverride>[];
+    return <_StageCharacterOverride>[
+      _StageCharacterOverride(
+        id: 'primary-${current.id}',
+        speaker: current.speaker,
+        asset: asset,
+        x: current.characterX,
+        y: current.characterY,
+        scale: current.characterScale,
+      ),
+    ];
   }
+
+  String get _dialogueMode => _currentDialogue?.dialogueMode ?? 'dialogue';
+
+  bool get _usesNarrationPanel =>
+      _isNarration || _dialogueMode == 'narration' || _dialogueMode == 'system';
+
+  List<_DialogueChoiceOverride> get _availableChoices =>
+      (_currentDialogue?.choices ?? const <_DialogueChoiceOverride>[])
+          .where((choice) => _conditionMatches(choice.condition))
+          .toList(growable: false);
 
   bool get _isNarration => _speaker == '이야기';
 
@@ -549,20 +933,105 @@ class _VisualNovelOnboardingScreenState
     _goBackOneBeat();
   }
 
-  void _next() {
-    if (_beat >= _dialogueEndBeat) return;
+  Object _parseStoryValue(String raw) {
+    final value = raw.trim();
+    if (value == 'true') return true;
+    if (value == 'false') return false;
+    if (value == 'null') return '';
+    final number = num.tryParse(value);
+    if (number != null) return number;
+    return value.replaceAll(RegExp(r'''^["']|["']$'''), '');
+  }
+
+  bool _conditionMatches(String source) {
+    final condition = source.trim();
+    if (condition.isEmpty) return true;
+    for (final rawLine in condition.split(RegExp(r'[\n;]+'))) {
+      final line = rawLine.trim();
+      if (line.isEmpty) continue;
+      final match = RegExp(r'^(.+?)\s*(==|!=|=)\s*(.+)$').firstMatch(line);
+      if (match == null) {
+        final value = _storyVariables[line];
+        if (value != true && value != 1 && value != 'true') return false;
+        continue;
+      }
+      final key = match.group(1)!.trim();
+      final operator = match.group(2)!;
+      final expected = _parseStoryValue(match.group(3)!);
+      final actual = _storyVariables[key];
+      final equal = actual?.toString() == expected.toString();
+      if (operator == '!=' ? equal : !equal) return false;
+    }
+    return true;
+  }
+
+  void _applyStoryEffects(String source) {
+    for (final rawLine in source.split(RegExp(r'[\n;]+'))) {
+      final line = rawLine.trim();
+      if (line.isEmpty) continue;
+      final match = RegExp(r'^(.+?)\s*(\+=|-=|=)\s*(.+)$').firstMatch(line);
+      if (match == null) continue;
+      final key = match.group(1)!.trim();
+      final operator = match.group(2)!;
+      final value = _parseStoryValue(match.group(3)!);
+      if (operator == '=') {
+        _storyVariables[key] = value;
+        continue;
+      }
+      final current = (_storyVariables[key] as num?) ?? 0;
+      final amount = value is num ? value : num.tryParse(value.toString()) ?? 0;
+      _storyVariables[key] = operator == '+='
+          ? current + amount
+          : current - amount;
+    }
+  }
+
+  int? _beatForSceneId(String sceneId) {
+    final target = sceneId.trim();
+    if (target.isEmpty) return null;
+    for (final entry in _dialogueOverrides.entries) {
+      if (entry.value.id == target) return entry.key;
+    }
+    return null;
+  }
+
+  int _nextVisibleBeat(int candidate) {
+    var beat = candidate.clamp(0, _dialogueEndBeat);
+    final checked = <int>{};
+    while (beat < _dialogueEndBeat && checked.add(beat)) {
+      final scene = _dialogueOverrides[beat];
+      if (scene == null || _conditionMatches(scene.condition)) return beat;
+      final explicit = _beatForSceneId(scene.nextSceneId);
+      beat = explicit ?? beat + 1;
+    }
+    return beat;
+  }
+
+  void _advanceTo({String targetSceneId = '', String choiceEffects = ''}) {
+    if (_beat >= _dialogueEndBeat && targetSceneId.trim().isEmpty) return;
     final currentBeat = _beat;
+    final current = _currentDialogue;
     FocusManager.instance.primaryFocus?.unfocus();
     _rememberCurrentLine();
     _rememberNavigationBeat(currentBeat);
+    _applyStoryEffects(current?.effects ?? '');
+    _applyStoryEffects(choiceEffects);
     _playStoryFeedback();
+    final explicitTarget = _beatForSceneId(targetSceneId);
+    final configuredTarget = _beatForSceneId(current?.nextSceneId ?? '');
+    final candidate = explicitTarget ?? configuredTarget ?? currentBeat + 1;
     setState(() {
-      if (_beat == currentBeat) {
-        _beat = math.min(currentBeat + 1, _dialogueEndBeat);
-      }
+      if (_beat == currentBeat) _beat = _nextVisibleBeat(candidate);
     });
     unawaited(_saveCheckpoint());
   }
+
+  void _next() => _advanceTo();
+
+  void _selectChoice(_DialogueChoiceOverride choice) => _advanceTo(
+    targetSceneId: choice.targetSceneId,
+    choiceEffects: choice.effects,
+  );
 
   Future<void> _saveCheckpoint() =>
       widget.onCheckpoint?.call(
@@ -834,36 +1303,106 @@ class _VisualNovelOnboardingScreenState
         resizeToAvoidBottomInset: false,
         body: LayoutBuilder(
           builder: (context, constraints) {
-            final sceneCharacterAsset = _character;
-            final isTeacherScene = _speaker == '한서윤 운영관';
+            final scene = _currentDialogue;
+            final stageCharacters = _stageCharacters;
             return Stack(
               key: const Key('onboarding-stage'),
               fit: StackFit.expand,
               children: [
                 AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 700),
-                  child: _LivingBackground(
-                    key: ValueKey(_background),
-                    asset: _background,
-                    sceneBeat: _beat,
-                    ambientFlicker: true,
+                  duration: Duration(
+                    milliseconds: scene?.transition == 'cut'
+                        ? 0
+                        : scene?.transitionDurationMs ?? 700,
                   ),
-                ),
-                if (_playerNameConfirmed && sceneCharacterAsset != null)
-                  Positioned.fill(
-                    top: -_storyCharacterBottomInset,
-                    bottom: _storyCharacterBottomInset,
-                    child: IgnorePointer(
-                      child: _OnboardingCharacterSlot(
-                        key: const Key('story-character-stage-slot'),
-                        asset: sceneCharacterAsset,
-                        alignment: Alignment.bottomCenter,
-                        characterKey: isTeacherScene
-                            ? const Key('academy-teacher-character')
-                            : const Key('story-character-character'),
+                  transitionBuilder: (child, animation) =>
+                      _storySceneTransition(
+                        scene?.transition ?? 'fade',
+                        child,
+                        animation,
                       ),
+                  child: _StoryCameraStage(
+                    key: ValueKey('camera-${scene?.id ?? _beat}'),
+                    x: scene?.cameraX ?? 0,
+                    y: scene?.cameraY ?? 0,
+                    zoom: scene?.cameraZoom ?? 1,
+                    shake: scene?.cameraShake ?? 0,
+                    duration: Duration(
+                      milliseconds: scene?.transitionDurationMs ?? 700,
+                    ),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        _LivingBackground(
+                          key: ValueKey(_background),
+                          asset: _background,
+                          sceneBeat: _beat,
+                          ambientFlicker: scene?.ambientEffect == 'flicker',
+                        ),
+                        if (_playerNameConfirmed)
+                          for (final stageCharacter in stageCharacters)
+                            Positioned.fill(
+                              key: ValueKey(
+                                'stage-${scene?.id}-${stageCharacter.id}',
+                              ),
+                              top: -_storyCharacterBottomInset,
+                              bottom: _storyCharacterBottomInset,
+                              child: IgnorePointer(
+                                child: Opacity(
+                                  opacity: stageCharacter.opacity,
+                                  child: Transform(
+                                    alignment: Alignment.center,
+                                    transform: Matrix4.diagonal3Values(
+                                      stageCharacter.flipX ? -1 : 1,
+                                      1,
+                                      1,
+                                    ),
+                                    child: _OnboardingCharacterSlot(
+                                      asset: stageCharacter.asset,
+                                      alignment: Alignment.bottomCenter,
+                                      position: Offset(
+                                        stageCharacter.x,
+                                        stageCharacter.y,
+                                      ),
+                                      scale: stageCharacter.scale,
+                                      entrance: stageCharacter.enter,
+                                      motion: stageCharacter.motion,
+                                      characterKey:
+                                          stageCharacter.speaker == '한서윤 운영관'
+                                          ? const Key(
+                                              'academy-teacher-character',
+                                            )
+                                          : ValueKey(
+                                              'story-character-${stageCharacter.id}',
+                                            ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        if ((scene?.lighting ?? 1) != 1)
+                          IgnorePointer(
+                            child: ColoredBox(
+                              color: (scene?.lighting ?? 1) < 1
+                                  ? Colors.black.withValues(
+                                      alpha: (1 - (scene?.lighting ?? 1))
+                                          .clamp(0.0, 0.78)
+                                          .toDouble(),
+                                    )
+                                  : Colors.white.withValues(
+                                      alpha: ((scene?.lighting ?? 1) - 1)
+                                          .clamp(0.0, 0.32)
+                                          .toDouble(),
+                                    ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
+                ),
+                if ((scene?.ambientEffect ?? 'none') != 'none' &&
+                    scene?.ambientEffect != 'flicker')
+                  _StoryAmbientOverlay(effect: scene!.ambientEffect),
                 const DecoratedBox(
                   key: Key('story-stage-reading-scrim'),
                   decoration: BoxDecoration(
@@ -1007,8 +1546,19 @@ class _VisualNovelOnboardingScreenState
       playerName: _playerController.text.trim(),
       line: _line,
       stageDirection: _stageDirection,
-      narration: _isNarration,
+      narration: _usesNarrationPanel,
+      mode: _dialogueMode,
+      charactersPerSecond: _currentDialogue?.textSpeed ?? 32,
+      autoAdvanceMs: _currentDialogue?.autoAdvanceMs ?? 0,
       onContinue: _next,
+      choices: <_NovelChoice>[
+        for (final choice in _availableChoices)
+          _NovelChoice(
+            key: ValueKey('choice-${choice.id}'),
+            label: choice.label,
+            onTap: () => _selectChoice(choice),
+          ),
+      ],
     );
   }
 
@@ -1543,16 +2093,187 @@ class _LivingBackgroundState extends State<_LivingBackground>
   );
 }
 
+class _StoryCameraStage extends StatefulWidget {
+  const _StoryCameraStage({
+    super.key,
+    required this.x,
+    required this.y,
+    required this.zoom,
+    required this.shake,
+    required this.duration,
+    required this.child,
+  });
+
+  final double x;
+  final double y;
+  final double zoom;
+  final double shake;
+  final Duration duration;
+  final Widget child;
+
+  @override
+  State<_StoryCameraStage> createState() => _StoryCameraStageState();
+}
+
+class _StoryCameraStageState extends State<_StoryCameraStage>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 420),
+    );
+    final isTestBinding = WidgetsBinding.instance.runtimeType
+        .toString()
+        .contains('TestWidgetsFlutterBinding');
+    if (!const bool.fromEnvironment('FLUTTER_TEST') && !isTestBinding) {
+      _controller.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) => AnimatedBuilder(
+      animation: _controller,
+      child: widget.child,
+      builder: (context, child) {
+        final phase = _controller.value * math.pi * 4;
+        final shakeX = math.sin(phase * 1.7) * widget.shake * 7;
+        final shakeY = math.cos(phase * 2.3) * widget.shake * 4;
+        return AnimatedContainer(
+          duration: widget.duration,
+          curve: Curves.easeOutCubic,
+          transformAlignment: Alignment.center,
+          transform: Matrix4.identity()
+            ..translateByDouble(
+              widget.x / 100 * constraints.maxWidth + shakeX,
+              -widget.y / 100 * constraints.maxHeight + shakeY,
+              0,
+              1,
+            )
+            ..scaleByDouble(widget.zoom, widget.zoom, 1, 1),
+          child: child,
+        );
+      },
+    ),
+  );
+}
+
+class _StoryAmbientOverlay extends StatefulWidget {
+  const _StoryAmbientOverlay({required this.effect});
+
+  final String effect;
+
+  @override
+  State<_StoryAmbientOverlay> createState() => _StoryAmbientOverlayState();
+}
+
+class _StoryAmbientOverlayState extends State<_StoryAmbientOverlay>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 5),
+    );
+    final isTestBinding = WidgetsBinding.instance.runtimeType
+        .toString()
+        .contains('TestWidgetsFlutterBinding');
+    if (!const bool.fromEnvironment('FLUTTER_TEST') && !isTestBinding) {
+      _controller.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => IgnorePointer(
+    child: AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) => CustomPaint(
+        painter: _StoryAmbientPainter(
+          effect: widget.effect,
+          progress: _controller.value,
+        ),
+        size: Size.infinite,
+      ),
+    ),
+  );
+}
+
+class _StoryAmbientPainter extends CustomPainter {
+  const _StoryAmbientPainter({required this.effect, required this.progress});
+
+  final String effect;
+  final double progress;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..strokeCap = StrokeCap.round;
+    final count = effect == 'rain' ? 44 : 30;
+    for (var index = 0; index < count; index += 1) {
+      final seedX = ((index * 47) % 101) / 100;
+      final seedY = ((index * 73) % 97) / 96;
+      final speed = 0.55 + (index % 7) * 0.09;
+      final y = ((seedY + progress * speed) % 1.12) * size.height;
+      final x = (seedX * size.width + math.sin(progress * 6 + index) * 9).clamp(
+        0.0,
+        size.width,
+      );
+      if (effect == 'rain') {
+        paint
+          ..color = const Color(0x66B8E8FF)
+          ..strokeWidth = 1.15;
+        canvas.drawLine(Offset(x, y), Offset(x - 5, y + 18), paint);
+      } else if (effect == 'snow') {
+        paint.color = const Color(0xAAFFFFFF);
+        canvas.drawCircle(Offset(x, y), 1.2 + (index % 3) * 0.7, paint);
+      } else if (effect == 'dust') {
+        paint.color = const Color(0x55FFE3A6);
+        canvas.drawCircle(Offset(x, y), 0.8 + (index % 4) * 0.55, paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _StoryAmbientPainter oldDelegate) =>
+      oldDelegate.effect != effect || oldDelegate.progress != progress;
+}
+
 class _OnboardingCharacterSlot extends StatefulWidget {
   const _OnboardingCharacterSlot({
     super.key,
     required this.asset,
     required this.alignment,
+    this.position = Offset.zero,
+    this.scale = 1,
+    this.entrance = 'fade',
+    this.motion = 'idle',
     required this.characterKey,
   });
 
   final String asset;
   final Alignment alignment;
+  final Offset position;
+  final double scale;
+  final String entrance;
+  final String motion;
   final Key characterKey;
 
   @override
@@ -1594,7 +2315,11 @@ class _OnboardingCharacterSlotState extends State<_OnboardingCharacterSlot>
   void didUpdateWidget(covariant _OnboardingCharacterSlot oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.asset == widget.asset &&
-        oldWidget.alignment == widget.alignment) {
+        oldWidget.alignment == widget.alignment &&
+        oldWidget.position == widget.position &&
+        oldWidget.scale == widget.scale &&
+        oldWidget.entrance == widget.entrance &&
+        oldWidget.motion == widget.motion) {
       return;
     }
     if (_motionEnabled) {
@@ -1621,16 +2346,21 @@ class _OnboardingCharacterSlotState extends State<_OnboardingCharacterSlot>
         switchInCurve: Curves.easeOut,
         switchOutCurve: Curves.easeIn,
         transitionBuilder: (child, animation) {
-          final horizontalOffset = widget.alignment.x < 0
-              ? -0.08
-              : widget.alignment.x > 0
-              ? 0.08
-              : 0.0;
+          final horizontalOffset = switch (widget.entrance) {
+            'slide-left' => -0.12,
+            'slide-right' => 0.12,
+            _ =>
+              widget.alignment.x < 0
+                  ? -0.08
+                  : widget.alignment.x > 0
+                  ? 0.08
+                  : 0.0,
+          };
           final entrance = CurvedAnimation(
             parent: animation,
             curve: Curves.easeOutCubic,
           );
-          return FadeTransition(
+          final entered = FadeTransition(
             opacity: entrance,
             child: SlideTransition(
               position: Tween<Offset>(
@@ -1640,10 +2370,17 @@ class _OnboardingCharacterSlotState extends State<_OnboardingCharacterSlot>
               child: child,
             ),
           );
+          return widget.entrance == 'pop'
+              ? ScaleTransition(
+                  scale: Tween<double>(begin: 0.9, end: 1).animate(entrance),
+                  alignment: Alignment.bottomCenter,
+                  child: entered,
+                )
+              : entered;
         },
         child: LayoutBuilder(
           key: ValueKey(
-            '${widget.asset}-${widget.alignment.x}-${widget.alignment.y}',
+            '${widget.asset}-${widget.alignment.x}-${widget.alignment.y}-${widget.position.dx}-${widget.position.dy}-${widget.scale}',
           ),
           builder: (context, constraints) {
             final characterHeight =
@@ -1655,28 +2392,38 @@ class _OnboardingCharacterSlotState extends State<_OnboardingCharacterSlot>
             final characterImageHeight = characterHeight
                 .clamp(0.0, constraints.maxHeight - _storyCharacterBottomInset)
                 .toDouble();
-            return Align(
-              alignment: widget.alignment,
-              child: SizedBox(
-                key: widget.characterKey,
-                width: characterWidth,
-                height: characterHeight,
-                child: Align(
-                  alignment: Alignment.bottomCenter,
-                  child: Transform.scale(
-                    key: const Key('story-character-scale'),
-                    scale: _storyCharacterScaleForAsset(widget.asset),
+            final positionOffset = Offset(
+              widget.position.dx / 100 * constraints.maxWidth,
+              -widget.position.dy / 100 * constraints.maxHeight,
+            );
+            return Transform.translate(
+              key: const Key('story-character-position'),
+              offset: positionOffset,
+              child: Align(
+                alignment: widget.alignment,
+                child: SizedBox(
+                  key: widget.characterKey,
+                  width: characterWidth,
+                  height: characterHeight,
+                  child: Align(
                     alignment: Alignment.bottomCenter,
-                    child: SizedBox(
-                      width: characterWidth,
-                      height: characterImageHeight,
-                      child: Image.asset(
-                        key: const Key('story-character-image'),
-                        widget.asset,
-                        fit: BoxFit.contain,
-                        alignment: Alignment.bottomCenter,
-                        filterQuality: FilterQuality.high,
-                        gaplessPlayback: true,
+                    child: Transform.scale(
+                      key: const Key('story-character-scale'),
+                      scale:
+                          _storyCharacterScaleForAsset(widget.asset) *
+                          widget.scale,
+                      alignment: Alignment.bottomCenter,
+                      child: SizedBox(
+                        width: characterWidth,
+                        height: characterImageHeight,
+                        child: Image.asset(
+                          key: const Key('story-character-image'),
+                          widget.asset,
+                          fit: BoxFit.contain,
+                          alignment: Alignment.bottomCenter,
+                          filterQuality: FilterQuality.high,
+                          gaplessPlayback: true,
+                        ),
                       ),
                     ),
                   ),
@@ -1703,8 +2450,16 @@ class _OnboardingCharacterSlotState extends State<_OnboardingCharacterSlot>
         );
         final phase = phaseSeed / 180 * math.pi;
         final idleAngle = _idleController.value * math.pi * 2;
-        final breathing = motionAllowed
+        final breathing =
+            motionAllowed &&
+                (widget.motion == 'idle' || widget.motion == 'breathing')
             ? (math.sin(idleAngle + phase) + 1) * 0.5
+            : 0.0;
+        final floating = motionAllowed && widget.motion == 'float'
+            ? math.sin(idleAngle + phase) * 3.5
+            : 0.0;
+        final shaking = motionAllowed && widget.motion == 'shake'
+            ? math.sin(idleAngle * 9 + phase) * 1.8
             : 0.0;
         final reactionProgress = motionAllowed
             ? Curves.easeOutCubic.transform(_reactionController.value)
@@ -1715,7 +2470,10 @@ class _OnboardingCharacterSlotState extends State<_OnboardingCharacterSlot>
         final reactionSide = phaseSeed.isEven ? 1.0 : -1.0;
         return Transform.translate(
           key: const Key('story-character-living-motion'),
-          offset: Offset((1 - reactionProgress) * reactionSide * 7, 0),
+          offset: Offset(
+            (1 - reactionProgress) * reactionSide * 7 + shaking,
+            floating,
+          ),
           child: Transform.rotate(
             angle: reactionEmphasis * reactionSide * 0.0018,
             alignment: Alignment.bottomCenter,
@@ -2273,6 +3031,9 @@ class _NovelDialogue extends StatefulWidget {
     this.playerName = '',
     required this.line,
     this.narration = false,
+    this.mode = 'dialogue',
+    this.charactersPerSecond = 32,
+    this.autoAdvanceMs = 0,
     this.stageDirection,
     this.onContinue,
     this.continueKey,
@@ -2284,6 +3045,9 @@ class _NovelDialogue extends StatefulWidget {
   final String playerName;
   final String line;
   final bool narration;
+  final String mode;
+  final double charactersPerSecond;
+  final int autoAdvanceMs;
   final String? stageDirection;
   final VoidCallback? onContinue;
   final Key? continueKey;
@@ -2297,28 +3061,49 @@ class _NovelDialogue extends StatefulWidget {
 class _NovelDialogueState extends State<_NovelDialogue>
     with SingleTickerProviderStateMixin {
   late final AnimationController _typingController;
+  Timer? _autoAdvanceTimer;
 
   bool get _typingComplete => _typingController.isCompleted;
 
   Duration _typingDuration(String line) => Duration(
-    milliseconds: math.min(1400, math.max(180, line.length * 14)).toInt(),
+    milliseconds: math
+        .min(
+          15000,
+          math.max(120, line.length / widget.charactersPerSecond * 1000),
+        )
+        .toInt(),
   );
+
+  void _scheduleAutoAdvance(AnimationStatus status) {
+    _autoAdvanceTimer?.cancel();
+    if (status != AnimationStatus.completed ||
+        widget.autoAdvanceMs <= 0 ||
+        widget.choices.isNotEmpty ||
+        widget.onContinue == null) {
+      return;
+    }
+    _autoAdvanceTimer = Timer(Duration(milliseconds: widget.autoAdvanceMs), () {
+      if (mounted) widget.onContinue?.call();
+    });
+  }
 
   @override
   void initState() {
     super.initState();
     _activeNovelDialogueState = this;
-    _typingController = AnimationController(
-      vsync: this,
-      duration: _typingDuration(widget.line),
-    )..addListener(() => setState(() {}));
+    _typingController =
+        AnimationController(vsync: this, duration: _typingDuration(widget.line))
+          ..addListener(() => setState(() {}))
+          ..addStatusListener(_scheduleAutoAdvance);
     _typingController.forward();
   }
 
   @override
   void didUpdateWidget(covariant _NovelDialogue oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.line != widget.line) {
+    if (oldWidget.line != widget.line ||
+        oldWidget.charactersPerSecond != widget.charactersPerSecond) {
+      _autoAdvanceTimer?.cancel();
       _typingController
         ..duration = _typingDuration(widget.line)
         ..reset()
@@ -2327,6 +3112,11 @@ class _NovelDialogueState extends State<_NovelDialogue>
   }
 
   void _handleExternalTap() {
+    if (!_typingComplete) {
+      _typingController.value = 1;
+      return;
+    }
+    if (widget.choices.isNotEmpty) return;
     widget.onContinue?.call();
   }
 
@@ -2335,6 +3125,7 @@ class _NovelDialogueState extends State<_NovelDialogue>
     if (identical(_activeNovelDialogueState, this)) {
       _activeNovelDialogueState = null;
     }
+    _autoAdvanceTimer?.cancel();
     _typingController.dispose();
     super.dispose();
   }
@@ -2361,6 +3152,23 @@ class _NovelDialogueState extends State<_NovelDialogue>
       onTap: _handleExternalTap,
       child: Container(
         key: const Key('story-dialogue-panel'),
+        decoration: BoxDecoration(
+          color: switch (widget.mode) {
+            'thought' => const Color(0xBD221E35),
+            'system' => const Color(0xD91A2E3F),
+            'narration' => const Color(0xB3161D2A),
+            _ => const Color(0xB8222937),
+          },
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0x668CCEEB)),
+          boxShadow: const <BoxShadow>[
+            BoxShadow(
+              color: Color(0x66000000),
+              blurRadius: 20,
+              offset: Offset(0, 8),
+            ),
+          ],
+        ),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(18, 13, 18, 14),
           child: Column(
@@ -2447,6 +3255,25 @@ class _NovelDialogueState extends State<_NovelDialogue>
                   ),
                 ),
               ),
+              if (widget.stageDirection?.trim().isNotEmpty ?? false) ...[
+                Text(
+                  widget.stageDirection!.trim(),
+                  key: const Key('story-stage-direction'),
+                  style: const TextStyle(
+                    color: Color(0xFFE8DDBF),
+                    fontFamily: 'Pretendard',
+                    fontSize: 12.5,
+                    height: 1.4,
+                    fontStyle: FontStyle.italic,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.2,
+                    shadows: <Shadow>[
+                      Shadow(color: Color(0xD9000000), blurRadius: 4),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 6),
+              ],
               Semantics(
                 liveRegion: true,
                 label: widget.line,

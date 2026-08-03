@@ -234,7 +234,7 @@ test("documents and preserves the portrait-mobile product contract", async () =>
   assert.match(rules, /390×844(?:px)?/);
   assert.match(rules, /최소 너비 360px/);
   assert.match(guide, /처음하기.*이어하기/);
-  assert.match(guide, /현재 상태 스키마는 `v24`/);
+  assert.match(guide, /현재 상태 스키마는 `v25`/);
   assert.match(guide, /최대 5슬롯/);
   assert.doesNotMatch(rules, /게임 화면보다 먼저 회사 이름/);
   assert.doesNotMatch(guide, /첫 방문 시 회사 이름 입력 화면/);
@@ -242,7 +242,7 @@ test("documents and preserves the portrait-mobile product contract", async () =>
   assert.match(css, /env\(safe-area-inset-bottom\)/);
   assert.match(css, /width: min\(100%, 430px\)/);
   assert.match(css, /\.asset-grid \{[\s\S]*?grid-template-columns: 1fr;/);
-  assert.match(state, /schemaVersion = 24/);
+  assert.match(state, /schemaVersion = 25/);
   assert.match(state, /simulationSeed/);
   assert.match(market, /daily-market-report-card/);
   assert.match(market, /purchase-market-report-button/);
@@ -493,6 +493,9 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
     onboarding,
     pubspec,
     mbtiGuide,
+    directorStudio,
+    sceneToolbox,
+    dialogueTypes,
   ] = await Promise.all([
     readFile(new URL("../app/editor/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/editor/editor.module.css", import.meta.url), "utf8"),
@@ -517,6 +520,9 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
     readFile(new URL("../flutter_app/lib/visual_novel_onboarding.dart", import.meta.url), "utf8"),
     readFile(new URL("../flutter_app/pubspec.yaml", import.meta.url), "utf8"),
     readFile(new URL("../characters/cohort6_girls/README.md", import.meta.url), "utf8"),
+    readFile(new URL("../app/editor/director-studio.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/editor/scene-toolbox.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/editor/dialogue-types.ts", import.meta.url), "utf8"),
   ]);
   const canonical = JSON.parse(canonicalRaw);
   const hanSuaAssets = (
@@ -549,9 +555,9 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
   assert.match(editor, /대사 편집기/);
   assert.match(editor, /자동 저장됨/);
   assert.match(editor, /말맛 체크/);
-  assert.match(editor, /저장하고 게임 빌드/);
+  assert.match(editor, /게임에 즉시 적용/);
   assert.match(editor, /\/api\/dialogue\/build/);
-  assert.match(editor, /게임 빌드 완료/);
+  assert.match(editor, /게임 즉시 적용 완료/);
   assert.match(editor, /화자 선택/);
   assert.match(editor, /표정·동작/);
   assert.match(editor, /이 화자만 표시/);
@@ -559,19 +565,49 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
   assert.match(editor, /기존 장면도 여기서 바로 바꿀 수 있어요/);
   assert.match(editor, /BackgroundPicker/);
   assert.match(editor, /장면 추가/);
+  assert.match(editor, /캐릭터 화면 배치/);
+  assert.match(editor, /이 장면만/);
+  assert.match(editor, /전체 ·/);
+  assert.match(editor, /beginCharacterDrag/);
+  assert.match(editor, /characterScale/);
+  assert.match(editor, /전신/);
+  assert.match(editor, /전체 빌드/);
+  assert.match(editor, /undoLastChange/);
+  assert.match(editor, /redoLastChange/);
+  assert.match(editor, /shortcut && key === "z"/);
+  assert.match(editor, /수정 전으로 돌아갔어요/);
+  assert.match(editor, /characterDragHandle/);
+  assert.match(editorCss, /\.characterDragHandle\s*\{/);
+  assert.match(editorCss, /pointer-events: none/);
+  assert.match(editorCss, /\.transformStudio\s*\{/);
   assert.match(backgroundCatalog, /bg_bank_branch_2000_portrait_cartoon_v2\.png/);
   assert.match(backgroundCatalog, /bg_decimal_trading_floor_dawn_2000_v1\.png/);
   assert.match(editorCss, /\.sceneComposer\s*\{/);
   assert.match(editorCss, /\.backgroundGrid\s*\{/);
-  assert.match(editorCss, /\.character\s*\{[\s\S]*?bottom: 12\.3%/);
+  assert.match(editorCss, /\.characterManipulator\s*\{[\s\S]*?bottom: 12\.3%/);
   assert.match(editor, /project-decimal-dialogue-runtime-v2/);
   assert.match(editor, /play\/index\.html\?dialoguePreview=1/);
   assert.doesNotMatch(editor, /window\.location\.hostname/);
   assert.doesNotMatch(editor, /이 장면을 저장하시겠습니까/);
   assert.doesNotMatch(editor, /저장하고 이동/);
   assert.match(editor, /새 장면 .*개 자동 추가/);
+  assert.match(editor, /DirectorStudio/);
+  assert.match(editor, /SceneToolbox/);
+  assert.match(directorStudio, /인물·레이어/);
+  assert.match(directorStudio, /카메라·효과/);
+  assert.match(directorStudio, /선택지·분기/);
+  assert.match(directorStudio, /오디오·메모/);
+  assert.match(directorStudio, /setPointerCapture/);
+  assert.match(sceneToolbox, /찾아바꾸기/);
+  assert.match(sceneToolbox, /버전/);
+  assert.match(sceneToolbox, /도달 불가/);
+  assert.match(dialogueTypes, /DialogueStageCharacter/);
+  assert.match(dialogueTypes, /DialogueChoice/);
+  assert.match(onboarding, /_StoryCameraStage/);
+  assert.match(onboarding, /_StoryAmbientOverlay/);
+  assert.match(onboarding, /_selectChoice/);
   assert.equal(canonical.contentVersion, 3);
-  assert.equal(canonical.appearanceVersion, 16);
+  assert.equal(canonical.appearanceVersion, 17);
   assert.deepEqual(hanSuaAssets, expectedHanSuaAssets);
   assert.equal(canonical.scenes.length, 292);
   assert.equal(new Set(canonical.scenes.map((scene) => scene.id)).size, 292);
@@ -581,6 +617,12 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
     for (const field of ["id", "speaker", "line", "character", "background"]) {
       assert.equal(typeof scene[field], "string");
     }
+    assert.equal(typeof scene.characterX, "number");
+    assert.equal(typeof scene.characterY, "number");
+    assert.equal(typeof scene.characterScale, "number");
+    assert.ok(scene.characterX >= -60 && scene.characterX <= 60);
+    assert.ok(scene.characterY >= -40 && scene.characterY <= 80);
+    assert.ok(scene.characterScale >= 0.45 && scene.characterScale <= 1.8);
     assert.ok(scene.line.length <= 6000);
     const dateMatch = scene.date.match(/^(\d{4})(?:\.(\d{2})\.(\d{2}))?/);
     assert.ok(dateMatch, `${scene.id} 날짜를 해석할 수 있어야 합니다.`);
@@ -649,19 +691,22 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
   assert.doesNotMatch(data, /단팥빵 얘기 들은 다음부터 계속 배고파/);
   assert.match(data, /bg_decimal_gangnam_exterior_winter_1999_v1\.png/);
   assert.match(editor, /const CONTENT_VERSION = 3/);
-  assert.match(editor, /const APPEARANCE_VERSION = 16/);
+  assert.match(editor, /const APPEARANCE_VERSION = 17/);
   assert.equal(data.includes("\\\\n"), false);
   assert.match(data, /character_hakjun_orientation_v2\.png/);
   assert.match(generator, /dialogue-editor-override\.json/);
   assert.match(generator, /loadCanonicalDialogue/);
   assert.doesNotMatch(generator, /_onboardingBeatCount/);
   assert.doesNotMatch(generator, /visual_novel_onboarding\.dart/);
-  assert.match(generator, /appearanceVersion !== 16/);
-  assert.match(generator, /content 3 \/ appearance 16/);
+  assert.match(generator, /appearanceVersion !== 17/);
+  assert.match(generator, /content 3 \/ appearance 17/);
   assert.match(generator, /Dialogue editor synced/);
   assert.match(validation, /DIALOGUE_MAX_TEXT_LENGTH = 6000/);
   assert.match(validation, /중복 장면 ID/);
   assert.match(buildScript, /renameWithRetry/);
+  assert.match(validation, /CHARACTER_SCALE_MIN = 0\.45/);
+  assert.match(validation, /characterX/);
+  assert.match(validation, /characterScale/);
   assert.doesNotMatch(buildScript, /syncDirectoryContents/);
   const protagonistCatalog = catalog.slice(
     catalog.indexOf("const protagonistPoses"),
@@ -686,7 +731,7 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
   assert.match(packageJson, /prebuild:flutter-web/);
   assert.match(packageJson, /dialogue:sync/);
   assert.match(buildRoute, /dialogue-editor-override\.json/);
-  assert.match(buildRoute, /appearanceVersion: 16/);
+  assert.match(buildRoute, /appearanceVersion: 17/);
   assert.match(buildRoute, /validateDialogueScenes/);
   assert.match(buildRoute, /DIALOGUE_BUILD_TOKEN/);
   assert.match(buildRoute, /requiresToken:\s*true/);
@@ -699,6 +744,11 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
   assert.match(buildRoute, /backups/);
   assert.match(catalog, /production_soft_painted\/park_haeun/);
   assert.match(catalog, /production_soft_painted\/yoon_chaea/);
+  assert.match(buildRoute, /mode === "quick"/);
+  assert.match(buildRoute, /copyFile\(assetPath, runtimeDialoguePath\)/);
+  assert.match(buildRoute, /새 에셋은 전체 빌드가 필요합니다/);
+  assert.match(buildRoute, /encodeURI\(asset\.slice\("\/play\/"\.length\)\)/);
+  assert.match(buildRoute, /persistDialogue\(validation\.scenes, mode\)/);
   assert.match(catalog, /production_soft_painted\/han_sua/);
   assert.match(catalog, /production_soft_painted\/kim_seoa/);
   assert.match(catalog, /production_soft_painted\/lee_jian/);
@@ -736,16 +786,19 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
   }
   assert.match(editor, /character: migrateHanSuaCharacterAsset\(scene\.character\)/);
   assert.match(onboarding, /_migrateHanSuaCharacterAsset\(normalized\)/);
-  assert.match(buildRoute, /persistAndBuild\(validation\.scenes\)/);
+  assert.match(buildRoute, /persistDialogue\(validation\.scenes, mode\)/);
   assert.match(buildRoute, /scripts\/build-flutter-web\.mjs/);
   assert.match(onboarding, /_dialogueBundleAsset/);
-  assert.match(onboarding, /_dialogueAppearanceVersion = 16/);
+  assert.match(onboarding, /_dialogueAppearanceVersion = 17/);
   assert.match(onboarding, /_mergeCurrentAppearance/);
   assert.match(onboarding, /rootBundle\.loadString/);
   assert.match(
     onboarding,
     /injectedRaw == null && widget\.allowRuntimeDialoguePreview/,
   );
+  assert.match(onboarding, /characterX/);
+  assert.match(onboarding, /characterScale/);
+  assert.match(onboarding, /Transform\.translate/);
   assert.doesNotMatch(onboarding, /switch \(_beat\)/);
   assert.doesNotMatch(onboarding, /왕딱지|단팥빵|첫날이니/);
   assert.match(onboarding, /character: asset\('character'\)/);
@@ -756,7 +809,7 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
   assert.match(onboarding, /_storyCharacterSceneScale = 2\.0/);
   assert.doesNotMatch(onboarding, /story-crt-scanline/);
   assert.doesNotMatch(onboarding, /orientation-dust-motes/);
-  assert.match(onboarding, /_minhoCharacterScale = 0\.72/);
+  assert.doesNotMatch(onboarding, /_minhoCharacterScale|character_minho_farewell/);
   assert.doesNotMatch(onboarding, /왼쪽으로 움직여 대화창 배경을 더 투명하게 조절/);
   assert.match(pubspec, /assets\/dialogue\//);
 });

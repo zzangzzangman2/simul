@@ -18,6 +18,7 @@ import 'real_estate_market.dart';
 import 'real_estate_rental.dart';
 import 'real_estate_world.dart';
 import 'personal_finance_state.dart';
+import 'phone_dialogue_composer.dart';
 import 'phone_messenger_state.dart';
 import 'relationship_state.dart';
 import 'seed_money_content.dart';
@@ -642,12 +643,26 @@ class PhoneMessengerActionResult {
     required this.success,
     required this.message,
     this.reply,
+    this.affectionDelta = 0,
+    this.trustDelta = 0,
+    this.closenessDelta = 0,
+    this.investmentRespectDelta = 0,
   });
 
   final GameState state;
   final bool success;
   final String message;
   final PhoneMessage? reply;
+  final int affectionDelta;
+  final int trustDelta;
+  final int closenessDelta;
+  final int investmentRespectDelta;
+
+  bool get relationshipChanged =>
+      affectionDelta != 0 ||
+      trustDelta != 0 ||
+      closenessDelta != 0 ||
+      investmentRespectDelta != 0;
 }
 
 class GameEngine {
@@ -735,6 +750,44 @@ class GameEngine {
     }
 
     final sequence = progress.totalExchanges + 1;
+    final report = state.cohortInvestments.reportForDay(state.day);
+    final playerRow = report?.resultFor('player');
+    final contactRow = report?.resultFor(contactId);
+    int rankFor(String investorId) {
+      final rows = report?.rankedRows ?? const <CohortDailyInvestmentResult>[];
+      for (var index = 0; index < rows.length; index++) {
+        if (rows[index].investorId == investorId) return index + 1;
+      }
+      return 0;
+    }
+
+    final girlProfile = cohortGirlProfileById(contactId);
+    final relationship = girlProfile == null
+        ? null
+        : state.relationships.progressFor(contactId);
+    final composed = composePhoneReply(
+      PhoneDialogueContext(
+        worldSeed: state.simulationSeed,
+        day: state.day,
+        marketMinute: state.marketMinute,
+        contact: contact,
+        progress: progress,
+        relationship: relationship,
+        investment: PhoneInvestmentConversationContext(
+          hasCurrentReport: report != null,
+          marketClosed: !isMarketTradingDay(state.currentDate),
+          playerDailyProfitLoss: playerRow?.profitLoss ?? 0,
+          playerCumulativeProfitLoss:
+              state.cohortInvestments.playerCumulativeProfitLoss,
+          playerTotal: playerRow?.totalAmount ?? 0,
+          playerRank: rankFor('player'),
+          contactDailyProfitLoss: contactRow?.profitLoss ?? 0,
+          contactRank: rankFor(contactId),
+        ),
+        recentMemories: state.phoneMessenger.memoriesFor(contactId),
+      ),
+      content,
+    );
     final playerMessage = PhoneMessage(
       id: 'phone-${state.day}-${state.marketMinute}-$contactId-$sequence-me',
       contactId: contactId,
@@ -748,7 +801,7 @@ class GameEngine {
       id: 'phone-${state.day}-${state.marketMinute}-$contactId-$sequence-reply',
       contactId: contactId,
       senderId: contactId,
-      text: phoneReplyFor(contact, content),
+      text: composed.text,
       day: state.day,
       marketMinute: state.marketMinute,
       read: true,
@@ -769,12 +822,85 @@ class GameEngine {
         : appended.sublist(appended.length - phoneMessengerHistoryLimit);
     final nextProgress = <String, PhoneThreadProgress>{
       ...state.phoneMessenger.progressByContact,
-      contactId: progress.recordExchange(state.day),
+      contactId: progress.recordExchange(
+        state.day,
+        intent: composed.intent.name,
+      ),
     };
+    var affectionDelta = 0;
+    var trustDelta = 0;
+    var closenessDelta = 0;
+    var investmentRespectDelta = 0;
+    var nextRelationships = state.relationships;
+    if (relationship != null &&
+        composed.meaningful &&
+        relationship.lastMeaningfulMessageDay != state.day) {
+      final nextAffection = (relationship.affection + composed.affectionDelta)
+          .clamp(relationshipMinAffection, relationshipMaxAffection)
+          .toInt();
+      final nextTrust = (relationship.trust + composed.trustDelta)
+          .clamp(relationshipDimensionMin, relationshipDimensionMax)
+          .toInt();
+      final nextCloseness = (relationship.closeness + composed.closenessDelta)
+          .clamp(relationshipDimensionMin, relationshipDimensionMax)
+          .toInt();
+      final nextInvestmentRespect =
+          (relationship.investmentRespect + composed.investmentRespectDelta)
+              .clamp(relationshipDimensionMin, relationshipDimensionMax)
+              .toInt();
+      affectionDelta = nextAffection - relationship.affection;
+      trustDelta = nextTrust - relationship.trust;
+      closenessDelta = nextCloseness - relationship.closeness;
+      investmentRespectDelta =
+          nextInvestmentRespect - relationship.investmentRespect;
+      final updated = relationship.copyWith(
+        affection: nextAffection,
+        trust: nextTrust,
+        closeness: nextCloseness,
+        investmentRespect: nextInvestmentRespect,
+        lastInteractionDay: state.day,
+        lastMeaningfulMessageDay: state.day,
+        meaningfulMessageCount: relationship.meaningfulMessageCount + 1,
+      );
+      nextRelationships = state.relationships.copyWith(
+        girls: <String, GirlRelationshipProgress>{
+          ...state.relationships.girls,
+          contactId: updated,
+        },
+      );
+    }
+    final memory = PhoneConversationMemory(
+      id: 'phone-memory-${state.day}-$contactId-$sequence',
+      contactId: contactId,
+      day: state.day,
+      intent: composed.intent.name,
+      investmentSituation: composed.investmentSituation.name,
+      playerText: content,
+      replyText: reply.text,
+      playerDailyProfitLoss: playerRow?.profitLoss ?? 0,
+      playerCumulativeProfitLoss:
+          state.cohortInvestments.playerCumulativeProfitLoss,
+      contactDailyProfitLoss: contactRow?.profitLoss ?? 0,
+      affectionDelta: affectionDelta,
+      trustDelta: trustDelta,
+      closenessDelta: closenessDelta,
+      investmentRespectDelta: investmentRespectDelta,
+    );
+    final appendedMemories = <PhoneConversationMemory>[
+      ...state.phoneMessenger.memories,
+      memory,
+    ];
+    final memories = appendedMemories.length <= phoneConversationMemoryLimit
+        ? appendedMemories
+        : appendedMemories.sublist(
+            appendedMemories.length - phoneConversationMemoryLimit,
+          );
     final next = state.copyWith(
+      relationships: nextRelationships,
       phoneMessenger: state.phoneMessenger.copyWith(
         messages: messages,
         progressByContact: nextProgress,
+        memories: memories,
       ),
     );
     return PhoneMessengerActionResult(
@@ -782,6 +908,10 @@ class GameEngine {
       success: true,
       message: '${contact.name}에게 메시지를 보냈습니다.',
       reply: reply,
+      affectionDelta: affectionDelta,
+      trustDelta: trustDelta,
+      closenessDelta: closenessDelta,
+      investmentRespectDelta: investmentRespectDelta,
     );
   }
 
@@ -823,6 +953,14 @@ class GameEngine {
     final npcRows = <CohortDailyInvestmentResult>[];
     for (final profile in cohortNpcInvestorProfiles) {
       final account = state.cohortInvestments.accountFor(profile.id);
+      var previousCumulativeProfitLoss =
+          account.balance - cohortInvestmentInitialBalance;
+      for (final previousReport in state.cohortInvestments.reports.reversed) {
+        final previousRow = previousReport.resultFor(profile.id);
+        if (previousRow == null) continue;
+        previousCumulativeProfitLoss = previousRow.cumulativeProfitLoss;
+        break;
+      }
       if (candidates.isEmpty || !isMarketTradingDay(state.currentDate)) {
         npcRows.add(
           CohortDailyInvestmentResult(
@@ -835,6 +973,7 @@ class GameEngine {
             totalAmount: account.balance,
             traded: false,
             isPlayer: false,
+            cumulativeProfitLoss: previousCumulativeProfitLoss,
           ),
         );
         continue;
@@ -882,6 +1021,7 @@ class GameEngine {
           totalAmount: totalAmount,
           traded: true,
           isPlayer: false,
+          cumulativeProfitLoss: previousCumulativeProfitLoss + profitLoss,
         ),
       );
     }
@@ -969,6 +1109,8 @@ class GameEngine {
             : playerTotal - netBrokerageFlow);
     final playerProfitLoss =
         playerTotal - previousPlayerTotal - netBrokerageFlow;
+    final playerCumulativeProfitLoss =
+        state.cohortInvestments.playerCumulativeProfitLoss + playerProfitLoss;
     final playerTradeEntries = state.ledger
         .where(
           (entry) =>
@@ -1012,6 +1154,7 @@ class GameEngine {
           totalAmount: playerTotal,
           traded: playerTradeEntries.isNotEmpty,
           isPlayer: true,
+          cumulativeProfitLoss: playerCumulativeProfitLoss,
         ),
         ...npcRows,
       ],
@@ -1030,6 +1173,7 @@ class GameEngine {
         loans: repaidLoans,
         lastSettledDay: state.day,
         previousPlayerCloseTotal: playerTotal,
+        playerCumulativeProfitLoss: playerCumulativeProfitLoss,
       ),
     );
     return CohortInvestmentActionResult(
@@ -1229,6 +1373,19 @@ class GameEngine {
         message: '호감도 $relationshipDateUnlockAffection부터 데이트를 신청할 수 있습니다.',
       );
     }
+    if (activity == RelationshipActivity.date &&
+        !relationshipOutingAvailableOn(state.currentDate)) {
+      return RelationshipActionResult(
+        state: state,
+        success: false,
+        girlId: girlId,
+        activity: activity,
+        affectionBefore: progress.affection,
+        affectionAfter: progress.affection,
+        message: '센터 밖 외출은 주식시장이 쉬는 토·일요일에만 가능합니다.',
+      );
+    }
+
     final scene = relationshipSceneFor(
       profile: profile,
       activity: activity,
@@ -1258,10 +1415,26 @@ class GameEngine {
         .clamp(relationshipMinAffection, relationshipMaxAffection)
         .toInt();
     final appliedDelta = after - before;
+    final trustChoiceDelta = choice.affectionDelta >= 0
+        ? (choice.affectionDelta + 1) ~/ 2
+        : choice.affectionDelta;
+    final closenessChoiceDelta = choice.affectionDelta >= 0
+        ? choice.affectionDelta
+        : -((-choice.affectionDelta + 1) ~/ 2);
+    final nextTrust = (progress.trust + trustChoiceDelta)
+        .clamp(relationshipDimensionMin, relationshipDimensionMax)
+        .toInt();
+    final nextCloseness = (progress.closeness + closenessChoiceDelta)
+        .clamp(relationshipDimensionMin, relationshipDimensionMax)
+        .toInt();
+    final trustDelta = nextTrust - progress.trust;
+    final closenessDelta = nextCloseness - progress.closeness;
     final beforeStage = relationshipStageFor(before);
     final afterStage = relationshipStageFor(after);
     final updatedProgress = progress.copyWith(
       affection: after,
+      trust: nextTrust,
+      closeness: nextCloseness,
       lastInteractionDay: state.day,
       conversationCount:
           progress.conversationCount +
@@ -1283,6 +1456,8 @@ class GameEngine {
         choiceId: choice.id,
         affectionDelta: appliedDelta,
         affectionAfter: after,
+        trustDelta: trustDelta,
+        closenessDelta: closenessDelta,
       ),
     ];
     final trimmedMemories = updatedMemories.length <= 64

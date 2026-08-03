@@ -6,12 +6,14 @@
 - 판단 축: **F**
 - 캐릭터 문장: **사람 표정 하나에서 가능성을 열 개 떠올리고 먼저 말을 건다.**
 - 기존 근거: 낯선 사람에게 먼저 말 걸기, 표정 읽기, 음식 비유와 농담으로 긴장 풀기, 고객 반응을 빠르게 포착함.
-- 6기 역할: 사람 관찰·가능성 연결·분위기 촉진 담당.
+- 데시멀 역할: 사람 관찰·가능성 연결·분위기 촉진 담당.
 - 런타임 주의: 현재 주식 튜토리얼에 등장하는 `수아` 대사는 이 문서를 정규 기준으로 삼는다.
 
 ## 승인 이미지 연결·제작 고정값
 
-- 화풍: `SIMUL luminous soft-painted VN anime v2`
+- 목표 화풍: `SIMUL polished soft-render VN anime v3`
+- v3 화풍 참조: `art_references/simul_polished_soft_render_vn_style_anchor_v3.png`. 이 정식
+  앵커는 렌더링 기준이며 얼굴·헤어·체형·의상·포즈를 바꾸는 새 정체성 앵커가 아니다.
 - 1차 전신 정체성 앵커: `art_references/han_sua_identity_anchor_v3.png`
 - 2차 얼굴 크롭 앵커: `art_references/han_sua_face_identity_anchor_v3.png`. 얼굴 비율·눈·코·입을
   확인할 때만 보조로 사용한다.
@@ -33,9 +35,12 @@
   중력·관성·반동을 따라 자연스럽게 움직인다. 포즈마다 같은 머리 외곽선을 복제하지
   않으며 전신·양손·양발·신발을 자르지 않는다.
 
-### 런타임 v3 9종
+### 현행 런타임 9종과 v3 재제작 순서
 
 정식 런타임 폴더는 `flutter_app/assets/images/production_soft_painted/han_sua/`다.
+9종은 2026-08-03 사용자 승인 후 `SIMUL polished soft-render VN anime v3`로 교체·
+적용했다. 기존 얼굴·헤어·체형·의상과 각 파일의 표정·포즈는 유지했으며 구형 한수아
+이미지는 삭제했다.
 
 | 파일 | 표정·동작 의미 |
 | --- | --- |

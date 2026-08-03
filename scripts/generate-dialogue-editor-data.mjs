@@ -13,12 +13,36 @@ const dartOutputPath = path.join(
 );
 const maximumScenes = 320;
 const maximumTextLength = 6000;
+const defaultDirecting = {
+  characters: [],
+  dialogueMode: "dialogue",
+  textSpeed: 32,
+  autoAdvanceMs: 0,
+  transition: "fade",
+  transitionDurationMs: 700,
+  cameraX: 0,
+  cameraY: 0,
+  cameraZoom: 1,
+  cameraShake: 0,
+  ambientEffect: "none",
+  lighting: 1,
+  bgm: "",
+  soundEffect: "",
+  voice: "",
+  audioVolume: 0.8,
+  nextSceneId: "",
+  condition: "",
+  effects: "",
+  choices: [],
+  tags: [],
+  notes: "",
+};
 
 function loadCanonicalDialogue() {
   const raw = fs.readFileSync(canonicalPath, "utf8");
   const decoded = JSON.parse(raw);
-  if (decoded.contentVersion !== 3 || decoded.appearanceVersion !== 16) {
-    throw new Error("Canonical dialogue versions must be content 3 / appearance 16.");
+  if (decoded.contentVersion !== 3 || decoded.appearanceVersion !== 17) {
+    throw new Error("Canonical dialogue versions must be content 3 / appearance 17.");
   }
   if (
     !Array.isArray(decoded.scenes) ||
@@ -54,10 +78,29 @@ function loadCanonicalDialogue() {
     const id = scene.id.trim();
     if (!id || ids.has(id)) throw new Error(`Duplicate or empty scene id: ${id}`);
     ids.add(id);
+    const numberField = (key, fallback, minimum, maximum) => {
+      const value = scene[key] ?? fallback;
+      if (typeof value !== "number" || !Number.isFinite(value)) {
+        throw new Error(`Scene ${index + 1} ${key} must be a finite number.`);
+      }
+      if (value < minimum || value > maximum) {
+        throw new Error(
+          `Scene ${index + 1} ${key} must be between ${minimum} and ${maximum}.`,
+        );
+      }
+      return value;
+    };
+    const characterX = numberField("characterX", 0, -60, 60);
+    const characterY = numberField("characterY", 0, -40, 80);
+    const characterScale = numberField("characterScale", 1, 0.45, 1.8);
     return {
+      ...defaultDirecting,
       ...scene,
       id,
       order: index + 1,
+      characterX,
+      characterY,
+      characterScale,
       direction: scene.direction
         .replaceAll("\\r\\n", "\n")
         .replaceAll("\\n", "\n")
@@ -71,23 +114,38 @@ function loadCanonicalDialogue() {
 }
 
 const scenes = loadCanonicalDialogue();
-const editorOutput = `export type DialogueScene = {
-  id: string;
-  order: number;
-  chapter: string;
-  date: string;
-  location: string;
-  speaker: string;
-  direction: string;
-  line: string;
-  background: string;
-  character: string;
-};
+const editorOutput = `import type { DialogueScene } from "./dialogue-types";
+export type { DialogueScene } from "./dialogue-types";
 
 export const initialDialogue: DialogueScene[] = ${JSON.stringify(scenes, null, 2)};
 `;
 
 const dartString = (value) => JSON.stringify(String(value)).replaceAll("$", "\\$");
+const dartStageCharacters = (characters) => `<Map<String, Object>>[
+${characters.map((character) => `      <String, Object>{
+        "id": ${dartString(character.id)},
+        "speaker": ${dartString(character.speaker)},
+        "asset": ${dartString(character.asset)},
+        "x": ${character.x},
+        "y": ${character.y},
+        "scale": ${character.scale},
+        "opacity": ${character.opacity},
+        "flipX": ${character.flipX},
+        "zIndex": ${character.zIndex},
+        "enter": ${dartString(character.enter)},
+        "exit": ${dartString(character.exit)},
+        "motion": ${dartString(character.motion)},
+      }`).join(",\n")}
+    ]`;
+const dartChoices = (choices) => `<Map<String, Object>>[
+${choices.map((choice) => `      <String, Object>{
+        "id": ${dartString(choice.id)},
+        "label": ${dartString(choice.label)},
+        "targetSceneId": ${dartString(choice.targetSceneId)},
+        "condition": ${dartString(choice.condition)},
+        "effects": ${dartString(choice.effects)},
+      }`).join(",\n")}
+    ]`;
 const dartScenes = scenes
   .map(
     (scene) => `  <String, Object>{
@@ -100,6 +158,31 @@ const dartScenes = scenes
     "location": ${dartString(scene.location)},
     "background": ${dartString(scene.background)},
     "character": ${dartString(scene.character)},
+    "characterX": ${scene.characterX},
+    "characterY": ${scene.characterY},
+    "characterScale": ${scene.characterScale},
+    "characters": ${dartStageCharacters(scene.characters)},
+    "dialogueMode": ${dartString(scene.dialogueMode)},
+    "textSpeed": ${scene.textSpeed},
+    "autoAdvanceMs": ${scene.autoAdvanceMs},
+    "transition": ${dartString(scene.transition)},
+    "transitionDurationMs": ${scene.transitionDurationMs},
+    "cameraX": ${scene.cameraX},
+    "cameraY": ${scene.cameraY},
+    "cameraZoom": ${scene.cameraZoom},
+    "cameraShake": ${scene.cameraShake},
+    "ambientEffect": ${dartString(scene.ambientEffect)},
+    "lighting": ${scene.lighting},
+    "bgm": ${dartString(scene.bgm)},
+    "soundEffect": ${dartString(scene.soundEffect)},
+    "voice": ${dartString(scene.voice)},
+    "audioVolume": ${scene.audioVolume},
+    "nextSceneId": ${dartString(scene.nextSceneId)},
+    "condition": ${dartString(scene.condition)},
+    "effects": ${dartString(scene.effects)},
+    "choices": ${dartChoices(scene.choices)},
+    "tags": <String>[${scene.tags.map(dartString).join(", ")}],
+    "notes": ${dartString(scene.notes)},
   }`,
   )
   .join(",\n");

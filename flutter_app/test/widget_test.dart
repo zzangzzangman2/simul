@@ -559,7 +559,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('dialogue uses a full-stage scrim without a panel fill', (
+  testWidgets('dialogue uses a translucent Blue Archive-style panel', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
@@ -575,7 +575,9 @@ void main() {
     final panel = tester.widget<Container>(
       find.byKey(const Key('story-dialogue-panel')),
     );
-    expect(panel.decoration, isNull);
+    final panelDecoration = panel.decoration! as BoxDecoration;
+    expect(panelDecoration.color!.a, lessThan(1));
+    expect(panelDecoration.borderRadius, isNotNull);
     final scrim = tester.widget<DecoratedBox>(
       find.byKey(const Key('story-stage-reading-scrim')),
     );
@@ -600,11 +602,11 @@ void main() {
     final nextPanel = tester.widget<Container>(
       find.byKey(const Key('story-dialogue-panel')),
     );
-    expect(nextPanel.decoration, isNull);
+    expect(nextPanel.decoration, isA<BoxDecoration>());
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('tapping anywhere advances even while dialogue is typing', (
+  testWidgets('first tap completes typing and the next tap advances', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
@@ -633,6 +635,10 @@ void main() {
 
     await tester.tapAt(const Offset(24, 420));
     await tester.pump();
+    expect(find.text('이야기'), findsOneWidget);
+
+    await tester.tapAt(const Offset(24, 420));
+    await tester.pumpAndSettle();
     expect(find.text('한규진'), findsOneWidget);
     expect(find.text('국가정보원'), findsOneWidget);
 
@@ -794,6 +800,9 @@ void main() {
               '/play/assets/assets/images/bg_bank_branch_2000_portrait_cartoon_v2.png',
           'character':
               '/play/assets/assets/images/protagonist_seed01/05_surprised.png',
+          'characterX': 12.5,
+          'characterY': 18.0,
+          'characterScale': 0.75,
         };
       }
       if (order == 55) {
@@ -807,7 +816,7 @@ void main() {
           'direction': '수아가 새 장면의 문을 열었다.',
           'line': '이 대사는 편집기에서 새로 추가했어.',
           'background':
-              '/play/assets/assets/images/historical_prologue/bg_future_development_orientation_hall_2000_portrait_v1.png',
+              '/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_secure_entry_1999_v1.png',
           'character':
               '/play/assets/assets/images/production_soft_painted/han_sua/02_warm_smile_quality_v2.png',
         };
@@ -822,13 +831,13 @@ void main() {
         'direction': '',
         'line': '기존 장면 $order',
         'background':
-            '/play/assets/assets/images/historical_prologue/bg_future_development_orientation_hall_2000_portrait_v1.png',
+            '/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_secure_entry_1999_v1.png',
         'character': '',
       };
     });
     final dialogueOverrideJson = jsonEncode({
       'version': 1,
-      'appearanceVersion': 6,
+      'appearanceVersion': 17,
       'updatedAt': '2000-01-02T00:00:00.000Z',
       'scenes': scenes,
     });
@@ -846,7 +855,7 @@ void main() {
 
     expect(find.text('편집기 화자'), findsOneWidget);
     expect(find.text('(편집기에서 고친 지문이다.)'), findsNothing);
-    expect(find.byKey(const Key('story-stage-direction')), findsNothing);
+    expect(find.byKey(const Key('story-stage-direction')), findsOneWidget);
     expect(find.text('편집기에서 고친 대사다.\n두 번째 줄도 적용됐다.'), findsOneWidget);
     expect(find.textContaining(r'\n'), findsNothing);
     expect(find.textContaining('편집기 장소'), findsOneWidget);
@@ -859,6 +868,16 @@ void main() {
           .assetName,
       'assets/images/protagonist_seed01/05_surprised.png',
     );
+    final positionTransform = tester.widget<Transform>(
+      find.byKey(const Key('story-character-position')),
+    );
+    final position = positionTransform.transform.getTranslation();
+    expect(position.x, greaterThan(0));
+    expect(position.y, lessThan(0));
+    final scaleTransform = tester.widget<Transform>(
+      find.byKey(const Key('story-character-scale')),
+    );
+    expect(scaleTransform.transform.getMaxScaleOnAxis(), closeTo(1.5, 0.001));
     expect(
       (tester
                   .widget<Image>(
@@ -883,6 +902,135 @@ void main() {
       'assets/images/production_soft_painted/han_sua/02_warm_smile_wave_v3.png',
     );
     expect(find.byKey(const Key('orientation-complete-card')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('directed dialogue renders layers and follows choice branches', (
+    tester,
+  ) async {
+    const background =
+        '/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_secure_entry_1999_v1.png';
+    final dialogueOverrideJson = jsonEncode({
+      'version': 2,
+      'contentVersion': 3,
+      'appearanceVersion': 17,
+      'scenes': [
+        {
+          'id': 'directed-start',
+          'order': 1,
+          'chapter': '연출 테스트',
+          'date': '2000.01.01',
+          'location': '강당',
+          'speaker': '한수아',
+          'direction': '두 사람이 서로를 바라봤다.',
+          'line': '어느 쪽으로 갈래?',
+          'background': background,
+          'character': '',
+          'characters': [
+            {
+              'id': 'sua',
+              'speaker': '한수아',
+              'asset':
+                  '/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png',
+              'x': -18,
+              'y': 5,
+              'scale': 0.72,
+              'opacity': 1,
+              'flipX': false,
+              'zIndex': 0,
+              'enter': 'slide-left',
+              'exit': 'fade',
+              'motion': 'breathing',
+            },
+            {
+              'id': 'hakjun',
+              'speaker': '김학준',
+              'asset':
+                  '/play/assets/assets/images/legacy_quarantine/character_hakjun_orientation_v2.png',
+              'x': 20,
+              'y': 1,
+              'scale': 0.7,
+              'opacity': 0.9,
+              'flipX': true,
+              'zIndex': 1,
+              'enter': 'slide-right',
+              'exit': 'fade',
+              'motion': 'idle',
+            },
+          ],
+          'dialogueMode': 'thought',
+          'textSpeed': 120,
+          'cameraZoom': 1.08,
+          'ambientEffect': 'snow',
+          'choices': [
+            {
+              'id': 'route-a',
+              'label': '수아의 제안을 따른다',
+              'targetSceneId': 'directed-target',
+              'condition': '',
+              'effects': 'flag.route = true',
+            },
+          ],
+        },
+        {
+          'id': 'directed-skip',
+          'order': 2,
+          'chapter': '연출 테스트',
+          'date': '2000.01.01',
+          'location': '강당',
+          'speaker': '김학준',
+          'direction': '',
+          'line': '이 장면은 건너뛴다.',
+          'background': background,
+          'character': '',
+        },
+        {
+          'id': 'directed-target',
+          'order': 3,
+          'chapter': '연출 테스트',
+          'date': '2000.01.01',
+          'location': '복도',
+          'speaker': '한수아',
+          'direction': '',
+          'line': '좋아, 이쪽이야.',
+          'background': background,
+          'character': '',
+          'condition': 'flag.route = true',
+        },
+        {
+          'id': 'directed-end',
+          'order': 4,
+          'chapter': '연출 테스트',
+          'date': '2000.01.01',
+          'location': '복도',
+          'speaker': '이야기',
+          'direction': '',
+          'line': '끝.',
+          'background': background,
+          'character': '',
+        },
+      ],
+    });
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      MillenniumCapitalApp(
+        campaignWorldPreparer: _skipCampaignWorldPreparation,
+        dialogueOverrideJson: dialogueOverrideJson,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await startNewGame(tester);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('story-character-image')), findsNWidgets(2));
+    expect(find.byKey(const Key('story-stage-direction')), findsOneWidget);
+    expect(find.text('수아의 제안을 따른다'), findsOneWidget);
+
+    await tester.tap(find.text('수아의 제안을 따른다'));
+    await tester.pumpAndSettle();
+    expect(find.text('좋아, 이쪽이야.'), findsOneWidget);
+    expect(find.text('이 장면은 건너뛴다.'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -972,7 +1120,7 @@ void main() {
       final previewDraft = jsonEncode({
         'version': 1,
         'contentVersion': 2,
-        'appearanceVersion': 16,
+        'appearanceVersion': 17,
         'updatedAt': '2026-08-02T00:00:00.000Z',
         'scenes': [
           {
