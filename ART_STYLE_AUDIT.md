@@ -39,22 +39,27 @@
 | 자산군 | 경로·기준 | 2026-08-03 화풍 판정 |
 | --- | --- | --- |
 | 주인공 플레이어 | `flutter_app/assets/images/protagonist_seed01/` 24종(호환 경로) | 재제작 우선 — 굵은 검은 선, 평평한 피부와 하드 셀 명암 |
-| 김학준 | `historical_prologue/character_hakjun_orientation_v2.png` | 재제작 우선 — 큰 머리 비율과 하드 셀 애니 렌더링 |
+| 김학준 | `legacy_quarantine/character_hakjun_orientation_v2.png` | 격리됨·재제작 우선 — 23개 대사 장면 호환용이며 큰 머리 비율과 하드 셀 애니 렌더링 |
 | 한서윤 운영관 | `flutter_app/assets/images/주식선생님/`의 코드 연결 6포즈 | 재제작 우선 — 반실사 에어브러시와 3D형 광택 |
 | 1999년 국정원 인물 | `cinematic_soft_painted/decimal_nis_1999/characters/` 6명 | 재제작 우선 — 애니·반실사 렌더링이 한 세트 안에서 혼재 |
 | 1999년 국정원 배경 | `cinematic_soft_painted/decimal_nis_1999/backgrounds/` 2종 | 재제작 우선 — 사진·3D형 질감과 어두운 시네마틱 렌더링 |
 | 데시멀 센터 배경 | `cinematic_soft_painted/decimal/` 11종 | 재제작 우선 — 사진·3D형 재질과 공식 카툰 소프트 페인터리 문법 불일치 |
-| 구형 수면동 배경 | `cinematic_soft_painted/dormitory_2000/` 2종 | 교체 또는 제거 — 구형 기관명과 사진형 렌더링 |
-| 역사 프롤로그 | `historical_prologue/`의 현재 인물 3종·배경 3종 | 재제작 우선 — 하드 셀, 반실사, 사진형 배경이 혼재 |
 | 은행 창구 직원 | 루트 `character_bank_clerk_*_v2.png` 4종 | 재제작 우선 — 반실사 에어브러시, 플라스틱 피부와 성인 비율 과장 |
 | 서하늘 공인중개사 | 루트 `character_realtor_*_v1.png` 6종 | 재제작 우선 — 3D형 광택, 과밀 장식과 공식 렌더링 문법 불일치 |
 | 부동산 배경 | `real_estate/` 9종 | 보정 필요 — 후반 자산으로 갈수록 사진·건축 CG 인상이 강함 |
 | 생활 공간 배경 | `gameplay_map/`의 방·주방·거실 9종 | 대체로 유지 — 카툰 소프트 페인터리 범위, 세트 간 색온도 보정 필요 |
 | 라이더 코스 배경 | `gameplay_map/bg_minigame_rider_*` 2종 | 재제작 우선 — 실사 사진형 경기장 렌더링. 픽셀 오브젝트 예외와도 불일치 |
-| 1981 정책 자산 | `cinematic_soft_painted/policy_1981/` 인물 22종·배경 2종 | 제거 또는 격리 — 현재 서사 미참조이며 반실사 구형 화풍 |
 | 타이틀 일러스트 | `title_elementary_landlord_portrait_v2.png` | 보정 필요 — 강한 대비·굵은 선·광고형 합성 밀도가 공식 루미너스 톤과 다름 |
 | 픽셀 미니게임 | `minigames/` 6종 | 예외 통과 — `PROJECT_GUIDE.md`가 허용한 조작형 미니게임 전용 16비트 예외 |
 
+## 제거·격리 완료
+
+| 처리 대상 | 2026-08-03 결과 |
+| --- | --- |
+| 1981 정책 자산 | 미참조 인물 22종·배경 2종, 총 24종 삭제 및 번들 선언 제거 |
+| 구형 생활동 배경 | 4종 삭제. 방 화면은 `decimal/bg_decimal_sleeping_wing_1999_v1.png`, 투자·신문 화면은 `decimal/bg_decimal_trading_floor_dawn_2000_v1.png`로 치환 |
+| 구형 역사 프롤로그 | 배경 10종·미참조 인물 5종 삭제. 버스 전환과 본관 앞은 현행 데시멀 외관으로 치환 |
+| 김학준 호환 자산 | 실제 23개 대사 장면 때문에 1종을 `legacy_quarantine/`에 격리. 공식 v2 대체본 승인 뒤 삭제 |
 ## 승인·재제작 검사
 
 - 다른 여학생과 얼굴 골격·눈·코·입·턱선 중 최소 네 축이 뚜렷하게 다른가

@@ -33,6 +33,9 @@ const relationshipDateUnlockAffection = 20;
 const relationshipMinAffection = 1;
 const relationshipMaxAffection = 100;
 
+bool relationshipOutingAvailableOn(DateTime date) =>
+    date.weekday == DateTime.saturday || date.weekday == DateTime.sunday;
+
 class RelationshipChoiceDefinition {
   const RelationshipChoiceDefinition({
     required this.id,

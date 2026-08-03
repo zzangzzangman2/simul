@@ -12,9 +12,6 @@ const _storyDialogueBottomInset = 28.0;
 const _storyCharacterHeightFactor = 0.9;
 const _storyCharacterAspectRatio = 2 / 3;
 const _storyCharacterSceneScale = 2.0;
-const _minhoCharacterAsset =
-    'assets/images/historical_prologue/character_minho_farewell_v3.png';
-const _minhoCharacterScale = 0.72;
 const _maximumWheelBackSteps = 12;
 const _wheelBackDebounce = Duration(milliseconds: 180);
 
@@ -51,9 +48,7 @@ class _PrologueSkipStep {
   final int targetBeat;
 }
 
-double _storyCharacterScaleForAsset(String asset) =>
-    _storyCharacterSceneScale *
-    (asset == _minhoCharacterAsset ? _minhoCharacterScale : 1.0);
+double _storyCharacterScaleForAsset(String _) => _storyCharacterSceneScale;
 
 void _playStoryFeedback({bool strong = false}) {
   if (strong) {

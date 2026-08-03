@@ -172,6 +172,21 @@
   background: linear-gradient(180deg, #f8fbfd, #edf4f7);
 }
 
+.actions .historyAction {
+  width: 38px;
+  min-width: 38px;
+  padding: 0;
+  color: #2879aa;
+  font-size: 18px;
+}
+
+.actions .historyAction:disabled {
+  color: #a7b3bd;
+  cursor: not-allowed;
+  opacity: 0.45;
+  transform: none;
+}
+
 .actions .fullBuildAction:disabled {
   cursor: wait;
   opacity: 0.62;
@@ -1493,10 +1508,20 @@
   outline: 0;
   transform: translateX(-50%);
   transform-origin: center bottom;
-  touch-action: none;
-  cursor: grab;
+  pointer-events: none;
   filter: drop-shadow(0 9px 12px rgba(0,0,0,.34));
   will-change: left, bottom, transform;
+}
+
+.characterDragHandle {
+  position: absolute;
+  z-index: 1;
+  inset: 22% 24% 4%;
+  outline: 0;
+  border-radius: 18px;
+  pointer-events: auto;
+  touch-action: none;
+  cursor: grab;
 }
 
 .characterImage {
@@ -1506,18 +1531,13 @@
   user-select: none;
 }
 
-.characterMinho {
-  width: 65%;
-  height: 63%;
-}
-
-.characterManipulatorDragging {
+.characterManipulatorDragging .characterDragHandle {
   cursor: grabbing;
 }
 
 .characterSelectionFrame {
   position: absolute;
-  inset: 5% 8%;
+  inset: 0;
   opacity: 0;
   border: 1px solid rgba(102, 220, 255, 0.92);
   border-radius: 14px;
@@ -1547,8 +1567,8 @@
   bottom: -5px;
 }
 
-.characterManipulator:hover .characterSelectionFrame,
-.characterManipulator:focus-visible .characterSelectionFrame,
+.characterDragHandle:hover .characterSelectionFrame,
+.characterDragHandle:focus-visible .characterSelectionFrame,
 .characterManipulatorDragging .characterSelectionFrame {
   opacity: 1;
 }

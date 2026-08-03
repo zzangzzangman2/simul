@@ -32,7 +32,7 @@ const _stockTeacherPoseEmphasize =
 const _stockTutorialSuaAsset =
     'assets/images/production_soft_painted/han_sua/03_bright_laugh_v3.png';
 const _stockTutorialHakjunAsset =
-    'assets/images/historical_prologue/character_hakjun_orientation_v2.png';
+    'assets/images/legacy_quarantine/character_hakjun_orientation_v2.png';
 const _stockTutorialPlayerAsset =
     'assets/images/protagonist_seed01/12_thinking.png';
 

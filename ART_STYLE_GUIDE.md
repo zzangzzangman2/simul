@@ -13,7 +13,7 @@
 - 한수아 런타임은 `production_soft_painted/han_sua/`의 `*_v3.png` 9종만
   사용한다.
 - 1999년 국정원 도입부와 차은주·오경태는 `flutter_app/assets/images/cinematic_soft_painted/decimal_nis_1999/`의 현재 연결 자산을 사용한다. 2026-08-03 재검수에서 반실사·사진형 편차가 확인돼 공식 v2 재제작 대상이다.
-- 역사 프롤로그의 다른 장면은 `flutter_app/assets/images/historical_prologue/`의 구형 혼합 화풍 자산을 사용한다. 신규 생성 참조로 쓰지 않고 공식 v2 재제작 대상으로 관리한다.
+- 구형 역사 프롤로그와 1981 정책실·생활동 자산은 런타임에서 제거했다. 김학준 1종만 현재 대사 호환 때문에 `flutter_app/assets/images/legacy_quarantine/`에 격리하며 신규 생성 참조로 쓰지 않는다.
 
 ## 1. 대량생산형 고품질 고정 화풍
 

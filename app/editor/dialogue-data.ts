@@ -715,7 +715,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "힌트가 아니라 함정일 수도 있어. 마지막 열두 칸은 앞하고 규칙이 달라.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_matrix_exam_1999_v1.png",
-    "character": "/play/assets/assets/images/historical_prologue/character_hakjun_orientation_v2.png",
+    "character": "/play/assets/assets/images/legacy_quarantine/character_hakjun_orientation_v2.png",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -745,7 +745,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "아직 같은 차 탄 적 없어.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_matrix_exam_1999_v1.png",
-    "character": "/play/assets/assets/images/historical_prologue/character_hakjun_orientation_v2.png",
+    "character": "/play/assets/assets/images/legacy_quarantine/character_hakjun_orientation_v2.png",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -1090,7 +1090,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "봉투를 열 수 있다는 말도, 열면 안 된다는 말도 없어.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_unfair_game_1999_v1.png",
-    "character": "/play/assets/assets/images/historical_prologue/character_hakjun_orientation_v2.png",
+    "character": "/play/assets/assets/images/legacy_quarantine/character_hakjun_orientation_v2.png",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -1300,7 +1300,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "무슨 말이야?",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_unfair_game_1999_v1.png",
-    "character": "/play/assets/assets/images/historical_prologue/character_hakjun_orientation_v2.png",
+    "character": "/play/assets/assets/images/legacy_quarantine/character_hakjun_orientation_v2.png",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -1600,7 +1600,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "식판은 한 개고 숟가락도 한 개야. 위생 규칙부터 확인해야 해.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_desire_test_1999_v1.png",
-    "character": "/play/assets/assets/images/historical_prologue/character_hakjun_orientation_v2.png",
+    "character": "/play/assets/assets/images/legacy_quarantine/character_hakjun_orientation_v2.png",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -1765,7 +1765,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "나는 아무것도 고르지 않겠다. 선택 항목의 소유권과 반환 조건이 공개되지 않았어.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_desire_test_1999_v1.png",
-    "character": "/play/assets/assets/images/historical_prologue/character_hakjun_orientation_v2.png",
+    "character": "/play/assets/assets/images/legacy_quarantine/character_hakjun_orientation_v2.png",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -1795,7 +1795,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "네가 매번 안 찾으니까 둘이 합치면 평균은 맞아.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_desire_test_1999_v1.png",
-    "character": "/play/assets/assets/images/historical_prologue/character_hakjun_orientation_v2.png",
+    "character": "/play/assets/assets/images/legacy_quarantine/character_hakjun_orientation_v2.png",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -1915,7 +1915,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "큰 소리 내지 마. 주소가 공개되지 않은 데는 이유가 있을 거야.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_gangnam_exterior_winter_1999_v1.png",
-    "character": "/play/assets/assets/images/historical_prologue/character_hakjun_orientation_v2.png",
+    "character": "/play/assets/assets/images/legacy_quarantine/character_hakjun_orientation_v2.png",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -1990,7 +1990,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "네 가방은 지퍼에 네 이름표가 이미 달려 있어.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_secure_entry_1999_v1.png",
-    "character": "/play/assets/assets/images/historical_prologue/character_hakjun_orientation_v2.png",
+    "character": "/play/assets/assets/images/legacy_quarantine/character_hakjun_orientation_v2.png",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -2290,7 +2290,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "투입한 원금이 없어서 수익률을 계산할 수 없어.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_living_lounge_1999_v1.png",
-    "character": "/play/assets/assets/images/historical_prologue/character_hakjun_orientation_v2.png",
+    "character": "/play/assets/assets/images/legacy_quarantine/character_hakjun_orientation_v2.png",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -2365,7 +2365,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "김학준. 약속한 시간이나 숫자를 바꿀 때는 먼저 이유를 알려 줘. 틀린 건 고칠 수 있지만 숨긴 건 검산할 수 없으니까.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_living_lounge_1999_v1.png",
-    "character": "/play/assets/assets/images/historical_prologue/character_hakjun_orientation_v2.png",
+    "character": "/play/assets/assets/images/legacy_quarantine/character_hakjun_orientation_v2.png",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -2575,7 +2575,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "두 사람 중 한 명은 같은 성별이어야 합니까?",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_sleeping_wing_1999_v1.png",
-    "character": "/play/assets/assets/images/historical_prologue/character_hakjun_orientation_v2.png",
+    "character": "/play/assets/assets/images/legacy_quarantine/character_hakjun_orientation_v2.png",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -2635,7 +2635,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "수면동에 밥솥 없어.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_sleeping_wing_1999_v1.png",
-    "character": "/play/assets/assets/images/historical_prologue/character_hakjun_orientation_v2.png",
+    "character": "/play/assets/assets/images/legacy_quarantine/character_hakjun_orientation_v2.png",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -2860,7 +2860,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "재고가 일정 수량 아래로 내려가면 알림도 필요해. 다 먹고 나서 발견하면 기록이 있어도 늦어.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_living_lounge_1999_v1.png",
-    "character": "/play/assets/assets/images/historical_prologue/character_hakjun_orientation_v2.png",
+    "character": "/play/assets/assets/images/legacy_quarantine/character_hakjun_orientation_v2.png",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -3205,7 +3205,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "설명서에는 42분이라고 적혀 있어. 40분 전에 열면 네가 설거지 두 번.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_living_lounge_1999_v1.png",
-    "character": "/play/assets/assets/images/historical_prologue/character_hakjun_orientation_v2.png",
+    "character": "/play/assets/assets/images/legacy_quarantine/character_hakjun_orientation_v2.png",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -3355,7 +3355,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "수요는 열 명, 공급은 한 솥, 정보는 불완전. 시장보다 단순하진 않아.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_living_lounge_1999_v1.png",
-    "character": "/play/assets/assets/images/historical_prologue/character_hakjun_orientation_v2.png",
+    "character": "/play/assets/assets/images/legacy_quarantine/character_hakjun_orientation_v2.png",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -3385,7 +3385,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "설명서 기준이 분 단위니까 42분으로 본다.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_living_lounge_1999_v1.png",
-    "character": "/play/assets/assets/images/historical_prologue/character_hakjun_orientation_v2.png",
+    "character": "/play/assets/assets/images/legacy_quarantine/character_hakjun_orientation_v2.png",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -3415,7 +3415,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "그 조항은 합의한 적 없어.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_living_lounge_1999_v1.png",
-    "character": "/play/assets/assets/images/historical_prologue/character_hakjun_orientation_v2.png",
+    "character": "/play/assets/assets/images/legacy_quarantine/character_hakjun_orientation_v2.png",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -3670,7 +3670,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "그리고 내일 받는 오만 원은 용돈이 아니야. 국가원금이고, 확정이익의 20퍼센트는 환수된대.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_sleeping_wing_1999_v1.png",
-    "character": "/play/assets/assets/images/historical_prologue/character_hakjun_orientation_v2.png",
+    "character": "/play/assets/assets/images/legacy_quarantine/character_hakjun_orientation_v2.png",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -3850,7 +3850,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "네 계산도 내가 검산한다는 조건으로.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_sleeping_wing_1999_v1.png",
-    "character": "/play/assets/assets/images/historical_prologue/character_hakjun_orientation_v2.png",
+    "character": "/play/assets/assets/images/legacy_quarantine/character_hakjun_orientation_v2.png",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -4030,7 +4030,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "선택지가 있다고 생각을 대신해 주는 건 아니야. 매도 조건은 네가 확인해야 해.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_living_lounge_1999_v1.png",
-    "character": "/play/assets/assets/images/historical_prologue/character_hakjun_orientation_v2.png",
+    "character": "/play/assets/assets/images/legacy_quarantine/character_hakjun_orientation_v2.png",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -4060,7 +4060,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "그 별명은 승인 안 했어.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_living_lounge_1999_v1.png",
-    "character": "/play/assets/assets/images/historical_prologue/character_hakjun_orientation_v2.png",
+    "character": "/play/assets/assets/images/legacy_quarantine/character_hakjun_orientation_v2.png",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -4345,7 +4345,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "주문 수량과 최악 손실을 먼저 검산하기.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_trading_floor_dawn_2000_v1.png",
-    "character": "/play/assets/assets/images/historical_prologue/character_hakjun_orientation_v2.png",
+    "character": "/play/assets/assets/images/legacy_quarantine/character_hakjun_orientation_v2.png",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1

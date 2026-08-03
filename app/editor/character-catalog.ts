@@ -177,28 +177,6 @@ const noPortrait = [pose("00", "인물 없음", "")];
 export const dialogueCharacters: DialogueCharacter[] = [
   { speaker: "{{playerName}}", group: "주요 인물", poses: protagonistPoses },
   {
-    speaker: "민호",
-    group: "주요 인물",
-    poses: [
-      pose(
-        "01",
-        "걱정스러운 작별",
-        "assets/images/historical_prologue/character_minho_farewell_v3.png",
-      ),
-    ],
-  },
-  {
-    speaker: "박선희 원장",
-    group: "주요 인물",
-    poses: [
-      pose(
-        "01",
-        "다정한 당부",
-        "assets/images/historical_prologue/character_park_sunhee_farewell_v1.png",
-      ),
-    ],
-  },
-  {
     speaker: "한수아",
     group: "주요 인물",
     poses: suaPoses,
@@ -245,7 +223,7 @@ export const dialogueCharacters: DialogueCharacter[] = [
       pose(
         "01",
         "규정집 설명",
-        "assets/images/historical_prologue/character_hakjun_orientation_v2.png",
+        "assets/images/legacy_quarantine/character_hakjun_orientation_v2.png",
       ),
     ],
   },

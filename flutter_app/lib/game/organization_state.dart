@@ -447,7 +447,7 @@ class OrganizationState {
         specialty: '규정 · 위험 · 기록',
         effect: '규정집과 공시를 대조해 빠뜨린 위험 조건을 찾아냅니다.',
         asset:
-            'assets/images/historical_prologue/character_hakjun_orientation_v2.png',
+            'assets/images/legacy_quarantine/character_hakjun_orientation_v2.png',
         fatigue: 8,
         helpCount: 0,
         lastHelpDay: null,

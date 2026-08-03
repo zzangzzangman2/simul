@@ -67,6 +67,21 @@ type CharacterDragState = {
   speaker: string;
   scope: TransformScope;
 };
+type SceneHistoryEntry = {
+  scenes: DialogueScene[];
+  selectedId: string;
+};
+type SceneUpdateOptions = {
+  recordHistory?: boolean;
+  coalesceKey?: string | null;
+};
+type SceneHistoryCoalesce = {
+  key: string;
+  at: number;
+};
+
+const HISTORY_LIMIT = 60;
+const HISTORY_COALESCE_MS = 700;
 
 const CHARACTER_FRAME_PRESETS = [
   { id: "full", label: "전신", characterX: 0, characterY: 8, characterScale: 0.62 },
@@ -83,6 +98,10 @@ function clampNumber(
   const numeric =
     typeof value === "number" && Number.isFinite(value) ? value : fallback;
   return Math.min(maximum, Math.max(minimum, numeric));
+}
+
+function editorNow() {
+  return Date.now();
 }
 
 
@@ -381,9 +400,23 @@ export default function DialogueEditorPage() {
   const [sceneComposer, setSceneComposer] = useState<DialogueScene | null>(null);
   const [transformScope, setTransformScope] = useState<TransformScope>("scene");
   const [characterDragging, setCharacterDragging] = useState(false);
+  const [historyState, setHistoryState] = useState({ undo: 0, redo: 0 });
   const previewStageRef = useRef<HTMLDivElement>(null);
   const characterDragRef = useRef<CharacterDragState | null>(null);
+  const scenesRef = useRef(scenes);
+  const selectedIdRef = useRef(selectedId);
+  const undoHistoryRef = useRef<SceneHistoryEntry[]>([]);
+  const redoHistoryRef = useRef<SceneHistoryEntry[]>([]);
+  const historyCoalesceRef = useRef<SceneHistoryCoalesce | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    scenesRef.current = scenes;
+  }, [scenes]);
+
+  useEffect(() => {
+    selectedIdRef.current = selectedId;
+  }, [selectedId]);
 
   useEffect(() => {
     const restoreTimer = window.setTimeout(() => {
@@ -549,6 +582,101 @@ export default function DialogueEditorPage() {
             ? styles.publishBannerSuccess
             : styles.publishBannerIdle;
 
+  function snapshotScenes(source: DialogueScene[]) {
+    return source.map((scene) => ({ ...scene }));
+  }
+
+  function syncHistoryState() {
+    setHistoryState({
+      undo: undoHistoryRef.current.length,
+      redo: redoHistoryRef.current.length,
+    });
+  }
+
+  function rememberSceneState(source: DialogueScene[], coalesceKey: string | null) {
+    const now = editorNow();
+    const previous = historyCoalesceRef.current;
+    const shouldCoalesce = Boolean(
+      coalesceKey &&
+        previous?.key === coalesceKey &&
+        now - previous.at <= HISTORY_COALESCE_MS,
+    );
+    if (!shouldCoalesce) {
+      undoHistoryRef.current.push({
+        scenes: snapshotScenes(source),
+        selectedId: selectedIdRef.current,
+      });
+      if (undoHistoryRef.current.length > HISTORY_LIMIT) {
+        undoHistoryRef.current.shift();
+      }
+    }
+    redoHistoryRef.current = [];
+    historyCoalesceRef.current = coalesceKey ? { key: coalesceKey, at: now } : null;
+    syncHistoryState();
+  }
+
+  function replaceScenes(next: DialogueScene[], options: SceneUpdateOptions = {}) {
+    const current = scenesRef.current;
+    if (options.recordHistory !== false) {
+      rememberSceneState(current, options.coalesceKey ?? null);
+    }
+    scenesRef.current = next;
+    setScenes(next);
+  }
+
+  function updateScenes(
+    updater: (current: DialogueScene[]) => DialogueScene[],
+    options: SceneUpdateOptions = {},
+  ) {
+    replaceScenes(updater(scenesRef.current), options);
+  }
+
+  function undoLastChange() {
+    const previous = undoHistoryRef.current.pop();
+    if (!previous) {
+      setNotice("되돌릴 수정이 없어요");
+      return;
+    }
+    redoHistoryRef.current.push({
+      scenes: snapshotScenes(scenesRef.current),
+      selectedId: selectedIdRef.current,
+    });
+    historyCoalesceRef.current = null;
+    scenesRef.current = previous.scenes;
+    selectedIdRef.current = previous.selectedId;
+    setScenes(previous.scenes);
+    setSelectedId(
+      previous.scenes.some((scene) => scene.id === previous.selectedId)
+        ? previous.selectedId
+        : previous.scenes[0]?.id ?? "",
+    );
+    syncHistoryState();
+    setNotice("수정 전으로 돌아갔어요");
+  }
+
+  function redoLastChange() {
+    const next = redoHistoryRef.current.pop();
+    if (!next) {
+      setNotice("다시 실행할 수정이 없어요");
+      return;
+    }
+    undoHistoryRef.current.push({
+      scenes: snapshotScenes(scenesRef.current),
+      selectedId: selectedIdRef.current,
+    });
+    historyCoalesceRef.current = null;
+    scenesRef.current = next.scenes;
+    selectedIdRef.current = next.selectedId;
+    setScenes(next.scenes);
+    setSelectedId(
+      next.scenes.some((scene) => scene.id === next.selectedId)
+        ? next.selectedId
+        : next.scenes[0]?.id ?? "",
+    );
+    syncHistoryState();
+    setNotice("취소한 수정을 다시 적용했어요");
+  }
+
   function updateSelected(patch: Partial<DialogueScene>) {
     if (!selected) return;
     const normalizedPatch = {
@@ -558,10 +686,11 @@ export default function DialogueEditorPage() {
         : { direction: normalizeDialogueText(patch.direction) }),
       ...(patch.line === undefined ? {} : { line: normalizeDialogueText(patch.line) }),
     };
-    setScenes((current) =>
+    updateScenes((current) =>
       current.map((scene) =>
         scene.id === selected.id ? { ...scene, ...normalizedPatch } : scene,
       ),
+      { coalesceKey: `scene:${selected.id}:${Object.keys(normalizedPatch).sort().join(",")}` },
     );
   }
 
@@ -576,6 +705,7 @@ export default function DialogueEditorPage() {
       speaker: selected.speaker,
       scope: transformScope === "speaker" && selected.character ? "speaker" : "scene",
     },
+    options: SceneUpdateOptions = {},
   ) {
     const normalizedPatch: CharacterFramePatch = {};
     if (patch.characterX !== undefined) {
@@ -599,7 +729,7 @@ export default function DialogueEditorPage() {
           ) * 100,
         ) / 100;
     }
-    setScenes((current) =>
+    updateScenes((current) =>
       current.map((scene) => {
         const matches =
           target.scope === "speaker"
@@ -607,6 +737,15 @@ export default function DialogueEditorPage() {
             : scene.id === target.sceneId;
         return matches ? { ...scene, ...normalizedPatch } : scene;
       }),
+      {
+        recordHistory: options.recordHistory,
+        coalesceKey:
+          options.coalesceKey === undefined
+            ? `frame:${target.scope}:${target.sceneId}:${target.speaker}:${Object.keys(
+                normalizedPatch,
+              ).sort().join(",")}`
+            : options.coalesceKey,
+      },
     );
   }
 
@@ -617,7 +756,7 @@ export default function DialogueEditorPage() {
       characterX: preset.characterX,
       characterY: preset.characterY,
       characterScale: preset.characterScale,
-    });
+    }, undefined, { coalesceKey: null });
     setNotice(
       transformScope === "speaker"
         ? `${selected.speaker} 전체 장면에 ${preset.label} 구도를 적용했어요`
@@ -639,6 +778,7 @@ export default function DialogueEditorPage() {
       speaker: selected.speaker,
       scope: transformScope === "speaker" ? "speaker" : "scene",
     };
+    rememberSceneState(scenesRef.current, null);
     setCharacterDragging(true);
   }
 
@@ -654,6 +794,7 @@ export default function DialogueEditorPage() {
         characterY: drag.startY - ((event.clientY - drag.startClientY) / bounds.height) * 100,
       },
       drag,
+      { recordHistory: false },
     );
   }
 
@@ -772,6 +913,7 @@ export default function DialogueEditorPage() {
       localStorage.setItem(GAME_STORAGE_KEY, builtRaw);
       localStorage.setItem(FLUTTER_GAME_STORAGE_KEY, JSON.stringify(builtRaw));
       localStorage.setItem(BUILD_STORAGE_KEY, builtRaw);
+      scenesRef.current = builtValidation.scenes;
       setScenes(builtValidation.scenes);
       setAppliedScenes(builtValidation.scenes);
       setLastBuiltAt(result.builtAt);
@@ -839,14 +981,15 @@ export default function DialogueEditorPage() {
 
   function commitScene() {
     if (!sceneComposer || !sceneComposer.line.trim()) return;
-    let id = `scene-custom-${Date.now()}`;
+    const createdAt = editorNow();
+    let id = `scene-custom-${createdAt}`;
     let suffix = 1;
     while (scenes.some((scene) => scene.id === id)) {
-      id = `scene-custom-${Date.now()}-${suffix}`;
+      id = `scene-custom-${createdAt}-${suffix}`;
       suffix += 1;
     }
     const created = normalizeScene({ ...sceneComposer, id });
-    setScenes((current) => {
+    updateScenes((current) => {
       const insertionIndex = Math.max(
         0,
         current.findIndex((scene) => scene.id === selected.id) + 1,
@@ -862,9 +1005,9 @@ export default function DialogueEditorPage() {
 
   function duplicateScene() {
     if (!selected) return;
-    const id = `scene-copy-${Date.now()}`;
+    const id = `scene-copy-${editorNow()}`;
     const copy = { ...selected, id, order: selectedIndex + 2 };
-    setScenes((current) => {
+    updateScenes((current) => {
       const next = [...current];
       next.splice(selectedIndex + 1, 0, copy);
       return next.map((scene, index) => ({ ...scene, order: index + 1 }));
@@ -877,7 +1020,7 @@ export default function DialogueEditorPage() {
     if (!selected || scenes.length === 1) return;
     if (!window.confirm(`${selected.order}번 장면을 삭제할까요?`)) return;
     const nextId = scenes[selectedIndex + 1]?.id ?? scenes[selectedIndex - 1]?.id;
-    setScenes((current) =>
+    updateScenes((current) =>
       current
         .filter((scene) => scene.id !== selected.id)
         .map((scene, index) => ({ ...scene, order: index + 1 })),
@@ -889,7 +1032,7 @@ export default function DialogueEditorPage() {
   function moveScene(offset: number) {
     const target = selectedIndex + offset;
     if (target < 0 || target >= scenes.length) return;
-    setScenes((current) => {
+    updateScenes((current) => {
       const next = [...current];
       [next[selectedIndex], next[target]] = [next[target], next[selectedIndex]];
       return next.map((scene, index) => ({ ...scene, order: index + 1 }));
@@ -973,7 +1116,7 @@ export default function DialogueEditorPage() {
                 1,
         }),
       );
-      setScenes(normalized);
+      replaceScenes(normalized);
       setSelectedId(normalized[0].id);
       setNotice("편집본을 불러왔어요");
     } catch {
@@ -984,7 +1127,7 @@ export default function DialogueEditorPage() {
   function resetDraft() {
     if (!window.confirm("편집 중인 내용을 버리고 현재 게임 원본을 초안으로 불러올까요?")) return;
     const reset = cloneInitial();
-    setScenes(reset);
+    replaceScenes(reset);
     setSelectedId(reset[0].id);
     const payload: SavedDraft = {
       version: 1,
@@ -1012,6 +1155,19 @@ export default function DialogueEditorPage() {
         event.preventDefault();
         setSceneComposer(null);
       }
+      return;
+    }
+    const shortcut = event.ctrlKey || event.metaKey;
+    const key = event.key.toLowerCase();
+    if (shortcut && key === "z") {
+      event.preventDefault();
+      if (event.shiftKey) redoLastChange();
+      else undoLastChange();
+      return;
+    }
+    if (shortcut && key === "y") {
+      event.preventDefault();
+      redoLastChange();
       return;
     }
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
@@ -1049,6 +1205,26 @@ export default function DialogueEditorPage() {
               : `게임 반영 완료 · ${saveLabel}`}
         </div>
         <nav className={styles.actions} aria-label="파일 메뉴">
+          <button
+            className={styles.historyAction}
+            type="button"
+            onClick={undoLastChange}
+            disabled={!historyState.undo}
+            aria-label="실행 취소"
+            title="실행 취소 · Ctrl/⌘+Z"
+          >
+            ↶
+          </button>
+          <button
+            className={styles.historyAction}
+            type="button"
+            onClick={redoLastChange}
+            disabled={!historyState.redo}
+            aria-label="다시 실행"
+            title="다시 실행 · Ctrl/⌘+Shift+Z"
+          >
+            ↷
+          </button>
           <a
             href="/play/index.html?dialoguePreview=1"
             target="_blank"
@@ -1535,25 +1711,12 @@ export default function DialogueEditorPage() {
                     화면의 캐릭터를 직접 드래그하세요
                   </div>
                   <div
-                    className={`${styles.characterManipulator} ${
-                      selected.character.includes("character_minho_farewell_v3.png")
-                        ? styles.characterMinho
-                        : ""
-                    } ${characterDragging ? styles.characterManipulatorDragging : ""}`}
+                    className={`${styles.characterManipulator} ${characterDragging ? styles.characterManipulatorDragging : ""}`}
                     style={{
                       left: `${50 + selected.characterX}%`,
                       bottom: `${12.3 + selected.characterY}%`,
                       transform: `translateX(-50%) scale(${selected.characterScale})`,
                     }}
-                    onPointerDown={beginCharacterDrag}
-                    onPointerMove={moveCharacterDrag}
-                    onPointerUp={endCharacterDrag}
-                    onPointerCancel={endCharacterDrag}
-                    onWheel={zoomCharacter}
-                    onKeyDown={nudgeCharacter}
-                    tabIndex={0}
-                    aria-label={`${selected.speaker} 화면 위치 조정`}
-                    title="드래그 이동 · 휠 확대/축소"
                   >
                     <Image
                       className={styles.characterImage}
@@ -1565,7 +1728,20 @@ export default function DialogueEditorPage() {
                       draggable={false}
                       unoptimized
                     />
-                    <span className={styles.characterSelectionFrame} aria-hidden="true" />
+                    <div
+                      className={styles.characterDragHandle}
+                      onPointerDown={beginCharacterDrag}
+                      onPointerMove={moveCharacterDrag}
+                      onPointerUp={endCharacterDrag}
+                      onPointerCancel={endCharacterDrag}
+                      onWheel={zoomCharacter}
+                      onKeyDown={nudgeCharacter}
+                      tabIndex={0}
+                      aria-label={`${selected.speaker} 화면 위치 조정`}
+                      title="몸 위에서 드래그 이동 · 휠 확대/축소"
+                    >
+                      <span className={styles.characterSelectionFrame} aria-hidden="true" />
+                    </div>
                   </div>
                 </>
               ) : null}
@@ -1579,6 +1755,7 @@ export default function DialogueEditorPage() {
           </div>
           <div className={styles.previewTips}>
             <span>단축키</span>
+            <b>Ctrl/⌘ + Z</b> 수정 전으로
             <b>Ctrl/⌘ + S</b> 게임에 즉시 적용
             <b>Ctrl/⌘ + Enter</b> 다음 장면
           </div>

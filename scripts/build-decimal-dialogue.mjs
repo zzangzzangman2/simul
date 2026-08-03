@@ -21,7 +21,7 @@ const backgrounds = {
   matrix: image("cinematic_soft_painted/decimal/bg_decimal_matrix_exam_1999_v1.png"),
   unfair: image("cinematic_soft_painted/decimal/bg_decimal_unfair_game_1999_v1.png"),
   desire: image("cinematic_soft_painted/decimal/bg_decimal_desire_test_1999_v1.png"),
-  bus: image("historical_prologue/bg_bus_transition_seoul_outskirts_2000_portrait_v1.png"),
+  bus: image("cinematic_soft_painted/decimal/bg_decimal_gangnam_exterior_winter_1999_v1.png"),
   exterior: image(
     "cinematic_soft_painted/decimal/bg_decimal_gangnam_exterior_winter_1999_v1.png",
   ),
@@ -35,7 +35,7 @@ const backgrounds = {
 
 const sprites = {
   "{{playerName}}": image("protagonist_seed01/03_playful_grin.png"),
-  "김학준": image("historical_prologue/character_hakjun_orientation_v2.png"),
+  "김학준": image("legacy_quarantine/character_hakjun_orientation_v2.png"),
   "김서아": image("production_soft_painted/kim_seoa/01_neutral_notebook_v1.png"),
   "이지안": image("production_soft_painted/lee_jian/01_neutral_screwdriver_v2.png"),
   "최이서": image("production_soft_painted/choi_iseo/01_base_thread_v1.png"),

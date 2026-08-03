@@ -566,6 +566,13 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
   assert.match(editor, /characterScale/);
   assert.match(editor, /전신/);
   assert.match(editor, /전체 빌드/);
+  assert.match(editor, /undoLastChange/);
+  assert.match(editor, /redoLastChange/);
+  assert.match(editor, /shortcut && key === "z"/);
+  assert.match(editor, /수정 전으로 돌아갔어요/);
+  assert.match(editor, /characterDragHandle/);
+  assert.match(editorCss, /\.characterDragHandle\s*\{/);
+  assert.match(editorCss, /pointer-events: none/);
   assert.match(editorCss, /\.transformStudio\s*\{/);
   assert.match(backgroundCatalog, /bg_bank_branch_2000_portrait_cartoon_v2\.png/);
   assert.match(backgroundCatalog, /bg_decimal_trading_floor_dawn_2000_v1\.png/);
@@ -781,7 +788,7 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
   assert.match(onboarding, /_storyCharacterSceneScale = 2\.0/);
   assert.doesNotMatch(onboarding, /story-crt-scanline/);
   assert.doesNotMatch(onboarding, /orientation-dust-motes/);
-  assert.match(onboarding, /_minhoCharacterScale = 0\.72/);
+  assert.doesNotMatch(onboarding, /_minhoCharacterScale|character_minho_farewell/);
   assert.doesNotMatch(onboarding, /왼쪽으로 움직여 대화창 배경을 더 투명하게 조절/);
   assert.match(pubspec, /assets\/dialogue\//);
 });

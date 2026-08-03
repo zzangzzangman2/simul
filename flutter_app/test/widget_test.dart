@@ -810,7 +810,7 @@ void main() {
           'direction': '수아가 새 장면의 문을 열었다.',
           'line': '이 대사는 편집기에서 새로 추가했어.',
           'background':
-              '/play/assets/assets/images/historical_prologue/bg_future_development_orientation_hall_2000_portrait_v1.png',
+              '/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_secure_entry_1999_v1.png',
           'character':
               '/play/assets/assets/images/production_soft_painted/han_sua/02_warm_smile_quality_v2.png',
         };
@@ -825,7 +825,7 @@ void main() {
         'direction': '',
         'line': '기존 장면 $order',
         'background':
-            '/play/assets/assets/images/historical_prologue/bg_future_development_orientation_hall_2000_portrait_v1.png',
+            '/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_secure_entry_1999_v1.png',
         'character': '',
       };
     });
@@ -871,10 +871,7 @@ void main() {
     final scaleTransform = tester.widget<Transform>(
       find.byKey(const Key('story-character-scale')),
     );
-    expect(
-      scaleTransform.transform.getMaxScaleOnAxis(),
-      closeTo(1.5, 0.001),
-    );
+    expect(scaleTransform.transform.getMaxScaleOnAxis(), closeTo(1.5, 0.001));
     expect(
       (tester
                   .widget<Image>(

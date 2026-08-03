@@ -20,6 +20,7 @@ import 'game/cohort_investment_state.dart';
 import 'game/game_engine.dart';
 import 'game/game_persistence.dart';
 import 'game/game_state.dart';
+import 'game/life_calendar.dart';
 import 'game/home_improvement_state.dart';
 import 'game/investor_flow.dart';
 
@@ -68,6 +69,7 @@ part 'star_shop_screen.dart';
 part 'dialogue/canonical_dialogue_data.dart';
 part 'visual_novel_onboarding.dart';
 part 'campaign_scenes.dart';
+part 'life_calendar_screen.dart';
 part 'relationship_screens.dart';
 part 'cohort_investment_screens.dart';
 part 'phone_messenger_screens.dart';

@@ -1229,6 +1229,19 @@ class GameEngine {
         message: '호감도 $relationshipDateUnlockAffection부터 데이트를 신청할 수 있습니다.',
       );
     }
+    if (activity == RelationshipActivity.date &&
+        !relationshipOutingAvailableOn(state.currentDate)) {
+      return RelationshipActionResult(
+        state: state,
+        success: false,
+        girlId: girlId,
+        activity: activity,
+        affectionBefore: progress.affection,
+        affectionAfter: progress.affection,
+        message: '센터 밖 외출은 주식시장이 쉬는 토·일요일에만 가능합니다.',
+      );
+    }
+
     final scene = relationshipSceneFor(
       profile: profile,
       activity: activity,
