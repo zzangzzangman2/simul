@@ -120,12 +120,16 @@ Composition:
 - Both hands, fingers, legs, footwear, and props fully visible.
 - 1024×1536 portrait character slot with generous padding.
 - Flat removable chroma-key background for transparent extraction.
+- The delivered production PNG must use real RGBA transparency. Never bake a
+  checkerboard, white canvas, white silhouette, matte chunk, or bright fringe
+  into RGB pixels. Verify the cutout on black and cyan backgrounds.
 
 Avoid:
 photorealism, photo compositing, 3D, chibi, generic shared anime face,
 face redesign, identity drift, uniformly heavy black outlines, flat cel shading,
 plastic airbrushed skin, painterly blur, uncontrolled hair noise, unstable patterns,
 adult styling for minors, cropped limbs, extra people, text, logo, watermark.
+checkerboard background, white matte, white cutout border, opaque background.
 ```
 
 ### 비보존 인물 전면 재설계 프롬프트

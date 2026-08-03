@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter_test/flutter_test.dart';
@@ -32,9 +33,73 @@ void main() {
     'kim_hakjun': 9,
   };
 
+  const nisCharacterAssets = <String>[
+    'cha_eunjoo_selection_officer_v2.png',
+    'do_yunseok_planning_coordinator_v1.png',
+    'han_gyujin_nis_director_v1.png',
+    'jo_mingyeong_rights_auditor_v1.png',
+    'lim_seohee_economic_security_chief_v1.png',
+    'oh_gyeongtae_facilities_manager_v2.png',
+  ];
+
   test(
-    'connected Decimal character sprites use production canvas and alpha',
+    'connected Decimal character sprites use clean production alpha',
     () async {
+      Future<void> expectCleanCharacterAlpha(File file) async {
+        final codec = await ui.instantiateImageCodec(await file.readAsBytes());
+        final frame = await codec.getNextFrame();
+        final image = frame.image;
+        expect(image.width, 1024, reason: file.path);
+        expect(image.height, 1536, reason: file.path);
+
+        final byteData = await image.toByteData(
+          format: ui.ImageByteFormat.rawRgba,
+        );
+        expect(byteData, isNotNull, reason: file.path);
+        final rgba = byteData!.buffer.asUint8List();
+        int alphaAt(int x, int y) => rgba[(y * image.width + x) * 4 + 3];
+        expect(alphaAt(0, 0), 0, reason: file.path);
+        expect(alphaAt(image.width - 1, 0), 0, reason: file.path);
+        expect(alphaAt(0, image.height - 1), 0, reason: file.path);
+        expect(
+          alphaAt(image.width - 1, image.height - 1),
+          0,
+          reason: file.path,
+        );
+
+        var foregroundPixels = 0;
+        var brightNeutralPixels = 0;
+        for (var offset = 0; offset < rgba.length; offset += 4) {
+          if (rgba[offset + 3] < 128) {
+            continue;
+          }
+          foregroundPixels += 1;
+          final red = rgba[offset];
+          final green = rgba[offset + 1];
+          final blue = rgba[offset + 2];
+          final maxChannel = math.max(red, math.max(green, blue));
+          final minChannel = math.min(red, math.min(green, blue));
+          if (maxChannel - minChannel <= 12 &&
+              (red + green + blue) / 3 >= 230) {
+            brightNeutralPixels += 1;
+          }
+        }
+        final pixelCount = image.width * image.height;
+        expect(
+          foregroundPixels / pixelCount,
+          lessThan(0.30),
+          reason: '${file.path} contains an opaque background field',
+        );
+        expect(
+          brightNeutralPixels / pixelCount,
+          lessThan(0.06),
+          reason: '${file.path} contains a white/checker matte field',
+        );
+
+        image.dispose();
+        codec.dispose();
+      }
+
       for (final entry in expectedAssetCounts.entries) {
         final directory = Directory(
           'assets/images/production_soft_painted/${entry.key}',
@@ -50,33 +115,31 @@ void main() {
         expect(files.length, entry.value, reason: entry.key);
 
         for (final file in files) {
-          final codec = await ui.instantiateImageCodec(
-            await file.readAsBytes(),
-          );
-          final frame = await codec.getNextFrame();
-          final image = frame.image;
-          expect(image.width, 1024, reason: file.path);
-          expect(image.height, 1536, reason: file.path);
-
-          final byteData = await image.toByteData(
-            format: ui.ImageByteFormat.rawRgba,
-          );
-          expect(byteData, isNotNull, reason: file.path);
-          final rgba = byteData!.buffer.asUint8List();
-          int alphaAt(int x, int y) => rgba[(y * image.width + x) * 4 + 3];
-          expect(alphaAt(0, 0), 0, reason: file.path);
-          expect(alphaAt(image.width - 1, 0), 0, reason: file.path);
-          expect(alphaAt(0, image.height - 1), 0, reason: file.path);
-          expect(
-            alphaAt(image.width - 1, image.height - 1),
-            0,
-            reason: file.path,
-          );
-
-          image.dispose();
-          codec.dispose();
+          await expectCleanCharacterAlpha(file);
         }
       }
+
+      final nisDirectory = Directory(
+        'assets/images/cinematic_soft_painted/decimal_nis_1999/characters',
+      );
+      final nisFiles = nisDirectory
+          .listSync()
+          .whereType<File>()
+          .where((file) => file.path.endsWith('.png'))
+          .toList();
+      expect(
+        nisFiles.map((file) => file.uri.pathSegments.last).toSet(),
+        nisCharacterAssets.toSet(),
+      );
+      for (final file in nisFiles) {
+        await expectCleanCharacterAlpha(file);
+      }
+
+      await expectCleanCharacterAlpha(
+        File(
+          '../art_references/simul_polished_soft_render_vn_style_anchor_v3.png',
+        ),
+      );
     },
   );
 
