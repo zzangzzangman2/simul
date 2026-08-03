@@ -850,11 +850,16 @@ class _AcademyAssignmentBoard extends StatelessWidget {
                               borderRadius: BorderRadius.circular(10),
                             ),
                             clipBehavior: Clip.antiAlias,
-                            child: Image.asset(
-                              helper.asset,
-                              fit: BoxFit.cover,
-                              alignment: Alignment.topCenter,
-                            ),
+                            child: helper.asset.isEmpty
+                                ? const Icon(
+                                    Icons.person_outline_rounded,
+                                    color: Color(0xFF878C95),
+                                  )
+                                : Image.asset(
+                                    helper.asset,
+                                    fit: BoxFit.cover,
+                                    alignment: Alignment.topCenter,
+                                  ),
                           ),
                         ),
                         const SizedBox(height: 4),

@@ -32,10 +32,7 @@ const _stockTeacherPoseEmphasize =
 const _stockTutorialSuaAsset =
     'assets/images/production_soft_painted/han_sua/03_bright_laugh_v3.png';
 const _stockTutorialHakjunAsset =
-    'assets/images/legacy_quarantine/character_hakjun_orientation_v2.png';
-const _stockTutorialPlayerAsset =
-    'assets/images/protagonist_seed01/12_thinking.png';
-
+    'assets/images/production_soft_painted/kim_hakjun/01_neutral_crosscheck_uniform_v4.png';
 // 여자 동기 8명 튜토리얼 표정 슬롯. 승인된 9종 세트에서 실습 단계에 맞춰 고른다.
 const _stockTutorialSeoaRecordAsset =
     'assets/images/production_soft_painted/kim_seoa/08_determined_record_v1.png';
@@ -7512,9 +7509,8 @@ class _StockTutorialGuideOverlayState
     final activeCharacterAsset = isNarration
         ? ''
         : widget.characterAssets?[_messageIndex] ??
-              (isTeacherPage
-                  ? widget.teacherPoseAsset
-                  : _stockTutorialPlayerAsset);
+              (isTeacherPage ? widget.teacherPoseAsset : '');
+    final hasCharacterPortrait = activeCharacterAsset.isNotEmpty;
     return LayoutBuilder(
       builder: (context, constraints) {
         final guideWidth = constraints.maxWidth;
@@ -7570,7 +7566,7 @@ class _StockTutorialGuideOverlayState
                     ),
                   ),
                 ),
-              if (!isNarration)
+              if (hasCharacterPortrait)
                 Positioned(
                   right: -6,
                   bottom: 54,
@@ -7587,7 +7583,7 @@ class _StockTutorialGuideOverlayState
                 ),
               Positioned(
                 left: 12,
-                right: isNarration ? 12 : speechRight,
+                right: hasCharacterPortrait ? speechRight : 12,
                 top: speechAtTop ? 44 : null,
                 bottom: speechAtTop ? null : 185,
                 child: _StockTutorialSpeechBubble(

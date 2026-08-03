@@ -161,7 +161,7 @@ async function persistDialogue(
     {
       version: 2,
       contentVersion: 3,
-      appearanceVersion: 17,
+      appearanceVersion: 19,
       updatedAt: builtAt,
       scenes,
     },
@@ -307,7 +307,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       contentVersion: 3,
-      appearanceVersion: 17,
+      appearanceVersion: 19,
       ...result,
     });
   } catch (error) {

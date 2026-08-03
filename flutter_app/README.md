@@ -31,8 +31,9 @@ flutter build web --release --base-href /play/
 
 - `lib/main.dart`: 앱 상태·저장·신문·화면 연결
 - `lib/visual_novel_onboarding.dart`: 편집본 장면·배경·화자·포즈와 동적 종료점을 적용하는 리부트 프롤로그
-- `lib/game/game_state.dart`: 저장 스키마 v24와 관계·데시멀톡·일일 투자·대여채권·사업 자산·미지급금 합산
+- `lib/game/game_state.dart`: 저장 스키마 v26과 관계·데시멀톡·일일 투자·대여채권·친구 차입부채·사업 자산·미지급금 합산
 - `lib/game/phone_messenger_state.dart`: 데시멀 동기 9명 연락처·MBTI 답장·읽음·하루 제한 저장
+- `lib/game/phone_ai_service.dart`: 서버 Gemini 답장 호출과 안전한 로컬 조합기 폴백
 - `lib/phone_messenger_screens.dart`: 데시멀톡 채팅 목록·읽지 않음·자유 입력·좌우 말풍선 UI
 - `lib/game/cohort_investment_state.dart`: 데시멀 동기 9명 NPC 계좌·10인 일일 결과·대여·자동 상환 저장
 - `lib/cohort_investment_screens.dart`: 15:00 `오늘의 투자 결과` 10행 표와 하루 1회 대여 UI

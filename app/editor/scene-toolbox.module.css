@@ -1,5 +1,5 @@
-.toolbox { margin: 13px 0 16px; border: 1px solid #cadde7; border-radius: 14px; background: rgba(246,251,253,.94); overflow: hidden; }
-.toggle { width: 100%; min-height: 46px; display: grid; grid-template-columns: 28px auto 1fr auto; align-items: center; gap: 8px; padding: 8px 12px; border: 0; color: #43677e; background: linear-gradient(135deg, #f7fcfe, #edf6fa); text-align: left; cursor: pointer; }
+.toolbox { margin: 13px 0 16px; border: 1px solid #cadde7; border-radius: 13px; background: #f7fbfd; overflow: hidden; contain: layout paint style; }
+.toggle { width: 100%; min-height: 46px; display: grid; grid-template-columns: 28px auto 1fr auto; align-items: center; gap: 8px; padding: 8px 12px; border: 0; color: #43677e; background: #f3f8fb; text-align: left; cursor: pointer; }
 .toggle > span { display: grid; width: 28px; height: 28px; place-items: center; border-radius: 8px; color: white; background: #2d8fbb; font-size: 13px; }
 .toggle b { font-size: 10px; }.toggle small { color: #8b9ca7; font-size: 8px; }.toggle i { font-style: normal; font-size: 15px; }
 .body { padding: 9px; border-top: 1px solid #d5e4ec; }

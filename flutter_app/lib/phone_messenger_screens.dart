@@ -509,6 +509,30 @@ class _PhoneChatScreenState extends State<PhoneChatScreen> {
                         ),
                       ),
                     if (!limitReached) const SizedBox(height: 6),
+                    if (!limitReached)
+                      const Padding(
+                        key: Key('phone-ai-privacy-notice'),
+                        padding: EdgeInsets.only(bottom: 5),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.auto_awesome_rounded,
+                              size: 10,
+                              color: Color(0xFF777777),
+                            ),
+                            SizedBox(width: 4),
+                            Text(
+                              'AI 답장 실험 중 · 개인정보는 입력하지 마세요',
+                              style: TextStyle(
+                                color: Color(0xFF777777),
+                                fontSize: 8,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     if (limitReached)
                       Container(
                         key: const Key('phone-chat-daily-limit'),

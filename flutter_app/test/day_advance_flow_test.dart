@@ -129,6 +129,16 @@ void main() {
                   updateHarness(() {});
                   return result;
                 },
+                onBorrowFromCohortInvestor: (lenderId, amount) async {
+                  final result = engine.borrowFromCohortInvestor(
+                    currentState,
+                    lenderId: lenderId,
+                    amount: amount,
+                  );
+                  currentState = result.state;
+                  updateHarness(() {});
+                  return result;
+                },
                 onAcknowledgeCohortInvestmentReport: () async {
                   final result = engine.acknowledgeCohortInvestmentReport(
                     currentState,
@@ -375,6 +385,15 @@ void main() {
               onSaveMarketNotebook: (_, _) async => currentState,
               onResolveDecision: (_, _) async {},
               onRequestAcademyHelp: (_) async => currentState,
+              onCompleteWeekendActivity: (request) async {
+                final result = engine.completeWeekendActivity(
+                  currentState,
+                  request,
+                );
+                currentState = result.state;
+                updateHarness(() {});
+                return result;
+              },
               onSettleCohortInvestmentDay: () async {
                 settlementCalls += 1;
                 return CohortInvestmentActionResult(
@@ -384,6 +403,12 @@ void main() {
                 );
               },
               onLendToCohortInvestor: (_, _) async =>
+                  CohortInvestmentActionResult(
+                    state: currentState,
+                    success: false,
+                    message: '주말에는 호출되면 안 됨',
+                  ),
+              onBorrowFromCohortInvestor: (_, _) async =>
                   CohortInvestmentActionResult(
                     state: currentState,
                     success: false,
@@ -413,6 +438,17 @@ void main() {
 
     expect(settlementCalls, 0);
     expect(find.byType(CohortDailyResultScreen), findsNothing);
+    expect(find.byType(WeekendScheduleScreen), findsOneWidget);
+    expect(find.byType(RelationshipEveningScreen), findsNothing);
+
+    await tester.ensureVisible(find.byKey(const Key('weekend-action-rest')));
+    await tester.tap(find.byKey(const Key('weekend-action-rest')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('쉬기'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('weekend-schedule-finish-button')));
+    await tester.pumpAndSettle();
+
     expect(find.byType(RelationshipEveningScreen), findsOneWidget);
     expect(find.textContaining('주식시장이 쉬는 주말'), findsOneWidget);
     expect(tester.takeException(), isNull);

@@ -29,10 +29,11 @@ void main() {
     'han_sua': 9,
     'oh_jiwoo': 9,
     'yoon_chaea': 9,
+    'kim_hakjun': 9,
   };
 
   test(
-    'newly connected cohort sprites use production canvas and alpha',
+    'connected Decimal character sprites use production canvas and alpha',
     () async {
       for (final entry in expectedAssetCounts.entries) {
         final directory = Directory(
@@ -158,7 +159,7 @@ void main() {
               ).readAsStringSync(),
             )
             as Map<String, dynamic>;
-    expect(decoded['appearanceVersion'], 17);
+    expect(decoded['appearanceVersion'], 19);
     expect(decoded['contentVersion'], 3);
     final scenes = (decoded['scenes'] as List<dynamic>)
         .cast<Map<String, dynamic>>();
@@ -205,6 +206,32 @@ void main() {
         reason: scene['id'] as String,
       );
     }
+    final playerScenes = scenes.where(
+      (scene) => scene['speaker'] == '{{playerName}}',
+    );
+    expect(playerScenes, isNotEmpty);
+    for (final scene in playerScenes) {
+      expect(scene['character'], isEmpty, reason: scene['id'] as String);
+    }
+    final hakjunScenes = scenes.where((scene) => scene['speaker'] == '김학준');
+    expect(hakjunScenes, isNotEmpty);
+    final hakjunAssets = <String>{};
+    for (final scene in hakjunScenes) {
+      final asset = scene['character'] as String;
+      expect(asset, contains('/production_soft_painted/kim_hakjun/'));
+      hakjunAssets.add(asset.split('/').last);
+    }
+    expect(hakjunAssets, {
+      '01_neutral_crosscheck_uniform_v4.png',
+      '02_explaining_rules_uniform_v4.png',
+      '03_skeptical_condition_check_uniform_v4.png',
+      '04_surprised_hidden_clause_uniform_v4.png',
+      '05_worried_unfair_loss_uniform_v4.png',
+      '06_firm_objection_uniform_v4.png',
+      '07_determined_verification_uniform_v4.png',
+      '08_calculating_notes_uniform_v4.png',
+      '09_restrained_team_smile_uniform_v4.png',
+    });
     expect(
       scenes.where(
         (scene) => (scene['character'] as String).contains(
@@ -302,10 +329,7 @@ void main() {
           .cast<Map<String, dynamic>>();
       final decimalBackgrounds = scenes
           .map((scene) => scene['background'] as String)
-          .where(
-            (asset) =>
-                asset.contains('/cinematic_soft_painted/decimal'),
-          )
+          .where((asset) => asset.contains('/cinematic_soft_painted/decimal'))
           .toSet();
       expect(decimalBackgrounds.length, greaterThanOrEqualTo(10));
       for (final asset in decimalBackgrounds) {

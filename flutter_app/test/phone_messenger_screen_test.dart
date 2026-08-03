@@ -61,7 +61,7 @@ void main() {
     await tester.tap(find.byKey(const Key('phone-contact-han_sua')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('phone-chat-han_sua')), findsOneWidget);
-    expect(find.textContaining('뇌정지'), findsOneWidget);
+    expect(find.textContaining('한꺼번에 굳은'), findsOneWidget);
 
     await tester.enterText(
       find.byKey(const Key('phone-chat-input')),

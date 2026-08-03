@@ -1,8 +1,14 @@
 const cohortInvestmentMinBalance = 0;
-const cohortInvestmentInitialBalance = 10000;
+const cohortInvestmentInitialBalance = 50000;
 const cohortInvestmentMaxMoney = 9007199254740991;
 const cohortLoanTermDays = 7;
+const cohortLoanInterestRateBps = 1200;
+const cohortPlayerRecoveryCashThreshold = 10000;
+const cohortPlayerBorrowingLimit = 30000;
+const cohortNpcEmergencyReserve = 10000;
 const cohortInvestmentHistoryLimit = 64;
+
+enum CohortLoanDirection { playerLends, playerBorrows }
 
 class CohortInvestorProfile {
   const CohortInvestorProfile({
@@ -138,6 +144,7 @@ class CohortDailyInvestmentResult {
     required this.traded,
     required this.isPlayer,
     this.cumulativeProfitLoss = 0,
+    this.stateRecovery = 0,
   });
 
   final String investorId;
@@ -150,6 +157,13 @@ class CohortDailyInvestmentResult {
   final bool traded;
   final bool isPlayer;
   final int cumulativeProfitLoss;
+  final int stateRecovery;
+
+  /// 국가원금 50,000원 대비 누적 수익률이다. 열 명이 같은 분모를 쓰고
+  /// `cumulativeProfitLoss`가 증권계좌 입출금을 이미 걸러낸 값이므로, 회사 통장에서
+  /// 돈을 옮겨 순위를 사는 일이 생기지 않는다.
+  int get returnRateBps =>
+      (cumulativeProfitLoss * 10000 / cohortInvestmentInitialBalance).round();
 
   CohortDailyInvestmentResult copyWith({int? totalAmount}) =>
       CohortDailyInvestmentResult(
@@ -166,6 +180,7 @@ class CohortDailyInvestmentResult {
         traded: traded,
         isPlayer: isPlayer,
         cumulativeProfitLoss: cumulativeProfitLoss,
+        stateRecovery: stateRecovery,
       );
 
   Map<String, dynamic> toJson() => {
@@ -179,6 +194,7 @@ class CohortDailyInvestmentResult {
     'traded': traded,
     'isPlayer': isPlayer,
     'cumulativeProfitLoss': cumulativeProfitLoss,
+    'stateRecovery': stateRecovery,
   };
 
   factory CohortDailyInvestmentResult.fromJson(Map<String, dynamic> json) =>
@@ -209,6 +225,10 @@ class CohortDailyInvestmentResult {
                                   cohortInvestmentInitialBalance) -
                               cohortInvestmentInitialBalance))
                 .clamp(-cohortInvestmentMaxMoney, cohortInvestmentMaxMoney),
+        stateRecovery: ((json['stateRecovery'] as num?)?.toInt() ?? 0).clamp(
+          0,
+          cohortInvestmentMaxMoney,
+        ),
       );
 }
 
@@ -217,17 +237,29 @@ class CohortDailyInvestmentReport {
     required this.day,
     required this.rows,
     this.repaymentTotal = 0,
+    this.borrowingRepaymentTotal = 0,
+    this.loanInterestIncome = 0,
+    this.loanInterestExpense = 0,
   });
 
   final int day;
   final List<CohortDailyInvestmentResult> rows;
   final int repaymentTotal;
+  final int borrowingRepaymentTotal;
+  final int loanInterestIncome;
+  final int loanInterestExpense;
 
+  /// 순위 기준은 국가원금 대비 누적 수익률이다. 총금액으로 세우면 증권계좌 입금액이
+  /// 큰 사람이 실력과 무관하게 위로 올라간다.
   List<CohortDailyInvestmentResult> get rankedRows {
     final sorted = [...rows]
       ..sort((left, right) {
-        final totalOrder = right.totalAmount.compareTo(left.totalAmount);
-        if (totalOrder != 0) return totalOrder;
+        final rateOrder = right.returnRateBps.compareTo(left.returnRateBps);
+        if (rateOrder != 0) return rateOrder;
+        final profitOrder = right.cumulativeProfitLoss.compareTo(
+          left.cumulativeProfitLoss,
+        );
+        if (profitOrder != 0) return profitOrder;
         return left.investorId.compareTo(right.investorId);
       });
     return List<CohortDailyInvestmentResult>.unmodifiable(sorted);
@@ -243,16 +275,26 @@ class CohortDailyInvestmentReport {
   CohortDailyInvestmentReport copyWith({
     List<CohortDailyInvestmentResult>? rows,
     int? repaymentTotal,
+    int? borrowingRepaymentTotal,
+    int? loanInterestIncome,
+    int? loanInterestExpense,
   }) => CohortDailyInvestmentReport(
     day: day,
     rows: rows ?? this.rows,
     repaymentTotal: repaymentTotal ?? this.repaymentTotal,
+    borrowingRepaymentTotal:
+        borrowingRepaymentTotal ?? this.borrowingRepaymentTotal,
+    loanInterestIncome: loanInterestIncome ?? this.loanInterestIncome,
+    loanInterestExpense: loanInterestExpense ?? this.loanInterestExpense,
   );
 
   Map<String, dynamic> toJson() => {
     'day': day,
     'rows': rows.map((row) => row.toJson()).toList(),
     'repaymentTotal': repaymentTotal,
+    'borrowingRepaymentTotal': borrowingRepaymentTotal,
+    'loanInterestIncome': loanInterestIncome,
+    'loanInterestExpense': loanInterestExpense,
   };
 
   factory CohortDailyInvestmentReport.fromJson(
@@ -271,6 +313,15 @@ class CohortDailyInvestmentReport {
       0,
       cohortInvestmentMaxMoney,
     ),
+    borrowingRepaymentTotal:
+        ((json['borrowingRepaymentTotal'] as num?)?.toInt() ?? 0).clamp(
+          0,
+          cohortInvestmentMaxMoney,
+        ),
+    loanInterestIncome: ((json['loanInterestIncome'] as num?)?.toInt() ?? 0)
+        .clamp(0, cohortInvestmentMaxMoney),
+    loanInterestExpense: ((json['loanInterestExpense'] as num?)?.toInt() ?? 0)
+        .clamp(0, cohortInvestmentMaxMoney),
   );
 }
 
@@ -282,6 +333,8 @@ class CohortLoan {
     required this.issuedDay,
     required this.dueDay,
     required this.principal,
+    this.direction = CohortLoanDirection.playerLends,
+    this.interestRateBps = cohortLoanInterestRateBps,
     this.repaidAmount = 0,
   });
 
@@ -291,10 +344,23 @@ class CohortLoan {
   final int issuedDay;
   final int dueDay;
   final int principal;
+  final CohortLoanDirection direction;
+  final int interestRateBps;
   final int repaidAmount;
 
+  int get interest => (principal * interestRateBps / 10000).ceil().clamp(
+    0,
+    cohortInvestmentMaxMoney,
+  );
+  int get totalDue => (principal + interest).clamp(0, cohortInvestmentMaxMoney);
   int get outstanding =>
-      (principal - repaidAmount).clamp(0, cohortInvestmentMaxMoney);
+      (totalDue - repaidAmount).clamp(0, cohortInvestmentMaxMoney);
+  int get outstandingInterest => (interest - repaidAmount).clamp(0, interest);
+  int get outstandingPrincipal =>
+      (principal - (repaidAmount - interest).clamp(0, principal)).clamp(
+        0,
+        principal,
+      );
   bool get isRepaid => outstanding == 0;
 
   CohortLoan copyWith({int? repaidAmount}) => CohortLoan(
@@ -304,7 +370,9 @@ class CohortLoan {
     issuedDay: issuedDay,
     dueDay: dueDay,
     principal: principal,
-    repaidAmount: (repaidAmount ?? this.repaidAmount).clamp(0, principal),
+    direction: direction,
+    interestRateBps: interestRateBps,
+    repaidAmount: (repaidAmount ?? this.repaidAmount).clamp(0, totalDue),
   );
 
   Map<String, dynamic> toJson() => {
@@ -314,6 +382,8 @@ class CohortLoan {
     'issuedDay': issuedDay,
     'dueDay': dueDay,
     'principal': principal,
+    'direction': direction.name,
+    'interestRateBps': interestRateBps,
     'repaidAmount': repaidAmount,
   };
 
@@ -332,9 +402,17 @@ class CohortLoan {
       ),
       dueDay: ((json['dueDay'] as num?)?.toInt() ?? 1).clamp(1, 0x7fffffff),
       principal: principal,
+      direction: CohortLoanDirection.values.firstWhere(
+        (value) => value.name == json['direction'],
+        orElse: () => CohortLoanDirection.playerLends,
+      ),
+      interestRateBps: ((json['interestRateBps'] as num?)?.toInt() ?? 0).clamp(
+        0,
+        10000,
+      ),
       repaidAmount: ((json['repaidAmount'] as num?)?.toInt() ?? 0).clamp(
         0,
-        principal,
+        cohortInvestmentMaxMoney,
       ),
     );
   }
@@ -396,7 +474,21 @@ class CohortInvestmentState {
 
   int get outstandingLoanReceivables => loans.fold<int>(
     0,
-    (sum, loan) => (sum + loan.outstanding).clamp(0, cohortInvestmentMaxMoney),
+    (sum, loan) => loan.direction == CohortLoanDirection.playerLends
+        ? (sum + loan.outstandingPrincipal).clamp(0, cohortInvestmentMaxMoney)
+        : sum,
+  );
+
+  int get outstandingLoanPayables => loans.fold<int>(
+    0,
+    (sum, loan) => loan.direction == CohortLoanDirection.playerBorrows
+        ? (sum + loan.outstanding).clamp(0, cohortInvestmentMaxMoney)
+        : sum,
+  );
+
+  bool get hasOutstandingPlayerBorrowing => loans.any(
+    (loan) =>
+        loan.direction == CohortLoanDirection.playerBorrows && !loan.isRepaid,
   );
 
   CohortInvestmentState copyWith({

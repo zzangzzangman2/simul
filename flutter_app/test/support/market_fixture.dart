@@ -4,17 +4,19 @@ import 'package:millennium_capital/game/market_clock.dart';
 FictionalMarketUniverse testMarketUniverse({
   DateTime? tradingDate,
   bool includeKnownPartner = false,
+  double? closeOverride,
 }) {
+  final close = closeOverride ?? 6110;
   final prices = tradingDate == null
-      ? const <String, double>{
+      ? <String, double>{
           '1999-12-30': 5920,
           '2000-01-03': 5920,
           '2000-01-04': 6040,
-          '2000-01-05': 6110,
+          '2000-01-05': close,
         }
       : <String, double>{
           marketDateKey(_previousTradingDay(tradingDate)): 6040,
-          marketDateKey(tradingDate): 6110,
+          marketDateKey(tradingDate): close,
         };
   return FictionalMarketUniverse(
     schemaVersion: 1,

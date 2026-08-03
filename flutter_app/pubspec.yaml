@@ -11,6 +11,7 @@ dependencies:
   cupertino_icons: ^1.0.9
   flutter:
     sdk: flutter
+  http: ^1.6.0
   shared_preferences: ^2.5.5
 
 dev_dependencies:
@@ -24,8 +25,6 @@ flutter:
     - assets/audio/
     - assets/dialogue/
     - assets/images/
-    - assets/images/legacy_quarantine/
-    - assets/images/protagonist_seed01/
     - assets/images/production_soft_painted/kim_seoa/
     - assets/images/production_soft_painted/lee_jian/
     - assets/images/production_soft_painted/choi_iseo/
@@ -34,7 +33,9 @@ flutter:
     - assets/images/production_soft_painted/han_sua/
     - assets/images/production_soft_painted/oh_jiwoo/
     - assets/images/production_soft_painted/yoon_chaea/
+    - assets/images/production_soft_painted/kim_hakjun/
     - assets/images/cinematic_soft_painted/decimal/
+    - assets/images/cinematic_soft_painted/decimal_weekend/
     - assets/images/cinematic_soft_painted/decimal_nis_1999/backgrounds/
     - assets/images/cinematic_soft_painted/decimal_nis_1999/characters/
     - assets/images/minigames/

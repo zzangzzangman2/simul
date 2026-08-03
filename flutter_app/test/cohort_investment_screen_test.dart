@@ -45,6 +45,15 @@ void main() {
             state = result.state;
             return result;
           },
+          onBorrow: (lenderId, amount) async {
+            final result = engine.borrowFromCohortInvestor(
+              state,
+              lenderId: lenderId,
+              amount: amount,
+            );
+            state = result.state;
+            return result;
+          },
           onAcknowledge: () async {
             final result = engine.acknowledgeCohortInvestmentReport(state);
             state = result.state;
@@ -99,6 +108,15 @@ void main() {
             state = result.state;
             return result;
           },
+          onBorrow: (lenderId, amount) async {
+            final result = engine.borrowFromCohortInvestor(
+              state,
+              lenderId: lenderId,
+              amount: amount,
+            );
+            state = result.state;
+            return result;
+          },
           onAcknowledge: () async {
             final result = engine.acknowledgeCohortInvestmentReport(state);
             state = result.state;
@@ -144,5 +162,169 @@ void main() {
     await tester.tap(finish);
     await tester.pumpAndSettle();
     expect(state.cohortInvestments.acknowledgedForDay(state.day), isTrue);
+  });
+
+  testWidgets('bankrupt player can borrow from a peer at the displayed rate', (
+    tester,
+  ) async {
+    await setPhoneSurface(tester);
+    var state = engine
+        .createNewGame(
+          '제6기 긴급 차입 UI',
+          worldSeed: 'cohort-ui-borrow',
+          initialCash: 5000,
+        )
+        .copyWith(day: 2, marketMinute: krxCloseMinute);
+    state = state.copyWith(
+      story: state.story.copyWith(
+        storyFlags: {
+          ...state.story.storyFlags,
+          'marketTutorialSeen': true,
+          'liveTradingStarted': true,
+        },
+      ),
+    );
+    state = engine
+        .settleCohortInvestmentDay(
+          state,
+          universe: testMarketUniverse(tradingDate: state.currentDate),
+        )
+        .state;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CohortDailyResultScreen(
+          state: state,
+          onLend: (borrowerId, amount) async => engine.lendToCohortInvestor(
+            state,
+            borrowerId: borrowerId,
+            amount: amount,
+          ),
+          onBorrow: (lenderId, amount) async {
+            final result = engine.borrowFromCohortInvestor(
+              state,
+              lenderId: lenderId,
+              amount: amount,
+            );
+            state = result.state;
+            return result;
+          },
+          onAcknowledge: () async =>
+              engine.acknowledgeCohortInvestmentReport(state),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final lenderButton = find.byKey(
+      const Key('cohort-borrow-lender-kim_hakjun'),
+    );
+    await tester.scrollUntilVisible(
+      lenderButton,
+      250,
+      scrollable: find.descendant(
+        of: find.byKey(const Key('cohort-daily-result-list')),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    await tester.drag(
+      find.byKey(const Key('cohort-daily-result-list')),
+      const Offset(0, -140),
+    );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(lenderButton);
+    await tester.pumpAndSettle();
+    await tester.tap(lenderButton);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('단리 12%'), findsWidgets);
+    await tester.tap(find.byKey(const Key('cohort-borrow-amount-5000')));
+    await tester.pumpAndSettle();
+
+    expect(
+      state.cohortInvestments.loans.single.direction,
+      CohortLoanDirection.playerBorrows,
+    );
+    expect(state.cohortInvestments.loans.single.totalDue, 5600);
+    expect(find.textContaining('만기 상환액'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('ranking table publishes the return rate of all ten', (
+    tester,
+  ) async {
+    await setPhoneSurface(tester);
+    var state = engine
+        .createNewGame(
+          '수익률 순위 UI',
+          worldSeed: 'cohort-ui-rate',
+          initialCash: 50000,
+        )
+        // 2000-01-04 화요일이라야 열 명이 실제로 거래한다.
+        .copyWith(day: 4, marketMinute: krxCloseMinute);
+    state = engine
+        .settleCohortInvestmentDay(
+          state,
+          universe: testMarketUniverse(
+            tradingDate: state.currentDate,
+            closeOverride: 6600,
+          ),
+        )
+        .state;
+    final report = state.cohortInvestments.reportForDay(state.day)!;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CohortDailyResultScreen(
+          state: state,
+          onLend: (borrowerId, amount) async => engine.lendToCohortInvestor(
+            state,
+            borrowerId: borrowerId,
+            amount: amount,
+          ),
+          onBorrow: (lenderId, amount) async => engine.borrowFromCohortInvestor(
+            state,
+            lenderId: lenderId,
+            amount: amount,
+          ),
+          onAcknowledge: () async =>
+              engine.acknowledgeCohortInvestmentReport(state),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('총 수익률'), findsOneWidget);
+    expect(find.text('수익률 1등'), findsOneWidget);
+    for (final row in report.rows) {
+      expect(
+        find.byKey(Key('cohort-result-rate-${row.investorId}')),
+        findsOneWidget,
+        reason: '${row.name} 수익률 칸이 없습니다',
+      );
+    }
+
+    // 화면에 그려진 순서가 수익률 내림차순이어야 한다.
+    final rendered = tester
+        .widgetList<Text>(
+          find.byWidgetPredicate(
+            (widget) =>
+                widget is Text &&
+                widget.key is ValueKey<String> &&
+                (widget.key as ValueKey<String>).value.startsWith(
+                  'cohort-result-rate-',
+                ),
+          ),
+        )
+        .map((text) => text.data!)
+        .toList(growable: false);
+    expect(rendered, hasLength(10));
+    final values = rendered
+        .map((label) => double.parse(label.replaceAll(RegExp(r'[+%]'), '')))
+        .toList(growable: false);
+    expect(
+      values,
+      orderedEquals(<double>[...values]..sort((a, b) => b.compareTo(a))),
+    );
+    expect(tester.takeException(), isNull);
   });
 }

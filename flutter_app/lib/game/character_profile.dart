@@ -206,7 +206,7 @@ const cohortCharacterProfiles = <CohortCharacterProfile>[
     keywords: <String>['원칙', '검산', '신중함'],
     accentValue: 0xFF5D7FA3,
     portraitAsset:
-        'assets/images/legacy_quarantine/character_hakjun_orientation_v2.png',
+        'assets/images/production_soft_painted/kim_hakjun/01_neutral_crosscheck_uniform_v4.png',
   ),
   CohortCharacterProfile(
     id: 'han_seoyoon',

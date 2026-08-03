@@ -22,18 +22,18 @@
 
 | 인물 | 정체성 앵커 | 현행 런타임 세트 | v3 재제작 판정 |
 | --- | --- | --- | --- |
-| 김서아 | `kim_seoa_identity_anchor_v1.png` | `production_soft_painted/kim_seoa/` 9종 | 대기 — 얼굴·헤어·체형·의상·포즈를 유지하고 화풍만 v3로 재생성 |
-| 이지안 | `lee_jian_face_identity_anchor_v2.png`, `lee_jian_identity_anchor_v2.png` | `production_soft_painted/lee_jian/` v2 9종 | 대기 — 보이는 승인 얼굴 앵커를 우선하고 문서·런타임 외형 충돌은 재생성 전에 별도 확인 |
-| 최이서 | `choi_iseo_identity_anchor_v1.png` | `production_soft_painted/choi_iseo/` 9종 | 대기 — 얼굴·헤어·체형·의상·포즈를 유지하고 화풍만 v3로 재생성 |
-| 정아린 | `jung_arin_identity_anchor_v1.png` | `production_soft_painted/jung_arin/` 기존 9종 | **승인 대기** — 2026-08-03 얼굴·헤어·체형·의상·포즈 보존 v3 후보 9종 생성. 런타임 미적용 |
-| 박하은 | `park_haeun_face_identity_anchor_v2.png`, `park_haeun_identity_anchor_v2.png` | `production_soft_painted/park_haeun/` v2 9종 | 대기 — 구형 v2 화풍 통과 이력은 종료. 기존 얼굴·헤어·체형·의상·포즈 유지 |
+| 김서아 | `kim_seoa_identity_anchor_v1.png` | `production_soft_painted/kim_seoa/` 새 v3 9종 | **완료·적용** — 기존 얼굴·헤어·체형·의상·포즈를 유지한 9종을 런타임 교체 |
+| 이지안 | `lee_jian_face_identity_anchor_v2.png`, `lee_jian_identity_anchor_v2.png` | `production_soft_painted/lee_jian/` 새 v3 9종 | **완료·적용** — 얼굴 앵커를 픽셀 최우선으로 사용한 9종을 런타임 교체 |
+| 최이서 | `choi_iseo_identity_anchor_v1.png` | `production_soft_painted/choi_iseo/` 새 v3 9종 | **완료·적용** — 기존 얼굴·헤어·체형·의상·포즈를 유지한 9종을 런타임 교체 |
+| 정아린 | `jung_arin_identity_anchor_v1.png` | `production_soft_painted/jung_arin/` 새 v3 9종 | **완료·적용** — 9종 적용 후 1번 기본 표정도 사용자 승인 중립 얼굴 보정본으로 교체 |
+| 박하은 | `park_haeun_face_identity_anchor_v2.png`, `park_haeun_identity_anchor_v2.png` | `production_soft_painted/park_haeun/` 새 v3 9종 | **완료·적용** — 2026-08-03 사용자 승인 후 런타임 교체 |
 | 한수아 | `han_sua_identity_anchor_v3.png`(1차 전신), `han_sua_face_identity_anchor_v3.png`(2차 얼굴 크롭) | `production_soft_painted/han_sua/` 새 v3 9종 | **완료·적용** — 2026-08-03 사용자 승인. 구형 9종 제거 후 런타임 교체 |
-| 오지우 | `oh_jiwoo_identity_anchor_v1.png` | `production_soft_painted/oh_jiwoo/` 9종 | 대기 — 얼굴·헤어·체형·의상·포즈를 유지하고 화풍만 v3로 재생성 |
-| 윤채아 | `yoon_chaea_identity_anchor_v1.png` | `production_soft_painted/yoon_chaea/` 9종 | 대기 — 얼굴·헤어·체형·의상·포즈를 유지하고 화풍만 v3로 재생성 |
+| 오지우 | `oh_jiwoo_identity_anchor_v1.png` | `production_soft_painted/oh_jiwoo/` 새 v3 9종 | **완료·적용** — 2026-08-03 사용자 승인. 1번은 웃음 없는 무표정으로 런타임 교체 |
+| 윤채아 | `yoon_chaea_identity_anchor_v1.png` | `production_soft_painted/yoon_chaea/` 새 v3 9종 | **완료·적용** — 웃음 없는 무표정 기본 1번을 포함해 런타임 교체 |
 
 위 경로는 모두 `flutter_app/assets/images/` 기준이다. 현재 편집기와 프롤로그는
-이 파일들을 사용하지만, 전부 교체 전 임시 런타임 연결이다. 여자 8명의 현행 파일은
-정체성·포즈 입력으로만 사용하고 신규 제작의 화풍 참조로 사용하지 않는다.
+새 v3로 교체한 여자 8명의 런타임 세트를 사용한다. 이후 표정·포즈를 추가할 때에도
+현행 파일은 정체성·포즈 입력으로만 사용하고 신규 제작의 화풍 참조로 사용하지 않는다.
 
 한수아의 얼굴 크롭은 얼굴 비율 확인용이다. 크롭에 보이는 `1/2` UI, 손, 파란
 천·레이스는 승인 정체성에 포함하지 않는다.
@@ -46,12 +46,13 @@
 
 | 자산군 | 경로·기준 | 2026-08-03 화풍 판정 |
 | --- | --- | --- |
-| 주인공 플레이어 | `flutter_app/assets/images/protagonist_seed01/` 24종(호환 경로) | 전면 재설계 — 기존 얼굴·헤어·체형·의상 비보존 |
-| 김학준 | `legacy_quarantine/character_hakjun_orientation_v2.png` | 격리 유지·전면 재설계 — 구형 자산을 정체성 참조로 사용하지 않음 |
+| 주인공 플레이어 | 고정 인물 이미지 없음. 구형 `protagonist_seed01/` 24종 전부 삭제 | **완료·적용** — 플레이어 화자 31장면과 별도 주식 복기 연출의 초상화 슬롯을 비워 외형을 사용자 상상에 맡김 |
+| 김학준 | `production_soft_painted/kim_hakjun/` 남자 현장복 v4 9종 | **완료·적용** — 새 얼굴·헤어·체형과 공식 남자 현장복을 고정한 9종을 대사 23장면에 감정별 연결, 1번을 인물·조직·주식 화면 대표로 사용 |
 | 한서윤 운영관 | `flutter_app/assets/images/주식선생님/`의 코드 연결 6포즈 | 전면 재설계 가능 — 기존 외형 보존 대상이 아니며 새 v3 대표 디자인부터 승인 |
-| 1999년 국정원·정부 인물 | `cinematic_soft_painted/decimal_nis_1999/characters/` 6명 | 전면 재설계 — 혼재한 기존 외형을 보존하지 않음 |
-| 1999년 국정원 배경 | `cinematic_soft_painted/decimal_nis_1999/backgrounds/` 2종 | 재검수 대기 — 인물 완료 뒤 별도 v3 배경 앵커로 판단 |
+| 1999년 국정원·정부 인물 | `cinematic_soft_painted/decimal_nis_1999/characters/` 새 v3 6명 | **완료·적용** — 한규진·임서희·도윤석·조민경·차은주·오경태를 구형 외형 비보존 새 디자인으로 런타임 교체 |
+| 1999년 국정원 배경 | `cinematic_soft_painted/decimal_nis_1999/backgrounds/` 2종 | 재검수 대기 — 별도 v3 배경 앵커로 판단 |
 | 데시멀 센터 배경 | `cinematic_soft_painted/decimal/` 11종 | 재검수 대기 — 인물 완료 뒤 별도 v3 배경 앵커로 판단 |
+| 주말 생활 배경 | `cinematic_soft_painted/decimal_weekend/` 동네·식당·문구점·도서관 4종 | 신규 적용·재검수 대기 — 글자·로고·등장인물 없는 세로 기능 배경. 별도 v3 배경 앵커 확정 뒤 최종 승인 |
 | 은행 창구 직원 | 루트 `character_bank_clerk_*_v2.png` 4종 | 전면 재설계 — 기존 외형 보존 대상 아님 |
 | 서하늘 공인중개사 | 루트 `character_realtor_*_v1.png` 6종 | 전면 재설계 — 기존 얼굴·헤어·복장·장신구 고정 규칙 폐기 |
 | 부동산 배경 | `real_estate/` 9종 | 보정 필요 — 후반 자산으로 갈수록 사진·건축 CG 인상이 강함 |
@@ -67,7 +68,8 @@
 | 1981 정책 자산 | 미참조 인물 22종·배경 2종, 총 24종 삭제 및 번들 선언 제거 |
 | 구형 생활동 배경 | 4종 삭제. 방 화면은 `decimal/bg_decimal_sleeping_wing_1999_v1.png`, 투자·신문 화면은 `decimal/bg_decimal_trading_floor_dawn_2000_v1.png`로 치환 |
 | 구형 역사 프롤로그 | 배경 10종·미참조 인물 5종 삭제. 버스 전환과 본관 앞은 현행 데시멀 외관으로 치환 |
-| 김학준 호환 자산 | 실제 23개 대사 장면 때문에 1종을 `legacy_quarantine/`에 격리. 새 v3 디자인·세트 승인 뒤 삭제 |
+| 김학준 구형 호환 자산 | 새 v3 대표 디자인 연결 후 `legacy_quarantine/character_hakjun_orientation_v2.png`와 격리 폴더 삭제 |
+| 주인공 구형 포즈 | `protagonist_seed01/` 24종과 번들 선언 삭제. 대사·편집기·주식 실습·조직 기본값의 참조도 제거 |
 ## 승인·재제작 검사
 
 - 여자 동기 8명은 기존 승인 얼굴과 픽셀 비교했을 때 동일인으로 즉시 읽히는가
@@ -88,11 +90,24 @@
 ## 재제작 순서
 
 1. **완료: 한수아** — 새 v3 9종 런타임 적용, 구형 세트와 구형 v2 공통 앵커 삭제
-2. **승인 대기: 정아린** — 새 v3 후보 9종 생성 완료. 사용자 승인 전 런타임 미적용
-3. 나머지 여자 동기 6명: 인물별 중립 1장 승인 후 각 9종 세트
-4. 주인공·김학준·한서윤: 기존 외형 비보존, 새 대표 디자인 승인 후 포즈 세트
-5. 국정원·정부·청와대 계열 인물, 은행원, 공인중개사와 기타 반복 NPC 전면 재설계
-6. 인물 교체가 끝난 뒤 배경은 별도 v3 배경 앵커와 구도 규칙으로 재검수
+2. **완료: 정아린** — 새 v3 9종 사용자 승인·런타임 적용
+3. **완료: 박하은** — 새 v3 9종 사용자 승인·런타임 적용
+4. **완료: 정아린 1번 기본 표정 보정** — 웃는 입매 제거·더 정돈된 중립 얼굴 적용
+5. **완료: 오지우** — 무표정 기본 1번을 포함한 새 v3 9종 사용자 승인·런타임 적용
+6. **완료: 윤채아** — 무표정 기본 1번을 포함한 새 v3 9종 런타임 적용
+7. **완료: 김서아** — 기존 얼굴·헤어·체형·의상·포즈를 유지한 새 v3 9종 런타임 적용
+8. **완료: 이지안** — 얼굴 앵커를 픽셀 최우선으로 사용한 새 v3 9종 런타임 적용
+9. **완료: 최이서** — 기존 얼굴·헤어·체형·의상·포즈를 유지한 새 v3 9종 런타임 적용
+10. **완료: 플레이어·김학준** — 플레이어 고정 인물 이미지와 구형 포즈 24종 삭제, 김학준 공식 남자 현장복 v4 9종 런타임 적용
+11. 한서윤: 기존 외형 비보존, 새 대표 디자인 승인 후 포즈 세트
+12. **완료: 1999년 국정원·정부 인물 6명** — 구형 외형을 보존하지 않은 새 v3 대표 디자인으로 기존 런타임 경로 교체
+13. 은행원, 공인중개사와 기타 반복 NPC 전면 재설계
+13. 인물 교체가 끝난 뒤 배경은 별도 v3 배경 앵커와 구도 규칙으로 재검수
 
-완료 인물은 이 절과 위 표에 계속 누적한다. 한수아는 실제 런타임 적용까지 완료했고,
-정아린은 9종 후보 생성까지 완료했지만 사용자 승인 전이라 기존 런타임을 유지한다.
+완료 인물은 이 절과 위 표에 계속 누적한다. 한수아·정아린·박하은은 실제 런타임
+적용까지 완료했으며 정아린 1번 기본 표정 보정도 적용했다. 오지우도 무표정 기본 1번을
+포함한 9종 런타임 적용을 완료했다. 윤채아도 무표정 기본 1번을 포함한 9종 적용을
+완료했다. 김서아·이지안·최이서도 새 v3 9종을 런타임에 적용해 여자 동기 8명 전원의
+v3 전환과 런타임 연결을 완료했다.
+1999년 국정원·정부 인물 6명도 기존 얼굴·헤어·체형·의상을 보존하지 않고 역할·성격·
+장면 기능에서 새로 설계해 기존 대사 런타임 경로에 적용했다.

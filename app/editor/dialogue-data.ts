@@ -1625,7 +1625,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "시험지가 나한테 힌트를 주네. 인쇄소 아저씨가 공범인가?",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_matrix_exam_1999_v1.png",
-    "character": "/play/assets/assets/images/protagonist_seed01/03_playful_grin.png",
+    "character": "",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -1736,7 +1736,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "힌트가 아니라 함정일 수도 있어. 마지막 열두 칸은 앞하고 규칙이 달라.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_matrix_exam_1999_v1.png",
-    "character": "/play/assets/assets/images/legacy_quarantine/character_hakjun_orientation_v2.png",
+    "character": "/play/assets/assets/images/production_soft_painted/kim_hakjun/03_skeptical_condition_check_uniform_v4.png",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -1773,7 +1773,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "그러면 너는 브레이크, 나는 핸들. 사고는 덜 나겠다.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_matrix_exam_1999_v1.png",
-    "character": "/play/assets/assets/images/protagonist_seed01/03_playful_grin.png",
+    "character": "",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -1810,7 +1810,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "아직 같은 차 탄 적 없어.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_matrix_exam_1999_v1.png",
-    "character": "/play/assets/assets/images/legacy_quarantine/character_hakjun_orientation_v2.png",
+    "character": "/play/assets/assets/images/production_soft_painted/kim_hakjun/01_neutral_crosscheck_uniform_v4.png",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -2661,7 +2661,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "봉투를 열 수 있다는 말도, 열면 안 된다는 말도 없어.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_unfair_game_1999_v1.png",
-    "character": "/play/assets/assets/images/legacy_quarantine/character_hakjun_orientation_v2.png",
+    "character": "/play/assets/assets/images/production_soft_painted/kim_hakjun/03_skeptical_condition_check_uniform_v4.png",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -2698,7 +2698,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "규칙이 짧을수록 빈칸이 비싸지지. 저울부터 빌릴 사람? 사용료는 웃긴 표정 한 번.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_unfair_game_1999_v1.png",
-    "character": "/play/assets/assets/images/protagonist_seed01/03_playful_grin.png",
+    "character": "",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -2772,7 +2772,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "그건 파산 조항이라 비공개야.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_unfair_game_1999_v1.png",
-    "character": "/play/assets/assets/images/protagonist_seed01/03_playful_grin.png",
+    "character": "",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -3142,7 +3142,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "그러면 가장 많은 토큰을 가진 ‘사람’을 없애면 되겠네.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_unfair_game_1999_v1.png",
-    "character": "/play/assets/assets/images/protagonist_seed01/03_playful_grin.png",
+    "character": "",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -3179,7 +3179,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "무슨 말이야?",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_unfair_game_1999_v1.png",
-    "character": "/play/assets/assets/images/legacy_quarantine/character_hakjun_orientation_v2.png",
+    "character": "/play/assets/assets/images/production_soft_painted/kim_hakjun/04_surprised_hidden_clause_uniform_v4.png",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -3216,7 +3216,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "쟁반 열 개를 한 사람 소유가 아니라 공동 소유라고 선언하는 거지. 열 명 모두 같은 수를 가진 셈이야.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_unfair_game_1999_v1.png",
-    "character": "/play/assets/assets/images/protagonist_seed01/03_playful_grin.png",
+    "character": "",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -3401,7 +3401,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "같이 떨어지는 선택이 아니라, 출제자가 자기 문장을 책임지게 하는 선택이야. 그래도 싫으면 네 몫은 안 건드릴게.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_unfair_game_1999_v1.png",
-    "character": "/play/assets/assets/images/protagonist_seed01/03_playful_grin.png",
+    "character": "",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -3882,7 +3882,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "하나를 고르라고 안 했잖아요. 식사를 열한 등분해서 지금 먹고, 봉투는 공동자금으로 두면 안 돼요?",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_desire_test_1999_v1.png",
-    "character": "/play/assets/assets/images/protagonist_seed01/03_playful_grin.png",
+    "character": "",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -3919,7 +3919,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "식판은 한 개고 숟가락도 한 개야. 위생 규칙부터 확인해야 해.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_desire_test_1999_v1.png",
-    "character": "/play/assets/assets/images/legacy_quarantine/character_hakjun_orientation_v2.png",
+    "character": "/play/assets/assets/images/production_soft_painted/kim_hakjun/02_explaining_rules_uniform_v4.png",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -4326,7 +4326,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "나는 아무것도 고르지 않겠다. 선택 항목의 소유권과 반환 조건이 공개되지 않았어.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_desire_test_1999_v1.png",
-    "character": "/play/assets/assets/images/legacy_quarantine/character_hakjun_orientation_v2.png",
+    "character": "/play/assets/assets/images/production_soft_painted/kim_hakjun/06_firm_objection_uniform_v4.png",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -4363,7 +4363,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "학준이는 메뉴판에서도 약관을 찾네.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_desire_test_1999_v1.png",
-    "character": "/play/assets/assets/images/protagonist_seed01/03_playful_grin.png",
+    "character": "",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -4400,7 +4400,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "네가 매번 안 찾으니까 둘이 합치면 평균은 맞아.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_desire_test_1999_v1.png",
-    "character": "/play/assets/assets/images/legacy_quarantine/character_hakjun_orientation_v2.png",
+    "character": "/play/assets/assets/images/production_soft_painted/kim_hakjun/09_restrained_team_smile_uniform_v4.png",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -4696,7 +4696,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "큰 소리 내지 마. 주소가 공개되지 않은 데는 이유가 있을 거야.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_gangnam_exterior_winter_1999_v1.png",
-    "character": "/play/assets/assets/images/legacy_quarantine/character_hakjun_orientation_v2.png",
+    "character": "/play/assets/assets/images/production_soft_painted/kim_hakjun/05_worried_unfair_loss_uniform_v4.png",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -4733,7 +4733,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "우리 열 명이 동시에 내려서 서성이는 순간 이미 제일 큰 표지판인데.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_gangnam_exterior_winter_1999_v1.png",
-    "character": "/play/assets/assets/images/protagonist_seed01/03_playful_grin.png",
+    "character": "",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -4844,7 +4844,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "그럼 6번 가방이 아니라 {{playerName}} 가방. 이름부터 마음에 드네요.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_secure_entry_1999_v1.png",
-    "character": "/play/assets/assets/images/protagonist_seed01/03_playful_grin.png",
+    "character": "",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -4881,7 +4881,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "네 가방은 지퍼에 네 이름표가 이미 달려 있어.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_secure_entry_1999_v1.png",
-    "character": "/play/assets/assets/images/legacy_quarantine/character_hakjun_orientation_v2.png",
+    "character": "/play/assets/assets/images/production_soft_painted/kim_hakjun/01_neutral_crosscheck_uniform_v4.png",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -4918,7 +4918,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "규칙을 좋아하는 친구가 옆에 있으면 농담 유통기한이 짧아.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_secure_entry_1999_v1.png",
-    "character": "/play/assets/assets/images/protagonist_seed01/03_playful_grin.png",
+    "character": "",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -5621,7 +5621,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "투입한 원금이 없어서 수익률을 계산할 수 없어.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_living_lounge_1999_v1.png",
-    "character": "/play/assets/assets/images/legacy_quarantine/character_hakjun_orientation_v2.png",
+    "character": "/play/assets/assets/images/production_soft_painted/kim_hakjun/08_calculating_notes_uniform_v4.png",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -5658,7 +5658,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "학준아, 네가 농담을 망칠 때마다 10원씩 적립했으면 벌써 부자였겠다.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_living_lounge_1999_v1.png",
-    "character": "/play/assets/assets/images/protagonist_seed01/03_playful_grin.png",
+    "character": "",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -5769,7 +5769,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "두 손을 가볍게 들었다.",
     "line": "{{playerName}}. 생각 중일 때 웃는다고 놀고 있는 건 아니야. 가끔은 놀고 있지만, 그건 내가 먼저 말할게.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_living_lounge_1999_v1.png",
-    "character": "/play/assets/assets/images/protagonist_seed01/13_explaining_open_hands.png",
+    "character": "",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -5806,7 +5806,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "김학준. 약속한 시간이나 숫자를 바꿀 때는 먼저 이유를 알려 줘. 틀린 건 고칠 수 있지만 숨긴 건 검산할 수 없으니까.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_living_lounge_1999_v1.png",
-    "character": "/play/assets/assets/images/legacy_quarantine/character_hakjun_orientation_v2.png",
+    "character": "/play/assets/assets/images/production_soft_painted/kim_hakjun/07_determined_verification_uniform_v4.png",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -6324,7 +6324,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "두 사람 중 한 명은 같은 성별이어야 합니까?",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_sleeping_wing_1999_v1.png",
-    "character": "/play/assets/assets/images/legacy_quarantine/character_hakjun_orientation_v2.png",
+    "character": "/play/assets/assets/images/production_soft_painted/kim_hakjun/03_skeptical_condition_check_uniform_v4.png",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -6435,7 +6435,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "나는 밥솥과 최단거리. 생존 전략입니다.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_sleeping_wing_1999_v1.png",
-    "character": "/play/assets/assets/images/protagonist_seed01/03_playful_grin.png",
+    "character": "",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -6472,7 +6472,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "수면동에 밥솥 없어.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_sleeping_wing_1999_v1.png",
-    "character": "/play/assets/assets/images/legacy_quarantine/character_hakjun_orientation_v2.png",
+    "character": "/play/assets/assets/images/production_soft_painted/kim_hakjun/01_neutral_crosscheck_uniform_v4.png",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -6509,7 +6509,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "그러니까 출입구 쪽. 긴 설명을 줄여 줬는데도 알아듣네.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_sleeping_wing_1999_v1.png",
-    "character": "/play/assets/assets/images/protagonist_seed01/03_playful_grin.png",
+    "character": "",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -6842,7 +6842,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "아린이가 우리를 배치한 건지 우리가 알아서 배치된 건지 모르겠지만 빨랐다.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_sleeping_wing_1999_v1.png",
-    "character": "/play/assets/assets/images/protagonist_seed01/03_playful_grin.png",
+    "character": "",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -7027,7 +7027,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "재고가 일정 수량 아래로 내려가면 알림도 필요해. 다 먹고 나서 발견하면 기록이 있어도 늦어.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_living_lounge_1999_v1.png",
-    "character": "/play/assets/assets/images/legacy_quarantine/character_hakjun_orientation_v2.png",
+    "character": "/play/assets/assets/images/production_soft_painted/kim_hakjun/02_explaining_rules_uniform_v4.png",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -7175,7 +7175,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "채아는 농담에서도 백테스트를 하네.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_living_lounge_1999_v1.png",
-    "character": "/play/assets/assets/images/protagonist_seed01/03_playful_grin.png",
+    "character": "",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -7841,7 +7841,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "38분에 뜸까지 끝난다에 내일 설거지 한 번.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_living_lounge_1999_v1.png",
-    "character": "/play/assets/assets/images/protagonist_seed01/03_playful_grin.png",
+    "character": "",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -7878,7 +7878,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "설명서에는 42분이라고 적혀 있어. 40분 전에 열면 네가 설거지 두 번.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_living_lounge_1999_v1.png",
-    "character": "/play/assets/assets/images/legacy_quarantine/character_hakjun_orientation_v2.png",
+    "character": "/play/assets/assets/images/production_soft_painted/kim_hakjun/02_explaining_rules_uniform_v4.png",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -7915,7 +7915,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "좋아. 단, 전압이 220볼트라는 전제 포함.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_living_lounge_1999_v1.png",
-    "character": "/play/assets/assets/images/protagonist_seed01/03_playful_grin.png",
+    "character": "",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -8211,7 +8211,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "우리가 국가 자본전 후보라면서 첫 공식 시장이 밥솥이네.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_living_lounge_1999_v1.png",
-    "character": "/play/assets/assets/images/protagonist_seed01/03_playful_grin.png",
+    "character": "",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -8248,7 +8248,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "수요는 열 명, 공급은 한 솥, 정보는 불완전. 시장보다 단순하진 않아.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_living_lounge_1999_v1.png",
-    "character": "/play/assets/assets/images/legacy_quarantine/character_hakjun_orientation_v2.png",
+    "character": "/play/assets/assets/images/production_soft_painted/kim_hakjun/08_calculating_notes_uniform_v4.png",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -8322,7 +8322,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "설명서 기준이 분 단위니까 42분으로 본다.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_living_lounge_1999_v1.png",
-    "character": "/play/assets/assets/images/legacy_quarantine/character_hakjun_orientation_v2.png",
+    "character": "/play/assets/assets/images/production_soft_painted/kim_hakjun/02_explaining_rules_uniform_v4.png",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -8359,7 +8359,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "인정. 대신 네가 정확히 맞혔으니까 설거지는 내가 하고, 17초 동안은 네가 옆에서 승리 표정 유지해.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_living_lounge_1999_v1.png",
-    "character": "/play/assets/assets/images/protagonist_seed01/03_playful_grin.png",
+    "character": "",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -8396,7 +8396,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "그 조항은 합의한 적 없어.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_living_lounge_1999_v1.png",
-    "character": "/play/assets/assets/images/legacy_quarantine/character_hakjun_orientation_v2.png",
+    "character": "/play/assets/assets/images/production_soft_painted/kim_hakjun/06_firm_objection_uniform_v4.png",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -8581,7 +8581,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "세계보다 그릇이 많더라.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_sleeping_wing_1999_v1.png",
-    "character": "/play/assets/assets/images/protagonist_seed01/03_playful_grin.png",
+    "character": "",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -9025,7 +9025,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "그리고 내일 받는 오만 원은 용돈이 아니야. 국가원금이고, 확정이익의 20퍼센트는 환수된대.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_sleeping_wing_1999_v1.png",
-    "character": "/play/assets/assets/images/legacy_quarantine/character_hakjun_orientation_v2.png",
+    "character": "/play/assets/assets/images/production_soft_painted/kim_hakjun/02_explaining_rules_uniform_v4.png",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -9062,7 +9062,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "오만 원의 20퍼센트면 만 원. 단, 이익이 났을 때만. 손실까지 세금처럼 떼진 않겠지.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_sleeping_wing_1999_v1.png",
-    "character": "/play/assets/assets/images/protagonist_seed01/03_playful_grin.png",
+    "character": "",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -9432,7 +9432,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "그럼 나는 아홉 명이 놓친 빈칸을 찾지. 내일 누가 맞는지보다, 열 명이 합치면 뭐가 안 틀리는지 보자.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_sleeping_wing_1999_v1.png",
-    "character": "/play/assets/assets/images/protagonist_seed01/03_playful_grin.png",
+    "character": "",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -9469,7 +9469,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "네 계산도 내가 검산한다는 조건으로.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_sleeping_wing_1999_v1.png",
-    "character": "/play/assets/assets/images/legacy_quarantine/character_hakjun_orientation_v2.png",
+    "character": "/play/assets/assets/images/production_soft_painted/kim_hakjun/09_restrained_team_smile_uniform_v4.png",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -9506,7 +9506,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "조건부 승인. 이제 진짜 자자. 시장보다 먼저 우리 집중력이 상장폐지되겠다.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_sleeping_wing_1999_v1.png",
-    "character": "/play/assets/assets/images/protagonist_seed01/03_playful_grin.png",
+    "character": "",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -9876,7 +9876,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "드디어 글짓기 대회가 아니라 주식이네.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_living_lounge_1999_v1.png",
-    "character": "/play/assets/assets/images/protagonist_seed01/03_playful_grin.png",
+    "character": "",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -9913,7 +9913,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "선택지가 있다고 생각을 대신해 주는 건 아니야. 매도 조건은 네가 확인해야 해.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_living_lounge_1999_v1.png",
-    "character": "/play/assets/assets/images/legacy_quarantine/character_hakjun_orientation_v2.png",
+    "character": "/play/assets/assets/images/production_soft_painted/kim_hakjun/07_determined_verification_uniform_v4.png",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -9950,7 +9950,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "알겠습니다, 인간 약관.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_living_lounge_1999_v1.png",
-    "character": "/play/assets/assets/images/protagonist_seed01/03_playful_grin.png",
+    "character": "",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -9987,7 +9987,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "그 별명은 승인 안 했어.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_living_lounge_1999_v1.png",
-    "character": "/play/assets/assets/images/legacy_quarantine/character_hakjun_orientation_v2.png",
+    "character": "/play/assets/assets/images/production_soft_painted/kim_hakjun/06_firm_objection_uniform_v4.png",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -10357,7 +10357,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "종이색이 다르다고 비밀 운명 같은 건 없는 거네요.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_trading_floor_dawn_2000_v1.png",
-    "character": "/play/assets/assets/images/protagonist_seed01/03_playful_grin.png",
+    "character": "",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -10468,7 +10468,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "그럼 종이 운 말고 햇빛 운은 인정.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_trading_floor_dawn_2000_v1.png",
-    "character": "/play/assets/assets/images/protagonist_seed01/03_playful_grin.png",
+    "character": "",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -10690,7 +10690,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "",
     "line": "주문 수량과 최악 손실을 먼저 검산하기.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_trading_floor_dawn_2000_v1.png",
-    "character": "/play/assets/assets/images/legacy_quarantine/character_hakjun_orientation_v2.png",
+    "character": "/play/assets/assets/images/production_soft_painted/kim_hakjun/07_determined_verification_uniform_v4.png",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1
@@ -10727,7 +10727,7 @@ export const initialDialogue: DialogueScene[] = [
     "direction": "장난기 어린 표정이 잠깐 가라앉았다.",
     "line": "빈틈을 찾았다고 혼자 빠져나가지 않기. 다칠 사람이 있으면 먼저 말하기.",
     "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_trading_floor_dawn_2000_v1.png",
-    "character": "/play/assets/assets/images/protagonist_seed01/09_determined.png",
+    "character": "",
     "characterX": 0,
     "characterY": 0,
     "characterScale": 1

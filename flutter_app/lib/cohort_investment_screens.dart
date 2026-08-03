@@ -5,6 +5,7 @@ class CohortDailyResultScreen extends StatefulWidget {
     super.key,
     required this.state,
     required this.onLend,
+    required this.onBorrow,
     required this.onAcknowledge,
   });
 
@@ -14,6 +15,11 @@ class CohortDailyResultScreen extends StatefulWidget {
     int amount,
   )
   onLend;
+  final Future<CohortInvestmentActionResult> Function(
+    String lenderId,
+    int amount,
+  )
+  onBorrow;
   final Future<CohortInvestmentActionResult> Function() onAcknowledge;
 
   @override
@@ -57,7 +63,7 @@ class _CohortDailyResultScreenState extends State<CohortDailyResultScreen> {
               ),
               const SizedBox(height: 5),
               Text(
-                '국가계좌 현금에서 나가며 $cohortLoanTermDays일 뒤 무이자 자동상환 · 호감도 변화 없음',
+                '국가계좌 현금에서 나가며 $cohortLoanTermDays일 뒤 이자 ${(cohortLoanInterestRateBps / 100).toStringAsFixed(0)}%를 더해 자동상환 · 호감도 변화 없음',
                 style: const TextStyle(
                   color: Color(0xFF6D7892),
                   fontSize: 10,
@@ -101,6 +107,78 @@ class _CohortDailyResultScreenState extends State<CohortDailyResultScreen> {
     ).showSnackBar(SnackBar(content: Text(result.message)));
   }
 
+  Future<void> _borrow(CohortDailyInvestmentResult lender, int maximum) async {
+    final presetAmounts = <int>{
+      math.min(1000, maximum),
+      math.min(5000, maximum),
+      math.min(10000, maximum),
+      maximum,
+    }.where((amount) => amount > 0).toList()..sort();
+    final amount = await showModalBottomSheet<int>(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: const Color(0xFFFFFBF2),
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 0, 18, 22),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                '${lender.name}에게 얼마를 빌릴까?',
+                style: const TextStyle(
+                  color: _ink,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 5),
+              Text(
+                '$cohortLoanTermDays일 만기 · 단리 ${(cohortLoanInterestRateBps / 100).toStringAsFixed(0)}% · 만기일 국가계좌에서 자동상환',
+                style: const TextStyle(
+                  color: Color(0xFF9A4556),
+                  fontSize: 10,
+                  height: 1.4,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final value in presetAmounts)
+                    FilledButton(
+                      key: Key('cohort-borrow-amount-$value'),
+                      onPressed: () => Navigator.pop(sheetContext, value),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFFFFA7B4),
+                        foregroundColor: _ink,
+                        side: const BorderSide(color: _ink, width: 1.5),
+                      ),
+                      child: Text('${_money(value)}원'),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (amount == null || !mounted) return;
+    setState(() => _busy = true);
+    final result = await widget.onBorrow(lender.investorId, amount);
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      if (result.success) _state = result.state;
+    });
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(result.message)));
+  }
+
   Future<void> _finish() async {
     if (_busy) return;
     setState(() => _busy = true);
@@ -125,19 +203,34 @@ class _CohortDailyResultScreenState extends State<CohortDailyResultScreen> {
       );
     }
     final rankedRows = report.rankedRows;
-    final player = report.resultFor('player')!;
     final best = rankedRows.first;
     final profitableCount = rankedRows
         .where((row) => row.profitLoss > 0)
         .length;
     final loanUsed = _state.cohortInvestments.loanedForDay(_state.day);
     final eligibleBorrowers = rankedRows
+        .where((row) => !row.isPlayer)
+        .toList(growable: false);
+    final eligibleLenders = rankedRows
         .where((row) {
-          return !row.isPlayer && row.totalAmount < player.totalAmount;
+          if (row.isPlayer) return false;
+          return _state.cohortInvestments.accountFor(row.investorId).balance >
+              cohortNpcEmergencyReserve;
         })
         .toList(growable: false);
     final todayLoan = _state.cohortInvestments.loans
-        .where((loan) => loan.issuedDay == _state.day)
+        .where(
+          (loan) =>
+              loan.issuedDay == _state.day &&
+              loan.direction == CohortLoanDirection.playerLends,
+        )
+        .firstOrNull;
+    final todayBorrowing = _state.cohortInvestments.loans
+        .where(
+          (loan) =>
+              loan.issuedDay == _state.day &&
+              loan.direction == CohortLoanDirection.playerBorrows,
+        )
         .firstOrNull;
 
     return PopScope(
@@ -207,9 +300,11 @@ class _CohortDailyResultScreenState extends State<CohortDailyResultScreen> {
                       children: [
                         Expanded(
                           child: _CohortResultMetric(
-                            label: '오늘 1등',
+                            label: '수익률 1등',
                             value: best.name,
-                            detail: '${_cohortSignedMoney(best.profitLoss)}원',
+                            detail:
+                                '누적 ${_cohortSignedPercent(best.returnRateBps)} · '
+                                '오늘 ${_cohortSignedMoney(best.profitLoss)}원',
                             color: const Color(0xFFFFE5A0),
                           ),
                         ),
@@ -229,7 +324,15 @@ class _CohortDailyResultScreenState extends State<CohortDailyResultScreen> {
                       _CohortNotice(
                         icon: Icons.savings_rounded,
                         text:
-                            '오늘 만기 대여금 ${_money(report.repaymentTotal)}원이 국가계좌로 자동상환됐어.',
+                            '오늘 만기 대여금 ${_money(report.repaymentTotal)}원이 국가계좌로 자동상환됐어. 이자 수입 ${_money(report.loanInterestIncome)}원 포함.',
+                      ),
+                    ],
+                    if (report.borrowingRepaymentTotal > 0) ...[
+                      const SizedBox(height: 9),
+                      _CohortNotice(
+                        icon: Icons.warning_amber_rounded,
+                        text:
+                            '오늘 동기 차입금 ${_money(report.borrowingRepaymentTotal)}원을 자동상환했어. 이자 비용 ${_money(report.loanInterestExpense)}원 포함.',
                       ),
                     ],
                     const SizedBox(height: 11),
@@ -257,6 +360,118 @@ class _CohortDailyResultScreenState extends State<CohortDailyResultScreen> {
                       ),
                     ),
                     const SizedBox(height: 13),
+                    if (_state.needsTradingRecovery ||
+                        todayBorrowing != null ||
+                        _state.cohortInvestments.hasOutstandingPlayerBorrowing)
+                      Container(
+                        key: const Key('cohort-emergency-borrow-card'),
+                        margin: const EdgeInsets.only(bottom: 13),
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFE1E6),
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: _ink, width: 2),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Row(
+                              children: [
+                                Icon(Icons.crisis_alert_rounded, color: _coral),
+                                SizedBox(width: 7),
+                                Text(
+                                  '파산 구제 · 동기에게 빌리기',
+                                  style: TextStyle(
+                                    color: _ink,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 5),
+                            Text(
+                              '보유 주식이 없고 주문 가능금이 1만원 미만일 때만 가능 · $cohortLoanTermDays일 단리 ${(cohortLoanInterestRateBps / 100).toStringAsFixed(0)}% · 미상환 중 추가 차입 금지',
+                              style: const TextStyle(
+                                color: Color(0xFF88404E),
+                                fontSize: 9,
+                                height: 1.4,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            if (todayBorrowing != null)
+                              _CohortNotice(
+                                icon: Icons.check_circle_rounded,
+                                text:
+                                    '${todayBorrowing.borrowerName}에게 ${_money(todayBorrowing.principal)}원 차입 · 만기 상환액 ${_money(todayBorrowing.totalDue)}원',
+                              )
+                            else if (_state
+                                .cohortInvestments
+                                .hasOutstandingPlayerBorrowing)
+                              Text(
+                                '기존 동기 차입금 ${_money(_state.cohortInvestments.outstandingLoanPayables)}원을 먼저 갚아야 해.',
+                                style: const TextStyle(
+                                  color: _ink,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              )
+                            else if (eligibleLenders.isEmpty)
+                              const Text(
+                                '지금 여유 자금이 있는 동기가 없어.',
+                                style: TextStyle(
+                                  color: _ink,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              )
+                            else
+                              Wrap(
+                                spacing: 7,
+                                runSpacing: 7,
+                                children: [
+                                  for (final lender in eligibleLenders)
+                                    OutlinedButton.icon(
+                                      key: Key(
+                                        'cohort-borrow-lender-${lender.investorId}',
+                                      ),
+                                      onPressed: _busy || loanUsed
+                                          ? null
+                                          : () {
+                                              final account = _state
+                                                  .cohortInvestments
+                                                  .accountFor(
+                                                    lender.investorId,
+                                                  );
+                                              final maximum = math.min(
+                                                cohortPlayerBorrowingLimit,
+                                                math.max(
+                                                  0,
+                                                  account.balance -
+                                                      cohortNpcEmergencyReserve,
+                                                ),
+                                              );
+                                              _borrow(lender, maximum);
+                                            },
+                                      icon: const Icon(
+                                        Icons.handshake_rounded,
+                                        size: 16,
+                                      ),
+                                      label: Text(lender.name),
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: _ink,
+                                        side: const BorderSide(
+                                          color: _coral,
+                                          width: 1.5,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                          ],
+                        ),
+                      ),
                     Container(
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
@@ -286,7 +501,7 @@ class _CohortDailyResultScreenState extends State<CohortDailyResultScreen> {
                           ),
                           const SizedBox(height: 5),
                           const Text(
-                            '나보다 총금액이 적은 동기만 가능해. 대여는 호감도를 사는 행동이 아니야.',
+                            '동기 한 명에게 하루 한 번만 가능해. 7일 단리 12%이며 대여는 호감도를 사는 행동이 아니야.',
                             style: TextStyle(
                               color: Color(0xFF6D7892),
                               fontSize: 9,
@@ -299,11 +514,11 @@ class _CohortDailyResultScreenState extends State<CohortDailyResultScreen> {
                             _CohortNotice(
                               icon: Icons.check_circle_rounded,
                               text:
-                                  '${todayLoan.borrowerName}에게 ${_money(todayLoan.principal)}원 대여 완료 · $cohortLoanTermDays일 뒤 상환',
+                                  '${todayLoan.borrowerName}에게 ${_money(todayLoan.principal)}원 대여 완료 · $cohortLoanTermDays일 뒤 ${_money(todayLoan.totalDue)}원 상환',
                             )
                           else if (eligibleBorrowers.isEmpty)
                             const Text(
-                              '오늘은 나보다 총금액이 적은 동기가 없어.',
+                              '오늘 대여할 수 있는 동기가 없어.',
                               style: TextStyle(
                                 color: _ink,
                                 fontSize: 11,
@@ -334,8 +549,7 @@ class _CohortDailyResultScreenState extends State<CohortDailyResultScreen> {
                                         : () {
                                             final maximum = math.min(
                                               _state.withdrawableBrokerageCash,
-                                              player.totalAmount -
-                                                  borrower.totalAmount,
+                                              cohortPlayerBorrowingLimit,
                                             );
                                             _lend(borrower, maximum);
                                           },
@@ -457,7 +671,7 @@ class _CohortResultHeader extends StatelessWidget {
         ),
         Expanded(
           flex: 3,
-          child: Text('총금액', textAlign: TextAlign.right, style: _headerStyle),
+          child: Text('총 수익률', textAlign: TextAlign.right, style: _headerStyle),
         ),
       ],
     ),
@@ -486,6 +700,11 @@ class _CohortResultRow extends StatelessWidget {
     final profitColor = row.profitLoss > 0
         ? const Color(0xFFE85A5A)
         : row.profitLoss < 0
+        ? const Color(0xFF3B78C8)
+        : const Color(0xFF737A89);
+    final rateColor = row.returnRateBps > 0
+        ? const Color(0xFFE85A5A)
+        : row.returnRateBps < 0
         ? const Color(0xFF3B78C8)
         : const Color(0xFF737A89);
     return Container(
@@ -551,14 +770,32 @@ class _CohortResultRow extends StatelessWidget {
           ),
           Expanded(
             flex: 3,
-            child: Text(
-              '${_money(row.totalAmount)}원',
-              textAlign: TextAlign.right,
-              style: const TextStyle(
-                color: _ink,
-                fontSize: 9,
-                fontWeight: FontWeight.w900,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  _cohortSignedPercent(row.returnRateBps),
+                  key: Key('cohort-result-rate-${row.investorId}'),
+                  maxLines: 1,
+                  textAlign: TextAlign.right,
+                  style: TextStyle(
+                    color: rateColor,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                Text(
+                  '${_money(row.totalAmount)}원',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.right,
+                  style: const TextStyle(
+                    color: Color(0xFF788094),
+                    fontSize: 7.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -603,3 +840,9 @@ class _CohortNotice extends StatelessWidget {
 
 String _cohortSignedMoney(int value) =>
     '${value > 0 ? '+' : ''}${_money(value)}';
+
+/// 국가원금 대비 누적 수익률을 소수 첫째 자리까지 표시한다.
+String _cohortSignedPercent(int rateBps) {
+  final percent = rateBps / 100;
+  return '${rateBps > 0 ? '+' : ''}${percent.toStringAsFixed(1)}%';
+}

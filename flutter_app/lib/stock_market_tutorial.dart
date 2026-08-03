@@ -846,7 +846,7 @@ class _PracticalTradeTutorialSheetState
                         '${_money(_practiceState.story.stateRecoveryTotal)}원',
                   ),
                   _PracticeSummaryRow(
-                    label: '자립적립금 80% · 잠금',
+                    label: '모의 자립적립금 80% · 오늘만 잠금',
                     value:
                         '${_money(_practiceState.story.selfRelianceReserve)}원',
                   ),
@@ -856,7 +856,7 @@ class _PracticalTradeTutorialSheetState
           ),
           const SizedBox(height: 12),
           const Text(
-            '실제 한빛통신 시세·호가를 복제한 리허설 계좌입니다. 완료 뒤 정식 국가계좌 원금 50,000원은 그대로 유지됩니다.',
+            '국가원금 50,000원으로 연습하는 날은 오늘 딱 하루입니다. 오늘 손익은 리허설에만 남고, 다음 거래일부터 같은 50,000원으로 실전 운용을 시작합니다.',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Color(0xFF8B6F21),
@@ -1140,7 +1140,7 @@ class _PracticalTradeTutorialSheetState
     };
     final characterAsset = switch (_reviewBeat) {
       0 => _stockTeacherPoseListen,
-      1 => _stockTutorialPlayerAsset,
+      1 => '',
       2 =>
         _reviewChoice == 'ledger'
             ? _stockTeacherPoseBook
@@ -1246,22 +1246,21 @@ class _PracticalTradeTutorialSheetState
             ),
           ),
         ),
-        Positioned.fill(
-          top: -_storyCharacterBottomInset,
-          bottom: _storyCharacterBottomInset,
-          child: _OnboardingCharacterSlot(
-            key: ValueKey<String>('tutorial-review-slot-$characterAsset'),
-            asset: characterAsset,
-            alignment: Alignment.bottomCenter,
-            characterKey: Key(
-              isTeacherBeat
-                  ? 'tutorial-review-teacher-character'
-                  : _reviewBeat == 1
-                  ? 'tutorial-review-protagonist-character'
-                  : 'tutorial-review-peer-character',
+        if (characterAsset.isNotEmpty)
+          Positioned.fill(
+            top: -_storyCharacterBottomInset,
+            bottom: _storyCharacterBottomInset,
+            child: _OnboardingCharacterSlot(
+              key: ValueKey<String>('tutorial-review-slot-$characterAsset'),
+              asset: characterAsset,
+              alignment: Alignment.bottomCenter,
+              characterKey: Key(
+                isTeacherBeat
+                    ? 'tutorial-review-teacher-character'
+                    : 'tutorial-review-peer-character',
+              ),
             ),
           ),
-        ),
         Positioned(
           left: 12,
           right: 12,
@@ -1334,7 +1333,7 @@ class _PracticalTradeTutorialSheetState
                   const _TutorialDialogueCard(
                     speaker: '한서윤 운영관',
                     message:
-                        '오늘은 여기까지. 다음에는 전자창고에서 본 한빛통신처럼 네가 궁금한 회사 하나를 골라 와요. 가격보다 먼저 무엇을 팔아 돈 버는지부터 봅니다.',
+                        '오만 원 연습은 오늘 딱 하루로 끝이에요. 다음 거래일부터는 리허설이 아니라 실전입니다. 파산하면 주말 알바로 다시 만들거나 동기에게 높은 이자를 약속하고 빌릴 수 있어요.',
                     teacher: true,
                     characterAsset: _stockTeacherPoseBook,
                   ),
@@ -1392,7 +1391,7 @@ class _PracticalTradeTutorialSheetState
                       border: Border.all(color: const Color(0xFFEACB7B)),
                     ),
                     child: const Text(
-                      '마감음이 짧게 울렸다. 첫 투자장부와 국가계좌 기록을 확인했다. 이제 생활 라운지와 트레이딩 플로어를 오가며 내 이름으로 판단을 쌓을 차례였다.',
+                      '마감음이 짧게 울렸다. 50,000원 연습 계좌는 오늘로 닫혔다. 다음 거래일부터 손익과 빚이 저장되는 실전 계좌가 열린다.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: Color(0xFF5D4B21),
@@ -1429,7 +1428,7 @@ class _PracticalTradeTutorialSheetState
                       )
                     : const Icon(Icons.directions_walk_rounded),
                 label: Text(
-                  _finishing ? '첫 저장을 확인하는 중…' : '실습을 마치고 데시멀 생활 시작',
+                  _finishing ? '실전 계좌를 여는 중…' : '연습일 종료 · 다음 거래일부터 실전',
                   style: const TextStyle(fontWeight: FontWeight.w800),
                 ),
               ),

@@ -33,11 +33,11 @@
 | --- | --- |
 | 프로젝트 데시멀 세계관·프롤로그 | `DECIMAL_WORLD.md` |
 | 플레이어·동기 연령과 장기 성장 | `PROTAGONIST_AGE_LINE.md` |
-| 월간 성장 달력·주말 외출·날짜 사건 | `CALENDAR_SYSTEM.md` |
+| 월간 성장 달력·주말 행동력·알바·선물·외출·날짜 사건 | `CALENDAR_SYSTEM.md` |
 | 여학생 8명 성격·대사 | `characters/cohort6_girls/README.md`와 인물별 문서 |
 | 관계 시스템 | `RELATIONSHIP_SYSTEM.md` — 호감도·신뢰·친밀·투자존중·주말 외출 |
 | 데시멀 동기 일일 투자·대여 | `COHORT_DAILY_INVESTMENT.md` |
-| 데시멀톡 | `PHONE_MESSENGER_SYSTEM.md` — 성격별 조합 대화·투자 반응·장기기억 |
+| 데시멀톡 | `PHONE_MESSENGER_SYSTEM.md` — Gemini 3.5 Flash-Lite·로컬 폴백·성격별 대화·투자 반응·장기기억 |
 | 대사 편집기 | `DIALOGUE_EDITOR_GUIDE.md` |
 | 시장·경제 수치 | `BALANCE_NOTES.md` |
 | 부동산 | `REAL_ESTATE_SYSTEM.md` |
@@ -46,7 +46,7 @@
 | 제품 방향 | `PRODUCT_VISION.md` |
 | 이미지 제작·v3 전환 규칙 | `ART_STYLE_GUIDE.md`, `IMAGE_GENERATION_STYLE_PROMPT.md` |
 | 런타임 이미지 승인표 | `ART_STYLE_AUDIT.md` |
-| 주인공 포즈 | `PROTAGONIST_POSE_LIBRARY.md` |
+| 주인공 무초상화 정책 | `PROTAGONIST_POSE_LIBRARY.md` — 플레이어만 사진이 없는 이유와 적용 범위 |
 
 ## 런타임 자산 메모
 

@@ -20,34 +20,7 @@ function pose(id: string, label: string, asset: string): DialoguePose {
   return { id, label, asset: webAsset(asset) };
 }
 
-const protagonistPoses = [
-  ["01", "기본", "01_neutral.png"],
-  ["02", "활짝 웃음", "02_cheerful_laugh.png"],
-  ["03", "장난스러운 미소", "03_playful_grin.png"],
-  ["04", "궁금한 질문", "04_curious_question.png"],
-  ["05", "깜짝 놀람", "05_surprised.png"],
-  ["06", "걱정", "06_worried.png"],
-  ["07", "울음 참기", "07_sad_held_back.png"],
-  ["08", "화난 항의", "08_angry_protest.png"],
-  ["09", "결심", "09_determined.png"],
-  ["10", "쑥스러움", "10_embarrassed.png"],
-  ["11", "의심", "11_suspicious.png"],
-  ["12", "생각", "12_thinking.png"],
-  ["13", "양손 설명", "13_explaining_open_hands.png"],
-  ["14", "증거 가리키기", "14_pointing_evidence.png"],
-  ["15", "손들기", "15_hand_raise.png"],
-  ["16", "허리에 손", "16_hands_on_hips.png"],
-  ["17", "명찰 들기", "17_holding_badge.png"],
-  ["18", "통장과 연필", "18_passbook_pencil.png"],
-  ["19", "장부 읽기", "19_reading_ledger.png"],
-  ["20", "계산", "20_calculating.png"],
-  ["21", "손실 충격", "21_loss_shock.png"],
-  ["22", "승리 주먹", "22_victory_fist.png"],
-  ["23", "작별 인사", "23_farewell_wave.png"],
-  ["24", "보호 자세", "24_protective_stance.png"],
-].map(([id, label, file]) =>
-  pose(id, label, `assets/images/protagonist_seed01/${file}`),
-);
+const protagonistPoses = [pose("00", "인물 없음", "")];
 
 const teacherPoses = [
   ["01", "포인터 설명", "22_포즈1_주인공그림체_공통슬롯_투명.png"],
@@ -220,11 +193,15 @@ export const dialogueCharacters: DialogueCharacter[] = [
     speaker: "김학준",
     group: "주요 인물",
     poses: [
-      pose(
-        "01",
-        "규정집 설명",
-        "assets/images/legacy_quarantine/character_hakjun_orientation_v2.png",
-      ),
+      pose("01", "중립 검산", "assets/images/production_soft_painted/kim_hakjun/01_neutral_crosscheck_uniform_v4.png"),
+      pose("02", "규칙 설명", "assets/images/production_soft_painted/kim_hakjun/02_explaining_rules_uniform_v4.png"),
+      pose("03", "조건 의심", "assets/images/production_soft_painted/kim_hakjun/03_skeptical_condition_check_uniform_v4.png"),
+      pose("04", "숨은 조항 발견", "assets/images/production_soft_painted/kim_hakjun/04_surprised_hidden_clause_uniform_v4.png"),
+      pose("05", "불공정 손실 걱정", "assets/images/production_soft_painted/kim_hakjun/05_worried_unfair_loss_uniform_v4.png"),
+      pose("06", "단호한 이의", "assets/images/production_soft_painted/kim_hakjun/06_firm_objection_uniform_v4.png"),
+      pose("07", "검산 결의", "assets/images/production_soft_painted/kim_hakjun/07_determined_verification_uniform_v4.png"),
+      pose("08", "계산 기록", "assets/images/production_soft_painted/kim_hakjun/08_calculating_notes_uniform_v4.png"),
+      pose("09", "절제된 팀 인정", "assets/images/production_soft_painted/kim_hakjun/09_restrained_team_smile_uniform_v4.png"),
     ],
   },
   { speaker: "한서윤 운영관", group: "주요 인물", poses: teacherPoses },

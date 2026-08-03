@@ -75,6 +75,8 @@
 - `투자존중`: 손익을 솔직하게 공유하고 투자 판단을 복기할 때 오른다.
 - `호감도`: 기존 단계·주말 외출 해금에 사용하는 대표 수치다.
 
+주말 낮의 선물은 저녁 관계 시간을 소비하지 않는 별도 행동이다. `CALENDAR_SYSTEM.md`의 행동력 2칸을 사용하며, 선호 선물은 호감도 +4·신뢰 +2, 일반 선물은 호감도 +2·신뢰 +1을 기본으로 하고 친밀은 +1 오른다. 같은 날 같은 동기에게는 한 번만 줄 수 있다.
+
 ## 5. 인물별 데이트
 
 | 인물 | MBTI | 첫 데이트 장소 | 판단 포인트 |
@@ -92,7 +94,7 @@
 
 ## 6. 저장 구조
 
-- 현재 `GameState` 스키마: **v25**
+- 현재 `GameState` 스키마: **v26**
 - `RelationshipState.girls`: 8명별 호감도·신뢰·친밀·투자존중·마지막 상호작용일·대화/데이트/의미 있는 톡 횟수
 - `lastEveningEventDay`: 같은 날 중복 보상 방지
 - `memories`: 최근 64개의 날짜·인물·활동·장면·선택·증감 기록
@@ -112,7 +114,8 @@
 
 - `flutter_app/lib/game/relationship_state.dart`: 8명 프로필·장면·선택지·저장 모델
 - `flutter_app/lib/game/game_engine.dart`: 중복 방지·점수 적용·주말 외출 해금
-- `flutter_app/lib/game/game_state.dart`: v25 직렬화·마이그레이션
+- `flutter_app/lib/game/weekend_activity.dart`: 주말 선물 목록·취향·행동력·달력 기록
+- `flutter_app/lib/game/game_state.dart`: v26 직렬화·마이그레이션
 - `flutter_app/lib/game/phone_dialogue_composer.dart`: 의미 있는 톡과 관계 축별 변화 계산
 - `flutter_app/lib/relationship_screens.dart`: 목록·하루 종료·데이트 UI
 - `flutter_app/lib/game/life_calendar.dart`: 성장 연령·날짜 상태·관계 기억 사건 파생

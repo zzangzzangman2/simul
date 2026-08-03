@@ -159,7 +159,8 @@ class StoryState {
         // The simulation keeps 1–2 January as its deterministic pre-open
         // epoch. The playable account opens on Monday, 3 January.
         'campaignStartDate': '2000-01-01',
-        'formalTradingStartDate': '2000-01-03',
+        'practiceTradingDate': '2000-01-03',
+        'formalTradingStartDate': '2000-01-04',
         'stateAccountActive': true,
         'stateAccountOwner': '대한민국 데시멀 기금',
         'stateRecoveryRateBps': 2000,
@@ -185,6 +186,7 @@ class StoryState {
         'hubTutorialSeen': false,
         'marketTutorialEligible': true,
         'marketTutorialSeen': false,
+        'liveTradingStarted': false,
         'performanceHistory': <Map<String, dynamic>>[],
         'newsArchive': <Map<String, dynamic>>[],
       },
@@ -286,6 +288,8 @@ class StoryState {
       ..['femaleCandidateCount'] = 8
       ..['facility'] = 'gangnam_hideout'
       ..['storyAgeMode'] = 'koreanYearAge'
+      ..putIfAbsent('practiceTradingDate', () => '2000-01-03')
+      ..putIfAbsent('formalTradingStartDate', () => '2000-01-04')
       ..['selfRelianceUnlockAge'] = 19
       ..['stateAccountActive'] = true
       ..['stateAccountOwner'] = '대한민국 데시멀 기금'
@@ -313,6 +317,17 @@ class StoryState {
       ..remove('guardianConsent')
       ..remove('fatherOperationsAdvisor')
       ..remove('seedMoneySourceLegacy');
+    if (migrated['marketTutorialSeen'] == true) {
+      migrated.putIfAbsent('liveTradingStarted', () => true);
+      migrated.putIfAbsent(
+        'liveTradingStartDay',
+        () =>
+            ((migrated['marketTutorialCompletedDay'] as num?)?.toInt() ?? 3) +
+            1,
+      );
+    } else {
+      migrated.putIfAbsent('liveTradingStarted', () => false);
+    }
     if (<String>{
       'mother',
       'father',

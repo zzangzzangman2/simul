@@ -611,7 +611,7 @@ void main() {
     expect(find.text('새천년경제'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
-  testWidgets('360px visual novel portraits keep a centered close-up crop', (
+  testWidgets('360px visual novel portraits keep a centered readable crop', (
     tester,
   ) async {
     await usePhoneSurface(tester);
@@ -658,7 +658,7 @@ void main() {
         final teacherRect = tester.getRect(teacher);
         expect(teacherRect.center.dx, closeTo(stageRect.center.dx, 0.01));
         expect(teacherRect.height, closeTo(stageRect.height * 0.9, 0.01));
-        expect(teacherRect.bottom, closeTo(stageRect.bottom + 280, 0.01));
+        expect(teacherRect.bottom, closeTo(stageRect.bottom + 56, 0.01));
       }
       expect(tester.takeException(), isNull);
     }

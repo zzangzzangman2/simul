@@ -2,9 +2,12 @@
   margin-top: 18px;
   overflow: hidden;
   border: 1px solid rgba(46, 105, 142, .28);
-  border-radius: 20px;
-  background: linear-gradient(145deg, rgba(247,252,255,.98), rgba(235,244,250,.96));
-  box-shadow: 0 18px 42px rgba(24, 75, 107, .1), inset 0 1px 0 white;
+  border-radius: 16px;
+  background: #f4f9fc;
+  box-shadow: 0 5px 18px rgba(24, 75, 107, .07), inset 0 1px 0 white;
+  contain: layout paint style;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 620px;
 }
 
 .header {
@@ -29,7 +32,7 @@
 .tabs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; padding: 7px; border-bottom: 1px solid #d4e3eb; background: #e8f1f6; }
 .tabs button { min-height: 36px; border: 0; border-radius: 10px; color: #708797; background: transparent; font-size: 9px; font-weight: 850; cursor: pointer; }
 .tabs button:hover { color: #236f99; background: rgba(255,255,255,.72); }
-.tabs .tabActive { color: white; background: linear-gradient(135deg, #287eb0, #2ba9ce); box-shadow: 0 5px 13px rgba(34,125,170,.24); }
+.tabs .tabActive { color: white; background: #258bb7; box-shadow: 0 2px 8px rgba(34,125,170,.2); }
 
 .castWorkspace { display: grid; grid-template-columns: minmax(210px, .8fr) minmax(0, 1.45fr); min-height: 420px; }
 .layerColumn { padding: 16px; border-right: 1px solid #d6e3eb; background: rgba(229,240,246,.58); }
@@ -47,7 +50,7 @@
 
 .layerList { display: flex; flex-direction: column; gap: 6px; }
 .layerItem, .layerActive { width: 100%; display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 9px; border: 1px solid #cfdee6; border-radius: 11px; color: #496476; background: rgba(255,255,255,.72); text-align: left; cursor: pointer; }
-.layerActive { color: #155f89; border-color: #5cb9db; background: #f4fcff; box-shadow: 0 5px 13px rgba(45,143,183,.12); }
+.layerActive { color: #155f89; border-color: #5cb9db; background: #f4fcff; box-shadow: 0 2px 8px rgba(45,143,183,.09); }
 .layerItem > span, .layerActive > span { display: grid; width: 24px; height: 24px; place-items: center; border-radius: 7px; color: white; background: #7895a7; font-size: 8px; font-weight: 900; }
 .layerActive > span { background: #268dbb; }
 .layerItem div, .layerActive div { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
@@ -81,7 +84,7 @@
 .timelineTrack span[data-color="gold"] i { right: 42%; background: #d8aa55; }
 .timelineTrack small { position: absolute; z-index: 1; inset: 0 8px; display: flex; align-items: center; color: white; font-size: 7px; font-weight: 850; text-shadow: 0 1px 2px rgba(0,0,0,.35); }
 
-.previewDialogueBox { margin-top: 15px; padding: 15px 17px; border: 1px solid rgba(124,194,225,.36); border-radius: 15px; color: white; background: linear-gradient(135deg, rgba(12,35,55,.9), rgba(18,65,88,.78)); box-shadow: 0 12px 25px rgba(20,62,87,.14); }
+.previewDialogueBox { margin-top: 15px; padding: 15px 17px; border: 1px solid rgba(124,194,225,.36); border-radius: 13px; color: white; background: linear-gradient(135deg, rgba(12,35,55,.94), rgba(18,65,88,.9)); box-shadow: 0 4px 14px rgba(20,62,87,.11); }
 .previewDialogueBox[data-mode="thought"] { background: linear-gradient(135deg, rgba(47,34,69,.92), rgba(79,59,102,.82)); }
 .previewDialogueBox[data-mode="system"] { background: linear-gradient(135deg, rgba(42,47,52,.94), rgba(75,83,88,.86)); }
 .previewDialogueBox[data-mode="narration"] { background: linear-gradient(135deg, rgba(76,59,36,.9), rgba(109,82,48,.8)); }

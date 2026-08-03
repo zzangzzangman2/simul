@@ -196,7 +196,7 @@ class GameState {
        cohortInvestments = cohortInvestments ?? CohortInvestmentState.initial(),
        phoneMessenger = phoneMessenger ?? PhoneMessengerState.initial();
 
-  static const schemaVersion = 25;
+  static const schemaVersion = 26;
   static const maxCampaignDay = 9862;
 
   final int version;
@@ -265,6 +265,11 @@ class GameState {
   int get availableBrokerageCash =>
       math.max(0, brokerageCash - pendingBuyReservedCash);
 
+  bool get needsTradingRecovery =>
+      story.marketTutorialSeen &&
+      positions.isEmpty &&
+      availableBrokerageCash < cohortPlayerRecoveryCashThreshold;
+
   DateTime _brokerageSettlementDateFor(LedgerEntry entry) {
     var date = dateForDay(entry.day);
     var remainingTradingDays = 2;
@@ -323,6 +328,7 @@ class GameState {
 
   int get totalKnownLiabilities =>
       banking.totalUnsecuredLoanBalance +
+      cohortInvestments.outstandingLoanPayables +
       personalFinance.totalMortgageBalance +
       personalFinance.totalTenantDepositLiability +
       businesses.totalAccountsPayable +

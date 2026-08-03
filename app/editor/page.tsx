@@ -6,6 +6,7 @@ import {
   KeyboardEvent,
   PointerEvent as ReactPointerEvent,
   WheelEvent as ReactWheelEvent,
+  useDeferredValue,
   useEffect,
   useMemo,
   useRef,
@@ -43,7 +44,7 @@ const GAME_STORAGE_KEY = "project-decimal-dialogue-runtime-v2";
 const FLUTTER_GAME_STORAGE_KEY = `flutter.${GAME_STORAGE_KEY}`;
 const BUILD_STORAGE_KEY = "project-decimal-dialogue-built-v2";
 const CONTENT_VERSION = 3;
-const APPEARANCE_VERSION = 17;
+const APPEARANCE_VERSION = 19;
 
 const HAN_SUA_V2_FILENAME_MIGRATIONS = {
   "01_neutral_quality_v2.png": "01_neutral_wavy_v3.png",
@@ -63,6 +64,12 @@ type TransformScope = "scene" | "speaker";
 type CharacterFramePatch = Partial<
   Pick<DialogueScene, "characterX" | "characterY" | "characterScale">
 >;
+type CharacterLayerPatch = Partial<
+  Pick<
+    DialogueStageCharacter,
+    "asset" | "x" | "y" | "scale" | "opacity" | "flipX" | "enter" | "exit" | "motion"
+  >
+>;
 type CharacterDragState = {
   pointerId: number;
   startClientX: number;
@@ -73,6 +80,15 @@ type CharacterDragState = {
   speaker: string;
   scope: TransformScope;
   layerId?: string;
+};
+type CharacterResizeState = {
+  pointerId: number;
+  startClientX: number;
+  startScale: number;
+  sceneId: string;
+  speaker: string;
+  layerId: string;
+  scope: TransformScope;
 };
 type SceneHistoryEntry = {
   scenes: DialogueScene[];
@@ -89,6 +105,11 @@ type SceneHistoryCoalesce = {
 
 const HISTORY_LIMIT = 60;
 const HISTORY_COALESCE_MS = 700;
+const SCENES_PER_PAGE = 24;
+// Blue Archive-style portrait framing: the head stays in the upper 8–15%
+// while the lower body continues behind the dialogue glass.
+const STORY_CHARACTER_SCENE_SCALE = 1.45;
+const STORY_CHARACTER_SCENE_OFFSET_PERCENT = 8;
 
 const CHARACTER_FRAME_PRESETS = [
   { id: "full", label: "전신", characterX: 0, characterY: 8, characterScale: 0.62 },
@@ -240,9 +261,26 @@ function mergeWithCurrentStory(
   ].map((scene, index) => normalizeScene({ ...scene, order: index + 1 }));
 }
 
+const sceneFingerprintCache = new WeakMap<DialogueScene, string>();
+const sceneSearchTextCache = new WeakMap<DialogueScene, string>();
+
 function sceneFingerprint(scene: DialogueScene | undefined) {
   if (!scene) return "";
-  return JSON.stringify(scene);
+  const cached = sceneFingerprintCache.get(scene);
+  if (cached) return cached;
+  const fingerprint = JSON.stringify(scene);
+  sceneFingerprintCache.set(scene, fingerprint);
+  return fingerprint;
+}
+
+function sceneSearchText(scene: DialogueScene) {
+  const cached = sceneSearchTextCache.get(scene);
+  if (cached) return cached;
+  const searchText = [scene.speaker, scene.line, scene.direction, scene.location, scene.chapter]
+    .join(" ")
+    .toLowerCase();
+  sceneSearchTextCache.set(scene, searchText);
+  return searchText;
 }
 
 function downloadFile(name: string, contents: string, type: string) {
@@ -422,6 +460,7 @@ export default function DialogueEditorPage() {
   const [selectedId, setSelectedId] = useState(initialDialogue[0]?.id ?? "");
   const [query, setQuery] = useState("");
   const [speakerFilter, setSpeakerFilter] = useState("전체");
+  const [scenePage, setScenePage] = useState(1);
   const [ready, setReady] = useState(false);
   const [saveLabel, setSaveLabel] = useState("불러오는 중");
   const [notice, setNotice] = useState("");
@@ -436,6 +475,9 @@ export default function DialogueEditorPage() {
   const [historyState, setHistoryState] = useState({ undo: 0, redo: 0 });
   const previewStageRef = useRef<HTMLDivElement>(null);
   const characterDragRef = useRef<CharacterDragState | null>(null);
+  const characterResizeRef = useRef<CharacterResizeState | null>(null);
+  const characterFrameRef = useRef<number | null>(null);
+  const queuedCharacterUpdateRef = useRef<(() => void) | null>(null);
   const scenesRef = useRef(scenes);
   const selectedIdRef = useRef(selectedId);
   const undoHistoryRef = useRef<SceneHistoryEntry[]>([]);
@@ -450,6 +492,13 @@ export default function DialogueEditorPage() {
   useEffect(() => {
     selectedIdRef.current = selectedId;
   }, [selectedId]);
+
+  useEffect(() => () => {
+    if (characterFrameRef.current !== null) {
+      window.cancelAnimationFrame(characterFrameRef.current);
+    }
+    queuedCharacterUpdateRef.current = null;
+  }, []);
 
   useEffect(() => {
     const restoreTimer = window.setTimeout(() => {
@@ -560,6 +609,9 @@ export default function DialogueEditorPage() {
   const activeLayerId = selectedStageCharacters.some((layer) => layer.id === selectedLayerId)
     ? selectedLayerId
     : selectedStageCharacters[0]?.id ?? "";
+  const selectedSpeakerLayer =
+    selectedStageCharacters.find((layer) => layer.speaker === selected.speaker) ??
+    selectedStageCharacters[0];
 
   const appliedById = useMemo(
     () => new Map(appliedScenes.map((scene) => [scene.id, scene])),
@@ -567,31 +619,40 @@ export default function DialogueEditorPage() {
   );
   const dirtyIds = useMemo(() => {
     const dirty = new Set<string>();
+    const sceneIds = new Set<string>();
     for (const scene of scenes) {
+      sceneIds.add(scene.id);
       if (sceneFingerprint(scene) !== sceneFingerprint(appliedById.get(scene.id))) {
         dirty.add(scene.id);
       }
     }
     for (const applied of appliedScenes) {
-      if (!scenes.some((scene) => scene.id === applied.id)) dirty.add(applied.id);
+      if (!sceneIds.has(applied.id)) dirty.add(applied.id);
     }
     return dirty;
   }, [appliedById, appliedScenes, scenes]);
   const dirtyCount = dirtyIds.size;
+  const deferredQuery = useDeferredValue(query);
+  const deferredScenes = useDeferredValue(scenes);
 
   const speakers = useMemo(
-    () => ["전체", ...Array.from(new Set(scenes.map((scene) => scene.speaker))).sort()],
-    [scenes],
+    () => ["전체", ...Array.from(new Set(deferredScenes.map((scene) => scene.speaker))).sort()],
+    [deferredScenes],
   );
   const customSpeakers = useMemo(
     () =>
-      Array.from(new Set(scenes.map((scene) => scene.speaker)))
+      Array.from(new Set(deferredScenes.map((scene) => scene.speaker)))
         .filter((speaker) => !dialogueCharacterBySpeaker.has(speaker))
         .sort(),
-    [scenes],
+    [deferredScenes],
   );
   const sameSpeakerSceneCount = useMemo(
-    () => scenes.filter((scene) => scene.speaker === selected.speaker).length,
+    () =>
+      scenes.filter(
+        (scene) =>
+          scene.speaker === selected.speaker ||
+          scene.characters?.some((layer) => layer.speaker === selected.speaker),
+      ).length,
     [scenes, selected.speaker],
   );
   const selectedPoses = useMemo<DialoguePose[]>(() => {
@@ -606,16 +667,43 @@ export default function DialogueEditorPage() {
   );
 
   const filteredScenes = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    return scenes.filter((scene) => {
+    const needle = deferredQuery.trim().toLowerCase();
+    if (!needle && speakerFilter === "전체") return deferredScenes;
+    return deferredScenes.filter((scene) => {
       if (speakerFilter !== "전체" && scene.speaker !== speakerFilter) return false;
       if (!needle) return true;
-      return [scene.speaker, scene.line, scene.direction, scene.location, scene.chapter]
-        .join(" ")
-        .toLowerCase()
-        .includes(needle);
+      return sceneSearchText(scene).includes(needle);
     });
-  }, [query, scenes, speakerFilter]);
+  }, [deferredQuery, deferredScenes, speakerFilter]);
+  const scenePageCount = Math.max(1, Math.ceil(filteredScenes.length / SCENES_PER_PAGE));
+  const currentScenePage = Math.min(scenePage, scenePageCount);
+  const pagedScenes = useMemo(() => {
+    const start = (currentScenePage - 1) * SCENES_PER_PAGE;
+    return filteredScenes.slice(start, start + SCENES_PER_PAGE);
+  }, [currentScenePage, filteredScenes]);
+  const scenePageItems = useMemo<Array<number | "ellipsis-start" | "ellipsis-end">>(() => {
+    const candidates = new Set([
+      1,
+      scenePageCount,
+      currentScenePage - 1,
+      currentScenePage,
+      currentScenePage + 1,
+      ...(currentScenePage <= 3 ? [2, 3] : []),
+      ...(currentScenePage >= scenePageCount - 2 ? [scenePageCount - 2, scenePageCount - 1] : []),
+    ]);
+    const pages = [...candidates]
+      .filter((page) => page >= 1 && page <= scenePageCount)
+      .sort((a, b) => a - b);
+    const items: Array<number | "ellipsis-start" | "ellipsis-end"> = [];
+    pages.forEach((page, index) => {
+      const previous = pages[index - 1];
+      if (previous && page - previous > 1) {
+        items.push(previous === 1 ? "ellipsis-start" : "ellipsis-end");
+      }
+      items.push(page);
+    });
+    return items;
+  }, [currentScenePage, scenePageCount]);
 
   const warnings = selected ? tasteChecks(selected) : [];
   const builtTimeLabel = lastBuiltAt
@@ -851,21 +939,53 @@ export default function DialogueEditorPage() {
 
   function updateStageLayerFrame(
     layerId: string,
-    patch: Partial<Pick<DialogueStageCharacter, "x" | "y" | "scale">>,
+    patch: CharacterLayerPatch,
     options: SceneUpdateOptions = {},
     sceneId = selected.id,
+    speaker = selected.speaker,
+    scope: TransformScope = transformScope,
   ) {
-    const normalizedPatch = {
+    const normalizedPatch: CharacterLayerPatch = {
+      ...patch,
       ...(patch.x === undefined ? {} : { x: Math.round(clampNumber(patch.x, 0, CHARACTER_X_MIN, CHARACTER_X_MAX) * 10) / 10 }),
       ...(patch.y === undefined ? {} : { y: Math.round(clampNumber(patch.y, 0, CHARACTER_Y_MIN, CHARACTER_Y_MAX) * 10) / 10 }),
       ...(patch.scale === undefined ? {} : { scale: Math.round(clampNumber(patch.scale, 1, CHARACTER_SCALE_MIN, CHARACTER_SCALE_MAX) * 100) / 100 }),
+      ...(patch.opacity === undefined ? {} : { opacity: Math.round(clampNumber(patch.opacity, 1, 0, 1) * 100) / 100 }),
     };
     updateScenes(
       (current) => current.map((scene) => {
-        if (scene.id !== sceneId || !scene.characters?.length) return scene;
-        const characters = scene.characters.map((layer) =>
-          layer.id === layerId ? { ...layer, ...normalizedPatch } : layer,
-        );
+        const matchesScene =
+          scope === "speaker"
+            ? scene.speaker === speaker || scene.characters?.some((layer) => layer.speaker === speaker)
+            : scene.id === sceneId;
+        if (!matchesScene) return scene;
+        const currentCharacters = scene.characters?.length
+          ? scene.characters
+          : scene.character
+            ? [{
+                id: "primary",
+                speaker: scene.speaker,
+                asset: scene.character,
+                x: scene.characterX,
+                y: scene.characterY,
+                scale: scene.characterScale,
+                opacity: 1,
+                flipX: false,
+                zIndex: 0,
+                enter: "fade" as const,
+                exit: "fade" as const,
+                motion: "none" as const,
+              }]
+            : [];
+        if (!currentCharacters.length) return scene;
+        let changed = false;
+        const characters = currentCharacters.map((layer) => {
+          const matchesLayer = scope === "speaker" ? layer.speaker === speaker : layer.id === layerId;
+          if (!matchesLayer) return layer;
+          changed = true;
+          return { ...layer, ...normalizedPatch };
+        });
+        if (!changed) return scene;
         const primary = characters.find((layer) => layer.speaker === scene.speaker) ?? characters[0];
         return {
           ...scene,
@@ -878,24 +998,75 @@ export default function DialogueEditorPage() {
       }),
       {
         recordHistory: options.recordHistory,
-        coalesceKey: options.coalesceKey === undefined ? `stage-layer:${sceneId}:${layerId}` : options.coalesceKey,
+        coalesceKey:
+          options.coalesceKey === undefined
+            ? `stage-layer:${scope}:${sceneId}:${speaker}:${layerId}:${Object.keys(normalizedPatch).sort().join(",")}`
+            : options.coalesceKey,
       },
     );
+  }
+
+  function updateActiveCharacterFrame(
+    patch: CharacterFramePatch,
+    options: SceneUpdateOptions = {},
+  ) {
+    if (!selectedSpeakerLayer) return;
+    updateStageLayerFrame(
+      selectedSpeakerLayer.id,
+      {
+        ...(patch.characterX === undefined ? {} : { x: patch.characterX }),
+        ...(patch.characterY === undefined ? {} : { y: patch.characterY }),
+        ...(patch.characterScale === undefined ? {} : { scale: patch.characterScale }),
+      },
+      options,
+      selected.id,
+      selectedSpeakerLayer.speaker,
+      transformScope,
+    );
+  }
+
+  function updateCharacterLayer(
+    layerId: string,
+    speaker: string,
+    patch: CharacterLayerPatch,
+  ) {
+    updateStageLayerFrame(layerId, patch, {}, selected.id, speaker, transformScope);
   }
 
   function applyCharacterPreset(presetId: (typeof CHARACTER_FRAME_PRESETS)[number]["id"]) {
     const preset = CHARACTER_FRAME_PRESETS.find((item) => item.id === presetId);
     if (!preset) return;
-    updateCharacterFrame({
+    updateActiveCharacterFrame({
       characterX: preset.characterX,
       characterY: preset.characterY,
       characterScale: preset.characterScale,
-    }, undefined, { coalesceKey: null });
+    }, { coalesceKey: null });
     setNotice(
       transformScope === "speaker"
         ? `${selected.speaker} 전체 장면에 ${preset.label} 구도를 적용했어요`
         : `현재 장면을 ${preset.label} 구도로 맞췄어요`,
     );
+  }
+
+  function scheduleCharacterUpdate(update: () => void) {
+    queuedCharacterUpdateRef.current = update;
+    if (characterFrameRef.current !== null) return;
+    characterFrameRef.current = window.requestAnimationFrame(() => {
+      characterFrameRef.current = null;
+      const queuedUpdate = queuedCharacterUpdateRef.current;
+      queuedCharacterUpdateRef.current = null;
+      queuedUpdate?.();
+    });
+  }
+
+  function flushCharacterUpdate() {
+    if (characterFrameRef.current !== null) {
+      window.cancelAnimationFrame(characterFrameRef.current);
+      characterFrameRef.current = null;
+    }
+    const queuedUpdate = queuedCharacterUpdateRef.current;
+    queuedCharacterUpdateRef.current = null;
+    queuedUpdate?.();
   }
 
   function beginCharacterDrag(
@@ -914,7 +1085,7 @@ export default function DialogueEditorPage() {
       startY: layer?.y ?? selected.characterY,
       sceneId: selected.id,
       speaker: layer?.speaker ?? selected.speaker,
-      scope: layer ? "scene" : transformScope === "speaker" ? "speaker" : "scene",
+      scope: transformScope,
       layerId: layer?.id,
     };
     rememberSceneState(scenesRef.current, null);
@@ -929,15 +1100,24 @@ export default function DialogueEditorPage() {
     const bounds = stage.getBoundingClientRect();
     const nextX = drag.startX + ((event.clientX - drag.startClientX) / bounds.width) * 100;
     const nextY = drag.startY - ((event.clientY - drag.startClientY) / bounds.height) * 100;
-    if (drag.layerId) {
-      updateStageLayerFrame(drag.layerId, { x: nextX, y: nextY }, { recordHistory: false }, drag.sceneId);
-    } else {
-      updateCharacterFrame(
-        { characterX: nextX, characterY: nextY },
-        drag,
-        { recordHistory: false },
-      );
-    }
+    scheduleCharacterUpdate(() => {
+      if (drag.layerId) {
+        updateStageLayerFrame(
+          drag.layerId,
+          { x: nextX, y: nextY },
+          { recordHistory: false },
+          drag.sceneId,
+          drag.speaker,
+          drag.scope,
+        );
+      } else {
+        updateCharacterFrame(
+          { characterX: nextX, characterY: nextY },
+          drag,
+          { recordHistory: false },
+        );
+      }
+    });
   }
 
   function endCharacterDrag(event: ReactPointerEvent<HTMLDivElement>) {
@@ -946,6 +1126,7 @@ export default function DialogueEditorPage() {
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
+    flushCharacterUpdate();
     characterDragRef.current = null;
     setCharacterDragging(false);
     setNotice(
@@ -959,15 +1140,79 @@ export default function DialogueEditorPage() {
     event.preventDefault();
     event.stopPropagation();
     const step = event.deltaY > 0 ? -0.05 : 0.05;
-    if (layer) updateStageLayerFrame(layer.id, { scale: layer.scale + step });
-    else updateCharacterFrame({ characterScale: selected.characterScale + step });
+    if (layer) {
+      updateStageLayerFrame(
+        layer.id,
+        { scale: layer.scale + step },
+        {},
+        selected.id,
+        layer.speaker,
+        transformScope,
+      );
+    } else updateActiveCharacterFrame({ characterScale: selected.characterScale + step });
+  }
+
+  function beginCharacterResize(
+    event: ReactPointerEvent<HTMLButtonElement>,
+    layer: DialogueStageCharacter,
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    characterResizeRef.current = {
+      pointerId: event.pointerId,
+      startClientX: event.clientX,
+      startScale: layer.scale,
+      sceneId: selected.id,
+      speaker: layer.speaker,
+      layerId: layer.id,
+      scope: transformScope,
+    };
+    rememberSceneState(scenesRef.current, null);
+    setCharacterDragging(true);
+  }
+
+  function moveCharacterResize(event: ReactPointerEvent<HTMLButtonElement>) {
+    const resize = characterResizeRef.current;
+    if (!resize || resize.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const nextScale = resize.startScale + (event.clientX - resize.startClientX) / 140;
+    scheduleCharacterUpdate(() => {
+      updateStageLayerFrame(
+        resize.layerId,
+        { scale: nextScale },
+        { recordHistory: false },
+        resize.sceneId,
+        resize.speaker,
+        resize.scope,
+      );
+    });
+  }
+
+  function endCharacterResize(event: ReactPointerEvent<HTMLButtonElement>) {
+    const resize = characterResizeRef.current;
+    if (!resize || resize.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    flushCharacterUpdate();
+    characterResizeRef.current = null;
+    setCharacterDragging(false);
+    setNotice(
+      resize.scope === "speaker"
+        ? `${resize.speaker} 전체 장면의 크기를 바꿨어요`
+        : `${resize.speaker} 크기를 바꿨어요`,
+    );
   }
 
   function updateCharacterScaleFromPointer(event: ReactPointerEvent<HTMLInputElement>) {
     const bounds = event.currentTarget.getBoundingClientRect();
     if (!bounds.width) return;
     const ratio = Math.min(1, Math.max(0, (event.clientX - bounds.left) / bounds.width));
-    updateCharacterFrame({
+    updateActiveCharacterFrame({
       characterScale: CHARACTER_SCALE_MIN + ratio * (CHARACTER_SCALE_MAX - CHARACTER_SCALE_MIN),
     });
   }
@@ -1006,7 +1251,7 @@ export default function DialogueEditorPage() {
     if (nextScale === null) return;
     event.preventDefault();
     event.stopPropagation();
-    updateCharacterFrame({ characterScale: nextScale });
+    updateActiveCharacterFrame({ characterScale: nextScale });
   }
 
   function nudgeCharacter(event: KeyboardEvent<HTMLDivElement>, layer?: DialogueStageCharacter) {
@@ -1031,8 +1276,8 @@ export default function DialogueEditorPage() {
         ...(patch.characterX === undefined ? {} : { x: patch.characterX }),
         ...(patch.characterY === undefined ? {} : { y: patch.characterY }),
         ...(patch.characterScale === undefined ? {} : { scale: patch.characterScale }),
-      });
-    } else updateCharacterFrame(patch);
+      }, {}, selected.id, layer.speaker, transformScope);
+    } else updateActiveCharacterFrame(patch);
   }
 
   async function saveAndBuild(mode: PublishMode = "quick") {
@@ -1164,7 +1409,22 @@ export default function DialogueEditorPage() {
 
   function selectRelative(offset: number) {
     const next = Math.min(Math.max(selectedIndex + offset, 0), scenes.length - 1);
-    setSelectedId(scenes[next].id);
+    selectSceneAndReveal(scenes[next].id);
+  }
+
+  function selectSceneAndReveal(sceneId: string) {
+    setSelectedId(sceneId);
+    const filteredIndex = filteredScenes.findIndex((scene) => scene.id === sceneId);
+    if (filteredIndex >= 0) {
+      setScenePage(Math.floor(filteredIndex / SCENES_PER_PAGE) + 1);
+    }
+  }
+
+  function goToScenePage(page: number) {
+    const nextPage = Math.min(Math.max(page, 1), scenePageCount);
+    setScenePage(nextPage);
+    const firstScene = filteredScenes[(nextPage - 1) * SCENES_PER_PAGE];
+    if (firstScene) setSelectedId(firstScene.id);
   }
 
   function addScene() {
@@ -1527,7 +1787,7 @@ export default function DialogueEditorPage() {
           <div className={styles.railTitle}>
             <div>
               <strong>장면 목록</strong>
-              <span>{filteredScenes.length}개 표시</span>
+              <span>{filteredScenes.length}개 · {currentScenePage}/{scenePageCount}페이지</span>
             </div>
             <button
               className={styles.addSceneButton}
@@ -1542,14 +1802,20 @@ export default function DialogueEditorPage() {
             <span>⌕</span>
             <input
               value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                setScenePage(1);
+              }}
               placeholder="대사·지문 검색"
             />
           </label>
           <select
             className={styles.filter}
             value={speakerFilter}
-            onChange={(event) => setSpeakerFilter(event.target.value)}
+            onChange={(event) => {
+              setSpeakerFilter(event.target.value);
+              setScenePage(1);
+            }}
             aria-label="화자 필터"
           >
             {speakers.map((speaker) => (
@@ -1557,7 +1823,7 @@ export default function DialogueEditorPage() {
             ))}
           </select>
           <div className={styles.sceneList}>
-            {filteredScenes.map((scene) => (
+            {pagedScenes.map((scene) => (
               <div className={styles.sceneListRow} key={scene.id}>
                 <button
                   className={`${styles.sceneSelectToggle} ${selectedSceneIds.includes(scene.id) ? styles.sceneSelectToggleActive : ""}`}
@@ -1571,7 +1837,7 @@ export default function DialogueEditorPage() {
                 <button
                   className={scene.id === selected.id ? styles.sceneActive : styles.sceneItem}
                   type="button"
-                  onClick={() => setSelectedId(scene.id)}
+                  onClick={() => selectSceneAndReveal(scene.id)}
                   aria-current={scene.id === selected.id ? "true" : undefined}
                 >
                   {dirtyIds.has(scene.id) ? (
@@ -1587,7 +1853,49 @@ export default function DialogueEditorPage() {
                 </button>
               </div>
             ))}
+            {!pagedScenes.length ? (
+              <div className={styles.sceneListEmpty}>검색 조건에 맞는 장면이 없습니다.</div>
+            ) : null}
           </div>
+          <nav className={styles.scenePagination} aria-label="장면 목록 페이지">
+            <button
+              type="button"
+              onClick={() => goToScenePage(currentScenePage - 1)}
+              disabled={currentScenePage === 1}
+              aria-label="이전 장면 페이지"
+            >
+              ‹
+            </button>
+            {scenePageItems.map((item) =>
+              typeof item === "number" ? (
+                <button
+                  type="button"
+                  key={item}
+                  className={item === currentScenePage ? styles.scenePageActive : ""}
+                  onClick={() => goToScenePage(item)}
+                  aria-current={item === currentScenePage ? "page" : undefined}
+                  aria-label={`장면 목록 ${item}페이지`}
+                >
+                  {item}
+                </button>
+              ) : (
+                <span key={item} aria-hidden="true">…</span>
+              ),
+            )}
+            <button
+              type="button"
+              onClick={() => goToScenePage(currentScenePage + 1)}
+              disabled={currentScenePage === scenePageCount}
+              aria-label="다음 장면 페이지"
+            >
+              ›
+            </button>
+            <small>
+              {filteredScenes.length
+                ? `${(currentScenePage - 1) * SCENES_PER_PAGE + 1}–${Math.min(currentScenePage * SCENES_PER_PAGE, filteredScenes.length)}번만 표시`
+                : "0개 표시"}
+            </small>
+          </nav>
         </aside>
 
         <section className={styles.editorPane}>
@@ -1624,7 +1932,7 @@ export default function DialogueEditorPage() {
             filteredIds={filteredScenes.map((scene) => scene.id)}
             onSelectedIdsChange={setSelectedSceneIds}
             onReplaceScenes={replaceScenesFromToolbox}
-            onSelectScene={setSelectedId}
+            onSelectScene={selectSceneAndReveal}
           />
 
           <section
@@ -1702,6 +2010,42 @@ export default function DialogueEditorPage() {
             </div>
 
             <div className={styles.characterControls}>
+              <div className={styles.characterApplyScope}>
+                <div>
+                  <b>캐릭터 적용 범위</b>
+                  <small>표정·위치·크기·연출을 어디까지 바꿀지 선택하세요.</small>
+                </div>
+                <div
+                  className={styles.scopeSwitch}
+                  role="radiogroup"
+                  aria-label="캐릭터 편집 적용 범위"
+                >
+                  <button
+                    type="button"
+                    className={transformScope === "scene" ? styles.scopeActive : ""}
+                    onClick={() => {
+                      setTransformScope("scene");
+                      setNotice(`이 장면의 ${selected.speaker}만 조정합니다`);
+                    }}
+                    aria-pressed={transformScope === "scene"}
+                  >
+                    이 캐릭터만 적용
+                  </button>
+                  <button
+                    type="button"
+                    className={transformScope === "speaker" ? styles.scopeActive : ""}
+                    onClick={() => {
+                      if (!selected.character) return;
+                      setTransformScope("speaker");
+                      setNotice(`${selected.speaker}가 나오는 ${sameSpeakerSceneCount}개 장면을 함께 조정합니다`);
+                    }}
+                    disabled={!selected.character}
+                    aria-pressed={transformScope === "speaker"}
+                  >
+                    같은 캐릭터 전체 적용 · {sameSpeakerSceneCount}
+                  </button>
+                </div>
+              </div>
               <label className={styles.field}>
                 <span>
                   화자
@@ -1728,13 +2072,20 @@ export default function DialogueEditorPage() {
                   aria-label={`${selected.speaker} 표정과 동작`}
                 >
                   {selectedPoses.map((pose) => {
-                    const active = pose.asset === selected.character;
+                    const active = pose.asset === selectedSpeakerLayer?.asset;
                     return (
                       <button
                         className={active ? styles.poseOptionActive : styles.poseOption}
                         type="button"
                         key={`${selected.speaker}-${pose.id}-${pose.asset}`}
-                        onClick={() => updateSelected({ character: pose.asset })}
+                        onClick={() => {
+                          if (!selectedSpeakerLayer) return;
+                          updateCharacterLayer(
+                            selectedSpeakerLayer.id,
+                            selectedSpeakerLayer.speaker,
+                            { asset: pose.asset },
+                          );
+                        }}
                         aria-pressed={active}
                         title={`${pose.id} · ${pose.label}`}
                       >
@@ -1764,34 +2115,7 @@ export default function DialogueEditorPage() {
               <div className={styles.transformStudioHeader}>
                 <div>
                   <b>캐릭터 화면 배치</b>
-                  <span>오른쪽 화면에서 캐릭터를 직접 끌어도 됩니다.</span>
-                </div>
-                <div
-                  className={styles.scopeSwitch}
-                  role="radiogroup"
-                  aria-label="캐릭터 배치 적용 범위"
-                >
-                  <button
-                    type="button"
-                    className={transformScope === "scene" ? styles.scopeActive : ""}
-                    onClick={() => setTransformScope("scene")}
-                    aria-pressed={transformScope === "scene"}
-                  >
-                    이 장면만
-                  </button>
-                  <button
-                    type="button"
-                    className={transformScope === "speaker" ? styles.scopeActive : ""}
-                    onClick={() => {
-                      if (!selected.character) return;
-                      setTransformScope("speaker");
-                      setNotice(`${selected.speaker}의 ${sameSpeakerSceneCount}개 장면을 함께 조정합니다`);
-                    }}
-                    disabled={!selected.character}
-                    aria-pressed={transformScope === "speaker"}
-                  >
-                    {selected.speaker} 전체 · {sameSpeakerSceneCount}
-                  </button>
+                  <span>게임과 같은 상반신 중심 기본 구도이며, 오른쪽 화면에서 직접 끌 수 있습니다.</span>
                 </div>
               </div>
 
@@ -1805,7 +2129,7 @@ export default function DialogueEditorPage() {
                     step="0.5"
                     value={selected.characterX}
                     disabled={!selected.character}
-                    onInput={(event) => updateCharacterFrame({ characterX: Number(event.currentTarget.value) })}
+                    onInput={(event) => updateActiveCharacterFrame({ characterX: Number(event.currentTarget.value) })}
                     aria-label="캐릭터 가로 위치"
                   />
                   <small>왼쪽</small><small>오른쪽</small>
@@ -1819,7 +2143,7 @@ export default function DialogueEditorPage() {
                     step="0.5"
                     value={selected.characterY}
                     disabled={!selected.character}
-                    onInput={(event) => updateCharacterFrame({ characterY: Number(event.currentTarget.value) })}
+                    onInput={(event) => updateActiveCharacterFrame({ characterY: Number(event.currentTarget.value) })}
                     aria-label="캐릭터 세로 위치"
                   />
                   <small>아래</small><small>위 · 신발 보이기</small>
@@ -1833,7 +2157,7 @@ export default function DialogueEditorPage() {
                     step="0.01"
                     value={selected.characterScale}
                     disabled={!selected.character}
-                    onInput={(event) => updateCharacterFrame({ characterScale: Number(event.currentTarget.value) })}
+                    onInput={(event) => updateActiveCharacterFrame({ characterScale: Number(event.currentTarget.value) })}
                     onPointerDown={beginCharacterScaleDrag}
                     onPointerMove={moveCharacterScaleDrag}
                     onPointerUp={endCharacterScaleDrag}
@@ -1859,7 +2183,7 @@ export default function DialogueEditorPage() {
                 ))}
                 <button
                   type="button"
-                  onClick={() => updateCharacterFrame({ characterX: 0, characterY: 0, characterScale: 1 })}
+                  onClick={() => updateActiveCharacterFrame({ characterX: 0, characterY: 0, characterScale: 1 })}
                   disabled={!selected.character}
                 >
                   초기화
@@ -1876,6 +2200,7 @@ export default function DialogueEditorPage() {
             onSelectLayer={setSelectedLayerId}
             onUpdateScene={updateSelected}
             onUpdateLayers={updateStageLayers}
+            onUpdateLayer={updateCharacterLayer}
           />
 
           <section className={styles.editorSection}>
@@ -1953,13 +2278,13 @@ export default function DialogueEditorPage() {
           <div className={styles.phone}>
             <div
               ref={previewStageRef}
-              className={`${styles.previewStage} ${(selected.cameraShake ?? 0) > 0 ? styles.previewStageShake : ""}`}
+              className={`${styles.previewStage} ${(selected.cameraShake ?? 0) > 0 ? styles.previewStageShake : ""} ${characterDragging ? styles.previewStageInteracting : ""}`}
             >
               <div
                 className={styles.previewBackdrop}
                 style={{
                   backgroundImage: selected.background
-                    ? `linear-gradient(180deg, rgba(4,14,28,.18), transparent 48%, rgba(2,8,18,.55)), url("${selected.background}")`
+                    ? `linear-gradient(180deg, rgba(4,14,28,.2), transparent 52%, rgba(2,8,18,.32)), url("${selected.background}")`
                     : undefined,
                   filter: `brightness(${selected.lighting ?? 1})`,
                   transform: `translate(${(selected.cameraX ?? 0) / 5}%, ${-(selected.cameraY ?? 0) / 5}%) scale(${selected.cameraZoom ?? 1})`,
@@ -1983,7 +2308,7 @@ export default function DialogueEditorPage() {
                       style={{
                         zIndex: 2 + layer.zIndex,
                         left: `${50 + layer.x}%`,
-                        bottom: `${12.3 + layer.y}%`,
+                        bottom: `${layer.y}%`,
                         transform: "translateX(-50%)",
                       }}
                     >
@@ -1991,7 +2316,7 @@ export default function DialogueEditorPage() {
                         className={styles.characterVisual}
                         style={{
                           opacity: layer.opacity,
-                          transform: `scale(${layer.scale}) scaleX(${layer.flipX ? -1 : 1})`,
+                          transform: `translateY(${STORY_CHARACTER_SCENE_OFFSET_PERCENT}%) scale(${STORY_CHARACTER_SCENE_SCALE * layer.scale}) scaleX(${layer.flipX ? -1 : 1})`,
                         }}
                       >
                         {layer.asset ? (
@@ -2009,6 +2334,10 @@ export default function DialogueEditorPage() {
                       </div>
                       <div
                         className={styles.characterDragHandle}
+                        style={{
+                          width: `${Math.min(94, Math.max(56, 104 * layer.scale))}%`,
+                          height: `${Math.min(88, Math.max(54, 88 * layer.scale))}%`,
+                        }}
                         onPointerDown={(event) => {
                           setSelectedLayerId(layer.id);
                           beginCharacterDrag(event, layer);
@@ -2023,6 +2352,64 @@ export default function DialogueEditorPage() {
                         title="몸 위에서 드래그 이동 · 휠 확대/축소"
                       >
                         <span className={styles.characterSelectionFrame} aria-hidden="true" />
+                        <div className={styles.characterQuickControls} aria-label={`${layer.speaker} 크기 빠른 조절`}>
+                          <button
+                            type="button"
+                            onPointerDown={(event) => event.stopPropagation()}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              updateCharacterLayer(layer.id, layer.speaker, { scale: layer.scale - 0.1 });
+                            }}
+                            aria-label={`${layer.speaker} 축소`}
+                            title="축소"
+                          >
+                            −
+                          </button>
+                          <output>{Math.round(layer.scale * 100)}%</output>
+                          <button
+                            type="button"
+                            onPointerDown={(event) => event.stopPropagation()}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              updateCharacterLayer(layer.id, layer.speaker, { scale: layer.scale + 0.1 });
+                            }}
+                            aria-label={`${layer.speaker} 확대`}
+                            title="확대"
+                          >
+                            +
+                          </button>
+                        </div>
+                        <div className={styles.characterCoordinateBadge}>
+                          <output>
+                            X {layer.x > 0 ? "+" : ""}{layer.x.toFixed(1)} · Y {layer.y > 0 ? "+" : ""}{layer.y.toFixed(1)} · {Math.round(layer.scale * 100)}%
+                          </output>
+                          <button
+                            type="button"
+                            onPointerDown={(event) => event.stopPropagation()}
+                            onClick={async (event) => {
+                              event.stopPropagation();
+                              const coordinates = `X ${layer.x.toFixed(1)} / Y ${layer.y.toFixed(1)} / 크기 ${Math.round(layer.scale * 100)}%`;
+                              await navigator.clipboard.writeText(coordinates);
+                              setNotice(`${layer.speaker} 좌표를 복사했어요`);
+                            }}
+                            aria-label={`${layer.speaker} 좌표 복사`}
+                            title="좌표 복사"
+                          >
+                            복사
+                          </button>
+                        </div>
+                        <button
+                          type="button"
+                          className={styles.characterScaleHandle}
+                          onPointerDown={(event) => beginCharacterResize(event, layer)}
+                          onPointerMove={moveCharacterResize}
+                          onPointerUp={endCharacterResize}
+                          onPointerCancel={endCharacterResize}
+                          aria-label={`${layer.speaker} 크기 드래그 조절`}
+                          title="좌우로 드래그해 크기 조절"
+                        >
+                          ↔
+                        </button>
                       </div>
                     </div>
                   ))}

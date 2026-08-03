@@ -379,9 +379,7 @@ class AcademyHelperStatus {
         role: json['role'] as String? ?? '도움',
         specialty: json['specialty'] as String? ?? '생활 경험',
         effect: json['effect'] as String? ?? '조사에 도움을 줍니다.',
-        asset:
-            json['asset'] as String? ??
-            'assets/images/protagonist_seed01/01_neutral.png',
+        asset: json['asset'] as String? ?? '',
         fatigue: (json['fatigue'] as num?)?.toInt() ?? 0,
         helpCount: (json['helpCount'] as num?)?.toInt() ?? 0,
         lastHelpDay: (json['lastHelpDay'] as num?)?.toInt(),
@@ -447,7 +445,7 @@ class OrganizationState {
         specialty: '규정 · 위험 · 기록',
         effect: '규정집과 공시를 대조해 빠뜨린 위험 조건을 찾아냅니다.',
         asset:
-            'assets/images/legacy_quarantine/character_hakjun_orientation_v2.png',
+            'assets/images/production_soft_painted/kim_hakjun/01_neutral_crosscheck_uniform_v4.png',
         fatigue: 8,
         helpCount: 0,
         lastHelpDay: null,

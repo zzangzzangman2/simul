@@ -23,8 +23,10 @@ class OfficeScreen extends StatelessWidget {
     required this.onRequestAcademyHelp,
     this.onCompleteRelationshipEvening,
     this.onRestDuringRelationshipEvening,
+    this.onCompleteWeekendActivity,
     this.onSettleCohortInvestmentDay,
     this.onLendToCohortInvestor,
+    this.onBorrowFromCohortInvestor,
     this.onAcknowledgeCohortInvestmentReport,
     this.onMarkPhoneThreadRead,
     this.onSendPhoneMessage,
@@ -92,6 +94,8 @@ class OfficeScreen extends StatelessWidget {
   onCompleteRelationshipEvening;
   final Future<RelationshipActionResult> Function()?
   onRestDuringRelationshipEvening;
+  final Future<WeekendActivityResult> Function(WeekendActivityRequest request)?
+  onCompleteWeekendActivity;
   final Future<CohortInvestmentActionResult> Function()?
   onSettleCohortInvestmentDay;
   final Future<CohortInvestmentActionResult> Function(
@@ -99,6 +103,11 @@ class OfficeScreen extends StatelessWidget {
     int amount,
   )?
   onLendToCohortInvestor;
+  final Future<CohortInvestmentActionResult> Function(
+    String lenderId,
+    int amount,
+  )?
+  onBorrowFromCohortInvestor;
   final Future<CohortInvestmentActionResult> Function()?
   onAcknowledgeCohortInvestmentReport;
   final Future<PhoneMessengerActionResult> Function(String contactId)?
@@ -764,10 +773,12 @@ class OfficeScreen extends StatelessWidget {
 
     final settleCohort = onSettleCohortInvestmentDay;
     final lendToCohort = onLendToCohortInvestor;
+    final borrowFromCohort = onBorrowFromCohortInvestor;
     final acknowledgeCohort = onAcknowledgeCohortInvestmentReport;
     if (isMarketTradingDay(closingState.currentDate) &&
         settleCohort != null &&
         lendToCohort != null &&
+        borrowFromCohort != null &&
         acknowledgeCohort != null) {
       if (!closingState.cohortInvestments.settledForDay(closingState.day)) {
         final settlement = await settleCohort();
@@ -784,6 +795,7 @@ class OfficeScreen extends StatelessWidget {
             CohortDailyResultScreen(
               state: closingState,
               onLend: lendToCohort,
+              onBorrow: borrowFromCohort,
               onAcknowledge: acknowledgeCohort,
             ),
           ),
@@ -791,6 +803,22 @@ class OfficeScreen extends StatelessWidget {
         if (completed != true || !context.mounted) return;
         closingState = _latestState;
       }
+    }
+
+    final completeWeekendActivity = onCompleteWeekendActivity;
+    if (isWeekendOutingDay(closingState.currentDate) &&
+        completeWeekendActivity != null &&
+        !weekendScheduleCompleteForState(closingState)) {
+      final completed = await navigator.push<bool>(
+        _gameSceneRoute<bool>(
+          WeekendScheduleScreen(
+            state: closingState,
+            onComplete: completeWeekendActivity,
+          ),
+        ),
+      );
+      if (completed != true || !context.mounted) return;
+      closingState = _latestState;
     }
 
     if (closingState.marketMinute < marketDayEndMinute) {

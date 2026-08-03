@@ -39,6 +39,7 @@ import 'game/real_estate_financing.dart';
 import 'game/real_estate_rental.dart';
 import 'game/real_estate_world.dart';
 import 'game/personal_finance_state.dart';
+import 'game/phone_ai_service.dart';
 import 'game/phone_messenger_state.dart';
 import 'game/real_estate_market.dart';
 import 'game/relationship_state.dart';
@@ -47,6 +48,7 @@ import 'game/star_shop.dart';
 import 'game/story_state.dart';
 import 'game/world_bootstrapper.dart';
 import 'game/world_economy.dart';
+import 'game/weekend_activity.dart';
 export 'game/world_bootstrapper.dart'
     show CampaignWorldPreparer, WorldLoadProgress, WorldLoadProgressCallback;
 
@@ -71,6 +73,7 @@ part 'dialogue/canonical_dialogue_data.dart';
 part 'visual_novel_onboarding.dart';
 part 'campaign_scenes.dart';
 part 'life_calendar_screen.dart';
+part 'weekend_activity_screen.dart';
 part 'relationship_screens.dart';
 part 'cohort_investment_screens.dart';
 part 'phone_messenger_screens.dart';
@@ -142,6 +145,7 @@ class MillenniumCapitalApp extends StatefulWidget {
 class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
   static const _engine = GameEngine();
   static const _businessEngine = LocalBusinessEngine();
+  final _phoneAiService = PhoneAiService();
   final _scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
   final _navigatorKey = GlobalKey<NavigatorState>();
   late final GamePersistence _persistence;
@@ -702,6 +706,17 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     return result;
   }
 
+  Future<WeekendActivityResult> _completeWeekendActivity(
+    WeekendActivityRequest request,
+  ) async {
+    final current = _state!;
+    final result = _engine.completeWeekendActivity(current, request);
+    if (!result.success) return result;
+    await _persistence.save(result.state);
+    if (mounted) setState(() => _state = result.state);
+    return result;
+  }
+
   Future<CohortInvestmentActionResult> _settleCohortInvestmentDay() async {
     final current = _state!;
     final universe = await FictionalMarketUniverse.load(
@@ -726,6 +741,22 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     final result = _engine.lendToCohortInvestor(
       current,
       borrowerId: borrowerId,
+      amount: amount,
+    );
+    if (!result.success) return result;
+    await _persistence.save(result.state);
+    if (mounted) setState(() => _state = result.state);
+    return result;
+  }
+
+  Future<CohortInvestmentActionResult> _borrowFromCohortInvestor(
+    String lenderId,
+    int amount,
+  ) async {
+    final current = _state!;
+    final result = _engine.borrowFromCohortInvestor(
+      current,
+      lenderId: lenderId,
       amount: amount,
     );
     if (!result.success) return result;
@@ -760,12 +791,31 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     String text,
   ) async {
     final current = _state!;
-    final result = _engine.sendPhoneMessage(
+    final localResult = _engine.sendPhoneMessage(
       current,
       contactId: contactId,
       text: text,
     );
-    if (!result.success) return result;
+    if (!localResult.success) return localResult;
+    var result = localResult;
+    final localDraft = localResult.reply?.text;
+    if (localDraft != null) {
+      final aiReply = await _phoneAiService.createReply(
+        state: current,
+        contactId: contactId,
+        playerText: text,
+        localDraft: localDraft,
+      );
+      if (aiReply != null) {
+        final generated = _engine.sendPhoneMessage(
+          current,
+          contactId: contactId,
+          text: text,
+          replyOverride: aiReply.text,
+        );
+        if (generated.success) result = generated;
+      }
+    }
     await _persistence.save(result.state);
     if (mounted) setState(() => _state = result.state);
     return result;
@@ -1170,7 +1220,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
   }
 
   Future<GameState> _completeMarketTutorial() async {
-    final next = _engine.markMarketTutorialSeen(_state!);
+    final next = _engine.completeInitialPracticeDay(_state!);
     await _persistMarketState(next);
     if (mounted) setState(() => _state = next);
     return next;
@@ -1555,8 +1605,10 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
                   onCompleteRelationshipEvening: _completeRelationshipEvening,
                   onRestDuringRelationshipEvening:
                       _restDuringRelationshipEvening,
+                  onCompleteWeekendActivity: _completeWeekendActivity,
                   onSettleCohortInvestmentDay: _settleCohortInvestmentDay,
                   onLendToCohortInvestor: _lendToCohortInvestor,
+                  onBorrowFromCohortInvestor: _borrowFromCohortInvestor,
                   onAcknowledgeCohortInvestmentReport:
                       _acknowledgeCohortInvestmentReport,
                   onMarkPhoneThreadRead: _markPhoneThreadRead,

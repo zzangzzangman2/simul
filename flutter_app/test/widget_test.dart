@@ -583,11 +583,15 @@ void main() {
     );
     final scrimDecoration = scrim.decoration as BoxDecoration;
     final scrimGradient = scrimDecoration.gradient! as LinearGradient;
-    expect(scrimGradient.colors.last, const Color(0x70000000));
+    expect(scrimGradient.colors.last, const Color(0x52000000));
     expect(find.byKey(const Key('story-moving-light-beam')), findsNothing);
     expect(find.byKey(const Key('story-crt-scanline')), findsNothing);
     expect(find.byKey(const Key('orientation-dust-motes')), findsNothing);
-    expect(find.byType(BackdropFilter), findsNothing);
+    expect(find.byType(BackdropFilter), findsOneWidget);
+    expect(
+      find.byKey(const Key('story-dialogue-backdrop-blur')),
+      findsOneWidget,
+    );
     expect(
       find.byKey(const Key('story-dialogue-opacity-control')),
       findsNothing,
@@ -799,7 +803,7 @@ void main() {
           'background':
               '/play/assets/assets/images/bg_bank_branch_2000_portrait_cartoon_v2.png',
           'character':
-              '/play/assets/assets/images/protagonist_seed01/05_surprised.png',
+              '/play/assets/assets/images/production_soft_painted/kim_hakjun/01_neutral_crosscheck_uniform_v4.png',
           'characterX': 12.5,
           'characterY': 18.0,
           'characterScale': 0.75,
@@ -837,7 +841,7 @@ void main() {
     });
     final dialogueOverrideJson = jsonEncode({
       'version': 1,
-      'appearanceVersion': 17,
+      'appearanceVersion': 19,
       'updatedAt': '2000-01-02T00:00:00.000Z',
       'scenes': scenes,
     });
@@ -866,7 +870,7 @@ void main() {
                   .image
               as AssetImage)
           .assetName,
-      'assets/images/protagonist_seed01/05_surprised.png',
+      'assets/images/production_soft_painted/kim_hakjun/01_neutral_crosscheck_uniform_v4.png',
     );
     final positionTransform = tester.widget<Transform>(
       find.byKey(const Key('story-character-position')),
@@ -877,7 +881,10 @@ void main() {
     final scaleTransform = tester.widget<Transform>(
       find.byKey(const Key('story-character-scale')),
     );
-    expect(scaleTransform.transform.getMaxScaleOnAxis(), closeTo(1.5, 0.001));
+    expect(
+      scaleTransform.transform.getMaxScaleOnAxis(),
+      closeTo(1.0875, 0.001),
+    );
     expect(
       (tester
                   .widget<Image>(
@@ -913,7 +920,7 @@ void main() {
     final dialogueOverrideJson = jsonEncode({
       'version': 2,
       'contentVersion': 3,
-      'appearanceVersion': 17,
+      'appearanceVersion': 19,
       'scenes': [
         {
           'id': 'directed-start',
@@ -946,7 +953,7 @@ void main() {
               'id': 'hakjun',
               'speaker': '김학준',
               'asset':
-                  '/play/assets/assets/images/legacy_quarantine/character_hakjun_orientation_v2.png',
+                  '/play/assets/assets/images/production_soft_painted/kim_hakjun/01_neutral_crosscheck_uniform_v4.png',
               'x': 20,
               'y': 1,
               'scale': 0.7,
@@ -2242,6 +2249,7 @@ void main() {
         actionKey: const Key('tutorial-recovery-continue'),
         overlayKey: const Key('tutorial-state-recovery'),
       );
+      await tester.pump(const Duration(seconds: 3));
       expect(
         find.byKey(const Key('tutorial-post-trade-review')),
         findsOneWidget,
@@ -2266,7 +2274,7 @@ void main() {
       );
       expect(
         reviewTeacherRect.bottom,
-        closeTo(reviewStageRect.bottom - 104, 0.01),
+        closeTo(reviewStageRect.bottom + 56, 0.01),
       );
       expect(
         reviewTeacherRect.center.dx,
@@ -2291,26 +2299,7 @@ void main() {
       await tester.pump(const Duration(seconds: 2));
       expect(
         find.byKey(const Key('tutorial-review-protagonist-character')),
-        findsOneWidget,
-      );
-      expect(
-        tester.getRect(
-          find.byKey(const Key('tutorial-review-protagonist-character')),
-        ),
-        reviewTeacherRect,
-      );
-      expect(
-        find.descendant(
-          of: find.byKey(const Key('tutorial-review-protagonist-character')),
-          matching: find.byWidgetPredicate(
-            (widget) =>
-                widget is Image &&
-                widget.image is AssetImage &&
-                (widget.image as AssetImage).assetName ==
-                    'assets/images/protagonist_seed01/12_thinking.png',
-          ),
-        ),
-        findsOneWidget,
+        findsNothing,
       );
       await tester.tap(find.byKey(const Key('tutorial-review-continue')));
       await tester.pump();
@@ -2333,7 +2322,7 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('호가 · 주문 · 차트 · 회사 정보/투자노트'), findsOneWidget);
-      expect(find.textContaining('생활 라운지와 트레이딩 플로어를 오가며'), findsOneWidget);
+      expect(find.textContaining('파산하면 주말 알바로 다시 만들거나'), findsOneWidget);
       await tester.tap(
         find.byKey(const Key('market-practical-tutorial-complete')),
       );

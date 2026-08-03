@@ -20,6 +20,16 @@ type DirectorStudioProps = {
   onSelectLayer: (id: string) => void;
   onUpdateScene: (patch: Partial<DialogueScene>) => void;
   onUpdateLayers: (layers: DialogueStageCharacter[]) => void;
+  onUpdateLayer: (
+    layerId: string,
+    speaker: string,
+    patch: Partial<
+      Pick<
+        DialogueStageCharacter,
+        "asset" | "x" | "y" | "scale" | "opacity" | "flipX" | "enter" | "exit" | "motion"
+      >
+    >,
+  ) => void;
 };
 
 const entranceLabels = {
@@ -90,6 +100,7 @@ export default function DirectorStudio({
   onSelectLayer,
   onUpdateScene,
   onUpdateLayers,
+  onUpdateLayer,
 }: DirectorStudioProps) {
   const [activeTab, setActiveTab] = useState<"cast" | "camera" | "dialogue" | "branch" | "audio">("cast");
   const [newSpeaker, setNewSpeaker] = useState(() =>
@@ -107,7 +118,21 @@ export default function DirectorStudio({
     }
   }, [layers, onSelectLayer, selectedLayerId]);
 
-  function updateLayer(layerId: string, patch: Partial<DialogueStageCharacter>) {
+  function updateLayer(
+    layerId: string,
+    patch: Partial<
+      Pick<
+        DialogueStageCharacter,
+        "asset" | "x" | "y" | "scale" | "opacity" | "flipX" | "enter" | "exit" | "motion"
+      >
+    >,
+  ) {
+    const layer = layers.find((item) => item.id === layerId);
+    if (!layer) return;
+    onUpdateLayer(layerId, layer.speaker, patch);
+  }
+
+  function updateLayerLocally(layerId: string, patch: Partial<DialogueStageCharacter>) {
     onUpdateLayers(
       layers.map((layer) => (layer.id === layerId ? { ...layer, ...patch } : layer)),
     );
@@ -234,7 +259,7 @@ export default function DirectorStudio({
                   <label><span>인물</span><select value={activeLayer.speaker} onChange={(event) => {
                     const speaker = event.target.value;
                     const asset = dialogueCharacterBySpeaker.get(speaker)?.poses[0]?.asset ?? "";
-                    updateLayer(activeLayer.id, { speaker, asset });
+                    updateLayerLocally(activeLayer.id, { speaker, asset });
                   }}>{dialogueCharacters.filter((character) => character.speaker !== "이야기").map((character) => <option key={character.speaker}>{character.speaker}</option>)}</select></label>
                   <label><span>표정·포즈</span><select value={activeLayer.asset} onChange={(event) => updateLayer(activeLayer.id, { asset: event.target.value })}>
                     {(dialogueCharacterBySpeaker.get(activeLayer.speaker)?.poses ?? []).map((pose) => <option key={pose.asset} value={pose.asset}>{pose.label}</option>)}

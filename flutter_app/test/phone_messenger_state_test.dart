@@ -6,10 +6,10 @@ import 'package:millennium_capital/game/phone_messenger_state.dart';
 void main() {
   const engine = GameEngine();
 
-  test('new and migrated saves have nine distinct phone contacts in v25', () {
+  test('new and migrated saves have nine distinct phone contacts in v26', () {
     final state = engine.createNewGame('미래톡 테스트', worldSeed: 'phone-initial');
 
-    expect(GameState.schemaVersion, 25);
+    expect(GameState.schemaVersion, 26);
     expect(phoneMessengerContacts.length, 9);
     expect(state.phoneMessenger.messages.length, 9);
     expect(state.phoneMessenger.totalUnread, 9);
@@ -54,11 +54,10 @@ void main() {
     }
 
     expect(replies, hasLength(9));
-    expect(replies.any((reply) => reply.contains('수수료')), isTrue);
-    expect(replies.any((reply) => reply.contains('약속')), isTrue);
-    expect(replies.any((reply) => reply.contains('반대로')), isFalse);
-    expect(replies.any((reply) => reply.contains('속보 정정')), isTrue);
-    expect(replies.any((reply) => reply.contains('왜 이 가격')), isTrue);
+    expect(replies.any((reply) => reply.contains('지난 기록이나')), isTrue);
+    expect(replies.any((reply) => reply.contains('숫자도 잠깐')), isTrue);
+    expect(replies.any((reply) => reply.contains('반대로 틀릴 이유')), isTrue);
+    expect(replies.any((reply) => reply.contains('지난 기록은 볼 수')), isTrue);
   });
 
   test('each contact allows three replies per day and resets next day', () {

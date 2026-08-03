@@ -15,6 +15,12 @@
 거래일: 15:00 종가·데시멀 투자 결과표
 휴장일: 투자 결과표 생략
         ↓
+토·일요일: 주말 자유 일정·행동력 2칸
+        ├─ 식당 설거지·문구 창고·교환장터 알바
+        ├─ 동기에게 취향별 선물
+        ├─ 도서관 시장 복기
+        └─ 남은 시간 휴식
+        ↓
 20:00 관계 시간
         ├─ 평일: 이야기·데시멀톡
         ├─ 토·일요일: 이야기·데시멀톡·공개 장소 외출
@@ -30,7 +36,33 @@
 - 주말과 시장 휴장일에는 데시멀 10인 투자 결과를 만들지 않는다.
 - 달력 전환 화면의 계속 버튼을 눌러야 다음 날 저장과 조간신문 생성으로 넘어간다.
 
-## 3. 달력 화면
+## 3. 주말 자유 일정
+
+토요일과 일요일은 낮 행동력 2칸을 사용한 뒤 기존 20:00 관계 시간으로 이어진다.
+
+| 활동 | 행동력 | 결과 |
+| --- | ---: | --- |
+| 식당 설거지 | 1 | 안정적인 알바 수당 |
+| 문구 창고 정리 | 1 | 꼼꼼함 중심의 중간 수당 |
+| 교환장터 판매 보조 | 1 | 변동 폭이 큰 높은 수당 |
+| 동기에게 선물 | 1 | 생활비 차감, 취향 일치 시 호감도 +4·불일치 시 +2 |
+| 도서관 시장 복기 | 1 | 다음 거래일 시장 조사보고서 무료 이용권 1회, 최대 3회 보관 |
+| 남은 시간 휴식 | 남은 전부 | 즉시 낮 일정 종료 |
+
+- 생활비가 1,200원 미만이면 알바를 추천한다.
+- 보유 주식이 없고 주문 가능금이 1만원 미만인 재기 상태에서는 알바 수당을 실전 증권계좌에 바로 넣는다.
+- 선물은 생활비 통장에서 결제하며 같은 날 같은 동기에게 두 번 줄 수 없다.
+- 선물은 저녁 관계 시간을 대신하지 않는다. 낮에 선물을 준 뒤에도 이야기·외출·휴식을 고를 수 있다.
+- 주말 활동은 날짜·수입·선물·호감도 변화·배경 그림을 생활 기록으로 남긴다. 한 날짜에 기록이 여러 개면 달력 카드가 개수를 함께 표시한다.
+
+주말 화면은 아래의 전용 배경 4종을 사용한다.
+
+- `decimal_weekend/bg_weekend_neighborhood_winter_2000_v1.png`
+- `decimal_weekend/bg_weekend_restaurant_kitchen_2000_v1.png`
+- `decimal_weekend/bg_weekend_stationery_gift_shop_2000_v1.png`
+- `decimal_weekend/bg_weekend_public_library_2000_v1.png`
+
+## 4. 달력 화면
 
 - 기준 화면은 390×844이며 최소 360×800에서도 스크롤과 하단 계속 버튼이 겹치지 않는다.
 - 월요일부터 일요일까지 고정 7열·6주 그리드를 사용한다.
@@ -39,7 +71,7 @@
 - 하루 전환 중에는 다음 날까지 볼 수 있지만 그 뒤의 미래 날짜와 미래 사건은 열지 않는다.
 - 상단 성장선은 14살에서 20살까지의 연도 진행을 시각화한다.
 
-## 4. 사건과 그림 확장 계약
+## 5. 사건과 그림 확장 계약
 
 날짜가 고정된 사건은 `authoredLifeCalendarEvents`에 아래 필드로 추가한다.
 
@@ -54,17 +86,21 @@
 | `imageAsset` | 선택 사항인 Flutter 에셋 경로 |
 
 - `imageAsset`이 있으면 사건 카드에 그림을 표시하고, 없으면 명시적인 그림 슬롯을 유지한다.
-- 관계 대화와 주말 외출은 `RelationshipState.memories`에서 자동으로 달력 사건이 된다.
+- 관계 대화·주말 외출은 `RelationshipState.memories`에서, 주말 자유 일정은 `weekendActivityLog`에서 자동으로 달력 사건이 된다.
 - 관계 사건의 그림은 해당 인물의 현재 승인 초상 에셋을 사용한다.
 - 저장된 현재 날짜보다 뒤의 작성 사건은 노출하지 않아 미래 내용을 누설하지 않는다.
-- 달력은 저장된 날짜와 관계 기억에서 파생하므로 이번 구현은 `GameState` 스키마를 올리지 않는다.
+- 주말 기록은 `StoryState.storyFlags`에 최대 256개를 보존한다. 달력은 저장된 날짜·관계 기억·주말 기록에서 파생하므로 `GameState` 스키마를 올리지 않는다.
 
-## 5. 주요 구현과 검증
+## 6. 주요 구현과 검증
 
 - `flutter_app/lib/game/life_calendar.dart`: 날짜·성장 나이·월 그리드·사건 모델
+- `flutter_app/lib/game/weekend_activity.dart`: 행동력·알바·선물·시장 공부·기록 모델
 - `flutter_app/lib/life_calendar_screen.dart`: 월간 달력과 사건 그림 카드
+- `flutter_app/lib/weekend_activity_screen.dart`: 390×844·360×800 주말 자유 일정 UI
 - `flutter_app/lib/campaign_scenes.dart`: 하루 마감과 다음 날 사이의 달력 전환
 - `flutter_app/lib/relationship_screens.dart`: 평일 대화·메신저와 주말 외출 표시
+- `flutter_app/test/weekend_activity_test.dart`: 주말 수입·재기·평일 차단 규칙
+- `flutter_app/test/weekend_activity_screen_test.dart`: 행동 카드·휴식 확인·최소 화면 회귀
 - `flutter_app/test/life_calendar_test.dart`: 날짜·연령·사건 파생 규칙
 - `flutter_app/test/life_calendar_screen_test.dart`: 390×844·360×800 화면 회귀
 - `flutter_app/test/day_advance_flow_test.dart`: 거래일·휴장일과 신문 전환 순서

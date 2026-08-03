@@ -2,16 +2,18 @@ part of 'main.dart';
 
 const _onboardingBeatCount = 292;
 const _maximumDialogueBeatCount = 320;
-const _dialogueAppearanceVersion = 17;
+const _dialogueAppearanceVersion = 19;
 const _dialogueContentVersion = 3;
 const _dialogueRuntimeStorageKey = 'project-decimal-dialogue-runtime-v2';
 const _dialogueBundleAsset = 'assets/dialogue/dialogue-editor-override.json';
 const _orientationCompleteBeat = _onboardingBeatCount - 1;
-const _storyCharacterBottomInset = -280.0;
+const _storyCharacterBottomInset = -56.0;
 const _storyDialogueBottomInset = 28.0;
 const _storyCharacterHeightFactor = 0.9;
 const _storyCharacterAspectRatio = 2 / 3;
-const _storyCharacterSceneScale = 2.0;
+const _storyCharacterSceneScale = 1.45;
+const _storyDialogueBackdropBlur = 3.2;
+const _storyDialoguePanelMinHeight = 154.0;
 const _maximumWheelBackSteps = 12;
 const _wheelBackDebounce = Duration(milliseconds: 180);
 
@@ -374,15 +376,9 @@ class _VisualNovelOnboardingScreenState
     extends State<VisualNovelOnboardingScreen> {
   final _playerController = TextEditingController();
   final _companyController = TextEditingController();
-  final AudioPlayer _storyBgmPlayer = AudioPlayer(
-    playerId: 'project-decimal-story-bgm',
-  );
-  final AudioPlayer _storyEffectPlayer = AudioPlayer(
-    playerId: 'project-decimal-story-effect',
-  );
-  final AudioPlayer _storyVoicePlayer = AudioPlayer(
-    playerId: 'project-decimal-story-voice',
-  );
+  AudioPlayer? _storyBgmPlayer;
+  AudioPlayer? _storyEffectPlayer;
+  AudioPlayer? _storyVoicePlayer;
   final List<String> _dialogueHistory = <String>[];
   final List<int> _beatNavigationHistory = <int>[];
   final Map<String, Object> _storyVariables = <String, Object>{};
@@ -736,9 +732,12 @@ class _VisualNovelOnboardingScreenState
   void dispose() {
     _playerController.dispose();
     _companyController.dispose();
-    unawaited(_storyBgmPlayer.dispose());
-    unawaited(_storyEffectPlayer.dispose());
-    unawaited(_storyVoicePlayer.dispose());
+    final storyBgmPlayer = _storyBgmPlayer;
+    final storyEffectPlayer = _storyEffectPlayer;
+    final storyVoicePlayer = _storyVoicePlayer;
+    if (storyBgmPlayer != null) unawaited(storyBgmPlayer.dispose());
+    if (storyEffectPlayer != null) unawaited(storyEffectPlayer.dispose());
+    if (storyVoicePlayer != null) unawaited(storyVoicePlayer.dispose());
     super.dispose();
   }
 
@@ -895,30 +894,39 @@ class _VisualNovelOnboardingScreenState
     }
     try {
       if (bgm != _activeStoryBgm) {
-        await _storyBgmPlayer.stop();
+        await _storyBgmPlayer?.stop();
         _activeStoryBgm = bgm;
         if (bgm.isNotEmpty) {
-          await _storyBgmPlayer.setReleaseMode(ReleaseMode.loop);
-          await _storyBgmPlayer.play(
+          final player = _storyBgmPlayer ??= AudioPlayer(
+            playerId: 'project-decimal-story-bgm',
+          );
+          await player.setReleaseMode(ReleaseMode.loop);
+          await player.play(
             AssetSource(_audioAssetSource(bgm)),
             volume: volume,
           );
         }
       } else if (bgm.isNotEmpty) {
-        await _storyBgmPlayer.setVolume(volume);
+        await _storyBgmPlayer?.setVolume(volume);
       }
-      if (_storyEffectActive) await _storyEffectPlayer.stop();
+      if (_storyEffectActive) await _storyEffectPlayer?.stop();
       _storyEffectActive = effect.isNotEmpty;
       if (effect.isNotEmpty) {
-        await _storyEffectPlayer.play(
+        final player = _storyEffectPlayer ??= AudioPlayer(
+          playerId: 'project-decimal-story-effect',
+        );
+        await player.play(
           AssetSource(_audioAssetSource(effect)),
           volume: volume,
         );
       }
-      if (_storyVoiceActive) await _storyVoicePlayer.stop();
+      if (_storyVoiceActive) await _storyVoicePlayer?.stop();
       _storyVoiceActive = voice.isNotEmpty;
       if (voice.isNotEmpty) {
-        await _storyVoicePlayer.play(
+        final player = _storyVoicePlayer ??= AudioPlayer(
+          playerId: 'project-decimal-story-voice',
+        );
+        await player.play(
           AssetSource(_audioAssetSource(voice)),
           volume: volume,
         );
@@ -1491,7 +1499,7 @@ class _VisualNovelOnboardingScreenState
                       colors: [
                         Color(0x33000000),
                         Colors.transparent,
-                        Color(0x70000000),
+                        Color(0x52000000),
                       ],
                       stops: [0, 0.52, 1],
                     ),
@@ -2912,7 +2920,7 @@ class _AcademyPcTerminal extends StatelessWidget {
             border: Border.all(color: const Color(0xFFE4C779)),
           ),
           child: const Text(
-            '국가원금 50,000원 · 기록형 원칙 · 확정이익 20% 국가 환수 / 80% 자립적립',
+            '국가원금 50,000원 · 1월 3일 모의 실습 · 다음 날 실전 / 순이익 20% 환수 · 80% 재투자',
             key: Key('academy-state-account-rule'),
             textAlign: TextAlign.center,
             style: TextStyle(
@@ -3229,167 +3237,180 @@ class _NovelDialogueState extends State<_NovelDialogue>
           : widget.continueKey ?? const Key('story-continue'),
       behavior: HitTestBehavior.opaque,
       onTap: _handleExternalTap,
-      child: Container(
-        key: const Key('story-dialogue-panel'),
-        decoration: BoxDecoration(
-          color: switch (widget.mode) {
-            'thought' => const Color(0xBD221E35),
-            'system' => const Color(0xD91A2E3F),
-            'narration' => const Color(0xB3161D2A),
-            _ => const Color(0xB8222937),
-          },
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: const Color(0x668CCEEB)),
-          boxShadow: const <BoxShadow>[
-            BoxShadow(
-              color: Color(0x66000000),
-              blurRadius: 20,
-              offset: Offset(0, 8),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: BackdropFilter(
+          key: const Key('story-dialogue-backdrop-blur'),
+          filter: ui.ImageFilter.blur(
+            sigmaX: _storyDialogueBackdropBlur,
+            sigmaY: _storyDialogueBackdropBlur,
+          ),
+          child: Container(
+            key: const Key('story-dialogue-panel'),
+            constraints: const BoxConstraints(
+              minHeight: _storyDialoguePanelMinHeight,
             ),
-          ],
-        ),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(18, 13, 18, 14),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Semantics(
-                key: const Key('story-speaker-chip'),
-                label: affiliation.isEmpty
-                    ? widget.speaker
-                    : '${widget.speaker}, $affiliation',
-                child: ExcludeSemantics(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.baseline,
-                    textBaseline: TextBaseline.alphabetic,
-                    children: [
-                      Text(
-                        speakerName,
-                        key: const Key('story-speaker-name'),
-                        style: const TextStyle(
-                          color: Color(0xFFF8FBFF),
-                          fontFamily: 'Pretendard',
-                          fontSize: 18,
-                          height: 1.1,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -0.45,
-                          shadows: [
-                            Shadow(
-                              color: Color(0xB8000000),
-                              blurRadius: 4,
-                              offset: Offset(0, 1),
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (affiliation.isNotEmpty) ...[
-                        const SizedBox(width: 7),
-                        Flexible(
-                          child: Text(
-                            affiliation,
-                            key: const Key('story-speaker-affiliation'),
-                            overflow: TextOverflow.ellipsis,
+            decoration: BoxDecoration(
+              color: switch (widget.mode) {
+                'thought' => const Color(0x7A211C36),
+                'system' => const Color(0x7A162C3E),
+                'narration' => const Color(0x74161D2A),
+                _ => const Color(0x74101A28),
+              },
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0x3D8CCEEB)),
+              boxShadow: const <BoxShadow>[
+                BoxShadow(
+                  color: Color(0x52000000),
+                  blurRadius: 18,
+                  offset: Offset(0, 7),
+                ),
+              ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(18, 13, 18, 14),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Semantics(
+                    key: const Key('story-speaker-chip'),
+                    label: affiliation.isEmpty
+                        ? widget.speaker
+                        : '${widget.speaker}, $affiliation',
+                    child: ExcludeSemantics(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Text(
+                            speakerName,
+                            key: const Key('story-speaker-name'),
                             style: const TextStyle(
-                              color: Color(0xFF62C9F6),
+                              color: Color(0xFFF8FBFF),
                               fontFamily: 'Pretendard',
-                              fontSize: 11.5,
+                              fontSize: 18,
                               height: 1.1,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -0.25,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: -0.45,
                               shadows: [
                                 Shadow(
                                   color: Color(0xB8000000),
-                                  blurRadius: 3,
+                                  blurRadius: 4,
                                   offset: Offset(0, 1),
                                 ),
                               ],
                             ),
                           ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 6),
-              const SizedBox(
-                key: Key('story-dialogue-divider'),
-                width: double.infinity,
-                height: 9,
-                child: Align(
-                  alignment: Alignment.topCenter,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          Color(0xAA9CB5C5),
-                          Color(0x668AA8BC),
-                          Color(0x009CB5C5),
+                          if (affiliation.isNotEmpty) ...[
+                            const SizedBox(width: 7),
+                            Flexible(
+                              child: Text(
+                                affiliation,
+                                key: const Key('story-speaker-affiliation'),
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Color(0xFF62C9F6),
+                                  fontFamily: 'Pretendard',
+                                  fontSize: 11.5,
+                                  height: 1.1,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -0.25,
+                                  shadows: [
+                                    Shadow(
+                                      color: Color(0xB8000000),
+                                      blurRadius: 3,
+                                      offset: Offset(0, 1),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
                         ],
-                        stops: [0, 0.7, 1],
                       ),
                     ),
-                    child: SizedBox(width: double.infinity, height: 1),
                   ),
-                ),
-              ),
-              if (widget.stageDirection?.trim().isNotEmpty ?? false) ...[
-                Text(
-                  widget.stageDirection!.trim(),
-                  key: const Key('story-stage-direction'),
-                  style: const TextStyle(
-                    color: Color(0xFFE8DDBF),
-                    fontFamily: 'Pretendard',
-                    fontSize: 12.5,
-                    height: 1.4,
-                    fontStyle: FontStyle.italic,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.2,
-                    shadows: <Shadow>[
-                      Shadow(color: Color(0xD9000000), blurRadius: 4),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 6),
-              ],
-              Semantics(
-                liveRegion: true,
-                label: widget.line,
-                child: Text(
-                  visibleLine,
-                  key: const Key('story-line-text'),
-                  style: const TextStyle(
-                    color: Color(0xFFF9FCFF),
-                    fontFamily: 'Pretendard',
-                    fontSize: 15.5,
-                    height: 1.48,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: -0.3,
-                    shadows: [
-                      Shadow(
-                        color: Color(0xE8000000),
-                        blurRadius: 5,
-                        offset: Offset(0, 1.4),
+                  const SizedBox(height: 6),
+                  const SizedBox(
+                    key: Key('story-dialogue-divider'),
+                    width: double.infinity,
+                    height: 9,
+                    child: Align(
+                      alignment: Alignment.topCenter,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Color(0xAA9CB5C5),
+                              Color(0x668AA8BC),
+                              Color(0x009CB5C5),
+                            ],
+                            stops: [0, 0.7, 1],
+                          ),
+                        ),
+                        child: SizedBox(width: double.infinity, height: 1),
                       ),
-                    ],
+                    ),
                   ),
-                ),
+                  if (widget.stageDirection?.trim().isNotEmpty ?? false) ...[
+                    Text(
+                      widget.stageDirection!.trim(),
+                      key: const Key('story-stage-direction'),
+                      style: const TextStyle(
+                        color: Color(0xFFE8DDBF),
+                        fontFamily: 'Pretendard',
+                        fontSize: 12.5,
+                        height: 1.4,
+                        fontStyle: FontStyle.italic,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.2,
+                        shadows: <Shadow>[
+                          Shadow(color: Color(0xD9000000), blurRadius: 4),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                  ],
+                  Semantics(
+                    liveRegion: true,
+                    label: widget.line,
+                    child: Text(
+                      visibleLine,
+                      key: const Key('story-line-text'),
+                      style: const TextStyle(
+                        color: Color(0xFFF9FCFF),
+                        fontFamily: 'Pretendard',
+                        fontSize: 15.5,
+                        height: 1.48,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: -0.3,
+                        shadows: [
+                          Shadow(
+                            color: Color(0xE8000000),
+                            blurRadius: 5,
+                            offset: Offset(0, 1.4),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (_typingComplete && widget.choices.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    ...widget.choices.map(
+                      (choice) => Padding(
+                        padding: const EdgeInsets.only(bottom: 7),
+                        child: choice,
+                      ),
+                    ),
+                  ],
+                  if (_typingComplete && widget.child != null) ...[
+                    const SizedBox(height: 10),
+                    widget.child!,
+                  ],
+                ],
               ),
-              if (_typingComplete && widget.choices.isNotEmpty) ...[
-                const SizedBox(height: 10),
-                ...widget.choices.map(
-                  (choice) => Padding(
-                    padding: const EdgeInsets.only(bottom: 7),
-                    child: choice,
-                  ),
-                ),
-              ],
-              if (_typingComplete && widget.child != null) ...[
-                const SizedBox(height: 10),
-                widget.child!,
-              ],
-            ],
+            ),
           ),
         ),
       ),

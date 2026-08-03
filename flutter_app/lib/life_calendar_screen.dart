@@ -544,14 +544,18 @@ class _CalendarDayCell extends StatelessWidget {
                 ),
                 const Spacer(),
                 Text(
-                  weekend
-                      ? '외출'
+                  events.isNotEmpty
+                      ? events.first.markerLabel
+                      : weekend
+                      ? '일정'
                       : holiday
                       ? '휴장'
                       : '개장',
                   maxLines: 1,
                   style: TextStyle(
-                    color: weekend
+                    color: events.isNotEmpty
+                        ? eventColor
+                        : weekend
                         ? _calendarCoral
                         : holiday
                         ? _calendarMuted
@@ -632,7 +636,7 @@ class _CalendarDayRecord extends StatelessWidget {
               (isIncoming
                   ? '새로운 하루'
                   : isWeekendOutingDay(date)
-                  ? '주말 자유 외출'
+                  ? '주말 자유 일정'
                   : !isMarketTradingDay(date)
                   ? '휴장일의 생활 기록'
                   : '정규 거래일');
@@ -642,7 +646,7 @@ class _CalendarDayRecord extends StatelessWidget {
               (isIncoming
                   ? '달력을 한 칸 넘기고 08:00 조간신문으로 하루를 시작합니다.'
                   : isWeekendOutingDay(date)
-                  ? '주식시장은 쉬고, 친해진 동기와 공개 장소로 외출할 수 있습니다.'
+                  ? '행동력 2칸으로 알바·선물·시장 공부·휴식을 고른 뒤, 저녁에는 친해진 동기와 공개 장소로 외출할 수 있습니다.'
                   : !isMarketTradingDay(date)
                   ? '시장은 쉬지만 데시멀톡과 생활 관계 행동은 이어집니다.'
                   : '15:00 종가 뒤 데시멀톡·관계 행동 중 하나를 고르고 하루를 정리합니다.');

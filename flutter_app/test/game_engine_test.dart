@@ -175,6 +175,27 @@ void main() {
   });
 
   test(
+    'the 50000 won practice lasts one day and live trading starts next day',
+    () {
+      final initial = engine
+          .createNewGame('하루 연습 계좌', worldSeed: 'one-day-practice')
+          .copyWith(day: 3, marketMinute: krxOpenMinute);
+
+      final completed = engine.completeInitialPracticeDay(initial);
+
+      expect(completed.day, 4);
+      expect(completed.marketMinute, marketDayStartMinute);
+      expect(completed.cash, initialCompanyCash);
+      expect(completed.brokerageCash, initialCompanyCash);
+      expect(completed.story.marketTutorialSeen, isTrue);
+      expect(completed.story.flagInt('practiceTradingDay'), 3);
+      expect(completed.story.flagInt('liveTradingStartDay'), 4);
+      expect(completed.story.flagBool('liveTradingStarted'), isTrue);
+      expect(completed.pendingDecisions.single.id, 'first-research-note');
+    },
+  );
+
+  test(
     'first research choice changes cohort trust and is applied only once',
     () {
       var state = engine.createNewGame('조사 연구소');
@@ -1165,6 +1186,51 @@ void main() {
           .amount,
       -expectedReserve,
     );
+  });
+
+  test('live trading keeps 80 percent of net profit as reusable cash', () {
+    final base = engine.createNewGame('실전 복리 테스트', initialCash: 0);
+    final state = base.copyWith(
+      day: 4,
+      marketMinute: krxOpenMinute,
+      cash: 0,
+      brokerageCash: 0,
+      positions: const [
+        PortfolioPosition(
+          assetId: 'hanbit_telecom',
+          symbol: '1001',
+          name: '한빛통신',
+          market: fictionalMainMarket,
+          currency: 'KRW',
+          units: 4,
+          totalCost: 30000,
+        ),
+      ],
+      story: base.story.copyWith(
+        accountAuthorityLevel: 2,
+        storyFlags: {
+          ...base.story.storyFlags,
+          'marketTutorialSeen': true,
+          'liveTradingStarted': true,
+        },
+      ),
+    );
+    final result = engine.executeTrade(
+      state,
+      hanbitOrder(
+        side: TradeSide.sell,
+        quantity: 4,
+        unitPrice: 11000,
+        quoteDate: state.currentDate.toIso8601String().split('T').first,
+      ),
+    );
+    final recovery = (result.realizedPnl * 0.2).round();
+
+    expect(result.success, isTrue, reason: result.message);
+    expect(result.realizedPnl, greaterThan(0));
+    expect(result.state.brokerageCash, 30000 + result.realizedPnl - recovery);
+    expect(result.state.story.stateRecoveryTotal, recovery);
+    expect(result.state.story.selfRelianceReserve, 0);
   });
 
   test('fractional market sell follows IOC partial-fill semantics', () {
@@ -2502,7 +2568,7 @@ void main() {
       });
 
       expect(state.version, GameState.schemaVersion);
-      expect(GameState.schemaVersion, 25);
+      expect(GameState.schemaVersion, 26);
       expect(state.businesses.businesses, isEmpty);
       expect(state.day, 5);
       expect(state.cash, 765432);

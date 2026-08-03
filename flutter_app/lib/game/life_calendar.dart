@@ -1,6 +1,7 @@
 import 'game_state.dart';
 import 'market_clock.dart';
 import 'relationship_state.dart';
+import 'weekend_activity.dart';
 
 const decimalCohortBirthYear = 1987;
 const decimalGrowthCalendarStartYear = 2000;
@@ -122,6 +123,7 @@ List<LifeCalendarEvent> lifeCalendarEventsForState(GameState state) {
   ];
 
   for (final memory in state.relationships.memories) {
+    if (memory.activity == RelationshipActivity.gift) continue;
     final date = state.dateForDay(memory.day);
     if (date.isAfter(currentDate)) continue;
     final profile = cohortGirlProfileById(memory.girlId);
@@ -147,6 +149,24 @@ List<LifeCalendarEvent> lifeCalendarEventsForState(GameState state) {
     );
   }
 
+  for (final log in weekendActivityLogsForState(state)) {
+    final date = state.dateForDay(log.day);
+    if (date.isAfter(currentDate)) continue;
+    events.add(
+      LifeCalendarEvent(
+        date: date,
+        title: log.title,
+        body: log.body,
+        markerLabel: log.markerLabel,
+        kind: log.kind == WeekendActivityKind.gift
+            ? LifeCalendarEventKind.relationship
+            : LifeCalendarEventKind.personal,
+        accentValue: log.accentValue,
+        imageAsset: log.imageAsset,
+      ),
+    );
+  }
+
   events.sort((left, right) {
     final dateOrder = left.date.compareTo(right.date);
     if (dateOrder != 0) return dateOrder;
@@ -163,7 +183,7 @@ List<LifeCalendarEvent> lifeCalendarEventsOn(
     .toList(growable: false);
 
 String lifeCalendarDayStatus(DateTime date) {
-  if (isWeekendOutingDay(date)) return '주말 · 외출 가능';
+  if (isWeekendOutingDay(date)) return '주말 · 행동력 2 · 외출 가능';
   if (!isMarketTradingDay(date)) return '휴장일 · 생활 시간';
   return '정규 거래일 · 09:00~15:00';
 }

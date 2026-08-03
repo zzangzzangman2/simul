@@ -25,6 +25,7 @@ import 'seed_money_content.dart';
 import 'stable_hash.dart';
 import 'star_shop.dart';
 import 'story_state.dart';
+import 'weekend_activity.dart';
 
 part 'game_engine_corporate_actions.dart';
 part 'game_engine_story_decisions.dart';
@@ -715,6 +716,7 @@ class GameEngine {
     GameState state, {
     required String contactId,
     required String text,
+    String? replyOverride,
   }) {
     final contact = phoneContactById(contactId);
     if (contact == null) {
@@ -801,7 +803,7 @@ class GameEngine {
       id: 'phone-${state.day}-${state.marketMinute}-$contactId-$sequence-reply',
       contactId: contactId,
       senderId: contactId,
-      text: composed.text,
+      text: _normalizedPhoneReply(replyOverride) ?? composed.text,
       day: state.day,
       marketMinute: state.marketMinute,
       read: true,
@@ -915,6 +917,16 @@ class GameEngine {
     );
   }
 
+  String? _normalizedPhoneReply(String? raw) {
+    if (raw == null) return null;
+    final normalized = raw
+        .replaceAll(RegExp(r'[\x00-\x1F\x7F]'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    if (normalized.isEmpty || normalized.length > 160) return null;
+    return normalized;
+  }
+
   CohortInvestmentActionResult settleCohortInvestmentDay(
     GameState state, {
     required FictionalMarketUniverse universe,
@@ -1007,7 +1019,19 @@ class GameEngine {
                           )))
                   .round(),
             );
-      final profitLoss = grossProfitLoss - tradingCost;
+      final netProfitLoss = grossProfitLoss - tradingCost;
+      // 동기 9명도 플레이어와 같은 조건으로 확정 순이익을 국가에 환수한다. 한쪽만
+      // 환수하면 수익률 순위표에서 플레이어가 구조적으로 불리해진다.
+      final npcRecoveryRateBps = state.story.orphanageReboot
+          ? state.story.stateRecoveryRateBps.clamp(0, 10000).toInt()
+          : 0;
+      final stateRecovery = netProfitLoss <= 0
+          ? 0
+          : (netProfitLoss * npcRecoveryRateBps / 10000)
+                .round()
+                .clamp(0, netProfitLoss)
+                .toInt();
+      final profitLoss = netProfitLoss - stateRecovery;
       final totalAmount = math.max(0, account.balance + profitLoss);
       accounts[profile.id] = account.copyWith(balance: totalAmount);
       npcRows.add(
@@ -1022,11 +1046,17 @@ class GameEngine {
           traded: true,
           isPlayer: false,
           cumulativeProfitLoss: previousCumulativeProfitLoss + profitLoss,
+          stateRecovery: stateRecovery,
         ),
       );
     }
 
     var repaymentTotal = 0;
+    var borrowingRepaymentTotal = 0;
+    var incomingPrincipalRepayment = 0;
+    var outgoingPrincipalRepayment = 0;
+    var loanInterestIncome = 0;
+    var loanInterestExpense = 0;
     final repaidLoans = <CohortLoan>[];
     final repaymentEntries = <LedgerEntry>[];
     for (final loan in state.cohortInvestments.loans) {
@@ -1039,36 +1069,67 @@ class GameEngine {
         repaidLoans.add(loan);
         continue;
       }
-      final affordable = math.max(0, account.balance - 1000);
+      final affordable = loan.direction == CohortLoanDirection.playerLends
+          ? math.max(0, account.balance - 1000)
+          : math.max(
+              0,
+              state.withdrawableBrokerageCash +
+                  repaymentTotal -
+                  borrowingRepaymentTotal,
+            );
       final repayment = math.min(loan.outstanding, affordable);
       if (repayment <= 0) {
         repaidLoans.add(loan);
         continue;
       }
+      final interestPaid = math.min(repayment, loan.outstandingInterest);
+      final principalPaid = repayment - interestPaid;
       accounts[loan.borrowerId] = account.copyWith(
-        balance: account.balance - repayment,
+        balance:
+            account.balance +
+            (loan.direction == CohortLoanDirection.playerLends
+                ? -repayment
+                : repayment),
       );
       final updatedLoan = loan.copyWith(
         repaidAmount: loan.repaidAmount + repayment,
       );
       repaidLoans.add(updatedLoan);
-      repaymentTotal += repayment;
+      if (loan.direction == CohortLoanDirection.playerLends) {
+        repaymentTotal += repayment;
+        incomingPrincipalRepayment += principalPaid;
+        loanInterestIncome += interestPaid;
+      } else {
+        borrowingRepaymentTotal += repayment;
+        outgoingPrincipalRepayment += principalPaid;
+        loanInterestExpense += interestPaid;
+      }
       repaymentEntries.add(
         LedgerEntry(
           id: '${loan.id}-repay-${state.day}',
           day: state.day,
-          amount: repayment,
-          account: 'brokerage_cash',
-          counterAccount: 'cohort_loan_receivable',
-          description:
-              '${loan.borrowerName} 동기 대여금 ${updatedLoan.isRepaid ? '상환 완료' : '일부 상환'}',
+          amount: loan.direction == CohortLoanDirection.playerLends
+              ? repayment
+              : -repayment,
+          account: loan.direction == CohortLoanDirection.playerLends
+              ? 'brokerage_cash'
+              : 'cohort_loan_payable',
+          counterAccount: loan.direction == CohortLoanDirection.playerLends
+              ? 'cohort_loan_receivable'
+              : 'brokerage_cash',
+          description: loan.direction == CohortLoanDirection.playerLends
+              ? '${loan.borrowerName} 동기 대여금 ${updatedLoan.isRepaid ? '상환 완료' : '일부 상환'} · 이자 $interestPaid원'
+              : '${loan.borrowerName}에게 빌린 돈 ${updatedLoan.isRepaid ? '상환 완료' : '일부 상환'} · 이자 $interestPaid원',
           sourceId: '${loan.id}-repay-${state.day}',
           notional: repayment,
+          realizedPnl: loan.direction == CohortLoanDirection.playerLends
+              ? interestPaid
+              : -interestPaid,
           marketMinute: krxCloseMinute,
         ),
       );
     }
-    if (repaymentTotal > 0) {
+    if (repaymentTotal > 0 || borrowingRepaymentTotal > 0) {
       for (var index = 0; index < npcRows.length; index++) {
         final account = accounts[npcRows[index].investorId];
         if (account != null) {
@@ -1080,8 +1141,9 @@ class GameEngine {
     }
 
     final afterRepayment = state.copyWith(
-      cash: state.cash + repaymentTotal,
-      brokerageCash: state.brokerageCash + repaymentTotal,
+      cash: state.cash + repaymentTotal - borrowingRepaymentTotal,
+      brokerageCash:
+          state.brokerageCash + repaymentTotal - borrowingRepaymentTotal,
       ledger: [...state.ledger, ...repaymentEntries],
     );
     final closePrices = <String, double>{};
@@ -1092,7 +1154,8 @@ class GameEngine {
     final playerTotal =
         afterRepayment.brokerageCash +
         afterRepayment.portfolioValue(closePrices);
-    var netBrokerageFlow = repaymentTotal;
+    var netBrokerageFlow =
+        incomingPrincipalRepayment - outgoingPrincipalRepayment;
     for (final entry in state.ledger.where((entry) => entry.day == state.day)) {
       if (entry.account == 'brokerage_cash' &&
           entry.counterAccount == 'company_bank') {
@@ -1143,6 +1206,9 @@ class GameEngine {
     final report = CohortDailyInvestmentReport(
       day: state.day,
       repaymentTotal: repaymentTotal,
+      borrowingRepaymentTotal: borrowingRepaymentTotal,
+      loanInterestIncome: loanInterestIncome,
+      loanInterestExpense: loanInterestExpense,
       rows: [
         CohortDailyInvestmentResult(
           investorId: 'player',
@@ -1224,17 +1290,9 @@ class GameEngine {
         report: report,
       );
     }
-    if (borrower.totalAmount >= player.totalAmount) {
-      return CohortInvestmentActionResult(
-        state: state,
-        success: false,
-        message: '현재 총금액이 나보다 적은 동기에게만 빌려줄 수 있습니다.',
-        report: report,
-      );
-    }
     final maximum = math.min(
       state.withdrawableBrokerageCash,
-      player.totalAmount - borrower.totalAmount,
+      cohortPlayerBorrowingLimit,
     );
     if (amount <= 0 || amount > maximum) {
       return CohortInvestmentActionResult(
@@ -1254,6 +1312,8 @@ class GameEngine {
       issuedDay: state.day,
       dueDay: state.day + cohortLoanTermDays,
       principal: amount,
+      direction: CohortLoanDirection.playerLends,
+      interestRateBps: cohortLoanInterestRateBps,
     );
     final updatedRows = [
       for (final row in report.rows)
@@ -1300,7 +1360,8 @@ class GameEngine {
           amount: -amount,
           account: 'cohort_loan_receivable',
           counterAccount: 'brokerage_cash',
-          description: '${profile.name} 동기 대여금 · $cohortLoanTermDays일 뒤 무이자 상환',
+          description:
+              '${profile.name} 동기 대여금 · $cohortLoanTermDays일 뒤 원금과 이자 ${loan.interest}원 상환',
           sourceId: sourceId,
           notional: amount,
           marketMinute: krxCloseMinute,
@@ -1310,7 +1371,124 @@ class GameEngine {
     return CohortInvestmentActionResult(
       state: next,
       success: true,
-      message: '${profile.name}에게 $amount원을 빌려줬습니다. 호감도와는 별개입니다.',
+      message:
+          '${profile.name}에게 $amount원을 빌려줬습니다. $cohortLoanTermDays일 뒤 ${loan.totalDue}원 상환입니다.',
+      report: updatedReport,
+      loan: loan,
+    );
+  }
+
+  CohortInvestmentActionResult borrowFromCohortInvestor(
+    GameState state, {
+    required String lenderId,
+    required int amount,
+  }) {
+    final report = state.cohortInvestments.reportForDay(state.day);
+    CohortInvestmentActionResult reject(String message) =>
+        CohortInvestmentActionResult(
+          state: state,
+          success: false,
+          message: message,
+          report: report,
+        );
+    if (report == null || !state.cohortInvestments.settledForDay(state.day)) {
+      return reject('오늘의 투자 결과가 확정된 뒤 동기에게 빌릴 수 있습니다.');
+    }
+    if (state.cohortInvestments.acknowledgedForDay(state.day)) {
+      return reject('오늘 결과표를 닫은 뒤에는 빌릴 수 없습니다.');
+    }
+    if (state.cohortInvestments.hasOutstandingPlayerBorrowing) {
+      return reject('먼저 기존 동기 차입금을 모두 갚아야 합니다.');
+    }
+    if (!state.needsTradingRecovery) {
+      return reject('보유 주식이 없고 주문 가능금이 1만원 미만일 때만 긴급 차입할 수 있습니다.');
+    }
+    if (state.cohortInvestments.loanedForDay(state.day)) {
+      return reject('돈을 빌리거나 빌려주는 행동은 하루에 한 번만 가능합니다.');
+    }
+    final profile = cohortNpcInvestorProfileById(lenderId);
+    final lenderRow = report.resultFor(lenderId);
+    final player = report.resultFor('player');
+    if (profile == null || lenderRow == null || player == null) {
+      return reject('데시멀 결과표에 없는 동기입니다.');
+    }
+    final lenderAccount = state.cohortInvestments.accountFor(lenderId);
+    final maximum = math.min(
+      cohortPlayerBorrowingLimit,
+      math.max(0, lenderAccount.balance - cohortNpcEmergencyReserve),
+    );
+    if (amount <= 0 || amount > maximum) {
+      return reject(
+        maximum <= 0
+            ? '${profile.name}도 지금 빌려줄 여유가 없습니다.'
+            : '${profile.name}에게는 최대 $maximum원까지 빌릴 수 있습니다.',
+      );
+    }
+
+    final loan = CohortLoan(
+      id: 'cohort-borrow-${state.day}-$lenderId',
+      borrowerId: lenderId,
+      borrowerName: profile.name,
+      issuedDay: state.day,
+      dueDay: state.day + cohortLoanTermDays,
+      principal: amount,
+      direction: CohortLoanDirection.playerBorrows,
+      interestRateBps: cohortLoanInterestRateBps,
+    );
+    final updatedRows = <CohortDailyInvestmentResult>[
+      for (final row in report.rows)
+        if (row.investorId == 'player')
+          row.copyWith(totalAmount: row.totalAmount + amount)
+        else if (row.investorId == lenderId)
+          row.copyWith(totalAmount: math.max(0, row.totalAmount - amount))
+        else
+          row,
+    ];
+    final updatedReport = report.copyWith(rows: updatedRows);
+    final reports = <CohortDailyInvestmentReport>[
+      for (final item in state.cohortInvestments.reports)
+        if (item.day == state.day) updatedReport else item,
+    ];
+    final sourceId = loan.id;
+    final next = state.copyWith(
+      cash: state.cash + amount,
+      brokerageCash: state.brokerageCash + amount,
+      cohortInvestments: state.cohortInvestments.copyWith(
+        accounts: <String, CohortInvestorAccount>{
+          ...state.cohortInvestments.accounts,
+          lenderId: lenderAccount.copyWith(
+            balance: lenderAccount.balance - amount,
+          ),
+        },
+        reports: reports,
+        loans: <CohortLoan>[...state.cohortInvestments.loans, loan],
+        lastLoanDay: state.day,
+        previousPlayerCloseTotal:
+            (state.cohortInvestments.previousPlayerCloseTotal ??
+                player.totalAmount) +
+            amount,
+      ),
+      ledger: <LedgerEntry>[
+        ...state.ledger,
+        LedgerEntry(
+          id: sourceId,
+          day: state.day,
+          amount: amount,
+          account: 'brokerage_cash',
+          counterAccount: 'cohort_loan_payable',
+          description:
+              '${profile.name}에게 긴급 차입 · 원금 $amount원 · $cohortLoanTermDays일 뒤 이자 ${loan.interest}원 포함 상환',
+          sourceId: sourceId,
+          notional: amount,
+          marketMinute: krxCloseMinute,
+        ),
+      ],
+    );
+    return CohortInvestmentActionResult(
+      state: next,
+      success: true,
+      message:
+          '${profile.name}에게 $amount원을 빌렸습니다. $cohortLoanTermDays일 뒤 ${loan.totalDue}원을 갚아야 합니다.',
       report: updatedReport,
       loan: loan,
     );
@@ -1507,6 +1685,264 @@ class GameEngine {
       success: true,
       message: '오늘은 혼자 쉬며 하루를 정리했습니다.',
     );
+  }
+
+  WeekendActivityResult completeWeekendActivity(
+    GameState state,
+    WeekendActivityRequest request,
+  ) {
+    if (!relationshipOutingAvailableOn(state.currentDate)) {
+      return WeekendActivityResult(
+        state: state,
+        success: false,
+        message: '주말 일정은 토요일과 일요일에만 열립니다.',
+      );
+    }
+    final remaining = weekendActivityPointsRemaining(state);
+    if (remaining <= 0) {
+      return WeekendActivityResult(
+        state: state,
+        success: false,
+        message: '오늘의 주말 행동력은 모두 사용했습니다.',
+      );
+    }
+
+    final job = weekendJobById(request.activityId);
+    if (job != null) {
+      final score =
+          72 +
+          _stableHash(
+                '${state.simulationSeed}:${state.day}:weekend:${job.id}:'
+                '${weekendActivityPointsUsed(state)}',
+              ) %
+              27;
+      final worked = completeWorkSession(
+        state,
+        WorkSessionResult(
+          activityId: job.workActivityId,
+          score: score,
+          maxScore: 100,
+        ),
+      );
+      final earned = worked.cash - state.cash;
+      if (earned <= 0) {
+        return WeekendActivityResult(
+          state: state,
+          success: false,
+          message: '오늘 받을 수 있는 알바 수당을 이미 모두 정산했습니다.',
+        );
+      }
+      final rescueFunded = state.needsTradingRecovery
+          ? transferBrokerageCash(worked, amount: earned, deposit: true).state
+          : worked;
+      final next = _appendWeekendActivityLog(
+        rescueFunded,
+        WeekendActivityLog(
+          day: state.day,
+          kind: WeekendActivityKind.partTimeJob,
+          activityId: job.id,
+          title: job.title,
+          body: state.needsTradingRecovery
+              ? '${job.location}에서 $earned원을 벌어 실전 증권계좌에 바로 넣었다.'
+              : '${job.location}에서 맡은 일을 마치고 $earned원을 벌었다.',
+          markerLabel: '알바',
+          accentValue: job.accentValue,
+          imageAsset: job.imageAsset,
+          cashDelta: earned,
+        ),
+      );
+      return WeekendActivityResult(
+        state: next,
+        success: true,
+        message: state.needsTradingRecovery
+            ? '${job.title} 완료 · 수당 $earned원을 실전 증권계좌에 입금'
+            : '${job.title} 완료 · 수당 +$earned원',
+        cashDelta: earned,
+      );
+    }
+
+    if (request.activityId == 'market_study') {
+      final flags = Map<String, dynamic>.from(state.story.storyFlags);
+      final credits =
+          (flags[weekendMarketResearchCreditsFlag] as num?)?.toInt() ?? 0;
+      flags[weekendMarketResearchCreditsFlag] = (credits + 1).clamp(0, 3);
+      final prepared = state.copyWith(
+        story: state.story.copyWith(storyFlags: flags),
+      );
+      final next = _appendWeekendActivityLog(
+        prepared,
+        WeekendActivityLog(
+          day: state.day,
+          kind: WeekendActivityKind.marketStudy,
+          activityId: request.activityId,
+          title: '도서관 시장 복기',
+          body: '지난 신문과 장부를 대조해 다음 거래일 조사보고서 1회 이용권을 준비했다.',
+          markerLabel: '공부',
+          accentValue: 0xFF5C79A9,
+          imageAsset: weekendLibraryAsset,
+        ),
+      );
+      return WeekendActivityResult(
+        state: next,
+        success: true,
+        message: '다음 거래일 조사보고서 1회 이용권을 준비했습니다.',
+      );
+    }
+
+    if (request.activityId == 'gift') {
+      final girlId = request.girlId;
+      final giftId = request.giftId;
+      final profile = girlId == null ? null : cohortGirlProfileById(girlId);
+      final gift = giftId == null ? null : weekendGiftById(giftId);
+      if (profile == null || gift == null) {
+        return WeekendActivityResult(
+          state: state,
+          success: false,
+          message: '선물과 받을 동기를 모두 골라야 합니다.',
+        );
+      }
+      if (weekendGiftAlreadyGivenTo(state, profile.id)) {
+        return WeekendActivityResult(
+          state: state,
+          success: false,
+          message: '${profile.name}에게는 오늘 이미 선물을 건넸습니다.',
+        );
+      }
+      if (state.bankCash < gift.cost) {
+        return WeekendActivityResult(
+          state: state,
+          success: false,
+          message: '생활비 통장에 ${gift.cost - state.bankCash}원이 부족합니다.',
+        );
+      }
+
+      final progress = state.relationships.progressFor(profile.id);
+      final requestedAffection = gift.affectionFor(profile.id);
+      final nextAffection = (progress.affection + requestedAffection)
+          .clamp(relationshipMinAffection, relationshipMaxAffection)
+          .toInt();
+      final affectionDelta = nextAffection - progress.affection;
+      final nextTrust = (progress.trust + gift.trustFor(profile.id))
+          .clamp(relationshipDimensionMin, relationshipDimensionMax)
+          .toInt();
+      final nextCloseness = (progress.closeness + 1)
+          .clamp(relationshipDimensionMin, relationshipDimensionMax)
+          .toInt();
+      final updatedProgress = progress.copyWith(
+        affection: nextAffection,
+        trust: nextTrust,
+        closeness: nextCloseness,
+        lastInteractionDay: state.day,
+      );
+      final memory = RelationshipMemory(
+        day: state.day,
+        girlId: profile.id,
+        activity: RelationshipActivity.gift,
+        sceneId: 'weekend_gift_${gift.id}',
+        choiceId: gift.id,
+        affectionDelta: affectionDelta,
+        affectionAfter: nextAffection,
+        trustDelta: nextTrust - progress.trust,
+        closenessDelta: nextCloseness - progress.closeness,
+      );
+      final memories = <RelationshipMemory>[
+        ...state.relationships.memories,
+        memory,
+      ];
+      final sourceId = 'weekend-gift-${state.day}-${profile.id}-${gift.id}';
+      final gifted = state.copyWith(
+        cash: state.cash - gift.cost,
+        relationships: state.relationships.copyWith(
+          girls: <String, GirlRelationshipProgress>{
+            ...state.relationships.girls,
+            profile.id: updatedProgress,
+          },
+          memories: memories.length <= 64
+              ? memories
+              : memories.sublist(memories.length - 64),
+        ),
+        ledger: <LedgerEntry>[
+          ...state.ledger,
+          LedgerEntry(
+            id: sourceId,
+            day: state.day,
+            amount: -gift.cost,
+            account: 'company_bank',
+            counterAccount: 'relationship_gift_expense',
+            description: '${profile.name}에게 건넬 ${gift.title}',
+            sourceId: sourceId,
+          ),
+        ],
+        processedEventIds: <String>[...state.processedEventIds, sourceId],
+      );
+      final next = _appendWeekendActivityLog(
+        gifted,
+        WeekendActivityLog(
+          day: state.day,
+          kind: WeekendActivityKind.gift,
+          activityId: gift.id,
+          title: '${profile.name}에게 고른 선물',
+          body:
+              '${gift.title}을 골라 건넸다. 생활비 -${gift.cost}원 · 호감도 +$affectionDelta.',
+          markerLabel: '선물',
+          accentValue: profile.accentValue,
+          imageAsset: weekendGiftShopAsset,
+          cashDelta: -gift.cost,
+          girlId: profile.id,
+          affectionDelta: affectionDelta,
+        ),
+      );
+      return WeekendActivityResult(
+        state: next,
+        success: true,
+        message:
+            '${profile.name}에게 ${gift.title}을 건넸습니다. · 호감도 +$affectionDelta',
+        cashDelta: -gift.cost,
+        affectionDelta: affectionDelta,
+      );
+    }
+
+    if (request.activityId == 'rest') {
+      final cost = remaining;
+      final next = _appendWeekendActivityLog(
+        state,
+        WeekendActivityLog(
+          day: state.day,
+          kind: WeekendActivityKind.rest,
+          activityId: request.activityId,
+          title: '천천히 보내는 주말',
+          body: '남은 시간을 비워 두고 몸과 장부를 함께 정리했다.',
+          markerLabel: '휴식',
+          accentValue: 0xFF7B8DA8,
+          imageAsset: weekendNeighborhoodAsset,
+          actionPointCost: cost,
+        ),
+      );
+      return WeekendActivityResult(
+        state: next,
+        success: true,
+        message: '남은 주말 시간을 쉬면서 정리했습니다.',
+      );
+    }
+
+    return WeekendActivityResult(
+      state: state,
+      success: false,
+      message: '선택할 수 없는 주말 활동입니다.',
+    );
+  }
+
+  GameState _appendWeekendActivityLog(GameState state, WeekendActivityLog log) {
+    final flags = Map<String, dynamic>.from(state.story.storyFlags);
+    final logs = <WeekendActivityLog>[
+      ...weekendActivityLogsForState(state),
+      log,
+    ];
+    final trimmed = logs.length <= 256 ? logs : logs.sublist(logs.length - 256);
+    flags[weekendActivityLogFlag] = trimmed
+        .map((entry) => entry.toJson())
+        .toList(growable: false);
+    return state.copyWith(story: state.story.copyWith(storyFlags: flags));
   }
 
   GameState createNewGame(
@@ -3797,7 +4233,8 @@ class GameEngine {
           .round()
           .clamp(0, realizedPnl)
           .toInt();
-      selfRelianceContribution = realizedPnl - stateRecovery;
+      final liveTrading = state.story.flagBool('liveTradingStarted');
+      selfRelianceContribution = liveTrading ? 0 : realizedPnl - stateRecovery;
       spendableCashDelta -= stateRecovery + selfRelianceContribution;
       flags['stateRecoveryTotal'] =
           state.story.stateRecoveryTotal + stateRecovery;
@@ -3805,7 +4242,7 @@ class GameEngine {
           state.story.selfRelianceReserve + selfRelianceContribution;
       description =
           '$description · 국가 환수 $stateRecovery원 · '
-          '자립적립 $selfRelianceContribution원';
+          '${liveTrading ? '실전 재투자 가능 ${realizedPnl - stateRecovery}원' : '자립적립 $selfRelianceContribution원'}';
     }
     var authority = state.story.accountAuthorityLevel;
     var reputation = state.story.reputation;
@@ -3927,7 +4364,7 @@ class GameEngine {
           '${order.name} ${_tradeUnits(order.quantity)}주 $sideLabel 완료 · 증권 수수료 $fee원'
           '${transactionTax > 0 ? ' · 거래세 $transactionTax원' : ''}'
           '${order.side == TradeSide.sell ? ' · 실현손익 ${realizedPnl >= 0 ? '+' : ''}$realizedPnl원' : ''}'
-          '${stateRecovery > 0 ? ' · 국가 환수 $stateRecovery원 · 자립적립 $selfRelianceContribution원' : ''}',
+          '${stateRecovery > 0 ? ' · 국가 환수 $stateRecovery원${selfRelianceContribution > 0 ? ' · 자립적립 $selfRelianceContribution원' : ' · 나머지 실전 자금 유지'}' : ''}',
       notional: notional,
       fee: fee,
       transactionTax: transactionTax,
@@ -4041,9 +4478,31 @@ class GameEngine {
         ...state.story.storyFlags,
         'marketTutorialSeen': true,
         'marketTutorialCompletedDay': state.day,
+        'practiceTradingDay': state.day,
+        'liveTradingStartDay': state.day + 1,
+        'liveTradingStarted': false,
       },
     ),
   );
+
+  GameState completeInitialPracticeDay(GameState state) {
+    final marked = markMarketTutorialSeen(
+      state.copyWith(marketMinute: krxCloseMinute),
+    );
+    // The first research card remains available after the paper-trading day,
+    // but it must not trap the player on the practice date.
+    final advanced = advanceOneDay(marked.copyWith(decisions: const []));
+    return advanced.copyWith(
+      decisions: marked.decisions,
+      story: advanced.story.copyWith(
+        storyFlags: <String, dynamic>{
+          ...advanced.story.storyFlags,
+          'liveTradingStarted': true,
+          'liveTradingStartDay': advanced.day,
+        },
+      ),
+    );
+  }
 
   GameState requestAcademyHelp(GameState state, String helperId) {
     final organization = state.organization.requestAcademyHelp(
@@ -5726,6 +6185,9 @@ class GameEngine {
   FinanceActionResult purchaseDailyMarketReport(GameState state) {
     final dateKey = marketDateKey(state.currentDate);
     final flags = Map<String, dynamic>.from(state.story.storyFlags);
+    final researchCredits =
+        (flags[weekendMarketResearchCreditsFlag] as num?)?.toInt() ?? 0;
+    final effectivePrice = researchCredits > 0 ? 0 : dailyMarketReportPrice;
     final reports = <String, dynamic>{
       for (final entry
           in ((flags['dailyMarketReports'] as Map?) ?? const {}).entries)
@@ -5752,12 +6214,11 @@ class GameEngine {
         message: '오늘 장이 끝나 새로 조사할 장중 신호가 없습니다.',
       );
     }
-    if (state.bankCash < dailyMarketReportPrice) {
+    if (state.bankCash < effectivePrice) {
       return FinanceActionResult(
         state: state,
         success: false,
-        message:
-            '보고서 구매에 은행 잔고가 ${dailyMarketReportPrice - state.bankCash}원 부족합니다.',
+        message: '보고서 구매에 은행 잔고가 ${effectivePrice - state.bankCash}원 부족합니다.',
       );
     }
 
@@ -5803,29 +6264,35 @@ class GameEngine {
         .toList(growable: false);
     reports[dateKey] = signals;
     flags['dailyMarketReports'] = reports;
+    if (researchCredits > 0) {
+      flags[weekendMarketResearchCreditsFlag] = researchCredits - 1;
+    }
     final sourceId = 'market-report-$dateKey';
     final next = state.copyWith(
-      cash: state.cash - dailyMarketReportPrice,
+      cash: state.cash - effectivePrice,
       story: state.story.copyWith(storyFlags: flags),
       ledger: [
         ...state.ledger,
-        LedgerEntry(
-          id: sourceId,
-          day: state.day,
-          amount: -dailyMarketReportPrice,
-          account: 'company_bank',
-          counterAccount: 'market_research_expense',
-          description: '오늘의 시장 조사 보고서',
-          sourceId: sourceId,
-        ),
+        if (effectivePrice > 0)
+          LedgerEntry(
+            id: sourceId,
+            day: state.day,
+            amount: -effectivePrice,
+            account: 'company_bank',
+            counterAccount: 'market_research_expense',
+            description: '오늘의 시장 조사 보고서',
+            sourceId: sourceId,
+          ),
       ],
       processedEventIds: [...state.processedEventIds, sourceId],
     );
     return FinanceActionResult(
       state: next,
       success: true,
-      message: '현장 징후를 정리한 보고서를 받았습니다. 결과와 방향은 보장하지 않습니다.',
-      cashDelta: -dailyMarketReportPrice,
+      message: researchCredits > 0
+          ? '주말에 준비한 조사권으로 보고서를 받았습니다. 결과와 방향은 보장하지 않습니다.'
+          : '현장 징후를 정리한 보고서를 받았습니다. 결과와 방향은 보장하지 않습니다.',
+      cashDelta: -effectivePrice,
     );
   }
 

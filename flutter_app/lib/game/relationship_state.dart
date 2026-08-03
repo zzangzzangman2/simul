@@ -1,4 +1,4 @@
-enum RelationshipActivity { conversation, date }
+enum RelationshipActivity { conversation, date, gift }
 
 enum RelationshipStage {
   newClassmate,
