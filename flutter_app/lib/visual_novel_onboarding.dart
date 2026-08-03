@@ -374,6 +374,15 @@ class _VisualNovelOnboardingScreenState
     extends State<VisualNovelOnboardingScreen> {
   final _playerController = TextEditingController();
   final _companyController = TextEditingController();
+  final AudioPlayer _storyBgmPlayer = AudioPlayer(
+    playerId: 'project-decimal-story-bgm',
+  );
+  final AudioPlayer _storyEffectPlayer = AudioPlayer(
+    playerId: 'project-decimal-story-effect',
+  );
+  final AudioPlayer _storyVoicePlayer = AudioPlayer(
+    playerId: 'project-decimal-story-voice',
+  );
   final List<String> _dialogueHistory = <String>[];
   final List<int> _beatNavigationHistory = <int>[];
   final Map<String, Object> _storyVariables = <String, Object>{};
@@ -387,6 +396,9 @@ class _VisualNovelOnboardingScreenState
   late bool _academyPcPoweredOn;
   late bool _academyStockAppOpen;
   DateTime? _lastWheelBackAt;
+  String _activeStoryBgm = '';
+  bool _storyEffectActive = false;
+  bool _storyVoiceActive = false;
   late Future<void> _dialogueLoadFuture;
   WorldLoadProgress _creationProgress = const WorldLoadProgress(
     0.02,
@@ -717,12 +729,16 @@ class _VisualNovelOnboardingScreenState
       _dialogueOverrides = Map<int, _DialogueOverride>.unmodifiable(loaded);
       _dialogueEndBeat = loaded.keys.reduce(math.max);
     });
+    unawaited(_syncStoryAudio());
   }
 
   @override
   void dispose() {
     _playerController.dispose();
     _companyController.dispose();
+    unawaited(_storyBgmPlayer.dispose());
+    unawaited(_storyEffectPlayer.dispose());
+    unawaited(_storyVoicePlayer.dispose());
     super.dispose();
   }
 
@@ -854,6 +870,64 @@ class _VisualNovelOnboardingScreenState
           .where((choice) => _conditionMatches(choice.condition))
           .toList(growable: false);
 
+  String _audioAssetSource(String asset) {
+    final normalized = asset.trim();
+    return normalized.startsWith('assets/')
+        ? normalized.substring('assets/'.length)
+        : normalized;
+  }
+
+  Future<void> _syncStoryAudio() async {
+    if (!_playerNameConfirmed) return;
+    final scene = _currentDialogue;
+    if (scene == null) return;
+    final volume = scene.audioVolume.clamp(0.0, 1.0).toDouble();
+    final bgm = scene.bgm.trim();
+    final effect = scene.soundEffect.trim();
+    final voice = scene.voice.trim();
+    if (bgm.isEmpty &&
+        _activeStoryBgm.isEmpty &&
+        effect.isEmpty &&
+        voice.isEmpty &&
+        !_storyEffectActive &&
+        !_storyVoiceActive) {
+      return;
+    }
+    try {
+      if (bgm != _activeStoryBgm) {
+        await _storyBgmPlayer.stop();
+        _activeStoryBgm = bgm;
+        if (bgm.isNotEmpty) {
+          await _storyBgmPlayer.setReleaseMode(ReleaseMode.loop);
+          await _storyBgmPlayer.play(
+            AssetSource(_audioAssetSource(bgm)),
+            volume: volume,
+          );
+        }
+      } else if (bgm.isNotEmpty) {
+        await _storyBgmPlayer.setVolume(volume);
+      }
+      if (_storyEffectActive) await _storyEffectPlayer.stop();
+      _storyEffectActive = effect.isNotEmpty;
+      if (effect.isNotEmpty) {
+        await _storyEffectPlayer.play(
+          AssetSource(_audioAssetSource(effect)),
+          volume: volume,
+        );
+      }
+      if (_storyVoiceActive) await _storyVoicePlayer.stop();
+      _storyVoiceActive = voice.isNotEmpty;
+      if (voice.isNotEmpty) {
+        await _storyVoicePlayer.play(
+          AssetSource(_audioAssetSource(voice)),
+          volume: volume,
+        );
+      }
+    } catch (error) {
+      debugPrint('Failed to play dialogue audio for ${scene.id}: $error');
+    }
+  }
+
   bool get _isNarration => _speaker == '이야기';
 
   bool get _isOrientationRosterScene =>
@@ -921,6 +995,7 @@ class _VisualNovelOnboardingScreenState
     FocusManager.instance.primaryFocus?.unfocus();
     _playStoryFeedback();
     setState(() => _beat = previousBeat);
+    unawaited(_syncStoryAudio());
     unawaited(_saveCheckpoint());
   }
 
@@ -1023,6 +1098,7 @@ class _VisualNovelOnboardingScreenState
     setState(() {
       if (_beat == currentBeat) _beat = _nextVisibleBeat(candidate);
     });
+    unawaited(_syncStoryAudio());
     unawaited(_saveCheckpoint());
   }
 
@@ -1063,6 +1139,7 @@ class _VisualNovelOnboardingScreenState
       _playerNameConfirmed = true;
       _creationError = null;
     });
+    unawaited(_syncStoryAudio());
     unawaited(_saveCheckpoint());
   }
 
@@ -1178,12 +1255,14 @@ class _VisualNovelOnboardingScreenState
       _beatNavigationHistory.clear();
       _beat = skipStep.targetBeat;
     });
+    unawaited(_syncStoryAudio());
     unawaited(_saveCheckpoint());
     await _dialogueLoadFuture;
     if (!mounted) return;
     final resolvedSkipStep = _prologueSkipStepForBeat(startingBeat);
     if (_beat == resolvedSkipStep.targetBeat) return;
     setState(() => _beat = resolvedSkipStep.targetBeat);
+    unawaited(_syncStoryAudio());
     unawaited(_saveCheckpoint());
   }
 

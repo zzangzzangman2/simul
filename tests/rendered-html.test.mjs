@@ -606,6 +606,9 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
   assert.match(onboarding, /_StoryCameraStage/);
   assert.match(onboarding, /_StoryAmbientOverlay/);
   assert.match(onboarding, /_selectChoice/);
+  assert.match(onboarding, /AudioPlayer/);
+  assert.match(onboarding, /AssetSource/);
+  assert.match(pubspec, /audioplayers: \^6\.8\.1/);
   assert.equal(canonical.contentVersion, 3);
   assert.equal(canonical.appearanceVersion, 17);
   assert.deepEqual(hanSuaAssets, expectedHanSuaAssets);
