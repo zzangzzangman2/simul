@@ -1507,10 +1507,17 @@
   height: 87%;
   outline: 0;
   transform: translateX(-50%);
+  pointer-events: none;
+  will-change: left, bottom;
+}
+
+.characterVisual {
+  position: absolute;
+  inset: 0;
   transform-origin: center bottom;
   pointer-events: none;
   filter: drop-shadow(0 9px 12px rgba(0,0,0,.34));
-  will-change: left, bottom, transform;
+  will-change: transform;
 }
 
 .characterDragHandle {

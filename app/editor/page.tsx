@@ -767,6 +767,7 @@ export default function DialogueEditorPage() {
   function beginCharacterDrag(event: ReactPointerEvent<HTMLDivElement>) {
     if (!selected.character) return;
     event.preventDefault();
+    event.currentTarget.focus({ preventScroll: true });
     event.currentTarget.setPointerCapture(event.pointerId);
     characterDragRef.current = {
       pointerId: event.pointerId,
@@ -815,8 +816,55 @@ export default function DialogueEditorPage() {
 
   function zoomCharacter(event: ReactWheelEvent<HTMLDivElement>) {
     event.preventDefault();
+    event.stopPropagation();
     const step = event.deltaY > 0 ? -0.05 : 0.05;
     updateCharacterFrame({ characterScale: selected.characterScale + step });
+  }
+
+  function updateCharacterScaleFromPointer(event: ReactPointerEvent<HTMLInputElement>) {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    if (!bounds.width) return;
+    const ratio = Math.min(1, Math.max(0, (event.clientX - bounds.left) / bounds.width));
+    updateCharacterFrame({
+      characterScale: CHARACTER_SCALE_MIN + ratio * (CHARACTER_SCALE_MAX - CHARACTER_SCALE_MIN),
+    });
+  }
+
+  function beginCharacterScaleDrag(event: ReactPointerEvent<HTMLInputElement>) {
+    if (!selected.character) return;
+    event.preventDefault();
+    event.currentTarget.focus({ preventScroll: true });
+    event.currentTarget.setPointerCapture(event.pointerId);
+    updateCharacterScaleFromPointer(event);
+  }
+
+  function moveCharacterScaleDrag(event: ReactPointerEvent<HTMLInputElement>) {
+    if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
+    event.preventDefault();
+    updateCharacterScaleFromPointer(event);
+  }
+
+  function endCharacterScaleDrag(event: ReactPointerEvent<HTMLInputElement>) {
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  }
+
+  function nudgeCharacterScale(event: KeyboardEvent<HTMLInputElement>) {
+    let nextScale: number | null = null;
+    if (event.key === "ArrowLeft" || event.key === "ArrowDown") {
+      nextScale = selected.characterScale - 0.01;
+    } else if (event.key === "ArrowRight" || event.key === "ArrowUp") {
+      nextScale = selected.characterScale + 0.01;
+    } else if (event.key === "Home") {
+      nextScale = CHARACTER_SCALE_MIN;
+    } else if (event.key === "End") {
+      nextScale = CHARACTER_SCALE_MAX;
+    }
+    if (nextScale === null) return;
+    event.preventDefault();
+    event.stopPropagation();
+    updateCharacterFrame({ characterScale: nextScale });
   }
 
   function nudgeCharacter(event: KeyboardEvent<HTMLDivElement>) {
@@ -1148,6 +1196,32 @@ export default function DialogueEditorPage() {
     await navigator.clipboard.writeText(makeTxt([selected]));
     setNotice("현재 장면을 복사했어요");
   }
+
+  const undoActionRef = useRef(undoLastChange);
+  const redoActionRef = useRef(redoLastChange);
+
+  useEffect(() => {
+    undoActionRef.current = undoLastChange;
+    redoActionRef.current = redoLastChange;
+  });
+
+  useEffect(() => {
+    function handleGlobalHistoryShortcut(event: globalThis.KeyboardEvent) {
+      if (event.defaultPrevented || sceneComposer || !(event.ctrlKey || event.metaKey)) return;
+      const key = event.key.toLowerCase();
+      if (key === "z") {
+        event.preventDefault();
+        if (event.shiftKey) redoActionRef.current();
+        else undoActionRef.current();
+      } else if (key === "y") {
+        event.preventDefault();
+        redoActionRef.current();
+      }
+    }
+
+    window.addEventListener("keydown", handleGlobalHistoryShortcut);
+    return () => window.removeEventListener("keydown", handleGlobalHistoryShortcut);
+  }, [sceneComposer]);
 
   function handleEditorKey(event: KeyboardEvent<HTMLElement>) {
     if (sceneComposer) {
@@ -1560,7 +1634,7 @@ export default function DialogueEditorPage() {
                     step="0.5"
                     value={selected.characterX}
                     disabled={!selected.character}
-                    onChange={(event) => updateCharacterFrame({ characterX: Number(event.target.value) })}
+                    onInput={(event) => updateCharacterFrame({ characterX: Number(event.currentTarget.value) })}
                     aria-label="캐릭터 가로 위치"
                   />
                   <small>왼쪽</small><small>오른쪽</small>
@@ -1574,7 +1648,7 @@ export default function DialogueEditorPage() {
                     step="0.5"
                     value={selected.characterY}
                     disabled={!selected.character}
-                    onChange={(event) => updateCharacterFrame({ characterY: Number(event.target.value) })}
+                    onInput={(event) => updateCharacterFrame({ characterY: Number(event.currentTarget.value) })}
                     aria-label="캐릭터 세로 위치"
                   />
                   <small>아래</small><small>위 · 신발 보이기</small>
@@ -1588,7 +1662,12 @@ export default function DialogueEditorPage() {
                     step="0.01"
                     value={selected.characterScale}
                     disabled={!selected.character}
-                    onChange={(event) => updateCharacterFrame({ characterScale: Number(event.target.value) })}
+                    onInput={(event) => updateCharacterFrame({ characterScale: Number(event.currentTarget.value) })}
+                    onPointerDown={beginCharacterScaleDrag}
+                    onPointerMove={moveCharacterScaleDrag}
+                    onPointerUp={endCharacterScaleDrag}
+                    onPointerCancel={endCharacterScaleDrag}
+                    onKeyDown={nudgeCharacterScale}
                     aria-label="캐릭터 확대율"
                   />
                   <small>전신</small><small>얼굴 가까이</small>
@@ -1715,19 +1794,24 @@ export default function DialogueEditorPage() {
                     style={{
                       left: `${50 + selected.characterX}%`,
                       bottom: `${12.3 + selected.characterY}%`,
-                      transform: `translateX(-50%) scale(${selected.characterScale})`,
+                      transform: "translateX(-50%)",
                     }}
                   >
-                    <Image
-                      className={styles.characterImage}
-                      src={selected.character}
-                      alt=""
-                      aria-hidden="true"
-                      fill
-                      sizes="322px"
-                      draggable={false}
-                      unoptimized
-                    />
+                    <div
+                      className={styles.characterVisual}
+                      style={{ transform: `scale(${selected.characterScale})` }}
+                    >
+                      <Image
+                        className={styles.characterImage}
+                        src={selected.character}
+                        alt=""
+                        aria-hidden="true"
+                        fill
+                        sizes="322px"
+                        draggable={false}
+                        unoptimized
+                      />
+                    </div>
                     <div
                       className={styles.characterDragHandle}
                       onPointerDown={beginCharacterDrag}
