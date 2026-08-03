@@ -184,6 +184,7 @@ class StoryState {
         'fundLaunched': false,
         'externalAum': 0,
         'hubTutorialSeen': false,
+        'legacyMissionUiDisabled': true,
         'marketTutorialEligible': true,
         'marketTutorialSeen': false,
         'liveTradingStarted': false,
@@ -220,6 +221,7 @@ class StoryState {
         'prologueComplete': true,
         'marketTutorialEligible': false,
         'marketTutorialSeen': true,
+        'legacyMissionUiDisabled': false,
         'migratedCompanyName': companyName,
       },
     );

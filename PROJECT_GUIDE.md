@@ -434,6 +434,7 @@ standing depth만 통과한다. 상승은 ask, 하락은 bid를 최우선부터 
 | `flutter_app/test/business_districts_test.dart` | 32개 상권·7국면·결정론·미래 비누설·순위·적합도·부동산 매핑·레거시 회귀 |
 | `flutter_app/test/business_simulation_test.dart` | 업종·미시 입지·실제 상권, 월 고정 매물, 날짜별 손익·사건·저장 결정론 회귀 |
 | `flutter_app/test/business_engine_test.dart` | 공용 견적·회사 통장·실제 상권 일치 부동산 연결·정책·월 정산·강제폐업 회귀 |
+| `flutter_app/test/business_long_run_balance_test.dart` | 복수 시드·18업종·6입지·32상권·여러 개점 연도·4정책의 2000~2026 장기 분포 감사 |
 | `flutter_app/test/business_ui_test.dart` | 390×844·360×800·텍스트 1.2에서 5탭·상권판세·공개 이력·인수·운영 UI 회귀 |
 | `flutter_app/test/shared_economy_stock_export_test.dart` | 주식 정규 사건 객체 재사용·정렬·순수 시장구조 제외 회귀 |
 | `flutter_app/test/world_economy_test.dart` | 결정론·다음날 전파·분류·상한·14권역 중앙 매핑 회귀 |

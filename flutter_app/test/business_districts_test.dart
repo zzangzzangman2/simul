@@ -185,6 +185,33 @@ void main() {
       expect(vitalityByDate.toSet().length, greaterThan(1));
     });
 
+    test('일일 영업용 경량 지표는 전체 상권 스냅샷의 수치와 같다', () {
+      final profile = businessDistrictProfileById('seoul_seongsu')!;
+      for (final date in <DateTime>[
+        DateTime(2000, 1, 3),
+        DateTime(2008, 9, 17),
+        DateTime(2020, 3, 16),
+        DateTime(2026, 12, 31),
+      ]) {
+        final full = businessDistrictSnapshotFor(
+          profile,
+          asOf: date,
+          worldSeed: 'district-operating-factors',
+        );
+        final operating = businessDistrictOperatingFactorsFor(
+          profile,
+          asOf: date,
+          worldSeed: 'district-operating-factors',
+        );
+
+        expect(operating.demandMultiplier, full.demandMultiplier);
+        expect(operating.rentMultiplier, full.rentMultiplier);
+        expect(operating.competitionMultiplier, full.competitionMultiplier);
+        expect(operating.wageMultiplier, full.wageMultiplier);
+        expect(operating.riskMultiplier, full.riskMultiplier);
+      }
+    });
+
     test('시드 미세변동이 신도시 성장과 쇠퇴 상권의 구조 방향을 뒤집지 않는다', () {
       for (final seed in <String>[
         'structural-seed-a',

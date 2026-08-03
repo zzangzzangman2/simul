@@ -83,7 +83,12 @@ class _ApartmentHubScreenState extends State<ApartmentHubScreen> {
   @override
   Widget build(BuildContext context) {
     final details = _ApartmentPlaceDetails.forPlace(_place);
-    final missionProgress = const GameEngine().missionProgress(widget.state);
+    final legacyMissionUiDisabled = widget.state.story.flagBool(
+      'legacyMissionUiDisabled',
+    );
+    final missionProgress = legacyMissionUiDisabled
+        ? null
+        : const GameEngine().missionProgress(widget.state);
     final placeIndex = _ApartmentPlace.values.indexOf(_place);
     final previousPlace = placeIndex > 0
         ? _ApartmentPlace.values[placeIndex - 1]
@@ -137,15 +142,16 @@ class _ApartmentHubScreenState extends State<ApartmentHubScreen> {
               onOpenGameMenu: widget.onOpenGameMenu,
             ),
           ),
-          Positioned(
-            right: 10,
-            bottom: 100,
-            child: _ApartmentMissionCard(
-              progress: missionProgress,
-              starBalance: widget.state.progression.starBalance,
-              onClaim: widget.onClaimMission,
+          if (!legacyMissionUiDisabled)
+            Positioned(
+              right: 10,
+              bottom: 100,
+              child: _ApartmentMissionCard(
+                progress: missionProgress,
+                starBalance: widget.state.progression.starBalance,
+                onClaim: widget.onClaimMission,
+              ),
             ),
-          ),
           Positioned(
             left: 10,
             bottom: 24,

@@ -483,4 +483,161 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets(
+    '360px text 1.2 keeps all tabs, event confirmation, and statements usable',
+    (tester) async {
+      await usePhoneSurface(tester, const Size(360, 800));
+      final base = newState();
+      final listing = generateBusinessListings(
+        worldSeed: base.simulationSeed,
+        asOfDate: base.currentDate,
+        count: LocalBusinessEngine.listingCount,
+      ).first;
+      const statement = BusinessMonthlyStatement(
+        businessId: 'mobile-audit-shop',
+        year: 2000,
+        month: 1,
+        operatingDays: 31,
+        customerCount: 1240,
+        grossSales: 18600000,
+        variableCosts: 6700000,
+        payroll: 3200000,
+        rent: 1400000,
+        utilities: 900000,
+        marketing: 500000,
+        maintenance: 350000,
+        eventCosts: 200000,
+        taxes: 160000,
+        netProfit: 5190000,
+        policySnapshot: BusinessOperatingPolicy.neutral,
+        sourceId: 'business-month-mobile-audit-shop-2000-01',
+      );
+      final business =
+          createOwnedBusinessFromListing(
+            listing: listing,
+            businessId: 'mobile-audit-shop',
+            name: '모바일 감사 점포',
+            acquiredDay: 1,
+            openedDate: base.currentDate,
+          ).copyWith(
+            statements: const [statement],
+            totalSales: statement.grossSales,
+            totalProfit: statement.netProfit,
+          );
+      const choice = BusinessEventChoice(
+        id: 'repair-now',
+        label: '즉시 수리한다',
+        description: '비용을 내고 영업 중단 위험을 줄인다.',
+        upfrontCost: 300000,
+        immediateReputationDelta: 1,
+        immediateRiskDelta: -4,
+        successChanceBps: 7000,
+        successCashDelta: 500000,
+        successDemandDeltaBps: 300,
+        successReputationDelta: 2,
+        failureCashDelta: -200000,
+        failureDemandDeltaBps: -200,
+        failureReputationDelta: -1,
+      );
+      const event = BusinessEventInstance(
+        id: 'mobile-audit-event',
+        templateId: 'mobile-audit-template',
+        businessId: 'mobile-audit-shop',
+        title: '냉방 설비 이상',
+        body: '더운 날 손님이 불편해하기 전에 대응 수준을 정해야 한다.',
+        occurredDateIso: '2000-01-10',
+        choiceDueDateIso: '2000-01-12',
+        resolutionDateIso: '2000-01-16',
+        choices: [choice],
+        tags: ['maintenance'],
+        dailyDemandDeltaBps: -200,
+        dailyExtraCost: 10000,
+      );
+      final state = base.copyWith(
+        businesses: BusinessPortfolioState(
+          businesses: [business],
+          pendingEvents: const [event],
+          eventHistory: const [],
+          totalAcquisitionSpend: business.totalInvested,
+          totalSales: statement.grossSales,
+          totalProfit: statement.netProfit,
+          totalClosures: 0,
+        ),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: const TextScaler.linear(1.2)),
+            child: child!,
+          ),
+          home: businessScreen(state),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      for (final key in const <String>[
+        'business-tab-listings',
+        'business-tab-owned',
+        'business-tab-events',
+        'business-tab-statements',
+        'business-tab-districts',
+      ]) {
+        final tab = find.byKey(Key(key));
+        await tester.ensureVisible(tab);
+        await tester.pumpAndSettle();
+        expect(tab.hitTestable(), findsOneWidget, reason: key);
+      }
+
+      final eventTab = find.byKey(const Key('business-tab-events'));
+      await tester.ensureVisible(eventTab);
+      await tester.tap(eventTab);
+      await tester.pumpAndSettle();
+      final choiceButton = find.byKey(
+        const Key('business-event-choice-mobile-audit-event-repair-now'),
+      );
+      await tester.scrollUntilVisible(
+        choiceButton,
+        180,
+        scrollable: find
+            .descendant(
+              of: find.byKey(const Key('business-events-panel')),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      expect(choiceButton.hitTestable(), findsOneWidget);
+      expect(tester.getSize(choiceButton).height, greaterThanOrEqualTo(44));
+      await tester.tap(choiceButton);
+      await tester.pumpAndSettle();
+      final dialog = find.byType(AlertDialog);
+      expect(dialog, findsOneWidget);
+      final dialogRect = tester.getRect(dialog);
+      expect(dialogRect.left, greaterThanOrEqualTo(0));
+      expect(dialogRect.right, lessThanOrEqualTo(360));
+      expect(dialogRect.top, greaterThanOrEqualTo(0));
+      expect(dialogRect.bottom, lessThanOrEqualTo(800));
+      expect(find.text('대응 선택').hitTestable(), findsOneWidget);
+      await tester.tap(find.text('취소'));
+      await tester.pumpAndSettle();
+
+      final statementTab = find.byKey(const Key('business-tab-statements'));
+      await tester.ensureVisible(statementTab);
+      await tester.tap(statementTab);
+      await tester.pumpAndSettle();
+      final statementCard = find.byKey(
+        const Key('business-statement-mobile-audit-shop-2000-1'),
+      );
+      expect(statementCard, findsOneWidget);
+      expect(tester.getRect(statementCard).right, lessThanOrEqualTo(360));
+      await tester.tap(statementCard);
+      await tester.pumpAndSettle();
+      expect(find.text('영업일'), findsOneWidget);
+      expect(find.text('31일'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

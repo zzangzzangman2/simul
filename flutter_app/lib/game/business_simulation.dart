@@ -1112,7 +1112,7 @@ BusinessDailyResult simulateBusinessDay({
       : null;
   final district = districtProfile == null
       ? null
-      : businessDistrictSnapshotFor(
+      : businessDistrictOperatingFactorsFor(
           districtProfile,
           asOf: date,
           worldSeed: worldSeed,

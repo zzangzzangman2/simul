@@ -559,7 +559,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('dialogue uses a translucent Blue Archive-style panel', (
+  testWidgets('dialogue uses an edgeless Blue Archive-style blur overlay', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
@@ -576,8 +576,19 @@ void main() {
       find.byKey(const Key('story-dialogue-panel')),
     );
     final panelDecoration = panel.decoration! as BoxDecoration;
-    expect(panelDecoration.color!.a, lessThan(1));
-    expect(panelDecoration.borderRadius, isNotNull);
+    expect(panelDecoration.color, isNull);
+    expect(panelDecoration.border, isNull);
+    expect(panelDecoration.borderRadius, isNull);
+    expect(panelDecoration.boxShadow, isNull);
+    final panelGradient = panelDecoration.gradient! as LinearGradient;
+    expect(panelGradient.colors.first.a, 0);
+    expect(panelGradient.colors.last.a, 0);
+    expect(
+      panelGradient.colors.every(
+        (color) => color.r == color.g && color.g == color.b,
+      ),
+      isTrue,
+    );
     final scrim = tester.widget<DecoratedBox>(
       find.byKey(const Key('story-stage-reading-scrim')),
     );
@@ -600,13 +611,26 @@ void main() {
     final dialoguePosition = tester.widget<AnimatedPositioned>(
       find.byKey(const Key('keyboard-name-panel')),
     );
-    expect(dialoguePosition.bottom, 28);
+    expect(dialoguePosition.bottom, 44);
 
     await advanceDialogue(tester, 1);
     final nextPanel = tester.widget<Container>(
       find.byKey(const Key('story-dialogue-panel')),
     );
     expect(nextPanel.decoration, isA<BoxDecoration>());
+    final characterScale = tester.widget<Transform>(
+      find.byKey(const Key('story-character-scale')),
+    );
+    expect(
+      characterScale.transform.getMaxScaleOnAxis(),
+      greaterThanOrEqualTo(1.72),
+    );
+    expect(
+      tester.getRect(find.byKey(const Key('story-character-image'))).bottom,
+      greaterThan(
+        tester.getRect(find.byKey(const Key('story-dialogue-panel'))).top,
+      ),
+    );
     expect(tester.takeException(), isNull);
   });
 
@@ -881,10 +905,7 @@ void main() {
     final scaleTransform = tester.widget<Transform>(
       find.byKey(const Key('story-character-scale')),
     );
-    expect(
-      scaleTransform.transform.getMaxScaleOnAxis(),
-      closeTo(1.0875, 0.001),
-    );
+    expect(scaleTransform.transform.getMaxScaleOnAxis(), closeTo(1.29, 0.001));
     expect(
       (tester
                   .widget<Image>(
@@ -1404,9 +1425,22 @@ void main() {
       );
       expect(
         (stockAppIcon.image as AssetImage).assetName,
-        'assets/images/stock_practice_app_icon_v1.png',
+        'assets/images/stock_practice_app_icon_v2.png',
       );
       expect(stockAppIcon.filterQuality, FilterQuality.high);
+      expect(
+        find.byKey(const Key('decimal-desktop-my-computer')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('decimal-desktop-recycle-bin')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('decimal-desktop-taskbar')), findsOneWidget);
+      expect(
+        find.byKey(const Key('decimal-desktop-start-button')),
+        findsOneWidget,
+      );
 
       await tester.tap(find.byKey(const Key('academy-stock-app-icon')));
       await tester.pumpAndSettle();
@@ -1442,6 +1476,7 @@ void main() {
       expect(tutorialScreen, findsOneWidget);
       await waitForMarketHome(tester);
       expect(find.byKey(const Key('market-tutorial-overlay')), findsOneWidget);
+      expect(find.byKey(const Key('market-tutorial-skip')), findsOneWidget);
 
       final saved = await persistence.loadSlot(1);
       expect(saved, isNotNull);
@@ -1456,6 +1491,116 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('market tutorial can be skipped from the persistent top action', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(360, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    const engine = GameEngine();
+    final story = StoryState.newDecimalPlayer(
+      playerName: '민재',
+      introChoice: 'stocks',
+      startingTrait: StoryTrait.analysis,
+      operatingPrinciple: OperatingPrinciple.reportLosses,
+    );
+    var current = engine
+        .createNewGame('건너뛰기 테스트', story: story)
+        .copyWith(day: 3, marketMinute: krxOpenMinute);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StockMarketScreen(
+          state: current,
+          universe: testMarketUniverse(tradingDate: current.currentDate),
+          onCompleteTutorial: () async {
+            current = engine.completeInitialPracticeDay(current);
+            return current;
+          },
+        ),
+      ),
+    );
+    await waitForMarketHome(tester);
+
+    expect(find.byKey(const Key('market-tutorial-skip')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('market-tutorial-skip')));
+    await tester.pump();
+    expect(
+      find.byKey(const Key('market-tutorial-skip-dialog')),
+      findsOneWidget,
+    );
+    expect(find.textContaining('1월 4일 실전 국가계좌'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('market-tutorial-skip-confirm')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(current.story.marketTutorialSeen, isTrue);
+    expect(current.currentDate, DateTime(2000, 1, 4));
+    expect(find.byKey(const Key('market-tutorial-overlay')), findsNothing);
+    expect(find.byKey(const Key('market-tutorial-skip')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('new Decimal campaign omits the obsolete mission board', (
+    tester,
+  ) async {
+    const engine = GameEngine();
+    final story = StoryState.newDecimalPlayer(
+      playerName: '민재',
+      introChoice: 'stocks',
+      startingTrait: StoryTrait.analysis,
+      operatingPrinciple: OperatingPrinciple.reportLosses,
+    );
+    final state = engine.createNewGame('신규 데시멀', story: story);
+
+    expect(state.story.flagBool('legacyMissionUiDisabled'), isTrue);
+    expect(state.pendingDecisions, isEmpty);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: DecisionInboxScreen(
+          state: state,
+          onResolveDecision: (_, _) async {},
+          onClaimMission: () async => engine.claimMission(state),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('내 방 · 안건함'), findsOneWidget);
+    expect(find.text('미션 · 안건 보드'), findsNothing);
+    expect(find.byKey(const Key('active-mission-card')), findsNothing);
+    expect(find.text('도착한 안건이 없어요'), findsOneWidget);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ApartmentHubScreen(
+          state: state,
+          onOpenMarket: () {},
+          onOpenBank: () {},
+          onOpenDecisions: () {},
+          onOpenLedger: () {},
+          onOpenOrganization: () {},
+          onOpenRelationships: () {},
+          onOpenMessenger: () {},
+          onOpenCalendar: () {},
+          onOpenHomeImprovements: () {},
+          onOpenWork: () {},
+          activeSaveSlot: 1,
+          lastSavedAt: null,
+          onOpenGameMenu: () {},
+          onAdvanceHour: () {},
+          onAdvanceDay: () {},
+          onAdvanceBatch: () {},
+          onOpenEnding: () {},
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.byKey(const Key('hub-mission-card')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('existing v1 save is restored with safe story defaults', (
     tester,
@@ -1823,6 +1968,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 600));
 
       expect(find.byKey(const Key('market-tutorial-overlay')), findsOneWidget);
+      expect(find.byKey(const Key('market-tutorial-skip')), findsOneWidget);
       expect(find.byKey(const Key('market-tutorial-teacher')), findsOneWidget);
       expect(
         find.byKey(const Key('market-tutorial-teacher-upper-body')),
@@ -1899,6 +2045,19 @@ void main() {
         find.byKey(const Key('market-detail-tutorial-overlay')),
         findsOneWidget,
       );
+      expect(
+        find.byKey(const Key('market-detail-tutorial-skip')),
+        findsOneWidget,
+      );
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.tap(find.byKey(const Key('market-detail-tutorial-skip')));
+      await tester.pump();
+      expect(
+        find.byKey(const Key('market-tutorial-skip-dialog')),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const Key('market-tutorial-skip-cancel')));
+      await tester.pump();
       expect(find.text('1 / 3').hitTestable(), findsOneWidget);
       await advanceTutorialPagesToTarget(
         tester,
@@ -2062,6 +2221,19 @@ void main() {
         find.byKey(const Key('market-order-tutorial-overlay')),
         findsOneWidget,
       );
+      expect(
+        find.byKey(const Key('market-order-tutorial-skip')),
+        findsOneWidget,
+      );
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.tap(find.byKey(const Key('market-order-tutorial-skip')));
+      await tester.pump();
+      expect(
+        find.byKey(const Key('market-tutorial-skip-dialog')),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const Key('market-tutorial-skip-cancel')));
+      await tester.pump();
       final tutorialPageRect = tester.getRect(
         find.byKey(const Key('market-practical-tutorial-page')),
       );
@@ -2084,6 +2256,10 @@ void main() {
       );
       expect(
         find.byKey(const Key('tutorial-failure-practice')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('market-order-tutorial-skip')),
         findsOneWidget,
       );
       expect(find.text('틀려 봐야 주문표가 보입니다'), findsOneWidget);
@@ -2274,7 +2450,7 @@ void main() {
       );
       expect(
         reviewTeacherRect.bottom,
-        closeTo(reviewStageRect.bottom + 56, 0.01),
+        closeTo(reviewStageRect.bottom + 144, 0.01),
       );
       expect(
         reviewTeacherRect.center.dx,
@@ -2331,6 +2507,12 @@ void main() {
       completionGate.complete();
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('market-practical-tutorial')), findsNothing);
+      expect(find.byKey(const Key('market-tutorial-skip')), findsNothing);
+      expect(
+        find.byKey(const Key('market-detail-tutorial-skip')),
+        findsNothing,
+      );
+      expect(find.byKey(const Key('market-order-tutorial-skip')), findsNothing);
       final restored = await persistence.load();
       expect(restored!.cash, actualCashBefore);
       expect(restored.brokerageCash, actualBrokerageBefore);

@@ -88,7 +88,8 @@ void main() {
     expect(state.ledger.single.account, 'brokerage_cash');
     expect(state.ledger.single.counterAccount, 'state_seed_capital');
     expect(state.ledger.single.description, contains('데시멀 기금'));
-    expect(state.pendingDecisions.first.id, 'first-research-note');
+    expect(state.story.flagBool('legacyMissionUiDisabled'), isTrue);
+    expect(state.pendingDecisions, isEmpty);
   });
 
   test('Project Decimal starts with ten peers and an active state account', () {

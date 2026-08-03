@@ -60,6 +60,7 @@ flutter build web --release --base-href /play/
 - `test/business_districts_test.dart`: 상권 카탈로그·국면·사건 비누설·순위·적합도·부동산 매핑·레거시 회귀
 - `test/business_simulation_test.dart`: 카탈로그·손익·사건·JSON 결정론 회귀
 - `test/business_engine_test.dart`: 인수·부동산 연결·정책·투자·월 정산·강제폐업 회귀
+- `test/business_long_run_balance_test.dart`: 2000~2026 다중 시드·18업종·6입지·32상권·4정책 장기 분포 감사
 - `test/business_ui_test.dart`: 390×844·360×800 앱 진입·5탭·상권판세·실제 인수·6축·투자·폐업 회귀
 - `test/widget_test.dart`: 프롤로그, 대사 편집본 배경과 추가 장면을 포함한 위젯 회귀
 
@@ -83,7 +84,7 @@ flutter build web --release --base-href /play/
   유지한다. 공통 유동성은 NPC 신규 매물은 각 주기의 `listedAt`, 플레이어 보유
   부동산은 `saleListedDay` 시점에 한 번 고정해 매물 체류기간과 매각 대기에
   적용한다.
-- 저장은 v24다. 신규 사업 v3는 상권 생성기 v2, 신규 부동산은 v4를
+- 저장은 v26이다. 신규 사업 v3는 상권 생성기 v2, 신규 부동산은 v4를
   사용하며 사업 v1·v2와 부동산 v1·v2·v3 저장분의 수치 경로는 바꾸지 않는다.
 
 ## 동네 사업 규칙
@@ -108,7 +109,7 @@ flutter build web --release --base-href /play/
   미지급금이며 3개월 연속 남으면 강제폐업과 잔존자산 상계로 이어진다.
 - 사건 선택지·기한·결과 예정일은 저장하고, 같은 시드·날짜·선택은 같은 결과를
   낸다. 성공은 즉시 보장하지 않고 예정일에 성공·부분 성공·실패를 공개한다.
-- 현재 저장은 v24·신규 점포는 사업 생성기 v3와 상권 생성기 v2다.
+- 현재 저장은 v26·신규 점포는 사업 생성기 v3와 상권 생성기 v2다.
   사업 생성기 v1·v2는 저장된 수치 경로를 동결하며, `districtId`가 없는 v1은
   기존 `locationId`와 중립 상권 보정을 유지해 안전하게 복원한다.
 

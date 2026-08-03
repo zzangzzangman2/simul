@@ -905,9 +905,9 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
   assert.match(onboarding, /character: asset\('character'\)/);
   assert.match(onboarding, /background: asset\('background'\)/);
   assert.match(onboarding, /_dialogueEndBeat = loaded\.keys\.reduce\(math\.max\)/);
-  assert.match(onboarding, /_storyCharacterBottomInset = -56\.0/);
-  assert.match(onboarding, /_storyDialogueBottomInset = 28\.0/);
-  assert.match(onboarding, /_storyCharacterSceneScale = 1\.45/);
+  assert.match(onboarding, /_storyCharacterBottomInset = -144\.0/);
+  assert.match(onboarding, /_storyDialogueBottomInset = 44\.0/);
+  assert.match(onboarding, /_storyCharacterSceneScale = 1\.72/);
   assert.doesNotMatch(onboarding, /story-crt-scanline/);
   assert.doesNotMatch(onboarding, /orientation-dust-motes/);
   assert.doesNotMatch(onboarding, /_minhoCharacterScale|character_minho_farewell/);

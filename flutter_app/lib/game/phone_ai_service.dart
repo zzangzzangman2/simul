@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import 'cohort_investment_state.dart';
@@ -126,7 +127,24 @@ class PhoneAiService {
             body: jsonEncode(body),
           )
           .timeout(const Duration(seconds: 45));
-      if (response.statusCode < 200 || response.statusCode >= 300) return null;
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        var serverMessage = '';
+        try {
+          final errorBody = jsonDecode(response.body);
+          if (errorBody is Map) {
+            serverMessage = (errorBody['message'] as String? ?? '').trim();
+          }
+        } on FormatException {
+          // The local reply remains available when the error body is not JSON.
+        }
+        if (kDebugMode) {
+          debugPrint(
+            'Phone AI fallback: HTTP ${response.statusCode}'
+            '${serverMessage.isEmpty ? '' : ' · $serverMessage'}',
+          );
+        }
+        return null;
+      }
       final decoded = jsonDecode(response.body);
       if (decoded is! Map) return null;
       final reply = (decoded['reply'] as String? ?? '')
@@ -141,10 +159,13 @@ class PhoneAiService {
         fallbackUsed: decoded['fallbackUsed'] == true,
       );
     } on TimeoutException {
+      if (kDebugMode) debugPrint('Phone AI fallback: request timed out');
       return null;
     } on FormatException {
+      if (kDebugMode) debugPrint('Phone AI fallback: invalid JSON response');
       return null;
-    } catch (_) {
+    } catch (error) {
+      if (kDebugMode) debugPrint('Phone AI fallback: $error');
       return null;
     }
   }

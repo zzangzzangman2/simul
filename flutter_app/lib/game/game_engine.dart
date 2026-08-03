@@ -2017,7 +2017,9 @@ class GameEngine {
       story: storyState,
       company: company,
       project: null,
-      decisions: [_firstResearchNote(1)],
+      decisions: storyState.flagBool('legacyMissionUiDisabled')
+          ? const []
+          : [_firstResearchNote(1)],
       scheduledEvents: const [],
       ledger: isStandardSeedStart
           ? [

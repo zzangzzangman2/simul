@@ -3056,6 +3056,11 @@ class _StockMarketScreenState extends State<StockMarketScreen>
     return saved;
   }
 
+  Future<void> _skipMarketTutorial() async {
+    await _completeMarketTutorial();
+    if (mounted) await Navigator.of(context).maybePop();
+  }
+
   Future<void> _openStock(
     _StockDefinition stock, {
     bool fromTutorial = false,
@@ -3706,6 +3711,15 @@ class _StockMarketScreenState extends State<StockMarketScreen>
                   _ => null,
                 },
                 onAction: _handleMarketTutorialAction,
+              ),
+            ),
+          if (_tutorialActive)
+            Positioned(
+              top: 0,
+              right: 0,
+              child: _MarketTutorialSkipButton(
+                buttonKey: const Key('market-tutorial-skip'),
+                onSkip: _skipMarketTutorial,
               ),
             ),
         ],
@@ -5087,6 +5101,18 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
     }
   }
 
+  Future<void> _skipDetailTutorial() async {
+    final callback = widget.onCompleteTutorial;
+    if (callback == null) return;
+    final saved = await callback();
+    if (!mounted) return;
+    setState(() {
+      _state = saved;
+      _tutorialStep = null;
+    });
+    await Navigator.of(context).maybePop();
+  }
+
   bool get _isFavorite {
     final raw = state.story.storyFlags['marketFavoriteAssetIds'];
     return raw is List && raw.whereType<String>().contains(definition.id);
@@ -5685,6 +5711,15 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
                 onAction: _handleDetailTutorialAction,
               ),
             ),
+          if (_tutorialStep != null)
+            Positioned(
+              top: 0,
+              right: 0,
+              child: _MarketTutorialSkipButton(
+                buttonKey: const Key('market-detail-tutorial-skip'),
+                onSkip: _skipDetailTutorial,
+              ),
+            ),
         ],
       ),
     );
@@ -5756,6 +5791,19 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
                             setSheetState(() => showingTutorial = false);
                           },
                         ),
+                      Positioned(
+                        top: 0,
+                        right: 0,
+                        child: _MarketTutorialSkipButton(
+                          buttonKey: const Key('market-order-tutorial-skip'),
+                          onSkip: () async {
+                            await onCompleteTutorial?.call();
+                            if (routeContext.mounted) {
+                              Navigator.of(routeContext).pop();
+                            }
+                          },
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -7187,6 +7235,103 @@ class _MarketSessionNoticeCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _MarketTutorialSkipButton extends StatefulWidget {
+  const _MarketTutorialSkipButton({
+    required this.buttonKey,
+    required this.onSkip,
+  });
+
+  final Key buttonKey;
+  final Future<void> Function() onSkip;
+
+  @override
+  State<_MarketTutorialSkipButton> createState() =>
+      _MarketTutorialSkipButtonState();
+}
+
+class _MarketTutorialSkipButtonState extends State<_MarketTutorialSkipButton> {
+  bool _skipping = false;
+
+  Future<void> _requestSkip() async {
+    if (_skipping) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierColor: const Color(0xB3000000),
+      builder: (dialogContext) => AlertDialog(
+        key: const Key('market-tutorial-skip-dialog'),
+        title: const Text('튜토리얼을 건너뛸까요?'),
+        content: const Text('1월 3일 모의 실습을 마치고 1월 4일 실전 국가계좌로 이동합니다.'),
+        actions: [
+          TextButton(
+            key: const Key('market-tutorial-skip-cancel'),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('계속 배우기'),
+          ),
+          FilledButton(
+            key: const Key('market-tutorial-skip-confirm'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('건너뛰기'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _skipping = true);
+    try {
+      await widget.onSkip();
+    } finally {
+      if (mounted) setState(() => _skipping = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => SafeArea(
+    minimum: const EdgeInsets.only(top: 8, right: 10),
+    child: Material(
+      color: const Color(0xE61B2435),
+      elevation: 8,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        key: widget.buttonKey,
+        onTap: _skipping ? null : _requestSkip,
+        borderRadius: BorderRadius.circular(18),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_skipping)
+                const SizedBox(
+                  width: 13,
+                  height: 13,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              else
+                const Icon(
+                  Icons.fast_forward_rounded,
+                  size: 15,
+                  color: Colors.white,
+                ),
+              const SizedBox(width: 5),
+              const Text(
+                '튜토리얼 건너뛰기',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 class _MarketTutorialOverlay extends StatelessWidget {

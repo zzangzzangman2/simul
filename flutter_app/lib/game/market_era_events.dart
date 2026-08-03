@@ -2085,6 +2085,9 @@ bool _isRealEconomySharedSource(FictionalMarketEvent event) {
 /// through [fictionalMarketEventsForDate]. This preserves the exact normalized
 /// event objects used by stock news and pricing without creating a second
 /// generator or changing the stock timeline.
+final Map<String, List<FictionalMarketEvent>> _sharedEconomyEventCache =
+    <String, List<FictionalMarketEvent>>{};
+
 List<FictionalMarketEvent> fictionalSharedEconomyEventsThrough(
   String seed,
   DateTime through,
@@ -2094,11 +2097,30 @@ List<FictionalMarketEvent> fictionalSharedEconomyEventsThrough(
     return const [];
   }
 
+  final allEvents = _sharedEconomyEvents(seed);
+  var low = 0;
+  var high = allEvents.length;
+  while (low < high) {
+    final middle = low + ((high - low) >> 1);
+    final eventDate = DateTime.parse(allEvents[middle].date);
+    if (eventDate.isAfter(cutoff)) {
+      high = middle;
+    } else {
+      low = middle + 1;
+    }
+  }
+  if (low == 0) return const [];
+  if (low == allEvents.length) return allEvents;
+  return List<FictionalMarketEvent>.unmodifiable(allEvents.take(low));
+}
+
+List<FictionalMarketEvent> _sharedEconomyEvents(String seed) {
+  final cached = _readFictionalMarketCache(_sharedEconomyEventCache, seed);
+  if (cached != null) return cached;
+
   final eligibleIdsByDate = <String, Set<String>>{};
 
   void includeEvent(FictionalMarketEvent event) {
-    final eventDate = DateTime.parse(event.date);
-    if (eventDate.isAfter(cutoff)) return;
     eligibleIdsByDate.putIfAbsent(event.date, () => <String>{}).add(event.id);
   }
 
@@ -2134,5 +2156,12 @@ List<FictionalMarketEvent> fictionalSharedEconomyEventsThrough(
     if (byRevealMinute != 0) return byRevealMinute;
     return left.id.compareTo(right.id);
   });
-  return List<FictionalMarketEvent>.unmodifiable(result);
+  final immutable = List<FictionalMarketEvent>.unmodifiable(result);
+  _writeFictionalMarketCache(
+    _sharedEconomyEventCache,
+    seed,
+    immutable,
+    maximumEntries: _maxFictionalMarketSeedCacheEntries,
+  );
+  return immutable;
 }

@@ -7,11 +7,11 @@ const _dialogueContentVersion = 3;
 const _dialogueRuntimeStorageKey = 'project-decimal-dialogue-runtime-v2';
 const _dialogueBundleAsset = 'assets/dialogue/dialogue-editor-override.json';
 const _orientationCompleteBeat = _onboardingBeatCount - 1;
-const _storyCharacterBottomInset = -56.0;
-const _storyDialogueBottomInset = 28.0;
+const _storyCharacterBottomInset = -144.0;
+const _storyDialogueBottomInset = 44.0;
 const _storyCharacterHeightFactor = 0.9;
 const _storyCharacterAspectRatio = 2 / 3;
-const _storyCharacterSceneScale = 1.45;
+const _storyCharacterSceneScale = 1.72;
 const _storyDialogueBackdropBlur = 3.2;
 const _storyDialoguePanelMinHeight = 154.0;
 const _maximumWheelBackSteps = 12;
@@ -1575,8 +1575,8 @@ class _VisualNovelOnboardingScreenState
                   key: const Key('keyboard-name-panel'),
                   duration: const Duration(milliseconds: 180),
                   curve: Curves.easeOutCubic,
-                  left: 12,
-                  right: 12,
+                  left: 0,
+                  right: 0,
                   bottom: keyboardLift + panelBottomInset,
                   child: SafeArea(
                     top: false,
@@ -2581,6 +2581,206 @@ class _OnboardingCharacterSlotState extends State<_OnboardingCharacterSlot>
   }
 }
 
+class _DecimalDesktopWallpaperPainter extends CustomPainter {
+  const _DecimalDesktopWallpaperPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final gridPaint = Paint()
+      ..color = const Color(0x16B9F4F0)
+      ..strokeWidth = 1;
+    const spacing = 22.0;
+    for (var x = -size.height; x < size.width; x += spacing) {
+      canvas.drawLine(
+        Offset(x, size.height),
+        Offset(x + size.height, 0),
+        gridPaint,
+      );
+    }
+    final orbitPaint = Paint()
+      ..color = const Color(0x1FF6D57A)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.4;
+    canvas.drawCircle(
+      Offset(size.width * .72, size.height * .43),
+      size.shortestSide * .28,
+      orbitPaint,
+    );
+    canvas.drawCircle(
+      Offset(size.width * .72, size.height * .43),
+      size.shortestSide * .20,
+      orbitPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _DecimalDesktopIcon extends StatelessWidget {
+  const _DecimalDesktopIcon({
+    super.key,
+    required this.label,
+    this.image,
+    this.icon,
+    this.iconColor = Colors.white,
+    this.onTap,
+  }) : assert(image != null || icon != null);
+
+  final String label;
+  final Widget? image;
+  final IconData? icon;
+  final Color iconColor;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: Colors.transparent,
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(5),
+      splashColor: const Color(0x55FFFFFF),
+      highlightColor: const Color(0x330B2F53),
+      child: SizedBox(
+        width: 66,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(4, 4, 4, 5),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 56,
+                height: 56,
+                child:
+                    image ??
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: const Color(0x3309152A),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0x44FFFFFF)),
+                      ),
+                      child: Icon(icon, color: iconColor, size: 38),
+                    ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 9.5,
+                  height: 1.05,
+                  fontWeight: FontWeight.w800,
+                  shadows: <Shadow>[
+                    Shadow(color: Colors.black, offset: Offset(1, 1)),
+                    Shadow(color: Colors.black54, blurRadius: 2),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+class _DecimalDesktopTaskbar extends StatelessWidget {
+  const _DecimalDesktopTaskbar();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    key: const Key('decimal-desktop-taskbar'),
+    height: 30,
+    padding: const EdgeInsets.fromLTRB(4, 3, 4, 3),
+    decoration: const BoxDecoration(
+      color: Color(0xFFC5C8C2),
+      border: Border(
+        top: BorderSide(color: Colors.white, width: 2),
+        bottom: BorderSide(color: Color(0xFF555A58)),
+      ),
+    ),
+    child: Row(
+      children: [
+        Container(
+          key: const Key('decimal-desktop-start-button'),
+          padding: const EdgeInsets.symmetric(horizontal: 7),
+          decoration: BoxDecoration(
+            color: const Color(0xFFD6D8D3),
+            border: Border.all(color: const Color(0xFF69716D)),
+            boxShadow: const <BoxShadow>[
+              BoxShadow(color: Colors.white, offset: Offset(1, 1)),
+            ],
+          ),
+          child: const Row(
+            children: [
+              Icon(Icons.grid_view_rounded, size: 13, color: Color(0xFF0B6B72)),
+              SizedBox(width: 4),
+              Text(
+                '시작',
+                style: TextStyle(
+                  color: Color(0xFF1B2427),
+                  fontSize: 9,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 5),
+        const VerticalDivider(width: 5, thickness: 1, color: Color(0xFF7B817F)),
+        const SizedBox(width: 3),
+        Expanded(
+          child: Container(
+            height: 22,
+            padding: const EdgeInsets.symmetric(horizontal: 7),
+            alignment: Alignment.centerLeft,
+            decoration: BoxDecoration(
+              color: const Color(0xFFB6BAB5),
+              border: Border.all(color: const Color(0xFF7B817F)),
+            ),
+            child: const Text(
+              '데시멀 실습 PC',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: Color(0xFF27302F),
+                fontSize: 8.5,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 5),
+        Container(
+          height: 22,
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          decoration: BoxDecoration(
+            color: const Color(0xFFC9CCC6),
+            border: Border.all(color: const Color(0xFF8A8E8A)),
+          ),
+          child: const Row(
+            children: [
+              Icon(Icons.volume_up_rounded, size: 11, color: Color(0xFF3B4543)),
+              SizedBox(width: 5),
+              Text(
+                '08:59',
+                style: TextStyle(
+                  color: Color(0xFF27302F),
+                  fontSize: 8.5,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 class _AcademyPcTerminal extends StatelessWidget {
   const _AcademyPcTerminal({
     required this.poweredOn,
@@ -2747,96 +2947,98 @@ class _AcademyPcTerminal extends StatelessWidget {
   Widget _desktop() => Container(
     key: const Key('academy-pc-desktop'),
     width: double.infinity,
-    height: 150,
-    padding: const EdgeInsets.all(12),
+    height: 202,
+    clipBehavior: Clip.antiAlias,
     decoration: BoxDecoration(
-      gradient: const LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [Color(0xFF3D6B92), Color(0xFF75A6C7)],
-      ),
+      color: const Color(0xFF0F5965),
       borderRadius: BorderRadius.circular(12),
       border: Border.all(color: const Color(0xFF756D60), width: 5),
+      boxShadow: const <BoxShadow>[
+        BoxShadow(color: Color(0x66000000), blurRadius: 8),
+      ],
     ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    child: Stack(
       children: [
-        const Text(
-          '프로젝트 데시멀 · 06번 실습 PC',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 10,
-            fontWeight: FontWeight.w800,
-            shadows: [Shadow(color: Colors.black45, blurRadius: 3)],
-          ),
-        ),
-        const Spacer(),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: InkWell(
-            key: const Key('academy-stock-app-icon'),
-            onTap: onOpenStockApp,
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              width: 122,
-              padding: const EdgeInsets.fromLTRB(8, 6, 8, 5),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: <Color>[Color(0xFFF8FCFF), Color(0xFFE2F2F3)],
-                ),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFFBFD7E1)),
-                boxShadow: const <BoxShadow>[
-                  BoxShadow(
-                    color: Color(0x4D0C2338),
-                    blurRadius: 10,
-                    offset: Offset(0, 4),
-                  ),
-                  BoxShadow(
-                    color: Color(0x4DFFFFFF),
-                    blurRadius: 2,
-                    offset: Offset(0, -1),
-                  ),
+        const Positioned.fill(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: <Color>[
+                  Color(0xFF083F4C),
+                  Color(0xFF0C6971),
+                  Color(0xFF164C62),
                 ],
-              ),
-              child: Column(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(11),
-                    child: Image.asset(
-                      'assets/images/stock_practice_app_icon_v1.png',
-                      key: const Key('academy-stock-app-icon-image'),
-                      width: 48,
-                      height: 48,
-                      fit: BoxFit.cover,
-                      filterQuality: FilterQuality.high,
-                      isAntiAlias: true,
-                    ),
-                  ),
-                  const SizedBox(height: 5),
-                  const Text(
-                    '주식실습',
-                    style: TextStyle(
-                      color: _ink,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ],
+                stops: <double>[0, 0.58, 1],
               ),
             ),
           ),
         ),
-        const Spacer(),
-        const Text(
-          '시작 → 프로그램 → 주식실습',
-          style: TextStyle(
-            color: Color(0xFFEAF4FF),
-            fontSize: 9,
-            fontWeight: FontWeight.w700,
+        const Positioned.fill(
+          child: IgnorePointer(
+            child: CustomPaint(painter: _DecimalDesktopWallpaperPainter()),
           ),
+        ),
+        const Positioned(
+          top: 8,
+          right: 9,
+          child: Text(
+            'DECIMAL OS 2000 · CRT-06',
+            style: TextStyle(
+              color: Color(0xBFFFFFFF),
+              fontSize: 8,
+              letterSpacing: .4,
+              fontWeight: FontWeight.w800,
+              shadows: <Shadow>[
+                Shadow(color: Color(0x99000000), offset: Offset(1, 1)),
+              ],
+            ),
+          ),
+        ),
+        Positioned(
+          left: 8,
+          top: 10,
+          bottom: 32,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _DecimalDesktopIcon(
+                key: const Key('academy-stock-app-icon'),
+                label: '주식실습',
+                onTap: onOpenStockApp,
+                image: Image.asset(
+                  'assets/images/stock_practice_app_icon_v2.png',
+                  key: const Key('academy-stock-app-icon-image'),
+                  width: 54,
+                  height: 54,
+                  fit: BoxFit.cover,
+                  filterQuality: FilterQuality.high,
+                  isAntiAlias: true,
+                ),
+              ),
+              const SizedBox(width: 7),
+              const _DecimalDesktopIcon(
+                key: Key('decimal-desktop-my-computer'),
+                label: '내 컴퓨터',
+                icon: Icons.computer_rounded,
+                iconColor: Color(0xFFE7E0C9),
+              ),
+              const SizedBox(width: 7),
+              const _DecimalDesktopIcon(
+                key: Key('decimal-desktop-recycle-bin'),
+                label: '휴지통',
+                icon: Icons.delete_outline_rounded,
+                iconColor: Color(0xFFE7F3F2),
+              ),
+            ],
+          ),
+        ),
+        const Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          child: _DecimalDesktopTaskbar(),
         ),
       ],
     ),
@@ -3237,8 +3439,7 @@ class _NovelDialogueState extends State<_NovelDialogue>
           : widget.continueKey ?? const Key('story-continue'),
       behavior: HitTestBehavior.opaque,
       onTap: _handleExternalTap,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
+      child: ClipRect(
         child: BackdropFilter(
           key: const Key('story-dialogue-backdrop-blur'),
           filter: ui.ImageFilter.blur(
@@ -3251,21 +3452,18 @@ class _NovelDialogueState extends State<_NovelDialogue>
               minHeight: _storyDialoguePanelMinHeight,
             ),
             decoration: BoxDecoration(
-              color: switch (widget.mode) {
-                'thought' => const Color(0x7A211C36),
-                'system' => const Color(0x7A162C3E),
-                'narration' => const Color(0x74161D2A),
-                _ => const Color(0x74101A28),
-              },
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0x3D8CCEEB)),
-              boxShadow: const <BoxShadow>[
-                BoxShadow(
-                  color: Color(0x52000000),
-                  blurRadius: 18,
-                  offset: Offset(0, 7),
-                ),
-              ],
+              gradient: const LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: <Color>[
+                  Color(0x00000000),
+                  Color(0x32000000),
+                  Color(0x66000000),
+                  Color(0x46000000),
+                  Color(0x00000000),
+                ],
+                stops: <double>[0, 0.15, 0.58, 0.88, 1],
+              ),
             ),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(18, 13, 18, 14),
@@ -3342,9 +3540,9 @@ class _NovelDialogueState extends State<_NovelDialogue>
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: [
-                              Color(0xAA9CB5C5),
-                              Color(0x668AA8BC),
-                              Color(0x009CB5C5),
+                              Color(0x99FFFFFF),
+                              Color(0x4DFFFFFF),
+                              Color(0x00FFFFFF),
                             ],
                             stops: [0, 0.7, 1],
                           ),

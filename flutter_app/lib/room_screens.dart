@@ -346,7 +346,12 @@ class DecisionInboxScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pending = state.pendingDecisions;
-    final missionProgress = const GameEngine().missionProgress(state);
+    final legacyMissionUiDisabled = state.story.flagBool(
+      'legacyMissionUiDisabled',
+    );
+    final missionProgress = legacyMissionUiDisabled
+        ? null
+        : const GameEngine().missionProgress(state);
     return Scaffold(
       key: const Key('decision-inbox-screen'),
       backgroundColor: const Color(0xFF272331),
@@ -364,13 +369,18 @@ class DecisionInboxScreen extends StatelessWidget {
             child: Column(
               children: [
                 _SceneClockStrip(
-                  location: '내 방 · 미션 보드',
-                  caption: missionProgress == null
+                  location: legacyMissionUiDisabled
+                      ? '내 방 · 안건함'
+                      : '내 방 · 미션 보드',
+                  caption: legacyMissionUiDisabled
+                      ? '오늘 도착한 안건과 기록을 확인합니다.'
+                      : missionProgress == null
                       ? '모든 장기 미션을 완주했다.'
                       : '행동으로 목표를 채우고 보상과 스킬을 얻는다.',
                   minute: state.marketMinute,
-                  costLabel:
-                      'LV.${state.progression.level} · ${pending.length}건',
+                  costLabel: legacyMissionUiDisabled
+                      ? '${pending.length}건'
+                      : 'LV.${state.progression.level} · ${pending.length}건',
                   onBack: () => Navigator.of(context).pop(),
                 ),
                 Expanded(
@@ -410,9 +420,11 @@ class DecisionInboxScreen extends StatelessWidget {
                                 ),
                               ),
                               const SizedBox(height: 3),
-                              const Text(
-                                '미션 · 안건 보드',
-                                style: TextStyle(
+                              Text(
+                                legacyMissionUiDisabled
+                                    ? '안건 · 기록'
+                                    : '미션 · 안건 보드',
+                                style: const TextStyle(
                                   color: _ink,
                                   fontSize: 25,
                                   fontWeight: FontWeight.w900,
@@ -421,7 +433,9 @@ class DecisionInboxScreen extends StatelessWidget {
                               ),
                               const SizedBox(height: 6),
                               Text(
-                                'LV.${state.progression.level} · ${state.progression.experience} XP · 완수 ${state.progression.claimedMissionIds.length}/${missionCatalog.length}',
+                                legacyMissionUiDisabled
+                                    ? '보류 안건 ${pending.length}건'
+                                    : 'LV.${state.progression.level} · ${state.progression.experience} XP · 완수 ${state.progression.claimedMissionIds.length}/${missionCatalog.length}',
                                 style: const TextStyle(
                                   color: Color(0xFF777D8B),
                                   fontSize: 10,
@@ -438,7 +452,7 @@ class DecisionInboxScreen extends StatelessWidget {
                                     onClaim: onClaimMission,
                                   ),
                                 ),
-                              if (pending.isEmpty)
+                              if (pending.isEmpty && !legacyMissionUiDisabled)
                                 const Padding(
                                   padding: EdgeInsets.only(bottom: 12),
                                   child: Text(

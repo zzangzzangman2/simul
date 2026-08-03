@@ -262,6 +262,28 @@ class BusinessDistrictSnapshot {
   final List<String> currentSignals;
 }
 
+/// The dated factors needed by daily shop operations.
+///
+/// The full district snapshot also calculates month-over-month/year-over-year
+/// comparisons, public history, and display signals. Daily profit simulation
+/// does not consume those presentation fields, so using this smaller view
+/// avoids rebuilding them for every shop and every operating day.
+class BusinessDistrictOperatingFactors {
+  const BusinessDistrictOperatingFactors({
+    required this.demandMultiplier,
+    required this.rentMultiplier,
+    required this.competitionMultiplier,
+    required this.wageMultiplier,
+    required this.riskMultiplier,
+  });
+
+  final double demandMultiplier;
+  final double rentMultiplier;
+  final double competitionMultiplier;
+  final double wageMultiplier;
+  final double riskMultiplier;
+}
+
 class BusinessDistrictRankingEntry {
   const BusinessDistrictRankingEntry({
     required this.rank,
@@ -383,6 +405,30 @@ BusinessDistrictSnapshot businessDistrictSnapshotFor(
         revealedEvents: revealedEvents,
       ),
     ),
+  );
+}
+
+BusinessDistrictOperatingFactors businessDistrictOperatingFactorsFor(
+  BusinessDistrictProfile profile, {
+  required DateTime asOf,
+  required String worldSeed,
+  int generatorVersion = businessDistrictGeneratorVersion,
+}) {
+  final effectiveGeneratorVersion = generatorVersion >= 2
+      ? businessDistrictGeneratorVersion
+      : 1;
+  final point = _calculateDistrictPoint(
+    profile,
+    asOf: _validatedAsOf(asOf),
+    worldSeed: worldSeed,
+    generatorVersion: effectiveGeneratorVersion,
+  );
+  return BusinessDistrictOperatingFactors(
+    demandMultiplier: point.demand,
+    rentMultiplier: point.rent,
+    competitionMultiplier: point.competition,
+    wageMultiplier: point.wage,
+    riskMultiplier: point.risk,
   );
 }
 

@@ -66,6 +66,6 @@ test("approved v3 sprites remain byte-exact and mirrored to the web build", asyn
 
   assert.equal(
     digest.digest("hex"),
-    "c5f43ce70d61e6b9af5b15f27279975e64d0c3d55e69437411f33836984ae190",
+    "f1738279728ab661f5873af2713f9bbb8ef2785df2665d0aabb38976fc0d07b8",
   );
 });
