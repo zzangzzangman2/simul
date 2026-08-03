@@ -17,7 +17,7 @@ void main() {
     currency: 'KRW',
     quantity: 1,
     unitPrice: 10000,
-    quoteDate: '2000-01-04',
+    quoteDate: '2000-01-05',
     marketMinute: 9 * 60,
     isTradingDay: true,
   );
@@ -54,7 +54,7 @@ void main() {
       );
       expect(claim.message, contains('⭐ +1'));
       expect(claim.message, contains('+80 XP'));
-      expect(claim.message, contains('가족 신뢰 +1'));
+      expect(claim.message, contains('공동체 신뢰 +1'));
     },
   );
 
@@ -85,17 +85,17 @@ void main() {
     },
   );
 
-  test('legacy family campaign keeps its saved age convention', () {
+  test('Decimal peers use the Korean year-age convention', () {
     final story = engine.createNewGame('나이 기준 테스트').story;
 
-    expect(story.ageOn(DateTime(2000, 1, 2)), 10);
-    expect(story.ageOn(DateTime(2010, 12, 31)), 20);
+    expect(story.ageOn(DateTime(2000, 1, 2)), 14);
+    expect(story.ageOn(DateTime(2010, 12, 31)), 24);
   });
 
   test('level skills change work rewards and trading fees', () {
     final base = engine
         .createNewGame('스킬 효과 테스트', initialCash: 200000)
-        .copyWith(day: 4, marketMinute: 9 * 60, decisions: const []);
+        .copyWith(day: 5, marketMinute: 9 * 60, decisions: const []);
     final skilledWork = base.copyWith(
       progression: base.progression.copyWith(experience: 120),
     );

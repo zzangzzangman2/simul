@@ -3,7 +3,7 @@ import 'real_estate_financing.dart';
 import 'real_estate_rental.dart';
 import 'real_estate_world.dart';
 
-enum SpendingCategory { family, education, business, realEstate, social }
+enum SpendingCategory { community, education, business, realEstate, social }
 
 enum SpendingRepeat { once, monthly, yearly }
 
@@ -25,7 +25,7 @@ class SpendingOption {
     this.researchIncomeBonus = 0,
     this.researchIncomePerEmployeeBonus = 0,
     this.reputationDelta = 0,
-    this.familyTrustDelta = 0,
+    this.communityTrustDelta = 0,
   });
 
   final String id;
@@ -44,7 +44,7 @@ class SpendingOption {
   final int researchIncomeBonus;
   final int researchIncomePerEmployeeBonus;
   final int reputationDelta;
-  final int familyTrustDelta;
+  final int communityTrustDelta;
 
   RealEstateMarketAsset? get marketAsset =>
       marketAssetId == null ? null : realEstateMarketAssetById(marketAssetId!);
@@ -62,14 +62,14 @@ class SpendingOption {
 
 final spendingCatalog = <SpendingOption>[
   SpendingOption(
-    id: 'family_outing',
-    title: '가족과 보내는 하루',
-    description: '가족 외식과 나들이 비용입니다. 같은 달에는 한 번만 선택해 가족 신뢰를 높입니다.',
-    category: SpendingCategory.family,
+    id: 'cohort_field_day',
+    title: '데시멀 동기 현장조사 하루',
+    description: '동기들과 상권과 제품을 직접 관찰합니다. 같은 달에는 한 번만 선택해 공동체 신뢰를 높입니다.',
+    category: SpendingCategory.community,
     unlockYear: 2000,
     cost: 20000,
     repeat: SpendingRepeat.monthly,
-    familyTrustDelta: 4,
+    communityTrustDelta: 4,
   ),
   SpendingOption(
     id: 'research_books',
@@ -132,25 +132,25 @@ final spendingCatalog = <SpendingOption>[
   SpendingOption(
     id: 'scholarship',
     title: '청소년 금융교육 장학금',
-    description: '지역 학생을 지원합니다. 한 해에 한 번 평판과 가족 신뢰를 높입니다.',
+    description: '지역 동기을 지원합니다. 한 해에 한 번 평판과 공동체 신뢰를 높입니다.',
     category: SpendingCategory.social,
     unlockYear: 2008,
     cost: 1000000,
     repeat: SpendingRepeat.yearly,
     reputationDelta: 7,
-    familyTrustDelta: 2,
+    communityTrustDelta: 2,
   ),
   SpendingOption(
-    id: 'family_home_trust',
-    title: '가족 주택 신탁',
-    description: '보호자와 공동 관리하는 게임용 주거자산입니다. 월 관리비 8만원이 듭니다.',
+    id: 'alumni_housing_trust',
+    title: '수료생 공동주거 신탁',
+    description: '데시멀 센터 수료생이 공동 관리하는 게임용 주거자산입니다. 월 관리비 8만원이 듭니다.',
     category: SpendingCategory.realEstate,
     unlockYear: 2009,
     cost: 25000000,
     requiresLegalCompany: true,
     isRealEstate: true,
     monthlyCost: 80000,
-    familyTrustDelta: 8,
+    communityTrustDelta: 8,
   ),
   ...realEstateMarketCatalog.map((asset) {
     final openingQuote = asset.quoteAt(asset.availableFrom);
@@ -285,7 +285,7 @@ class OwnedRealEstate {
       leaseType == RealEstateLeaseType.jeonse;
 
   bool get isDirectUse =>
-      optionId == 'owner_office' || optionId == 'family_home_trust';
+      optionId == 'owner_office' || optionId == 'alumni_housing_trust';
 
   bool get isLandmarkFund => assetType == RealEstateAssetType.landmarkFund;
 
@@ -807,6 +807,7 @@ class PersonalFinanceState {
 
   factory PersonalFinanceState.fromJson(Map<String, dynamic> json) {
     if (json.isEmpty) return PersonalFinanceState.initial();
+    final knownOptionIds = spendingCatalog.map((option) => option.id).toSet();
     return PersonalFinanceState(
       realEstate: ((json['realEstate'] as List?) ?? const [])
           .whereType<Map>()
@@ -815,10 +816,13 @@ class PersonalFinanceState {
           .toList(growable: false),
       permanentPurchases: ((json['permanentPurchases'] as List?) ?? const [])
           .whereType<String>()
+          .where(knownOptionIds.contains)
           .toSet()
           .toList(growable: false),
-      lastPurchasePeriods: ((json['lastPurchasePeriods'] as Map?) ?? const {})
-          .map((key, value) => MapEntry(key.toString(), value.toString())),
+      lastPurchasePeriods:
+          ((json['lastPurchasePeriods'] as Map?) ?? const {}).map(
+            (key, value) => MapEntry(key.toString(), value.toString()),
+          )..removeWhere((key, _) => !knownOptionIds.contains(key)),
       totalSpent: (json['totalSpent'] as num?)?.toInt() ?? 0,
       totalPropertyIncome: (json['totalPropertyIncome'] as num?)?.toInt() ?? 0,
       lastChanceMonth: json['lastChanceMonth'] as String? ?? '',

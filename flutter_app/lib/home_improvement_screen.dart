@@ -30,34 +30,6 @@ String _homeImprovementBackgroundAsset(HomeImprovementRoom room, int tier) {
   };
 }
 
-int _sharedHomeExteriorTier(HomeImprovementState home) =>
-    switch (home.completedCount) {
-      >= 4 => 2,
-      >= 1 => 1,
-      _ => 0,
-    };
-
-String _gameplayCorridorBackgroundAsset(HomeImprovementState home) =>
-    'assets/images/gameplay_map/bg_gameplay_corridor_tier${_sharedHomeExteriorTier(home)}_2000_portrait_cartoon_v1.png';
-
-String _gameplayNeighborhoodBackgroundAsset(GameState state) {
-  if (state.marketMinute >= 17 * 60) {
-    return 'assets/images/gameplay_map/bg_gameplay_neighborhood_dusk_2000_portrait_cartoon_v1.png';
-  }
-  final weatherSeed = state.simulationSeed.codeUnits.fold<int>(
-    state.day * 17,
-    (value, unit) => (value * 31 + unit) & 0x7fffffff,
-  );
-  return switch (weatherSeed % 5) {
-    1 || 3 =>
-      'assets/images/gameplay_map/bg_gameplay_neighborhood_cloudy_2000_portrait_cartoon_v1.png',
-    4 =>
-      'assets/images/gameplay_map/bg_gameplay_neighborhood_rain_2000_portrait_cartoon_v1.png',
-    _ =>
-      'assets/images/gameplay_map/bg_gameplay_neighborhood_clear_2000_portrait_cartoon_v1.png',
-  };
-}
-
 String _homeRoomLabel(HomeImprovementRoom room) => switch (room) {
   HomeImprovementRoom.bedroom => '작은방',
   HomeImprovementRoom.livingRoom => '거실',
@@ -70,12 +42,12 @@ IconData _homeRoomIcon(HomeImprovementRoom room) => switch (room) {
   HomeImprovementRoom.kitchen => Icons.kitchen_rounded,
 };
 
-String _homeFamilyLabel(HomeFamilyMember member) => switch (member) {
-  HomeFamilyMember.mother => '어머니',
-  HomeFamilyMember.father => '아버지',
-  HomeFamilyMember.sibling => '누나',
-  HomeFamilyMember.grandfather => '외할아버지',
-  HomeFamilyMember.family => '온 가족',
+String _homeCommunityLabel(HomeCommunityMember member) => switch (member) {
+  HomeCommunityMember.hakjun => '김학준',
+  HomeCommunityMember.sua => '한수아',
+  HomeCommunityMember.seoa => '김서아',
+  HomeCommunityMember.jian => '이지안',
+  HomeCommunityMember.cohort => '데시멀 동기',
 };
 
 class HomeImprovementScreen extends StatefulWidget {
@@ -177,7 +149,7 @@ class _HomeImprovementScreenState extends State<HomeImprovementScreen> {
                         const SizedBox(width: 9),
                         Expanded(
                           child: Text(
-                            '한 번에 번쩍 바꾸는 집이 아닙니다. 필요한 살림부터 하나씩 마련하고, 그날의 가족 이야기를 장부에 남깁니다.',
+                            '한 번에 모든 시설을 바꿀 수는 없습니다. 필요한 곳부터 하나씩 고치고, 그날의 공동생활 기록을 남깁니다.',
                             style: const TextStyle(
                               color: _ink,
                               fontSize: 11,
@@ -246,7 +218,7 @@ class _HomeImprovementHeader extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '우리 집 살림 장부',
+                '데시멀 센터 시설 장부',
                 style: TextStyle(
                   fontFamily: _hubDisplayFont,
                   color: Colors.white,
@@ -257,7 +229,7 @@ class _HomeImprovementHeader extends StatelessWidget {
               ),
               SizedBox(height: 5),
               Text(
-                '회사 통장으로 가족의 생활을 조금씩 바꿉니다',
+                '운용 수익으로 데시멀 공동생활 시설을 개선합니다',
                 style: TextStyle(
                   color: Color(0xFFC7D4E8),
                   fontSize: 9.5,
@@ -272,7 +244,7 @@ class _HomeImprovementHeader extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             const Text(
-              '회사 통장',
+              '운용계좌',
               style: TextStyle(
                 color: Color(0xFFC7D4E8),
                 fontSize: 8.5,
@@ -293,7 +265,7 @@ class _HomeImprovementHeader extends StatelessWidget {
         ),
         IconButton(
           key: const Key('home-improvement-close'),
-          tooltip: '살림 장부 닫기',
+          tooltip: '시설 장부 닫기',
           onPressed: onClose,
           icon: const Icon(Icons.close_rounded),
           color: Colors.white,
@@ -323,7 +295,7 @@ class _HomeRoomTabs extends StatelessWidget {
           child: Semantics(
             button: true,
             selected: room == selected,
-            label: '${_homeRoomLabel(room)} 살림 ${home.roomTier(room)}/2단계',
+            label: '${_homeRoomLabel(room)} 시설 ${home.roomTier(room)}/2단계',
             child: Material(
               color: Colors.transparent,
               child: InkWell(
@@ -543,7 +515,7 @@ class _HomeImprovementCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${_homeFamilyLabel(improvement.familyMember)} 이야기 · ${improvement.storyTitle}',
+                      '${_homeCommunityLabel(improvement.communityMember)} 기록 · ${improvement.storyTitle}',
                       style: const TextStyle(
                         color: Color(0xFF80612F),
                         fontSize: 9.5,
@@ -579,7 +551,7 @@ class _HomeImprovementCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  '집 안정 +${improvement.householdStabilityDelta} · 가족 신뢰 +${improvement.familyTrustDelta}',
+                  '시설 안정 +${improvement.facilityStabilityDelta} · 공동체 신뢰 +${improvement.communityTrustDelta}',
                   style: const TextStyle(
                     color: Color(0xFF61704F),
                     fontSize: 9.5,
@@ -678,7 +650,7 @@ class _HomeEpisodeDialog extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        '우리 집 이야기',
+                        '데시멀 공동생활 기록',
                         style: TextStyle(
                           color: Color(0xFFC7D4E8),
                           fontSize: 9,

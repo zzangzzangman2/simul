@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="refresh" content="0; url=/play/index.html" />
+    <title>SIMUL</title>
+    <script>
+      (() => {
+        const target = `/play/index.html${window.location.search}${window.location.hash}`;
+        window.location.replace(target);
+      })();
+    </script>
+  </head>
+  <body>
+    <p><a href="/play/index.html">SIMUL 실행하기</a></p>
+  </body>
+</html>

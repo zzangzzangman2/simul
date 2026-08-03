@@ -4,7 +4,7 @@
 
 ## 기준 참조의 역할
 
-- 최상위 렌더링 화풍: `art_references/simul_cinematic_soft_painted_style_v1.png`
+- 최상위 렌더링 화풍: `art_references/simul_luminous_soft_painted_vn_style_anchor_v2.png`
 - 서하늘 정체성·복장·장신구:
   - `art_references/realtor_identity_pose_reference_01.jpg`
   - `art_references/realtor_identity_pose_reference_02.jpg`
@@ -68,7 +68,7 @@
 ## 생성 프롬프트 고정 블록
 
 ```text
-Canonical rendering reference: art_references/simul_cinematic_soft_painted_style_v1.png.
+Canonical rendering reference: art_references/simul_luminous_soft_painted_vn_style_anchor_v2.png.
 Identity references: art_references/realtor_identity_pose_reference_01.jpg,
 art_references/realtor_identity_pose_reference_02.jpg,
 art_references/realtor_identity_pose_reference_03.jpg.
@@ -80,7 +80,7 @@ Keep exactly the same white and pale-blue short off-shoulder frilled dress,
 fixed blue bows, right-thigh black garter, white wrist frill,
 and blue-black ribbon platform sandals in every pose.
 
-Match the cinematic soft-painted anime realism: nearly invisible colored edges,
+Match the SIMUL luminous soft-painted VN anime v2: fine colored edges,
 natural layered irises, delicate hair strands, smooth painterly skin and cloth shading,
 and subtle optical light. Do not copy Sua's face, black hair, body, or uniform.
 Standing full-body transparent sprite, 1024x1536, common baseline,

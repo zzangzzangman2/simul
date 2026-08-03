@@ -4,6 +4,8 @@ import Image from "next/image";
 import {
   ChangeEvent,
   KeyboardEvent,
+  PointerEvent as ReactPointerEvent,
+  WheelEvent as ReactWheelEvent,
   useEffect,
   useMemo,
   useRef,
@@ -19,25 +21,82 @@ import {
   dialogueBackgrounds,
 } from "./background-catalog";
 import { DialogueScene, initialDialogue } from "./dialogue-data";
+import {
+  CHARACTER_SCALE_MAX,
+  CHARACTER_SCALE_MIN,
+  CHARACTER_X_MAX,
+  CHARACTER_X_MIN,
+  CHARACTER_Y_MAX,
+  CHARACTER_Y_MIN,
+  validateDialogueScenes,
+} from "./dialogue-validation";
 import styles from "./editor.module.css";
 
-const STORAGE_KEY = "future-academy-dialogue-editor-v1";
-const GAME_STORAGE_KEY = "future-academy-dialogue-runtime-v1";
+const STORAGE_KEY = "project-decimal-dialogue-editor-v2";
+const GAME_STORAGE_KEY = "project-decimal-dialogue-runtime-v2";
 const FLUTTER_GAME_STORAGE_KEY = `flutter.${GAME_STORAGE_KEY}`;
-const BUILD_STORAGE_KEY = "future-academy-dialogue-built-v1";
+const BUILD_STORAGE_KEY = "project-decimal-dialogue-built-v2";
+const CONTENT_VERSION = 3;
+const APPEARANCE_VERSION = 17;
+
+const HAN_SUA_V2_FILENAME_MIGRATIONS = {
+  "01_neutral_quality_v2.png": "01_neutral_wavy_v3.png",
+  "02_warm_smile_quality_v2.png": "02_warm_smile_wave_v3.png",
+  "03_bright_laugh_quality_v2.png": "03_bright_laugh_v3.png",
+  "04_surprised_quality_v2.png": "05_surprised_v3.png",
+  "05_worried_quality_v2.png": "06_worried_v3.png",
+  "06_annoyed_quality_v2.png": "07_annoyed_v3.png",
+  "07_determined_quality_v2.png": "08_determined_v3.png",
+  "08_explaining_quality_v2.png": "09_explaining_v3.png",
+} as const;
+const HAN_SUA_ASSET_DIRECTORY = "production_soft_painted/han_sua/";
 
 type PublishStatus = "idle" | "building" | "success" | "error";
+type PublishMode = "quick" | "full";
+type TransformScope = "scene" | "speaker";
+type CharacterFramePatch = Partial<
+  Pick<DialogueScene, "characterX" | "characterY" | "characterScale">
+>;
+type CharacterDragState = {
+  pointerId: number;
+  startClientX: number;
+  startClientY: number;
+  startX: number;
+  startY: number;
+  sceneId: string;
+  speaker: string;
+  scope: TransformScope;
+};
+
+const CHARACTER_FRAME_PRESETS = [
+  { id: "full", label: "전신", characterX: 0, characterY: 8, characterScale: 0.62 },
+  { id: "default", label: "기본", characterX: 0, characterY: 0, characterScale: 1 },
+  { id: "close", label: "상반신", characterX: 0, characterY: -1, characterScale: 1.28 },
+] as const;
+
+function clampNumber(
+  value: unknown,
+  fallback: number,
+  minimum: number,
+  maximum: number,
+) {
+  const numeric =
+    typeof value === "number" && Number.isFinite(value) ? value : fallback;
+  return Math.min(maximum, Math.max(minimum, numeric));
+}
+
 
 const CHARACTER_GROUPS = [
   "주요 인물",
-  "1981년 정책실",
-  "미래양성원",
+  "1999년 국정원",
+  "프로젝트 데시멀",
   "화면 인물 없음",
 ] as const;
 
 type SavedDraft = {
   version: 1;
-  appearanceVersion?: 8;
+  contentVersion?: number;
+  appearanceVersion?: number;
   updatedAt: string;
   scenes: DialogueScene[];
 };
@@ -49,11 +108,33 @@ function normalizeDialogueText(value: string) {
     .replaceAll("\\r", "\n");
 }
 
+function migrateHanSuaCharacterAsset(asset: string) {
+  const directoryIndex = asset.lastIndexOf(HAN_SUA_ASSET_DIRECTORY);
+  if (directoryIndex < 0) return asset;
+  const filenameIndex = directoryIndex + HAN_SUA_ASSET_DIRECTORY.length;
+  const filename = asset.slice(filenameIndex);
+  const migrated =
+    HAN_SUA_V2_FILENAME_MIGRATIONS[
+      filename as keyof typeof HAN_SUA_V2_FILENAME_MIGRATIONS
+    ];
+  return migrated ? `${asset.slice(0, filenameIndex)}${migrated}` : asset;
+}
+
 function normalizeScene(scene: DialogueScene): DialogueScene {
   return {
     ...scene,
     direction: normalizeDialogueText(scene.direction),
     line: normalizeDialogueText(scene.line),
+    character: migrateHanSuaCharacterAsset(scene.character),
+    characterX:
+      Math.round(clampNumber(scene.characterX, 0, CHARACTER_X_MIN, CHARACTER_X_MAX) * 10) /
+      10,
+    characterY:
+      Math.round(clampNumber(scene.characterY, 0, CHARACTER_Y_MIN, CHARACTER_Y_MAX) * 10) /
+      10,
+    characterScale:
+      Math.round(clampNumber(scene.characterScale, 1, CHARACTER_SCALE_MIN, CHARACTER_SCALE_MAX) * 100) /
+      100,
   };
 }
 
@@ -62,25 +143,34 @@ function cloneInitial() {
 }
 
 function validScenes(value: unknown): value is DialogueScene[] {
-  if (!Array.isArray(value) || value.length === 0) return false;
-  return value.every(
-    (scene) =>
-      scene &&
-      typeof scene === "object" &&
-      typeof scene.id === "string" &&
-      typeof scene.speaker === "string" &&
-      typeof scene.line === "string",
-  );
+  return validateDialogueScenes(value).ok;
 }
 
-function mergeWithCurrentStory(saved: DialogueScene[], upgradeAppearance = false) {
+function mergeWithCurrentStory(
+  saved: DialogueScene[],
+  upgradeAppearance = false,
+  upgradeContent = false,
+) {
   const savedById = new Map(saved.map((scene) => [scene.id, scene]));
   const builtInIds = new Set(initialDialogue.map((scene) => scene.id));
+  if (upgradeContent) {
+    return [
+      ...initialDialogue,
+      ...saved.filter((scene) => !builtInIds.has(scene.id)),
+    ].map((scene, index) => normalizeScene({ ...scene, order: index + 1 }));
+  }
   return [
     ...initialDialogue.map((scene) => {
       const merged = { ...scene, ...(savedById.get(scene.id) ?? {}) };
       return upgradeAppearance
-        ? { ...merged, background: scene.background, character: scene.character }
+        ? {
+            ...merged,
+            background: scene.background,
+            character: scene.character,
+            characterX: scene.characterX,
+            characterY: scene.characterY,
+            characterScale: scene.characterScale,
+          }
         : merged;
     }),
     ...saved.filter((scene) => !builtInIds.has(scene.id)),
@@ -99,6 +189,9 @@ function sceneFingerprint(scene: DialogueScene | undefined) {
     line: scene.line,
     background: scene.background,
     character: scene.character,
+    characterX: scene.characterX,
+    characterY: scene.characterY,
+    characterScale: scene.characterScale,
   });
 }
 
@@ -210,7 +303,7 @@ function BackgroundPicker({
           aria-label="장면 배경 선택"
         >
           {!current ? <option value={value}>직접 지정한 배경</option> : null}
-          {(["프롤로그", "미래양성원", "생활·투자"] as const).map((group) => (
+          {(["프롤로그", "데시멀 센터", "생활·투자"] as const).map((group) => (
             <optgroup key={group} label={group}>
               {dialogueBackgrounds
                 .filter((entry) => entry.group === group)
@@ -286,6 +379,10 @@ export default function DialogueEditorPage() {
   const [publishMessage, setPublishMessage] = useState("아직 이번 편집본을 빌드하지 않았어요.");
   const [lastBuiltAt, setLastBuiltAt] = useState<string | null>(null);
   const [sceneComposer, setSceneComposer] = useState<DialogueScene | null>(null);
+  const [transformScope, setTransformScope] = useState<TransformScope>("scene");
+  const [characterDragging, setCharacterDragging] = useState(false);
+  const previewStageRef = useRef<HTMLDivElement>(null);
+  const characterDragRef = useRef<CharacterDragState | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -298,7 +395,8 @@ export default function DialogueEditorPage() {
             const builtInIds = new Set(initialDialogue.map((scene) => scene.id));
             const merged = mergeWithCurrentStory(
               parsed.scenes,
-              parsed.appearanceVersion !== 8,
+              parsed.appearanceVersion !== APPEARANCE_VERSION,
+              parsed.contentVersion !== CONTENT_VERSION,
             );
             const addedCount = Math.max(
               0,
@@ -322,7 +420,8 @@ export default function DialogueEditorPage() {
             setAppliedScenes(
               mergeWithCurrentStory(
                 applied.scenes,
-                applied.appearanceVersion !== 8,
+                applied.appearanceVersion !== APPEARANCE_VERSION,
+                applied.contentVersion !== CONTENT_VERSION,
               ),
             );
             setLastBuiltAt(applied.updatedAt);
@@ -345,11 +444,15 @@ export default function DialogueEditorPage() {
     const timer = window.setTimeout(() => {
       const draft: SavedDraft = {
         version: 1,
-        appearanceVersion: 8,
+        contentVersion: CONTENT_VERSION,
+        appearanceVersion: APPEARANCE_VERSION,
         updatedAt: new Date().toISOString(),
         scenes,
       };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
+      const raw = JSON.stringify(draft);
+      localStorage.setItem(STORAGE_KEY, raw);
+      localStorage.setItem(GAME_STORAGE_KEY, raw);
+      localStorage.setItem(FLUTTER_GAME_STORAGE_KEY, JSON.stringify(raw));
       setSaveLabel("자동 저장됨");
     }, 280);
     return () => {
@@ -398,6 +501,10 @@ export default function DialogueEditorPage() {
         .filter((speaker) => !dialogueCharacterBySpeaker.has(speaker))
         .sort(),
     [scenes],
+  );
+  const sameSpeakerSceneCount = useMemo(
+    () => scenes.filter((scene) => scene.speaker === selected.speaker).length,
+    [scenes, selected.speaker],
   );
   const selectedPoses = useMemo<DialoguePose[]>(() => {
     return posesForScene(selected.speaker, selected.character);
@@ -458,53 +565,224 @@ export default function DialogueEditorPage() {
     );
   }
 
-  async function saveAndBuild() {
+  function updateCharacterFrame(
+    patch: CharacterFramePatch,
+    target: {
+      sceneId: string;
+      speaker: string;
+      scope: TransformScope;
+    } = {
+      sceneId: selected.id,
+      speaker: selected.speaker,
+      scope: transformScope === "speaker" && selected.character ? "speaker" : "scene",
+    },
+  ) {
+    const normalizedPatch: CharacterFramePatch = {};
+    if (patch.characterX !== undefined) {
+      normalizedPatch.characterX =
+        Math.round(clampNumber(patch.characterX, 0, CHARACTER_X_MIN, CHARACTER_X_MAX) * 10) /
+        10;
+    }
+    if (patch.characterY !== undefined) {
+      normalizedPatch.characterY =
+        Math.round(clampNumber(patch.characterY, 0, CHARACTER_Y_MIN, CHARACTER_Y_MAX) * 10) /
+        10;
+    }
+    if (patch.characterScale !== undefined) {
+      normalizedPatch.characterScale =
+        Math.round(
+          clampNumber(
+            patch.characterScale,
+            1,
+            CHARACTER_SCALE_MIN,
+            CHARACTER_SCALE_MAX,
+          ) * 100,
+        ) / 100;
+    }
+    setScenes((current) =>
+      current.map((scene) => {
+        const matches =
+          target.scope === "speaker"
+            ? scene.speaker === target.speaker
+            : scene.id === target.sceneId;
+        return matches ? { ...scene, ...normalizedPatch } : scene;
+      }),
+    );
+  }
+
+  function applyCharacterPreset(presetId: (typeof CHARACTER_FRAME_PRESETS)[number]["id"]) {
+    const preset = CHARACTER_FRAME_PRESETS.find((item) => item.id === presetId);
+    if (!preset) return;
+    updateCharacterFrame({
+      characterX: preset.characterX,
+      characterY: preset.characterY,
+      characterScale: preset.characterScale,
+    });
+    setNotice(
+      transformScope === "speaker"
+        ? `${selected.speaker} 전체 장면에 ${preset.label} 구도를 적용했어요`
+        : `현재 장면을 ${preset.label} 구도로 맞췄어요`,
+    );
+  }
+
+  function beginCharacterDrag(event: ReactPointerEvent<HTMLDivElement>) {
+    if (!selected.character) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    characterDragRef.current = {
+      pointerId: event.pointerId,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      startX: selected.characterX,
+      startY: selected.characterY,
+      sceneId: selected.id,
+      speaker: selected.speaker,
+      scope: transformScope === "speaker" ? "speaker" : "scene",
+    };
+    setCharacterDragging(true);
+  }
+
+  function moveCharacterDrag(event: ReactPointerEvent<HTMLDivElement>) {
+    const drag = characterDragRef.current;
+    const stage = previewStageRef.current;
+    if (!drag || !stage || drag.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    const bounds = stage.getBoundingClientRect();
+    updateCharacterFrame(
+      {
+        characterX: drag.startX + ((event.clientX - drag.startClientX) / bounds.width) * 100,
+        characterY: drag.startY - ((event.clientY - drag.startClientY) / bounds.height) * 100,
+      },
+      drag,
+    );
+  }
+
+  function endCharacterDrag(event: ReactPointerEvent<HTMLDivElement>) {
+    const drag = characterDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    characterDragRef.current = null;
+    setCharacterDragging(false);
+    setNotice(
+      drag.scope === "speaker"
+        ? `${drag.speaker} 전체 배치를 바꿨어요`
+        : "장면 배치를 바꿨어요",
+    );
+  }
+
+  function zoomCharacter(event: ReactWheelEvent<HTMLDivElement>) {
+    event.preventDefault();
+    const step = event.deltaY > 0 ? -0.05 : 0.05;
+    updateCharacterFrame({ characterScale: selected.characterScale + step });
+  }
+
+  function nudgeCharacter(event: KeyboardEvent<HTMLDivElement>) {
+    const step = event.shiftKey ? 5 : 1;
+    const patch: CharacterFramePatch = {};
+    if (event.key === "ArrowLeft") patch.characterX = selected.characterX - step;
+    if (event.key === "ArrowRight") patch.characterX = selected.characterX + step;
+    if (event.key === "ArrowUp") patch.characterY = selected.characterY + step;
+    if (event.key === "ArrowDown") patch.characterY = selected.characterY - step;
+    if (event.key === "+" || event.key === "=") {
+      patch.characterScale = selected.characterScale + 0.05;
+    }
+    if (event.key === "-") patch.characterScale = selected.characterScale - 0.05;
+    if (!Object.keys(patch).length) return;
+    event.preventDefault();
+    event.stopPropagation();
+    updateCharacterFrame(patch);
+  }
+
+  async function saveAndBuild(mode: PublishMode = "quick") {
     if (publishStatus === "building") return;
     const snapshot = scenes.map((scene) => normalizeScene({ ...scene }));
+    const validation = validateDialogueScenes(snapshot);
+    if (!validation.ok) {
+      setPublishStatus("error");
+      setPublishMessage(validation.message);
+      setNotice("장면 검증에 실패했습니다");
+      return;
+    }
     const payload: SavedDraft = {
       version: 1,
-      appearanceVersion: 8,
+      contentVersion: CONTENT_VERSION,
+      appearanceVersion: APPEARANCE_VERSION,
       updatedAt: new Date().toISOString(),
-      scenes: snapshot,
+      scenes: validation.scenes,
     };
     const raw = JSON.stringify(payload);
 
-    // shared_preferences_web stores Dart strings as a JSON-encoded localStorage value.
-    localStorage.setItem(GAME_STORAGE_KEY, raw);
-    localStorage.setItem(FLUTTER_GAME_STORAGE_KEY, JSON.stringify(raw));
     localStorage.setItem(STORAGE_KEY, raw);
     setSaveLabel("초안 저장됨");
     setPublishStatus("building");
-    setPublishMessage("Flutter 게임을 다시 만드는 중이에요. 보통 20~60초 걸립니다.");
+    setPublishMessage(
+      mode === "quick"
+        ? "대사와 화면 배치를 게임 파일에 즉시 반영하고 있어요."
+        : "새 에셋까지 포함해 Flutter 게임을 다시 만드는 중이에요. 보통 20~60초 걸립니다.",
+    );
 
     try {
+      let buildToken = sessionStorage.getItem("dialogue-build-token") || "";
+      if (!buildToken) {
+        buildToken = window.prompt("개발 PC에 설정한 대사 빌드 토큰을 입력하세요.") || "";
+        if (!buildToken) throw new Error("대사 빌드 토큰이 필요합니다.");
+        sessionStorage.setItem("dialogue-build-token", buildToken);
+      }
       const response = await fetch("/api/dialogue/build", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scenes: snapshot }),
+        headers: {
+          "Content-Type": "application/json",
+          ...(buildToken ? { "X-Dialogue-Build-Token": buildToken } : {}),
+        },
+        body: JSON.stringify({ mode, scenes: validation.scenes }),
       });
       const result = (await response.json()) as {
         ok?: boolean;
         builtAt?: string;
         durationMs?: number;
         message?: string;
+        contentVersion?: number;
+        appearanceVersion?: number;
+        sha256?: string;
+        scenes?: DialogueScene[];
+        mode?: PublishMode;
       };
-      if (!response.ok || !result.ok || !result.builtAt) {
+      const builtValidation = validateDialogueScenes(result.scenes);
+      if (
+        !response.ok ||
+        !result.ok ||
+        !result.builtAt ||
+        !result.sha256 ||
+        !builtValidation.ok
+      ) {
         throw new Error(result.message || "게임 빌드에 실패했습니다.");
       }
 
       const builtPayload: SavedDraft = {
-        ...payload,
+        version: 1,
+        contentVersion: result.contentVersion ?? CONTENT_VERSION,
+        appearanceVersion: result.appearanceVersion ?? APPEARANCE_VERSION,
         updatedAt: result.builtAt,
+        scenes: builtValidation.scenes,
       };
-      localStorage.setItem(BUILD_STORAGE_KEY, JSON.stringify(builtPayload));
-      setAppliedScenes(snapshot);
+      const builtRaw = JSON.stringify(builtPayload);
+      // shared_preferences_web stores Dart strings as a JSON-encoded value.
+      localStorage.setItem(GAME_STORAGE_KEY, builtRaw);
+      localStorage.setItem(FLUTTER_GAME_STORAGE_KEY, JSON.stringify(builtRaw));
+      localStorage.setItem(BUILD_STORAGE_KEY, builtRaw);
+      setScenes(builtValidation.scenes);
+      setAppliedScenes(builtValidation.scenes);
       setLastBuiltAt(result.builtAt);
       setPublishStatus("success");
+      const completedMode = result.mode ?? mode;
       setPublishMessage(
-        `게임 빌드 완료 · ${Math.max(1, Math.round((result.durationMs ?? 0) / 1000))}초`,
+        completedMode === "quick"
+          ? `게임 즉시 적용 완료 · ${Math.max(1, Math.round(result.durationMs ?? 0))}ms`
+          : `전체 빌드 완료 · ${Math.max(1, Math.round((result.durationMs ?? 0) / 1000))}초`,
       );
-      setNotice("저장과 게임 빌드가 끝났어요 · 새 게임에서 확인하세요");
+      setNotice(completedMode === "quick" ? "게임에 바로 적용했어요 · 열려 있다면 새로고침하세요" : "전체 게임 빌드가 끝났어요");
     } catch (error) {
       const message = error instanceof Error ? error.message : "게임 빌드에 실패했습니다.";
       setPublishStatus("error");
@@ -515,7 +793,16 @@ export default function DialogueEditorPage() {
 
   function changeSpeaker(speaker: string) {
     const firstPose = dialogueCharacterBySpeaker.get(speaker)?.poses[0];
-    updateSelected({ speaker, character: firstPose?.asset ?? "" });
+    const reference = scenes.find(
+      (scene) => scene.speaker === speaker && scene.character,
+    );
+    updateSelected({
+      speaker,
+      character: firstPose?.asset ?? "",
+      characterX: reference?.characterX ?? 0,
+      characterY: reference?.characterY ?? 0,
+      characterScale: reference?.characterScale ?? 1,
+    });
   }
 
   function updateComposer(patch: Partial<DialogueScene>) {
@@ -612,12 +899,13 @@ export default function DialogueEditorPage() {
   function exportJson() {
     const payload: SavedDraft = {
       version: 1,
-      appearanceVersion: 8,
+      contentVersion: CONTENT_VERSION,
+      appearanceVersion: APPEARANCE_VERSION,
       updatedAt: new Date().toISOString(),
       scenes,
     };
     downloadFile(
-      "미래양성원6기_대사편집본.json",
+      "프로젝트데시멀_대사편집본.json",
       JSON.stringify(payload, null, 2),
       "application/json;charset=utf-8",
     );
@@ -626,7 +914,7 @@ export default function DialogueEditorPage() {
 
   function exportTxt() {
     downloadFile(
-      "미래양성원6기_대사편집본.txt",
+      "프로젝트데시멀_대사편집본.txt",
       makeTxt(scenes),
       "text/plain;charset=utf-8",
     );
@@ -641,29 +929,50 @@ export default function DialogueEditorPage() {
       const parsed = JSON.parse(await file.text()) as SavedDraft | DialogueScene[];
       const imported = Array.isArray(parsed) ? parsed : parsed.scenes;
       const appearanceVersion = Array.isArray(parsed) ? undefined : parsed.appearanceVersion;
-      if (!validScenes(imported)) throw new Error("invalid");
-      const normalized = imported.map((scene, index) => ({
-        ...scene,
-        id: scene.id || `scene-import-${index + 1}`,
-        order: index + 1,
-        chapter: scene.chapter || "새 장",
-        date: scene.date || "",
-        location: scene.location || "",
-        direction: normalizeDialogueText(scene.direction || ""),
-        line: normalizeDialogueText(scene.line || ""),
-        background:
-          appearanceVersion === 8
-            ? scene.background || ""
-            : initialDialogue.find((current) => current.id === scene.id)?.background ||
-              scene.background ||
-              "",
-        character:
-          appearanceVersion === 8
-            ? scene.character || ""
-            : initialDialogue.find((current) => current.id === scene.id)?.character ||
-              scene.character ||
-              "",
-      }));
+      const importValidation = validateDialogueScenes(imported);
+      if (!importValidation.ok) throw new Error(importValidation.message);
+      const normalized = importValidation.scenes.map((scene, index) =>
+        normalizeScene({
+          ...scene,
+          id: scene.id || `scene-import-${index + 1}`,
+          order: index + 1,
+          chapter: scene.chapter || "새 장",
+          date: scene.date || "",
+          location: scene.location || "",
+          direction: scene.direction || "",
+          line: scene.line || "",
+          background:
+            appearanceVersion === APPEARANCE_VERSION
+              ? scene.background || ""
+              : initialDialogue.find((current) => current.id === scene.id)?.background ||
+                scene.background ||
+                "",
+          character:
+            appearanceVersion === APPEARANCE_VERSION
+              ? scene.character || ""
+              : initialDialogue.find((current) => current.id === scene.id)?.character ||
+                scene.character ||
+                "",
+          characterX:
+            appearanceVersion === APPEARANCE_VERSION
+              ? scene.characterX
+              : initialDialogue.find((current) => current.id === scene.id)?.characterX ??
+                scene.characterX ??
+                0,
+          characterY:
+            appearanceVersion === APPEARANCE_VERSION
+              ? scene.characterY
+              : initialDialogue.find((current) => current.id === scene.id)?.characterY ??
+                scene.characterY ??
+                0,
+          characterScale:
+            appearanceVersion === APPEARANCE_VERSION
+              ? scene.characterScale
+              : initialDialogue.find((current) => current.id === scene.id)?.characterScale ??
+                scene.characterScale ??
+                1,
+        }),
+      );
       setScenes(normalized);
       setSelectedId(normalized[0].id);
       setNotice("편집본을 불러왔어요");
@@ -679,14 +988,13 @@ export default function DialogueEditorPage() {
     setSelectedId(reset[0].id);
     const payload: SavedDraft = {
       version: 1,
-      appearanceVersion: 8,
+      contentVersion: CONTENT_VERSION,
+      appearanceVersion: APPEARANCE_VERSION,
       updatedAt: new Date().toISOString(),
       scenes: reset,
     };
     const raw = JSON.stringify(payload);
     localStorage.setItem(STORAGE_KEY, raw);
-    localStorage.setItem(GAME_STORAGE_KEY, raw);
-    localStorage.setItem(FLUTTER_GAME_STORAGE_KEY, JSON.stringify(raw));
     setPublishStatus("idle");
     setPublishMessage("원본을 초안에 불러왔어요. 저장·빌드하면 게임 파일도 바뀝니다.");
     setNotice("원본을 초안에 불러왔어요 · 저장·빌드하면 반영됩니다");
@@ -725,7 +1033,7 @@ export default function DialogueEditorPage() {
           <span className={styles.logo}>台本</span>
           <div>
             <h1>대사 편집기</h1>
-            <p>미래양성원 제6기 · {scenes.length}개 장면</p>
+            <p>프로젝트 데시멀 · {scenes.length}개 장면</p>
           </div>
         </div>
         <div
@@ -735,14 +1043,18 @@ export default function DialogueEditorPage() {
         >
           <i />
           {publishStatus === "building"
-            ? "게임 빌드 중"
+            ? "게임 반영 중"
             : dirtyCount
-              ? `초안 자동 저장 · 빌드 필요 ${dirtyCount}개`
+              ? `초안 자동 저장 · 즉시 적용 필요 ${dirtyCount}개`
               : `게임 반영 완료 · ${saveLabel}`}
         </div>
         <nav className={styles.actions} aria-label="파일 메뉴">
-          <a href="/play/index.html" target="_blank" rel="noreferrer">
-            게임 열기
+          <a
+            href="/play/index.html?dialoguePreview=1"
+            target="_blank"
+            rel="noreferrer"
+          >
+            대사 미리보기
           </a>
           <button type="button" onClick={() => importRef.current?.click()}>
             불러오기
@@ -754,16 +1066,24 @@ export default function DialogueEditorPage() {
             JSON 백업
           </button>
           <button
+            className={styles.fullBuildAction}
+            type="button"
+            onClick={() => void saveAndBuild("full")}
+            disabled={publishStatus === "building"}
+          >
+            전체 빌드
+          </button>
+          <button
             className={`${styles.primaryAction} ${
               publishStatus === "building" ? styles.primaryActionBusy : ""
             }`}
             type="button"
-            onClick={() => void saveAndBuild()}
+            onClick={() => void saveAndBuild("quick")}
             disabled={publishStatus === "building"}
           >
             {publishStatus === "building"
-              ? "게임 빌드 중…"
-              : `저장하고 게임 빌드${dirtyCount ? ` · ${dirtyCount}` : ""}`}
+              ? "게임 반영 중…"
+              : `게임에 즉시 적용${dirtyCount ? ` · ${dirtyCount}` : ""}`}
           </button>
           <input
             ref={importRef}
@@ -789,14 +1109,14 @@ export default function DialogueEditorPage() {
           <i aria-hidden="true">→</i>
           <div className={`${styles.workflowStep} ${dirtyCount ? styles.workflowStepActive : ""}`}>
             <b>3</b>
-            <span>게임 반영<small>저장·빌드 버튼 한 번</small></span>
+            <span>게임 반영<small>즉시 적용 버튼 한 번</small></span>
           </div>
         </div>
         <div className={styles.workflowSummary}>
           <span className={dirtyCount ? styles.summaryDirty : styles.summaryReady} />
           <div>
-            <b>{dirtyCount ? `빌드할 수정 ${dirtyCount}개` : "최신 게임과 일치"}</b>
-            <small>{dirtyCount ? "초안은 이미 안전하게 저장됐어요" : builtTimeLabel ? `${builtTimeLabel} 빌드` : "수정을 시작해보세요"}</small>
+            <b>{dirtyCount ? `반영할 수정 ${dirtyCount}개` : "최신 게임과 일치"}</b>
+            <small>{dirtyCount ? "초안과 게임 미리보기에는 이미 반영됐어요" : builtTimeLabel ? `${builtTimeLabel} 적용` : "수정을 시작해보세요"}</small>
           </div>
         </div>
       </section>
@@ -910,10 +1230,10 @@ export default function DialogueEditorPage() {
             <button
               className={styles.publishButton}
               type="button"
-              onClick={() => void saveAndBuild()}
+              onClick={() => void saveAndBuild("quick")}
               disabled={publishStatus === "building"}
             >
-              {publishStatus === "building" ? "빌드 중…" : publishStatus === "error" ? "다시 시도" : "저장·빌드"}
+              {publishStatus === "building" ? "반영 중…" : publishStatus === "error" ? "다시 시도" : "즉시 적용"}
             </button>
           </section>
 
@@ -1019,6 +1339,108 @@ export default function DialogueEditorPage() {
                 </div>
               </div>
             </div>
+            <div className={styles.transformStudio}>
+              <div className={styles.transformStudioHeader}>
+                <div>
+                  <b>캐릭터 화면 배치</b>
+                  <span>오른쪽 화면에서 캐릭터를 직접 끌어도 됩니다.</span>
+                </div>
+                <div
+                  className={styles.scopeSwitch}
+                  role="radiogroup"
+                  aria-label="캐릭터 배치 적용 범위"
+                >
+                  <button
+                    type="button"
+                    className={transformScope === "scene" ? styles.scopeActive : ""}
+                    onClick={() => setTransformScope("scene")}
+                    aria-pressed={transformScope === "scene"}
+                  >
+                    이 장면만
+                  </button>
+                  <button
+                    type="button"
+                    className={transformScope === "speaker" ? styles.scopeActive : ""}
+                    onClick={() => {
+                      if (!selected.character) return;
+                      setTransformScope("speaker");
+                      setNotice(`${selected.speaker}의 ${sameSpeakerSceneCount}개 장면을 함께 조정합니다`);
+                    }}
+                    disabled={!selected.character}
+                    aria-pressed={transformScope === "speaker"}
+                  >
+                    {selected.speaker} 전체 · {sameSpeakerSceneCount}
+                  </button>
+                </div>
+              </div>
+
+              <div className={styles.transformSliders}>
+                <label>
+                  <span><b>가로</b><output>{selected.characterX > 0 ? "+" : ""}{selected.characterX.toFixed(1)}</output></span>
+                  <input
+                    type="range"
+                    min={CHARACTER_X_MIN}
+                    max={CHARACTER_X_MAX}
+                    step="0.5"
+                    value={selected.characterX}
+                    disabled={!selected.character}
+                    onChange={(event) => updateCharacterFrame({ characterX: Number(event.target.value) })}
+                    aria-label="캐릭터 가로 위치"
+                  />
+                  <small>왼쪽</small><small>오른쪽</small>
+                </label>
+                <label>
+                  <span><b>세로</b><output>{selected.characterY > 0 ? "+" : ""}{selected.characterY.toFixed(1)}</output></span>
+                  <input
+                    type="range"
+                    min={CHARACTER_Y_MIN}
+                    max={CHARACTER_Y_MAX}
+                    step="0.5"
+                    value={selected.characterY}
+                    disabled={!selected.character}
+                    onChange={(event) => updateCharacterFrame({ characterY: Number(event.target.value) })}
+                    aria-label="캐릭터 세로 위치"
+                  />
+                  <small>아래</small><small>위 · 신발 보이기</small>
+                </label>
+                <label>
+                  <span><b>확대</b><output>{Math.round(selected.characterScale * 100)}%</output></span>
+                  <input
+                    type="range"
+                    min={CHARACTER_SCALE_MIN}
+                    max={CHARACTER_SCALE_MAX}
+                    step="0.01"
+                    value={selected.characterScale}
+                    disabled={!selected.character}
+                    onChange={(event) => updateCharacterFrame({ characterScale: Number(event.target.value) })}
+                    aria-label="캐릭터 확대율"
+                  />
+                  <small>전신</small><small>얼굴 가까이</small>
+                </label>
+              </div>
+
+              <div className={styles.transformPresetRow}>
+                <span>빠른 구도</span>
+                {CHARACTER_FRAME_PRESETS.map((preset) => (
+                  <button
+                    type="button"
+                    key={preset.id}
+                    onClick={() => applyCharacterPreset(preset.id)}
+                    disabled={!selected.character}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => updateCharacterFrame({ characterX: 0, characterY: 0, characterScale: 1 })}
+                  disabled={!selected.character}
+                >
+                  초기화
+                </button>
+              </div>
+              <p className={styles.transformHelp}>드래그 이동 · 휠 확대/축소 · 방향키 1칸 · Shift+방향키 5칸</p>
+            </div>
           </section>
 
           <section className={styles.editorSection}>
@@ -1095,6 +1517,7 @@ export default function DialogueEditorPage() {
           </div>
           <div className={styles.phone}>
             <div
+              ref={previewStageRef}
               className={styles.previewStage}
               style={{
                 backgroundImage: selected.background
@@ -1107,19 +1530,44 @@ export default function DialogueEditorPage() {
                 <small>{selected.date}</small>
               </div>
               {selected.character ? (
-                <Image
-                  className={`${styles.character} ${
-                    selected.character.includes("character_minho_farewell_v3.png")
-                      ? styles.characterMinho
-                      : ""
-                  }`}
-                  src={selected.character}
-                  alt=""
-                  aria-hidden="true"
-                  width={640}
-                  height={960}
-                  unoptimized
-                />
+                <>
+                  <div className={styles.directManipulationHint} aria-hidden="true">
+                    화면의 캐릭터를 직접 드래그하세요
+                  </div>
+                  <div
+                    className={`${styles.characterManipulator} ${
+                      selected.character.includes("character_minho_farewell_v3.png")
+                        ? styles.characterMinho
+                        : ""
+                    } ${characterDragging ? styles.characterManipulatorDragging : ""}`}
+                    style={{
+                      left: `${50 + selected.characterX}%`,
+                      bottom: `${12.3 + selected.characterY}%`,
+                      transform: `translateX(-50%) scale(${selected.characterScale})`,
+                    }}
+                    onPointerDown={beginCharacterDrag}
+                    onPointerMove={moveCharacterDrag}
+                    onPointerUp={endCharacterDrag}
+                    onPointerCancel={endCharacterDrag}
+                    onWheel={zoomCharacter}
+                    onKeyDown={nudgeCharacter}
+                    tabIndex={0}
+                    aria-label={`${selected.speaker} 화면 위치 조정`}
+                    title="드래그 이동 · 휠 확대/축소"
+                  >
+                    <Image
+                      className={styles.characterImage}
+                      src={selected.character}
+                      alt=""
+                      aria-hidden="true"
+                      fill
+                      sizes="322px"
+                      draggable={false}
+                      unoptimized
+                    />
+                    <span className={styles.characterSelectionFrame} aria-hidden="true" />
+                  </div>
+                </>
               ) : null}
               <div className={styles.previewDialogue}>
                 <b>{selected.speaker || "화자 없음"}</b>
@@ -1131,7 +1579,7 @@ export default function DialogueEditorPage() {
           </div>
           <div className={styles.previewTips}>
             <span>단축키</span>
-            <b>Ctrl/⌘ + S</b> 저장하고 게임 빌드
+            <b>Ctrl/⌘ + S</b> 게임에 즉시 적용
             <b>Ctrl/⌘ + Enter</b> 다음 장면
           </div>
         </aside>

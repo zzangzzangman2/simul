@@ -318,11 +318,106 @@ class LocalBusinessEngine {
         business.status == BusinessStatus.sold) {
       return _failure(state, '이미 폐업 또는 매각 정산을 마친 사업체입니다.');
     }
-    return _liquidateBusiness(
-      state,
-      business,
+    final accrued = accrueCurrentDay(state, onlyBusinessId: businessId);
+    final partialSettlement = _settleAccruedMonth(
+      accrued.state,
+      businessId,
+      state.currentDate,
+    );
+    final current = partialSettlement.state.businesses.businessById(businessId);
+    if (current == null) return _failure(state, '사업체를 찾지 못했습니다.');
+    final liquidation = _liquidateBusiness(
+      partialSettlement.state,
+      current,
       forced: false,
       sourceId: 'business-disposition-${business.id}',
+    );
+    return BusinessActionResult(
+      state: liquidation.state,
+      success: liquidation.success,
+      cashDelta:
+          accrued.cashDelta +
+          partialSettlement.cashDelta +
+          liquidation.cashDelta,
+      message: partialSettlement.message.isEmpty
+          ? liquidation.message
+          : '${partialSettlement.message} · ${liquidation.message}',
+    );
+  }
+
+  /// Freezes the current day's operating result before the game clock moves.
+  /// Existing saves without an accrual ledger backfill only the still-open
+  /// portion of the current month once, then append one immutable day at a time.
+  BusinessActionResult accrueCurrentDay(
+    GameState state, {
+    String? onlyBusinessId,
+  }) {
+    var portfolio = state.businesses;
+    var accruedCount = 0;
+    final date = state.currentDate;
+    final dateIso = _businessDateIso(date);
+    final monthKey = _businessMonthKey(date);
+    final allEvents = <BusinessEventInstance>[
+      ...state.businesses.pendingEvents,
+      ...state.businesses.eventHistory,
+    ];
+
+    for (final snapshot in state.businesses.activeBusinesses) {
+      if (onlyBusinessId != null && snapshot.id != onlyBusinessId) continue;
+      var business = portfolio.businessById(snapshot.id);
+      if (business == null || !business.isActive) continue;
+      if (business.lastSettledMonth == monthKey) continue;
+      final openedDate =
+          DateTime.tryParse(business.openedDateIso) ??
+          state.dateForDay(business.acquiredDay);
+      if (date.isBefore(openedDate)) continue;
+      if (business.unsettledDailyResults.any(
+        (result) => result.dateIso == dateIso,
+      )) {
+        continue;
+      }
+
+      final existingThisMonth = business.unsettledDailyResults
+          .where((result) => result.dateIso.startsWith('$monthKey-'))
+          .toList(growable: false);
+      final firstDate = existingThisMonth.isEmpty
+          ? _laterDate(DateTime(date.year, date.month, 1), openedDate)
+          : date;
+      final additions = <BusinessDailyResult>[];
+      for (
+        var cursor = firstDate;
+        !cursor.isAfter(date);
+        cursor = cursor.add(const Duration(days: 1))
+      ) {
+        final cursorIso = _businessDateIso(cursor);
+        if (business.unsettledDailyResults.any(
+          (result) => result.dateIso == cursorIso,
+        )) {
+          continue;
+        }
+        additions.add(
+          simulateBusinessDay(
+            business: business,
+            worldSeed: state.simulationSeed,
+            date: cursor,
+            events: allEvents,
+          ),
+        );
+      }
+      if (additions.isEmpty) continue;
+      business = business.copyWith(
+        unsettledDailyResults: <BusinessDailyResult>[
+          ...business.unsettledDailyResults,
+          ...additions,
+        ]..sort((left, right) => left.dateIso.compareTo(right.dateIso)),
+      );
+      portfolio = portfolio.replaceBusiness(business);
+      accruedCount += additions.length;
+    }
+    return BusinessActionResult(
+      state: state.copyWith(businesses: portfolio),
+      success: true,
+      message: accruedCount == 0 ? '' : '사업 일일 원장 $accruedCount일 확정',
     );
   }
 
@@ -727,7 +822,15 @@ class LocalBusinessEngine {
       final openedDate =
           DateTime.tryParse(business.openedDateIso) ??
           state.dateForDay(business.acquiredDay);
-      if (openedDate.isAfter(previousMonth)) {
+      final accruedResults = business.unsettledDailyResults
+          .where(
+            (result) => result.dateIso.startsWith(
+              '${previousMonth.year}-'
+              '${previousMonth.month.toString().padLeft(2, '0')}-',
+            ),
+          )
+          .toList(growable: false);
+      if (openedDate.isAfter(previousMonth) && accruedResults.isEmpty) {
         continue;
       }
       final monthKey =
@@ -739,17 +842,28 @@ class LocalBusinessEngine {
         ...next.businesses.pendingEvents,
         ...next.businesses.eventHistory,
       ];
-      final simulation = simulateBusinessMonth(
-        business: business,
-        worldSeed: next.simulationSeed,
-        year: previousMonth.year,
-        month: previousMonth.month,
-        events: allEvents,
-      );
+      final simulation = accruedResults.isEmpty
+          ? simulateBusinessMonth(
+              business: business,
+              worldSeed: next.simulationSeed,
+              year: previousMonth.year,
+              month: previousMonth.month,
+              events: allEvents,
+            )
+          : summarizeBusinessDays(
+              business: business,
+              year: previousMonth.year,
+              month: previousMonth.month,
+              dailyResults: accruedResults,
+            );
       final sourceId = simulation.statement.sourceId;
       if (next.processedEventIds.contains(sourceId)) continue;
       final settlement = settleBusinessMonth(
-        business: business,
+        business: business.copyWith(
+          unsettledDailyResults: business.unsettledDailyResults
+              .where((result) => !accruedResults.contains(result))
+              .toList(growable: false),
+        ),
         statement: simulation.statement,
         availableBankCash: next.bankCash,
       );
@@ -822,6 +936,91 @@ class LocalBusinessEngine {
       message: settlementCount == 0
           ? '정산할 완전 영업월이 없습니다.'
           : '직영점 월 정산 $settlementCount건 완료',
+    );
+  }
+
+  BusinessActionResult _settleAccruedMonth(
+    GameState state,
+    String businessId,
+    DateTime date,
+  ) {
+    final business = state.businesses.businessById(businessId);
+    if (business == null) return _failure(state, '사업체를 찾지 못했습니다.');
+    final monthKey = _businessMonthKey(date);
+    if (business.lastSettledMonth == monthKey) {
+      return BusinessActionResult(state: state, success: true, message: '');
+    }
+    final results = business.unsettledDailyResults
+        .where((result) => result.dateIso.startsWith('$monthKey-'))
+        .toList(growable: false);
+    if (results.isEmpty) {
+      return BusinessActionResult(state: state, success: true, message: '');
+    }
+    final simulation = summarizeBusinessDays(
+      business: business,
+      year: date.year,
+      month: date.month,
+      dailyResults: results,
+    );
+    final settlement = settleBusinessMonth(
+      business: business.copyWith(
+        unsettledDailyResults: business.unsettledDailyResults
+            .where((result) => !results.contains(result))
+            .toList(growable: false),
+      ),
+      statement: simulation.statement,
+      availableBankCash: state.bankCash,
+    );
+    final portfolio = applyBusinessMonthSettlement(
+      state.businesses,
+      settlement,
+    );
+    final sourceId = simulation.statement.sourceId;
+    final next = state.copyWith(
+      cash: state.cash + settlement.cashDelta,
+      businesses: portfolio,
+      ledger: <LedgerEntry>[
+        ...state.ledger,
+        LedgerEntry(
+          id: sourceId,
+          day: state.day,
+          amount: settlement.cashDelta,
+          notional: settlement.statement.grossSales,
+          realizedPnl: settlement.statement.netProfit,
+          account: 'company_bank',
+          counterAccount: settlement.statement.netProfit >= 0
+              ? 'business_operating_profit'
+              : 'business_operating_loss',
+          description:
+              '${business.name} $monthKey 폐업일 부분 정산 · '
+              '순이익 ${settlement.statement.netProfit}원',
+          sourceId: sourceId,
+        ),
+        if (settlement.payableChange != 0)
+          LedgerEntry(
+            id: '$sourceId-payable',
+            day: state.day,
+            amount: 0,
+            notional: settlement.payableChange.abs(),
+            account: settlement.payableChange > 0
+                ? 'business_operating_expense'
+                : 'business_accounts_payable',
+            counterAccount: settlement.payableChange > 0
+                ? 'business_accounts_payable'
+                : 'company_bank',
+            description: settlement.payableChange > 0
+                ? '${business.name} 월 운영비 미지급'
+                : '${business.name} 기존 미지급금 상환',
+            sourceId: sourceId,
+          ),
+      ],
+      processedEventIds: _appendProcessed(state.processedEventIds, sourceId),
+    );
+    return BusinessActionResult(
+      state: next,
+      success: true,
+      cashDelta: settlement.cashDelta,
+      message: '$monthKey 영업손익 부분 정산',
     );
   }
 
@@ -1042,6 +1241,18 @@ const _noPremiseChangeMessage = '사업장 연결 이상이 없습니다.';
 int _monthlySettlementCount(List<String> processedIds) => processedIds
     .where((sourceId) => sourceId.startsWith('business-month-'))
     .length;
+
+String _businessDateIso(DateTime date) =>
+    '${date.year.toString().padLeft(4, '0')}-'
+    '${date.month.toString().padLeft(2, '0')}-'
+    '${date.day.toString().padLeft(2, '0')}';
+
+String _businessMonthKey(DateTime date) =>
+    '${date.year.toString().padLeft(4, '0')}-'
+    '${date.month.toString().padLeft(2, '0')}';
+
+DateTime _laterDate(DateTime left, DateTime right) =>
+    left.isAfter(right) ? left : right;
 
 BusinessActionResult _failure(GameState state, String message) =>
     BusinessActionResult(state: state, success: false, message: message);

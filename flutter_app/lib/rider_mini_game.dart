@@ -278,7 +278,7 @@ class _RiderMiniGameState extends State<RiderMiniGame> {
   Widget build(BuildContext context) {
     return _MiniGameShell(
       title: '잼민 라이더',
-      subtitle: '2000년 동네 축제 · 보호자와 함께하는 폐쇄 코스',
+      subtitle: '2000년 데시멀 센터 · 교사 감독 폐쇄 코스',
       backgroundAsset:
           'assets/images/gameplay_map/bg_minigame_rider_venue_2000_portrait_cartoon_v1.png',
       progress: _phase == _RiderPhase.complete ? 1 : _progress,

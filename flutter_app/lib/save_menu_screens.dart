@@ -39,7 +39,7 @@ class _GameTitleScreen extends StatelessWidget {
                   children: [
                     SizedBox(height: compact ? 8 : 14),
                     Text(
-                      '초딩부터 건물주',
+                      '10대부터 건물주',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: const Color(0xFFFFF4C6),
@@ -59,7 +59,7 @@ class _GameTitleScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     const Text(
-                      '세뱃돈 1만원으로 시작하는 꼬마 투자왕의 꿈',
+                      '국가원금 5만원으로 시작하는 데시멀 동기 운용자의 기록',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: Color(0xFFD4E8E3),
@@ -145,7 +145,7 @@ class _AnimatedTitleHeroState extends State<_AnimatedTitleHero>
               child: Semantics(
                 key: const Key('title-cartoon-hero'),
                 image: true,
-                label: '초딩부터 건물주, 액자 밖으로 손을 내미는 꼬마 투자자',
+                label: '10대부터 건물주, 액자 밖으로 손을 내미는 10대 투자자',
                 child: Image.asset(
                   _asset,
                   fit: BoxFit.cover,

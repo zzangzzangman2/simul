@@ -442,6 +442,7 @@ void main() {
           equipmentBookValue: 20000000,
           goodwillBookValue: 5000000,
           equipmentCondition: 80,
+          lastSettledMonth: '2000-01',
         );
     final state = _newState(
       cash: 100000000,
@@ -476,11 +477,17 @@ void main() {
 
   group('폐업 후 미지급금', () {
     test('폐업 당일 회사 통장 잔액으로 상계 후 잔존 미지급금을 즉시 상환한다', () {
-      final business = _monthlyBusiness(
-        id: 'same-day-payable',
-        profitable: true,
-        accountsPayable: 5000000,
-      ).copyWith(leaseDeposit: 0, equipmentBookValue: 0, goodwillBookValue: 0);
+      final business =
+          _monthlyBusiness(
+            id: 'same-day-payable',
+            profitable: true,
+            accountsPayable: 5000000,
+          ).copyWith(
+            leaseDeposit: 0,
+            equipmentBookValue: 0,
+            goodwillBookValue: 0,
+            lastSettledMonth: '2000-01',
+          );
       final state = _newState(
         cash: 3000000,
         seed: 'same-day-payable-repayment',
@@ -620,11 +627,17 @@ void main() {
 
     test('청산 상환 뒤 하루 진행 후반 유입도 별도 ID로 같은 진행 안에 상환한다', () {
       const eventId = 'late-payable-income';
-      final business = _monthlyBusiness(
-        id: 'late-income-payable',
-        profitable: true,
-        accountsPayable: 120000,
-      ).copyWith(leaseDeposit: 0, equipmentBookValue: 0, goodwillBookValue: 0);
+      final business =
+          _monthlyBusiness(
+            id: 'late-income-payable',
+            profitable: true,
+            accountsPayable: 120000,
+          ).copyWith(
+            leaseDeposit: 0,
+            equipmentBookValue: 0,
+            goodwillBookValue: 0,
+            lastSettledMonth: '2000-01',
+          );
       final base = _newState(cash: 30000, seed: 'late-payable-0');
       final closingState = base.copyWith(
         day: _dayFor(base, DateTime(2000, 1, 31)),
@@ -846,6 +859,182 @@ void main() {
       expect(
         result.state.processedEventIds,
         isNot(contains('business-liquidation-${business.id}')),
+      );
+    });
+
+    test('15일 정책 변경은 변경일 이전 일일 원장을 다시 쓰지 않는다', () {
+      final original = _monthlyBusiness(
+        id: 'midmonth-policy',
+        profitable: true,
+      ).copyWith(lastSettledMonth: '2000-01');
+      var state = _newState(
+        cash: 1000000000,
+        seed: 'midmonth-policy-ledger',
+      ).copyWith(businesses: _portfolioOf(original));
+
+      for (var day = 1; day <= 14; day += 1) {
+        state = state.copyWith(day: _dayFor(state, DateTime(2000, 2, day)));
+        state = _businessEngine.accrueCurrentDay(state).state;
+      }
+      final frozenFourteenth = state.businesses
+          .businessById(original.id)!
+          .unsettledDailyResults
+          .singleWhere((result) => result.dateIso == '2000-02-14');
+      final changedPolicy = original.policy.copyWith(pricing: 5, marketing: 5);
+      state = state.copyWith(day: _dayFor(state, DateTime(2000, 2, 15)));
+      state = _businessEngine
+          .updatePolicy(state, original.id, changedPolicy)
+          .state;
+      state = _businessEngine.accrueCurrentDay(state).state;
+      final updated = state.businesses.businessById(original.id)!;
+
+      expect(
+        updated.unsettledDailyResults
+            .singleWhere((result) => result.dateIso == '2000-02-14')
+            .toJson(),
+        frozenFourteenth.toJson(),
+      );
+      expect(
+        updated.unsettledDailyResults
+            .singleWhere((result) => result.dateIso == '2000-02-15')
+            .toJson(),
+        simulateBusinessDay(
+          business: updated,
+          worldSeed: state.simulationSeed,
+          date: DateTime(2000, 2, 15),
+        ).toJson(),
+      );
+    });
+
+    test('20일 추가 투자는 20일 이후 원장에만 반영된다', () {
+      final original = _monthlyBusiness(
+        id: 'midmonth-investment',
+        profitable: true,
+      ).copyWith(lastSettledMonth: '2000-01');
+      var state = _newState(
+        cash: 1000000000,
+        seed: 'midmonth-investment-ledger',
+      ).copyWith(businesses: _portfolioOf(original));
+      for (var day = 1; day <= 19; day += 1) {
+        state = state.copyWith(day: _dayFor(state, DateTime(2000, 2, day)));
+        state = _businessEngine.accrueCurrentDay(state).state;
+      }
+      final frozenNineteenth = state.businesses
+          .businessById(original.id)!
+          .unsettledDailyResults
+          .singleWhere((result) => result.dateIso == '2000-02-19');
+      state = state.copyWith(day: _dayFor(state, DateTime(2000, 2, 20)));
+      final investment = _businessEngine.invest(
+        state,
+        original.id,
+        BusinessInvestmentKind.equipment,
+      );
+      expect(investment.success, isTrue);
+      state = _businessEngine.accrueCurrentDay(investment.state).state;
+      final invested = state.businesses.businessById(original.id)!;
+
+      expect(
+        invested.unsettledDailyResults
+            .singleWhere((result) => result.dateIso == '2000-02-19')
+            .toJson(),
+        frozenNineteenth.toJson(),
+      );
+      expect(
+        invested.unsettledDailyResults
+            .singleWhere((result) => result.dateIso == '2000-02-20')
+            .toJson(),
+        simulateBusinessDay(
+          business: invested,
+          worldSeed: state.simulationSeed,
+          date: DateTime(2000, 2, 20),
+        ).toJson(),
+      );
+    });
+
+    test('25일 폐업은 1일부터 25일까지 영업손익을 먼저 확정한다', () {
+      final business = _monthlyBusiness(
+        id: 'partial-month-close',
+        profitable: false,
+      ).copyWith(lastSettledMonth: '2000-01');
+      var state = _newState(
+        cash: 0,
+        seed: 'partial-month-close-ledger',
+      ).copyWith(businesses: _portfolioOf(business));
+      for (var day = 1; day <= 24; day += 1) {
+        state = state.copyWith(day: _dayFor(state, DateTime(2000, 2, day)));
+        state = _businessEngine.accrueCurrentDay(state).state;
+      }
+      final beforeClose = state.businesses.businessById(business.id)!;
+      final twentyFifth = simulateBusinessDay(
+        business: beforeClose,
+        worldSeed: state.simulationSeed,
+        date: DateTime(2000, 2, 25),
+      );
+      final expectedProfit =
+          beforeClose.unsettledDailyResults.fold<int>(
+            0,
+            (total, result) => total + result.netProfit,
+          ) +
+          twentyFifth.netProfit;
+      state = state.copyWith(day: _dayFor(state, DateTime(2000, 2, 25)));
+
+      final result = _businessEngine.closeOrSell(state, business.id);
+      final closed = result.state.businesses.businessById(business.id)!;
+      final statement = closed.statements.singleWhere(
+        (item) => item.year == 2000 && item.month == 2,
+      );
+
+      expect(result.success, isTrue);
+      expect(statement.netProfit, expectedProfit);
+      expect(statement.sourceId, 'business-month-${business.id}-2000-02');
+      expect(closed.unsettledDailyResults, isEmpty);
+      expect(closed.status, BusinessStatus.closed);
+      expect(
+        result.state.processedEventIds,
+        contains('business-month-${business.id}-2000-02'),
+      );
+      final payableEntry = result.state.ledger.singleWhere(
+        (entry) => entry.id == 'business-month-${business.id}-2000-02-payable',
+      );
+      expect(payableEntry.amount, 0);
+      expect(payableEntry.notional, greaterThan(0));
+      expect(payableEntry.account, 'business_operating_expense');
+      expect(payableEntry.counterAccount, 'business_accounts_payable');
+      expect(payableEntry.description, contains('월 운영비 미지급'));
+    });
+
+    test('월중 일일 원장은 저장 복원 뒤 같은 폐업 결과를 만든다', () {
+      final business = _monthlyBusiness(
+        id: 'partial-month-restore',
+        profitable: true,
+      ).copyWith(lastSettledMonth: '2000-01');
+      var state = _newState(
+        cash: 1000000000,
+        seed: 'partial-month-restore-ledger',
+      ).copyWith(businesses: _portfolioOf(business));
+      for (var day = 1; day <= 18; day += 1) {
+        state = state.copyWith(day: _dayFor(state, DateTime(2000, 2, day)));
+        state = _businessEngine.accrueCurrentDay(state).state;
+      }
+      final restored = _gameEngine.migrate(state.toJson());
+
+      final direct = _businessEngine.closeOrSell(state, business.id);
+      final replay = _businessEngine.closeOrSell(restored, business.id);
+
+      expect(replay.cashDelta, direct.cashDelta);
+      expect(
+        replay.state.businesses.businessById(business.id)!.toJson(),
+        direct.state.businesses.businessById(business.id)!.toJson(),
+      );
+      expect(
+        replay.state.ledger
+            .where((entry) => entry.sourceId.contains(business.id))
+            .map((entry) => entry.toJson())
+            .toList(),
+        direct.state.ledger
+            .where((entry) => entry.sourceId.contains(business.id))
+            .map((entry) => entry.toJson())
+            .toList(),
       );
     });
   });

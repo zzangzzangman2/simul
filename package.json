@@ -8,15 +8,16 @@
   "scripts": {
     "dev": "next dev --webpack",
     "dev:lan": "next dev --webpack --hostname 0.0.0.0 --port 8000",
-    "build": "vinext build",
+    "build": "node scripts/build-flutter-web.mjs && vinext build",
     "build:flutter-web": "node scripts/build-flutter-web.mjs",
     "build:release": "node scripts/build-flutter-web.mjs && vinext build",
+    "build:web-shell": "vinext build",
     "start": "vinext start",
     "test": "vinext build && node --test tests/rendered-html.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern build --ignore-pattern .next --ignore-pattern .vinext --ignore-pattern .wrangler --ignore-pattern work --ignore-pattern public/play --ignore-pattern flutter_app/.dart_tool --ignore-pattern flutter_app/build --ignore-pattern flutter_app/.plugin_symlinks",
-    "db:generate": "drizzle-kit generate",
     "dev:sites": "vinext dev",
     "dialogue:sync": "node scripts/generate-dialogue-editor-data.mjs",
+    "dialogue:import": "node scripts/build-decimal-dialogue.mjs && node scripts/generate-dialogue-editor-data.mjs",
     "predev": "node scripts/generate-dialogue-editor-data.mjs",
     "predev:lan": "node scripts/generate-dialogue-editor-data.mjs",
     "prebuild": "node scripts/generate-dialogue-editor-data.mjs",
@@ -24,7 +25,6 @@
     "prebuild:release": "node scripts/generate-dialogue-editor-data.mjs"
   },
   "dependencies": {
-    "drizzle-orm": "0.45.2",
     "next": "16.2.6",
     "react": "19.2.6",
     "react-dom": "19.2.6"
@@ -37,7 +37,6 @@
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "6.0.2",
     "@vitejs/plugin-rsc": "0.5.26",
-    "drizzle-kit": "0.31.10",
     "eslint": "9.39.4",
     "eslint-config-next": "16.2.6",
     "react-server-dom-webpack": "19.2.6",

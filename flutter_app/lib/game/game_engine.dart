@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'banking_state.dart';
 import 'business_engine.dart';
+import 'cohort_investment_state.dart';
 import 'game_state.dart';
 import 'home_improvement_state.dart';
 import 'market_clock.dart';
@@ -17,16 +18,20 @@ import 'real_estate_market.dart';
 import 'real_estate_rental.dart';
 import 'real_estate_world.dart';
 import 'personal_finance_state.dart';
+import 'phone_messenger_state.dart';
+import 'relationship_state.dart';
 import 'seed_money_content.dart';
 import 'stable_hash.dart';
 import 'star_shop.dart';
 import 'story_state.dart';
 
-const initialCompanyCash = 10000;
-const grandfatherNewYearGiftSourceId = 'grandfather-new-year-gift';
+part 'game_engine_corporate_actions.dart';
+part 'game_engine_story_decisions.dart';
+
+// 프로젝트 데시멀 국가원금. 출발 종목 중 가장 싼 한 주도 살 수 있어야 첫 실습이
+// 성립하므로, 한빛통신 28,400원을 기준으로 50,000원을 지급한다.
+const initialCompanyCash = 50000;
 const stateAccountSeedCapitalSourceId = 'state-account-seed-capital';
-const academyTuitionDebtAmount = 1000000;
-const academyTuitionRepaymentSourceId = 'academy-tuition-repayment';
 const gameDividendWithholdingTaxRate = 0.154;
 const dailyMarketReportPrice = 1200;
 const gameRealEstateInvestmentNoteMaxLength = 300;
@@ -50,7 +55,7 @@ class GamePendingOrderQuotePath {
 
 double gameTradingFeeMultiplier(GameState state) {
   final helperDiscount =
-      state.story.storyFlags['activeResearchHelper'] == 'mother' &&
+      state.story.storyFlags['activeResearchHelper'] == 'hakjun' &&
       state.story.flagInt('activeResearchHelperDay', -1) == state.day;
   final skillDiscount = state.progression.hasSkill('fee_sense') ? 0.9 : 1.0;
   return (helperDiscount ? 0.9 : 1.0) * skillDiscount;
@@ -587,11 +592,747 @@ class MissionClaimResult {
   final SkillDefinition? unlockedSkill;
 }
 
+class RelationshipActionResult {
+  const RelationshipActionResult({
+    required this.state,
+    required this.success,
+    required this.message,
+    this.girlId,
+    this.activity,
+    this.affectionBefore,
+    this.affectionAfter,
+    this.affectionDelta = 0,
+    this.response,
+    this.dateJustUnlocked = false,
+    this.stageJustUnlocked,
+  });
+
+  final GameState state;
+  final bool success;
+  final String message;
+  final String? girlId;
+  final RelationshipActivity? activity;
+  final int? affectionBefore;
+  final int? affectionAfter;
+  final int affectionDelta;
+  final String? response;
+  final bool dateJustUnlocked;
+  final RelationshipStage? stageJustUnlocked;
+}
+
+class CohortInvestmentActionResult {
+  const CohortInvestmentActionResult({
+    required this.state,
+    required this.success,
+    required this.message,
+    this.report,
+    this.loan,
+  });
+
+  final GameState state;
+  final bool success;
+  final String message;
+  final CohortDailyInvestmentReport? report;
+  final CohortLoan? loan;
+}
+
+class PhoneMessengerActionResult {
+  const PhoneMessengerActionResult({
+    required this.state,
+    required this.success,
+    required this.message,
+    this.reply,
+  });
+
+  final GameState state;
+  final bool success;
+  final String message;
+  final PhoneMessage? reply;
+}
+
 class GameEngine {
   const GameEngine();
 
   static int _newGameSerial = 0;
   static final math.Random _worldSeedRandom = math.Random.secure();
+
+  PhoneMessengerActionResult markPhoneThreadRead(
+    GameState state, {
+    required String contactId,
+  }) {
+    if (phoneContactById(contactId) == null) {
+      return PhoneMessengerActionResult(
+        state: state,
+        success: false,
+        message: '데시멀 연락처에 없는 동기입니다.',
+      );
+    }
+    var changed = false;
+    final messages = [
+      for (final message in state.phoneMessenger.messages)
+        if (message.contactId == contactId &&
+            !message.isFromPlayer &&
+            !message.read)
+          (() {
+            changed = true;
+            return message.copyWith(read: true);
+          })()
+        else
+          message,
+    ];
+    if (!changed) {
+      return PhoneMessengerActionResult(
+        state: state,
+        success: true,
+        message: '새 메시지를 모두 읽었습니다.',
+      );
+    }
+    return PhoneMessengerActionResult(
+      state: state.copyWith(
+        phoneMessenger: state.phoneMessenger.copyWith(messages: messages),
+      ),
+      success: true,
+      message: '새 메시지를 모두 읽었습니다.',
+    );
+  }
+
+  PhoneMessengerActionResult sendPhoneMessage(
+    GameState state, {
+    required String contactId,
+    required String text,
+  }) {
+    final contact = phoneContactById(contactId);
+    if (contact == null) {
+      return PhoneMessengerActionResult(
+        state: state,
+        success: false,
+        message: '데시멀 연락처에 없는 동기입니다.',
+      );
+    }
+    final content = text.trim();
+    if (content.isEmpty) {
+      return PhoneMessengerActionResult(
+        state: state,
+        success: false,
+        message: '보낼 말을 입력해 주세요.',
+      );
+    }
+    if (content.length > phoneMessengerMaxMessageLength) {
+      return PhoneMessengerActionResult(
+        state: state,
+        success: false,
+        message: '메시지는 $phoneMessengerMaxMessageLength자까지 보낼 수 있습니다.',
+      );
+    }
+    final progress = state.phoneMessenger.progressFor(contactId);
+    final exchangesToday = progress.exchangesForDay(state.day);
+    if (exchangesToday >= phoneMessengerDailySendLimit) {
+      return PhoneMessengerActionResult(
+        state: state,
+        success: false,
+        message: '오늘은 이 친구와 충분히 이야기했습니다. 내일 다시 톡해요.',
+      );
+    }
+
+    final sequence = progress.totalExchanges + 1;
+    final playerMessage = PhoneMessage(
+      id: 'phone-${state.day}-${state.marketMinute}-$contactId-$sequence-me',
+      contactId: contactId,
+      senderId: phoneMessengerPlayerId,
+      text: content,
+      day: state.day,
+      marketMinute: state.marketMinute,
+      read: true,
+    );
+    final reply = PhoneMessage(
+      id: 'phone-${state.day}-${state.marketMinute}-$contactId-$sequence-reply',
+      contactId: contactId,
+      senderId: contactId,
+      text: phoneReplyFor(contact, content),
+      day: state.day,
+      marketMinute: state.marketMinute,
+      read: true,
+    );
+    final appended = [
+      for (final message in state.phoneMessenger.messages)
+        if (message.contactId == contactId &&
+            !message.isFromPlayer &&
+            !message.read)
+          message.copyWith(read: true)
+        else
+          message,
+      playerMessage,
+      reply,
+    ];
+    final messages = appended.length <= phoneMessengerHistoryLimit
+        ? appended
+        : appended.sublist(appended.length - phoneMessengerHistoryLimit);
+    final nextProgress = <String, PhoneThreadProgress>{
+      ...state.phoneMessenger.progressByContact,
+      contactId: progress.recordExchange(state.day),
+    };
+    final next = state.copyWith(
+      phoneMessenger: state.phoneMessenger.copyWith(
+        messages: messages,
+        progressByContact: nextProgress,
+      ),
+    );
+    return PhoneMessengerActionResult(
+      state: next,
+      success: true,
+      message: '${contact.name}에게 메시지를 보냈습니다.',
+      reply: reply,
+    );
+  }
+
+  CohortInvestmentActionResult settleCohortInvestmentDay(
+    GameState state, {
+    required FictionalMarketUniverse universe,
+  }) {
+    final existing = state.cohortInvestments.reportForDay(state.day);
+    if (state.cohortInvestments.settledForDay(state.day) && existing != null) {
+      return CohortInvestmentActionResult(
+        state: state,
+        success: true,
+        message: '오늘의 데시멀 투자 결과는 이미 확정됐습니다.',
+        report: existing,
+      );
+    }
+    if (state.marketMinute < krxCloseMinute) {
+      return CohortInvestmentActionResult(
+        state: state,
+        success: false,
+        message: '15:00 종가가 확정된 뒤 오늘의 결과를 계산할 수 있습니다.',
+      );
+    }
+
+    final dateKey = marketDateKey(state.currentDate);
+    final candidates =
+        universe.assets
+            .where((asset) {
+              if (!asset.isDomestic) return false;
+              final history = asset.historyThrough(state.currentDate, count: 2);
+              return history.length >= 2 && history.last.date == dateKey;
+            })
+            .toList(growable: false)
+          ..sort((left, right) => left.id.compareTo(right.id));
+
+    var accounts = <String, CohortInvestorAccount>{
+      ...state.cohortInvestments.accounts,
+    };
+    final npcRows = <CohortDailyInvestmentResult>[];
+    for (final profile in cohortNpcInvestorProfiles) {
+      final account = state.cohortInvestments.accountFor(profile.id);
+      if (candidates.isEmpty || !isMarketTradingDay(state.currentDate)) {
+        npcRows.add(
+          CohortDailyInvestmentResult(
+            investorId: profile.id,
+            name: profile.name,
+            assetId: '',
+            assetName: '휴장 · 투자 없음',
+            investedAmount: 0,
+            profitLoss: 0,
+            totalAmount: account.balance,
+            traded: false,
+            isPlayer: false,
+          ),
+        );
+        continue;
+      }
+      final pick =
+          _stableHash(
+            '${state.simulationSeed}:cohort:${state.day}:${profile.id}',
+          ) %
+          candidates.length;
+      final asset = candidates[pick];
+      final history = asset.historyThrough(state.currentDate, count: 2);
+      final previousClose = history[history.length - 2].close;
+      final close = history.last.close;
+      final investedAmount =
+          (account.balance * profile.investmentRatioBps / 10000).round().clamp(
+            0,
+            account.balance,
+          );
+      final returnRate = previousClose <= 0
+          ? 0.0
+          : ((close - previousClose) / previousClose).clamp(-0.30, 0.30);
+      final grossProfitLoss = (investedAmount * returnRate).round();
+      final tradingCost = investedAmount <= 0
+          ? 0
+          : math.max(
+              1,
+              (investedAmount *
+                      (marketTradingFeeRate(state.currentDate) * 2 +
+                          marketSecuritiesTransactionTaxRate(
+                            state.currentDate,
+                          )))
+                  .round(),
+            );
+      final profitLoss = grossProfitLoss - tradingCost;
+      final totalAmount = math.max(0, account.balance + profitLoss);
+      accounts[profile.id] = account.copyWith(balance: totalAmount);
+      npcRows.add(
+        CohortDailyInvestmentResult(
+          investorId: profile.id,
+          name: profile.name,
+          assetId: asset.id,
+          assetName: asset.name,
+          investedAmount: investedAmount,
+          profitLoss: profitLoss,
+          totalAmount: totalAmount,
+          traded: true,
+          isPlayer: false,
+        ),
+      );
+    }
+
+    var repaymentTotal = 0;
+    final repaidLoans = <CohortLoan>[];
+    final repaymentEntries = <LedgerEntry>[];
+    for (final loan in state.cohortInvestments.loans) {
+      if (loan.isRepaid || loan.dueDay > state.day) {
+        repaidLoans.add(loan);
+        continue;
+      }
+      final account = accounts[loan.borrowerId];
+      if (account == null) {
+        repaidLoans.add(loan);
+        continue;
+      }
+      final affordable = math.max(0, account.balance - 1000);
+      final repayment = math.min(loan.outstanding, affordable);
+      if (repayment <= 0) {
+        repaidLoans.add(loan);
+        continue;
+      }
+      accounts[loan.borrowerId] = account.copyWith(
+        balance: account.balance - repayment,
+      );
+      final updatedLoan = loan.copyWith(
+        repaidAmount: loan.repaidAmount + repayment,
+      );
+      repaidLoans.add(updatedLoan);
+      repaymentTotal += repayment;
+      repaymentEntries.add(
+        LedgerEntry(
+          id: '${loan.id}-repay-${state.day}',
+          day: state.day,
+          amount: repayment,
+          account: 'brokerage_cash',
+          counterAccount: 'cohort_loan_receivable',
+          description:
+              '${loan.borrowerName} 동기 대여금 ${updatedLoan.isRepaid ? '상환 완료' : '일부 상환'}',
+          sourceId: '${loan.id}-repay-${state.day}',
+          notional: repayment,
+          marketMinute: krxCloseMinute,
+        ),
+      );
+    }
+    if (repaymentTotal > 0) {
+      for (var index = 0; index < npcRows.length; index++) {
+        final account = accounts[npcRows[index].investorId];
+        if (account != null) {
+          npcRows[index] = npcRows[index].copyWith(
+            totalAmount: account.balance,
+          );
+        }
+      }
+    }
+
+    final afterRepayment = state.copyWith(
+      cash: state.cash + repaymentTotal,
+      brokerageCash: state.brokerageCash + repaymentTotal,
+      ledger: [...state.ledger, ...repaymentEntries],
+    );
+    final closePrices = <String, double>{};
+    for (final asset in universe.assets) {
+      final quote = asset.quoteAtOrBefore(state.currentDate);
+      if (quote != null) closePrices[asset.id] = quote.close;
+    }
+    final playerTotal =
+        afterRepayment.brokerageCash +
+        afterRepayment.portfolioValue(closePrices);
+    var netBrokerageFlow = repaymentTotal;
+    for (final entry in state.ledger.where((entry) => entry.day == state.day)) {
+      if (entry.account == 'brokerage_cash' &&
+          entry.counterAccount == 'company_bank') {
+        netBrokerageFlow += entry.notional;
+      } else if (entry.account == 'company_bank' &&
+          entry.counterAccount == 'brokerage_cash') {
+        netBrokerageFlow -= entry.notional;
+      }
+    }
+    final previousPlayerTotal =
+        state.cohortInvestments.previousPlayerCloseTotal ??
+        (state.day == 1
+            ? cohortInvestmentInitialBalance
+            : playerTotal - netBrokerageFlow);
+    final playerProfitLoss =
+        playerTotal - previousPlayerTotal - netBrokerageFlow;
+    final playerTradeEntries = state.ledger
+        .where(
+          (entry) =>
+              entry.day == state.day &&
+              (entry.tradeSide == 'buy' || entry.tradeSide == 'sell'),
+        )
+        .toList(growable: false);
+    final tradedAssetIds = playerTradeEntries
+        .map((entry) => entry.assetId)
+        .where((assetId) => assetId.isNotEmpty)
+        .toSet();
+    String playerAssetName = '거래 없음';
+    String playerAssetId = '';
+    if (tradedAssetIds.length == 1) {
+      playerAssetId = tradedAssetIds.single;
+      for (final asset in universe.assets) {
+        if (asset.id == playerAssetId) {
+          playerAssetName = asset.name;
+          break;
+        }
+      }
+    } else if (tradedAssetIds.length > 1) {
+      playerAssetName = '실제 포트폴리오 ${tradedAssetIds.length}종목';
+    } else if (state.positions.isNotEmpty) {
+      playerAssetName = '보유 포트폴리오';
+    }
+    final playerName = state.story.playerName.trim().isEmpty
+        ? '나'
+        : state.story.playerName.trim();
+    final report = CohortDailyInvestmentReport(
+      day: state.day,
+      repaymentTotal: repaymentTotal,
+      rows: [
+        CohortDailyInvestmentResult(
+          investorId: 'player',
+          name: playerName,
+          assetId: playerAssetId,
+          assetName: playerAssetName,
+          investedAmount: state.portfolioValue(closePrices),
+          profitLoss: playerProfitLoss,
+          totalAmount: playerTotal,
+          traded: playerTradeEntries.isNotEmpty,
+          isPlayer: true,
+        ),
+        ...npcRows,
+      ],
+    );
+    final reports = [
+      ...state.cohortInvestments.reports.where((item) => item.day != state.day),
+      report,
+    ];
+    final trimmedReports = reports.length <= cohortInvestmentHistoryLimit
+        ? reports
+        : reports.sublist(reports.length - cohortInvestmentHistoryLimit);
+    final next = afterRepayment.copyWith(
+      cohortInvestments: state.cohortInvestments.copyWith(
+        accounts: accounts,
+        reports: trimmedReports,
+        loans: repaidLoans,
+        lastSettledDay: state.day,
+        previousPlayerCloseTotal: playerTotal,
+      ),
+    );
+    return CohortInvestmentActionResult(
+      state: next,
+      success: true,
+      message: '데시멀 동기 10명의 오늘 투자 결과가 확정됐습니다.',
+      report: report,
+    );
+  }
+
+  CohortInvestmentActionResult lendToCohortInvestor(
+    GameState state, {
+    required String borrowerId,
+    required int amount,
+  }) {
+    final report = state.cohortInvestments.reportForDay(state.day);
+    if (report == null || !state.cohortInvestments.settledForDay(state.day)) {
+      return CohortInvestmentActionResult(
+        state: state,
+        success: false,
+        message: '오늘의 투자 결과가 확정된 뒤 돈을 빌려줄 수 있습니다.',
+      );
+    }
+    if (state.cohortInvestments.acknowledgedForDay(state.day)) {
+      return CohortInvestmentActionResult(
+        state: state,
+        success: false,
+        message: '오늘 결과표를 닫은 뒤에는 대여할 수 없습니다.',
+        report: report,
+      );
+    }
+    if (state.cohortInvestments.loanedForDay(state.day)) {
+      return CohortInvestmentActionResult(
+        state: state,
+        success: false,
+        message: '돈 빌려주기는 하루에 한 번만 가능합니다.',
+        report: report,
+      );
+    }
+    final profile = cohortNpcInvestorProfileById(borrowerId);
+    final borrower = report.resultFor(borrowerId);
+    final player = report.resultFor('player');
+    if (profile == null || borrower == null || player == null) {
+      return CohortInvestmentActionResult(
+        state: state,
+        success: false,
+        message: '데시멀 결과표에 없는 동기입니다.',
+        report: report,
+      );
+    }
+    if (borrower.totalAmount >= player.totalAmount) {
+      return CohortInvestmentActionResult(
+        state: state,
+        success: false,
+        message: '현재 총금액이 나보다 적은 동기에게만 빌려줄 수 있습니다.',
+        report: report,
+      );
+    }
+    final maximum = math.min(
+      state.withdrawableBrokerageCash,
+      player.totalAmount - borrower.totalAmount,
+    );
+    if (amount <= 0 || amount > maximum) {
+      return CohortInvestmentActionResult(
+        state: state,
+        success: false,
+        message: maximum <= 0
+            ? '지금 빌려줄 수 있는 국가계좌 현금이 없습니다.'
+            : '오늘은 최대 $maximum원까지 빌려줄 수 있습니다.',
+        report: report,
+      );
+    }
+
+    final loan = CohortLoan(
+      id: 'cohort-loan-${state.day}-$borrowerId',
+      borrowerId: borrowerId,
+      borrowerName: profile.name,
+      issuedDay: state.day,
+      dueDay: state.day + cohortLoanTermDays,
+      principal: amount,
+    );
+    final updatedRows = [
+      for (final row in report.rows)
+        if (row.investorId == 'player')
+          row.copyWith(totalAmount: row.totalAmount - amount)
+        else if (row.investorId == borrowerId)
+          row.copyWith(totalAmount: row.totalAmount + amount)
+        else
+          row,
+    ];
+    final updatedReport = report.copyWith(rows: updatedRows);
+    final reports = [
+      for (final item in state.cohortInvestments.reports)
+        if (item.day == state.day) updatedReport else item,
+    ];
+    final borrowerAccount = state.cohortInvestments.accountFor(borrowerId);
+    final accounts = <String, CohortInvestorAccount>{
+      ...state.cohortInvestments.accounts,
+      borrowerId: borrowerAccount.copyWith(
+        balance: borrowerAccount.balance + amount,
+      ),
+    };
+    final sourceId = loan.id;
+    final next = state.copyWith(
+      cash: state.cash - amount,
+      brokerageCash: state.brokerageCash - amount,
+      cohortInvestments: state.cohortInvestments.copyWith(
+        accounts: accounts,
+        reports: reports,
+        loans: [...state.cohortInvestments.loans, loan],
+        lastLoanDay: state.day,
+        previousPlayerCloseTotal: math.max(
+          0,
+          (state.cohortInvestments.previousPlayerCloseTotal ??
+                  player.totalAmount) -
+              amount,
+        ),
+      ),
+      ledger: [
+        ...state.ledger,
+        LedgerEntry(
+          id: sourceId,
+          day: state.day,
+          amount: -amount,
+          account: 'cohort_loan_receivable',
+          counterAccount: 'brokerage_cash',
+          description: '${profile.name} 동기 대여금 · $cohortLoanTermDays일 뒤 무이자 상환',
+          sourceId: sourceId,
+          notional: amount,
+          marketMinute: krxCloseMinute,
+        ),
+      ],
+    );
+    return CohortInvestmentActionResult(
+      state: next,
+      success: true,
+      message: '${profile.name}에게 $amount원을 빌려줬습니다. 호감도와는 별개입니다.',
+      report: updatedReport,
+      loan: loan,
+    );
+  }
+
+  CohortInvestmentActionResult acknowledgeCohortInvestmentReport(
+    GameState state,
+  ) {
+    final report = state.cohortInvestments.reportForDay(state.day);
+    if (report == null || !state.cohortInvestments.settledForDay(state.day)) {
+      return CohortInvestmentActionResult(
+        state: state,
+        success: false,
+        message: '확인할 오늘의 투자 결과가 없습니다.',
+      );
+    }
+    final next = state.copyWith(
+      cohortInvestments: state.cohortInvestments.copyWith(
+        lastAcknowledgedDay: state.day,
+      ),
+    );
+    return CohortInvestmentActionResult(
+      state: next,
+      success: true,
+      message: '오늘의 결과표를 확인했습니다.',
+      report: report,
+    );
+  }
+
+  RelationshipActionResult completeRelationshipEvening(
+    GameState state, {
+    required String girlId,
+    required RelationshipActivity activity,
+    required String choiceId,
+  }) {
+    if (state.relationships.completedEveningForDay(state.day)) {
+      return RelationshipActionResult(
+        state: state,
+        success: false,
+        message: '오늘의 관계 시간은 이미 보냈습니다.',
+      );
+    }
+    final profile = cohortGirlProfileById(girlId);
+    if (profile == null) {
+      return RelationshipActionResult(
+        state: state,
+        success: false,
+        message: '여자 동기 명단에 없는 인물입니다.',
+      );
+    }
+    final progress = state.relationships.progressFor(girlId);
+    if (activity == RelationshipActivity.date && !progress.dateUnlocked) {
+      return RelationshipActionResult(
+        state: state,
+        success: false,
+        girlId: girlId,
+        activity: activity,
+        affectionBefore: progress.affection,
+        affectionAfter: progress.affection,
+        message: '호감도 $relationshipDateUnlockAffection부터 데이트를 신청할 수 있습니다.',
+      );
+    }
+    final scene = relationshipSceneFor(
+      profile: profile,
+      activity: activity,
+      day: state.day,
+    );
+    RelationshipChoiceDefinition? choice;
+    for (final candidate in scene.choices) {
+      if (candidate.id == choiceId) {
+        choice = candidate;
+        break;
+      }
+    }
+    if (choice == null) {
+      return RelationshipActionResult(
+        state: state,
+        success: false,
+        girlId: girlId,
+        activity: activity,
+        affectionBefore: progress.affection,
+        affectionAfter: progress.affection,
+        message: '이 장면에서 사용할 수 없는 선택지입니다.',
+      );
+    }
+
+    final before = progress.affection;
+    final after = (before + choice.affectionDelta)
+        .clamp(relationshipMinAffection, relationshipMaxAffection)
+        .toInt();
+    final appliedDelta = after - before;
+    final beforeStage = relationshipStageFor(before);
+    final afterStage = relationshipStageFor(after);
+    final updatedProgress = progress.copyWith(
+      affection: after,
+      lastInteractionDay: state.day,
+      conversationCount:
+          progress.conversationCount +
+          (activity == RelationshipActivity.conversation ? 1 : 0),
+      dateCount:
+          progress.dateCount + (activity == RelationshipActivity.date ? 1 : 0),
+    );
+    final updatedGirls = <String, GirlRelationshipProgress>{
+      ...state.relationships.girls,
+      girlId: updatedProgress,
+    };
+    final updatedMemories = <RelationshipMemory>[
+      ...state.relationships.memories,
+      RelationshipMemory(
+        day: state.day,
+        girlId: girlId,
+        activity: activity,
+        sceneId: scene.id,
+        choiceId: choice.id,
+        affectionDelta: appliedDelta,
+        affectionAfter: after,
+      ),
+    ];
+    final trimmedMemories = updatedMemories.length <= 64
+        ? updatedMemories
+        : updatedMemories.sublist(updatedMemories.length - 64);
+    final next = state.copyWith(
+      relationships: state.relationships.copyWith(
+        girls: updatedGirls,
+        lastEveningEventDay: state.day,
+        memories: trimmedMemories,
+      ),
+    );
+    return RelationshipActionResult(
+      state: next,
+      success: true,
+      message: '${profile.name}과의 저녁 시간을 보냈습니다.',
+      girlId: girlId,
+      activity: activity,
+      affectionBefore: before,
+      affectionAfter: after,
+      affectionDelta: appliedDelta,
+      response: choice.response,
+      dateJustUnlocked:
+          before < relationshipDateUnlockAffection &&
+          after >= relationshipDateUnlockAffection,
+      stageJustUnlocked: afterStage != beforeStage && after > before
+          ? afterStage
+          : null,
+    );
+  }
+
+  RelationshipActionResult restDuringRelationshipEvening(GameState state) {
+    if (state.relationships.completedEveningForDay(state.day)) {
+      return RelationshipActionResult(
+        state: state,
+        success: false,
+        message: '오늘의 관계 시간은 이미 보냈습니다.',
+      );
+    }
+    final next = state.copyWith(
+      relationships: state.relationships.copyWith(
+        lastEveningEventDay: state.day,
+      ),
+    );
+    return RelationshipActionResult(
+      state: next,
+      success: true,
+      message: '오늘은 혼자 쉬며 하루를 정리했습니다.',
+    );
+  }
 
   GameState createNewGame(
     String companyName, {
@@ -605,14 +1346,8 @@ class GameEngine {
     final baseStory = story ?? StoryState.migratedDefault(companyName);
     final isStandardSeedStart =
         initialCompanyCash > 0 && initialCash == initialCompanyCash;
-    final isStateAccountStart =
-        isStandardSeedStart && baseStory.orphanageReboot;
-    final seedMoneySource = isStateAccountStart
-        ? 'future_development_fund'
-        : 'grandfather_new_year_gift';
-    final seedMoneySourceId = isStateAccountStart
-        ? stateAccountSeedCapitalSourceId
-        : grandfatherNewYearGiftSourceId;
+    final seedMoneySource = 'project_decimal_fund';
+    const seedMoneySourceId = stateAccountSeedCapitalSourceId;
     final storyState = isStandardSeedStart
         ? baseStory.copyWith(
             accountAuthorityLevel: math.max(1, baseStory.accountAuthorityLevel),
@@ -623,10 +1358,22 @@ class GameEngine {
               'firstSeedGoalReached': true,
             },
           )
-        : initialCash > initialCompanyCash &&
-              baseStory.accountAuthorityLevel == 0
-        ? baseStory.copyWith(accountAuthorityLevel: 5)
-        : baseStory;
+        : initialCash > initialCompanyCash
+        ? baseStory.copyWith(
+            accountAuthorityLevel: math.max(5, baseStory.accountAuthorityLevel),
+            storyFlags: {
+              ...baseStory.storyFlags,
+              'firstSeedGoalReached': initialCash >= 10000,
+            },
+          )
+        : baseStory.copyWith(
+            storyFlags: {
+              ...baseStory.storyFlags,
+              'firstSeedGoalReached':
+                  baseStory.startingSeedMoney + baseStory.earnedSeedMoney >=
+                  10000,
+            },
+          );
     final company = const CompanyState(
       id: 'hanbit_telecom',
       name: '한빛통신',
@@ -653,7 +1400,7 @@ class GameEngine {
       positions: const [],
       pendingOrders: const [],
       banking: BankingState.initial(),
-      organization: OrganizationState.initial(storyState.familyRule),
+      organization: OrganizationState.initial(storyState.operatingPrinciple),
       personalFinance: PersonalFinanceState.initial(),
       progression: MissionProgressionState.initial(day: 1, cash: initialCash),
       story: storyState,
@@ -668,12 +1415,8 @@ class GameEngine {
                 day: 1,
                 amount: initialCompanyCash,
                 account: 'brokerage_cash',
-                counterAccount: isStateAccountStart
-                    ? 'state_seed_capital'
-                    : 'family_gift',
-                description: isStateAccountStart
-                    ? '대한민국 미래양성기금 · 제6기 국가계좌 원금'
-                    : '외할아버지 세뱃돈 · 첫 투자금',
+                counterAccount: 'state_seed_capital',
+                description: '대한민국 데시멀 기금 · 국가계좌 원금',
                 sourceId: seedMoneySourceId,
               ),
             ]
@@ -692,8 +1435,8 @@ class GameEngine {
       return _recoverLegacyMarketState(state);
     }
     final companyName = (json['companyName'] as String? ?? '').trim();
-    // Legacy saves keep their recorded balance and must not receive the new
-    // grandfather gift retroactively.
+    // Migrated saves keep their recorded balance and do not receive the
+    // academy state-account principal a second time.
     final fresh = createNewGame(companyName, initialCash: 0);
     final currentDate = DateTime.tryParse(
       (json['currentDate'] as String? ?? '').trim(),
@@ -710,7 +1453,7 @@ class GameEngine {
         organization: OrganizationState.fromJson(
           const {},
           legacyTeamCount: (json['team'] as num?)?.toInt() ?? 1,
-          familyRule: fresh.story.familyRule,
+          operatingPrinciple: fresh.story.operatingPrinciple,
         ),
       ),
     );
@@ -834,12 +1577,11 @@ class GameEngine {
       ...state.story.storyFlags,
       'reputation': (state.story.reputation + progress.mission.reputationReward)
           .clamp(0, 100),
+      'cohortTrust':
+          state.story.flagInt('cohortTrust', 30) + progress.mission.trustReward,
     };
     var rewarded = state.copyWith(
-      story: state.story.copyWith(
-        familyTrust: state.story.familyTrust + progress.mission.trustReward,
-        storyFlags: flags,
-      ),
+      story: state.story.copyWith(storyFlags: flags),
     );
     final nextIndex = state.progression.currentMissionIndex + 1;
     final nextMission = nextIndex < missionCatalog.length
@@ -880,7 +1622,7 @@ class GameEngine {
       if (progress.mission.reputationReward > 0)
         '평판 +${progress.mission.reputationReward}',
       if (progress.mission.trustReward > 0)
-        '가족 신뢰 +${progress.mission.trustReward}',
+        '공동체 신뢰 +${progress.mission.trustReward}',
       if (unlockedSkill != null) 'LV.$afterLevel ${unlockedSkill.name} 해금',
     ];
     return MissionClaimResult(
@@ -1033,7 +1775,7 @@ class GameEngine {
           (sum, entry) => sum + (entry.realizedPnl > 0 ? entry.realizedPnl : 0),
         ),
       ),
-      'family_help' => state.organization.researchHelpCount,
+      'academy_help' => state.organization.researchHelpCount,
       'cash' => state.cash,
       'reputation' => state.story.reputation,
       'positive_months' => counter,
@@ -1373,53 +2115,6 @@ class GameEngine {
       state: next,
       success: true,
       message: '$amount원을 증권계좌에 ${deposit ? '입금' : '출금'}했습니다.',
-    );
-  }
-
-  FinanceActionResult repayAcademyTuitionDebt(GameState state) {
-    FinanceActionResult reject(String message) =>
-        FinanceActionResult(state: state, success: false, message: message);
-    final debt = state.story.academyTuitionDebt;
-    if (debt <= 0) return reject('아빠에게 빌린 학원비는 이미 모두 갚았습니다.');
-    if (state.processedEventIds.contains(academyTuitionRepaymentSourceId)) {
-      return reject('학원비 상환 기록이 이미 처리되었습니다.');
-    }
-    if (state.bankCash < debt) {
-      return reject('회사 통장 잔액이 ${debt - state.bankCash}원 부족합니다.');
-    }
-
-    final flags = Map<String, dynamic>.from(state.story.storyFlags)
-      ..['academyTuitionDebt'] = 0
-      ..['academyTuitionRepaidDay'] = state.day;
-    final next = state.copyWith(
-      cash: state.cash - debt,
-      story: state.story.copyWith(
-        fatherAffinity: state.story.fatherAffinity + 3,
-        familyTrust: state.story.familyTrust + 2,
-        storyFlags: flags,
-      ),
-      ledger: [
-        ...state.ledger,
-        LedgerEntry(
-          id: academyTuitionRepaymentSourceId,
-          day: state.day,
-          amount: -debt,
-          account: 'company_bank',
-          counterAccount: 'family_debt_repayment',
-          description: '아빠 선납 주식학원비 상환',
-          sourceId: academyTuitionRepaymentSourceId,
-        ),
-      ],
-      processedEventIds: [
-        ...state.processedEventIds,
-        academyTuitionRepaymentSourceId,
-      ],
-    );
-    return FinanceActionResult(
-      state: next,
-      success: true,
-      message: '아빠에게 학원비 1,000,000원을 모두 갚았습니다.',
-      cashDelta: -debt,
     );
   }
 
@@ -2830,7 +3525,7 @@ class GameEngine {
       final authority = state.story.accountAuthorityLevel;
       final limit = gameOrderAuthorityLimit(state);
       if (authority == 0) {
-        return reject('종잣돈 10,000원을 먼저 마련해 보호자 승인을 받아야 합니다.');
+        return reject('종잣돈 10,000원을 먼저 마련해 국가계좌 승인을 받아야 합니다.');
       }
       if (rawNotional > limit) {
         return reject('현재 계좌 권한의 1회 주문 한도는 $limit원입니다.');
@@ -2980,6 +3675,9 @@ class GameEngine {
         state.story.flagInt('lastTradeTrustRewardDay', -1) != state.day;
     if (earnsDailyTrust) flags['lastTradeTrustRewardDay'] = state.day;
     flags['reputation'] = reputation.clamp(0, 100);
+    if (earnsDailyTrust) {
+      flags['cohortTrust'] = state.story.flagInt('cohortTrust', 30) + 1;
+    }
     final next = state.copyWith(
       marketMinute: order.marketMinute,
       brokerageCash: state.brokerageCash + spendableCashDelta,
@@ -2988,7 +3686,6 @@ class GameEngine {
       progression: progression,
       story: state.story.copyWith(
         accountAuthorityLevel: authority,
-        familyTrust: state.story.familyTrust + (earnsDailyTrust ? 1 : 0),
         storyFlags: flags,
       ),
       ledger: [
@@ -3065,406 +3762,6 @@ class GameEngine {
     );
   }
 
-  GameState applyCorporateActions(
-    GameState state,
-    List<MarketCorporateAction> actions,
-  ) {
-    var cash = state.cash;
-    var brokerageCash = state.brokerageCash;
-    var positions = [...state.positions];
-    var pendingOrders = [...state.pendingOrders];
-    final ledger = [...state.ledger];
-    final processed = {...state.processedEventIds};
-    var changed = false;
-    final dateKey = state.currentDate.toIso8601String().split('T').first;
-
-    final orderedActions = [...actions]
-      ..sort((left, right) {
-        final typeOrder = marketCorporateActionOrder(
-          left.type,
-        ).compareTo(marketCorporateActionOrder(right.type));
-        if (typeOrder != 0) return typeOrder;
-        return left.id.compareTo(right.id);
-      });
-    for (final action in orderedActions) {
-      final eventId = 'market-action-${action.id}';
-      if (action.date != dateKey || processed.contains(eventId)) continue;
-      final canceledOrders = pendingOrders
-          .where((order) => order.assetId == action.assetId)
-          .toList(growable: false);
-      if (canceledOrders.isNotEmpty) {
-        final canceledIds = canceledOrders.map((order) => order.id).toSet();
-        pendingOrders = pendingOrders
-            .where((order) => !canceledIds.contains(order.id))
-            .toList(growable: false);
-        for (final order in canceledOrders) {
-          ledger.add(
-            LedgerEntry(
-              id: '$eventId-cancel-${order.id}',
-              day: state.day,
-              amount: 0,
-              account: 'brokerage_order',
-              counterAccount: 'corporate_action_cancel',
-              description:
-                  '${order.name} ${_tradeUnits(order.remainingQuantity)}주 '
-                  '미체결 주문 · 기업행동으로 자동 취소',
-              sourceId: '$eventId-cancel-${order.id}',
-              assetId: order.assetId,
-              tradeSide: order.side.name,
-              marketMinute: state.marketMinute,
-              orderType: TradeOrderType.limit.name,
-            ),
-          );
-        }
-        changed = true;
-      }
-      final index = positions.indexWhere(
-        (position) => position.assetId == action.assetId,
-      );
-      final position = index < 0 ? null : positions[index];
-      if (position != null && action.type == MarketCorporateActionType.split) {
-        final nextUnits = position.units * action.unitFactor;
-        if (nextUnits.isFinite && nextUnits > 0) {
-          positions[index] = position.copyWith(units: nextUnits);
-          ledger.add(
-            LedgerEntry(
-              id: eventId,
-              day: state.day,
-              amount: 0,
-              account: 'market_security',
-              counterAccount: 'corporate_action',
-              description:
-                  '${position.name} 주식수 조정 · ${action.numerator}:${action.denominator}',
-              sourceId: eventId,
-            ),
-          );
-          changed = true;
-        }
-      } else if (position != null &&
-          action.type == MarketCorporateActionType.dividend &&
-          action.currency == 'KRW') {
-        final grossDividend = (position.units * action.amount).round();
-        if (grossDividend > 0) {
-          final withholdingTax =
-              (grossDividend * gameDividendWithholdingTaxRate).round();
-          final netDividend = grossDividend - withholdingTax;
-          cash += netDividend;
-          brokerageCash += netDividend;
-          ledger.add(
-            LedgerEntry(
-              id: eventId,
-              day: state.day,
-              amount: grossDividend,
-              account: 'brokerage_cash',
-              counterAccount: 'dividend_income',
-              description: '${position.name} 배당금(세전)',
-              sourceId: eventId,
-            ),
-          );
-          if (withholdingTax > 0) {
-            ledger.add(
-              LedgerEntry(
-                id: '$eventId-tax',
-                day: state.day,
-                amount: -withholdingTax,
-                account: 'brokerage_cash',
-                counterAccount: 'dividend_withholding_tax',
-                description: '${position.name} 배당소득세 원천징수',
-                sourceId: '$eventId-tax',
-              ),
-            );
-          }
-          changed = true;
-        }
-      } else if (position != null &&
-          action.type == MarketCorporateActionType.spinoff &&
-          action.relatedAssetId != null &&
-          action.relatedSymbol != null &&
-          action.relatedName != null &&
-          action.relatedMarket != null) {
-        final grantedUnits = position.units * action.unitFactor;
-        if (grantedUnits.isFinite && grantedUnits > 0) {
-          final detachedValue = action.unitFactor * action.amount;
-          final referencePrice = action.referencePrice;
-          final allocationWeight =
-              (referencePrice != null &&
-                          referencePrice.isFinite &&
-                          referencePrice > 0 &&
-                          detachedValue.isFinite &&
-                          detachedValue >= 0
-                      ? (detachedValue / referencePrice).clamp(0.0, 1.0)
-                      : (action.unitFactor / (1 + action.unitFactor)).clamp(
-                          0.0,
-                          1.0,
-                        ))
-                  .toDouble();
-          final grantedCost = math.min(
-            position.totalCost,
-            math.max(0, (position.totalCost * allocationWeight).round()),
-          );
-          positions[index] = position.copyWith(
-            totalCost: position.totalCost - grantedCost,
-          );
-          final relatedIndex = positions.indexWhere(
-            (item) => item.assetId == action.relatedAssetId,
-          );
-          if (relatedIndex >= 0) {
-            positions[relatedIndex] = positions[relatedIndex].copyWith(
-              units: positions[relatedIndex].units + grantedUnits,
-              totalCost: positions[relatedIndex].totalCost + grantedCost,
-            );
-          } else {
-            positions.add(
-              PortfolioPosition(
-                assetId: action.relatedAssetId!,
-                symbol: action.relatedSymbol!,
-                name: action.relatedName!,
-                market: action.relatedMarket!,
-                currency: action.currency,
-                units: grantedUnits,
-                totalCost: grantedCost,
-              ),
-            );
-          }
-          ledger.add(
-            LedgerEntry(
-              id: eventId,
-              day: state.day,
-              amount: 0,
-              account: 'market_security',
-              counterAccount: 'corporate_spinoff',
-              description:
-                  '${position.name} 분사 · ${action.relatedName} ${_tradeUnits(grantedUnits)}주 배정',
-              sourceId: eventId,
-            ),
-          );
-          changed = true;
-        }
-      } else if (position != null &&
-          action.type == MarketCorporateActionType.materialSpinoff) {
-        ledger.add(
-          LedgerEntry(
-            id: eventId,
-            day: state.day,
-            amount: 0,
-            account: 'market_security',
-            counterAccount: 'corporate_material_spinoff',
-            description: '${position.name} 물적분할 · 신설법인 지분은 모회사가 보유',
-            sourceId: eventId,
-          ),
-        );
-        changed = true;
-      } else if (position != null &&
-          action.type == MarketCorporateActionType.rightsIssue) {
-        final dilutionPct = action.ownershipDilutionRate * 100;
-        final isShareholderAllocation =
-            action.allocationMethod ==
-            MarketRightsIssueAllocationMethod.shareholder;
-        final prefersSubscription =
-            state.story.storyFlags[marketRightsIssuePreferenceFlag] ==
-            marketRightsIssueSubscribePreference;
-        final subscriptionUnits = position.units * action.rightsIssueRate;
-        final subscriptionCost = (subscriptionUnits * action.amount).round();
-        final availableForSubscription = state
-            .copyWith(
-              brokerageCash: brokerageCash,
-              pendingOrders: pendingOrders,
-            )
-            .availableBrokerageCash;
-        final hasExecutableSubscription =
-            isShareholderAllocation &&
-            prefersSubscription &&
-            action.currency == position.currency &&
-            subscriptionUnits.isFinite &&
-            subscriptionUnits > 0 &&
-            subscriptionCost > 0;
-
-        if (hasExecutableSubscription &&
-            subscriptionCost <= availableForSubscription) {
-          cash -= subscriptionCost;
-          brokerageCash -= subscriptionCost;
-          positions[index] = position.copyWith(
-            units: position.units + subscriptionUnits,
-            totalCost: position.totalCost + subscriptionCost,
-          );
-          ledger.add(
-            LedgerEntry(
-              id: eventId,
-              day: state.day,
-              amount: -subscriptionCost,
-              account: 'brokerage_cash',
-              counterAccount: 'corporate_rights_subscription',
-              description:
-                  '${position.name} 주주배정 유상증자 청약 · '
-                  '${_tradeUnits(subscriptionUnits)}주 배정 · '
-                  '청약대금 $subscriptionCost원',
-              sourceId: eventId,
-              notional: subscriptionCost,
-              assetId: action.assetId,
-            ),
-          );
-          changed = true;
-        } else {
-          final theoreticalExRightsPrice = action.theoreticalExRightsPrice;
-          final rightsValuePerShare =
-              isShareholderAllocation &&
-                  action.referencePrice != null &&
-                  theoreticalExRightsPrice != null
-              ? math.max(0, action.referencePrice! - theoreticalExRightsPrice)
-              : 0.0;
-          final rightsSaleProceeds = (position.units * rightsValuePerShare)
-              .round();
-          if (rightsSaleProceeds > 0) {
-            cash += rightsSaleProceeds;
-            brokerageCash += rightsSaleProceeds;
-          }
-          final subscriptionFallback =
-              hasExecutableSubscription &&
-              subscriptionCost > availableForSubscription;
-          ledger.add(
-            LedgerEntry(
-              id: eventId,
-              day: state.day,
-              amount: rightsSaleProceeds,
-              account: rightsSaleProceeds > 0
-                  ? 'brokerage_cash'
-                  : 'market_security',
-              counterAccount: isShareholderAllocation
-                  ? 'corporate_rights_sale'
-                  : 'corporate_rights_issue',
-              description: isShareholderAllocation
-                  ? '${position.name} 주주배정 유상증자 · '
-                        '${subscriptionFallback ? '청약대금 부족으로 ' : ''}'
-                        '신주인수권 자동매각 $rightsSaleProceeds원 · '
-                        '보유주식수 유지 · '
-                        '지분율 -${dilutionPct.toStringAsFixed(2)}%'
-                  : '${position.name} 제3자배정 유상증자 · 신주인수권 없음 · '
-                        '보유주식수 유지 · 지분율 '
-                        '-${dilutionPct.toStringAsFixed(2)}%',
-              sourceId: eventId,
-              notional: rightsSaleProceeds,
-              assetId: action.assetId,
-            ),
-          );
-          changed = true;
-        }
-      } else if (position != null &&
-          (action.type == MarketCorporateActionType.merger ||
-              action.type == MarketCorporateActionType.shareExchange) &&
-          action.relatedAssetId != null &&
-          action.relatedSymbol != null &&
-          action.relatedName != null &&
-          action.relatedMarket != null) {
-        final receivedUnits = position.units * action.unitFactor;
-        if (receivedUnits.isFinite && receivedUnits > 0) {
-          positions.removeAt(index);
-          final destinationIndex = positions.indexWhere(
-            (item) => item.assetId == action.relatedAssetId,
-          );
-          if (destinationIndex >= 0) {
-            final destination = positions[destinationIndex];
-            positions[destinationIndex] = destination.copyWith(
-              units: destination.units + receivedUnits,
-              totalCost: destination.totalCost + position.totalCost,
-            );
-          } else {
-            positions.add(
-              PortfolioPosition(
-                assetId: action.relatedAssetId!,
-                symbol: action.relatedSymbol!,
-                name: action.relatedName!,
-                market: action.relatedMarket!,
-                currency: action.currency,
-                units: receivedUnits,
-                totalCost: position.totalCost,
-              ),
-            );
-          }
-          final actionLabel = action.type == MarketCorporateActionType.merger
-              ? '합병'
-              : '포괄적 주식교환';
-          ledger.add(
-            LedgerEntry(
-              id: eventId,
-              day: state.day,
-              amount: 0,
-              account: 'market_security',
-              counterAccount: action.type == MarketCorporateActionType.merger
-                  ? 'corporate_merger'
-                  : 'corporate_share_exchange',
-              description:
-                  '${position.name} $actionLabel · '
-                  '${action.relatedName} ${_tradeUnits(receivedUnits)}주 수령 · '
-                  '원가 ${position.totalCost}원 승계',
-              sourceId: eventId,
-              assetId: action.relatedAssetId!,
-            ),
-          );
-          changed = true;
-        }
-      } else if (position != null &&
-          action.type == MarketCorporateActionType.tenderOffer &&
-          action.amount > 0) {
-        final payout = (position.units * action.amount).round();
-        cash += payout;
-        brokerageCash += payout;
-        positions.removeAt(index);
-        ledger.add(
-          LedgerEntry(
-            id: eventId,
-            day: state.day,
-            amount: payout,
-            account: 'brokerage_cash',
-            counterAccount: 'corporate_tender_offer',
-            description:
-                '${position.name} 공개매수 참여 · '
-                '${_tradeUnits(position.units)}주 ${action.amount.round()}원 정산',
-            sourceId: eventId,
-            notional: payout,
-            assetId: action.assetId,
-            disposedCost: position.totalCost,
-            realizedPnl: payout - position.totalCost,
-          ),
-        );
-        changed = true;
-      } else if (position != null &&
-          action.type == MarketCorporateActionType.delisting) {
-        final payout = (position.units * action.amount).round();
-        cash += payout;
-        brokerageCash += payout;
-        positions.removeAt(index);
-        ledger.add(
-          LedgerEntry(
-            id: eventId,
-            day: state.day,
-            amount: payout,
-            account: 'brokerage_cash',
-            counterAccount: 'delisting_settlement',
-            description: '${position.name} 상장폐지 정리매매·잔여가치 정산',
-            sourceId: eventId,
-            notional: payout,
-            disposedCost: position.totalCost,
-            realizedPnl: payout - position.totalCost,
-          ),
-        );
-        changed = true;
-      }
-      processed.add(eventId);
-    }
-
-    if (!changed && processed.length == state.processedEventIds.length) {
-      return state;
-    }
-    return state.copyWith(
-      cash: cash,
-      brokerageCash: brokerageCash,
-      positions: positions,
-      pendingOrders: pendingOrders,
-      ledger: ledger,
-      processedEventIds: processed.toList(growable: false),
-    );
-  }
-
   GameState completeWorkSession(GameState state, WorkSessionResult result) {
     final flags = Map<String, dynamic>.from(state.story.storyFlags);
     final recordedDay = (flags['workDay'] as num?)?.toInt();
@@ -3500,11 +3797,11 @@ class GameEngine {
     if (reward <= 0) return state;
 
     final activityLabel = switch (result.activityId) {
-      'rider' => '동네 축제 킥보드 코스',
-      'dishes' => '저녁 설거지',
-      'stationery' => '문방구 재고 정리',
-      'flea_market' => '가족 벼룩장터',
-      _ => '일거리',
+      'rider' => '데시멀 센터 킥보드 실기 코스',
+      'dishes' => '식당 당번 실습',
+      'stationery' => '교육자료 창고 정리',
+      'flea_market' => '데시멀 교환장터',
+      _ => '원내 실습',
     };
     final sessionNumber = (flags['workSessions'] as num?)?.toInt() ?? 0;
     final sourceId =
@@ -3526,6 +3823,7 @@ class GameEngine {
       flags['firstSeedGoalReached'] = true;
       if (firstCompletion) {
         flags['reputation'] = (state.story.reputation + 3).clamp(0, 100);
+        flags['cohortTrust'] = state.story.flagInt('cohortTrust', 30) + 2;
       }
     }
 
@@ -3537,7 +3835,6 @@ class GameEngine {
             reachedSeedGoal && state.story.accountAuthorityLevel < 1
             ? 1
             : state.story.accountAuthorityLevel,
-        familyTrust: state.story.familyTrust + (firstCompletion ? 2 : 0),
         storyFlags: flags,
       ),
       ledger: [
@@ -3573,8 +3870,8 @@ class GameEngine {
     ),
   );
 
-  GameState requestFamilyHelp(GameState state, String helperId) {
-    final organization = state.organization.requestFamilyHelp(
+  GameState requestAcademyHelp(GameState state, String helperId) {
+    final organization = state.organization.requestAcademyHelp(
       helperId,
       state.day,
     );
@@ -3583,40 +3880,25 @@ class GameEngine {
       ...state.story.storyFlags,
       'activeResearchHelper': helperId,
       'activeResearchHelperDay': state.day,
-      'researchBonusPct': helperId == 'mother'
-          ? 10
-          : helperId == 'father'
-          ? 8
-          : helperId == 'sister'
+      'researchBonusPct': helperId == 'hakjun'
+          ? 15
+          : helperId == 'sua'
           ? 12
-          : 15,
+          : 10,
       'reputation': (state.story.reputation + 1).clamp(0, 100),
+      'cohortTrust': state.story.flagInt('cohortTrust', 30) + 1,
     };
-    final story = switch (helperId) {
-      'mother' => state.story.copyWith(
-        motherAffinity: state.story.motherAffinity + 2,
-        familyTrust: state.story.familyTrust + 1,
-        storyFlags: flags,
-      ),
-      'father' => state.story.copyWith(
-        fatherAffinity: state.story.fatherAffinity + 2,
-        familyTrust: state.story.familyTrust + 1,
-        storyFlags: flags,
-      ),
-      'sister' => state.story.copyWith(
-        siblingAffinity: state.story.siblingAffinity + 2,
-        storyFlags: flags,
-      ),
-      _ => state.story.copyWith(
-        grandfatherAffinity: state.story.grandfatherAffinity + 2,
-        familyTrust: state.story.familyTrust + 1,
-        storyFlags: flags,
-      ),
-    };
+    if (helperId == 'hakjun') {
+      flags['hakjunAffinity'] = state.story.flagInt('hakjunAffinity', 30) + 2;
+    } else if (helperId == 'sua') {
+      flags['suaAffinity'] = state.story.flagInt('suaAffinity', 30) + 2;
+    } else {
+      flags['teacherTrust'] = state.story.flagInt('teacherTrust', 30) + 2;
+    }
     return state.copyWith(
       organization: organization,
-      story: story,
-      progression: state.progression.record('family_help'),
+      story: state.story.copyWith(storyFlags: flags),
+      progression: state.progression.record('academy_help'),
     );
   }
 
@@ -3692,14 +3974,14 @@ class GameEngine {
       return FinanceActionResult(
         state: state,
         success: false,
-        message: '존재하지 않는 살림 항목입니다.',
+        message: '존재하지 않는 시설 항목입니다.',
       );
     }
     if (state.homeImprovements.has(improvement.id)) {
       return FinanceActionResult(
         state: state,
         success: false,
-        message: '이미 마련한 살림입니다.',
+        message: '이미 개선한 시설입니다.',
       );
     }
     final prerequisiteId = improvement.prerequisiteId;
@@ -3708,7 +3990,7 @@ class GameEngine {
       return FinanceActionResult(
         state: state,
         success: false,
-        message: '${prerequisite?.title ?? '앞 단계 살림'}부터 먼저 마련해야 합니다.',
+        message: '${prerequisite?.title ?? '앞 단계 시설'}부터 먼저 마련해야 합니다.',
       );
     }
     if (state.bankCash < improvement.cost) {
@@ -3727,33 +4009,23 @@ class GameEngine {
         state.story.seenStoryEventIds.contains(improvement.storyEventId)
         ? state.story.seenStoryEventIds
         : <String>[...state.story.seenStoryEventIds, improvement.storyEventId];
-    var motherAffinity = state.story.motherAffinity;
-    var fatherAffinity = state.story.fatherAffinity;
-    var siblingAffinity = state.story.siblingAffinity;
-    var grandfatherAffinity = state.story.grandfatherAffinity;
-    switch (improvement.familyMember) {
-      case HomeFamilyMember.mother:
-        motherAffinity += improvement.affinityDelta;
-      case HomeFamilyMember.father:
-        fatherAffinity += improvement.affinityDelta;
-      case HomeFamilyMember.sibling:
-        siblingAffinity += improvement.affinityDelta;
-      case HomeFamilyMember.grandfather:
-        grandfatherAffinity += improvement.affinityDelta;
-      case HomeFamilyMember.family:
-        motherAffinity += improvement.affinityDelta;
-        fatherAffinity += improvement.affinityDelta;
-        siblingAffinity += improvement.affinityDelta;
-        grandfatherAffinity += improvement.affinityDelta;
-    }
+    final flags = Map<String, dynamic>.from(state.story.storyFlags)
+      ..['cohortTrust'] =
+          state.story.flagInt('cohortTrust', 30) +
+          improvement.communityTrustDelta;
+    final affinityKey = switch (improvement.communityMember) {
+      HomeCommunityMember.hakjun => 'hakjunAffinity',
+      HomeCommunityMember.sua => 'suaAffinity',
+      HomeCommunityMember.seoa => 'seoaAffinity',
+      HomeCommunityMember.jian => 'jianAffinity',
+      HomeCommunityMember.cohort => 'cohortTrust',
+    };
+    flags[affinityKey] =
+        state.story.flagInt(affinityKey, 30) + improvement.affinityDelta;
     final nextStory = state.story.copyWith(
-      familyTrust: state.story.familyTrust + improvement.familyTrustDelta,
-      motherAffinity: motherAffinity,
-      fatherAffinity: fatherAffinity,
-      siblingAffinity: siblingAffinity,
-      grandfatherAffinity: grandfatherAffinity,
       householdStability:
-          state.story.householdStability + improvement.householdStabilityDelta,
+          state.story.householdStability + improvement.facilityStabilityDelta,
+      storyFlags: flags,
       seenStoryEventIds: storyEventIds,
     );
     final sourceId = 'home-improvement-${improvement.id}';
@@ -3771,7 +4043,7 @@ class GameEngine {
           day: state.day,
           amount: -improvement.cost,
           account: 'company_bank',
-          counterAccount: 'family_household',
+          counterAccount: 'academy_facility',
           description: improvement.title,
           sourceId: sourceId,
         ),
@@ -4042,17 +4314,10 @@ class GameEngine {
         0,
         100,
       ),
+      'cohortTrust':
+          state.story.flagInt('cohortTrust', 30) + option.communityTrustDelta,
     };
-    final nextStory = state.story.copyWith(
-      familyTrust: state.story.familyTrust + option.familyTrustDelta,
-      motherAffinity:
-          state.story.motherAffinity + (option.familyTrustDelta > 0 ? 1 : 0),
-      fatherAffinity:
-          state.story.fatherAffinity + (option.familyTrustDelta > 0 ? 1 : 0),
-      siblingAffinity:
-          state.story.siblingAffinity + (option.familyTrustDelta > 0 ? 1 : 0),
-      storyFlags: flags,
-    );
+    final nextStory = state.story.copyWith(storyFlags: flags);
     final sourceId = 'spending-$effectiveOptionId-${state.day}-$period';
     final next = state.copyWith(
       cash: state.cash - purchaseCost,
@@ -4548,11 +4813,11 @@ class GameEngine {
       );
     }
     if (asset.optionId == 'owner_office' ||
-        asset.optionId == 'family_home_trust') {
+        asset.optionId == 'alumni_housing_trust') {
       return FinanceActionResult(
         state: state,
         success: false,
-        message: '직접 사용하는 사무실·가족 주택은 임대할 수 없습니다.',
+        message: '직접 사용하는 사무실·수료생 공동주거는 임대할 수 없습니다.',
       );
     }
     final assetType =
@@ -5429,11 +5694,11 @@ class GameEngine {
         final focus = optionId.replaceFirst('research_', '');
         next = next.copyWith(
           story: next.story.copyWith(
-            familyTrust: next.story.familyTrust + 1,
             storyFlags: {
               ...next.story.storyFlags,
               'firstResearchFocus': focus,
               'researchNoteUnlocked': true,
+              'cohortTrust': next.story.flagInt('cohortTrust', 30) + 1,
             },
             seenStoryEventIds: [
               ...next.story.seenStoryEventIds,
@@ -5503,10 +5768,10 @@ class GameEngine {
           technologyDelta: 0,
           riskDelta: -2,
         );
-      case 'appoint_father_advisor':
+      case 'appoint_academy_advisor':
         next = _assignControlLeadership(
           next,
-          CompanyLeadershipModel.fatherAdvisor,
+          CompanyLeadershipModel.academyAdvisor,
           moraleDelta: 4,
           technologyDelta: 4,
           riskDelta: -3,
@@ -5766,10 +6031,10 @@ class GameEngine {
       case 'era_observe':
         next = next.copyWith(
           story: next.story.copyWith(
-            familyTrust: next.story.familyTrust + 1,
             storyFlags: {
               ...next.story.storyFlags,
               'lastObservedEraTechnology': decision.title,
+              'cohortTrust': next.story.flagInt('cohortTrust', 30) + 1,
             },
           ),
         );
@@ -5791,7 +6056,7 @@ class GameEngine {
           reputation: 4,
           trust: 0,
         );
-      case 'milestone_family':
+      case 'milestone_cohort':
         next = _applyMilestoneResolution(
           next,
           decision,
@@ -5803,10 +6068,10 @@ class GameEngine {
       case 'acknowledge':
         break;
     }
-    if (state.progression.hasSkill('family_briefing')) {
-      next = next.copyWith(
-        story: next.story.copyWith(familyTrust: next.story.familyTrust + 1),
-      );
+    if (state.progression.hasSkill('cohort_briefing')) {
+      final flags = Map<String, dynamic>.from(next.story.storyFlags)
+        ..['cohortTrust'] = next.story.flagInt('cohortTrust', 30) + 1;
+      next = next.copyWith(story: next.story.copyWith(storyFlags: flags));
     }
     return next;
   }
@@ -5896,8 +6161,11 @@ class GameEngine {
   }) {
     final flags = Map<String, dynamic>.from(state.story.storyFlags)
       ..['controlledCompanyLeadership'] = model.name;
-    if (model == CompanyLeadershipModel.fatherAdvisor) {
-      flags['fatherOperationsAdvisor'] = true;
+    if (model == CompanyLeadershipModel.academyAdvisor) {
+      flags
+        ..['academyOperationsAdvisor'] = true
+        ..['cohortTrust'] = state.story.flagInt('cohortTrust', 30) + 2
+        ..['teacherTrust'] = state.story.flagInt('teacherTrust', 30) + 3;
     }
     return state.copyWith(
       company: state.company.copyWith(
@@ -5906,15 +6174,7 @@ class GameEngine {
         technology: state.company.technology + technologyDelta,
         risk: state.company.risk + riskDelta,
       ),
-      story: state.story.copyWith(
-        familyTrust:
-            state.story.familyTrust +
-            (model == CompanyLeadershipModel.fatherAdvisor ? 2 : 0),
-        fatherAffinity:
-            state.story.fatherAffinity +
-            (model == CompanyLeadershipModel.fatherAdvisor ? 3 : 0),
-        storyFlags: flags,
-      ),
+      story: state.story.copyWith(storyFlags: flags),
       decisions: [...state.decisions, _factoryStrategyDecision(state.day)],
     );
   }
@@ -5992,17 +6252,9 @@ class GameEngine {
     }
     flags['officeTier'] = officeTier;
     flags['isLegalCompany'] = legal;
+    flags['cohortTrust'] = state.story.flagInt('cohortTrust', 30) + trust;
     return state.copyWith(
-      story: state.story.copyWith(
-        familyTrust: state.story.familyTrust + trust,
-        motherAffinity: state.story.motherAffinity + (trust > 0 ? 1 : 0),
-        fatherAffinity: state.story.fatherAffinity + (trust > 0 ? 1 : 0),
-        siblingAffinity: state.story.siblingAffinity + (trust > 0 ? 1 : 0),
-        grandfatherAffinity:
-            state.story.grandfatherAffinity + (trust > 0 ? 1 : 0),
-        roomLevel: roomLevel,
-        storyFlags: flags,
-      ),
+      story: state.story.copyWith(roomLevel: roomLevel, storyFlags: flags),
       company: state.company.copyWith(
         risk: state.company.risk + risk,
         technology: state.company.technology + (risk > 0 ? 2 : 0),
@@ -6056,7 +6308,8 @@ class GameEngine {
           )
         : state;
     final settled = replayed.copyWith(marketMinute: krxCloseMinute);
-    var next = settled.copyWith(
+    final accrued = const LocalBusinessEngine().accrueCurrentDay(settled).state;
+    var next = accrued.copyWith(
       day: state.day + 1,
       marketMinute: marketDayStartMinute,
       progression: state.progression.record('days_advanced'),
@@ -7138,7 +7391,7 @@ class GameEngine {
             advisorOpinions: const [
               '기술자: 작은 시제품으로 먼저 검증하면 실패 비용을 줄일 수 있습니다.',
               '회계사: 협력비는 반드시 은행 잔고 안에서 집행해야 합니다.',
-              '가족: 유행 이름보다 고객과 현금흐름을 함께 확인하자.',
+              '데시멀 전략회의: 유행 이름보다 고객과 현금흐름을 함께 확인하자.',
             ],
             options: [
               DecisionOptionData(
@@ -7175,13 +7428,13 @@ class GameEngine {
             id: 'dotcom-reckoning',
             date: DateTime(2001, 3, 12),
             title: '닷컴 열풍 뒤의 첫 원칙 시험',
-            body: '유행보다 현금흐름을 볼지, 기술의 장기 가능성을 더 조사할지 가족 앞에서 설명해야 합니다.',
+            body: '유행보다 현금흐름을 볼지, 기술의 장기 가능성을 더 조사할지 데시멀 전략회의에서 설명해야 합니다.',
           ),
           (
             id: 'september-eleven',
             date: DateTime(2001, 9, 12),
             title: '불확실성 속에서 지킬 것',
-            body: '시장이 흔들리는 날, 계좌보다 가족과 원칙을 먼저 확인합니다.',
+            body: '시장이 흔들리는 날, 계좌보다 공동체와 기록 원칙을 먼저 확인합니다.',
           ),
           (
             id: 'first-hiring-year',
@@ -7192,7 +7445,7 @@ class GameEngine {
           (
             id: 'office-year',
             date: DateTime(2004, 1, 2),
-            title: '아파트 밖 첫 사무실',
+            title: '데시멀 센터 밖 첫 사무실',
             body: '작은 사무실을 얻으면 신뢰가 오르지만 매달 임대료가 생깁니다.',
           ),
           (
@@ -7233,7 +7486,7 @@ class GameEngine {
             id: eventId,
             category: 'milestone',
             title: milestone.title,
-            proposer: '가족 투자회의',
+            proposer: '데시멀 전략회의',
             body: milestone.body,
             createdDay: next.day,
             dueDay: next.day + 7,
@@ -7242,17 +7495,17 @@ class GameEngine {
                 : milestone.id == 'incorporation-year'
                 ? 150000
                 : 0,
-            benefit: '평판·가족 신뢰·조직 성장',
+            benefit: '평판·공동체 신뢰·조직 성장',
             risk: '선택에 따라 위험과 성장 속도가 달라집니다.',
             advisorOpinions: const [
-              '엄마: 장부에 설명할 수 있는 선택이어야 해.',
-              '외할아버지: 오래 버틸 수 있는 원칙부터 보자.',
+              '한서윤: 장부에 설명할 수 있는 선택이어야 합니다.',
+              '김학준: 오래 버틸 수 있는 원칙부터 보자.',
             ],
             options: milestone.id == 'office-year'
                 ? const [
                     DecisionOptionData(
                       id: 'milestone_prudent',
-                      label: '작은방 사무실 유지',
+                      label: '원내 투자실 유지',
                       description: '월 임대료 없이 현금과 원칙을 지킵니다.',
                     ),
                     DecisionOptionData(
@@ -7261,9 +7514,9 @@ class GameEngine {
                       description: '신뢰를 얻는 대신 다음 달부터 월 5만원 임대료가 생깁니다.',
                     ),
                     DecisionOptionData(
-                      id: 'milestone_family',
-                      label: '가족 공간부터 정비',
-                      description: '재택 공간을 개선하고 가족 신뢰를 우선합니다.',
+                      id: 'milestone_cohort',
+                      label: '공동시설부터 정비',
+                      description: '데시멀 생활환경을 개선하고 공동체 신뢰를 우선합니다.',
                     ),
                   ]
                 : milestone.id == 'incorporation-year'
@@ -7279,16 +7532,16 @@ class GameEngine {
                       description: '조직 신뢰를 높이지만 다음 달부터 월 15만원 임대료가 생깁니다.',
                     ),
                     DecisionOptionData(
-                      id: 'milestone_family',
-                      label: '가족 회계 약속 후 전환',
-                      description: '현재 공간을 유지하며 가족과 법인 원칙을 정합니다.',
+                      id: 'milestone_cohort',
+                      label: '공동 회계 약속 후 전환',
+                      description: '현재 공간을 유지하며 공동체와 법인 원칙을 정합니다.',
                     ),
                   ]
                 : const [
                     DecisionOptionData(
                       id: 'milestone_prudent',
                       label: '현금과 원칙 우선',
-                      description: '위험을 낮추고 가족 신뢰를 높입니다.',
+                      description: '위험을 낮추고 공동체 신뢰를 높입니다.',
                     ),
                     DecisionOptionData(
                       id: 'milestone_bold',
@@ -7296,8 +7549,8 @@ class GameEngine {
                       description: '평판과 기술을 얻는 대신 위험이 조금 오릅니다.',
                     ),
                     DecisionOptionData(
-                      id: 'milestone_family',
-                      label: '가족과 함께 결정',
+                      id: 'milestone_cohort',
+                      label: '동기들과 함께 결정',
                       description: '관계와 장기 신뢰를 우선합니다.',
                     ),
                   ],
@@ -7622,356 +7875,6 @@ class GameEngine {
       ],
     );
   }
-
-  static DecisionCardData _firstResearchNote(int day) => DecisionCardData(
-    id: 'first-research-note',
-    category: '처음 배우기',
-    title: '첫 미션: 회사 하나를 구경해 보자',
-    proposer: '외할아버지',
-    body:
-        '아직 돈을 쓰지 않아도 괜찮아. 눈에 익은 회사 하나를 고르고, 무엇을 파는지부터 같이 살펴보자. 아래 네 가지 중 가장 쉬워 보이는 방법을 하나 고르면 돼.',
-    createdDay: day,
-    dueDay: day + 30,
-    requestedFunds: 0,
-    benefit: '회사 보는 첫 방법을 배우고 +25 XP 받기',
-    risk: '한 가지만 보고 바로 사면 실수할 수 있음',
-    advisorOpinions: const [
-      '엄마: 이 회사가 무엇을 팔아 돈을 버는지부터 적어 보자.',
-      '아빠: 우리가 써 본 제품부터 보면 이해하기 쉬워.',
-      '누나: 주변 사람들이 정말 쓰는지도 찾아보자.',
-    ],
-    options: const [
-      DecisionOptionData(
-        id: 'research_products',
-        label: '써 본 제품부터 보기',
-        description: '집에서 써 본 물건을 떠올려 회사와 연결해 봅니다.',
-      ),
-      DecisionOptionData(
-        id: 'research_cashflow',
-        label: '회사가 돈 버는 법 보기',
-        description: '누가 이 회사에 왜 돈을 내는지 한 줄로 적습니다.',
-      ),
-      DecisionOptionData(
-        id: 'research_people',
-        label: '회사를 운영하는 사람 보기',
-        description: '대표와 직원이 어떤 목표로 일하는지 살펴봅니다.',
-      ),
-      DecisionOptionData(
-        id: 'research_price',
-        label: '가격부터 본다',
-        description: '주가가 싼지 비싼지 다른 회사와 천천히 비교합니다.',
-      ),
-    ],
-  );
-
-  static DecisionCardData _controlOffer(
-    int day, {
-    required bool followUp,
-  }) => DecisionCardData(
-    id: followUp ? 'control-offer-followup-$day' : 'control-offer-$day',
-    category: '경영권 기회',
-    title: followUp ? '한빛전자부품 지분 협상, 마지막 선택' : '아빠가 다녔던 회사를 우리가 다시 세울까?',
-    proposer: '한빛전자부품 매각자문 윤 실장',
-    body: followUp
-        ? '사흘 사이 다른 인수자가 우호지분을 모았습니다. 경영권 가격은 올랐고, 이사회에 들어갈 마지막 조건도 오늘 결정해야 합니다.'
-        : '구조조정 뒤 주인이 여러 번 바뀐 한빛전자부품이 투자자를 찾습니다. 작은 지분으로 이사회를 지켜볼 수도, 주요주주가 될 수도, 과반 의결권을 인수할 수도 있습니다.',
-    createdDay: day,
-    dueDay: day + (followUp ? 1 : 3),
-    requestedFunds: followUp ? 240000 : 120000,
-    benefit: '지분 단계에 맞는 배당·이사회 정보·경영권',
-    risk: '회사 통장 감소 · 공장 정상화 비용 · 직원과 거래처 책임',
-    advisorOpinions: const [
-      '아빠: 싸게 사는 것보다 공장과 거래처가 왜 흔들렸는지 먼저 봐야 한다.',
-      '엄마: 지분을 사는 돈은 사라지는 비용이 아니라 투자 장부가치로 남겨야 해.',
-      '누나: 주인이 된다고 제품이 저절로 팔리는 건 아니잖아.',
-    ],
-    options: followUp
-        ? const [
-            DecisionOptionData(
-              id: 'acquire_board_stake',
-              label: '24만원 · 주요주주 34%',
-              description: '이사회 2석을 확보하고 경영을 감시하지만 단독 결정권은 없습니다.',
-              cashCost: 240000,
-            ),
-            DecisionOptionData(
-              id: 'acquire_control_followup',
-              label: '35만원 · 경영권 55%',
-              description: '의결권 과반과 이사회 4석을 확보해 첫 경영 안건을 맡습니다.',
-              cashCost: 350000,
-            ),
-            DecisionOptionData(
-              id: 'pass_control',
-              label: '이번 기회 포기',
-              description: '현금을 지키고 다른 인수자의 선택을 지켜봅니다.',
-            ),
-          ]
-        : const [
-            DecisionOptionData(
-              id: 'acquire_board_observer',
-              label: '12만원 · 지분 18%',
-              description: '이사회 관찰권과 소수지분 배당을 얻고 회사부터 배웁니다.',
-              cashCost: 120000,
-            ),
-            DecisionOptionData(
-              id: 'acquire_board_stake',
-              label: '22만원 · 주요주주 34%',
-              description: '이사회 2석을 확보하지만 경영권은 아직 없습니다.',
-              cashCost: 220000,
-            ),
-            DecisionOptionData(
-              id: 'acquire_control',
-              label: '30만원 · 경영권 55%',
-              description: '의결권 과반과 이사회 4석을 확보해 직접 운영을 시작합니다.',
-              cashCost: 300000,
-            ),
-            DecisionOptionData(
-              id: 'review_control',
-              label: '3일 더 검토',
-              description: '실사 자료는 늘지만 지분 가격과 경쟁 위험이 커집니다.',
-            ),
-          ],
-  );
-
-  static DecisionCardData _controlStakeFollowUp(int day, CompanyState company) {
-    final observerStage = company.votingOwnershipPct < 33.4;
-    return DecisionCardData(
-      id: 'control-stake-followup-$day',
-      category: '주주 행동',
-      title: observerStage ? '관찰권을 이사회 자리로 넓힐까?' : '주요주주에서 경영권으로 올라설까?',
-      proposer: '한빛전자부품 매각자문 윤 실장',
-      body: observerStage
-          ? '90일 동안 공장과 장부를 지켜봤습니다. 34% 주요주주나 55% 경영권으로 지분을 늘릴 수 있습니다.'
-          : '이사회 두 자리는 확보했지만 단독으로 대표와 투자안을 결정할 수는 없습니다. 과반 인수 여부를 정해야 합니다.',
-      createdDay: day,
-      dueDay: day + 7,
-      requestedFunds: observerStage ? 120000 : 160000,
-      benefit: '기존 장부가치와 지분을 보존한 단계적 인수',
-      risk: '추가 출자 · 과반 취득 뒤 운영 책임',
-      advisorOpinions: const [
-        '아빠: 관찰한 문제를 고칠 준비가 됐는지부터 생각하자.',
-        '엄마: 이미 산 지분과 이번 추가대금을 한 장부에서 이어 적자.',
-      ],
-      options: [
-        if (observerStage)
-          const DecisionOptionData(
-            id: 'expand_board_stake',
-            label: '12만원 추가 · 34%',
-            description: '이사회 2석을 확보하고 주요 안건에 목소리를 냅니다.',
-            cashCost: 120000,
-          ),
-        DecisionOptionData(
-          id: 'complete_control',
-          label: observerStage ? '23만원 추가 · 55%' : '16만원 추가 · 55%',
-          description: '의결권 과반과 이사회 4석을 확보합니다.',
-          cashCost: observerStage ? 230000 : 160000,
-        ),
-        const DecisionOptionData(
-          id: 'hold_company_stake',
-          label: '현재 지분 유지',
-          description: '보유 지분과 이사회 권한만 유지하고 이번 증액은 넘깁니다.',
-        ),
-      ],
-    );
-  }
-
-  static DecisionCardData _controlTransitionDecision(
-    int day,
-  ) => DecisionCardData(
-    id: 'control-transition-$day',
-    category: '첫 이사회',
-    title: '한빛전자부품을 누가 이끌어야 할까?',
-    proposer: '한빛전자부품 이사회',
-    body:
-        '경영권 인수는 끝났지만 회사를 바로 바꿀 수는 없습니다. 기존 대표, 현장을 아는 아빠, 외부 전문경영인 중 첫 운영 체계를 정해야 합니다.',
-    createdDay: day,
-    dueDay: day + 7,
-    requestedFunds: 0,
-    benefit: '첫 리더십 확정과 공장 운영계획 안건 개방',
-    risk: '현장 반발 · 가족과 회사 역할 혼동 · 실행 속도',
-    advisorOpinions: const [
-      '아빠: 나는 직원으로 들어가는 게 아니라 운영 자문만 맡을 수 있다.',
-      '엄마: 가족을 쓴다면 권한과 보수를 회사 장부와 분리해 적어야 해.',
-      '기존 공장장: 숙련직원이 떠나면 새 설비도 돌릴 사람이 없습니다.',
-    ],
-    options: const [
-      DecisionOptionData(
-        id: 'retain_incumbent_ceo',
-        label: '기존 대표 유임',
-        description: '현장 충격을 줄이고 이사회가 계획을 감독합니다.',
-      ),
-      DecisionOptionData(
-        id: 'appoint_father_advisor',
-        label: '아빠를 운영자문으로',
-        description: '정식 직원 수에는 넣지 않고 현장 실사와 운영 자문만 맡깁니다.',
-      ),
-      DecisionOptionData(
-        id: 'appoint_professional_ceo',
-        label: '전문경영인 선임',
-        description: '변화 속도는 높지만 기존 직원의 불안도 커집니다.',
-      ),
-    ],
-  );
-
-  static DecisionCardData _factoryStrategyDecision(int day) => DecisionCardData(
-    id: 'factory-strategy-$day',
-    category: '공장 운영계획',
-    title: '낡은 공장에 첫 돈을 어디에 쓸까?',
-    proposer: '한빛전자부품 경영회의',
-    body:
-        '한 번에 모든 문제를 고칠 수 없습니다. 회사 통장에서 출자한 돈은 지배회사 투자 장부가치로 남고, 선택은 매출·비용·기술·사기·위험을 함께 바꿉니다.',
-    createdDay: day,
-    dueDay: day + 10,
-    requestedFunds: 180000,
-    benefit: '첫 운영전략과 월간 손익 구조 확정',
-    risk: '자동화 해고 충격 · 인건비 · 신제품 실패 · 현금 부족',
-    advisorOpinions: const [
-      '아빠: 기계만 바꾸지 말고 누가 그 기계를 돌릴지도 봐야 한다.',
-      '엄마: 매출 증가보다 매달 남는 영업이익을 같이 계산하자.',
-      '누나: 비싼 부품이면 고객이 정말 차이를 알아보는지도 확인해야 해.',
-    ],
-    options: const [
-      DecisionOptionData(
-        id: 'factory_automation',
-        label: '18만원 · 공장 자동화',
-        description: '고정비와 기술은 개선되지만 숙련직원 사기와 실행 위험이 흔들립니다.',
-        cashCost: 180000,
-      ),
-      DecisionOptionData(
-        id: 'protect_skilled_workforce',
-        label: '9만원 · 숙련직원 유지',
-        description: '급여·교육비는 늘지만 현장 지식과 사기를 지킵니다.',
-        cashCost: 90000,
-      ),
-      DecisionOptionData(
-        id: 'premium_components',
-        label: '14만원 · 고부가 부품',
-        description: '매출과 기술 기회를 늘리지만 개발비와 실패 위험도 커집니다.',
-        cashCost: 140000,
-      ),
-      DecisionOptionData(
-        id: 'stabilize_existing_lines',
-        label: '기존 라인 안정화',
-        description: '큰 출자 없이 불량과 위험부터 줄입니다.',
-      ),
-    ],
-  );
-
-  static DecisionCardData _developmentIssue(int day) => DecisionCardData(
-    id: 'development-issue-$day',
-    category: '개발 문제',
-    title: '시제품이 너무 뜨거워집니다',
-    proposer: '기술책임자 미나',
-    body: '오래 사용하면 배터리 온도가 안전 기준을 넘습니다. 출시 일정, 기능, 품질을 동시에 지킬 수는 없어요.',
-    createdDay: day,
-    dueDay: day + 2,
-    requestedFunds: 80000,
-    benefit: '품질 개선 또는 빠른 일정 유지',
-    risk: '지연 · 기능 축소 · 개발비 증가',
-    advisorOpinions: const [
-      '기술자: 부품을 바꾸면 품질은 좋아지지만 시간이 듭니다.',
-      'CEO: 핵심 기능을 줄이면 제품의 매력이 약해집니다.',
-      '회계사: 추가 지출 뒤에도 비상금은 남겨야 합니다.',
-    ],
-    options: const [
-      DecisionOptionData(
-        id: 'fix_quality',
-        label: '8만원 들여 부품 교체',
-        description: '품질과 팀 사기는 오르지만 비용이 큽니다.',
-        cashCost: 80000,
-      ),
-      DecisionOptionData(
-        id: 'cut_scope',
-        label: '2만원으로 기능 축소',
-        description: '빠르게 가지만 품질과 시장성이 낮아집니다.',
-        cashCost: 20000,
-      ),
-      DecisionOptionData(
-        id: 'delay_development',
-        label: '3만5천원 · 일정 연장',
-        description: '품질을 보강하지만 경쟁사가 움직일 시간이 생깁니다.',
-        cashCost: 35000,
-      ),
-      DecisionOptionData(
-        id: 'cancel_development',
-        label: '개발 중단',
-        description: '추가 손실을 막지만 조직 충격이 큽니다.',
-      ),
-    ],
-  );
-
-  static DecisionCardData _launchReview(int day, {required bool finalReview}) =>
-      DecisionCardData(
-        id: '${finalReview ? 'final-' : ''}launch-review-$day',
-        category: '출시 심사',
-        title: finalReview ? '완성한 기기를 이제 출시할까?' : '새 휴대기기를 지금 팔기 시작할까?',
-        proposer: '한빛통신 이사회',
-        body: finalReview
-            ? '품질 보강은 끝났지만 경쟁사의 소문이 커졌습니다. 이제 출시하거나 접어야 합니다.'
-            : '시제품은 작동하지만 수요는 넓은 범위로만 추정됩니다. 지금 출시하면 빠르지만 품질 위험이 남습니다.',
-        createdDay: day,
-        dueDay: day + 2,
-        requestedFunds: finalReview ? 0 : 40000,
-        benefit: '첫 매출과 브랜드 기회',
-        risk: '실제 성공은 보장되지 않음 · 출시 후 지원비',
-        advisorOpinions: const [
-          'CEO: 완벽하지 않아도 시장에서 배울 수 있습니다.',
-          '기술자: 조금 더 다듬으면 결함 가능성을 낮출 수 있습니다.',
-          '회계사: 연기할수록 현금과 선점 기회가 줄어듭니다.',
-        ],
-        options: finalReview
-            ? const [
-                DecisionOptionData(
-                  id: 'launch_after_delay',
-                  label: '보강한 제품 출시',
-                  description: '개선된 품질로 시장 반응을 확인합니다.',
-                ),
-                DecisionOptionData(
-                  id: 'cancel_launch',
-                  label: '출시 취소',
-                  description: '남은 위험을 피하지만 투자금과 기회를 잃습니다.',
-                ),
-              ]
-            : const [
-                DecisionOptionData(
-                  id: 'launch_now',
-                  label: '지금 출시',
-                  description: '선점 기회가 크지만 품질 위험도 남습니다.',
-                ),
-                DecisionOptionData(
-                  id: 'delay_launch',
-                  label: '4만원 · 3일 연기',
-                  description: '품질은 좋아지지만 비용과 경쟁 위험이 생깁니다.',
-                  cashCost: 40000,
-                ),
-                DecisionOptionData(
-                  id: 'cancel_launch',
-                  label: '출시 취소',
-                  description: '추가 위험은 막지만 팀과 브랜드가 흔들립니다.',
-                ),
-              ],
-      );
-
-  static DecisionCardData _endingCard(int day, String message) =>
-      DecisionCardData(
-        id: 'story-result-$day-${_stableHash(message)}',
-        category: '결과 보고',
-        title: '선택의 결과가 도착했어요',
-        proposer: '시뮬레이션 기록실',
-        body: message,
-        createdDay: day,
-        dueDay: day + 30,
-        requestedFunds: 0,
-        benefit: '이번 선택의 변화가 저장됩니다.',
-        risk: '다음 선택에도 누적 영향을 줍니다.',
-        advisorOpinions: const ['기록: 모든 회사명·수치·의견·결과는 게임용 가상 시나리오입니다.'],
-        options: const [
-          DecisionOptionData(
-            id: 'acknowledge',
-            label: '결과 확인',
-            description: '가상 세계 기록을 닫고 사무실로 돌아갑니다.',
-          ),
-        ],
-      );
 
   static int _stableHash(String input) {
     var hash = 2166136261;

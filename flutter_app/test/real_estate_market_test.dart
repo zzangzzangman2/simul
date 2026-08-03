@@ -122,10 +122,10 @@ void main() {
       final asset = realEstateMarketAssetById(
         'uijeongbu_station_officetel_20',
       )!;
-      final quote = asset.quoteAt(DateTime(2000));
       final initial = engine
           .createNewGame('부동산 테스트', initialCash: 100000000)
           .copyWith(brokerageCash: 0, decisions: const []);
+      final quote = asset.quoteAt(initial.currentDate);
 
       final result = engine.purchaseSpendingOption(
         initial,

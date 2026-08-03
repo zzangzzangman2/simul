@@ -1,37 +1,59 @@
 part of 'main.dart';
 
-const _onboardingBeatCount = 73;
-const _maximumDialogueBeatCount = 240;
-const _dialogueRuntimeStorageKey = 'future-academy-dialogue-runtime-v1';
+const _onboardingBeatCount = 292;
+const _maximumDialogueBeatCount = 320;
+const _dialogueAppearanceVersion = 17;
+const _dialogueContentVersion = 3;
+const _dialogueRuntimeStorageKey = 'project-decimal-dialogue-runtime-v2';
 const _dialogueBundleAsset = 'assets/dialogue/dialogue-editor-override.json';
-const _dialoguePanelOpacityStorageKey =
-    'future-academy-dialogue-panel-opacity-v2';
-const _dialoguePanelOpacityMin = 0.0;
-const _dialoguePanelOpacityMax = 0.74;
-const _dialoguePanelOpacityDefault = _dialoguePanelOpacityMin;
-final ValueNotifier<double> _dialoguePanelOpacity = ValueNotifier<double>(
-  _dialoguePanelOpacityDefault,
-);
-const _orientationRosterBeat = 43;
 const _orientationCompleteBeat = _onboardingBeatCount - 1;
-const _introChoiceBeat = 120;
-const _accountHallDepartureBeat = 131;
-const _stateAccountActivationBeat = 134;
-const _playerNameBeat = 137;
-const _traitChoiceBeat = 144;
-const _principleChoiceBeat = 147;
-const _companyNameBeat = 150;
-const _storyCharacterBottomInset = 104.0;
+const _storyCharacterBottomInset = -280.0;
+const _storyDialogueBottomInset = 28.0;
 const _storyCharacterHeightFactor = 0.9;
 const _storyCharacterAspectRatio = 2 / 3;
+const _storyCharacterSceneScale = 2.0;
 const _minhoCharacterAsset =
     'assets/images/historical_prologue/character_minho_farewell_v3.png';
 const _minhoCharacterScale = 0.72;
 const _maximumWheelBackSteps = 12;
 const _wheelBackDebounce = Duration(milliseconds: 180);
 
+const _hanSuaV2FilenameMigrations = <String, String>{
+  '01_neutral_quality_v2.png': '01_neutral_wavy_v3.png',
+  '02_warm_smile_quality_v2.png': '02_warm_smile_wave_v3.png',
+  '03_bright_laugh_quality_v2.png': '03_bright_laugh_v3.png',
+  '04_surprised_quality_v2.png': '05_surprised_v3.png',
+  '05_worried_quality_v2.png': '06_worried_v3.png',
+  '06_annoyed_quality_v2.png': '07_annoyed_v3.png',
+  '07_determined_quality_v2.png': '08_determined_v3.png',
+  '08_explaining_quality_v2.png': '09_explaining_v3.png',
+};
+const _hanSuaAssetDirectory = 'production_soft_painted/han_sua/';
+
+typedef PrologueCheckpointSaver =
+    Future<void> Function(
+      int beat,
+      bool academyPcPoweredOn,
+      bool academyStockAppOpen,
+      String playerName,
+      String companyName,
+    );
+
+class _PrologueSkipStep {
+  const _PrologueSkipStep({
+    required this.sectionLabel,
+    required this.destinationLabel,
+    required this.targetBeat,
+  });
+
+  final String sectionLabel;
+  final String destinationLabel;
+  final int targetBeat;
+}
+
 double _storyCharacterScaleForAsset(String asset) =>
-    asset == _minhoCharacterAsset ? _minhoCharacterScale : 1.0;
+    _storyCharacterSceneScale *
+    (asset == _minhoCharacterAsset ? _minhoCharacterScale : 1.0);
 
 void _playStoryFeedback({bool strong = false}) {
   if (strong) {
@@ -40,34 +62,6 @@ void _playStoryFeedback({bool strong = false}) {
     unawaited(HapticFeedback.selectionClick());
   }
   unawaited(SystemSound.play(SystemSoundType.click));
-}
-
-double _clampDialoguePanelOpacity(double value) =>
-    value.clamp(_dialoguePanelOpacityMin, _dialoguePanelOpacityMax).toDouble();
-
-double _dialogueBackdropBlurSigma(double panelOpacity) {
-  final progress =
-      ((panelOpacity - _dialoguePanelOpacityMin) /
-              (_dialoguePanelOpacityMax - _dialoguePanelOpacityMin))
-          .clamp(0.0, 1.0)
-          .toDouble();
-  return 7 * progress * progress;
-}
-
-void _setDialoguePanelOpacity(double value) {
-  _dialoguePanelOpacity.value = _clampDialoguePanelOpacity(value);
-}
-
-Future<void> _saveDialoguePanelOpacity() async {
-  try {
-    final preferences = await SharedPreferences.getInstance();
-    await preferences.setDouble(
-      _dialoguePanelOpacityStorageKey,
-      _dialoguePanelOpacity.value,
-    );
-  } catch (_) {
-    // The control must remain usable even when browser storage is unavailable.
-  }
 }
 
 typedef NewGameCreator =
@@ -86,6 +80,9 @@ class _DialogueOverride {
     required this.location,
     this.background,
     this.character,
+    this.characterX = 0,
+    this.characterY = 0,
+    this.characterScale = 1,
   });
 
   final String id;
@@ -96,18 +93,71 @@ class _DialogueOverride {
   final String location;
   final String? background;
   final String? character;
+  final double characterX;
+  final double characterY;
+  final double characterScale;
 }
+
+String _canonicalDialogueAsset(Object? value) {
+  final asset = value is String ? value : '';
+  const webAssetPrefix = '/play/assets/';
+  return asset.startsWith(webAssetPrefix)
+      ? asset.substring(webAssetPrefix.length)
+      : asset;
+}
+
+String _migrateHanSuaCharacterAsset(String asset) {
+  final directoryIndex = asset.lastIndexOf(_hanSuaAssetDirectory);
+  if (directoryIndex < 0) return asset;
+  final filenameIndex = directoryIndex + _hanSuaAssetDirectory.length;
+  final migrated = _hanSuaV2FilenameMigrations[asset.substring(filenameIndex)];
+  return migrated == null
+      ? asset
+      : '${asset.substring(0, filenameIndex)}$migrated';
+}
+
+Map<int, _DialogueOverride> _canonicalDialogueOverrides() =>
+    <int, _DialogueOverride>{
+      for (final scene in canonicalDialogueScenes)
+        (scene['order']! as int) - 1: _DialogueOverride(
+          id: scene['id']! as String,
+          speaker: scene['speaker']! as String,
+          line: scene['line']! as String,
+          direction: scene['direction']! as String,
+          date: scene['date']! as String,
+          location: scene['location']! as String,
+          background: _canonicalDialogueAsset(scene['background']),
+          character: _canonicalDialogueAsset(scene['character']),
+          characterX: (scene['characterX'] as num?)?.toDouble() ?? 0,
+          characterY: (scene['characterY'] as num?)?.toDouble() ?? 0,
+          characterScale: (scene['characterScale'] as num?)?.toDouble() ?? 1,
+        ),
+    };
 
 class VisualNovelOnboardingScreen extends StatefulWidget {
   const VisualNovelOnboardingScreen({
     super.key,
     required this.onCreate,
     this.onExit,
+    this.onCheckpoint,
+    this.initialBeat = 0,
+    this.initialAcademyPcPoweredOn = false,
+    this.initialAcademyStockAppOpen = false,
+    this.initialPlayerName = '',
+    this.initialCompanyName = '',
+    this.allowRuntimeDialoguePreview = false,
     this.dialogueOverrideJson,
   });
 
   final NewGameCreator onCreate;
   final VoidCallback? onExit;
+  final PrologueCheckpointSaver? onCheckpoint;
+  final int initialBeat;
+  final bool initialAcademyPcPoweredOn;
+  final bool initialAcademyStockAppOpen;
+  final String initialPlayerName;
+  final String initialCompanyName;
+  final bool allowRuntimeDialoguePreview;
   final String? dialogueOverrideJson;
 
   @override
@@ -122,44 +172,43 @@ class _VisualNovelOnboardingScreenState
   final List<String> _dialogueHistory = <String>[];
   final List<int> _beatNavigationHistory = <int>[];
   Map<int, _DialogueOverride> _dialogueOverrides =
-      const <int, _DialogueOverride>{};
-  int _beat = 0;
-  int _dialogueEndBeat = _orientationCompleteBeat;
-  String? _introChoice;
-  StoryTrait? _trait;
-  FamilyRule? _familyRule;
+      _canonicalDialogueOverrides();
+  late int _beat;
+  int _dialogueEndBeat = canonicalDialogueScenes.length - 1;
   bool _isCreating = false;
+  late bool _playerNameConfirmed;
   String? _creationError;
-  bool _isTraveling = false;
-  bool _stateAccountActivated = false;
-  bool _academyPcPoweredOn = false;
-  bool _academyStockAppOpen = false;
-  Timer? _travelTimer;
+  late bool _academyPcPoweredOn;
+  late bool _academyStockAppOpen;
   DateTime? _lastWheelBackAt;
-  late final Future<void> _dialogueLoadFuture;
+  late Future<void> _dialogueLoadFuture;
   WorldLoadProgress _creationProgress = const WorldLoadProgress(
     0.02,
-    '제6기 국가계좌 정보를 정리하는 중…',
+    '데시멀 국가계좌 정보를 정리하는 중…',
   );
 
   @override
   void initState() {
     super.initState();
+    _beat = widget.initialBeat.clamp(0, canonicalDialogueScenes.length - 1);
+    _academyPcPoweredOn = widget.initialAcademyPcPoweredOn;
+    _academyStockAppOpen =
+        widget.initialAcademyPcPoweredOn && widget.initialAcademyStockAppOpen;
+    _playerController.text = widget.initialPlayerName.trim();
+    _playerNameConfirmed = _playerController.text.isNotEmpty;
+    _companyController.text = widget.initialCompanyName;
     _dialogueLoadFuture = _loadDialogueOverrides();
     unawaited(_dialogueLoadFuture);
-    unawaited(_loadDialoguePanelOpacity());
   }
 
-  Future<void> _loadDialoguePanelOpacity() async {
-    try {
-      final preferences = await SharedPreferences.getInstance();
-      await preferences.reload();
-      _setDialoguePanelOpacity(
-        preferences.getDouble(_dialoguePanelOpacityStorageKey) ??
-            _dialoguePanelOpacityDefault,
-      );
-    } catch (_) {
-      _setDialoguePanelOpacity(_dialoguePanelOpacityDefault);
+  @override
+  void didUpdateWidget(covariant VisualNovelOnboardingScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.allowRuntimeDialoguePreview !=
+            widget.allowRuntimeDialoguePreview ||
+        oldWidget.dialogueOverrideJson != widget.dialogueOverrideJson) {
+      _dialogueLoadFuture = _loadDialogueOverrides();
+      unawaited(_dialogueLoadFuture);
     }
   }
 
@@ -185,13 +234,27 @@ class _VisualNovelOnboardingScreenState
             .replaceAll(r'\r', '\n');
       }
 
+      double number(
+        String key,
+        double fallback,
+        double minimum,
+        double maximum,
+      ) {
+        final value = rawScene[key];
+        if (value is! num) return fallback;
+        return value.toDouble().clamp(minimum, maximum).toDouble();
+      }
+
       String? asset(String key) {
         if (!rawScene.containsKey(key)) return null;
         final value = text(key).trim();
         const webAssetPrefix = '/play/assets/';
-        return value.startsWith(webAssetPrefix)
+        final normalized = value.startsWith(webAssetPrefix)
             ? value.substring(webAssetPrefix.length)
             : value;
+        return key == 'character'
+            ? _migrateHanSuaCharacterAsset(normalized)
+            : normalized;
       }
 
       loaded[beat] = _DialogueOverride(
@@ -203,10 +266,52 @@ class _VisualNovelOnboardingScreenState
         location: text('location'),
         background: asset('background'),
         character: asset('character'),
+        characterX: number('characterX', 0, -60, 60),
+        characterY: number('characterY', 0, -40, 80),
+        characterScale: number('characterScale', 1, 0.45, 1.8),
       );
     }
     return loaded;
   }
+
+  int _decodeDialogueAppearanceVersion(String raw) {
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map<String, dynamic>) return 0;
+      final version = decoded['appearanceVersion'];
+      return version is num ? version.toInt() : 0;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  int _decodeDialogueContentVersion(String raw) {
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map<String, dynamic>) return 0;
+      final version = decoded['contentVersion'];
+      return version is num ? version.toInt() : 0;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  _DialogueOverride _mergeCurrentAppearance(
+    _DialogueOverride draft,
+    _DialogueOverride current,
+  ) => _DialogueOverride(
+    id: draft.id,
+    speaker: draft.speaker,
+    line: draft.line,
+    direction: draft.direction,
+    date: draft.date,
+    location: draft.location,
+    background: current.background,
+    character: current.character,
+    characterX: current.characterX,
+    characterY: current.characterY,
+    characterScale: current.characterScale,
+  );
 
   Future<void> _loadDialogueOverrides() async {
     final loaded = <int, _DialogueOverride>{};
@@ -215,25 +320,58 @@ class _VisualNovelOnboardingScreenState
       loaded.addAll(_decodeDialogueOverrides(injectedRaw));
     }
 
-    if (injectedRaw == null) {
+    if (injectedRaw == null && widget.allowRuntimeDialoguePreview) {
+      // Preview mode must be immediately usable even when an earlier asset
+      // request is still being torn down in the browser. The generated Dart
+      // map and bundled JSON come from the same canonical source.
+      loaded.addAll(_canonicalDialogueOverrides());
+    } else if (injectedRaw == null) {
       try {
         final bundledRaw = await rootBundle.loadString(_dialogueBundleAsset);
         loaded.addAll(_decodeDialogueOverrides(bundledRaw));
-      } catch (_) {
+      } catch (error, stackTrace) {
         // An absent or damaged generated asset falls back to the source dialogue.
+        debugPrint('Failed to load bundled dialogue: $error\n$stackTrace');
       }
     }
 
-    if (injectedRaw == null) {
+    final bundledAppearance = Map<int, _DialogueOverride>.of(loaded);
+
+    if (injectedRaw == null && widget.allowRuntimeDialoguePreview) {
       try {
         final preferences = await SharedPreferences.getInstance();
+        await preferences.reload();
         final raw = preferences.getString(_dialogueRuntimeStorageKey);
         if (raw != null && raw.trim().isNotEmpty) {
           final browserDraft = _decodeDialogueOverrides(raw);
           if (browserDraft.isNotEmpty) {
-            loaded
-              ..clear()
-              ..addAll(browserDraft);
+            if (_decodeDialogueContentVersion(raw) < _dialogueContentVersion) {
+              final customScenes = Map<int, _DialogueOverride>.fromEntries(
+                browserDraft.entries.where(
+                  (entry) => bundledAppearance[entry.key]?.id != entry.value.id,
+                ),
+              );
+              browserDraft
+                ..clear()
+                ..addAll(bundledAppearance)
+                ..addAll(customScenes);
+            }
+            if (_decodeDialogueAppearanceVersion(raw) <
+                _dialogueAppearanceVersion) {
+              for (final entry in browserDraft.entries.toList()) {
+                final current = bundledAppearance[entry.key];
+                if (current != null && current.id == entry.value.id) {
+                  browserDraft[entry.key] = _mergeCurrentAppearance(
+                    entry.value,
+                    current,
+                  );
+                }
+              }
+            }
+            // A browser draft may contain only edited/custom scenes. Keep the
+            // generated canonical map underneath it so a partial cache can
+            // never resurrect the handwritten legacy switch fallbacks.
+            loaded.addAll(browserDraft);
           }
         }
       } catch (_) {
@@ -250,422 +388,154 @@ class _VisualNovelOnboardingScreenState
 
   @override
   void dispose() {
-    _travelTimer?.cancel();
     _playerController.dispose();
     _companyController.dispose();
     super.dispose();
   }
 
-  String get _background {
-    final override = _dialogueOverrides[_beat]?.background?.trim();
-    if (override != null && override.isNotEmpty) return override;
-    return switch (_beat) {
-      <= 4 =>
-        'assets/images/cinematic_soft_painted/policy_1981/backgrounds/bg_policy_room_night_v1.png',
-      <= 15 =>
-        'assets/images/cinematic_soft_painted/policy_1981/backgrounds/bg_conference_night_v1.png',
-      16 =>
-        'assets/images/historical_prologue/bg_future_development_orphanage_1982_portrait_cartoon_v1.png',
-      <= 22 =>
-        'assets/images/historical_prologue/bg_orphanage_departure_2000_portrait_v1.png',
-      <= 31 =>
-        'assets/images/historical_prologue/bg_future_development_academy_gate_2000_portrait_v1.png',
-      <= 53 =>
-        'assets/images/historical_prologue/bg_future_development_orientation_hall_2000_portrait_v1.png',
-      <= 57 =>
-        'assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_corridor_2000_v1.png',
-      <= 63 =>
-        'assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_day_2000_v1.png',
-      64 =>
-        'assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_washroom_2000_v1.png',
-      65 =>
-        'assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_night_2000_v1.png',
-      66 =>
-        'assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_shared_room_day_2000_v1.png',
-      67 =>
-        'assets/images/cinematic_soft_painted/dormitory_2000/bg_future_academy_dorm_corridor_2000_v1.png',
-      _ => 'assets/images/bg_stock_academy_2000_portrait_cartoon_v4.png',
-    };
+  String _backgroundForBeat(int beat) {
+    final background = _dialogueOverrides[beat]?.background?.trim();
+    return background == null || background.isEmpty
+        ? 'assets/images/bg_stock_academy_2000_portrait_cartoon_v4.png'
+        : background;
   }
 
-  String get _location {
-    final override = _dialogueOverrides[_beat]?.location.trim();
-    if (override != null && override.isNotEmpty) return override;
-    return switch (_beat) {
-      <= 4 => '청와대 · 정책실',
-      <= 15 => '청와대 · 미래전략 심야회의',
-      16 => '국립 미래양성원 · 개원 기록',
-      <= 22 => '새봄보육원 · 2층 다섯 번째 방',
-      <= 31 => '국립 미래양성원 · 투자전문과정 정문',
-      <= 53 => '국립 미래양성원 · 제6기 오리엔테이션 강당',
-      <= 57 => '국립 미래양성원 · 기숙사 중앙 복도',
-      <= 63 => '국립 미래양성원 · 제6기 공용 생활실',
-      64 => '국립 미래양성원 · 기숙사 세면실',
-      65 || 66 => '국립 미래양성원 · 제6기 공용 생활실',
-      67 => '국립 미래양성원 · 기숙사 중앙 복도',
-      _ => '국립 미래양성원 · 주식 PC 실습실',
-    };
+  String get _background => _backgroundForBeat(_beat);
+
+  int _firstBeatWithBackground(String token, int fallbackBeat) {
+    for (var beat = 0; beat <= _dialogueEndBeat; beat += 1) {
+      if (_backgroundForBeat(beat).contains(token)) return beat;
+    }
+    return math.min(fallbackBeat, _dialogueEndBeat);
   }
 
-  String get _dateLabel {
-    final override = _dialogueOverrides[_beat]?.date.trim();
-    if (override != null && override.isNotEmpty) return override;
-    return switch (_beat) {
-      <= 15 => '1981.01.12  ·  23:40',
-      16 => '1982년  ·  미래양성계획 출범',
-      <= 22 => '2000.01.02  ·  06:42',
-      <= 31 => '2000.01.02  ·  07:31',
-      <= 53 => '2000.01.02  ·  08:00',
-      <= 57 => '2000.01.02  ·  09:05',
-      <= 64 => '2000.01.02  ·  09:10',
-      65 => '2000.01.02  ·  21:40',
-      66 => '2000.01.03  ·  08:40',
-      67 => '2000.01.03  ·  08:55',
-      _ => '2000.01.03  ·  09:00',
-    };
+  _PrologueSkipStep _prologueSkipStepForBeat(int beat) {
+    final archiveBeat = _firstBeatWithBackground('bg_nis_decimal_archive_', 20);
+    final matrixBeat = _firstBeatWithBackground('bg_decimal_matrix_exam_', 38);
+    final unfairBeat = _firstBeatWithBackground('bg_decimal_unfair_game_', 68);
+    final desireBeat = _firstBeatWithBackground('bg_decimal_desire_test_', 99);
+    final gangnamBeat = _firstBeatWithBackground(
+      'bg_decimal_gangnam_exterior_',
+      123,
+    );
+    final loungeBeat = _firstBeatWithBackground(
+      'bg_decimal_living_lounge_',
+      149,
+    );
+    final tradingBeat = _firstBeatWithBackground(
+      'bg_decimal_trading_floor_',
+      269,
+    );
+
+    if (beat < archiveBeat) {
+      return _PrologueSkipStep(
+        sectionLabel: '데시멀 재가동',
+        destinationLabel: '봉인된 실패 기록',
+        targetBeat: archiveBeat,
+      );
+    }
+    if (beat < matrixBeat) {
+      return _PrologueSkipStep(
+        sectionLabel: '봉인된 실패 기록',
+        destinationLabel: '행렬 시험',
+        targetBeat: matrixBeat,
+      );
+    }
+    if (beat < unfairBeat) {
+      return _PrologueSkipStep(
+        sectionLabel: '행렬 시험',
+        destinationLabel: '불공정 게임',
+        targetBeat: unfairBeat,
+      );
+    }
+    if (beat < desireBeat) {
+      return _PrologueSkipStep(
+        sectionLabel: '불공정 게임',
+        destinationLabel: '욕망 검증',
+        targetBeat: desireBeat,
+      );
+    }
+    if (beat < gangnamBeat) {
+      return _PrologueSkipStep(
+        sectionLabel: '욕망 검증',
+        destinationLabel: '강남 아지트 도착',
+        targetBeat: gangnamBeat,
+      );
+    }
+    if (beat < loungeBeat) {
+      return _PrologueSkipStep(
+        sectionLabel: '강남 아지트 도착',
+        destinationLabel: '최종 열 명 소개',
+        targetBeat: loungeBeat,
+      );
+    }
+    if (beat < tradingBeat) {
+      return _PrologueSkipStep(
+        sectionLabel: '첫날 공동생활',
+        destinationLabel: '트레이딩 플로어',
+        targetBeat: tradingBeat,
+      );
+    }
+    return _PrologueSkipStep(
+      sectionLabel: '첫 주문 브리핑',
+      destinationLabel: '주식 PC 튜토리얼',
+      targetBeat: _dialogueEndBeat,
+    );
   }
+
+  _PrologueSkipStep get _currentPrologueSkipStep =>
+      _prologueSkipStepForBeat(_beat);
+
+  String get _location =>
+      _dialogueOverrides[_beat]?.location.trim() ?? '프로젝트 데시멀';
+
+  String get _dateLabel => _dialogueOverrides[_beat]?.date.trim() ?? '';
 
   String? get _character {
-    return switch (_beat) {
-      1 =>
-        'assets/images/cinematic_soft_painted/policy_1981/jeon_dugwang/02_listening_v1.png',
-      5 =>
-        'assets/images/cinematic_soft_painted/policy_1981/jeon_dugwang/05_pressure_v1.png',
-      9 =>
-        'assets/images/cinematic_soft_painted/policy_1981/jeon_dugwang/04_cold_laugh_v1.png',
-      12 =>
-        'assets/images/cinematic_soft_painted/policy_1981/jeon_dugwang/03_calculating_v1.png',
-      14 =>
-        'assets/images/cinematic_soft_painted/policy_1981/jeon_dugwang/01_signing_v1.png',
-      2 =>
-        'assets/images/cinematic_soft_painted/policy_1981/seo_muntae/01_policy_pitch_v1.png',
-      7 =>
-        'assets/images/cinematic_soft_painted/policy_1981/seo_muntae/04_exhausted_concession_v1.png',
-      11 =>
-        'assets/images/cinematic_soft_painted/policy_1981/seo_muntae/02_searching_chart_v1.png',
-      13 =>
-        'assets/images/cinematic_soft_painted/policy_1981/seo_muntae/03_rebuttal_v1.png',
-      3 =>
-        'assets/images/cinematic_soft_painted/policy_1981/baek_gihyeon/03_warning_v2.png',
-      10 =>
-        'assets/images/cinematic_soft_painted/policy_1981/baek_gihyeon/02_advice_v2.png',
-      4 =>
-        'assets/images/cinematic_soft_painted/policy_1981/kang_incheol/02_explain_v2.png',
-      8 =>
-        'assets/images/cinematic_soft_painted/policy_1981/yoon_mira/03_objection_v1.png',
-      15 =>
-        'assets/images/cinematic_soft_painted/policy_1981/yoon_mira/04_solution_v1.png',
-      18 => _minhoCharacterAsset,
-      19 => 'assets/images/protagonist_seed01/03_playful_grin.png',
-      21 => 'assets/images/protagonist_seed01/17_holding_badge.png',
-      26 => 'assets/images/protagonist_seed01/02_cheerful_laugh.png',
-      40 => 'assets/images/protagonist_seed01/04_curious_question.png',
-      48 => 'assets/images/protagonist_seed01/16_hands_on_hips.png',
-      50 => 'assets/images/protagonist_seed01/22_victory_fist.png',
-      22 =>
-        'assets/images/historical_prologue/character_park_sunhee_farewell_v1.png',
-      25 => 'assets/images/cinematic_soft_painted/sua/07_determined_v1.png',
-      27 => 'assets/images/cinematic_soft_painted/sua/01_neutral_v1.png',
-      29 => 'assets/images/cinematic_soft_painted/sua/04_playful_tease_v1.png',
-      31 => 'assets/images/cinematic_soft_painted/sua/03_bright_laugh_v1.png',
-      36 => 'assets/images/cinematic_soft_painted/sua/05_surprised_v1.png',
-      38 => 'assets/images/cinematic_soft_painted/sua/06_worried_v1.png',
-      47 => 'assets/images/cinematic_soft_painted/sua/02_warm_smile_v1.png',
-      60 => 'assets/images/cinematic_soft_painted/sua/04_playful_tease_v1.png',
-      56 =>
-        'assets/images/historical_prologue/character_hakjun_orientation_v2.png',
-      70 =>
-        'assets/images/historical_prologue/character_hakjun_orientation_v2.png',
-      62 => 'assets/images/protagonist_seed01/04_curious_question.png',
-      28 || 30 || 39 || 46 =>
-        'assets/images/historical_prologue/character_hakjun_orientation_v2.png',
-      _ => null,
-    };
+    final character = _dialogueOverrides[_beat]?.character?.trim();
+    return character == null || character.isEmpty ? null : character;
   }
 
-  bool get _isAcademyTeacherBeat =>
-      _beat == 34 ||
-      _beat == 35 ||
-      _beat == 37 ||
-      _beat == 42 ||
-      _beat == 43 ||
-      _beat == 44 ||
-      _beat == 45 ||
-      _beat == 49 ||
-      _beat == 51 ||
-      _beat == 53 ||
-      _beat == 55 ||
-      _beat == 57 ||
-      _beat == 59 ||
-      _beat == 61 ||
-      _beat == 63 ||
-      _beat == 64 ||
-      _beat == 67 ||
-      _beat == 69 ||
-      _beat == 71 ||
-      _beat == 72;
+  double get _characterX => _dialogueOverrides[_beat]?.characterX ?? 0;
 
-  bool get _isAcademyReceptionistBeat =>
-      _beat == _stateAccountActivationBeat || _beat == 135;
+  double get _characterY => _dialogueOverrides[_beat]?.characterY ?? 0;
 
-  String get _teacherPoseAsset => switch (_beat) {
-    34 || 42 || 51 => 'assets/images/주식선생님/22_포즈1_주인공그림체_공통슬롯_투명.png',
-    35 || 43 || 49 => 'assets/images/주식선생님/24_포즈3_주인공그림체_공통슬롯_투명.png',
-    37 || 44 => 'assets/images/주식선생님/23_포즈2_주인공그림체_공통슬롯_투명.png',
-    45 || 53 || 64 || 72 => 'assets/images/주식선생님/26_포즈5_주인공그림체_공통슬롯_투명.png',
-    55 || 63 || 67 => 'assets/images/주식선생님/22_포즈1_주인공그림체_공통슬롯_투명.png',
-    57 || 61 || 69 => 'assets/images/주식선생님/24_포즈3_주인공그림체_공통슬롯_투명.png',
-    59 || 71 => 'assets/images/주식선생님/23_포즈2_주인공그림체_공통슬롯_투명.png',
-    _ => 'assets/images/주식선생님/22_포즈1_주인공그림체_공통슬롯_투명.png',
-  };
+  double get _characterScale => _dialogueOverrides[_beat]?.characterScale ?? 1;
 
   bool get _isNarration => _speaker == '이야기';
 
   bool get _isOrientationRosterScene =>
-      _dialogueOverrides[_beat]?.id == 'scene-44' ||
-      (_dialogueOverrides[_beat] == null && _beat == _orientationRosterBeat);
+      _dialogueOverrides[_beat]?.id == 'decimal-final-ten-roster';
+
+  bool _hasBatchim(String value) {
+    if (value.isEmpty) return false;
+    final last = value.runes.last;
+    return last >= 0xAC00 && last <= 0xD7A3 ? (last - 0xAC00) % 28 != 0 : false;
+  }
+
+  String _resolvePlayerName(String source) {
+    final name = _playerController.text.trim();
+    if (name.isEmpty || !source.contains('{{playerName}}')) return source;
+    final hasBatchim = _hasBatchim(name);
+    return source
+        .replaceAll('{{playerName}}은', '$name${hasBatchim ? '은' : '는'}')
+        .replaceAll('{{playerName}}이', '$name${hasBatchim ? '이' : '가'}')
+        .replaceAll('{{playerName}}과', '$name${hasBatchim ? '과' : '와'}')
+        .replaceAll('{{playerName}}', name);
+  }
 
   String get _speaker =>
-      _dialogueOverrides[_beat]?.speaker ??
-      switch (_beat) {
-        0 ||
-        6 ||
-        16 ||
-        17 ||
-        20 ||
-        23 ||
-        27 ||
-        32 ||
-        41 ||
-        52 ||
-        54 ||
-        58 ||
-        65 ||
-        66 ||
-        68 => '이야기',
-        1 || 9 || 12 || 14 => '전두광',
-        2 || 7 || 11 || 13 => '서문태 정책실장',
-        3 || 10 => '백기현 비서실장',
-        4 => '강인철 경제수석',
-        5 => '전두광',
-        8 || 15 => '윤미라 사회교육수석',
-        18 => '민호',
-        19 || 21 || 26 || 40 || 48 || 50 => '나',
-        22 => '박선희 원장',
-        24 || 33 => '아이들',
-        25 || 29 || 31 || 36 || 38 || 47 => '수아',
-        28 => '김학준',
-        30 || 39 || 46 || 56 || 70 => '학준',
-        60 => '수아',
-        62 => '나',
-        34 ||
-        35 ||
-        37 ||
-        42 ||
-        43 ||
-        44 ||
-        45 ||
-        49 ||
-        51 ||
-        53 ||
-        55 ||
-        57 ||
-        59 ||
-        61 ||
-        63 ||
-        64 ||
-        67 ||
-        69 ||
-        71 ||
-        72 => '한서윤 선생님',
-        _ => '이야기',
-      };
+      _resolvePlayerName(_dialogueOverrides[_beat]?.speaker ?? '이야기');
 
-  String get _line =>
-      _dialogueOverrides[_beat]?.line ??
-      switch (_beat) {
-        0 =>
-          '1981년 1월 12일 밤 11시 40분. 청와대 정책실의 불은 자정이 가까워져도 꺼지지 않았다. 보고서 다섯 권 가운데 하나만, 이상할 만큼 얇았다.',
-        1 => '그래서. 당장은 멀쩡한데, 이대로 가면 나라가 망한다?',
-        2 => '당장은 아닙니다. 하지만 지금만 보고 달리면 이십 년 뒤에는 남의 기술과 남의 돈에 나라의 목줄이 잡힙니다.',
-        3 => '각하 앞에서 나라 앞날이 어둡다고 했으니, 자네 앞날도 같이 어두워질 수 있겠어.',
-        4 =>
-          '지금은 공장 세우고 물건을 찍는 쪽이 이깁니다. 하지만 미래에는 어떤 기술에 돈을 넣고, 어떤 회사를 살릴지 정하는 사람이 공장 몇 개보다 더 큰 힘을 갖게 됩니다.',
-        5 => '공장도, 인구도, 법도 두꺼운데 아이들 보고서만 이 모양이군. 미래를 말하면서, 미래에 살 아이들은 뺐나?',
-        6 => '수출산업, 인구전망, 국가계좌, 특별법. 네 권은 벽돌처럼 두꺼웠다. 「요보호아동 시설 현황」만 종잇장처럼 얇았다.',
-        7 => '국가는 이미 아이들에게 밥과 잠자리를 줍니다. 이제는 내일을 고를 힘도 줘야 합니다.',
-        8 => '미치셨습니까? 아이들을 국가가 키우는 자본이나 실험쥐로 보겠다는 겁니까? 실패하면 그 아이 인생은 누가 책임집니까!',
-        9 => '먹이고 재우는 데서 끝내면 세금 낭비지. 스스로 돈을 벌게 만들면 투자가 되고.',
-        10 => '핏덩이들에게 나랏돈을 줬다가 잃으면 혈세 낭비라 할 겁니다. 벌면 나라가 코 묻은 돈을 빼앗는다고 할 테고요.',
-        11 =>
-          '열네 살, SEED 01부터 시작합니다. 원금은 만 원입니다. 작아서 우스워 보여도, 손실 이유를 감추기엔 충분히 큰 돈입니다.',
-        12 => '잃으면?',
-        13 => '아이 빚으로 남기지 않습니다. 대신 다음 달 주문 한도를 깎습니다. 벌면 일부를 국가가 회수하고요.',
-        14 =>
-          '이십 퍼센트. 나머지는 아이 몫. 대신 왜 샀고 왜 팔았는지 전부 쓰게 해. 잘한 이야기만 말고, 손실로 바닥까지 내려간 기록도.',
-        15 => '그 80퍼센트는 시설 돈이 아닙니다. 아이 이름으로 묶어두고, 열아홉에 1원도 빠짐없이 넘기십시오.',
-        16 => '이듬해, 국립 미래양성원이 문을 열었다. 환영 문구 대신 정문에는 한 줄이 걸렸다. 「기록 없는 판단은 우연이다」',
-        17 =>
-          '2000년 1월 2일 오전 6시 42분. 눈을 뜨자 천장의 누런 물자국이 먼저 보였다. 여섯 살 때부터 귀 잘린 토끼 같다고 생각했던 얼룩. 마지막 날인데도 물자국은 그냥 물자국이었다.',
-        18 => '형아… 진짜 가?',
-        19 => '응. 돈 세는 학교래. 그냥 주면 더 좋을 텐데, 세기만 시키면 손가락만 아프잖아.',
-        20 =>
-          '민호가 웃다가 낡은 가방을 보고 입을 다물었다. 나는 왕딱지 한 장만 챙기고 나머지는 민호 이불 위에 던졌다. 가방 안감을 들추자 낯선 쇳조각이 손끝에 걸렸다. 「제5기 · 17번」.',
-        21 =>
-          '이름은 칼로 긁어 지워져 있었다. 뒷면에는 더 이상한 말이 파여 있었다. 「17번을 믿지 마.」 …이게 17번 명찰인데, 누구를 믿지 말라는 거야?',
-        22 =>
-          '짐이 가볍다고 주눅 들지 마. 앞으로 채울 게 많다는 뜻이니까. 가서도 이상한 말은 그냥 넘기지 말고 두 번 물어. 그래도 이상하면 장부에 적어 둬. 말은 날아가도 글은 남으니까.',
-        23 =>
-          '버스는 서울을 벗어나 한참을 덜컹거렸다. 눈발 너머로 붉은 벽돌 건물이 나타났다. 학교치고는 담장이 길었고, 공장치고는 창문이 많았다.',
-        24 => '“여기가 그 유명한 데래.”\n“고아원에서 추천받은 애들만 온다던데?”\n“입학식인데 왜 면접장보다 조용해?”',
-        25 => '야, 가방 바퀴 하나가 눈을 계속 끌고 다녀.',
-        26 => '일부러 눈사람 만드는 중이야. 본관 도착할 때쯤 머리까지 붙이려고.',
-        27 =>
-          '여자아이는 대꾸 대신 쪼그려 앉아 연필로 바퀴의 눈을 긁어냈다. 처음 보는 사이인데도 망설임이 없었다. 이름은 수아라고 했다.',
-        28 => '정문에서 본관까지 420미터. 6분 안에 도착해야 하고, 뛰면 감점이야. 안내문 7쪽에 있어.',
-        29 => '설명서 학준아, 별명 붙이면 안 된다는 규정도 있어?',
-        30 => '…없어. 그리고 그렇게 부르지 마.',
-        31 => '그럼 합법이네.',
-        32 =>
-          '강당에는 내빈석도 부모 자리도 없었다. 열 개의 의자만 반원으로 놓여 있었다. 무대 위 나무상자 하나가 더 수상해 보였다.',
-        33 => '“남자 둘, 여자 여덟이래.”\n“자리도 성적순일까?”\n“아직 시험도 안 봤는데 무슨 성적이 있어.”',
-        34 => '제6기 교육을 맡은 한서윤입니다. 인사는 조금 뒤에 하죠. 여러분 배에서 나는 소리가 더 급해 보이니까.',
-        35 => '이 상자 안에는 단팥빵 하나와 500원짜리 동전이 있어요. 식당에서 빵은 300원입니다. 하나만 고르세요.',
-        36 => '동전이요! 빵 사고도 200원 남잖아요.',
-        37 => '좋아요. 그런데 식당 문은 두 시간 뒤, 열 시에 열립니다.',
-        38 => '두 시간이요? …참을 수 있어요. 아마도.',
-        39 =>
-          '빵이 얼마나 남았는지, 열 시에 새 빵이 들어오는지부터 알아야 해요. 동전만 보고 고르기엔 모르는 게 너무 많아요.',
-        40 => '그 전에 상자부터 열어봐야 하는 거 아니에요? 선생님이 단팥빵을 벌써 드셨을 수도 있잖아요.',
-        41 => '아이들 사이에서 웃음이 터졌다. 한서윤은 화내지 않았다. 오히려 상자 뚜껑 위에 손을 얹고 나를 다시 보았다.',
-        42 =>
-          '그래요. 아는 게 달라지면 답도 달라집니다. 여기서 제일 먼저 배울 건 돈 버는 법이 아니라, 모르는 걸 모른다고 말하는 법이에요.',
-        43 =>
-          '여기 온 아이는 열 명, 남학생 두 명과 여학생 여덟 명입니다. 이번 기수는 여학생이 유난히 많네요. 모두 전국 보호시설의 추천을 받고, 오랫동안 생활 기록을 살핀 끝에 선발됐어요.',
-        44 =>
-          '여긴 간판만 바꾼 고아원도, 부자 흉내를 내는 학원도 아니에요. 숫자 뒤에 있는 사람과 거짓말을 보고, 자기 판단에 책임지는 법을 배우는 곳입니다.',
-        45 => '그럼 첫 기록부터 남겨 볼까요? 자기가 왜 뽑혔다고 생각해요?',
-        46 => '규칙을 빨리 외우고, 계산을 잘해서요.',
-        47 => '사람 얼굴 보면 뭘 좋아하고 싫어하는지 금방 알아서요.',
-        48 => '돈을 많이 벌 것 같아서 뽑은 거 아니에요?',
-        49 => '지금 가진 돈은 얼마인데요?',
-        50 => '왕딱지 한 장이요. 용 그려진 제일 센 거.',
-        51 => '돈은 빵점. 솔직함은 합격. 뽑힌 이유는 내일부터 직접 찾아보죠.',
-        52 =>
-          '가장 어둡던 형광등이 한 번 떨리고 안정됐다. 열 개의 이름표가 같은 빛을 받았다. 주머니 속 5기 명찰만 혼자 차갑게 식어 있었다.',
-        53 => '자, 이제 오늘은 첫날이니 기숙사 소개를 해줄게요. 짐 챙기고 모두 따라오세요.',
-        54 =>
-          '열 명의 의자가 한꺼번에 밀렸다. 강당 문 너머로 이어진 복도에는 젖은 운동화 자국과 낯선 방문들이 줄지어 있었다.',
-        55 =>
-          '복도 끝이 제6기 생활실이에요. 남학생 둘과 여학생 여덟이 방 하나를 함께 씁니다. 침상과 사물함은 한 사람에게 하나씩 돌아가요.',
-        56 => '남학생하고 여학생이 정말 같은 방에서 잔다고요?',
-        57 =>
-          '같은 방에서 자지만 남의 침상과 사물함은 허락 없이 건드리지 않습니다. 옷을 갈아입거나 씻을 때는 잠금 칸막이실을 쓰고요. 불편한 일이 생기면 참지 말고 바로 말하세요.',
-        58 => '한서윤이 가장 가까운 방문을 밀었다. 양쪽 벽의 이층침대와 열 개의 사물함, 길쭉한 공용 책상이 한눈에 들어왔다.',
-        59 =>
-          '아래층과 위층 중 원하는 자리를 먼저 골라 보세요. 자리를 바꾸고 싶을 때는 둘이 합의하고 생활기록표에 적으면 됩니다.',
-        60 => '그럼 코 고는 사람은 남자든 여자든 창가 자리로 보내도 돼요?',
-        61 => '보내는 건 안 되고, 본인에게 먼저 말하는 건 됩니다. 첫 생활 회의 안건으로 올려도 좋고요.',
-        62 => '맨 위 침대는 먼저 올라가는 사람이 임자예요?',
-        63 =>
-          '오늘만 선착순이에요. 짐을 풀고 서로 이름부터 외우세요. 주식 수업은 내일 시작합니다. 주식이 뭔지도 모른다고 생각하고, 회사와 주식 한 주가 무엇인지부터 천천히 배울 거예요.',
-        64 =>
-          '세면대와 바구니도 한 사람당 하나씩입니다. 씻는 칸과 갈아입는 칸은 문을 잠그고 사용하세요. 같은 방을 쓴다는 말이 서로의 경계까지 없어진다는 뜻은 아니에요.',
-        65 =>
-          '밤 아홉 시 사십 분. 열 개의 침상에서 이불이 차례로 부풀었다. 남자 둘과 여자 여덟이 한 방을 쓰는 첫날, 낯선 숨소리 사이로 내일 배울 ‘주식’이라는 말만 오래 잠들지 않았다.',
-        66 =>
-          '다음 날 아침 여덟 시 사십 분. 창문으로 들어온 겨울 햇빛이 침상과 사물함을 환하게 훑었다. 세수를 마친 열 명은 공책 한 권씩 챙겼다.',
-        67 =>
-          '첫 수업은 교실이 아니라 PC 실습실에서 합니다. 앞으로 주식 수업은 각자 자기 컴퓨터로 화면을 직접 보면서 배울 거예요.',
-        68 =>
-          '문이 열리자 베이지색 모니터와 본체가 두 줄로 늘어서 있었다. 학생 자리마다 키보드와 줄 달린 마우스가 하나씩 놓여 있었다.',
-        69 =>
-          '자, 여기가 주식 PC 실습실이에요. 오늘부터 한 사람당 컴퓨터 한 대를 맡습니다. 하지만 아직 아무 버튼도 누르지 마세요.',
-        70 => '컴퓨터를 켜면 바로 주식을 살 수 있는 건가요?',
-        71 =>
-          '아니요. 먼저 회사가 무엇인지, 주식 한 주가 그 회사의 얼마나 작은 소유 조각인지부터 배웁니다. 모르는 말은 그 자리에서 바로 풀어 설명할게요.',
-        _ =>
-          '이제 자기 번호가 붙은 PC 앞에 앉으세요. 오늘 목표는 돈을 버는 게 아니라, 화면에 무엇이 있고 왜 숫자가 움직이는지 이해하는 겁니다.',
-      };
+  String get _line => _resolvePlayerName(
+    _dialogueOverrides[_beat]?.line ?? '대사 정본을 불러오지 못했습니다.',
+  );
 
   String? get _stageDirection {
-    final override = _dialogueOverrides[_beat];
-    if (override != null) {
-      final direction = override.direction.trim();
-      return direction.isEmpty ? null : direction;
-    }
-    return switch (_beat) {
-      1 => '전두광이 가장 얇은 보고서를 탁자 가운데로 밀었다.',
-      2 => '밤샘으로 충혈된 서문태의 눈이 잠깐 흔들렸다.',
-      3 => '백기현은 안경을 벗어 천천히 닦았다.',
-      4 => '강인철의 연필이 1981년에서 2000년으로 긴 선을 그었다.',
-      5 => '전두광이 「요보호아동 시설 현황」 표지를 손가락으로 두 번 두드렸다.',
-      7 => '서문태의 손이 가장 얇은 보고서 위에서 멈췄다.',
-      8 => '윤미라가 손바닥으로 탁자를 내리쳤다.',
-      9 => '전두광은 대답 대신 보고서 표지를 두 번 두드렸다.',
-      10 => '백기현이 안경을 다시 쓰며 정치적 손익을 셌다.',
-      11 => '서문태가 기다렸다는 듯 새 계좌 양식을 펼쳤다.',
-      12 => '만년필 끝이 손실 처리 칸 위에서 멈췄다.',
-      13 => '서문태가 다음 달 주문 한도 칸을 손가락으로 짚었다.',
-      14 => '전두광은 20%에 동그라미를 치고 「미래양성원」 네 글자를 갈겨썼다.',
-      15 => '윤미라는 80% 아래에 ‘아이 명의’라고 힘주어 적었다.',
-      18 => '옆 침대 이불이 꿈틀거리더니 민호가 코만 내밀었다.',
-      19 => '나는 지퍼가 잘 닫히지 않는 가방을 무릎으로 눌렀다.',
-      20 => '모서리가 닳은 왕딱지 두 장이 민호의 이불 위로 날아갔다.',
-      21 => '나는 쇳조각 명찰을 재빨리 바지 주머니에 쑤셔 넣었다.',
-      22 => '박선희 원장이 목도리를 한 번 더 단단히 매어주었다.',
-      23 => '정문의 돌 표어가 눈발 사이로 드러났다. 「기록 없는 판단은 우연이다」.',
-      24 => '종이상자와 비닐봉지를 든 아이들의 속삭임이 겹쳤다.',
-      25 => '수아가 내 가방이 남긴 삐뚤어진 바퀴 자국을 가리켰다.',
-      26 => '나는 한쪽으로 기운 가방을 태연하게 세웠다.',
-      27 => '연필 끝에서 굳은 눈덩이가 후두둑 떨어졌다.',
-      28 => '남색 규정집을 낀 김학준이 우리 옆에 바짝 붙었다.',
-      29 => '수아가 눈을 가늘게 뜨고 김학준의 명찰을 읽었다.',
-      30 => '학준의 귀끝이 규정집 표지보다 먼저 붉어졌다.',
-      31 => '수아가 깔깔 웃으며 먼저 언덕을 뛰어올랐다.',
-      32 => '오래된 형광등 아래, 이름표 열 장이 빈 의자를 지키고 있었다.',
-      33 => '앞자리와 뒷자리에서 서로 다른 소문이 동시에 튀어나왔다.',
-      34 => '구두 소리가 무대에 닿자 웅성거림이 절반쯤 줄었다.',
-      35 => '한서윤이 나무상자 위에 손바닥을 올렸다.',
-      36 => '수아의 손이 누구보다 먼저 천장을 찔렀다.',
-      37 => '한서윤이 벽시계를 턱으로 가리켰다.',
-      38 => '말이 끝나자마자 수아의 배에서 작은 소리가 났다.',
-      39 => '학준은 규정집 모서리를 만지며 상자를 노려봤다.',
-      40 => '나는 열리지 않은 상자 뚜껑을 손가락으로 가리켰다.',
-      41 => '한서윤의 입꼬리가 처음으로 아주 조금 올라갔다.',
-      42 => '칠판에 네 칸이 그어졌다. 아는 것, 모르는 것, 고른 이유, 생각을 바꿀 조건.',
-      43 => '출석부가 펼쳐지고 남학생 두 칸, 여학생 여덟 칸이 차례로 확인됐다.',
-      44 => '지시봉이 숫자, 사람, 판단 세 단어를 천천히 지나갔다.',
-      45 => '한서윤의 시선이 반원으로 앉은 아이들을 훑었다.',
-      46 => '학준은 기다렸다는 듯 허리를 곧게 폈다.',
-      47 => '수아는 옆자리 아이들의 표정을 한번 훑고 대답했다.',
-      48 => '나는 이유를 찾는 대신 가장 그럴듯한 답부터 꺼냈다.',
-      49 => '한서윤이 웃음을 누르며 되물었다.',
-      50 => '주머니 속 왕딱지가 손끝에 걸렸다.',
-      51 => '한서윤이 출석부 내 이름 옆에 짧은 표시를 남겼다.',
-      52 => '낡은 명찰의 모서리가 주머니 안에서 허벅지를 찔렀다.',
-      53 => '강당 문이 열리고 차가운 복도 공기가 발끝으로 밀려왔다.',
-      54 => '한서윤이 출석부를 덮고 복도 쪽으로 먼저 걸음을 옮겼다.',
-      55 => '한서윤이 복도 끝 열린 방문을 가리켰다.',
-      56 => '학준의 규정집이 가슴팍에서 조금 내려갔다.',
-      57 => '한서윤은 열린 방문보다 먼저 복도 안쪽 칸막이실을 가리켰다.',
-      58 => '낡은 경첩이 낮게 울리고 생활실의 따뜻한 공기가 복도로 흘러나왔다.',
-      59 => '한서윤이 양쪽 이층침대와 사물함을 차례로 짚었다.',
-      60 => '수아가 가장 안쪽 침대를 보며 코끝을 찡긋했다.',
-      61 => '한서윤이 웃음을 참듯 출석부로 입가를 가렸다.',
-      62 => '나는 창가 쪽 위층 침대 사다리에 손을 얹었다.',
-      63 => '한서윤이 공용 책상 위 빈 장부를 펼쳐 보였다.',
-      64 => '세면실 문 안쪽의 잠금쇠가 또각 소리를 냈다.',
-      65 => '소등 뒤에도 창밖의 눈빛이 이층침대 난간에 가늘게 남아 있었다.',
-      66 => '알람시계가 울리기 전부터 침상 사다리와 사물함 문이 차례로 움직였다.',
-      67 => '한서윤이 출석부 대신 얇은 PC 좌석표를 들고 복도 끝으로 걸었다.',
-      68 => 'CRT 모니터 열 대가 꺼진 유리 화면으로 아이들을 비췄다.',
-      69 => '한서윤이 중앙 통로에 서서 양쪽 컴퓨터 줄을 펼친 손으로 가리켰다.',
-      70 => '학준의 시선이 전원 버튼과 키보드 사이를 빠르게 오갔다.',
-      71 => '한서윤이 칠판에 회사, 한 주, 가격 세 단어를 크게 적었다.',
-      72 => '교실 앞의 큰 CRT 화면 두 대에 아직 이름 없는 차트 선만 떠올랐다.',
-      _ => null,
-    };
+    final direction = _dialogueOverrides[_beat]?.direction.trim();
+    return direction == null || direction.isEmpty
+        ? null
+        : _resolvePlayerName(direction);
   }
 
   String get _historyLine {
@@ -693,12 +563,13 @@ class _VisualNovelOnboardingScreenState
   }
 
   void _goBackOneBeat() {
-    if (_isCreating || _isTraveling || _beatNavigationHistory.isEmpty) return;
+    if (_isCreating || _beatNavigationHistory.isEmpty) return;
     final previousBeat = _beatNavigationHistory.removeLast();
     if (previousBeat == _beat) return;
     FocusManager.instance.primaryFocus?.unfocus();
     _playStoryFeedback();
     setState(() => _beat = previousBeat);
+    unawaited(_saveCheckpoint());
   }
 
   void _handlePointerSignal(PointerSignalEvent event) {
@@ -717,36 +588,50 @@ class _VisualNovelOnboardingScreenState
     _rememberCurrentLine();
     _rememberNavigationBeat(currentBeat);
     _playStoryFeedback();
-    if (_beat == _accountHallDepartureBeat) {
-      _travelToAccountHall();
-      return;
-    }
     setState(() {
       if (_beat == currentBeat) {
         _beat = math.min(currentBeat + 1, _dialogueEndBeat);
       }
     });
+    unawaited(_saveCheckpoint());
   }
 
-  void _travelToAccountHall() {
-    if (_isTraveling) return;
-    setState(() => _isTraveling = true);
-    _travelTimer?.cancel();
-    _travelTimer = Timer(
-      const Duration(milliseconds: 2600),
-      _finishAccountHallTravel,
+  Future<void> _saveCheckpoint() =>
+      widget.onCheckpoint?.call(
+        _beat,
+        _academyPcPoweredOn,
+        _academyStockAppOpen,
+        _playerController.text,
+        _companyController.text,
+      ) ??
+      Future<void>.value();
+
+  void _confirmPlayerName() {
+    final playerName = _playerController.text.trim().replaceAll(
+      RegExp(r'\s+'),
+      ' ',
     );
-  }
-
-  void _finishAccountHallTravel() {
-    _travelTimer?.cancel();
-    _travelTimer = null;
-    if (!mounted || !_isTraveling) return;
+    if (playerName.isEmpty) {
+      setState(() => _creationError = '플레이할 이름을 입력해 주세요.');
+      return;
+    }
+    if (playerName.length > 12) {
+      setState(() => _creationError = '이름은 12자 이내로 입력해 주세요.');
+      return;
+    }
+    FocusManager.instance.primaryFocus?.unfocus();
     _playStoryFeedback(strong: true);
     setState(() {
-      _isTraveling = false;
-      _beat = 32;
+      _playerController.text = playerName;
+      _playerNameConfirmed = true;
+      _creationError = null;
     });
+    unawaited(_saveCheckpoint());
+  }
+
+  void _exitOnboarding() {
+    unawaited(_saveCheckpoint());
+    widget.onExit?.call();
   }
 
   Future<void> _showBacklog() async {
@@ -824,15 +709,17 @@ class _VisualNovelOnboardingScreenState
 
   Future<void> _showSkipDialog() async {
     _playStoryFeedback();
+    final startingBeat = _beat;
+    final skipStep = _currentPrologueSkipStep;
     final shouldSkip = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         key: const Key('story-skip-dialog'),
-        title: const Text('프롤로그를 건너뛸까요?'),
-        content: const Text(
-          '미래양성계획 창설과 수아·학준의 첫 만남을 건너뛰고 '
-          '제6기 주식 PC 실습실의 전원 실습으로 이동합니다. '
-          'PC를 켜고 주식실습 프로그램을 열기 전에는 저장이 만들어지지 않습니다.',
+        title: Text('${_withObjectParticle(skipStep.sectionLabel)} 건너뛸까요?'),
+        content: Text(
+          '${skipStep.sectionLabel} 구간만 건너뛰고 '
+          '${skipStep.destinationLabel}의 첫 장면으로 이동합니다.'
+          '${skipStep.targetBeat == _dialogueEndBeat ? ' 이동한 위치와 PC 진행 상태는 자동 저장됩니다.' : ''}',
         ),
         actions: [
           TextButton(
@@ -843,21 +730,33 @@ class _VisualNovelOnboardingScreenState
           FilledButton(
             key: const Key('story-skip-confirm'),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('마지막 안내로'),
+            child: Text('${skipStep.destinationLabel}으로'),
           ),
         ],
       ),
     );
     if (!mounted || shouldSkip != true) return;
-    _travelTimer?.cancel();
     _playStoryFeedback(strong: true);
     setState(() {
-      _isTraveling = false;
-      _beat = _dialogueEndBeat;
+      _beatNavigationHistory.clear();
+      _beat = skipStep.targetBeat;
     });
+    unawaited(_saveCheckpoint());
     await _dialogueLoadFuture;
-    if (!mounted || _beat == _dialogueEndBeat) return;
-    setState(() => _beat = _dialogueEndBeat);
+    if (!mounted) return;
+    final resolvedSkipStep = _prologueSkipStepForBeat(startingBeat);
+    if (_beat == resolvedSkipStep.targetBeat) return;
+    setState(() => _beat = resolvedSkipStep.targetBeat);
+    unawaited(_saveCheckpoint());
+  }
+
+  String _withObjectParticle(String value) {
+    if (value.isEmpty) return value;
+    final last = value.runes.last;
+    final hasBatchim = last >= 0xAC00 && last <= 0xD7A3
+        ? (last - 0xAC00) % 28 != 0
+        : true;
+    return '$value${hasBatchim ? '을' : '를'}';
   }
 
   Future<void> _finish() async {
@@ -867,13 +766,9 @@ class _VisualNovelOnboardingScreenState
       RegExp(r'\s+'),
       ' ',
     );
-    if (playerName.isEmpty ||
-        companyName.isEmpty ||
-        _introChoice == null ||
-        _trait == null ||
-        _familyRule == null) {
+    if (playerName.isEmpty || companyName.isEmpty) {
       setState(() {
-        _creationError = '이름과 앞에서 선택한 투자 원칙을 모두 확인해 주세요.';
+        _creationError = '운용자 이름과 투자장부 이름을 모두 입력해 주세요.';
       });
       return;
     }
@@ -881,7 +776,7 @@ class _VisualNovelOnboardingScreenState
     setState(() {
       _isCreating = true;
       _creationError = null;
-      _creationProgress = const WorldLoadProgress(0.02, '제6기 국가계좌 정보를 정리하는 중…');
+      _creationProgress = const WorldLoadProgress(0.02, '데시멀 국가계좌 정보를 정리하는 중…');
     });
     await WidgetsBinding.instance.endOfFrame;
     try {
@@ -889,9 +784,9 @@ class _VisualNovelOnboardingScreenState
         NewGameSetup(
           playerName: playerName,
           companyName: companyName,
-          introChoice: _introChoice!,
-          startingTrait: _trait!,
-          familyRule: _familyRule!,
+          introChoice: 'stocks',
+          startingTrait: StoryTrait.analysis,
+          operatingPrinciple: OperatingPrinciple.reportLosses,
         ),
         (progress) {
           if (mounted) setState(() => _creationProgress = progress);
@@ -917,6 +812,7 @@ class _VisualNovelOnboardingScreenState
       if (!_academyPcPoweredOn) _academyStockAppOpen = false;
       _creationError = null;
     });
+    unawaited(_saveCheckpoint());
   }
 
   void _openAcademyStockApp() {
@@ -926,6 +822,7 @@ class _VisualNovelOnboardingScreenState
       _academyStockAppOpen = true;
       _creationError = null;
     });
+    unawaited(_saveCheckpoint());
   }
 
   void _closeAcademyStockApp() {
@@ -936,18 +833,13 @@ class _VisualNovelOnboardingScreenState
       _academyStockAppOpen = false;
       _creationError = null;
     });
+    unawaited(_saveCheckpoint());
   }
 
   Future<void> _startAcademyMarketTutorial() async {
     if (_isCreating || !_academyPcPoweredOn || !_academyStockAppOpen) return;
     FocusManager.instance.primaryFocus?.unfocus();
-    setState(() {
-      _introChoice = 'stocks';
-      _trait = StoryTrait.analysis;
-      _familyRule = FamilyRule.reportLosses;
-      _stateAccountActivated = true;
-      _creationError = null;
-    });
+    setState(() => _creationError = null);
     await _finish();
   }
 
@@ -956,14 +848,16 @@ class _VisualNovelOnboardingScreenState
     final viewInsets = MediaQuery.viewInsetsOf(context);
     final isKeyboardOpen = viewInsets.bottom > 0;
     final isNameEntry =
-        _beat == _playerNameBeat ||
-        _beat == _companyNameBeat ||
+        !_playerNameConfirmed ||
         (_beat >= _dialogueEndBeat &&
             _academyPcPoweredOn &&
             _academyStockAppOpen);
     final keyboardLift = isKeyboardOpen && isNameEntry
         ? viewInsets.bottom
         : 0.0;
+    final panelBottomInset = _playerNameConfirmed && _beat < _dialogueEndBeat
+        ? _storyDialogueBottomInset
+        : 10.0;
     return Listener(
       key: const Key('story-wheel-navigation-listener'),
       onPointerSignal: _handlePointerSignal,
@@ -972,14 +866,8 @@ class _VisualNovelOnboardingScreenState
         resizeToAvoidBottomInset: false,
         body: LayoutBuilder(
           builder: (context, constraints) {
-            final characterOverride = _dialogueOverrides[_beat]?.character;
-            final sceneCharacterAsset = characterOverride != null
-                ? (characterOverride.isEmpty ? null : characterOverride)
-                : _isAcademyTeacherBeat
-                ? _teacherPoseAsset
-                : _isAcademyReceptionistBeat
-                ? 'assets/images/historical_prologue/character_state_account_officer_cha_eunjoo_v1.png'
-                : _character;
+            final sceneCharacterAsset = _character;
+            final isTeacherScene = _speaker == '한서윤 운영관';
             return Stack(
               key: const Key('onboarding-stage'),
               fit: StackFit.expand,
@@ -989,10 +877,29 @@ class _VisualNovelOnboardingScreenState
                   child: _LivingBackground(
                     key: ValueKey(_background),
                     asset: _background,
-                    ambientFlicker: _beat >= 32,
+                    sceneBeat: _beat,
+                    ambientFlicker: true,
                   ),
                 ),
+                if (_playerNameConfirmed && sceneCharacterAsset != null)
+                  Positioned.fill(
+                    top: -_storyCharacterBottomInset,
+                    bottom: _storyCharacterBottomInset,
+                    child: IgnorePointer(
+                      child: _OnboardingCharacterSlot(
+                        key: const Key('story-character-stage-slot'),
+                        asset: sceneCharacterAsset,
+                        alignment: Alignment.bottomCenter,
+                        position: Offset(_characterX, _characterY),
+                        scale: _characterScale,
+                        characterKey: isTeacherScene
+                            ? const Key('academy-teacher-character')
+                            : const Key('story-character-character'),
+                      ),
+                    ),
+                  ),
                 const DecoratedBox(
+                  key: Key('story-stage-reading-scrim'),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
@@ -1000,7 +907,7 @@ class _VisualNovelOnboardingScreenState
                       colors: [
                         Color(0x33000000),
                         Colors.transparent,
-                        Color(0xA6000000),
+                        Color(0x70000000),
                       ],
                       stops: [0, 0.52, 1],
                     ),
@@ -1010,7 +917,7 @@ class _VisualNovelOnboardingScreenState
                   child: GestureDetector(
                     key: const Key('story-stage-advance-area'),
                     behavior: HitTestBehavior.translucent,
-                    onTap: _isCreating || _isTraveling
+                    onTap: _isCreating || !_playerNameConfirmed
                         ? null
                         : () => _activeNovelDialogueState?._handleExternalTap(),
                   ),
@@ -1028,59 +935,47 @@ class _VisualNovelOnboardingScreenState
                   ),
                 ),
 
-                SafeArea(
-                  child: Align(
-                    alignment: Alignment.topRight,
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 54, right: 10),
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: const Color(0xB8292B3A),
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: const Color(0x55FFFFFF)),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              key: const Key('story-backlog-button'),
-                              tooltip: '지난 대사',
-                              visualDensity: VisualDensity.compact,
-                              color: Colors.white,
-                              onPressed: _showBacklog,
-                              icon: const Icon(Icons.history_rounded, size: 19),
-                            ),
-                            IconButton(
-                              key: const Key('story-skip-button'),
-                              tooltip: '프롤로그 건너뛰기',
-                              visualDensity: VisualDensity.compact,
-                              color: _yellow,
-                              onPressed: _showSkipDialog,
-                              icon: const Icon(
-                                Icons.fast_forward_rounded,
-                                size: 19,
+                if (_playerNameConfirmed)
+                  SafeArea(
+                    child: Align(
+                      alignment: Alignment.topRight,
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 54, right: 10),
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: const Color(0xB8292B3A),
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(color: const Color(0x55FFFFFF)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                key: const Key('story-backlog-button'),
+                                tooltip: '지난 대사',
+                                visualDensity: VisualDensity.compact,
+                                color: Colors.white,
+                                onPressed: _showBacklog,
+                                icon: const Icon(
+                                  Icons.history_rounded,
+                                  size: 19,
+                                ),
                               ),
-                            ),
-                          ],
+                              IconButton(
+                                key: const Key('story-skip-button'),
+                                tooltip:
+                                    '${_currentPrologueSkipStep.sectionLabel} 건너뛰기',
+                                visualDensity: VisualDensity.compact,
+                                color: _yellow,
+                                onPressed: _showSkipDialog,
+                                icon: const Icon(
+                                  Icons.fast_forward_rounded,
+                                  size: 19,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ),
-                  ),
-                ),
-                if (sceneCharacterAsset != null)
-                  Positioned.fill(
-                    top: -_storyCharacterBottomInset,
-                    bottom: _storyCharacterBottomInset,
-                    child: IgnorePointer(
-                      child: _OnboardingCharacterSlot(
-                        key: const Key('story-character-stage-slot'),
-                        asset: sceneCharacterAsset,
-                        alignment: Alignment.bottomCenter,
-                        characterKey: _isAcademyTeacherBeat
-                            ? const Key('academy-teacher-character')
-                            : _isAcademyReceptionistBeat
-                            ? const Key('academy-receptionist-character')
-                            : const Key('story-character-character'),
                       ),
                     ),
                   ),
@@ -1090,7 +985,7 @@ class _VisualNovelOnboardingScreenState
                   curve: Curves.easeOutCubic,
                   left: 12,
                   right: 12,
-                  bottom: keyboardLift + 10,
+                  bottom: keyboardLift + panelBottomInset,
                   child: SafeArea(
                     top: false,
                     child: Align(
@@ -1121,12 +1016,6 @@ class _VisualNovelOnboardingScreenState
                       progress: _creationProgress,
                     ),
                   ),
-                if (_isTraveling)
-                  Positioned.fill(
-                    child: _AcademyTravelOverlay(
-                      onSkip: _finishAccountHallTravel,
-                    ),
-                  ),
               ],
             );
           },
@@ -1136,21 +1025,20 @@ class _VisualNovelOnboardingScreenState
   }
 
   Widget _buildDialogue(BuildContext context) {
+    if (!_playerNameConfirmed) {
+      return _PlayerNameSetup(
+        controller: _playerController,
+        error: _creationError,
+        onChanged: () => setState(() => _creationError = null),
+        onConfirm: _confirmPlayerName,
+      );
+    }
     if (_beat >= _dialogueEndBeat) return _orientationComplete();
     if (_isOrientationRosterScene) return _orientationRoster();
-    if (_beat == _introChoiceBeat) return _introChoices();
-    if (_beat == _stateAccountActivationBeat) {
-      return _stateAccountActivation();
-    }
-    if (_beat == 143) return _academyTutorial();
-    if (_beat == _playerNameBeat) return _nameEntry();
-    if (_beat == _traitChoiceBeat) return _traitChoices();
-    if (_beat == _principleChoiceBeat) return _principleChoices();
-    if (_beat >= _companyNameBeat) return _researchDeskName();
-
     return _NovelDialogue(
       key: ValueKey(_beat),
       speaker: _speaker,
+      playerName: _playerController.text.trim(),
       line: _line,
       stageDirection: _stageDirection,
       narration: _isNarration,
@@ -1161,6 +1049,7 @@ class _VisualNovelOnboardingScreenState
   Widget _orientationRoster() => _NovelDialogue(
     key: const ValueKey('orientation-roster'),
     speaker: _speaker,
+    playerName: _playerController.text.trim(),
     line: _line,
     stageDirection: _stageDirection,
     onContinue: _next,
@@ -1176,7 +1065,7 @@ class _VisualNovelOnboardingScreenState
       child: Column(
         children: [
           const Text(
-            '제6기 오리엔테이션 명단',
+            '프로젝트 데시멀 · 최종 열 명',
             style: TextStyle(
               color: _ink,
               fontSize: 13,
@@ -1198,7 +1087,7 @@ class _VisualNovelOnboardingScreenState
               Expanded(
                 child: _orientationStat(
                   key: const Key('orientation-male-count'),
-                  label: '남학생',
+                  label: '남자 동기',
                   value: '2명',
                   color: const Color(0xFF3F72A5),
                 ),
@@ -1207,7 +1096,7 @@ class _VisualNovelOnboardingScreenState
               Expanded(
                 child: _orientationStat(
                   key: const Key('orientation-female-count'),
-                  label: '여학생',
+                  label: '여자 동기',
                   value: '8명',
                   color: const Color(0xFFC85C72),
                 ),
@@ -1216,7 +1105,7 @@ class _VisualNovelOnboardingScreenState
           ),
           const SizedBox(height: 9),
           const Text(
-            '전국 보호시설 추천 · 제6기 투자전문과정',
+            '전국 보호시설 비공개 선발 · 남자 2명 · 여자 8명',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Color(0xFF697386),
@@ -1270,14 +1159,15 @@ class _VisualNovelOnboardingScreenState
     final endingOverride = _dialogueOverrides[_beat];
     final isCanonicalPcEnding = endingOverride == null
         ? _beat == _orientationCompleteBeat
-        : endingOverride.id == 'scene-73';
+        : endingOverride.id == canonicalDialogueScenes.last['id'];
     return _NovelDialogue(
       key: const ValueKey('orientation-complete'),
       speaker: isCanonicalPcEnding
           ? _academyPcPoweredOn
-                ? '미래양성원 실습 PC'
+                ? '데시멀 실습 PC'
                 : _speaker
           : _speaker,
+      playerName: _playerController.text.trim(),
       line: !isCanonicalPcEnding
           ? _line
           : !_academyPcPoweredOn
@@ -1291,7 +1181,7 @@ class _VisualNovelOnboardingScreenState
           ? '06번 좌석의 베이지색 CRT와 본체는 아직 꺼져 있다.'
           : _academyStockAppOpen
           ? '주식실습 프로그램이 국가계좌 개통 정보를 기다리고 있다.'
-          : '본체 팬이 돌고 CRT 화면에 미래양성원 바탕화면이 떠올랐다.',
+          : '본체 팬이 돌고 CRT 화면에 데시멀 전용 바탕화면이 떠올랐다.',
       child: _AcademyPcTerminal(
         poweredOn: _academyPcPoweredOn,
         stockAppOpen: _academyStockAppOpen,
@@ -1301,523 +1191,152 @@ class _VisualNovelOnboardingScreenState
         onTogglePower: _toggleAcademyPcPower,
         onOpenStockApp: _openAcademyStockApp,
         onCloseStockApp: _closeAcademyStockApp,
-        onChanged: () => setState(() => _creationError = null),
+        onChanged: () {
+          setState(() => _creationError = null);
+          unawaited(_saveCheckpoint());
+        },
         onStartTutorial: () => unawaited(_startAcademyMarketTutorial()),
-        onExit: widget.onExit ?? () {},
+        onExit: _exitOnboarding,
       ),
     );
   }
+}
 
-  Widget _introChoices() => _NovelDialogue(
-    key: const ValueKey('intro-choice'),
-    speaker: _speaker,
-    line: _line,
-    stageDirection: _stageDirection,
-    choices: [
-      _NovelChoice(
-        key: const Key('story-intro-computer'),
-        label: '국가 이름으로 시작해도 내 이름으로 끝낸다',
-        onTap: () => _chooseIntroChoice('computer'),
-      ),
-      _NovelChoice(
-        key: const Key('story-intro-y2k'),
-        label: '검게 지워진 5기 선배들의 장부를 찾는다',
-        onTap: () => _chooseIntroChoice('y2k'),
-      ),
-      _NovelChoice(
-        key: const Key('story-intro-stocks'),
-        label: '돈으로 내 선택권을 직접 산다',
-        onTap: () => _chooseIntroChoice('stocks'),
-      ),
-    ],
-  );
+class _PlayerNameSetup extends StatelessWidget {
+  const _PlayerNameSetup({
+    required this.controller,
+    required this.error,
+    required this.onChanged,
+    required this.onConfirm,
+  });
 
-  void _chooseIntroChoice(String choice) {
-    _rememberCurrentLine();
-    _rememberNavigationBeat(_beat);
-    _playStoryFeedback();
-    setState(() {
-      _introChoice = choice;
-      _beat = _introChoiceBeat + 1;
-    });
-  }
+  final TextEditingController controller;
+  final String? error;
+  final VoidCallback onChanged;
+  final VoidCallback onConfirm;
 
-  Widget _academyTutorial() => _NovelDialogue(
-    key: const ValueKey('academy-tutorial'),
-    speaker: _speaker,
-    line: _line,
-    stageDirection: _stageDirection,
-    child: Column(
-      children: [
-        const _AcademyLessonRow(
-          number: '1',
-          title: '지정가',
-          body: '원하는 가격에 줄을 서고 오지 않으면 사지 않는다',
-        ),
-        const SizedBox(height: 6),
-        const _AcademyLessonRow(
-          number: '2',
-          title: '시장가',
-          body: '지금 나온 호가부터 체결되어 가격이 달라질 수 있다',
-        ),
-        const SizedBox(height: 6),
-        const _AcademyLessonRow(
-          number: '3',
-          title: '확정수익',
-          body: '거래비용을 뺀 이익의 20%는 국가 환수로 기록한다',
-        ),
-        const SizedBox(height: 10),
-        _NovelNextButton(
-          key: const Key('academy-tutorial-continue'),
-          label: '주문과 국가 환수 규칙 확인',
-          enabled: true,
-          onTap: _next,
+  @override
+  Widget build(BuildContext context) => Container(
+    key: const Key('prologue-player-name-card'),
+    width: double.infinity,
+    padding: const EdgeInsets.fromLTRB(18, 17, 18, 16),
+    decoration: BoxDecoration(
+      gradient: const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color(0xF51B2A40), Color(0xF50B1423)],
+      ),
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: const Color(0xB883E5FF), width: 1.2),
+      boxShadow: const [
+        BoxShadow(
+          color: Color(0x85000000),
+          blurRadius: 24,
+          offset: Offset(0, 10),
         ),
       ],
     ),
-  );
-
-  Widget _stateAccountActivation() => _NovelDialogue(
-    key: const ValueKey('state-account-activation'),
-    speaker: _speaker,
-    line: _line,
-    stageDirection: _stageDirection,
-    child: _AcademyTuitionPaymentPanel(
-      paid: _stateAccountActivated,
-      onPay: () {
-        _playStoryFeedback(strong: true);
-        setState(() => _stateAccountActivated = true);
-      },
-      onContinue: _next,
-    ),
-  );
-
-  Widget _nameEntry() => _NovelDialogue(
-    key: const ValueKey('name-entry'),
-    speaker: _speaker,
-    line: _line,
-    stageDirection: _stageDirection,
     child: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        const Row(
+          children: [
+            Icon(Icons.badge_outlined, color: Color(0xFF83E5FF), size: 20),
+            SizedBox(width: 8),
+            Text(
+              '기록에 남길 이름',
+              style: TextStyle(
+                color: Colors.white,
+                fontFamily: 'Maplestory',
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 7),
+        const Text(
+          '지금 정한 이름으로 프롤로그의 주인공이 되고, 이후 저장과 모든 대사에도 그대로 표시됩니다.',
+          style: TextStyle(
+            color: Color(0xFFD9E9F5),
+            fontFamily: 'Pretendard',
+            fontSize: 11.5,
+            height: 1.4,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 12),
         TextField(
-          key: const Key('player-name-input'),
-          controller: _playerController,
+          key: const Key('prologue-player-name-input'),
+          controller: controller,
+          autofocus: true,
           maxLength: 12,
-          autofocus: false,
           textInputAction: TextInputAction.done,
-          onChanged: (_) => setState(() => _creationError = null),
-          onSubmitted: (_) {
-            if (_playerController.text.trim().isNotEmpty) _next();
-          },
-          onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
-          decoration: _fieldDecoration('예: 민준'),
+          onChanged: (_) => onChanged(),
+          onSubmitted: (_) => onConfirm(),
+          style: const TextStyle(
+            color: Color(0xFF17243A),
+            fontFamily: 'Maplestory',
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+          ),
+          decoration: InputDecoration(
+            counterText: '',
+            hintText: '플레이할 이름을 입력하세요',
+            filled: true,
+            fillColor: const Color(0xFFF7FBFF),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 12,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(11),
+              borderSide: const BorderSide(color: Color(0xFF9DC7DC)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(11),
+              borderSide: const BorderSide(color: Color(0xFF4FD7FF), width: 2),
+            ),
+          ),
         ),
-        const SizedBox(height: 16),
-        _NovelNextButton(
-          key: const Key('story-next-name'),
-          label: '이 이름으로 시작하기',
-          enabled: _playerController.text.trim().isNotEmpty,
-          onTap: _next,
-        ),
-      ],
-    ),
-  );
-
-  Widget _traitChoices() => _NovelDialogue(
-    key: const ValueKey('trait-choice'),
-    speaker: _speaker,
-    line: _line,
-    stageDirection: _stageDirection,
-    choices: [
-      _NovelChoice(
-        key: const Key('story-trait-stability'),
-        label: '불량이 줄지 않으면 사지 않는다',
-        onTap: () => _chooseTrait(StoryTrait.stability),
-      ),
-      _NovelChoice(
-        key: const Key('story-trait-innovation'),
-        label: '신형 통신칩이 문제를 바꾸는지 본다',
-        onTap: () => _chooseTrait(StoryTrait.innovation),
-      ),
-      _NovelChoice(
-        key: const Key('story-trait-analysis'),
-        label: '불량률·납품 속도·가격을 같이 본다',
-        onTap: () => _chooseTrait(StoryTrait.analysis),
-      ),
-      _NovelChoice(
-        key: const Key('story-trait-control'),
-        label: '회사가 약속을 지키는지 끝까지 묻는다',
-        onTap: () => _chooseTrait(StoryTrait.control),
-      ),
-    ],
-  );
-
-  void _chooseTrait(StoryTrait trait) {
-    _rememberCurrentLine();
-    _rememberNavigationBeat(_beat);
-    _playStoryFeedback();
-    setState(() {
-      _trait = trait;
-      _beat = 45;
-    });
-  }
-
-  Widget _principleChoices() => _NovelDialogue(
-    key: const ValueKey('investment-principle-choice'),
-    speaker: _speaker,
-    line: _line,
-    stageDirection: _stageDirection,
-    choices: [
-      _NovelChoice(
-        key: const Key('family-rule-report-losses'),
-        label: '손해가 나도 숨기지 않고 적기',
-        onTap: () => _chooseFamilyRule(FamilyRule.reportLosses),
-      ),
-      _NovelChoice(
-        key: const Key('family-rule-no-hot-tips'),
-        label: '추천보다 내 이유를 먼저 쓰기',
-        onTap: () => _chooseFamilyRule(FamilyRule.noHotTips),
-      ),
-      _NovelChoice(
-        key: const Key('family-rule-keep-cash'),
-        label: '돈을 한 번에 다 쓰지 않기',
-        onTap: () => _chooseFamilyRule(FamilyRule.keepCash),
-      ),
-    ],
-  );
-
-  void _chooseFamilyRule(FamilyRule rule) {
-    _rememberCurrentLine();
-    _rememberNavigationBeat(_beat);
-    _playStoryFeedback();
-    setState(() {
-      _familyRule = rule;
-      _beat = 48;
-    });
-  }
-
-  Widget _researchDeskName() => _NovelDialogue(
-    key: const ValueKey('desk-name'),
-    speaker: _speaker,
-    line: _line,
-    stageDirection: _stageDirection,
-    narration: true,
-    child: Column(
-      children: [
-        TextField(
-          key: const Key('company-name-input'),
-          controller: _companyController,
-          maxLength: 24,
-          textInputAction: TextInputAction.done,
-          onChanged: (_) => setState(() => _creationError = null),
-          onSubmitted: (_) => _finish(),
-          onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
-          decoration: _fieldDecoration('예: 별빛 투자'),
-        ),
-        const SizedBox(height: 16),
-        _NovelNextButton(
-          key: const Key('create-company-button'),
-          label: '투자회사 이름을 정하고 국가계좌 주문 시작',
-          enabled: _companyController.text.trim().isNotEmpty,
-          onTap: _finish,
-        ),
-        if (_creationError != null) ...[
-          const SizedBox(height: 10),
+        if (error != null) ...[
+          const SizedBox(height: 7),
           Text(
-            _creationError!,
-            key: const Key('new-game-creation-error'),
-            textAlign: TextAlign.center,
+            error!,
+            key: const Key('prologue-player-name-error'),
             style: const TextStyle(
-              color: Color(0xFFFFD1C7),
+              color: Color(0xFFFFB0A8),
               fontSize: 11,
-              height: 1.4,
               fontWeight: FontWeight.w800,
             ),
           ),
         ],
+        const SizedBox(height: 10),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            key: const Key('prologue-player-name-confirm'),
+            onPressed: onConfirm,
+            icon: const Icon(Icons.login_rounded, size: 19),
+            label: const Text('이 이름으로 시작'),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(45),
+              foregroundColor: const Color(0xFF092033),
+              backgroundColor: const Color(0xFF83E5FF),
+              textStyle: const TextStyle(
+                fontFamily: 'Pretendard',
+                fontSize: 13,
+                fontWeight: FontWeight.w900,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(11),
+              ),
+            ),
+          ),
+        ),
       ],
     ),
-  );
-
-  InputDecoration _fieldDecoration(String hint) => InputDecoration(
-    hintText: hint,
-    counterText: '',
-    filled: true,
-    fillColor: const Color(0xFFFFFCF2),
-    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-    enabledBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(14),
-      borderSide: const BorderSide(color: Color(0xFFD8BE91)),
-    ),
-    focusedBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(14),
-      borderSide: const BorderSide(color: _coral, width: 2),
-    ),
-  );
-}
-
-class _AcademyTravelOverlay extends StatelessWidget {
-  const _AcademyTravelOverlay({required this.onSkip});
-
-  final VoidCallback onSkip;
-
-  @override
-  Widget build(BuildContext context) => ColoredBox(
-    key: const Key('academy-travel-loading'),
-    color: const Color(0xF2171B2A),
-    child: SafeArea(
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(28),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox.square(
-                dimension: 64,
-                child: CircularProgressIndicator(
-                  strokeWidth: 7,
-                  color: _yellow,
-                  backgroundColor: Color(0x33536A96),
-                ),
-              ),
-              const SizedBox(height: 24),
-              const Text(
-                '국가계좌 개통실로 이동 중…',
-                key: Key('academy-travel-title'),
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 23,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -0.7,
-                ),
-              ),
-              const SizedBox(height: 11),
-              const Text(
-                '6기 기숙사  ·  중앙 복도  ·  계좌개통실',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Color(0xFFCCD4E6),
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 18),
-              Container(
-                width: 250,
-                height: 6,
-                clipBehavior: Clip.antiAlias,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF394259),
-                  borderRadius: BorderRadius.circular(99),
-                ),
-                child: const LinearProgressIndicator(
-                  color: _coral,
-                  backgroundColor: Colors.transparent,
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextButton.icon(
-                key: const Key('academy-travel-skip'),
-                onPressed: onSkip,
-                style: TextButton.styleFrom(foregroundColor: _yellow),
-                icon: const Icon(Icons.fast_forward_rounded, size: 18),
-                label: const Text(
-                  '복도 이동 건너뛰기',
-                  style: TextStyle(fontWeight: FontWeight.w900),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    ),
-  );
-}
-
-class _AcademyTuitionPaymentPanel extends StatelessWidget {
-  const _AcademyTuitionPaymentPanel({
-    required this.paid,
-    required this.onPay,
-    required this.onContinue,
-  });
-
-  final bool paid;
-  final VoidCallback onPay;
-  final VoidCallback onContinue;
-
-  @override
-  Widget build(BuildContext context) => Column(
-    children: [
-      AnimatedContainer(
-        key: const Key('state-account-activation-card'),
-        duration: const Duration(milliseconds: 320),
-        width: double.infinity,
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: paid ? const Color(0xFFE9F8EF) : const Color(0xFFFFF4D8),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: paid ? const Color(0xFF78BE91) : const Color(0xFFE5C98E),
-          ),
-        ),
-        child: Column(
-          children: [
-            Row(
-              children: [
-                Icon(
-                  paid ? Icons.verified_rounded : Icons.account_balance,
-                  color: paid
-                      ? const Color(0xFF258257)
-                      : const Color(0xFF536A96),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    paid ? '제6기 국가계좌 개통 완료' : '제6기 국가계좌 개통',
-                    style: const TextStyle(
-                      color: _ink,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ),
-                const Text(
-                  '10,000원',
-                  key: Key('state-account-principal'),
-                  style: TextStyle(
-                    color: Color(0xFF258257),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w900,
-                    fontFeatures: _marketNumberFeatures,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 9),
-            const Row(
-              children: [
-                Text(
-                  '계좌 명의',
-                  style: TextStyle(
-                    color: Color(0xFF697386),
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                Spacer(),
-                Text(
-                  '대한민국 미래양성기금',
-                  style: TextStyle(
-                    color: _ink,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ],
-            ),
-            const Divider(height: 17),
-            const Row(
-              children: [
-                Text(
-                  '확정수익 국가 환수',
-                  style: TextStyle(
-                    color: Color(0xFF697386),
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                Spacer(),
-                Text(
-                  '20%',
-                  key: Key('state-recovery-rate'),
-                  style: TextStyle(
-                    color: Color(0xFFC53F4B),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            const Row(
-              children: [
-                Text(
-                  '자립적립금',
-                  style: TextStyle(
-                    color: Color(0xFF697386),
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                Spacer(),
-                Text(
-                  '80% · 만 19세까지 잠금',
-                  key: Key('self-reliance-rate'),
-                  style: TextStyle(
-                    color: Color(0xFF536A96),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            const Row(
-              children: [
-                Text(
-                  '손실의 개인 채무',
-                  style: TextStyle(
-                    color: Color(0xFF697386),
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                Spacer(),
-                Text(
-                  '0원',
-                  key: Key('personal-debt-zero'),
-                  style: TextStyle(
-                    color: Color(0xFF258257),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ],
-            ),
-            if (paid) ...[
-              const SizedBox(height: 10),
-              const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.gavel_rounded, size: 15, color: Color(0xFF258257)),
-                  SizedBox(width: 6),
-                  Text(
-                    '국가계좌 약관과 위험평가표 연결 완료',
-                    key: Key('state-account-activated'),
-                    style: TextStyle(
-                      color: Color(0xFF258257),
-                      fontSize: 10,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ],
-        ),
-      ),
-      const SizedBox(height: 10),
-      _NovelNextButton(
-        key: Key(
-          paid
-              ? 'state-account-activation-continue'
-              : 'state-account-activation-button',
-        ),
-        label: paid ? '개통 통장 받고 투자실로 이동' : '국가계좌 약관 확인하고 개통',
-        enabled: true,
-        onTap: paid ? onContinue : onPay,
-      ),
-    ],
   );
 }
 
@@ -1927,10 +1446,12 @@ class _LivingBackground extends StatefulWidget {
   const _LivingBackground({
     super.key,
     required this.asset,
+    this.sceneBeat = 0,
     this.ambientFlicker = false,
   });
 
   final String asset;
+  final int sceneBeat;
   final bool ambientFlicker;
 
   @override
@@ -1938,41 +1459,63 @@ class _LivingBackground extends StatefulWidget {
 }
 
 class _LivingBackgroundState extends State<_LivingBackground>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late final AnimationController _ambientController;
+  late final AnimationController _scenePulseController;
 
   @override
   void initState() {
     super.initState();
     _ambientController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 12),
+      duration: const Duration(seconds: 14),
+    );
+    _scenePulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 620),
     );
     final isTestBinding = WidgetsBinding.instance.runtimeType
         .toString()
         .contains('TestWidgetsFlutterBinding');
     if (const bool.fromEnvironment('FLUTTER_TEST') || isTestBinding) {
       _ambientController.value = 0.25;
+      _scenePulseController.value = 1;
     } else {
       _ambientController.repeat();
+      _scenePulseController.forward();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _LivingBackground oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.sceneBeat == widget.sceneBeat) return;
+    final isTestBinding = WidgetsBinding.instance.runtimeType
+        .toString()
+        .contains('TestWidgetsFlutterBinding');
+    if (const bool.fromEnvironment('FLUTTER_TEST') || isTestBinding) {
+      _scenePulseController.value = 1;
+    } else {
+      _scenePulseController.forward(from: 0);
     }
   }
 
   @override
   void dispose() {
     _ambientController.dispose();
+    _scenePulseController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
-    animation: _ambientController,
+    animation: Listenable.merge([_ambientController, _scenePulseController]),
     builder: (context, child) => LayoutBuilder(
-      builder: (context, constraints) {
+      builder: (context, _) {
         final t = _ambientController.value;
         final wave = math.sin(t * math.pi * 2);
-        final driftX = wave * 1.8;
-        final driftY = math.cos(t * math.pi * 2) * 1.1;
+        final slowZoom = 1.032 + (wave + 1) * 0.0035;
+        final scenePulse = math.sin(_scenePulseController.value * math.pi);
         final fluorescentPulse =
             0.025 +
             (math.sin(t * math.pi * 14) + 1) * 0.012 +
@@ -1980,17 +1523,15 @@ class _LivingBackgroundState extends State<_LivingBackground>
         return Stack(
           fit: StackFit.expand,
           children: [
-            Transform.translate(
-              offset: Offset(driftX, driftY),
-              child: Transform.scale(
-                scale: 1.025,
-                child: Image.asset(
-                  widget.asset,
-                  key: const Key('story-background-image'),
-                  fit: BoxFit.cover,
-                  alignment: Alignment.center,
-                  filterQuality: FilterQuality.high,
-                ),
+            Transform.scale(
+              scale: slowZoom,
+              alignment: Alignment(0, -0.08 + wave * 0.015),
+              child: Image.asset(
+                widget.asset,
+                key: const Key('story-background-image'),
+                fit: BoxFit.cover,
+                alignment: Alignment.center,
+                filterQuality: FilterQuality.high,
               ),
             ),
             if (widget.ambientFlicker)
@@ -2014,36 +1555,21 @@ class _LivingBackgroundState extends State<_LivingBackground>
                   ),
                 ),
               ),
-            if (widget.ambientFlicker)
-              for (var index = 0; index < 12; index++)
-                Positioned(
-                  left:
-                      ((index * 37) % 101) / 101 * constraints.maxWidth +
-                      math.sin(t * math.pi * 2 + index) * 2,
-                  top:
-                      ((((index * 61) % 97) / 97 * constraints.maxHeight) +
-                          t * 42) %
-                      (constraints.maxHeight * 0.76),
-                  child: IgnorePointer(
-                    child: Opacity(
-                      opacity:
-                          0.11 +
-                          ((math.sin(t * math.pi * 2 + index * 0.8) + 1) *
-                              0.045),
-                      child: Container(
-                        key: index == 0
-                            ? const Key('orientation-dust-motes')
-                            : null,
-                        width: index.isEven ? 2.2 : 1.4,
-                        height: index.isEven ? 2.2 : 1.4,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFFFEDB5),
-                          shape: BoxShape.circle,
-                        ),
-                      ),
+            IgnorePointer(
+              child: Opacity(
+                key: const Key('story-scene-reaction-glow'),
+                opacity: (scenePulse * 0.13).clamp(0.0, 0.13),
+                child: const DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: RadialGradient(
+                      center: Alignment(0, -0.25),
+                      radius: 0.95,
+                      colors: [Color(0x6686DFFF), Colors.transparent],
                     ),
                   ),
                 ),
+              ),
+            ),
           ],
         );
       },
@@ -2051,154 +1577,213 @@ class _LivingBackgroundState extends State<_LivingBackground>
   );
 }
 
-class _OnboardingCharacterSlot extends StatelessWidget {
+class _OnboardingCharacterSlot extends StatefulWidget {
   const _OnboardingCharacterSlot({
     super.key,
     required this.asset,
     required this.alignment,
+    this.position = Offset.zero,
+    this.scale = 1,
     required this.characterKey,
   });
 
   final String asset;
   final Alignment alignment;
+  final Offset position;
+  final double scale;
   final Key characterKey;
 
   @override
-  Widget build(BuildContext context) => AnimatedOpacity(
-    duration: const Duration(milliseconds: 180),
-    opacity: 1,
-    child: AnimatedSwitcher(
-      duration: const Duration(milliseconds: 220),
-      switchInCurve: Curves.easeOut,
-      switchOutCurve: Curves.easeIn,
-      transitionBuilder: (child, animation) {
-        final horizontalOffset = alignment.x < 0
-            ? -0.08
-            : alignment.x > 0
-            ? 0.08
-            : 0.0;
-        final entrance = CurvedAnimation(
-          parent: animation,
-          curve: Curves.easeOutCubic,
-        );
-        return FadeTransition(
-          opacity: entrance,
-          child: SlideTransition(
-            position: Tween<Offset>(
-              begin: Offset(horizontalOffset, 0.02),
-              end: Offset.zero,
-            ).animate(entrance),
-            child: child,
+  State<_OnboardingCharacterSlot> createState() =>
+      _OnboardingCharacterSlotState();
+}
+
+class _OnboardingCharacterSlotState extends State<_OnboardingCharacterSlot>
+    with TickerProviderStateMixin {
+  late final AnimationController _idleController;
+  late final AnimationController _reactionController;
+  late final bool _motionEnabled;
+
+  @override
+  void initState() {
+    super.initState();
+    _idleController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 8200),
+    );
+    _reactionController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 520),
+    );
+    final isTestBinding = WidgetsBinding.instance.runtimeType
+        .toString()
+        .contains('TestWidgetsFlutterBinding');
+    _motionEnabled =
+        !const bool.fromEnvironment('FLUTTER_TEST') && !isTestBinding;
+    if (_motionEnabled) {
+      _idleController.repeat();
+      _reactionController.forward();
+    } else {
+      _reactionController.value = 1;
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _OnboardingCharacterSlot oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.asset == widget.asset &&
+        oldWidget.alignment == widget.alignment &&
+        oldWidget.position == widget.position &&
+        oldWidget.scale == widget.scale) {
+      return;
+    }
+    if (_motionEnabled) {
+      _reactionController.forward(from: 0);
+    } else {
+      _reactionController.value = 1;
+    }
+  }
+
+  @override
+  void dispose() {
+    _idleController.dispose();
+    _reactionController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final stage = AnimatedOpacity(
+      duration: const Duration(milliseconds: 180),
+      opacity: 1,
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 220),
+        switchInCurve: Curves.easeOut,
+        switchOutCurve: Curves.easeIn,
+        transitionBuilder: (child, animation) {
+          final horizontalOffset = widget.alignment.x < 0
+              ? -0.08
+              : widget.alignment.x > 0
+              ? 0.08
+              : 0.0;
+          final entrance = CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutCubic,
+          );
+          return FadeTransition(
+            opacity: entrance,
+            child: SlideTransition(
+              position: Tween<Offset>(
+                begin: Offset(horizontalOffset, 0.02),
+                end: Offset.zero,
+              ).animate(entrance),
+              child: child,
+            ),
+          );
+        },
+        child: LayoutBuilder(
+          key: ValueKey(
+            '${widget.asset}-${widget.alignment.x}-${widget.alignment.y}-${widget.position.dx}-${widget.position.dy}-${widget.scale}',
           ),
-        );
-      },
-      child: LayoutBuilder(
-        key: ValueKey('$asset-${alignment.x}-${alignment.y}'),
-        builder: (context, constraints) {
-          final characterHeight =
-              constraints.maxHeight * _storyCharacterHeightFactor;
-          final characterWidth = (characterHeight * _storyCharacterAspectRatio)
-              .clamp(0.0, constraints.maxWidth)
-              .toDouble();
-          final characterImageHeight = characterHeight
-              .clamp(0.0, constraints.maxHeight - _storyCharacterBottomInset)
-              .toDouble();
-          return Align(
-            alignment: alignment,
-            child: SizedBox(
-              key: characterKey,
-              width: characterWidth,
-              height: characterHeight,
+          builder: (context, constraints) {
+            final characterHeight =
+                constraints.maxHeight * _storyCharacterHeightFactor;
+            final characterWidth =
+                (characterHeight * _storyCharacterAspectRatio)
+                    .clamp(0.0, constraints.maxWidth)
+                    .toDouble();
+            final characterImageHeight = characterHeight
+                .clamp(0.0, constraints.maxHeight - _storyCharacterBottomInset)
+                .toDouble();
+            final positionOffset = Offset(
+              widget.position.dx / 100 * constraints.maxWidth,
+              -widget.position.dy / 100 * constraints.maxHeight,
+            );
+            return Transform.translate(
+              key: const Key('story-character-position'),
+              offset: positionOffset,
               child: Align(
-                alignment: Alignment.bottomCenter,
-                child: Transform.scale(
-                  key: const Key('story-character-scale'),
-                  scale: _storyCharacterScaleForAsset(asset),
-                  alignment: Alignment.bottomCenter,
-                  child: SizedBox(
-                    width: characterWidth,
-                    height: characterImageHeight,
-                    child: Image.asset(
-                      key: const Key('story-character-image'),
-                      asset,
-                      fit: BoxFit.contain,
+                alignment: widget.alignment,
+                child: SizedBox(
+                  key: widget.characterKey,
+                  width: characterWidth,
+                  height: characterHeight,
+                  child: Align(
+                    alignment: Alignment.bottomCenter,
+                    child: Transform.scale(
+                      key: const Key('story-character-scale'),
+                      scale:
+                          _storyCharacterScaleForAsset(widget.asset) *
+                          widget.scale,
                       alignment: Alignment.bottomCenter,
-                      filterQuality: FilterQuality.high,
-                      gaplessPlayback: true,
+                      child: SizedBox(
+                        width: characterWidth,
+                        height: characterImageHeight,
+                        child: Image.asset(
+                          key: const Key('story-character-image'),
+                          widget.asset,
+                          fit: BoxFit.contain,
+                          alignment: Alignment.bottomCenter,
+                          filterQuality: FilterQuality.high,
+                          gaplessPlayback: true,
+                        ),
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
-    ),
-  );
-}
+    );
 
-class _AcademyLessonRow extends StatelessWidget {
-  const _AcademyLessonRow({
-    required this.number,
-    required this.title,
-    required this.body,
-  });
-
-  final String number;
-  final String title;
-  final String body;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    width: double.infinity,
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-    decoration: BoxDecoration(
-      color: const Color(0xFFFFF4D8),
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: const Color(0xFFE5C98E)),
-    ),
-    child: Row(
-      children: [
-        CircleAvatar(
-          radius: 13,
-          backgroundColor: const Color(0xFF536A96),
-          child: Text(
-            number,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 10,
-              fontWeight: FontWeight.w900,
+    return AnimatedBuilder(
+      animation: Listenable.merge(<Listenable>[
+        _idleController,
+        _reactionController,
+      ]),
+      child: stage,
+      builder: (context, child) {
+        final motionAllowed =
+            _motionEnabled && !MediaQuery.disableAnimationsOf(context);
+        final phaseSeed = widget.asset.codeUnits.fold<int>(
+          0,
+          (sum, value) => (sum + value) % 360,
+        );
+        final phase = phaseSeed / 180 * math.pi;
+        final idleAngle = _idleController.value * math.pi * 2;
+        final breathing = motionAllowed
+            ? (math.sin(idleAngle + phase) + 1) * 0.5
+            : 0.0;
+        final reactionProgress = motionAllowed
+            ? Curves.easeOutCubic.transform(_reactionController.value)
+            : 1.0;
+        final reactionEmphasis = motionAllowed
+            ? math.sin(_reactionController.value * math.pi)
+            : 0.0;
+        final reactionSide = phaseSeed.isEven ? 1.0 : -1.0;
+        return Transform.translate(
+          key: const Key('story-character-living-motion'),
+          offset: Offset((1 - reactionProgress) * reactionSide * 7, 0),
+          child: Transform.rotate(
+            angle: reactionEmphasis * reactionSide * 0.0018,
+            alignment: Alignment.bottomCenter,
+            child: Transform(
+              key: const Key('story-character-breathing-motion'),
+              transform: Matrix4.diagonal3Values(
+                1 - breathing * 0.0007,
+                1 + breathing * 0.0022 + reactionEmphasis * 0.004,
+                1,
+              ),
+              alignment: Alignment.bottomCenter,
+              child: child,
             ),
           ),
-        ),
-        const SizedBox(width: 9),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  color: _ink,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              Text(
-                body,
-                style: const TextStyle(
-                  color: Color(0xFF687183),
-                  fontSize: 9,
-                  height: 1.3,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    ),
-  );
+        );
+      },
+    );
+  }
 }
 
 class _AcademyPcTerminal extends StatelessWidget {
@@ -2382,7 +1967,7 @@ class _AcademyPcTerminal extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          '국립 미래양성원 · 제6기 실습 PC',
+          '프로젝트 데시멀 · 06번 실습 PC',
           style: TextStyle(
             color: Colors.white,
             fontSize: 10,
@@ -2398,22 +1983,45 @@ class _AcademyPcTerminal extends StatelessWidget {
             onTap: onOpenStockApp,
             borderRadius: BorderRadius.circular(12),
             child: Container(
-              width: 112,
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+              width: 122,
+              padding: const EdgeInsets.fromLTRB(8, 6, 8, 5),
               decoration: BoxDecoration(
-                color: const Color(0xEFFFFFFF),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFDFE9F2)),
-              ),
-              child: const Column(
-                children: [
-                  Icon(
-                    Icons.candlestick_chart_rounded,
-                    color: Color(0xFFCE3E4E),
-                    size: 30,
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: <Color>[Color(0xFFF8FCFF), Color(0xFFE2F2F3)],
+                ),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFBFD7E1)),
+                boxShadow: const <BoxShadow>[
+                  BoxShadow(
+                    color: Color(0x4D0C2338),
+                    blurRadius: 10,
+                    offset: Offset(0, 4),
                   ),
-                  SizedBox(height: 4),
-                  Text(
+                  BoxShadow(
+                    color: Color(0x4DFFFFFF),
+                    blurRadius: 2,
+                    offset: Offset(0, -1),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(11),
+                    child: Image.asset(
+                      'assets/images/stock_practice_app_icon_v1.png',
+                      key: const Key('academy-stock-app-icon-image'),
+                      width: 48,
+                      height: 48,
+                      fit: BoxFit.cover,
+                      filterQuality: FilterQuality.high,
+                      isAntiAlias: true,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  const Text(
                     '주식실습',
                     style: TextStyle(
                       color: _ink,
@@ -2464,7 +2072,7 @@ class _AcademyPcTerminal extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '제6기 주식실습',
+                    '데시멀 주식실습',
                     style: TextStyle(
                       color: _ink,
                       fontSize: 12,
@@ -2489,10 +2097,11 @@ class _AcademyPcTerminal extends StatelessWidget {
         TextField(
           key: const Key('academy-player-name-input'),
           controller: playerController,
+          readOnly: true,
           maxLength: 12,
           textInputAction: TextInputAction.next,
           onChanged: (_) => onChanged(),
-          decoration: _inputDecoration('운용자 이름', '예: 민준'),
+          decoration: _inputDecoration('운용자', '프롤로그에서 정한 이름'),
         ),
         const SizedBox(height: 7),
         TextField(
@@ -2504,7 +2113,7 @@ class _AcademyPcTerminal extends StatelessWidget {
           onSubmitted: (_) {
             if (_canStart) onStartTutorial();
           },
-          decoration: _inputDecoration('투자장부 이름', '예: 첫빛 투자연구소'),
+          decoration: _inputDecoration('투자장부 이름', '예: 데시멀 첫 장부'),
         ),
         const SizedBox(height: 8),
         Container(
@@ -2516,7 +2125,7 @@ class _AcademyPcTerminal extends StatelessWidget {
             border: Border.all(color: const Color(0xFFE4C779)),
           ),
           child: const Text(
-            '국가원금 10,000원 · 기록형 원칙 · 확정이익 20% 국가 환수 / 80% 자립적립',
+            '국가원금 50,000원 · 기록형 원칙 · 확정이익 20% 국가 환수 / 80% 자립적립',
             key: Key('academy-state-account-rule'),
             textAlign: TextAlign.center,
             style: TextStyle(
@@ -2664,23 +2273,70 @@ class _SceneLabel extends StatelessWidget {
 
 _NovelDialogueState? _activeNovelDialogueState;
 
+const _decimalCohortSpeakers = <String>{
+  '김학준',
+  '김서아',
+  '이지안',
+  '최이서',
+  '정아린',
+  '박하은',
+  '한수아',
+  '오지우',
+  '윤채아',
+};
+
+String _dialogueSpeakerName(String speaker) => switch (speaker) {
+  '한규진 국정원장' => '한규진',
+  '임서희 경제안보국장' => '임서희',
+  '도윤석 기획조정관' => '도윤석',
+  '조민경 권익감사관' => '조민경',
+  '차은주 선발관' => '차은주',
+  '오경태 시설관리관' => '오경태',
+  '한서윤 운영관' => '한서윤',
+  '윤하린 은행원' => '윤하린',
+  _ => speaker,
+};
+
+String _dialogueSpeakerAffiliation(String speaker, String playerName) {
+  if (speaker == '이야기') return 'PROJECT DECIMAL';
+  if (speaker == '한규진 국정원장') return '국가정보원';
+  if (speaker == '임서희 경제안보국장') return '국가정보원 · 경제안보국';
+  if (speaker == '도윤석 기획조정관') return '국가정보원 · 기획조정실';
+  if (speaker == '조민경 권익감사관') return '국가정보원 · 권익감사실';
+  if (speaker == '차은주 선발관') return '프로젝트 데시멀 · 선발팀';
+  if (speaker == '오경태 시설관리관') return '프로젝트 데시멀 · 시설관리';
+  if (speaker == '한서윤 운영관') return '프로젝트 데시멀 · 운영관';
+  if (speaker == '윤하린 은행원') return '새천년은행 · 개인금융';
+  if (speaker == '데시멀 실습 PC') return '프로젝트 데시멀';
+  if (speaker == '거절한 후보') return '장학 적성검사 응시자';
+  if (_decimalCohortSpeakers.contains(speaker) ||
+      (playerName.isNotEmpty && speaker == playerName)) {
+    return '프로젝트 데시멀 · 제6기';
+  }
+  return '';
+}
+
 class _NovelDialogue extends StatefulWidget {
   const _NovelDialogue({
     super.key,
     required this.speaker,
+    this.playerName = '',
     required this.line,
     this.narration = false,
     this.stageDirection,
     this.onContinue,
+    this.continueKey,
     this.choices = const [],
     this.child,
   });
 
   final String speaker;
+  final String playerName;
   final String line;
   final bool narration;
   final String? stageDirection;
   final VoidCallback? onContinue;
+  final Key? continueKey;
   final List<_NovelChoice> choices;
   final Widget? child;
 
@@ -2702,7 +2358,6 @@ class _NovelDialogueState extends State<_NovelDialogue>
   void initState() {
     super.initState();
     _activeNovelDialogueState = this;
-    _dialoguePanelOpacity.addListener(_handlePanelOpacityChanged);
     _typingController = AnimationController(
       vsync: this,
       duration: _typingDuration(widget.line),
@@ -2721,36 +2376,8 @@ class _NovelDialogueState extends State<_NovelDialogue>
     }
   }
 
-  void _revealLine() {
-    if (_typingComplete) return;
-    _playStoryFeedback();
-    _typingController.value = 1;
-  }
-
   void _handleExternalTap() {
-    if (!_typingComplete) {
-      _revealLine();
-      return;
-    }
     widget.onContinue?.call();
-  }
-
-  void _handlePanelOpacityChanged() {
-    if (mounted) setState(() {});
-  }
-
-  void _updatePanelOpacity(double localX, double width) {
-    if (width <= 0) return;
-    final normalized = (localX / width).clamp(0.0, 1.0).toDouble();
-    _setDialoguePanelOpacity(
-      _dialoguePanelOpacityMin +
-          ((_dialoguePanelOpacityMax - _dialoguePanelOpacityMin) * normalized),
-    );
-  }
-
-  void _adjustPanelOpacity(double delta) {
-    _setDialoguePanelOpacity(_dialoguePanelOpacity.value + delta);
-    unawaited(_saveDialoguePanelOpacity());
   }
 
   @override
@@ -2758,7 +2385,6 @@ class _NovelDialogueState extends State<_NovelDialogue>
     if (identical(_activeNovelDialogueState, this)) {
       _activeNovelDialogueState = null;
     }
-    _dialoguePanelOpacity.removeListener(_handlePanelOpacityChanged);
     _typingController.dispose();
     super.dispose();
   }
@@ -2772,181 +2398,75 @@ class _NovelDialogueState extends State<_NovelDialogue>
       0,
       math.min(visibleCharacters, widget.line.length),
     );
-    final panelOpacity = _dialoguePanelOpacity.value;
-    final panelStrength = (panelOpacity / _dialoguePanelOpacityMax)
-        .clamp(0.0, 1.0)
-        .toDouble();
-    final backdropBlurSigma = _dialogueBackdropBlurSigma(panelOpacity);
-    final panelGradient = widget.narration
-        ? [
-            const Color(0xFF1B2436).withValues(alpha: panelOpacity),
-            const Color(0xFF111A2A).withValues(alpha: panelOpacity * 0.9),
-          ]
-        : [
-            const Color(0xFF172A42).withValues(alpha: panelOpacity),
-            const Color(0xFF111E31).withValues(alpha: panelOpacity * 0.9),
-          ];
-    final secondaryText = widget.narration
-        ? const Color(0xFFE1ECFA)
-        : const Color(0xFFEAF4FF);
-
+    final speakerName = _dialogueSpeakerName(widget.speaker);
+    final affiliation = _dialogueSpeakerAffiliation(
+      widget.speaker,
+      widget.playerName.trim(),
+    );
     return GestureDetector(
+      key: widget.onContinue == null
+          ? null
+          : widget.continueKey ?? const Key('story-continue'),
       behavior: HitTestBehavior.opaque,
       onTap: _handleExternalTap,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Container(
-            key: const Key('story-dialogue-panel'),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: panelGradient,
-              ),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xB8C8EDFF), width: 1.15),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x5C020814),
-                  blurRadius: 22,
-                  offset: Offset(0, 8),
-                ),
-                BoxShadow(
-                  color: Color(0x344BC7F1),
-                  blurRadius: 12,
-                  spreadRadius: -5,
-                ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(11),
-              child: BackdropFilter(
-                key: ValueKey(
-                  'story-dialogue-backdrop-blur-${backdropBlurSigma.toStringAsFixed(2)}',
-                ),
-                filter: ui.ImageFilter.blur(
-                  sigmaX: backdropBlurSigma,
-                  sigmaY: backdropBlurSigma,
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(17, 23, 14, 10),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
+      child: Container(
+        key: const Key('story-dialogue-panel'),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 13, 18, 14),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Semantics(
+                key: const Key('story-speaker-chip'),
+                label: affiliation.isEmpty
+                    ? widget.speaker
+                    : '${widget.speaker}, $affiliation',
+                child: ExcludeSemantics(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
                     children: [
-                      if (widget.stageDirection?.trim().isNotEmpty ??
-                          false) ...[
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.fromLTRB(10, 6, 9, 6),
-                          decoration: BoxDecoration(
-                            color: const Color(
-                              0xFF4FD7FF,
-                            ).withValues(alpha: 0.19 * panelStrength),
-                            border: const Border(
-                              left: BorderSide(
-                                color: Color(0xFF72DEFF),
-                                width: 3,
-                              ),
+                      Text(
+                        speakerName,
+                        key: const Key('story-speaker-name'),
+                        style: const TextStyle(
+                          color: Color(0xFFF8FBFF),
+                          fontFamily: 'Pretendard',
+                          fontSize: 18,
+                          height: 1.1,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: -0.45,
+                          shadows: [
+                            Shadow(
+                              color: Color(0xB8000000),
+                              blurRadius: 4,
+                              offset: Offset(0, 1),
                             ),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
+                          ],
+                        ),
+                      ),
+                      if (affiliation.isNotEmpty) ...[
+                        const SizedBox(width: 7),
+                        Flexible(
                           child: Text(
-                            widget.stageDirection!,
-                            key: const Key('story-stage-direction'),
+                            affiliation,
+                            key: const Key('story-speaker-affiliation'),
+                            overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                              color: Color(0xFFF2FAFF),
+                              color: Color(0xFF62C9F6),
                               fontFamily: 'Pretendard',
-                              fontSize: 12.5,
-                              height: 1.38,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: -0.15,
+                              fontSize: 11.5,
+                              height: 1.1,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.25,
                               shadows: [
                                 Shadow(
-                                  color: Color(0xCC000000),
-                                  blurRadius: 4,
+                                  color: Color(0xB8000000),
+                                  blurRadius: 3,
                                   offset: Offset(0, 1),
                                 ),
                               ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 7),
-                      ],
-                      Semantics(
-                        liveRegion: true,
-                        label: widget.line,
-                        child: Text(
-                          visibleLine,
-                          key: const Key('story-line-text'),
-                          style: const TextStyle(
-                            color: Color(0xFFF9FCFF),
-                            fontFamily: 'Maplestory',
-                            fontSize: 15,
-                            height: 1.5,
-                            fontWeight: FontWeight.w400,
-                            letterSpacing: -0.2,
-                            shadows: [
-                              Shadow(
-                                color: Color(0xE6000000),
-                                blurRadius: 5,
-                                offset: Offset(0, 1.4),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      if (!_typingComplete) ...[
-                        const SizedBox(height: 7),
-                        Text(
-                          '화면을 누르면 문장이 한 번에 표시됩니다',
-                          key: const Key('story-typewriter-hint'),
-                          style: TextStyle(
-                            color: secondaryText.withValues(alpha: 0.78),
-                            fontFamily: 'Pretendard',
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                      if (_typingComplete && widget.choices.isNotEmpty) ...[
-                        const SizedBox(height: 10),
-                        ...widget.choices.map(
-                          (choice) => Padding(
-                            padding: const EdgeInsets.only(bottom: 7),
-                            child: choice,
-                          ),
-                        ),
-                      ],
-                      if (_typingComplete && widget.child != null) ...[
-                        const SizedBox(height: 10),
-                        widget.child!,
-                      ],
-                      if (_typingComplete && widget.onContinue != null) ...[
-                        const SizedBox(height: 2),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton.icon(
-                            key: const Key('story-continue'),
-                            onPressed: widget.onContinue,
-                            label: const Text('다음'),
-                            iconAlignment: IconAlignment.end,
-                            icon: const Icon(
-                              Icons.keyboard_double_arrow_down_rounded,
-                              size: 20,
-                            ),
-                            style: TextButton.styleFrom(
-                              minimumSize: const Size(70, 36),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 9,
-                              ),
-                              foregroundColor: const Color(0xFF83E5FF),
-                              textStyle: const TextStyle(
-                                fontFamily: 'Pretendard',
-                                fontSize: 12,
-                                fontWeight: FontWeight.w900,
-                              ),
                             ),
                           ),
                         ),
@@ -2955,134 +2475,67 @@ class _NovelDialogueState extends State<_NovelDialogue>
                   ),
                 ),
               ),
-            ),
-          ),
-          Positioned(
-            left: 14,
-            top: -15,
-            child: Container(
-              key: const Key('story-speaker-chip'),
-              padding: const EdgeInsets.fromLTRB(13, 6, 16, 6),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xF03DB9E9), Color(0xE92D79C7)],
-                ),
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(5),
-                  topRight: Radius.circular(15),
-                  bottomRight: Radius.circular(5),
-                  bottomLeft: Radius.circular(5),
-                ),
-                border: Border.all(color: const Color(0xD9E6F9FF)),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x66020A18),
-                    blurRadius: 8,
-                    offset: Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: Text(
-                widget.speaker,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontFamily: 'Maplestory',
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: -0.1,
-                  shadows: [Shadow(color: Color(0x99000000), blurRadius: 3)],
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            right: 10,
-            top: 0,
-            child: Semantics(
-              slider: true,
-              label: '대화창 배경 농도',
-              value: '${(panelOpacity * 100).round()}%',
-              increasedValue:
-                  '${((_clampDialoguePanelOpacity(panelOpacity + 0.08)) * 100).round()}%',
-              decreasedValue:
-                  '${((_clampDialoguePanelOpacity(panelOpacity - 0.08)) * 100).round()}%',
-              onIncrease: () => _adjustPanelOpacity(0.08),
-              onDecrease: () => _adjustPanelOpacity(-0.08),
-              child: SizedBox(
-                key: const Key('story-dialogue-opacity-control'),
-                width: 72,
-                height: 28,
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    const thumbSize = 8.0;
-                    const horizontalInset = 5.0;
-                    final trackWidth =
-                        constraints.maxWidth - (horizontalInset * 2);
-                    final normalized =
-                        (panelOpacity - _dialoguePanelOpacityMin) /
-                        (_dialoguePanelOpacityMax - _dialoguePanelOpacityMin);
-                    final thumbLeft =
-                        horizontalInset +
-                        ((trackWidth - thumbSize) * normalized);
-                    return GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTapUp: (details) {
-                        _updatePanelOpacity(
-                          details.localPosition.dx - horizontalInset,
-                          trackWidth,
-                        );
-                        unawaited(_saveDialoguePanelOpacity());
-                      },
-                      onHorizontalDragUpdate: (details) => _updatePanelOpacity(
-                        details.localPosition.dx - horizontalInset,
-                        trackWidth,
-                      ),
-                      onHorizontalDragEnd: (_) =>
-                          unawaited(_saveDialoguePanelOpacity()),
-                      child: Stack(
-                        alignment: Alignment.centerLeft,
-                        children: [
-                          Positioned(
-                            left: horizontalInset,
-                            right: horizontalInset,
-                            child: Container(
-                              height: 2,
-                              decoration: BoxDecoration(
-                                color: const Color(0x996FDCFF),
-                                borderRadius: BorderRadius.circular(99),
-                              ),
-                            ),
-                          ),
-                          Positioned(
-                            left: thumbLeft,
-                            child: Transform.rotate(
-                              angle: math.pi / 4,
-                              child: Container(
-                                key: const Key('story-dialogue-opacity-thumb'),
-                                width: thumbSize,
-                                height: thumbSize,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF8BE6FF),
-                                  border: Border.all(color: Colors.white70),
-                                  boxShadow: const [
-                                    BoxShadow(
-                                      color: Color(0xAA39CFFF),
-                                      blurRadius: 5,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
+              const SizedBox(height: 6),
+              const SizedBox(
+                key: Key('story-dialogue-divider'),
+                width: double.infinity,
+                height: 9,
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Color(0xAA9CB5C5),
+                          Color(0x668AA8BC),
+                          Color(0x009CB5C5),
                         ],
+                        stops: [0, 0.7, 1],
                       ),
-                    );
-                  },
+                    ),
+                    child: SizedBox(width: double.infinity, height: 1),
+                  ),
                 ),
               ),
-            ),
+              Semantics(
+                liveRegion: true,
+                label: widget.line,
+                child: Text(
+                  visibleLine,
+                  key: const Key('story-line-text'),
+                  style: const TextStyle(
+                    color: Color(0xFFF9FCFF),
+                    fontFamily: 'Pretendard',
+                    fontSize: 15.5,
+                    height: 1.48,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -0.3,
+                    shadows: [
+                      Shadow(
+                        color: Color(0xE8000000),
+                        blurRadius: 5,
+                        offset: Offset(0, 1.4),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              if (_typingComplete && widget.choices.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                ...widget.choices.map(
+                  (choice) => Padding(
+                    padding: const EdgeInsets.only(bottom: 7),
+                    child: choice,
+                  ),
+                ),
+              ],
+              if (_typingComplete && widget.child != null) ...[
+                const SizedBox(height: 10),
+                widget.child!,
+              ],
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -3113,38 +2566,6 @@ class _NovelChoice extends StatelessWidget {
           Expanded(child: Text(label)),
           const Icon(Icons.chevron_right_rounded, color: _coral),
         ],
-      ),
-    ),
-  );
-}
-
-class _NovelNextButton extends StatelessWidget {
-  const _NovelNextButton({
-    super.key,
-    required this.label,
-    required this.enabled,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool enabled;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) => SizedBox(
-    width: double.infinity,
-    height: 47,
-    child: FilledButton.icon(
-      onPressed: enabled ? onTap : null,
-      label: Text(label),
-      iconAlignment: IconAlignment.end,
-      icon: const Icon(Icons.arrow_forward_rounded, size: 18),
-      style: FilledButton.styleFrom(
-        foregroundColor: _ink,
-        backgroundColor: _yellow,
-        disabledBackgroundColor: const Color(0xFFD9D6CC),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        textStyle: const TextStyle(fontWeight: FontWeight.w900),
       ),
     ),
   );

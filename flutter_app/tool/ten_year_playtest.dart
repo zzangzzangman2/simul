@@ -145,7 +145,7 @@ Future<void> main() async {
       playerName: 'Codex',
       introChoice: 'computer',
       startingTrait: StoryTrait.analysis,
-      familyRule: FamilyRule.reportLosses,
+      operatingPrinciple: OperatingPrinciple.reportLosses,
     ),
   );
   state = _resolvePending(state);

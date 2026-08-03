@@ -305,8 +305,8 @@ const kHiringCandidates = <EmployeeProfile>[
   ),
 ];
 
-class FamilyHelperStatus {
-  const FamilyHelperStatus({
+class AcademyHelperStatus {
+  const AcademyHelperStatus({
     required this.id,
     required this.name,
     required this.relation,
@@ -332,7 +332,7 @@ class FamilyHelperStatus {
 
   bool canHelpOn(int day) => fatigue < 80 && lastHelpDay != day;
 
-  FamilyHelperStatus requestHelp(int day) => FamilyHelperStatus(
+  AcademyHelperStatus requestHelp(int day) => AcademyHelperStatus(
     id: id,
     name: name,
     relation: relation,
@@ -345,7 +345,7 @@ class FamilyHelperStatus {
     lastHelpDay: day,
   );
 
-  FamilyHelperStatus recover() => FamilyHelperStatus(
+  AcademyHelperStatus recover() => AcademyHelperStatus(
     id: id,
     name: name,
     relation: relation,
@@ -371,11 +371,11 @@ class FamilyHelperStatus {
     'lastHelpDay': lastHelpDay,
   };
 
-  factory FamilyHelperStatus.fromJson(Map<String, dynamic> json) =>
-      FamilyHelperStatus(
-        id: json['id'] as String? ?? 'family',
-        name: json['name'] as String? ?? '가족',
-        relation: json['relation'] as String? ?? '가족',
+  factory AcademyHelperStatus.fromJson(Map<String, dynamic> json) =>
+      AcademyHelperStatus(
+        id: json['id'] as String? ?? 'academy-helper',
+        name: json['name'] as String? ?? '데시멀 동기 조언자',
+        relation: json['relation'] as String? ?? '데시멀 센터 공동체',
         role: json['role'] as String? ?? '도움',
         specialty: json['specialty'] as String? ?? '생활 경험',
         effect: json['effect'] as String? ?? '조사에 도움을 줍니다.',
@@ -391,37 +391,37 @@ class FamilyHelperStatus {
 class OrganizationState {
   const OrganizationState({
     required this.employees,
-    required this.familyHelpers,
+    required this.academyHelpers,
     required this.cultureTags,
     required this.helpLog,
   });
 
   final List<EmployeeProfile> employees;
-  final List<FamilyHelperStatus> familyHelpers;
+  final List<AcademyHelperStatus> academyHelpers;
   final List<String> cultureTags;
   final List<String> helpLog;
 
-  int get familyFatigue {
-    if (familyHelpers.isEmpty) return 0;
-    return (familyHelpers.fold<int>(0, (sum, item) => sum + item.fatigue) /
-            familyHelpers.length)
+  int get academyFatigue {
+    if (academyHelpers.isEmpty) return 0;
+    return (academyHelpers.fold<int>(0, (sum, item) => sum + item.fatigue) /
+            academyHelpers.length)
         .round();
   }
 
   int get researchHelpCount =>
-      familyHelpers.fold<int>(0, (sum, item) => sum + item.helpCount);
+      academyHelpers.fold<int>(0, (sum, item) => sum + item.helpCount);
 
   int get monthlyPayroll =>
       employees.fold<int>(0, (sum, employee) => sum + employee.salaryMonthly);
 
   OrganizationState copyWith({
     List<EmployeeProfile>? employees,
-    List<FamilyHelperStatus>? familyHelpers,
+    List<AcademyHelperStatus>? academyHelpers,
     List<String>? cultureTags,
     List<String>? helpLog,
   }) => OrganizationState(
     employees: employees ?? this.employees,
-    familyHelpers: familyHelpers ?? this.familyHelpers,
+    academyHelpers: academyHelpers ?? this.academyHelpers,
     cultureTags: cultureTags ?? this.cultureTags,
     helpLog: helpLog ?? this.helpLog,
   );
@@ -434,54 +434,46 @@ class OrganizationState {
     );
   }
 
-  factory OrganizationState.initial(FamilyRule rule) => OrganizationState(
+  factory OrganizationState.initial(
+    OperatingPrinciple rule,
+  ) => OrganizationState(
     employees: const [],
-    familyHelpers: const [
-      FamilyHelperStatus(
-        id: 'mother',
-        name: '엄마',
-        relation: '보호자·계좌 명의자',
-        role: '장부 검토와 주문 승인',
-        specialty: '회계 · 현금관리',
-        effect: '장부 실수 위험을 낮추고 계좌 규칙을 확인합니다.',
-        asset: 'assets/images/character_mother_title_style_v2.png',
+    academyHelpers: const [
+      AcademyHelperStatus(
+        id: 'hakjun',
+        name: '김학준',
+        relation: '데시멀 동기',
+        role: '규정과 공시 교차검토',
+        specialty: '규정 · 위험 · 기록',
+        effect: '규정집과 공시를 대조해 빠뜨린 위험 조건을 찾아냅니다.',
+        asset:
+            'assets/images/historical_prologue/character_hakjun_orientation_v2.png',
         fatigue: 8,
         helpCount: 0,
         lastHelpDay: null,
       ),
-      FamilyHelperStatus(
-        id: 'father',
-        name: '아빠',
-        relation: '현장 조언자',
-        role: '공장과 제품 확인',
-        specialty: '제조업 · 납품 · 재고',
-        effect: '제조업 종목에서 숫자만으로 보이지 않는 현장 단서를 찾습니다.',
-        asset: 'assets/images/character_father_title_style_v2.png',
+      AcademyHelperStatus(
+        id: 'sua',
+        name: '한수아',
+        relation: '데시멀 동기',
+        role: '고객과 생활 반응 조사',
+        specialty: '사람 · 소비 · 인터뷰',
+        effect: '숫자 뒤에 있는 고객 표정과 실제 사용 반응을 확인합니다.',
+        asset:
+            'assets/images/production_soft_painted/han_sua/02_warm_smile_wave_v3.png',
         fatigue: 5,
         helpCount: 0,
         lastHelpDay: null,
       ),
-      FamilyHelperStatus(
-        id: 'sister',
-        name: '누나',
-        relation: '소비자 조사 파트너',
-        role: '유행과 제품 반응 조사',
-        specialty: '인터넷 · 게임 · 음악',
-        effect: '또래 소비자 반응과 새로운 유행 단서를 발견합니다.',
-        asset: 'assets/images/character_sister_title_style_v2.png',
+      AcademyHelperStatus(
+        id: 'seoyoon',
+        name: '한서윤',
+        relation: '데시멀 담당 운영관',
+        role: '투자노트 점검',
+        specialty: '기업분석 · 손실복기 · 준법',
+        effect: '매수 이유와 매도 조건이 실제 기록으로 남았는지 점검합니다.',
+        asset: 'assets/images/주식선생님/26_포즈5_주인공그림체_공통슬롯_투명.png',
         fatigue: 4,
-        helpCount: 0,
-        lastHelpDay: null,
-      ),
-      FamilyHelperStatus(
-        id: 'grandfather',
-        name: '외할아버지',
-        relation: '첫 투자금의 주인',
-        role: '장기 투자 원칙 조언',
-        specialty: '배당 · 부채 · 현금흐름',
-        effect: '가격보다 현금과 부채를 먼저 보는 질문을 추가합니다.',
-        asset: 'assets/images/character_grandfather.png',
-        fatigue: 3,
         helpCount: 0,
         lastHelpDay: null,
       ),
@@ -490,20 +482,20 @@ class OrganizationState {
     helpLog: const [],
   );
 
-  static String _cultureForRule(FamilyRule rule) => switch (rule) {
-    FamilyRule.reportLosses => '정직한 보고',
-    FamilyRule.noHotTips => '독립 리서치',
-    FamilyRule.keepCash => '현금 우선',
+  static String _cultureForRule(OperatingPrinciple rule) => switch (rule) {
+    OperatingPrinciple.reportLosses => '정직한 보고',
+    OperatingPrinciple.noHotTips => '독립 리서치',
+    OperatingPrinciple.keepCash => '현금 우선',
   };
 
-  OrganizationState requestFamilyHelp(String helperId, int day) {
-    final helper = familyHelpers
+  OrganizationState requestAcademyHelp(String helperId, int day) {
+    final helper = academyHelpers
         .where((item) => item.id == helperId)
         .firstOrNull;
     if (helper == null || !helper.canHelpOn(day)) return this;
     return OrganizationState(
       employees: employees,
-      familyHelpers: familyHelpers
+      academyHelpers: academyHelpers
           .map((item) => item.id == helperId ? item.requestHelp(day) : item)
           .toList(growable: false),
       cultureTags: cultureTags,
@@ -513,14 +505,14 @@ class OrganizationState {
 
   OrganizationState recoverOneDay() => OrganizationState(
     employees: employees,
-    familyHelpers: familyHelpers.map((item) => item.recover()).toList(),
+    academyHelpers: academyHelpers.map((item) => item.recover()).toList(),
     cultureTags: cultureTags,
     helpLog: helpLog,
   );
 
   Map<String, dynamic> toJson() => {
     'employees': employees.map((item) => item.toJson()).toList(),
-    'familyHelpers': familyHelpers.map((item) => item.toJson()).toList(),
+    'academyHelpers': academyHelpers.map((item) => item.toJson()).toList(),
     'cultureTags': cultureTags,
     'helpLog': helpLog,
   };
@@ -528,21 +520,22 @@ class OrganizationState {
   factory OrganizationState.fromJson(
     Map<String, dynamic> json, {
     required int legacyTeamCount,
-    required FamilyRule familyRule,
+    required OperatingPrinciple operatingPrinciple,
   }) {
     if (json.isEmpty) {
-      final initial = OrganizationState.initial(familyRule);
+      final initial = OrganizationState.initial(operatingPrinciple);
       if (legacyTeamCount <= 1) return initial;
       return OrganizationState(
         employees: List.generate(
           legacyTeamCount - 1,
           (index) => EmployeeProfile.legacy(index + 1),
         ),
-        familyHelpers: initial.familyHelpers,
+        academyHelpers: initial.academyHelpers,
         cultureTags: initial.cultureTags,
         helpLog: const [],
       );
     }
+    final academy = OrganizationState.initial(operatingPrinciple);
     return OrganizationState(
       employees: ((json['employees'] as List?) ?? const [])
           .map(
@@ -550,15 +543,9 @@ class OrganizationState {
                 EmployeeProfile.fromJson((item as Map).cast<String, dynamic>()),
           )
           .toList(),
-      familyHelpers: ((json['familyHelpers'] as List?) ?? const [])
-          .map(
-            (item) => FamilyHelperStatus.fromJson(
-              (item as Map).cast<String, dynamic>(),
-            ),
-          )
-          .toList(),
+      academyHelpers: academy.academyHelpers,
       cultureTags: ((json['cultureTags'] as List?) ?? const []).cast<String>(),
-      helpLog: ((json['helpLog'] as List?) ?? const []).cast<String>(),
+      helpLog: const [],
     );
   }
 }

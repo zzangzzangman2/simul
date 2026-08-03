@@ -5,7 +5,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:millennium_capital/game/game_engine.dart';
 import 'package:millennium_capital/game/game_state.dart';
 import 'package:millennium_capital/game/market_news.dart';
-import 'package:millennium_capital/game/order_book.dart';
 import 'package:millennium_capital/game/seed_money_content.dart';
 import 'package:millennium_capital/main.dart';
 
@@ -94,8 +93,8 @@ void main() {
     final inlineBidRows = find.byKey(
       const ValueKey('inline-order-book-bid-row'),
     );
-    expect(inlineAskRows, findsNWidgets(gameOrderBookLevelCount));
-    expect(inlineBidRows, findsNWidgets(gameOrderBookLevelCount));
+    expect(inlineAskRows, findsNWidgets(stockOrderBookVisibleSideRows));
+    expect(inlineBidRows, findsNWidgets(stockOrderBookVisibleSideRows));
     final bestAskY = tester.getCenter(inlineAskRows.last).dy;
     final bestBidY = tester.getCenter(inlineBidRows.first).dy;
     expect(bestAskY, lessThan(bestBidY));
@@ -141,14 +140,14 @@ void main() {
       MaterialApp(
         home: OrganizationScreen(
           state: state,
-          onRequestFamilyHelp: (_) async => state,
+          onRequestAcademyHelp: (_) async => state,
         ),
       ),
     );
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('assignment-portrait-mother')), findsOneWidget);
-    await tester.ensureVisible(find.byKey(const Key('assignment-card-father')));
+    expect(find.byKey(const Key('assignment-portrait-hakjun')), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const Key('assignment-card-sua')));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
   });
@@ -170,7 +169,7 @@ void main() {
         totalBoardSeats: 7,
         investmentBookValue: 390000,
         acquiredAtDay: 1828,
-        leadershipModel: CompanyLeadershipModel.fatherAdvisor,
+        leadershipModel: CompanyLeadershipModel.academyAdvisor,
         monthlyRevenue: 175000,
         monthlyOperatingCost: 140000,
       ),
@@ -179,7 +178,7 @@ void main() {
       MaterialApp(
         home: OrganizationScreen(
           state: state,
-          onRequestFamilyHelp: (_) async => state,
+          onRequestAcademyHelp: (_) async => state,
         ),
       ),
     );
@@ -239,7 +238,7 @@ void main() {
           onSetMarketMinute: (_) async => state,
           onSaveMarketNotebook: (_, _) async => state,
           onResolveDecision: (_, _) async {},
-          onRequestFamilyHelp: (_) async => state,
+          onRequestAcademyHelp: (_) async => state,
           onCompleteWork: (_) async => state,
           onExecuteTrade: (_) async => TradeExecutionResult(
             success: false,
@@ -489,7 +488,7 @@ void main() {
     await tester.tap(appendix.hitTestable());
     await tester.pumpAndSettle();
 
-    expect(find.text('가족 계좌 상태와 오늘의 신문 스크랩'), findsOneWidget);
+    expect(find.text('국가계좌 상태와 오늘의 신문 스크랩'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -512,7 +511,7 @@ void main() {
           onSetMarketMinute: (_) async => state,
           onSaveMarketNotebook: (_, _) async => state,
           onResolveDecision: (_, _) => save.future,
-          onRequestFamilyHelp: (_) async => state,
+          onRequestAcademyHelp: (_) async => state,
           onCompleteWork: (_) async => state,
           onExecuteTrade: (_) async => TradeExecutionResult(
             success: false,
@@ -612,7 +611,7 @@ void main() {
     expect(find.text('새천년경제'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
-  testWidgets('360px visual novel portraits stay inside through all scenes', (
+  testWidgets('360px visual novel portraits keep a centered close-up crop', (
     tester,
   ) async {
     await usePhoneSurface(tester);
@@ -621,6 +620,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: VisualNovelOnboardingScreen(
+          initialPlayerName: '테스트운용자',
           onCreate: (_, onProgress) async {
             created = true;
             onProgress(const WorldLoadProgress(0.18, '테스트 시장 준비 중…'));
@@ -645,8 +645,10 @@ void main() {
         );
         expect(rect.right, greaterThan(stageRect.left));
         expect(rect.left, lessThan(stageRect.right));
-        expect(rect.top, greaterThanOrEqualTo(stageRect.top));
-        expect(rect.bottom, lessThanOrEqualTo(stageRect.bottom));
+        expect(rect.center.dx, closeTo(stageRect.center.dx, 0.01));
+        expect(rect.height, greaterThan(stageRect.height * 0.8));
+        expect(rect.top, lessThan(stageRect.top + stageRect.height * 0.25));
+        expect(rect.bottom, greaterThan(stageRect.bottom));
       }
       final teacher = find.byKey(const Key('academy-teacher-character'));
       if (teacher.evaluate().isNotEmpty) {
@@ -656,35 +658,30 @@ void main() {
         final teacherRect = tester.getRect(teacher);
         expect(teacherRect.center.dx, closeTo(stageRect.center.dx, 0.01));
         expect(teacherRect.height, closeTo(stageRect.height * 0.9, 0.01));
-        expect(teacherRect.bottom, closeTo(stageRect.bottom - 104, 0.01));
+        expect(teacherRect.bottom, closeTo(stageRect.bottom + 280, 0.01));
       }
       expect(tester.takeException(), isNull);
     }
 
-    for (var index = 0; index < 5; index++) {
+    var sawRosterCard = false;
+    for (var index = 0; index < 400; index++) {
+      sawRosterCard =
+          sawRosterCard ||
+          find
+              .byKey(const Key('orientation-roster-card'))
+              .evaluate()
+              .isNotEmpty;
+      if (find
+          .byKey(const Key('orientation-complete-card'))
+          .evaluate()
+          .isNotEmpty) {
+        break;
+      }
       await tester.tap(find.byKey(const Key('story-continue')));
       await tester.pumpAndSettle();
       expectPortraitInside();
     }
-    expect(find.byKey(const Key('policy-file-children')), findsNothing);
-    await tester.tap(find.byKey(const Key('story-continue')));
-    await tester.pumpAndSettle();
-    expectPortraitInside();
-
-    for (var index = 0; index < 37; index++) {
-      await tester.tap(find.byKey(const Key('story-continue')));
-      await tester.pumpAndSettle();
-      expectPortraitInside();
-    }
-    expect(find.byKey(const Key('orientation-roster-card')), findsOneWidget);
-    await tester.tap(find.byKey(const Key('story-continue')));
-    await tester.pumpAndSettle();
-    expectPortraitInside();
-    for (var index = 0; index < 28; index++) {
-      await tester.tap(find.byKey(const Key('story-continue')));
-      await tester.pumpAndSettle();
-      expectPortraitInside();
-    }
+    expect(sawRosterCard, isTrue);
     expect(find.byKey(const Key('orientation-complete-card')), findsOneWidget);
     expect(find.byKey(const Key('academy-pc-powered-off')), findsOneWidget);
     expect(find.byKey(const Key('academy-pc-power-toggle')), findsOneWidget);
@@ -696,20 +693,25 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('story skip opens the powered-off classroom PC', (tester) async {
+  testWidgets('story skip opens the powered-off Decimal PC', (tester) async {
     await usePhoneSurface(tester);
     addTearDown(tester.view.resetViewInsets);
     await tester.pumpWidget(
       MaterialApp(
-        home: VisualNovelOnboardingScreen(onCreate: (_, onProgress) async {}),
+        home: VisualNovelOnboardingScreen(
+          initialPlayerName: '테스트운용자',
+          onCreate: (_, onProgress) async {},
+        ),
       ),
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('story-skip-button')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('story-skip-confirm')));
-    await tester.pumpAndSettle();
+    for (var section = 0; section < 8; section++) {
+      await tester.tap(find.byKey(const Key('story-skip-button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('story-skip-confirm')));
+      await tester.pumpAndSettle();
+    }
     expect(find.byKey(const Key('orientation-complete-card')), findsOneWidget);
     expect(find.byKey(const Key('academy-pc-powered-off')), findsOneWidget);
     expect(find.byKey(const Key('academy-pc-power-toggle')), findsOneWidget);

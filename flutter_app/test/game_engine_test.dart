@@ -56,88 +56,83 @@ void main() {
     return engine.advanceOneDay(ready);
   }
 
-  test('new game starts as a guardian-approved family research desk', () {
+  test('new game always starts with the Project Decimal state account', () {
     final story = StoryState.newPlayer(
       playerName: '민준',
       introChoice: 'computer',
       startingTrait: StoryTrait.analysis,
-      familyRule: FamilyRule.reportLosses,
+      operatingPrinciple: OperatingPrinciple.reportLosses,
     );
     final state = engine.createNewGame('별빛', story: story);
 
     expect(state.version, GameState.schemaVersion);
     expect(state.story.playerName, '민준');
-    expect(state.cash, 10000);
-    expect(state.brokerageCash, 10000);
-    expect(state.story.startingSeedMoney, 10000);
+    expect(state.cash, initialCompanyCash);
+    expect(state.brokerageCash, initialCompanyCash);
+    expect(state.story.startingSeedMoney, initialCompanyCash);
     expect(state.story.earnedSeedMoney, 0);
-    expect(state.story.seedMoneyTotal, 10000);
+    expect(state.story.seedMoneyTotal, initialCompanyCash);
     expect(state.story.accountAuthorityLevel, 1);
-    expect(state.story.guardianAccountHolder, 'mother');
-    expect(state.story.storyFlags['guardianConsent'], isTrue);
+    expect(state.story.stateAccountHolder, 'project_decimal_fund');
+    expect(state.story.decimalProject, isTrue);
+    expect(state.story.orphanageReboot, isTrue);
     expect(state.story.storyFlags['isLegalCompany'], isFalse);
     expect(state.story.marketTutorialEligible, isTrue);
     expect(state.story.marketTutorialSeen, isFalse);
-    expect(state.story.academyTuitionDebt, academyTuitionDebtAmount);
-    expect(state.story.academyTuitionRepaid, isFalse);
-    expect(
-      state.story.storyFlags['seedMoneySource'],
-      'grandfather_new_year_gift',
-    );
+    expect(state.story.storyFlags['seedMoneySource'], 'project_decimal_fund');
+    expect(state.story.toJson(), isNot(contains('academyTuitionDebt')));
+    expect(state.story.toJson(), isNot(contains('motherAffinity')));
+    expect(state.story.toJson(), isNot(contains('fatherAffinity')));
     expect(state.ledger, hasLength(1));
-    expect(state.ledger.single.amount, 10000);
+    expect(state.ledger.single.amount, initialCompanyCash);
     expect(state.ledger.single.account, 'brokerage_cash');
-    expect(state.ledger.single.counterAccount, 'family_gift');
-    expect(state.ledger.single.description, contains('외할아버지 세뱃돈'));
+    expect(state.ledger.single.counterAccount, 'state_seed_capital');
+    expect(state.ledger.single.description, contains('데시멀 기금'));
     expect(state.pendingDecisions.first.id, 'first-research-note');
   });
 
-  test('orphanage reboot starts with an active sixth-cohort state account', () {
-    final story = StoryState.newOrphanagePlayer(
+  test('Project Decimal starts with ten peers and an active state account', () {
+    final story = StoryState.newDecimalPlayer(
       playerName: '명박',
       introChoice: 'stocks',
       startingTrait: StoryTrait.analysis,
-      operatingPrinciple: FamilyRule.reportLosses,
+      operatingPrinciple: OperatingPrinciple.reportLosses,
     );
     final state = engine.createNewGame('새천년투자연구소', story: story);
 
     expect(state.story.orphanageReboot, isTrue);
     expect(state.story.playerBirthYear, 1987);
     expect(state.story.ageOn(state.currentDate), 14);
-    expect(state.story.guardianAccountHolder, 'future_development_fund');
-    expect(state.story.flagInt('futureDevelopmentCohort'), 6);
-    expect(state.story.academyLevel, 1);
-    expect(state.story.academyMaxLevel, 6);
-    expect(state.story.expectedSeedAge, 14);
-    expect(state.story.storyFlags['academyLevelTitle'], '첫빛');
-    expect(state.story.academyLevelOn(DateTime(2005, 1, 2)), 6);
-    expect(state.story.academyLevelTitleOn(DateTime(2005, 1, 2)), '내 이름');
+    expect(state.story.stateAccountHolder, 'project_decimal_fund');
+    expect(state.story.decimalProject, isTrue);
+    expect(state.story.flagInt('finalCandidateCount'), 10);
+    expect(state.story.flagInt('maleCandidateCount'), 2);
+    expect(state.story.flagInt('femaleCandidateCount'), 8);
+    expect(state.story.storyFlags['facility'], 'gangnam_hideout');
+    expect(state.story.storyFlags, isNot(contains('futureDevelopmentCohort')));
+    expect(state.story.storyFlags, isNot(contains('academyProgram')));
     expect(state.story.ageOn(DateTime(2005, 1, 2)), 19);
     expect(state.story.flagBool('stateAccountActive'), isTrue);
     expect(state.story.stateRecoveryRateBps, 2000);
     expect(state.story.stateRecoveryTotal, 0);
     expect(state.story.selfRelianceReserve, 0);
-    expect(state.story.academyTuitionDebt, 0);
-    expect(state.cash, 10000);
-    expect(state.brokerageCash, 10000);
-    expect(state.story.startingSeedMoney, 10000);
-    expect(
-      state.story.storyFlags['seedMoneySource'],
-      'future_development_fund',
-    );
+    expect(state.cash, initialCompanyCash);
+    expect(state.brokerageCash, initialCompanyCash);
+    expect(state.story.startingSeedMoney, initialCompanyCash);
+    expect(state.story.storyFlags['seedMoneySource'], 'project_decimal_fund');
     expect(state.ledger, hasLength(1));
     expect(state.ledger.single.counterAccount, 'state_seed_capital');
     expect(state.processedEventIds, contains(stateAccountSeedCapitalSourceId));
   });
 
   test(
-    'old ten-year-old reboot saves migrate to the fourteen-year-old track',
+    'old reboot saves migrate to Project Decimal without academy tracks',
     () {
       final oldStory = StoryState.newOrphanagePlayer(
         playerName: '명박',
         introChoice: 'stocks',
         startingTrait: StoryTrait.analysis,
-        operatingPrinciple: FamilyRule.reportLosses,
+        operatingPrinciple: OperatingPrinciple.reportLosses,
       ).toJson()..['playerBirthYear'] = 1991;
       final oldFlags =
           Map<String, dynamic>.from(
@@ -152,10 +147,11 @@ void main() {
 
       expect(migrated.playerBirthYear, 1987);
       expect(migrated.ageOn(DateTime(2000, 1, 2)), 14);
-      expect(migrated.academyLevel, 1);
-      expect(migrated.academyMaxLevel, 6);
-      expect(migrated.expectedSeedAge, 14);
-      expect(migrated.storyFlags['seedTrackCompletionAge'], 19);
+      expect(migrated.decimalProject, isTrue);
+      expect(migrated.stateAccountHolder, 'project_decimal_fund');
+      expect(migrated.storyFlags, isNot(contains('academyLevel')));
+      expect(migrated.storyFlags, isNot(contains('academyMaxLevel')));
+      expect(migrated.storyFlags, isNot(contains('seedTrackCompletionAge')));
     },
   );
 
@@ -164,7 +160,7 @@ void main() {
       playerName: '민재',
       introChoice: 'stocks',
       startingTrait: StoryTrait.analysis,
-      familyRule: FamilyRule.reportLosses,
+      operatingPrinciple: OperatingPrinciple.reportLosses,
     );
     final initial = engine
         .createNewGame('별빛 투자', story: story)
@@ -178,71 +174,21 @@ void main() {
     expect(initial.story.marketTutorialSeen, isFalse);
   });
 
-  test('academy tuition is repaid from bank cash once and recorded', () {
-    final story = StoryState.newPlayer(
-      playerName: '민준',
-      introChoice: 'computer',
-      startingTrait: StoryTrait.analysis,
-      familyRule: FamilyRule.reportLosses,
-    );
-    final initial = engine
-        .createNewGame('별빛', story: story)
-        .copyWith(cash: academyTuitionDebtAmount + 10000);
-    final fatherBefore = initial.story.fatherAffinity;
-    final trustBefore = initial.story.familyTrust;
+  test(
+    'first research choice changes cohort trust and is applied only once',
+    () {
+      var state = engine.createNewGame('조사 연구소');
+      final decisionId = state.pendingDecisions.first.id;
+      final trustBefore = state.story.flagInt('cohortTrust', 30);
+      state = engine.resolveDecision(state, decisionId, 'research_cashflow');
+      final afterFirst = state;
+      state = engine.resolveDecision(state, decisionId, 'research_cashflow');
 
-    final result = engine.repayAcademyTuitionDebt(initial);
-
-    expect(result.success, isTrue);
-    expect(result.cashDelta, -academyTuitionDebtAmount);
-    expect(result.state.cash, 10000);
-    expect(result.state.brokerageCash, 10000);
-    expect(result.state.story.academyTuitionDebt, 0);
-    expect(result.state.story.academyTuitionRepaid, isTrue);
-    expect(result.state.story.fatherAffinity, fatherBefore + 3);
-    expect(result.state.story.familyTrust, trustBefore + 2);
-    expect(result.state.ledger.last.account, 'company_bank');
-    expect(result.state.ledger.last.counterAccount, 'family_debt_repayment');
-    expect(result.state.ledger.last.amount, -academyTuitionDebtAmount);
-
-    final repeated = engine.repayAcademyTuitionDebt(result.state);
-    expect(repeated.success, isFalse);
-    expect(repeated.state.toJson(), result.state.toJson());
-  });
-
-  test('academy tuition never withdraws from brokerage cash', () {
-    final story = StoryState.newPlayer(
-      playerName: '민준',
-      introChoice: 'stocks',
-      startingTrait: StoryTrait.stability,
-      familyRule: FamilyRule.keepCash,
-    );
-    final initial = engine
-        .createNewGame('별빛', story: story)
-        .copyWith(
-          cash: academyTuitionDebtAmount,
-          brokerageCash: academyTuitionDebtAmount,
-        );
-
-    final result = engine.repayAcademyTuitionDebt(initial);
-
-    expect(result.success, isFalse);
-    expect(result.message, contains('회사 통장'));
-    expect(result.state.toJson(), initial.toJson());
-  });
-
-  test('first research choice changes trust and is applied only once', () {
-    var state = engine.createNewGame('조사 연구소');
-    final decisionId = state.pendingDecisions.first.id;
-    final trustBefore = state.story.familyTrust;
-    state = engine.resolveDecision(state, decisionId, 'research_cashflow');
-    final afterFirst = state;
-    state = engine.resolveDecision(state, decisionId, 'research_cashflow');
-
-    expect(afterFirst.story.familyTrust, trustBefore + 1);
-    expect(afterFirst.story.storyFlags['firstResearchFocus'], 'cashflow');
-    expect(state.toJson(), afterFirst.toJson());
-  });
+      expect(afterFirst.story.flagInt('cohortTrust'), trustBefore + 1);
+      expect(afterFirst.story.storyFlags['firstResearchFocus'], 'cashflow');
+      expect(state.toJson(), afterFirst.toJson());
+    },
+  );
 
   test('new games start with Hanbit Telecom in a fictional world', () {
     final state = engine.createNewGame(
@@ -351,22 +297,22 @@ void main() {
     },
   );
 
-  test('family helper fatigue, daily limit, and recovery are persisted', () {
-    var state = engine.createNewGame('가족 연구소');
+  test('academy helper fatigue, daily limit, and recovery are persisted', () {
+    var state = engine.createNewGame('제6기 연구소');
     state = resolveFirst(state, 'research_products');
-    final motherBefore = state.organization.familyHelpers.first;
+    final helperBefore = state.organization.academyHelpers.first;
 
-    state = engine.requestFamilyHelp(state, 'mother');
-    final afterHelp = state.organization.familyHelpers.first;
-    expect(afterHelp.fatigue, motherBefore.fatigue + 12);
+    state = engine.requestAcademyHelp(state, 'hakjun');
+    final afterHelp = state.organization.academyHelpers.first;
+    expect(afterHelp.fatigue, helperBefore.fatigue + 12);
     expect(afterHelp.helpCount, 1);
     expect(state.organization.helpLog, hasLength(1));
 
-    final duplicate = engine.requestFamilyHelp(state, 'mother');
+    final duplicate = engine.requestAcademyHelp(state, 'hakjun');
     expect(duplicate.toJson(), state.toJson());
 
     state = engine.advanceOneDay(state);
-    final afterRest = state.organization.familyHelpers.first;
+    final afterRest = state.organization.academyHelpers.first;
     expect(afterRest.fatigue, afterHelp.fatigue - 3);
   });
   test(
@@ -432,8 +378,8 @@ void main() {
     expect(state.day, 17);
     expect(state.cash, 765432);
     expect(state.team, 2);
-    expect(state.story.playerName, '소년');
-    expect(state.story.storyFlags['guardianConsent'], isTrue);
+    expect(state.story.playerName, '운용자');
+    expect(state.story.stateAccountHolder, 'project_decimal_fund');
   });
 
   TradeOrder hanbitOrder({
@@ -1126,18 +1072,32 @@ void main() {
     expect(result.success, isTrue);
     expect(result.fee, tradingFee);
     expect(result.transactionTax, transactionTax);
-    expect(result.state.cash, cashBeforeSale + proceeds);
-    expect(result.state.brokerageCash, cashBeforeSale + proceeds);
+    final realizedProfit = math.max(0, proceeds - disposedCost);
+    expect(result.state.cash, cashBeforeSale + proceeds - realizedProfit);
+    expect(
+      result.state.brokerageCash,
+      cashBeforeSale + proceeds - realizedProfit,
+    );
+    expect(
+      result.state.story.stateRecoveryTotal +
+          result.state.story.selfRelianceReserve,
+      realizedProfit,
+    );
     expect(result.state.positions.single.units, 6);
     expect(
       result.state.positions.single.totalCost,
       costBeforeSale - disposedCost,
     );
-    expect(result.state.ledger.last.amount, proceeds);
-    expect(result.state.ledger.last.transactionTax, transactionTax);
+    final sellLedger = result.state.ledger.firstWhere(
+      (entry) =>
+          entry.counterAccount == 'market_security' &&
+          entry.tradeSide == TradeSide.sell.name,
+    );
+    expect(sellLedger.amount, proceeds);
+    expect(sellLedger.transactionTax, transactionTax);
     expect(result.realizedPnl, proceeds - disposedCost);
-    expect(result.state.ledger.last.disposedCost, disposedCost);
-    expect(result.state.ledger.last.realizedPnl, proceeds - disposedCost);
+    expect(sellLedger.disposedCost, disposedCost);
+    expect(sellLedger.realizedPnl, proceeds - disposedCost);
   });
 
   test('orphanage profitable sale splits profit into recovery and reserve', () {
@@ -1145,7 +1105,7 @@ void main() {
       playerName: '명박',
       introChoice: 'stocks',
       startingTrait: StoryTrait.analysis,
-      operatingPrinciple: FamilyRule.reportLosses,
+      operatingPrinciple: OperatingPrinciple.reportLosses,
     );
     final base = engine.createNewGame('새천년투자연구소', story: story);
     final state = base.copyWith(
@@ -1377,8 +1337,14 @@ void main() {
 
       expect(first.success, isTrue);
       expect(second.success, isTrue);
-      expect(first.state.story.familyTrust, state.story.familyTrust + 1);
-      expect(second.state.story.familyTrust, first.state.story.familyTrust);
+      expect(
+        first.state.story.flagInt('cohortTrust'),
+        state.story.flagInt('cohortTrust') + 1,
+      );
+      expect(
+        second.state.story.flagInt('cohortTrust'),
+        first.state.story.flagInt('cohortTrust'),
+      );
       expect(first.state.story.reputation, 13);
       expect(second.state.story.reputation, first.state.story.reputation);
     },
@@ -2522,7 +2488,7 @@ void main() {
   });
 
   test(
-    'React v3 date, fractional positions, cash, team, and businesses migrate to v20',
+    'React v3 date, fractional positions, cash, team, and businesses migrate',
     () {
       final state = engine.migrate({
         'version': 3,
@@ -2536,7 +2502,7 @@ void main() {
       });
 
       expect(state.version, GameState.schemaVersion);
-      expect(GameState.schemaVersion, 20);
+      expect(GameState.schemaVersion, 24);
       expect(state.businesses.businesses, isEmpty);
       expect(state.day, 5);
       expect(state.cash, 765432);
@@ -2599,16 +2565,25 @@ void main() {
     expect(result.notional, expectedNotional);
     expect(result.fee, expectedFee);
     expect(result.transactionTax, expectedTax);
+    final expectedProceeds = expectedNotional - expectedFee - expectedTax;
+    final expectedRealizedProfit = expectedProceeds - 15000;
+    expect(result.state.cash, 1000 + 15000);
     expect(
-      result.state.cash,
-      1000 + expectedNotional - expectedFee - expectedTax,
+      result.state.story.stateRecoveryTotal +
+          result.state.story.selfRelianceReserve,
+      expectedRealizedProfit,
     );
     expect(result.state.positions, isEmpty);
-    expect(result.state.ledger.last.description, contains('2.5주 매도'));
-    expect(result.state.ledger.last.orderBookSide, 'bid');
-    expect(result.state.ledger.last.orderBookFills, isNotEmpty);
+    final sellLedger = result.state.ledger.firstWhere(
+      (entry) =>
+          entry.counterAccount == 'market_security' &&
+          entry.tradeSide == TradeSide.sell.name,
+    );
+    expect(sellLedger.description, contains('2.5주 매도'));
+    expect(sellLedger.orderBookSide, 'bid');
+    expect(sellLedger.orderBookFills, isNotEmpty);
     expect(
-      result.state.ledger.last.orderBookFills.fold<double>(
+      sellLedger.orderBookFills.fold<double>(
         0,
         (sum, fill) => sum + fill.quantity,
       ),
@@ -3211,7 +3186,7 @@ void main() {
     expect(next.ledger.last.description, contains('신주인수권 없음'));
   });
 
-  test('earned seed money unlocks the first guardian order authority', () {
+  test('earned seed money unlocks the first state-account order authority', () {
     final base = engine.createNewGame('종잣돈 권한 테스트', initialCash: 0);
     final state = base.copyWith(
       story: base.story.copyWith(
@@ -3228,7 +3203,7 @@ void main() {
     expect(next.story.reputation, 3);
   });
 
-  test('guardian authority enforces the displayed per-order limit', () {
+  test('state-account authority enforces the displayed per-order limit', () {
     final funded = engine.createNewGame('주문 한도 테스트', initialCash: 300000);
     final state = funded.copyWith(
       day: 4,
@@ -3478,34 +3453,35 @@ void main() {
     },
   );
 
-  test(
-    'new games start Sunday and day advance always opens at 08:00 Monday',
-    () {
-      final story = StoryState.newPlayer(
-        playerName: '민준',
-        introChoice: 'computer',
-        startingTrait: StoryTrait.analysis,
-        familyRule: FamilyRule.reportLosses,
-      );
-      final initial = engine.createNewGame('일요일 시작 연구소', story: story);
+  test('simulation epoch precedes the Monday account opening at 08:00', () {
+    final story = StoryState.newPlayer(
+      playerName: '민준',
+      introChoice: 'computer',
+      startingTrait: StoryTrait.analysis,
+      operatingPrinciple: OperatingPrinciple.reportLosses,
+    );
+    final initial = engine.createNewGame('일요일 시작 연구소', story: story);
 
-      expect(initial.cash, initialCompanyCash);
-      expect(initial.currentDate, DateTime(2000, 1, 2));
-      expect(initial.currentDate.weekday, DateTime.sunday);
-      expect(initial.marketMinute, marketDayStartMinute);
+    expect(initial.cash, initialCompanyCash);
+    expect(initial.currentDate, DateTime(2000, 1, 1));
+    expect(initial.currentDate.weekday, DateTime.saturday);
+    expect(initial.marketMinute, marketDayStartMinute);
 
-      final closed = initial.copyWith(
-        decisions: const [],
-        marketMinute: marketDayEndMinute,
-      );
-      final monday = engine.advanceOneDay(closed);
+    final closed = initial.copyWith(
+      decisions: const [],
+      marketMinute: marketDayEndMinute,
+    );
+    final sunday = engine.advanceOneDay(closed);
+    final monday = engine.advanceOneDay(
+      sunday.copyWith(decisions: const [], marketMinute: marketDayEndMinute),
+    );
 
-      expect(monday.currentDate, DateTime(2000, 1, 3));
-      expect(monday.currentDate.weekday, DateTime.monday);
-      expect(isMarketTradingDay(monday.currentDate), isTrue);
-      expect(monday.marketMinute, marketDayStartMinute);
-    },
-  );
+    expect(sunday.currentDate, DateTime(2000, 1, 2));
+    expect(monday.currentDate, DateTime(2000, 1, 3));
+    expect(monday.currentDate.weekday, DateTime.monday);
+    expect(isMarketTradingDay(monday.currentDate), isTrue);
+    expect(monday.marketMinute, marketDayStartMinute);
+  });
 
   test('market reports use bank cash and never drain brokerage cash', () {
     final funded = engine
@@ -3677,13 +3653,13 @@ void main() {
     final leadership = engine.resolveDecision(
       controlled,
       controlled.pendingDecisions.single.id,
-      'appoint_father_advisor',
+      'appoint_academy_advisor',
     );
     expect(
       leadership.company.leadershipModel,
-      CompanyLeadershipModel.fatherAdvisor,
+      CompanyLeadershipModel.academyAdvisor,
     );
-    expect(leadership.story.flagBool('fatherOperationsAdvisor'), isTrue);
+    expect(leadership.story.flagBool('academyOperationsAdvisor'), isTrue);
     expect(leadership.organization.employees.length, employeeCount);
     expect(leadership.pendingDecisions.single.category, '공장 운영계획');
 

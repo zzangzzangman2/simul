@@ -8,8 +8,9 @@ FictionalMarketUniverse testMarketUniverse({
   final prices = tradingDate == null
       ? const <String, double>{
           '1999-12-30': 5920,
-          '2000-01-03': 6040,
-          '2000-01-04': 6110,
+          '2000-01-03': 5920,
+          '2000-01-04': 6040,
+          '2000-01-05': 6110,
         }
       : <String, double>{
           marketDateKey(_previousTradingDay(tradingDate)): 6040,

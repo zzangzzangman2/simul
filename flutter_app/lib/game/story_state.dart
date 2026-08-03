@@ -1,6 +1,6 @@
 enum StoryTrait { stability, innovation, analysis, control }
 
-enum FamilyRule { reportLosses, noHotTips, keepCash }
+enum OperatingPrinciple { reportLosses, noHotTips, keepCash }
 
 class StoryState {
   static const academyLevelKeys = <int, String>{
@@ -25,17 +25,12 @@ class StoryState {
     required this.playerBirthYear,
     required this.introChoice,
     required this.startingTrait,
-    required this.familyRule,
-    required this.familyTrust,
-    required this.motherAffinity,
-    required this.fatherAffinity,
-    required this.siblingAffinity,
-    required this.grandfatherAffinity,
+    required this.operatingPrinciple,
     required this.householdStability,
     required this.schoolBalance,
     required this.roomLevel,
     required this.accountAuthorityLevel,
-    required this.guardianAccountHolder,
+    required this.stateAccountHolder,
     required this.storyFlags,
     required this.seenStoryEventIds,
     required this.companyCultureTags,
@@ -45,30 +40,20 @@ class StoryState {
   final int playerBirthYear;
   final String introChoice;
   final StoryTrait startingTrait;
-  final FamilyRule familyRule;
-  final int familyTrust;
-  final int motherAffinity;
-  final int fatherAffinity;
-  final int siblingAffinity;
-  final int grandfatherAffinity;
+  final OperatingPrinciple operatingPrinciple;
   final int householdStability;
   final int schoolBalance;
   final int roomLevel;
   final int accountAuthorityLevel;
-  final String guardianAccountHolder;
+  final String stateAccountHolder;
   final Map<String, dynamic> storyFlags;
   final List<String> seenStoryEventIds;
   final List<String> companyCultureTags;
 
-  /// The orphanage reboot uses the story's Korean year-age convention:
-  /// a 1987-born sixth-cohort student is fourteen in 2000. Family-world saves keep
-  /// their legacy pre-birthday convention for compatibility.
+  /// The ten Decimal peers are born in 1987 and are fourteen by Korean
+  /// year-age in 2000.
   int ageOn(DateTime date) =>
-      (orphanageReboot
-              ? date.year - playerBirthYear + 1
-              : date.year - playerBirthYear - 1)
-          .clamp(0, 200)
-          .toInt();
+      (date.year - playerBirthYear + 1).clamp(0, 200).toInt();
 
   int flagInt(String key, [int fallback = 0]) =>
       (storyFlags[key] as num?)?.toInt() ?? fallback;
@@ -77,11 +62,8 @@ class StoryState {
   int get startingSeedMoney => flagInt('startingSeedMoney');
   int get earnedSeedMoney => flagInt('earnedSeedMoney');
   int get seedMoneyTotal => startingSeedMoney + earnedSeedMoney;
-  int get academyTuitionDebt => flagInt('academyTuitionDebt');
-  int get academyTuitionOriginal => flagInt('academyTuitionOriginal');
-  bool get academyTuitionRepaid =>
-      academyTuitionOriginal > 0 && academyTuitionDebt <= 0;
-  bool get orphanageReboot => flagBool('orphanageReboot');
+  bool get decimalProject => flagBool('decimalProject');
+  bool get orphanageReboot => decimalProject || flagBool('orphanageReboot');
   int get academyLevel => flagInt('academyLevel', orphanageReboot ? 1 : 0);
   int get academyMaxLevel =>
       flagInt('academyMaxLevel', orphanageReboot ? 6 : 0);
@@ -116,82 +98,31 @@ class StoryState {
     required String playerName,
     required String introChoice,
     required StoryTrait startingTrait,
-    required FamilyRule familyRule,
-  }) {
-    final introAffinity = switch (introChoice) {
-      'computer' => (mother: 0, father: 0, sibling: 3, grandfather: 0),
-      'y2k' => (mother: 2, father: 1, sibling: 0, grandfather: 0),
-      'stocks' => (mother: 0, father: 0, sibling: 0, grandfather: 3),
-      _ => (mother: 0, father: 0, sibling: 0, grandfather: 0),
-    };
-    final traitTrust = switch (startingTrait) {
-      StoryTrait.stability => 2,
-      StoryTrait.analysis => 1,
-      StoryTrait.innovation => 0,
-      StoryTrait.control => -1,
-    };
-    final traitSchool = switch (startingTrait) {
-      StoryTrait.analysis => 4,
-      StoryTrait.stability => 2,
-      StoryTrait.innovation => 1,
-      StoryTrait.control => 0,
-    };
-    return StoryState(
-      playerName: playerName.trim(),
-      playerBirthYear: 1989,
-      introChoice: introChoice,
-      startingTrait: startingTrait,
-      familyRule: familyRule,
-      familyTrust: 30 + traitTrust,
-      motherAffinity:
-          (familyRule == FamilyRule.reportLosses ? 33 : 30) +
-          introAffinity.mother,
-      fatherAffinity:
-          (familyRule == FamilyRule.noHotTips ? 33 : 30) + introAffinity.father,
-      siblingAffinity: 30 + introAffinity.sibling,
-      grandfatherAffinity:
-          (familyRule == FamilyRule.keepCash ? 33 : 30) +
-          introAffinity.grandfather,
-      householdStability: 55,
-      schoolBalance: 60 + traitSchool,
-      roomLevel: 0,
-      accountAuthorityLevel: 0,
-      guardianAccountHolder: 'mother',
-      storyFlags: const {
-        'prologueComplete': true,
-        'campaignStartDate': '2000-01-02',
-        'guardianConsent': true,
-        'isLegalCompany': false,
-        'startingSeedMoney': 0,
-        'seedMoneySource': '',
-        'earnedSeedMoney': 0,
-        'academyTuitionDebt': 1000000,
-        'academyTuitionOriginal': 1000000,
-        'academyTuitionPaidByFather': true,
-        'workSessions': 0,
-        'workSessionsToday': 0,
-        'firstSeedGoalReached': false,
-        'firstOrderExecuted': false,
-        'reputation': 0,
-        'officeTier': 0,
-        'fundLaunched': false,
-        'externalAum': 0,
-        'hubTutorialSeen': false,
-        'marketTutorialEligible': true,
-        'marketTutorialSeen': false,
-        'performanceHistory': <Map<String, dynamic>>[],
-        'newsArchive': <Map<String, dynamic>>[],
-      },
-      seenStoryEventIds: const ['PROLOGUE_MILLENNIUM'],
-      companyCultureTags: [familyRule.name, startingTrait.name, introChoice],
-    );
-  }
+    required OperatingPrinciple operatingPrinciple,
+  }) => StoryState.newDecimalPlayer(
+    playerName: playerName,
+    introChoice: introChoice,
+    startingTrait: startingTrait,
+    operatingPrinciple: operatingPrinciple,
+  );
 
   factory StoryState.newOrphanagePlayer({
     required String playerName,
     required String introChoice,
     required StoryTrait startingTrait,
-    required FamilyRule operatingPrinciple,
+    required OperatingPrinciple operatingPrinciple,
+  }) => StoryState.newDecimalPlayer(
+    playerName: playerName,
+    introChoice: introChoice,
+    startingTrait: startingTrait,
+    operatingPrinciple: operatingPrinciple,
+  );
+
+  factory StoryState.newDecimalPlayer({
+    required String playerName,
+    required String introChoice,
+    required StoryTrait startingTrait,
+    required OperatingPrinciple operatingPrinciple,
   }) {
     final traitTrust = switch (startingTrait) {
       StoryTrait.stability => 2,
@@ -199,7 +130,7 @@ class StoryState {
       StoryTrait.innovation => 0,
       StoryTrait.control => -1,
     };
-    final traitSchool = switch (startingTrait) {
+    final traitRoutine = switch (startingTrait) {
       StoryTrait.analysis => 4,
       StoryTrait.stability => 2,
       StoryTrait.innovation => 1,
@@ -210,44 +141,39 @@ class StoryState {
       playerBirthYear: 1987,
       introChoice: introChoice,
       startingTrait: startingTrait,
-      familyRule: operatingPrinciple,
-      familyTrust: 30 + traitTrust,
-      motherAffinity: 30,
-      fatherAffinity: 30,
-      siblingAffinity: 30,
-      grandfatherAffinity: 30,
+      operatingPrinciple: operatingPrinciple,
       householdStability: 55,
-      schoolBalance: 60 + traitSchool,
+      schoolBalance: 60 + traitRoutine,
       roomLevel: 0,
       accountAuthorityLevel: 1,
-      guardianAccountHolder: 'future_development_fund',
-      storyFlags: const {
+      stateAccountHolder: 'project_decimal_fund',
+      storyFlags: {
         'prologueComplete': true,
-        'orphanageReboot': true,
-        'futureDevelopmentCohort': 6,
+        'decimalProject': true,
+        'projectId': 'project_decimal',
+        'finalCandidateCount': 10,
+        'maleCandidateCount': 2,
+        'femaleCandidateCount': 8,
+        'facility': 'gangnam_hideout',
         'storyAgeMode': 'koreanYearAge',
-        'academyProgram': 'seedTrack',
-        'academyLevel': 1,
-        'academyMaxLevel': 6,
-        'academyLevelKey': 'firstLight',
-        'academyLevelTitle': '첫빛',
-        'seedTrackStartAge': 14,
-        'seedTrackCompletionAge': 19,
-        'campaignStartDate': '2000-01-02',
-        'guardianConsent': true,
+        // The simulation keeps 1–2 January as its deterministic pre-open
+        // epoch. The playable account opens on Monday, 3 January.
+        'campaignStartDate': '2000-01-01',
+        'formalTradingStartDate': '2000-01-03',
         'stateAccountActive': true,
-        'stateAccountOwner': '대한민국 미래양성기금',
+        'stateAccountOwner': '대한민국 데시멀 기금',
         'stateRecoveryRateBps': 2000,
         'stateRecoveryTotal': 0,
         'selfRelianceReserve': 0,
         'selfRelianceUnlockAge': 19,
         'isLegalCompany': false,
         'startingSeedMoney': 0,
-        'seedMoneySource': '',
+        'seedMoneySource': 'project_decimal_fund',
         'earnedSeedMoney': 0,
-        'academyTuitionDebt': 0,
-        'academyTuitionOriginal': 0,
-        'academyTuitionPaidByFather': false,
+        'cohortTrust': 30 + traitTrust,
+        'hakjunAffinity': 30,
+        'suaAffinity': 30,
+        'teacherTrust': 30,
         'workSessions': 0,
         'workSessionsToday': 0,
         'firstSeedGoalReached': true,
@@ -263,11 +189,11 @@ class StoryState {
         'newsArchive': <Map<String, dynamic>>[],
       },
       seenStoryEventIds: const [
-        'PROLOGUE_FUTURE_DEVELOPMENT_PLAN',
-        'COHORT_6_STATE_ACCOUNT_ACTIVATED',
+        'PROLOGUE_PROJECT_DECIMAL_SELECTION',
+        'DECIMAL_STATE_ACCOUNT_ACTIVATED',
       ],
       companyCultureTags: [
-        'futureDevelopmentCohort6',
+        'projectDecimalFinalTen',
         operatingPrinciple.name,
         startingTrait.name,
         introChoice,
@@ -276,25 +202,20 @@ class StoryState {
   }
 
   factory StoryState.migratedDefault(String companyName) {
-    return StoryState.newPlayer(
-      playerName: '소년',
+    return StoryState.newDecimalPlayer(
+      playerName: '운용자',
       introChoice: 'migrated_save',
       startingTrait: StoryTrait.analysis,
-      familyRule: FamilyRule.reportLosses,
+      operatingPrinciple: OperatingPrinciple.reportLosses,
     ).copyWith(
       storyFlags: {
+        ...StoryState.newDecimalPlayer(
+          playerName: '운용자',
+          introChoice: 'migrated_save',
+          startingTrait: StoryTrait.analysis,
+          operatingPrinciple: OperatingPrinciple.reportLosses,
+        ).storyFlags,
         'prologueComplete': true,
-        'guardianConsent': true,
-        'isLegalCompany': false,
-        'startingSeedMoney': 0,
-        'seedMoneySource': '',
-        'earnedSeedMoney': 0,
-        'academyTuitionDebt': 0,
-        'academyTuitionOriginal': 0,
-        'academyTuitionPaidByFather': false,
-        'workSessions': 0,
-        'workSessionsToday': 0,
-        'firstSeedGoalReached': false,
         'marketTutorialEligible': false,
         'marketTutorialSeen': true,
         'migratedCompanyName': companyName,
@@ -303,16 +224,11 @@ class StoryState {
   }
 
   StoryState copyWith({
-    int? familyTrust,
-    int? motherAffinity,
-    int? fatherAffinity,
-    int? siblingAffinity,
-    int? grandfatherAffinity,
     int? householdStability,
     int? schoolBalance,
     int? roomLevel,
     int? accountAuthorityLevel,
-    String? guardianAccountHolder,
+    String? stateAccountHolder,
     Map<String, dynamic>? storyFlags,
     List<String>? seenStoryEventIds,
     List<String>? companyCultureTags,
@@ -322,13 +238,7 @@ class StoryState {
       playerBirthYear: playerBirthYear,
       introChoice: introChoice,
       startingTrait: startingTrait,
-      familyRule: familyRule,
-      familyTrust: (familyTrust ?? this.familyTrust).clamp(0, 100),
-      motherAffinity: (motherAffinity ?? this.motherAffinity).clamp(0, 100),
-      fatherAffinity: (fatherAffinity ?? this.fatherAffinity).clamp(0, 100),
-      siblingAffinity: (siblingAffinity ?? this.siblingAffinity).clamp(0, 100),
-      grandfatherAffinity: (grandfatherAffinity ?? this.grandfatherAffinity)
-          .clamp(0, 100),
+      operatingPrinciple: operatingPrinciple,
       householdStability: (householdStability ?? this.householdStability).clamp(
         0,
         100,
@@ -337,8 +247,7 @@ class StoryState {
       roomLevel: (roomLevel ?? this.roomLevel).clamp(0, 4),
       accountAuthorityLevel:
           (accountAuthorityLevel ?? this.accountAuthorityLevel).clamp(0, 5),
-      guardianAccountHolder:
-          guardianAccountHolder ?? this.guardianAccountHolder,
+      stateAccountHolder: stateAccountHolder ?? this.stateAccountHolder,
       storyFlags: storyFlags ?? this.storyFlags,
       seenStoryEventIds: seenStoryEventIds ?? this.seenStoryEventIds,
       companyCultureTags: companyCultureTags ?? this.companyCultureTags,
@@ -350,48 +259,71 @@ class StoryState {
     'playerBirthYear': playerBirthYear,
     'introChoice': introChoice,
     'startingTrait': startingTrait.name,
-    'familyRule': familyRule.name,
-    'familyTrust': familyTrust,
-    'motherAffinity': motherAffinity,
-    'fatherAffinity': fatherAffinity,
-    'siblingAffinity': siblingAffinity,
-    'grandfatherAffinity': grandfatherAffinity,
+    'operatingPrinciple': operatingPrinciple.name,
     'householdStability': householdStability,
     'schoolBalance': schoolBalance,
     'roomLevel': roomLevel,
     'accountAuthorityLevel': accountAuthorityLevel,
-    'guardianAccountHolder': guardianAccountHolder,
+    'stateAccountHolder': stateAccountHolder,
     'storyFlags': storyFlags,
     'seenStoryEventIds': seenStoryEventIds,
     'companyCultureTags': companyCultureTags,
   };
 
   static int _migratedPlayerBirthYear(Map<String, dynamic> json) {
-    final stored = (json['playerBirthYear'] as num?)?.toInt() ?? 1989;
-    final flags =
-        (json['storyFlags'] as Map?)?.cast<String, dynamic>() ?? const {};
-    if (flags['orphanageReboot'] == true) return 1987;
-    return stored;
+    return 1987;
   }
 
   static Map<String, dynamic> _migratedStoryFlags(Map<String, dynamic> json) {
     final stored =
         (json['storyFlags'] as Map?)?.cast<String, dynamic>() ?? const {};
-    if (stored['orphanageReboot'] != true) return stored;
     final migrated = Map<String, dynamic>.from(stored);
-    final storedLevel = (migrated['academyLevel'] as num?)?.toInt() ?? 1;
-    final academyLevel = storedLevel.clamp(1, 6).toInt();
     migrated
-      ..['futureDevelopmentCohort'] = 6
+      ..['decimalProject'] = true
+      ..['projectId'] = 'project_decimal'
+      ..['finalCandidateCount'] = 10
+      ..['maleCandidateCount'] = 2
+      ..['femaleCandidateCount'] = 8
+      ..['facility'] = 'gangnam_hideout'
       ..['storyAgeMode'] = 'koreanYearAge'
-      ..['academyProgram'] = 'seedTrack'
-      ..['academyLevel'] = academyLevel
-      ..['academyMaxLevel'] = 6
-      ..['academyLevelKey'] = academyLevelKeys[academyLevel]
-      ..['academyLevelTitle'] = academyLevelTitles[academyLevel]
-      ..['seedTrackStartAge'] = 14
-      ..['seedTrackCompletionAge'] = 19
-      ..['selfRelianceUnlockAge'] = 19;
+      ..['selfRelianceUnlockAge'] = 19
+      ..['stateAccountActive'] = true
+      ..['stateAccountOwner'] = '대한민국 데시멀 기금'
+      ..['seedMoneySource'] = 'project_decimal_fund'
+      ..putIfAbsent('stateRecoveryRateBps', () => 2000)
+      ..putIfAbsent('stateRecoveryTotal', () => 0)
+      ..putIfAbsent('selfRelianceReserve', () => 0)
+      ..putIfAbsent('cohortTrust', () => 30)
+      ..putIfAbsent('hakjunAffinity', () => 30)
+      ..putIfAbsent('suaAffinity', () => 30)
+      ..putIfAbsent('teacherTrust', () => 30)
+      ..remove('academyTuitionDebt')
+      ..remove('academyTuitionOriginal')
+      ..remove('academyTuitionPaidByFather')
+      ..remove('academyTuitionRepaidDay')
+      ..remove('futureDevelopmentCohort')
+      ..remove('orphanageReboot')
+      ..remove('academyProgram')
+      ..remove('academyLevel')
+      ..remove('academyMaxLevel')
+      ..remove('academyLevelKey')
+      ..remove('academyLevelTitle')
+      ..remove('seedTrackStartAge')
+      ..remove('seedTrackCompletionAge')
+      ..remove('guardianConsent')
+      ..remove('fatherOperationsAdvisor')
+      ..remove('seedMoneySourceLegacy');
+    if (<String>{
+      'mother',
+      'father',
+      'sibling',
+      'grandfather',
+    }.contains(migrated['activeResearchHelper'])) {
+      migrated
+        ..remove('activeResearchHelper')
+        ..remove('activeResearchHelperDay')
+        ..remove('researchBonusPct');
+    }
     return migrated;
   }
 
@@ -401,32 +333,37 @@ class StoryState {
   }) {
     if (json.isEmpty) return StoryState.migratedDefault(companyName);
     return StoryState(
-      playerName: json['playerName'] as String? ?? '소년',
+      playerName: json['playerName'] as String? ?? '운용자',
       playerBirthYear: _migratedPlayerBirthYear(json),
       introChoice: json['introChoice'] as String? ?? 'migrated_save',
       startingTrait: StoryTrait.values.firstWhere(
         (value) => value.name == json['startingTrait'],
         orElse: () => StoryTrait.analysis,
       ),
-      familyRule: FamilyRule.values.firstWhere(
-        (value) => value.name == json['familyRule'],
-        orElse: () => FamilyRule.reportLosses,
+      operatingPrinciple: OperatingPrinciple.values.firstWhere(
+        (value) => value.name == json['operatingPrinciple'],
+        orElse: () => OperatingPrinciple.reportLosses,
       ),
-      familyTrust: (json['familyTrust'] as num?)?.toInt() ?? 30,
-      motherAffinity: (json['motherAffinity'] as num?)?.toInt() ?? 30,
-      fatherAffinity: (json['fatherAffinity'] as num?)?.toInt() ?? 30,
-      siblingAffinity: (json['siblingAffinity'] as num?)?.toInt() ?? 30,
-      grandfatherAffinity: (json['grandfatherAffinity'] as num?)?.toInt() ?? 30,
       householdStability: (json['householdStability'] as num?)?.toInt() ?? 55,
       schoolBalance: (json['schoolBalance'] as num?)?.toInt() ?? 60,
       roomLevel: (json['roomLevel'] as num?)?.toInt() ?? 0,
       accountAuthorityLevel:
           (json['accountAuthorityLevel'] as num?)?.toInt() ?? 0,
-      guardianAccountHolder:
-          json['guardianAccountHolder'] as String? ?? 'mother',
+      stateAccountHolder: 'project_decimal_fund',
       storyFlags: _migratedStoryFlags(json),
       seenStoryEventIds: ((json['seenStoryEventIds'] as List?) ?? const [])
-          .cast<String>(),
+          .whereType<String>()
+          .where(
+            (id) => !const <String>{
+              'HOME_FATHER_TOOLS',
+              'HOME_SISTER_DESK',
+              'HOME_GRANDFATHER_BEDDING',
+              'HOME_MOTHER_FLOOR',
+              'HOME_MOTHER_RICE',
+              'HOME_FAMILY_FRIDGE',
+            }.contains(id),
+          )
+          .toList(growable: false),
       companyCultureTags: ((json['companyCultureTags'] as List?) ?? const [])
           .cast<String>(),
     );

@@ -239,7 +239,7 @@ void main() {
       const engine = GameEngine();
       final state = engine.createNewGame('Market Desk').copyWith(day: 5);
       final paper = await buildDailyMarketNewspaper(state);
-      expect(paper.date, DateTime(2000, 1, 5));
+      expect(paper.date, state.currentDate);
       expect(paper.total, greaterThan(0));
       expect(paper.advancers + paper.decliners + paper.unchanged, paper.total);
       expect(paper.headline, isNotEmpty);
@@ -252,7 +252,7 @@ void main() {
       8 * 60 + 30,
     );
     expect(
-      advanceGameTime(marketDayStartMinute, familyHelpActionMinutes),
+      advanceGameTime(marketDayStartMinute, academyHelpActionMinutes),
       8 * 60 + 30,
     );
     expect(advanceGameTime(marketDayStartMinute, workActionMinutes), 9 * 60);

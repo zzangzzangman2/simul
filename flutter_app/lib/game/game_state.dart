@@ -2,12 +2,15 @@ import 'dart:math' as math;
 
 import 'banking_state.dart';
 import 'business_state.dart';
+import 'cohort_investment_state.dart';
 import 'home_improvement_state.dart';
 import 'market_clock.dart';
 import 'market_cost_rules.dart';
 import 'mission_progression.dart';
 import 'organization_state.dart';
 import 'personal_finance_state.dart';
+import 'phone_messenger_state.dart';
+import 'relationship_state.dart';
 import 'story_state.dart';
 
 enum CompanyWorldMode { fictional }
@@ -183,11 +186,17 @@ class GameState {
     required this.processedEventIds,
     BusinessPortfolioState? businesses,
     HomeImprovementState? homeImprovements,
+    RelationshipState? relationships,
+    CohortInvestmentState? cohortInvestments,
+    PhoneMessengerState? phoneMessenger,
   }) : businesses = businesses ?? const BusinessPortfolioState.initial(),
        homeImprovements =
-           homeImprovements ?? const HomeImprovementState.initial();
+           homeImprovements ?? const HomeImprovementState.initial(),
+       relationships = relationships ?? RelationshipState.initial(),
+       cohortInvestments = cohortInvestments ?? CohortInvestmentState.initial(),
+       phoneMessenger = phoneMessenger ?? PhoneMessengerState.initial();
 
-  static const schemaVersion = 20;
+  static const schemaVersion = 24;
   static const maxCampaignDay = 9862;
 
   final int version;
@@ -206,6 +215,9 @@ class GameState {
   final MissionProgressionState progression;
   final StoryState story;
   final HomeImprovementState homeImprovements;
+  final RelationshipState relationships;
+  final CohortInvestmentState cohortInvestments;
+  final PhoneMessengerState phoneMessenger;
   final CompanyState company;
   final ProjectState? project;
   final List<DecisionCardData> decisions;
@@ -223,7 +235,7 @@ class GameState {
 
   double get pendingOrderFeeMultiplier {
     final helperDiscount =
-        story.storyFlags['activeResearchHelper'] == 'mother' &&
+        story.storyFlags['activeResearchHelper'] == 'hakjun' &&
         story.flagInt('activeResearchHelperDay', -1) == day;
     final skillDiscount = progression.hasSkill('fee_sense') ? 0.9 : 1.0;
     return (helperDiscount ? 0.9 : 1.0) * skillDiscount;
@@ -314,7 +326,6 @@ class GameState {
       personalFinance.totalMortgageBalance +
       personalFinance.totalTenantDepositLiability +
       businesses.totalAccountsPayable +
-      story.academyTuitionDebt +
       story.flagInt('mortgageDeficiencyDebt') +
       story.flagInt('tenantDepositDebt') +
       story.flagInt('unpaidOperatingCost');
@@ -325,16 +336,23 @@ class GameState {
       businesses.totalBookValue +
       company.investmentBookValue +
       banking.termDepositAssetValueAt(day) +
+      cohortInvestments.outstandingLoanReceivables +
       (prices == null ? portfolioCost : portfolioValue(prices)) +
       personalFinance.estimatedPropertyValueAt(day);
 
   int balanceSheetNetWorth({Map<String, double>? prices}) =>
       balanceSheetGrossAssets(prices: prices) - totalKnownLiabilities;
 
-  DateTime get campaignStartDate =>
-      story.storyFlags['campaignStartDate'] == '2000-01-02'
-      ? DateTime(2000, 1, 2)
-      : DateTime(2000, 1, 1);
+  DateTime get campaignStartDate {
+    final encoded = story.storyFlags['campaignStartDate'];
+    if (encoded is String) {
+      final parsed = DateTime.tryParse(encoded);
+      if (parsed != null) {
+        return DateTime(parsed.year, parsed.month, parsed.day);
+      }
+    }
+    return DateTime(2000, 1, 1);
+  }
 
   DateTime dateForDay(int value) =>
       campaignStartDate.add(Duration(days: value - 1));
@@ -364,6 +382,9 @@ class GameState {
     MissionProgressionState? progression,
     StoryState? story,
     HomeImprovementState? homeImprovements,
+    RelationshipState? relationships,
+    CohortInvestmentState? cohortInvestments,
+    PhoneMessengerState? phoneMessenger,
     CompanyState? company,
     ProjectState? project,
     bool clearProject = false,
@@ -392,6 +413,9 @@ class GameState {
       progression: progression ?? this.progression,
       story: story ?? this.story,
       homeImprovements: homeImprovements ?? this.homeImprovements,
+      relationships: relationships ?? this.relationships,
+      cohortInvestments: cohortInvestments ?? this.cohortInvestments,
+      phoneMessenger: phoneMessenger ?? this.phoneMessenger,
       company: company ?? this.company,
       project: clearProject ? null : project ?? this.project,
       decisions: decisions ?? this.decisions,
@@ -419,6 +443,9 @@ class GameState {
     'progression': progression.toJson(),
     'story': story.toJson(),
     'homeImprovements': homeImprovements.toJson(),
+    'relationships': relationships.toJson(),
+    'cohortInvestments': cohortInvestments.toJson(),
+    'phoneMessenger': phoneMessenger.toJson(),
     'company': company.toJson(),
     'project': project?.toJson(),
     'decisions': decisions.map((item) => item.toJson()).toList(),
@@ -433,7 +460,7 @@ class GameState {
         .clamp(0, math.max(0, cash))
         .toInt();
     return GameState(
-      version: (json['version'] as num?)?.toInt() ?? schemaVersion,
+      version: schemaVersion,
       companyName: json['companyName'] as String? ?? '',
       day: ((json['day'] as num?)?.toInt() ?? 1).clamp(1, maxCampaignDay),
       marketMinute: ((json['marketMinute'] as num?)?.toInt() ?? 480).clamp(
@@ -457,10 +484,11 @@ class GameState {
       organization: OrganizationState.fromJson(
         (json['organization'] as Map?)?.cast<String, dynamic>() ?? const {},
         legacyTeamCount: (json['team'] as num?)?.toInt() ?? 1,
-        familyRule: FamilyRule.values.firstWhere(
+        operatingPrinciple: OperatingPrinciple.values.firstWhere(
           (value) =>
-              value.name == ((json['story'] as Map?)?['familyRule'] as String?),
-          orElse: () => FamilyRule.reportLosses,
+              value.name ==
+              ((json['story'] as Map?)?['operatingPrinciple'] as String?),
+          orElse: () => OperatingPrinciple.reportLosses,
         ),
       ),
       personalFinance: PersonalFinanceState.fromJson(
@@ -483,6 +511,16 @@ class GameState {
       ),
       homeImprovements: HomeImprovementState.fromJson(
         (json['homeImprovements'] as Map?)?.cast<String, dynamic>() ?? const {},
+      ),
+      relationships: RelationshipState.fromJson(
+        (json['relationships'] as Map?)?.cast<String, dynamic>() ?? const {},
+      ),
+      cohortInvestments: CohortInvestmentState.fromJson(
+        (json['cohortInvestments'] as Map?)?.cast<String, dynamic>() ??
+            const {},
+      ),
+      phoneMessenger: PhoneMessengerState.fromJson(
+        (json['phoneMessenger'] as Map?)?.cast<String, dynamic>() ?? const {},
       ),
       company: CompanyState.fromJson(
         (json['company'] as Map?)?.cast<String, dynamic>() ?? const {},
@@ -612,7 +650,7 @@ class PortfolioPosition {
 enum CompanyLeadershipModel {
   unassigned,
   incumbent,
-  fatherAdvisor,
+  academyAdvisor,
   professional,
 }
 
