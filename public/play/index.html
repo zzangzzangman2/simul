@@ -14,7 +14,9 @@
   <meta name="twitter:description" content="2000년 서울, 프로젝트 데시멀의 열 명이 국가원금 5만원으로 생존과 투자를 배워 가는 모바일 세로형 생활·투자 시뮬레이션">
   <meta name="theme-color" content="#061F2A">
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <!-- iOS는 아직 레거시 이름만 읽는다. 이 둘이 없으면 홈 화면에서 열어도 사파리 주소창이 남는다. -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="10대부터 건물주">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
   <link rel="icon" type="image/png" href="favicon.png">
@@ -85,6 +87,65 @@
           0 26px 80px rgba(0, 0, 0, 0.58),
           0 0 0 1px rgba(255, 255, 255, 0.08);
       }
+    }
+
+    #install-banner {
+      position: fixed;
+      left: 50%;
+      bottom: max(16px, env(safe-area-inset-bottom));
+      z-index: 40;
+      width: min(360px, calc(100vw - 24px));
+      transform: translateX(-50%);
+      box-sizing: border-box;
+      padding: 14px 16px;
+      border-radius: 18px;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      background: rgba(9, 30, 40, 0.94);
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+      color: #eaf3f7;
+      font-family: 'Maplestory', 'Pretendard', system-ui, sans-serif;
+    }
+
+    #install-banner[hidden] {
+      display: none;
+    }
+
+    #install-banner p {
+      margin: 0 0 10px;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    #install-banner-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    #install-banner button {
+      appearance: none;
+      border-radius: 11px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      padding: 8px 14px;
+      font: inherit;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    #install-banner-accept {
+      border-color: transparent;
+      background: #ffb84d;
+      color: #10222b;
+      font-weight: 700;
+    }
+
+    #install-banner-accept[hidden] {
+      display: none;
+    }
+
+    #install-banner-dismiss {
+      background: transparent;
+      color: rgba(234, 243, 247, 0.72);
     }
   </style>
 </head>
@@ -209,6 +270,92 @@
         }
       } catch (_) {
         // Storage can be unavailable in private or restricted browser contexts.
+      }
+    })();
+  </script>
+  <div id="install-banner" hidden>
+    <p id="install-banner-text"></p>
+    <div id="install-banner-actions">
+      <button id="install-banner-accept" type="button">설치</button>
+      <button id="install-banner-dismiss" type="button">나중에</button>
+    </div>
+  </div>
+  <script id="install-prompt">
+    (() => {
+      // 홈 화면에 설치해야 주소창이 사라진다. 설치 가능한 상태를 유저가 알 방법이
+      // 없어서 게임이 브라우저처럼 보였다. 설치 뒤에는 이 배너를 다시 띄우지 않는다.
+      const dismissKey = 'decimal-install-banner-dismissed-v1';
+      const banner = document.getElementById('install-banner');
+      const text = document.getElementById('install-banner-text');
+      const accept = document.getElementById('install-banner-accept');
+      const dismiss = document.getElementById('install-banner-dismiss');
+      if (!banner || !text || !accept || !dismiss) return;
+
+      const installed = () =>
+        window.matchMedia('(display-mode: fullscreen)').matches ||
+        window.matchMedia('(display-mode: standalone)').matches ||
+        window.navigator.standalone === true;
+
+      const suppressed = () => {
+        try {
+          return window.localStorage.getItem(dismissKey) === '1';
+        } catch (_) {
+          return false;
+        }
+      };
+
+      const hide = () => {
+        banner.hidden = true;
+      };
+
+      const show = (message, canInstall) => {
+        if (installed() || suppressed()) return;
+        text.textContent = message;
+        accept.hidden = !canInstall;
+        banner.hidden = false;
+      };
+
+      dismiss.addEventListener('click', () => {
+        try {
+          window.localStorage.setItem(dismissKey, '1');
+        } catch (_) {
+          // Storage can be unavailable in private or restricted browser contexts.
+        }
+        hide();
+      });
+
+      let deferred = null;
+      window.addEventListener('beforeinstallprompt', (event) => {
+        event.preventDefault();
+        deferred = event;
+        show('홈 화면에 설치하면 주소창 없이 전체화면으로 플레이할 수 있어요.', true);
+      });
+
+      accept.addEventListener('click', async () => {
+        if (!deferred) return hide();
+        hide();
+        deferred.prompt();
+        try {
+          await deferred.userChoice;
+        } catch (_) {
+          // The user can dismiss the native sheet without a choice.
+        }
+        deferred = null;
+      });
+
+      window.addEventListener('appinstalled', () => {
+        deferred = null;
+        hide();
+      });
+
+      // iOS 사파리는 beforeinstallprompt를 쏘지 않으므로 공유 버튼 경로를 직접 안내한다.
+      const isIosSafari =
+        /iPad|iPhone|iPod/.test(window.navigator.userAgent) &&
+        !/CriOS|FxiOS|EdgiOS/.test(window.navigator.userAgent);
+      if (isIosSafari) {
+        window.setTimeout(() => {
+          show('공유 버튼을 눌러 “홈 화면에 추가”하면 주소창 없이 전체화면으로 플레이할 수 있어요.', false);
+        }, 4000);
       }
     })();
   </script>

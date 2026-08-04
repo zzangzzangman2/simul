@@ -6,7 +6,7 @@
   "display_override": ["fullscreen", "standalone"],
   "background_color": "#061F2A",
   "theme_color": "#061F2A",
-  "description": "2000년 서울, 미래양성원 제6기 교육생이 국가원금 5만원으로 투자와 장부를 배우며 성장하는 모바일 세로형 생활·투자 시뮬레이션",
+  "description": "2000년 서울, 프로젝트 데시멀의 열 명이 국가원금 5만원으로 생존과 투자를 배워 가는 모바일 세로형 생활·투자 시뮬레이션",
   "orientation": "portrait-primary",
   "prefer_related_applications": false,
   "icons": [

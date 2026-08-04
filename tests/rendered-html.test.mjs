@@ -199,6 +199,20 @@ test("keeps Flutter launch metadata aligned with the current starting conditions
   assert.doesNotMatch(flutterTemplate, /초기자본 100만원/);
   assert.equal(parsedManifest.name, "10대부터 건물주");
   assert.match(parsedManifest.description, /2000년 서울/);
+  // 홈 화면 설치 없이는 주소창이 남아 게임처럼 보이지 않는다.
+  assert.equal(parsedManifest.display, "fullscreen");
+  assert.equal(parsedManifest.orientation, "portrait-primary");
+  assert.doesNotMatch(parsedManifest.description, /미래양성원|제6기|SEED/);
+  assert.match(flutterTemplate, /<link rel="manifest" href="manifest\.json">/);
+  assert.match(flutterTemplate, /name="mobile-web-app-capable" content="yes"/);
+  assert.match(flutterTemplate, /name="apple-mobile-web-app-capable" content="yes"/);
+  // 설치 유도 배너와 iOS 공유 버튼 안내가 함께 있어야 한다.
+  assert.match(flutterTemplate, /<script id="install-prompt">/);
+  assert.match(flutterTemplate, /beforeinstallprompt/);
+  assert.match(flutterTemplate, /display-mode: fullscreen/);
+  assert.match(flutterTemplate, /navigator\.standalone/);
+  assert.match(flutterTemplate, /홈 화면에 추가/);
+  assert.match(flutterTemplate, /install-banner-dismiss/);
   assert.match(parsedManifest.description, /국가원금 5만원/);
   assert.doesNotMatch(parsedManifest.description, /초기자본 100만원/);
 });
