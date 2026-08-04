@@ -7,7 +7,6 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart' show debugPaintBaselinesEnabled;
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -109,13 +108,16 @@ Route<T> _gameSceneRoute<T>(Widget page) => PageRouteBuilder<T>(
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  // Never leak Flutter's green/orange text-baseline diagnostics into the
-  // player-facing Web canvas, even if a connected inspector enabled them.
-  debugPaintBaselinesEnabled = false;
   runApp(
     MillenniumCapitalApp(
       stockTestMode: Uri.base.queryParameters['stockTest'] == '1',
       hubPreviewMode: Uri.base.queryParameters['hubPreview'] == '1',
+      hubBlinkPreviewMode: Uri.base.queryParameters['hubBlinkPreview'] == '1',
+      hubPreviewDay:
+          int.tryParse(Uri.base.queryParameters['hubPreviewDay'] ?? '') ?? 4,
+      hubPreviewAffection:
+          int.tryParse(Uri.base.queryParameters['hubPreviewAffection'] ?? '') ??
+          65,
       dialoguePreviewMode: Uri.base.queryParameters['dialoguePreview'] == '1',
     ),
   );
@@ -141,6 +143,9 @@ class MillenniumCapitalApp extends StatefulWidget {
     this.campaignWorldPreparer,
     this.stockTestMode = false,
     this.hubPreviewMode = false,
+    this.hubBlinkPreviewMode = false,
+    this.hubPreviewDay = 4,
+    this.hubPreviewAffection = 65,
     this.dialoguePreviewMode = false,
     this.dialogueOverrideJson,
   });
@@ -149,6 +154,9 @@ class MillenniumCapitalApp extends StatefulWidget {
   final CampaignWorldPreparer? campaignWorldPreparer;
   final bool stockTestMode;
   final bool hubPreviewMode;
+  final bool hubBlinkPreviewMode;
+  final int hubPreviewDay;
+  final int hubPreviewAffection;
   final bool dialoguePreviewMode;
   final String? dialogueOverrideJson;
 
@@ -201,22 +209,26 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
       final previewState = _engine.createNewGame(
         '데시멀 로비 검수',
         story: previewStory.copyWith(
-          storyFlags: {...previewStory.storyFlags, 'hubTutorialSeen': true},
+          storyFlags: {
+            ...previewStory.storyFlags,
+            'hubTutorialSeen': true,
+            'hubBlinkPreview': widget.hubBlinkPreviewMode,
+          },
         ),
         worldSeed: 'daily-lobby-preview-v1',
       );
       _state = previewState.copyWith(
-        day: 4,
+        day: widget.hubPreviewDay.clamp(1, 8),
         marketMinute: 17 * 60 + 40,
         decisions: const [],
         relationships: RelationshipState(
           girls: {
             for (final profile in cohortGirlProfiles)
-              profile.id: const GirlRelationshipProgress(
-                affection: 65,
-                trust: 65,
-                closeness: 65,
-                investmentRespect: 65,
+              profile.id: GirlRelationshipProgress(
+                affection: widget.hubPreviewAffection.clamp(0, 120),
+                trust: widget.hubPreviewAffection.clamp(0, 120),
+                closeness: widget.hubPreviewAffection.clamp(0, 120),
+                investmentRespect: widget.hubPreviewAffection.clamp(0, 120),
               ),
           },
         ),
@@ -872,7 +884,6 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     if (mounted) setState(() => _state = outcome.state);
     return outcome;
   }
-
 
   Future<PhoneMessengerActionResult> _markPhoneThreadRead(
     String contactId,

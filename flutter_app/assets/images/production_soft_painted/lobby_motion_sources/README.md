@@ -1,0 +1,28 @@
+# 로비 성격별 연속 동작 소스
+
+기존 승인 캐릭터 PNG를 참조해 built-in `imagegen`으로 만든 4프레임 동작 시트다.
+초록 크로마 원본은 최종 투명화 뒤 저장소에서 제거했으며, 이 폴더에는 재가공 가능한
+투명 시트만 둔다. 게임은 각 인물 폴더의 `10_lobby_*_f0..f3_v2.png`를 사용한다.
+
+| 인물 | 동작 | 투명 소스 |
+|---|---|---|
+| 김서아 | 수첩을 든 채 머리카락 정리 | `kim_seoa_hair_tuck_sheet_v1.png` |
+| 이지안 | 드라이버를 들어 끝부분 점검 | `lee_jian_tool_check_sheet_v1.png` |
+| 최이서 | 실과 실꾸러미 정돈 | `choi_iseo_thread_tidy_sheet_v1.png` |
+| 정아린 | 넥타이와 자세를 바로잡고 지시 준비 | `jung_arin_tie_reset_sheet_v1.png` |
+| 박하은 | 양손을 모으며 반갑게 기울기 | `park_haeun_welcome_sheet_v1.png` |
+| 한수아 | 양팔을 올리는 밝은 기지개 | `han_sua_stretch_strip_v2.png` |
+| 오지우 | 생각하다 아이디어를 떠올리는 손짓 | `oh_jiwoo_idea_sheet_v1.png` |
+| 윤채아 | 넥타이·옷매무새를 차분히 정리 | `yoon_chaea_uniform_tidy_sheet_v1.png` |
+
+공통 생성 프롬프트는 원본의 얼굴·헤어·교복·체형·소지품·조명·화풍을 잠그고,
+정확히 네 개의 연속 관절 프레임과 균일한 `#00ff00` 배경, 프레임 간 동일 기준선,
+추가 팔다리·손가락·텍스트·그림자 금지를 요구했다. 인물마다 위 표의 행동과 손의
+이동 경로를 별도로 지정했다. 한수아는 팔이 위 칸을 침범한 첫 2×2 결과를 폐기하고
+가로 1×4 시트로 재생성했다.
+
+투명 시트를 개별 1024×1536 프레임으로 다시 만들려면 저장소 루트에서 실행한다.
+
+```powershell
+python scripts\process_lobby_motion_sheets.py
+```

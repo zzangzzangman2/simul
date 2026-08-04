@@ -275,11 +275,24 @@ void main() {
 
     expect(find.byKey(const Key('apartment-place-bedroom')), findsOneWidget);
     expect(find.byKey(const Key('hub-mission-card')), findsOneWidget);
-    expectRoomHotspots(['open-market-button', 'open-ledger-button']);
+    expectRoomHotspots([]);
+    expect(find.byKey(const Key('daily-lobby-heroine-stage')), findsOneWidget);
+    expect(
+      find.byKey(const Key('lobby-heroine-greeting-card')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('apartment-location-dock')), findsOneWidget);
+    expect(find.byKey(const Key('open-market-button')), findsNothing);
+    expect(find.byKey(const Key('open-ledger-button')), findsNothing);
     expect(find.byKey(const Key('open-decisions-button')), findsNothing);
     expect(find.byKey(const Key('open-organization-button')), findsNothing);
     expect(find.byKey(const Key('open-work-button')), findsNothing);
     expect(tester.takeException(), isNull);
+
+    await tester.tap(find.byKey(const Key('apartment-go-kitchen')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('apartment-place-kitchen')), findsOneWidget);
+    expectRoomHotspots(['open-market-button', 'open-home-improvements-button']);
 
     await tester.tap(find.byKey(const Key('open-market-button')));
     await tester.pump();
@@ -350,46 +363,31 @@ void main() {
       find.byKey(const Key('apartment-place-living-room')),
       findsOneWidget,
     );
-    expectRoomHotspots([
-      'open-organization-button',
-      'open-home-improvements-button',
-    ]);
+    expectRoomHotspots(['open-organization-button']);
     expect(find.byKey(const Key('open-bank-button')), findsNothing);
     expect(find.byKey(const Key('open-decisions-button')), findsNothing);
     expect(find.byKey(const Key('open-work-button')), findsNothing);
     expect(find.byKey(const Key('hub-mission-card')), findsOneWidget);
 
-    final leftArrow = find.byKey(const Key('apartment-go-bedroom'));
-    final rightArrow = find.byKey(const Key('apartment-go-kitchen'));
-    expect(leftArrow, findsOneWidget);
-    expect(rightArrow, findsOneWidget);
-    final leftArrowRect = tester.getRect(leftArrow);
-    final rightArrowRect = tester.getRect(rightArrow);
-    expect(leftArrowRect.size, rightArrowRect.size);
-    expect(leftArrowRect.width, 68);
-    expect(leftArrowRect.height, 68);
-    expect(leftArrowRect.bottom, closeTo(rightArrowRect.bottom, 0.01));
-    expect(
-      leftArrowRect.left,
-      closeTo(phoneSize.width - rightArrowRect.right, 0.01),
-    );
-
+    final locationDock = find.byKey(const Key('apartment-location-dock'));
+    final dockRect = tester.getRect(locationDock);
+    expect(dockRect.left, greaterThanOrEqualTo(0));
+    expect(dockRect.right, lessThanOrEqualTo(phoneSize.width));
+    expect(dockRect.height, 58);
     final missionRect = tester.getRect(
       find.byKey(const Key('hub-mission-card')),
     );
     expect(missionRect.width, 202);
     expect(missionRect.height, 62);
-    expect(missionRect.right, closeTo(rightArrowRect.right, 0.01));
-    expect(missionRect.bottom, lessThan(rightArrowRect.top));
-    expect(missionRect.overlaps(rightArrowRect), isFalse);
-    expect(missionRect.overlaps(leftArrowRect), isFalse);
+    expect(missionRect.bottom, lessThan(dockRect.top));
+    expect(missionRect.overlaps(dockRect), isFalse);
     expect(find.byKey(const Key('open-market-button')), findsNothing);
     expect(find.byKey(const Key('open-ledger-button')), findsNothing);
 
     await tester.tap(find.byKey(const Key('apartment-go-kitchen')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('apartment-place-kitchen')), findsOneWidget);
-    expectRoomHotspots([]);
+    expectRoomHotspots(['open-market-button', 'open-home-improvements-button']);
     expect(find.byKey(const Key('hub-mission-card')), findsOneWidget);
     expect(find.byKey(const Key('open-work-button')), findsNothing);
     expect(find.byKey(const Key('open-decisions-button')), findsNothing);
@@ -398,7 +396,7 @@ void main() {
     await tester.tap(find.byKey(const Key('apartment-go-corridor')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('apartment-place-corridor')), findsOneWidget);
-    expectRoomHotspots(['open-decisions-button']);
+    expectRoomHotspots(['open-decisions-button', 'open-ledger-button']);
     expect(find.byKey(const Key('open-work-button')), findsNothing);
     expect(find.byKey(const Key('open-bank-button')), findsNothing);
     expect(find.byKey(const Key('open-organization-button')), findsNothing);
@@ -658,13 +656,15 @@ void main() {
         final teacherRect = tester.getRect(teacher);
         expect(teacherRect.center.dx, closeTo(stageRect.center.dx, 0.01));
         expect(teacherRect.height, closeTo(stageRect.height * 0.9, 0.01));
-        expect(teacherRect.bottom, closeTo(stageRect.bottom + 56, 0.01));
+        expect(teacherRect.bottom, closeTo(stageRect.bottom + 178, 0.01));
       }
       expect(tester.takeException(), isNull);
     }
 
     var sawRosterCard = false;
-    for (var index = 0; index < 400; index++) {
+    // A typewriter beat can consume one tap to reveal the line and another to
+    // advance, so leave enough taps to traverse the complete 302-beat script.
+    for (var index = 0; index < 720; index++) {
       sawRosterCard =
           sawRosterCard ||
           find
@@ -677,7 +677,16 @@ void main() {
           .isNotEmpty) {
         break;
       }
-      await tester.tap(find.byKey(const Key('story-continue')));
+      final choice = find.byWidgetPredicate(
+        (widget) =>
+            widget.key is ValueKey<String> &&
+            (widget.key as ValueKey<String>).value.startsWith('choice-'),
+      );
+      if (choice.evaluate().isNotEmpty) {
+        await tester.tap(choice.first);
+      } else {
+        await tester.tap(find.byKey(const Key('story-continue')));
+      }
       await tester.pumpAndSettle();
       expectPortraitInside();
     }

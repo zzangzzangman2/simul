@@ -1,8 +1,8 @@
 # 서하늘 공인중개사 자산 규격
 
 이 문서는 부동산 전용 화면에 반복 등장하는 **서하늘 공인중개사**의 역할, 6개
-런타임 상태와 v3 렌더링 전환 규칙을 정의한다. 서하늘의 기존 얼굴·헤어·체형·의상·
-장신구·신발·직업 소품은 정체성 보존 대상이다.
+런타임 상태와 v3 렌더링 전환 규칙을 정의한다. 서하늘의 승인된 브라운 그라데이션 단발,
+작아진 성인 얼굴 비율, 핑크 니트·흰색 밀착 바지·흰색 구두와 직업 소품은 정체성 보존 대상이다.
 
 ## 기준 참조의 역할
 
@@ -24,22 +24,28 @@
 - 여섯 상태에서 같은 새 인물로 읽히는 얼굴·헤어·체형·의상
 - 교복풍 얼굴·미성년 체형으로 줄이지 않는다.
 
-## 기존 디자인 보존 v3 대표 렌더링 승인
+## v2 대표 디자인 승인
 
-기존 오프숄더 프릴 원피스·가터·플랫폼 샌들·장식, 얼굴·헤어·체형을 그대로 보존한다.
-대표 전신 한 장의 선화·채색·명암·재질감만 v3로 다시 렌더링해 먼저 승인받는다.
-승인 뒤에는 같은 디자인을 6개 상태에서 동일하게 유지한다.
+브라운 계열 그라데이션 단발과 기존 장식, 자연스럽게 작아진 성인 얼굴 비율,
+몸에 맞는 핑크색 니트와 흰색 밀착 바지·흰색 구두를 대표 디자인으로 사용한다.
+승인된 `welcome` 전신을 기준으로 같은 얼굴·헤어 색·체형·의상을 6개 상태에서 동일하게 유지한다.
+
+- 머릿결은 가는 모발 묶음과 가볍고 자연스러운 볼륨으로 표현하고, 헬멧처럼 굳은 광택 띠를 쓰지 않는다.
+- 핑크 상의는 단순한 네크라인의 젊은 감각 골지 니트다. 재킷 라펠·랩 카디건 여밈·단추·어깨 패드를 넣지 않는다.
+- 고개와 시선은 상태별로 분리한다: `welcome`은 곧게 세운 정면, `explain`은 책 방향,
+  `finance`는 계산기 방향, `concerned`는 계약서 아래쪽, `approve`는 위쪽 열쇠,
+  `negotiate`는 전화 방향을 본다. 전 자세에 같은 옆 기울기를 복제하지 않는다.
 
 ## 런타임 자산과 상태 매핑
 
 | `_RealtorMood` | 자산 | 표정·자세·소품 | 사용 상태 |
 | --- | --- | --- | --- |
-| `welcome` | `character_realtor_welcome_v1.png` | 남색 서류철을 들고 열린 손으로 환영 | 첫 진입, 상담 다시 열기 |
-| `explain` | `character_realtor_explain_v1.png` | 펼친 매물 책자를 지시봉으로 설명 | 티어·지도·시장 안내 |
-| `finance` | `character_realtor_finance_v1.png` | 계산기를 들어 가리키고 클립보드를 듦 | 매입 자금·담보대출 안내 |
-| `concerned` | `character_realtor_concerned_v1.png` | 걱정스러운 표정으로 계약서의 경고 부분을 지시 | 매입 실패, 한도 부족, 위험 경고 |
-| `approve` | `character_realtor_approve_v1.png` | 집 모양 열쇠를 들어 밝게 축하 | 매입 성공 |
-| `negotiate` | `character_realtor_negotiate_v1.png` | 전화를 받으며 다른 손을 열어 협의 | 매각·월세·전세 협상 |
+| `welcome` | `character_realtor_welcome_v2.png` | 남색 서류철을 들고 열린 손으로 환영 | 첫 진입, 상담 다시 열기 |
+| `explain` | `character_realtor_explain_v2.png` | 펼친 매물 책자를 지시봉으로 설명 | 티어·지도·시장 안내 |
+| `finance` | `character_realtor_finance_v2.png` | 계산기를 들어 가리키고 클립보드를 듦 | 매입 자금·담보대출 안내 |
+| `concerned` | `character_realtor_concerned_v2.png` | 걱정스러운 표정으로 계약서의 경고 부분을 지시 | 매입 실패, 한도 부족, 위험 경고 |
+| `approve` | `character_realtor_approve_v2.png` | 집 모양 열쇠를 들어 밝게 축하 | 매입 성공 |
+| `negotiate` | `character_realtor_negotiate_v2.png` | 전화를 받으며 다른 손을 열어 협의 | 매각·월세·전세 협상 |
 
 `AssetSpendingScreen(realEstateOnly: true)`에서만 재무 개요 위 `_RealtorGuideCard`로 표시한다. 일반 자산 지출 화면에는 카드도 상태 변경도 노출하지 않는다.
 
@@ -65,10 +71,10 @@ Canonical rendering reference: art_references/simul_polished_soft_render_vn_styl
 Use it for SIMUL polished soft-render VN anime v3 rendering only.
 Do not copy Sua's face, black wavy hair, body, uniform, pose or expression.
 
-Render the same existing 24-year-old adult Korean realtor, Seo Haneul, for her
-representative full-body approval image. Preserve her exact face identity,
-indigo-to-cyan bob, ornaments, off-shoulder frilled dress, garter, platform
-sandals, body silhouette and work props. Do not redesign or simplify them.
+Render the same approved 24-year-old adult Korean realtor, Seo Haneul. Preserve
+her exact face identity, smaller natural adult head-to-body proportion, soft
+brown-based gradient bob, ornaments, fitted pink knit top, close-fitting white
+trousers, white heels, body silhouette and work props. Do not redesign or simplify them.
 Do not reuse any of the eight cohort girls.
 
 Use thin controlled dark colored linework, polished soft volume shading,

@@ -41,7 +41,7 @@ async function approvedSpritePaths() {
 
 test("approved v3 sprites remain byte-exact and mirrored to the web build", async () => {
   const sprites = await approvedSpritePaths();
-  assert.equal(sprites.length, 78);
+  assert.equal(sprites.length, 110);
 
   const digest = createHash("sha256");
   for (const relative of sprites) {
@@ -66,6 +66,6 @@ test("approved v3 sprites remain byte-exact and mirrored to the web build", asyn
 
   assert.equal(
     digest.digest("hex"),
-    "f1738279728ab661f5873af2713f9bbb8ef2785df2665d0aabb38976fc0d07b8",
+    "1330e6bf12d06d77aaa86d7a837ccade2b4736c74bb16ce78e8c9a08d26fb496",
   );
 });

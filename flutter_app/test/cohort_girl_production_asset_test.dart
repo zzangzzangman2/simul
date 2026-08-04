@@ -22,14 +22,14 @@ void main() {
   ];
 
   const expectedAssetCounts = <String, int>{
-    'kim_seoa': 9,
-    'lee_jian': 9,
-    'choi_iseo': 9,
-    'jung_arin': 9,
-    'park_haeun': 9,
-    'han_sua': 9,
-    'oh_jiwoo': 9,
-    'yoon_chaea': 9,
+    'kim_seoa': 13,
+    'lee_jian': 13,
+    'choi_iseo': 13,
+    'jung_arin': 13,
+    'park_haeun': 13,
+    'han_sua': 13,
+    'oh_jiwoo': 13,
+    'yoon_chaea': 13,
     'kim_hakjun': 9,
   };
 
@@ -175,7 +175,14 @@ void main() {
         Directory('assets/images/production_soft_painted/han_sua')
             .listSync()
             .whereType<File>()
-            .where((file) => file.path.endsWith('.png'))
+            .where(
+              (file) =>
+                  file.path.endsWith('.png') &&
+                  !file.path
+                      .split(Platform.pathSeparator)
+                      .last
+                      .startsWith('10_lobby_'),
+            )
             .map((file) => file.path.split(Platform.pathSeparator).last)
             .toList()
           ..sort();

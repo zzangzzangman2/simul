@@ -1094,12 +1094,12 @@ class _RealEstateTutorialOverlay extends StatelessWidget {
   final VoidCallback onAction;
 
   String get _asset => switch (step) {
-    0 => 'assets/images/character_realtor_welcome_v1.png',
-    1 => 'assets/images/character_realtor_explain_v1.png',
-    2 => 'assets/images/character_realtor_finance_v1.png',
-    3 => 'assets/images/character_realtor_concerned_v1.png',
-    4 => 'assets/images/character_realtor_negotiate_v1.png',
-    _ => 'assets/images/character_realtor_approve_v1.png',
+    0 => 'assets/images/character_realtor_welcome_v2.png',
+    1 => 'assets/images/character_realtor_explain_v2.png',
+    2 => 'assets/images/character_realtor_finance_v2.png',
+    3 => 'assets/images/character_realtor_concerned_v2.png',
+    4 => 'assets/images/character_realtor_negotiate_v2.png',
+    _ => 'assets/images/character_realtor_approve_v2.png',
   };
 
   List<String> get _messages => switch (step) {
@@ -1162,14 +1162,14 @@ class _RealtorGuideCard extends StatelessWidget {
   final VoidCallback onDismiss;
 
   String get _asset => switch (mood) {
-    _RealtorMood.welcome => 'assets/images/character_realtor_welcome_v1.png',
-    _RealtorMood.explain => 'assets/images/character_realtor_explain_v1.png',
-    _RealtorMood.finance => 'assets/images/character_realtor_finance_v1.png',
+    _RealtorMood.welcome => 'assets/images/character_realtor_welcome_v2.png',
+    _RealtorMood.explain => 'assets/images/character_realtor_explain_v2.png',
+    _RealtorMood.finance => 'assets/images/character_realtor_finance_v2.png',
     _RealtorMood.concerned =>
-      'assets/images/character_realtor_concerned_v1.png',
-    _RealtorMood.approve => 'assets/images/character_realtor_approve_v1.png',
+      'assets/images/character_realtor_concerned_v2.png',
+    _RealtorMood.approve => 'assets/images/character_realtor_approve_v2.png',
     _RealtorMood.negotiate =>
-      'assets/images/character_realtor_negotiate_v1.png',
+      'assets/images/character_realtor_negotiate_v2.png',
   };
 
   String get _line => switch (mood) {

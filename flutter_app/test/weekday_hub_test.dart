@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:millennium_capital/game/game_engine.dart';
 import 'package:millennium_capital/game/game_state.dart';
+import 'package:millennium_capital/game/relationship_state.dart';
 import 'package:millennium_capital/game/story_state.dart';
 import 'package:millennium_capital/main.dart';
 
@@ -10,33 +11,427 @@ Widget _testHub({
   required VoidCallback onOpenMarket,
   required VoidCallback onOpenRealEstate,
   required VoidCallback onOpenBank,
+  bool disableAnimations = false,
 }) => MaterialApp(
-  home: Scaffold(
-    body: ApartmentHubScreen(
-      state: state,
-      onOpenMarket: onOpenMarket,
-      onOpenRealEstate: onOpenRealEstate,
-      onOpenBank: onOpenBank,
-      onOpenDecisions: () {},
-      onOpenLedger: () {},
-      onOpenOrganization: () {},
-      onOpenRelationships: () {},
-      onOpenMessenger: () {},
-      onOpenCalendar: () {},
-      onOpenHomeImprovements: () {},
-      onOpenWork: () {},
-      activeSaveSlot: 1,
-      lastSavedAt: null,
-      onOpenGameMenu: () {},
-      onAdvanceHour: () {},
-      onAdvanceDay: () {},
-      onAdvanceBatch: () {},
-      onOpenEnding: () {},
+  home: MediaQuery(
+    data: MediaQueryData(disableAnimations: disableAnimations),
+    child: Scaffold(
+      body: ApartmentHubScreen(
+        state: state,
+        onOpenMarket: onOpenMarket,
+        onOpenRealEstate: onOpenRealEstate,
+        onOpenBank: onOpenBank,
+        onOpenDecisions: () {},
+        onOpenLedger: () {},
+        onOpenOrganization: () {},
+        onOpenRelationships: () {},
+        onOpenMessenger: () {},
+        onOpenCalendar: () {},
+        onOpenHomeImprovements: () {},
+        onOpenWork: () {},
+        activeSaveSlot: 1,
+        lastSavedAt: null,
+        onOpenGameMenu: () {},
+        onAdvanceHour: () {},
+        onAdvanceDay: () {},
+        onAdvanceBatch: () {},
+        onOpenEnding: () {},
+      ),
     ),
   ),
 );
 
 void main() {
+  testWidgets(
+    'lounge rotates heroines daily and changes pose copy and motion by affection',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      const engine = GameEngine();
+      final story = StoryState.newDecimalPlayer(
+        playerName: '민재',
+        introChoice: 'stocks',
+        startingTrait: StoryTrait.analysis,
+        operatingPrinciple: OperatingPrinciple.reportLosses,
+      );
+      final lowState = engine
+          .createNewGame(
+            '일일 로비 테스트',
+            story: story,
+            worldSeed: 'daily-lobby-rotation',
+          )
+          .copyWith(day: 4, decisions: const []);
+
+      await tester.pumpWidget(
+        _testHub(
+          state: lowState,
+          onOpenMarket: () {},
+          onOpenRealEstate: () {},
+          onOpenBank: () {},
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final firstName = tester
+          .widget<Text>(find.byKey(const Key('lobby-heroine-name')))
+          .data!;
+      final lowGreeting = tester
+          .widget<Text>(find.byKey(const Key('lobby-heroine-greeting')))
+          .data!;
+      final lowDistance = tester
+          .widget<AnimatedScale>(
+            find.byKey(const Key('lobby-heroine-affection-distance')),
+          )
+          .scale;
+      expect(find.text('새 동기'), findsOneWidget);
+      expect(find.byKey(const Key('lobby-heroine-idle-image')), findsOneWidget);
+
+      final closeRelationships = RelationshipState(
+        girls: {
+          for (final profile in cohortGirlProfiles)
+            profile.id: const GirlRelationshipProgress(
+              affection: 65,
+              trust: 65,
+              closeness: 65,
+              investmentRespect: 65,
+            ),
+        },
+      );
+      final closeState = lowState.copyWith(relationships: closeRelationships);
+      await tester.pumpWidget(
+        _testHub(
+          state: closeState,
+          onOpenMarket: () {},
+          onOpenRealEstate: () {},
+          onOpenBank: () {},
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.widget<Text>(find.byKey(const Key('lobby-heroine-name'))).data,
+        firstName,
+      );
+      expect(find.text('마음을 아는 사이'), findsOneWidget);
+      final closeDistance = tester
+          .widget<AnimatedScale>(
+            find.byKey(const Key('lobby-heroine-affection-distance')),
+          )
+          .scale;
+      expect(closeDistance, greaterThan(lowDistance));
+      expect(
+        tester
+            .widget<Text>(find.byKey(const Key('lobby-heroine-greeting')))
+            .data,
+        isNot(lowGreeting),
+      );
+
+      final profile = cohortGirlProfiles.singleWhere(
+        (candidate) => candidate.name == firstName,
+      );
+      await tester.tap(find.byKey(Key('daily-lobby-heroine-${profile.id}')));
+      await tester.pump(const Duration(milliseconds: 80));
+      expect(
+        find.byKey(const Key('lobby-heroine-reaction-image')),
+        findsOneWidget,
+      );
+      final motionBefore = tester
+          .widget<Transform>(
+            find.byKey(const Key('lobby-heroine-breathing-motion')),
+          )
+          .transform
+          .storage
+          .toList();
+      await tester.pump(const Duration(milliseconds: 520));
+      final motionAfter = tester
+          .widget<Transform>(
+            find.byKey(const Key('lobby-heroine-breathing-motion')),
+          )
+          .transform
+          .storage
+          .toList();
+      expect(motionAfter, isNot(motionBefore));
+
+      final nextDayState = closeState.copyWith(day: closeState.day + 1);
+      await tester.pumpWidget(
+        _testHub(
+          state: nextDayState,
+          onOpenMarket: () {},
+          onOpenRealEstate: () {},
+          onOpenBank: () {},
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<Text>(find.byKey(const Key('lobby-heroine-name'))).data,
+        isNot(firstName),
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('all eight lobby heroines receive a fitted blink layer', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    const engine = GameEngine();
+    final story = StoryState.newDecimalPlayer(
+      playerName: '민재',
+      introChoice: 'stocks',
+      startingTrait: StoryTrait.analysis,
+      operatingPrinciple: OperatingPrinciple.reportLosses,
+    );
+    final baseState = engine
+        .createNewGame(
+          'blink-layout-test',
+          story: story,
+          worldSeed: 'daily-lobby-eight-blinks',
+        )
+        .copyWith(day: 4, decisions: const []);
+    final names = <String>{};
+
+    for (var offset = 0; offset < cohortGirlProfiles.length; offset += 1) {
+      await tester.pumpWidget(
+        _testHub(
+          state: baseState.copyWith(day: baseState.day + offset),
+          onOpenMarket: () {},
+          onOpenRealEstate: () {},
+          onOpenBank: () {},
+        ),
+      );
+      await tester.pump();
+      names.add(
+        tester.widget<Text>(find.byKey(const Key('lobby-heroine-name'))).data!,
+      );
+      expect(
+        find.byKey(const Key('lobby-heroine-blink-overlay')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('lobby-heroine-touch-motion')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('lobby-heroine-affection-distance')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('lobby-heroine-idle-gesture-motion')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('lobby-heroine-gaze-motion')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('lobby-heroine-zone-reaction-motion')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('lobby-heroine-motion-frame-layer')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('lobby-ambient-background-motion')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('lobby-ambient-particles')), findsOneWidget);
+      final profile = cohortGirlProfiles.singleWhere(
+        (candidate) =>
+            candidate.name ==
+            tester
+                .widget<Text>(find.byKey(const Key('lobby-heroine-name')))
+                .data,
+      );
+      final motionSeed = profile.id.codeUnits.fold<int>(
+        0,
+        (value, unit) => (value * 31 + unit) & 0x7fffffff,
+      );
+      await tester.pump(Duration(milliseconds: 4200 + (motionSeed % 2800)));
+      await tester.pump(const Duration(milliseconds: 520));
+      final activeMotionAssets = tester
+          .widgetList<Image>(find.byType(Image))
+          .map((image) => image.image)
+          .whereType<AssetImage>()
+          .map((asset) => asset.assetName)
+          .where((asset) => asset.contains('/10_lobby_'))
+          .toList();
+      expect(activeMotionAssets, isNotEmpty);
+      expect(
+        activeMotionAssets.every((asset) => asset.contains('/${profile.id}/')),
+        isTrue,
+      );
+      expect(tester.takeException(), isNull);
+    }
+
+    expect(names, hasLength(cohortGirlProfiles.length));
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets(
+    'heroine touch zones react differently and repeated taps set a boundary',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      const engine = GameEngine();
+      final story = StoryState.newDecimalPlayer(
+        playerName: '민재',
+        introChoice: 'stocks',
+        startingTrait: StoryTrait.analysis,
+        operatingPrinciple: OperatingPrinciple.reportLosses,
+      );
+      final state = engine
+          .createNewGame(
+            'lobby-touch-zone-test',
+            story: story,
+            worldSeed: 'lobby-touch-zones',
+          )
+          .copyWith(day: 4, decisions: const []);
+
+      await tester.pumpWidget(
+        _testHub(
+          state: state,
+          onOpenMarket: () {},
+          onOpenRealEstate: () {},
+          onOpenBank: () {},
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 900));
+
+      final name = tester
+          .widget<Text>(find.byKey(const Key('lobby-heroine-name')))
+          .data!;
+      final profile = cohortGirlProfiles.singleWhere(
+        (candidate) => candidate.name == name,
+      );
+      final stageFinder = find.byKey(Key('daily-lobby-heroine-${profile.id}'));
+      final rect = tester.getRect(stageFinder);
+
+      await tester.tapAt(Offset(rect.center.dx, rect.top + rect.height * 0.2));
+      await tester.pump(const Duration(milliseconds: 80));
+      final faceLine = tester
+          .widget<Text>(find.byKey(const Key('lobby-heroine-greeting')))
+          .data!;
+      expect(
+        find.byKey(const Key('lobby-heroine-reaction-image')),
+        findsOneWidget,
+      );
+
+      await tester.tapAt(Offset(rect.center.dx, rect.top + rect.height * 0.5));
+      await tester.pump(const Duration(milliseconds: 80));
+      final torsoLine = tester
+          .widget<Text>(find.byKey(const Key('lobby-heroine-greeting')))
+          .data!;
+      expect(torsoLine, isNot(faceLine));
+
+      final accessoryPoint = Offset(
+        rect.center.dx,
+        rect.top + rect.height * 0.82,
+      );
+      await tester.tapAt(accessoryPoint);
+      await tester.pump(const Duration(milliseconds: 60));
+      final accessoryLine = tester
+          .widget<Text>(find.byKey(const Key('lobby-heroine-greeting')))
+          .data!;
+      expect(accessoryLine, isNot(torsoLine));
+      await tester.tapAt(accessoryPoint);
+      await tester.pump(const Duration(milliseconds: 60));
+      await tester.tapAt(accessoryPoint);
+      await tester.pump(const Duration(milliseconds: 60));
+      final repeatedLine = tester
+          .widget<Text>(find.byKey(const Key('lobby-heroine-greeting')))
+          .data!;
+      expect(repeatedLine, isNot(accessoryLine));
+      expect(tester.takeException(), isNull);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets('blink timing is irregular and reduced motion keeps it still', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    const engine = GameEngine();
+    final story = StoryState.newDecimalPlayer(
+      playerName: '민재',
+      introChoice: 'stocks',
+      startingTrait: StoryTrait.analysis,
+      operatingPrinciple: OperatingPrinciple.reportLosses,
+    );
+    final state = engine
+        .createNewGame(
+          'blink-timing-test',
+          story: story,
+          worldSeed: 'lobby-blink-timing',
+        )
+        .copyWith(day: 4, decisions: const []);
+
+    await tester.pumpWidget(
+      _testHub(
+        state: state,
+        onOpenMarket: () {},
+        onOpenRealEstate: () {},
+        onOpenBank: () {},
+      ),
+    );
+    await tester.pump();
+    expect(
+      tester
+          .widget<Opacity>(find.byKey(const Key('lobby-heroine-blink-overlay')))
+          .opacity,
+      0,
+    );
+    await tester.pump(const Duration(milliseconds: 2500));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(
+      tester
+          .widget<Opacity>(find.byKey(const Key('lobby-heroine-blink-overlay')))
+          .opacity,
+      greaterThan(0.7),
+    );
+
+    await tester.pumpWidget(
+      _testHub(
+        state: state,
+        onOpenMarket: () {},
+        onOpenRealEstate: () {},
+        onOpenBank: () {},
+        disableAnimations: true,
+      ),
+    );
+    await tester.pump(const Duration(seconds: 7));
+    expect(
+      tester
+          .widget<Opacity>(find.byKey(const Key('lobby-heroine-blink-overlay')))
+          .opacity,
+      0,
+    );
+    expect(
+      tester
+          .widgetList<Image>(find.byType(Image))
+          .map((image) => image.image)
+          .whereType<AssetImage>()
+          .where((asset) => asset.assetName.contains('/10_lobby_')),
+      isEmpty,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'new story shows bank and realtor as locked before introductions',
     (tester) async {

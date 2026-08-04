@@ -15,6 +15,8 @@ const _storyCharacterSceneScale = 1.55;
 const _storySceneControlsTopInset = 94.0;
 const _storyDialoguePanelMinHeight = 154.0;
 const _maximumWheelBackSteps = 12;
+const _maximumMobileSwipeBackSteps = 4;
+const _minimumMobileSwipeBackDistance = 72.0;
 const _wheelBackDebounce = Duration(milliseconds: 180);
 
 const _hanSuaV2FilenameMigrations = <String, String>{
@@ -392,6 +394,8 @@ class _VisualNovelOnboardingScreenState
   late bool _academyPcPoweredOn;
   late bool _academyStockAppOpen;
   DateTime? _lastWheelBackAt;
+  double _mobileSwipeDistance = 0;
+  int _mobileSwipeBackSteps = 0;
   String _activeStoryBgm = '';
   bool _storyEffectActive = false;
   bool _storyVoiceActive = false;
@@ -986,6 +990,7 @@ class _VisualNovelOnboardingScreenState
   }
 
   void _rememberNavigationBeat(int beat) {
+    _mobileSwipeBackSteps = 0;
     if (_beatNavigationHistory.isNotEmpty &&
         _beatNavigationHistory.last == beat) {
       return;
@@ -996,10 +1001,15 @@ class _VisualNovelOnboardingScreenState
     }
   }
 
-  void _goBackOneBeat() {
+  void _goBackOneBeat({bool fromMobileSwipe = false}) {
+    if (fromMobileSwipe &&
+        _mobileSwipeBackSteps >= _maximumMobileSwipeBackSteps) {
+      return;
+    }
     if (_isCreating || _beatNavigationHistory.isEmpty) return;
     final previousBeat = _beatNavigationHistory.removeLast();
     if (previousBeat == _beat) return;
+    if (fromMobileSwipe) _mobileSwipeBackSteps += 1;
     FocusManager.instance.primaryFocus?.unfocus();
     _playStoryFeedback();
     setState(() => _beat = previousBeat);
@@ -1014,6 +1024,26 @@ class _VisualNovelOnboardingScreenState
     if (last != null && now.difference(last) < _wheelBackDebounce) return;
     _lastWheelBackAt = now;
     _goBackOneBeat();
+  }
+
+  void _handleMobileSwipeStart(DragStartDetails details) {
+    _mobileSwipeDistance = 0;
+  }
+
+  void _handleMobileSwipeUpdate(DragUpdateDetails details) {
+    _mobileSwipeDistance += details.delta.dx;
+  }
+
+  void _handleMobileSwipeEnd(DragEndDetails details) {
+    final distance = _mobileSwipeDistance;
+    _mobileSwipeDistance = 0;
+    final velocity = details.primaryVelocity ?? 0;
+    if (distance < _minimumMobileSwipeBackDistance || velocity < -50) return;
+    _goBackOneBeat(fromMobileSwipe: true);
+  }
+
+  void _handleMobileSwipeCancel() {
+    _mobileSwipeDistance = 0;
   }
 
   Object _parseStoryValue(String raw) {
@@ -1385,252 +1415,272 @@ class _VisualNovelOnboardingScreenState
     return Listener(
       key: const Key('story-wheel-navigation-listener'),
       onPointerSignal: _handlePointerSignal,
-      child: Scaffold(
-        backgroundColor: const Color(0xFF171B2A),
-        resizeToAvoidBottomInset: false,
-        body: LayoutBuilder(
-          builder: (context, constraints) {
-            final scene = _currentDialogue;
-            final stageCharacters = _stageCharacters;
-            return Stack(
-              key: const Key('onboarding-stage'),
-              fit: StackFit.expand,
-              children: [
-                AnimatedSwitcher(
-                  duration: Duration(
-                    milliseconds: scene?.transition == 'cut'
-                        ? 0
-                        : scene?.transitionDurationMs ?? 700,
-                  ),
-                  transitionBuilder: (child, animation) =>
-                      _storySceneTransition(
-                        scene?.transition ?? 'fade',
-                        child,
-                        animation,
-                      ),
-                  child: _StoryCameraStage(
-                    key: ValueKey('camera-${scene?.id ?? _beat}'),
-                    x: scene?.cameraX ?? 0,
-                    y: scene?.cameraY ?? 0,
-                    zoom: scene?.cameraZoom ?? 1,
-                    shake: scene?.cameraShake ?? 0,
+      child: GestureDetector(
+        key: const Key('story-mobile-swipe-back-area'),
+        behavior: HitTestBehavior.translucent,
+        onHorizontalDragStart:
+            _playerNameConfirmed && !_isCreating && _beat < _dialogueEndBeat
+            ? _handleMobileSwipeStart
+            : null,
+        onHorizontalDragUpdate:
+            _playerNameConfirmed && !_isCreating && _beat < _dialogueEndBeat
+            ? _handleMobileSwipeUpdate
+            : null,
+        onHorizontalDragEnd:
+            _playerNameConfirmed && !_isCreating && _beat < _dialogueEndBeat
+            ? _handleMobileSwipeEnd
+            : null,
+        onHorizontalDragCancel: _handleMobileSwipeCancel,
+        child: Scaffold(
+          backgroundColor: const Color(0xFF171B2A),
+          resizeToAvoidBottomInset: false,
+          body: LayoutBuilder(
+            builder: (context, constraints) {
+              final scene = _currentDialogue;
+              final stageCharacters = _stageCharacters;
+              return Stack(
+                key: const Key('onboarding-stage'),
+                fit: StackFit.expand,
+                children: [
+                  AnimatedSwitcher(
                     duration: Duration(
-                      milliseconds: scene?.transitionDurationMs ?? 700,
+                      milliseconds: scene?.transition == 'cut'
+                          ? 0
+                          : scene?.transitionDurationMs ?? 700,
                     ),
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        _LivingBackground(
-                          key: ValueKey(_background),
-                          asset: _background,
-                          sceneBeat: _beat,
-                          ambientFlicker: scene?.ambientEffect == 'flicker',
+                    transitionBuilder: (child, animation) =>
+                        _storySceneTransition(
+                          scene?.transition ?? 'fade',
+                          child,
+                          animation,
                         ),
-                        if (_playerNameConfirmed)
-                          for (final stageCharacter in stageCharacters)
-                            Positioned.fill(
-                              key: ValueKey(
-                                'stage-${scene?.id}-${stageCharacter.id}',
-                              ),
-                              top: -_storyCharacterBottomInset,
-                              bottom: _storyCharacterBottomInset,
-                              child: IgnorePointer(
-                                child: Opacity(
-                                  opacity: stageCharacter.opacity,
-                                  child: Transform(
-                                    alignment: Alignment.center,
-                                    transform: Matrix4.diagonal3Values(
-                                      stageCharacter.flipX ? -1 : 1,
-                                      1,
-                                      1,
-                                    ),
-                                    child: _OnboardingCharacterSlot(
-                                      asset: stageCharacter.asset,
-                                      alignment: Alignment.bottomCenter,
-                                      position: Offset(
-                                        stageCharacter.x,
-                                        stageCharacter.y,
+                    child: _StoryCameraStage(
+                      key: ValueKey('camera-${scene?.id ?? _beat}'),
+                      x: scene?.cameraX ?? 0,
+                      y: scene?.cameraY ?? 0,
+                      zoom: scene?.cameraZoom ?? 1,
+                      shake: scene?.cameraShake ?? 0,
+                      duration: Duration(
+                        milliseconds: scene?.transitionDurationMs ?? 700,
+                      ),
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          _LivingBackground(
+                            key: ValueKey(_background),
+                            asset: _background,
+                            sceneBeat: _beat,
+                            ambientFlicker: scene?.ambientEffect == 'flicker',
+                          ),
+                          if (_playerNameConfirmed)
+                            for (final stageCharacter in stageCharacters)
+                              Positioned.fill(
+                                key: ValueKey(
+                                  'stage-${scene?.id}-${stageCharacter.id}',
+                                ),
+                                top: -_storyCharacterBottomInset,
+                                bottom: _storyCharacterBottomInset,
+                                child: IgnorePointer(
+                                  child: Opacity(
+                                    opacity: stageCharacter.opacity,
+                                    child: Transform(
+                                      alignment: Alignment.center,
+                                      transform: Matrix4.diagonal3Values(
+                                        stageCharacter.flipX ? -1 : 1,
+                                        1,
+                                        1,
                                       ),
-                                      scale: stageCharacter.scale,
-                                      entrance: stageCharacter.enter,
-                                      motion: stageCharacter.motion,
-                                      characterKey:
-                                          stageCharacter.speaker == '한서윤 운영관'
-                                          ? const Key(
-                                              'academy-teacher-character',
-                                            )
-                                          : ValueKey(
-                                              'story-character-${stageCharacter.id}',
-                                            ),
+                                      child: _OnboardingCharacterSlot(
+                                        asset: stageCharacter.asset,
+                                        alignment: Alignment.bottomCenter,
+                                        position: Offset(
+                                          stageCharacter.x,
+                                          stageCharacter.y,
+                                        ),
+                                        scale: stageCharacter.scale,
+                                        entrance: stageCharacter.enter,
+                                        motion: stageCharacter.motion,
+                                        characterKey:
+                                            stageCharacter.speaker == '한서윤 운영관'
+                                            ? const Key(
+                                                'academy-teacher-character',
+                                              )
+                                            : ValueKey(
+                                                'story-character-${stageCharacter.id}',
+                                              ),
+                                      ),
                                     ),
                                   ),
                                 ),
                               ),
+                          if ((scene?.lighting ?? 1) != 1)
+                            IgnorePointer(
+                              child: ColoredBox(
+                                color: (scene?.lighting ?? 1) < 1
+                                    ? Colors.black.withValues(
+                                        alpha: (1 - (scene?.lighting ?? 1))
+                                            .clamp(0.0, 0.78)
+                                            .toDouble(),
+                                      )
+                                    : Colors.white.withValues(
+                                        alpha: ((scene?.lighting ?? 1) - 1)
+                                            .clamp(0.0, 0.32)
+                                            .toDouble(),
+                                      ),
+                              ),
                             ),
-                        if ((scene?.lighting ?? 1) != 1)
-                          IgnorePointer(
-                            child: ColoredBox(
-                              color: (scene?.lighting ?? 1) < 1
-                                  ? Colors.black.withValues(
-                                      alpha: (1 - (scene?.lighting ?? 1))
-                                          .clamp(0.0, 0.78)
-                                          .toDouble(),
-                                    )
-                                  : Colors.white.withValues(
-                                      alpha: ((scene?.lighting ?? 1) - 1)
-                                          .clamp(0.0, 0.32)
-                                          .toDouble(),
-                                    ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-                if ((scene?.ambientEffect ?? 'none') != 'none' &&
-                    scene?.ambientEffect != 'flicker')
-                  _StoryAmbientOverlay(effect: scene!.ambientEffect),
-                const DecoratedBox(
-                  key: Key('story-stage-reading-scrim'),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Color(0x33000000),
-                        Colors.transparent,
-                        Color(0x52000000),
-                      ],
-                      stops: [0, 0.52, 1],
-                    ),
-                  ),
-                ),
-                Positioned.fill(
-                  child: GestureDetector(
-                    key: const Key('story-stage-advance-area'),
-                    behavior: HitTestBehavior.translucent,
-                    onTap: _isCreating || !_playerNameConfirmed
-                        ? null
-                        : () => _activeNovelDialogueState?._handleExternalTap(),
-                  ),
-                ),
-                SafeArea(
-                  child: IgnorePointer(
-                    child: Align(
-                      alignment: Alignment.topCenter,
-                      child: _SceneLabel(
-                        date: _dateLabel,
-                        location: _location,
-                        progress: (_beat + 1) / (_dialogueEndBeat + 1),
+                        ],
                       ),
                     ),
                   ),
-                ),
-
-                if (_playerNameConfirmed)
-                  SafeArea(
-                    child: Align(
-                      alignment: Alignment.topRight,
-                      child: Padding(
-                        padding: const EdgeInsets.only(
-                          top: _storySceneControlsTopInset,
-                          right: 12,
-                        ),
-                        child: DecoratedBox(
-                          key: const Key('story-scene-controls'),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [Color(0xE9293142), Color(0xE5161B27)],
-                            ),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: const Color(0x52FFFFFF)),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Color(0x66000000),
-                                blurRadius: 14,
-                                offset: Offset(0, 5),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                key: const Key('story-backlog-button'),
-                                tooltip: '지난 대사',
-                                visualDensity: VisualDensity.compact,
-                                color: Colors.white,
-                                onPressed: _showBacklog,
-                                icon: const Icon(
-                                  Icons.history_rounded,
-                                  size: 20,
-                                ),
-                              ),
-                              Container(
-                                width: 1,
-                                height: 22,
-                                color: const Color(0x26FFFFFF),
-                              ),
-                              IconButton(
-                                key: const Key('story-skip-button'),
-                                tooltip:
-                                    '${_currentPrologueSkipStep.sectionLabel} 건너뛰기',
-                                visualDensity: VisualDensity.compact,
-                                color: _yellow,
-                                onPressed: _showSkipDialog,
-                                icon: const Icon(
-                                  Icons.fast_forward_rounded,
-                                  size: 20,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                  if ((scene?.ambientEffect ?? 'none') != 'none' &&
+                      scene?.ambientEffect != 'flicker')
+                    _StoryAmbientOverlay(effect: scene!.ambientEffect),
+                  const DecoratedBox(
+                    key: Key('story-stage-reading-scrim'),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Color(0x33000000),
+                          Colors.transparent,
+                          Color(0x52000000),
+                        ],
+                        stops: [0, 0.52, 1],
                       ),
                     ),
                   ),
-                AnimatedPositioned(
-                  key: const Key('keyboard-name-panel'),
-                  duration: const Duration(milliseconds: 180),
-                  curve: Curves.easeOutCubic,
-                  left: 0,
-                  right: 0,
-                  bottom: keyboardLift + panelBottomInset,
-                  child: SafeArea(
-                    top: false,
-                    child: Align(
-                      alignment: Alignment.bottomCenter,
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 560),
-                        child: AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 260),
-                          layoutBuilder: (currentChild, previousChildren) {
-                            return Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                for (final child in previousChildren)
-                                  IgnorePointer(child: child),
-                                ?currentChild,
-                              ],
-                            );
-                          },
-                          child: _buildDialogue(context),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                if (_isCreating)
                   Positioned.fill(
-                    child: _NewGamePreparationOverlay(
-                      progress: _creationProgress,
+                    child: GestureDetector(
+                      key: const Key('story-stage-advance-area'),
+                      behavior: HitTestBehavior.translucent,
+                      onTap: _isCreating || !_playerNameConfirmed
+                          ? null
+                          : () =>
+                                _activeNovelDialogueState?._handleExternalTap(),
                     ),
                   ),
-              ],
-            );
-          },
+                  SafeArea(
+                    child: IgnorePointer(
+                      child: Align(
+                        alignment: Alignment.topCenter,
+                        child: _SceneLabel(
+                          date: _dateLabel,
+                          location: _location,
+                          progress: (_beat + 1) / (_dialogueEndBeat + 1),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  if (_playerNameConfirmed)
+                    SafeArea(
+                      child: Align(
+                        alignment: Alignment.topRight,
+                        child: Padding(
+                          padding: const EdgeInsets.only(
+                            top: _storySceneControlsTopInset,
+                            right: 12,
+                          ),
+                          child: DecoratedBox(
+                            key: const Key('story-scene-controls'),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [Color(0xE9293142), Color(0xE5161B27)],
+                              ),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: const Color(0x52FFFFFF),
+                              ),
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: Color(0x66000000),
+                                  blurRadius: 14,
+                                  offset: Offset(0, 5),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  key: const Key('story-backlog-button'),
+                                  tooltip: '지난 대사',
+                                  visualDensity: VisualDensity.compact,
+                                  color: Colors.white,
+                                  onPressed: _showBacklog,
+                                  icon: const Icon(
+                                    Icons.history_rounded,
+                                    size: 20,
+                                  ),
+                                ),
+                                Container(
+                                  width: 1,
+                                  height: 22,
+                                  color: const Color(0x26FFFFFF),
+                                ),
+                                IconButton(
+                                  key: const Key('story-skip-button'),
+                                  tooltip:
+                                      '${_currentPrologueSkipStep.sectionLabel} 건너뛰기',
+                                  visualDensity: VisualDensity.compact,
+                                  color: _yellow,
+                                  onPressed: _showSkipDialog,
+                                  icon: const Icon(
+                                    Icons.fast_forward_rounded,
+                                    size: 20,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  AnimatedPositioned(
+                    key: const Key('keyboard-name-panel'),
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOutCubic,
+                    left: 0,
+                    right: 0,
+                    bottom: keyboardLift + panelBottomInset,
+                    child: SafeArea(
+                      top: false,
+                      child: Align(
+                        alignment: Alignment.bottomCenter,
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 560),
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 260),
+                            layoutBuilder: (currentChild, previousChildren) {
+                              return Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  for (final child in previousChildren)
+                                    IgnorePointer(child: child),
+                                  ?currentChild,
+                                ],
+                              );
+                            },
+                            child: _buildDialogue(context),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (_isCreating)
+                    Positioned.fill(
+                      child: _NewGamePreparationOverlay(
+                        progress: _creationProgress,
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
         ),
       ),
     );
@@ -3176,7 +3226,7 @@ class _AcademyPcTerminal extends StatelessWidget {
             key: const Key('academy-start-market-tutorial'),
             onPressed: _canStart ? onStartTutorial : null,
             icon: const Icon(Icons.play_arrow_rounded),
-            label: const Text('국가계좌 만들고 실시간 주식 실습 시작'),
+            label: const Text('계좌 개설 및 실습 시작'),
             style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(46),
               backgroundColor: const Color(0xFFCE3E4E),

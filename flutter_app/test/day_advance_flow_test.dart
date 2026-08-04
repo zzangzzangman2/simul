@@ -7,6 +7,12 @@ import 'package:millennium_capital/main.dart';
 
 import 'support/market_fixture.dart';
 
+Future<void> openHubTimeActions(WidgetTester tester) async {
+  await tester.tap(find.byKey(const Key('hub-time-actions-button')));
+  await tester.pumpAndSettle();
+  expect(find.text('시간과 일정'), findsOneWidget);
+}
+
 void main() {
   testWidgets('1년 저개입 진행은 중요뉴스 정지 없는 전용 콜백을 사용한다', (tester) async {
     await tester.binding.setSurfaceSize(const Size(360, 800));
@@ -53,6 +59,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await openHubTimeActions(tester);
     await tester.tap(find.byKey(const Key('advance-batch-button')));
     await tester.pumpAndSettle();
     expect(find.text('1년 저개입 진행'), findsOneWidget);
@@ -180,6 +187,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      await openHubTimeActions(tester);
       await tester.tap(find.byKey(const Key('advance-day-button')));
       await tester.pumpAndSettle();
 
@@ -290,6 +298,7 @@ void main() {
         );
         await tester.pumpAndSettle();
 
+        await openHubTimeActions(tester);
         await tester.tap(find.byKey(const Key('advance-day-button')));
         await tester.pumpAndSettle();
         expect(find.byType(RelationshipEveningScreen), findsOneWidget);
@@ -433,6 +442,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await openHubTimeActions(tester);
     await tester.tap(find.byKey(const Key('advance-day-button')));
     await tester.pumpAndSettle();
 

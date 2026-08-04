@@ -79,7 +79,7 @@ void main() {
     );
     expect(
       realtorAssetName(tester),
-      'assets/images/character_realtor_welcome_v1.png',
+      'assets/images/character_realtor_welcome_v2.png',
     );
 
     await tester.tap(find.byKey(const Key('real-estate-realtor-consult')));
@@ -91,7 +91,7 @@ void main() {
     );
     expect(
       realtorAssetName(tester),
-      'assets/images/character_realtor_explain_v1.png',
+      'assets/images/character_realtor_explain_v2.png',
     );
     expect(tester.takeException(), isNull);
   });
@@ -122,7 +122,7 @@ void main() {
     expect(slotRect.bottom, lessThanOrEqualTo(800));
     expect(
       realtorAssetName(tester),
-      'assets/images/character_realtor_welcome_v1.png',
+      'assets/images/character_realtor_welcome_v2.png',
     );
     expect(tester.takeException(), isNull);
   });
@@ -167,18 +167,18 @@ void main() {
       find.byKey(const Key('real-estate-tutorial-overlay')),
       findsOneWidget,
     );
-    expect(tutorialAsset(), 'assets/images/character_realtor_welcome_v1.png');
+    expect(tutorialAsset(), 'assets/images/character_realtor_welcome_v2.png');
 
     await advanceStage(usesTarget: false);
-    expect(tutorialAsset(), 'assets/images/character_realtor_explain_v1.png');
+    expect(tutorialAsset(), 'assets/images/character_realtor_explain_v2.png');
     await advanceStage(usesTarget: true);
-    expect(tutorialAsset(), 'assets/images/character_realtor_finance_v1.png');
+    expect(tutorialAsset(), 'assets/images/character_realtor_finance_v2.png');
     await advanceStage(usesTarget: true);
-    expect(tutorialAsset(), 'assets/images/character_realtor_concerned_v1.png');
+    expect(tutorialAsset(), 'assets/images/character_realtor_concerned_v2.png');
     await advanceStage(usesTarget: false);
-    expect(tutorialAsset(), 'assets/images/character_realtor_negotiate_v1.png');
+    expect(tutorialAsset(), 'assets/images/character_realtor_negotiate_v2.png');
     await advanceStage(usesTarget: false);
-    expect(tutorialAsset(), 'assets/images/character_realtor_approve_v1.png');
+    expect(tutorialAsset(), 'assets/images/character_realtor_approve_v2.png');
     await advanceStage(usesTarget: false);
 
     expect(latest.story.realEstateTutorialSeen, isTrue);

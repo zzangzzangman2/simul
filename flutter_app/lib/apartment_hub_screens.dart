@@ -145,6 +145,420 @@ const _lobbyHeroinePresentations = <String, _LobbyHeroinePresentation>{
   ),
 };
 
+enum _LobbyIdleGesture { nod, lean, perk, settle, playful, shy }
+
+enum _LobbyTouchZone { face, torso, accessory }
+
+class _LobbyMotionProfile {
+  const _LobbyMotionProfile({
+    required this.gestures,
+    required this.motionFrames,
+    required this.strength,
+    required this.tempoMs,
+    required this.faceLine,
+    required this.torsoLine,
+    required this.accessoryLine,
+    required this.repeatLine,
+  });
+
+  final List<_LobbyIdleGesture> gestures;
+  final List<String> motionFrames;
+  final double strength;
+  final int tempoMs;
+  final String faceLine;
+  final String torsoLine;
+  final String accessoryLine;
+  final String repeatLine;
+}
+
+const _lobbyMotionProfiles = <String, _LobbyMotionProfile>{
+  'kim_seoa': _LobbyMotionProfile(
+    gestures: <_LobbyIdleGesture>[
+      _LobbyIdleGesture.nod,
+      _LobbyIdleGesture.settle,
+      _LobbyIdleGesture.shy,
+    ],
+    motionFrames: <String>[
+      'assets/images/production_soft_painted/kim_seoa/10_lobby_hair_tuck_f0_v2.png',
+      'assets/images/production_soft_painted/kim_seoa/10_lobby_hair_tuck_f1_v2.png',
+      'assets/images/production_soft_painted/kim_seoa/10_lobby_hair_tuck_f2_v2.png',
+      'assets/images/production_soft_painted/kim_seoa/10_lobby_hair_tuck_f3_v2.png',
+    ],
+    strength: 0.82,
+    tempoMs: 3200,
+    faceLine: '앗, 가까이 왔네. 기록은 흐트러뜨리지 말아 줘.',
+    torsoLine: '응, 같이 볼 부분은 여기야.',
+    accessoryLine: '수첩이 궁금해? 오늘 약속부터 적어 뒀어.',
+    repeatLine: '잠깐, 하나씩 말해 줘. 다 기억하고 싶어.',
+  ),
+  'lee_jian': _LobbyMotionProfile(
+    gestures: <_LobbyIdleGesture>[
+      _LobbyIdleGesture.lean,
+      _LobbyIdleGesture.settle,
+      _LobbyIdleGesture.perk,
+    ],
+    motionFrames: <String>[
+      'assets/images/production_soft_painted/lee_jian/10_lobby_tool_check_f0_v2.png',
+      'assets/images/production_soft_painted/lee_jian/10_lobby_tool_check_f1_v2.png',
+      'assets/images/production_soft_painted/lee_jian/10_lobby_tool_check_f2_v2.png',
+      'assets/images/production_soft_painted/lee_jian/10_lobby_tool_check_f3_v2.png',
+    ],
+    strength: 0.94,
+    tempoMs: 2800,
+    faceLine: '손보다 먼저 말해. 조금 놀랐잖아.',
+    torsoLine: '왜, 작업 순서가 궁금해?',
+    accessoryLine: '공구는 세어 놨어. 만지기 전에 나한테 물어봐.',
+    repeatLine: '계속 그러면 고장 원인보다 네 의도부터 검사한다?',
+  ),
+  'choi_iseo': _LobbyMotionProfile(
+    gestures: <_LobbyIdleGesture>[
+      _LobbyIdleGesture.shy,
+      _LobbyIdleGesture.settle,
+      _LobbyIdleGesture.lean,
+    ],
+    motionFrames: <String>[
+      'assets/images/production_soft_painted/choi_iseo/10_lobby_thread_tidy_f0_v2.png',
+      'assets/images/production_soft_painted/choi_iseo/10_lobby_thread_tidy_f1_v2.png',
+      'assets/images/production_soft_painted/choi_iseo/10_lobby_thread_tidy_f2_v2.png',
+      'assets/images/production_soft_painted/choi_iseo/10_lobby_thread_tidy_f3_v2.png',
+    ],
+    strength: 0.74,
+    tempoMs: 3400,
+    faceLine: '갑자기 가까워지면 조금 부끄러워.',
+    torsoLine: '괜찮아. 불편한 건 아니야.',
+    accessoryLine: '실이 걸릴 수 있으니까 천천히 봐 줘.',
+    repeatLine: '잠깐만… 조금만 거리를 두고 이야기하면 안 될까?',
+  ),
+  'jung_arin': _LobbyMotionProfile(
+    gestures: <_LobbyIdleGesture>[
+      _LobbyIdleGesture.nod,
+      _LobbyIdleGesture.perk,
+      _LobbyIdleGesture.lean,
+    ],
+    motionFrames: <String>[
+      'assets/images/production_soft_painted/jung_arin/10_lobby_tie_reset_f0_v2.png',
+      'assets/images/production_soft_painted/jung_arin/10_lobby_tie_reset_f1_v2.png',
+      'assets/images/production_soft_painted/jung_arin/10_lobby_tie_reset_f2_v2.png',
+      'assets/images/production_soft_painted/jung_arin/10_lobby_tie_reset_f3_v2.png',
+    ],
+    strength: 0.98,
+    tempoMs: 2600,
+    faceLine: '집중 중이었어. 용건부터 말해.',
+    torsoLine: '좋아, 확인했으면 다음 순서로 가자.',
+    accessoryLine: '표에는 다 이유가 있어. 궁금한 칸을 먼저 짚어.',
+    repeatLine: '반복 접촉은 비효율적이야. 한 번에 말해.',
+  ),
+  'park_haeun': _LobbyMotionProfile(
+    gestures: <_LobbyIdleGesture>[
+      _LobbyIdleGesture.perk,
+      _LobbyIdleGesture.shy,
+      _LobbyIdleGesture.nod,
+    ],
+    motionFrames: <String>[
+      'assets/images/production_soft_painted/park_haeun/10_lobby_welcome_f0_v2.png',
+      'assets/images/production_soft_painted/park_haeun/10_lobby_welcome_f1_v2.png',
+      'assets/images/production_soft_painted/park_haeun/10_lobby_welcome_f2_v2.png',
+      'assets/images/production_soft_painted/park_haeun/10_lobby_welcome_f3_v2.png',
+    ],
+    strength: 0.88,
+    tempoMs: 3200,
+    faceLine: '응? 무슨 일 있어? 표정부터 볼게.',
+    torsoLine: '여기 있어. 천천히 말해도 돼.',
+    accessoryLine: '그게 궁금했구나. 같이 보면 더 쉬워.',
+    repeatLine: '장난인 건 알겠는데, 나도 마음의 준비는 하게 해 줘.',
+  ),
+  'han_sua': _LobbyMotionProfile(
+    gestures: <_LobbyIdleGesture>[
+      _LobbyIdleGesture.playful,
+      _LobbyIdleGesture.perk,
+      _LobbyIdleGesture.lean,
+    ],
+    motionFrames: <String>[
+      'assets/images/production_soft_painted/han_sua/10_lobby_stretch_f0_v2.png',
+      'assets/images/production_soft_painted/han_sua/10_lobby_stretch_f1_v2.png',
+      'assets/images/production_soft_painted/han_sua/10_lobby_stretch_f2_v2.png',
+      'assets/images/production_soft_painted/han_sua/10_lobby_stretch_f3_v2.png',
+    ],
+    strength: 1.0,
+    tempoMs: 3600,
+    faceLine: '오, 지금 나 불렀지? 재미있는 얘기야?',
+    torsoLine: '반응 확인 완료. 이제 네 얘기 차례!',
+    accessoryLine: '그거보다 더 재미있는 걸 보여 줄까?',
+    repeatLine: '계속 누르면 나도 똑같이 장난친다?',
+  ),
+  'oh_jiwoo': _LobbyMotionProfile(
+    gestures: <_LobbyIdleGesture>[
+      _LobbyIdleGesture.playful,
+      _LobbyIdleGesture.lean,
+      _LobbyIdleGesture.nod,
+    ],
+    motionFrames: <String>[
+      'assets/images/production_soft_painted/oh_jiwoo/10_lobby_idea_f0_v2.png',
+      'assets/images/production_soft_painted/oh_jiwoo/10_lobby_idea_f1_v2.png',
+      'assets/images/production_soft_painted/oh_jiwoo/10_lobby_idea_f2_v2.png',
+      'assets/images/production_soft_painted/oh_jiwoo/10_lobby_idea_f3_v2.png',
+    ],
+    strength: 1.04,
+    tempoMs: 2800,
+    faceLine: '가설 하나. 지금 내 반응을 관찰 중이지?',
+    torsoLine: '접촉 위치와 반응의 상관관계라… 기록할까?',
+    accessoryLine: '좋은 관찰이야. 그런데 결론은 아직 비밀.',
+    repeatLine: '반복 실험은 대조군이 있어야지. 일단 멈춤!',
+  ),
+  'yoon_chaea': _LobbyMotionProfile(
+    gestures: <_LobbyIdleGesture>[
+      _LobbyIdleGesture.settle,
+      _LobbyIdleGesture.nod,
+      _LobbyIdleGesture.shy,
+    ],
+    motionFrames: <String>[
+      'assets/images/production_soft_painted/yoon_chaea/10_lobby_uniform_tidy_f0_v2.png',
+      'assets/images/production_soft_painted/yoon_chaea/10_lobby_uniform_tidy_f1_v2.png',
+      'assets/images/production_soft_painted/yoon_chaea/10_lobby_uniform_tidy_f2_v2.png',
+      'assets/images/production_soft_painted/yoon_chaea/10_lobby_uniform_tidy_f3_v2.png',
+    ],
+    strength: 0.78,
+    tempoMs: 3400,
+    faceLine: '시선이 가까워졌네. 이유를 말해 줄래?',
+    torsoLine: '확인했어. 필요한 이야기가 있으면 들어 줄게.',
+    accessoryLine: '그 물건의 용도를 먼저 추측해 봐.',
+    repeatLine: '충분히 관찰했을 텐데. 이제 말로 설명해 줘.',
+  ),
+};
+
+class _LobbyMotionFrame {
+  const _LobbyMotionFrame({
+    this.offset = Offset.zero,
+    this.rotation = 0,
+    this.scale = 1,
+  });
+
+  final Offset offset;
+  final double rotation;
+  final double scale;
+}
+
+_LobbyMotionFrame _lobbyIdleGestureFrame({
+  required _LobbyIdleGesture gesture,
+  required double value,
+  required double direction,
+  required double strength,
+}) {
+  final lift = math.sin(value * math.pi) * strength;
+  final ripple = math.sin(value * math.pi * 2) * lift;
+  return switch (gesture) {
+    _LobbyIdleGesture.nod => _LobbyMotionFrame(
+      offset: Offset(direction * 0.25 * ripple, 1.45 * lift),
+      rotation: direction * 0.0015 * ripple,
+      scale: 1 - 0.0012 * lift,
+    ),
+    _LobbyIdleGesture.lean => _LobbyMotionFrame(
+      offset: Offset(direction * 2.25 * lift, 0.35 * lift),
+      rotation: direction * 0.0055 * lift,
+    ),
+    _LobbyIdleGesture.perk => _LobbyMotionFrame(
+      offset: Offset(direction * 0.35 * ripple, -2.35 * lift),
+      rotation: direction * 0.0018 * ripple,
+      scale: 1 + 0.0028 * lift,
+    ),
+    _LobbyIdleGesture.settle => _LobbyMotionFrame(
+      offset: Offset(direction * 0.55 * lift, 1.35 * lift),
+      rotation: -direction * 0.0024 * lift,
+      scale: 1 - 0.0014 * lift,
+    ),
+    _LobbyIdleGesture.playful => _LobbyMotionFrame(
+      offset: Offset(direction * (2.0 * lift + 0.55 * ripple), -0.8 * lift),
+      rotation: direction * 0.0065 * lift,
+      scale: 1 + 0.0018 * lift,
+    ),
+    _LobbyIdleGesture.shy => _LobbyMotionFrame(
+      offset: Offset(-direction * 1.1 * lift, 1.0 * lift),
+      rotation: -direction * 0.0038 * lift,
+      scale: 1 - 0.001 * lift,
+    ),
+  };
+}
+
+class _LobbyBlinkGeometry {
+  const _LobbyBlinkGeometry({
+    required this.leftEye,
+    required this.rightEye,
+    this.eyeWidth = 0.044,
+    this.skinColor = const Color(0xFFFDEADE),
+  });
+
+  final Offset leftEye;
+  final Offset rightEye;
+  final double eyeWidth;
+  final double eyeHeight = 0.024;
+  final Color skinColor;
+  final Color lidColor = const Color(0xFF66413F);
+}
+
+// The production lobby portraits share a 1024x1536 canvas, but each face is
+// centered a little differently. These normalized anchors keep the blink over
+// the eyes instead of applying an unnatural squash to the whole face.
+const _lobbyBlinkGeometry = <String, _LobbyBlinkGeometry>{
+  'kim_seoa': _LobbyBlinkGeometry(
+    leftEye: Offset(0.532, 0.130),
+    rightEye: Offset(0.600, 0.130),
+    eyeWidth: 0.044,
+    skinColor: Color(0xFFFDE9DB),
+  ),
+  'lee_jian': _LobbyBlinkGeometry(
+    leftEye: Offset(0.412, 0.138),
+    rightEye: Offset(0.483, 0.138),
+    eyeWidth: 0.044,
+    skinColor: Color(0xFFFDEDE3),
+  ),
+  'choi_iseo': _LobbyBlinkGeometry(
+    leftEye: Offset(0.451, 0.133),
+    rightEye: Offset(0.516, 0.133),
+    eyeWidth: 0.044,
+    skinColor: Color(0xFFFDE5DB),
+  ),
+  'jung_arin': _LobbyBlinkGeometry(
+    leftEye: Offset(0.476, 0.139),
+    rightEye: Offset(0.549, 0.139),
+    eyeWidth: 0.047,
+    skinColor: Color(0xFFFDEADE),
+  ),
+  'park_haeun': _LobbyBlinkGeometry(
+    leftEye: Offset(0.476, 0.125),
+    rightEye: Offset(0.540, 0.125),
+    eyeWidth: 0.042,
+    skinColor: Color(0xFFFCD8CA),
+  ),
+  'han_sua': _LobbyBlinkGeometry(
+    leftEye: Offset(0.486, 0.133),
+    rightEye: Offset(0.555, 0.143),
+    eyeWidth: 0.043,
+    skinColor: Color(0xFFFDEAE2),
+  ),
+  'oh_jiwoo': _LobbyBlinkGeometry(
+    leftEye: Offset(0.500, 0.133),
+    rightEye: Offset(0.573, 0.146),
+    eyeWidth: 0.042,
+    skinColor: Color(0xFFFEE6D7),
+  ),
+  'yoon_chaea': _LobbyBlinkGeometry(
+    leftEye: Offset(0.478, 0.135),
+    rightEye: Offset(0.549, 0.135),
+    eyeWidth: 0.044,
+    skinColor: Color(0xFFFEE4D6),
+  ),
+};
+
+// Base and close portraits do not share the same face center as the friendly
+// portrait. Keep those anchors per asset so relationship-stage pose changes do
+// not make the eyelid drift across the cheek or hair.
+const _lobbyBlinkGeometryByAsset = <String, _LobbyBlinkGeometry>{
+  'assets/images/production_soft_painted/kim_seoa/01_neutral_notebook_v1.png':
+      _LobbyBlinkGeometry(
+        leftEye: Offset(0.464, 0.128),
+        rightEye: Offset(0.527, 0.128),
+        skinColor: Color(0xFFFDE9DB),
+      ),
+  'assets/images/production_soft_painted/kim_seoa/04_shy_appreciative_v1.png':
+      _LobbyBlinkGeometry(
+        leftEye: Offset(0.463, 0.133),
+        rightEye: Offset(0.527, 0.133),
+        skinColor: Color(0xFFFDF0EA),
+      ),
+  'assets/images/production_soft_painted/lee_jian/01_neutral_screwdriver_v2.png':
+      _LobbyBlinkGeometry(
+        leftEye: Offset(0.461, 0.139),
+        rightEye: Offset(0.534, 0.139),
+        skinColor: Color(0xFFFDEDE3),
+      ),
+  'assets/images/production_soft_painted/lee_jian/07_apologetic_boundary_v2.png':
+      _LobbyBlinkGeometry(
+        leftEye: Offset(0.416, 0.139),
+        rightEye: Offset(0.487, 0.139),
+        skinColor: Color(0xFFFDEDE4),
+      ),
+  'assets/images/production_soft_painted/choi_iseo/01_base_thread_v1.png':
+      _LobbyBlinkGeometry(
+        leftEye: Offset(0.456, 0.128),
+        rightEye: Offset(0.519, 0.128),
+        skinColor: Color(0xFFFDE5DB),
+      ),
+  'assets/images/production_soft_painted/choi_iseo/04_shy_flustered_v1.png':
+      _LobbyBlinkGeometry(
+        leftEye: Offset(0.438, 0.135),
+        rightEye: Offset(0.502, 0.135),
+        skinColor: Color(0xFFFDE8DF),
+      ),
+  'assets/images/production_soft_painted/jung_arin/01_base_cheeky_v1.png':
+      _LobbyBlinkGeometry(
+        leftEye: Offset(0.474, 0.138),
+        rightEye: Offset(0.546, 0.138),
+        eyeWidth: 0.047,
+        skinColor: Color(0xFFFDEADE),
+      ),
+  'assets/images/production_soft_painted/jung_arin/03_cheeky_laugh_v1.png':
+      _LobbyBlinkGeometry(
+        leftEye: Offset(0.473, 0.141),
+        rightEye: Offset(0.548, 0.141),
+        eyeWidth: 0.047,
+        skinColor: Color(0xFFFEE7DA),
+      ),
+  'assets/images/production_soft_painted/park_haeun/01_neutral_soft_v2.png':
+      _LobbyBlinkGeometry(
+        leftEye: Offset(0.471, 0.128),
+        rightEye: Offset(0.534, 0.128),
+        eyeWidth: 0.042,
+        skinColor: Color(0xFFFCD8CA),
+      ),
+  'assets/images/production_soft_painted/park_haeun/04_playful_wink_v2.png':
+      _LobbyBlinkGeometry(
+        leftEye: Offset(0.469, 0.135),
+        rightEye: Offset(0.532, 0.126),
+        eyeWidth: 0.042,
+        skinColor: Color(0xFFFCE2D9),
+      ),
+  'assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png':
+      _LobbyBlinkGeometry(
+        leftEye: Offset(0.474, 0.133),
+        rightEye: Offset(0.544, 0.141),
+        eyeWidth: 0.043,
+        skinColor: Color(0xFFFDEAE2),
+      ),
+  'assets/images/production_soft_painted/han_sua/03_bright_laugh_v3.png':
+      _LobbyBlinkGeometry(
+        leftEye: Offset(0.478, 0.133),
+        rightEye: Offset(0.547, 0.139),
+        eyeWidth: 0.043,
+        skinColor: Color(0xFFFDEDE6),
+      ),
+  'assets/images/production_soft_painted/oh_jiwoo/01_alert_neutral_v1.png':
+      _LobbyBlinkGeometry(
+        leftEye: Offset(0.468, 0.141),
+        rightEye: Offset(0.538, 0.141),
+        eyeWidth: 0.042,
+        skinColor: Color(0xFFFEE6D7),
+      ),
+  'assets/images/production_soft_painted/oh_jiwoo/04_playful_counterpoint_v1.png':
+      _LobbyBlinkGeometry(
+        leftEye: Offset(0.477, 0.136),
+        rightEye: Offset(0.545, 0.149),
+        eyeWidth: 0.042,
+        skinColor: Color(0xFFFEE6D7),
+      ),
+  'assets/images/production_soft_painted/yoon_chaea/01_neutral_tie_v1.png':
+      _LobbyBlinkGeometry(
+        leftEye: Offset(0.472, 0.135),
+        rightEye: Offset(0.542, 0.135),
+        skinColor: Color(0xFFFEE4D6),
+      ),
+  'assets/images/production_soft_painted/yoon_chaea/04_shy_blush_v1.png':
+      _LobbyBlinkGeometry(
+        leftEye: Offset(0.471, 0.141),
+        rightEye: Offset(0.540, 0.141),
+        skinColor: Color(0xFFFDE1D5),
+      ),
+};
+
 int _lobbyDateOrdinal(DateTime date) =>
     DateTime.utc(date.year, date.month, date.day).millisecondsSinceEpoch ~/
     Duration.millisecondsPerDay;
@@ -176,6 +590,77 @@ String _lobbyHeroineAsset({
     RelationshipStage.friendly ||
     RelationshipStage.interested => presentation.smileAsset,
     _ => presentation.closeAsset,
+  };
+}
+
+double _lobbyAffectionDistanceScale(RelationshipStage stage) => switch (stage) {
+  RelationshipStage.newClassmate => 0.992,
+  RelationshipStage.friendly => 0.996,
+  RelationshipStage.interested => 1.0,
+  RelationshipStage.close => 1.004,
+  RelationshipStage.special => 1.007,
+  RelationshipStage.trusted => 1.010,
+};
+
+double _lobbyAffectionDistanceY(RelationshipStage stage) => switch (stage) {
+  RelationshipStage.newClassmate => 3.0,
+  RelationshipStage.friendly => 1.8,
+  RelationshipStage.interested => 0.4,
+  RelationshipStage.close => -0.8,
+  RelationshipStage.special => -1.5,
+  RelationshipStage.trusted => -2.1,
+};
+
+int _lobbyBreathingDurationMs(int marketMinute) {
+  if (marketMinute < krxOpenMinute) return 3400;
+  if (marketMinute < krxCloseMinute) return 3600;
+  if (marketMinute < 20 * 60) return 4100;
+  return 4700;
+}
+
+int _lobbyEveningMotionDelayMs(int marketMinute) {
+  if (marketMinute < krxCloseMinute) return 0;
+  if (marketMinute < 20 * 60) return 700;
+  return 1700;
+}
+
+_LobbyMotionFrame _lobbyTouchReactionFrame({
+  required _LobbyTouchZone zone,
+  required double value,
+  required double direction,
+  required int affection,
+  required bool repeated,
+}) {
+  final pulse = math.sin(value * math.pi);
+  final ripple = math.sin(value * math.pi * 2) * pulse;
+  final distanceResponse = affection >= 60
+      ? 1.0
+      : affection < 20
+      ? -0.8
+      : 0.35;
+  if (repeated) {
+    return _LobbyMotionFrame(
+      offset: Offset(-direction * (1.5 * pulse + 0.7 * ripple), -1.2 * pulse),
+      rotation: -direction * 0.007 * pulse,
+      scale: 1 - 0.0025 * pulse,
+    );
+  }
+  return switch (zone) {
+    _LobbyTouchZone.face => _LobbyMotionFrame(
+      offset: Offset(-direction * 1.25 * pulse, -0.75 * pulse),
+      rotation: -direction * 0.0045 * pulse,
+      scale: 1 + distanceResponse * 0.0038 * pulse,
+    ),
+    _LobbyTouchZone.torso => _LobbyMotionFrame(
+      offset: Offset(direction * 1.8 * pulse, 0.35 * pulse),
+      rotation: direction * 0.0042 * pulse,
+      scale: 1 + distanceResponse * 0.0024 * pulse,
+    ),
+    _LobbyTouchZone.accessory => _LobbyMotionFrame(
+      offset: Offset(direction * 0.65 * ripple, 1.25 * pulse),
+      rotation: -direction * 0.0028 * pulse,
+      scale: 1 - 0.0012 * pulse,
+    ),
   };
 }
 
@@ -327,118 +812,128 @@ class _ApartmentHubScreenState extends State<ApartmentHubScreen> {
     final lobbyHeroine = _place == _ApartmentPlace.bedroom
         ? _dailyLobbyHeroine(widget.state)
         : null;
-    return ClipRect(
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 360),
-            reverseDuration: const Duration(milliseconds: 260),
-            switchInCurve: Curves.easeOutCubic,
-            switchOutCurve: Curves.easeInCubic,
-            transitionBuilder: (child, animation) {
-              final scale = Tween<double>(begin: 1.025, end: 1).animate(
-                CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
-              );
-              return FadeTransition(
-                opacity: animation,
-                child: ScaleTransition(scale: scale, child: child),
-              );
-            },
-            child: _ApartmentPlaceScene(
-              key: ValueKey(_place),
-              place: _place,
-              state: widget.state,
-              onOpenMarket: widget.onOpenMarket,
-              onOpenBank: widget.onOpenBank,
-              onOpenDecisions: widget.onOpenDecisions,
-              onOpenLedger: widget.onOpenLedger,
-              onOpenOrganization: widget.onOpenOrganization,
-              onOpenHomeImprovements: widget.onOpenHomeImprovements,
-              onOpenWork: widget.onOpenWork,
-            ),
-          ),
-          const Positioned.fill(
-            child: IgnorePointer(child: _ApartmentSceneVignette()),
-          ),
-          if (lobbyHeroine != null)
-            Positioned.fill(
-              top: 142,
-              bottom: 64,
-              child: _LobbyHeroineStage(
-                key: ValueKey(
-                  'daily-lobby-${widget.state.currentDate.toIso8601String()}-${lobbyHeroine.id}',
-                ),
+    return DefaultTextStyle.merge(
+      style: const TextStyle(
+        decoration: TextDecoration.none,
+        decorationColor: Colors.transparent,
+        decorationThickness: 0,
+      ),
+      child: ClipRect(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 360),
+              reverseDuration: const Duration(milliseconds: 260),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              transitionBuilder: (child, animation) {
+                final scale = Tween<double>(begin: 1.025, end: 1).animate(
+                  CurvedAnimation(
+                    parent: animation,
+                    curve: Curves.easeOutCubic,
+                  ),
+                );
+                return FadeTransition(
+                  opacity: animation,
+                  child: ScaleTransition(scale: scale, child: child),
+                );
+              },
+              child: _ApartmentPlaceScene(
+                key: ValueKey(_place),
+                place: _place,
                 state: widget.state,
-                profile: lobbyHeroine,
-                progress: widget.state.relationships.progressFor(
-                  lobbyHeroine.id,
+                onOpenMarket: widget.onOpenMarket,
+                onOpenBank: widget.onOpenBank,
+                onOpenDecisions: widget.onOpenDecisions,
+                onOpenLedger: widget.onOpenLedger,
+                onOpenOrganization: widget.onOpenOrganization,
+                onOpenHomeImprovements: widget.onOpenHomeImprovements,
+                onOpenWork: widget.onOpenWork,
+              ),
+            ),
+            const Positioned.fill(
+              child: IgnorePointer(child: _ApartmentSceneVignette()),
+            ),
+            if (lobbyHeroine != null)
+              Positioned.fill(
+                top: 142,
+                bottom: 64,
+                child: _LobbyHeroineStage(
+                  key: ValueKey(
+                    'daily-lobby-${widget.state.currentDate.toIso8601String()}-${lobbyHeroine.id}',
+                  ),
+                  state: widget.state,
+                  profile: lobbyHeroine,
+                  progress: widget.state.relationships.progressFor(
+                    lobbyHeroine.id,
+                  ),
+                  bottomInset: legacyMissionUiDisabled ? 0 : 68,
+                  onOpenMessenger: widget.onOpenMessenger,
+                  onOpenRelationships: widget.onOpenRelationships,
                 ),
-                bottomInset: legacyMissionUiDisabled ? 0 : 68,
+              ),
+            Positioned(
+              left: 6,
+              top: 6,
+              right: 6,
+              child: _ApartmentLocationHeader(
+                details: details,
+                state: widget.state,
+                activeSaveSlot: widget.activeSaveSlot,
+                lastSavedAt: widget.lastSavedAt,
+                onOpenGameMenu: widget.onOpenGameMenu,
+              ),
+            ),
+            Positioned(
+              left: 8,
+              top: 92,
+              right: 8,
+              child: _ApartmentDayGuideCard(
+                state: widget.state,
+                onPressed: _handleGuidanceAction,
+              ),
+            ),
+            if (!legacyMissionUiDisabled)
+              Positioned(
+                right: 10,
+                bottom: 76,
+                child: _ApartmentMissionCard(
+                  progress: missionProgress,
+                  starBalance: widget.state.progression.starBalance,
+                  onClaim: widget.onClaimMission,
+                ),
+              ),
+            Positioned(
+              right: 7,
+              top: 151,
+              child: _ApartmentActionRail(
+                hasPendingDecision: widget.state.pendingDecisions.isNotEmpty,
+                campaignComplete: widget.state.campaignComplete,
+                marketMinute: widget.state.marketMinute,
+                messengerUnread: widget.state.phoneMessenger.totalUnread,
                 onOpenMessenger: widget.onOpenMessenger,
                 onOpenRelationships: widget.onOpenRelationships,
+                onOpenCalendar: widget.onOpenCalendar,
+                onAdvanceHour: widget.onAdvanceHour,
+                onAdvanceDay: widget.onAdvanceDay,
+                onAdvanceBatch: widget.onAdvanceBatch,
+                onOpenEnding: widget.onOpenEnding,
+                onHelp: () => setState(() => _tutorialVisible = true),
               ),
             ),
-          Positioned(
-            left: 6,
-            top: 6,
-            right: 6,
-            child: _ApartmentLocationHeader(
-              details: details,
-              state: widget.state,
-              activeSaveSlot: widget.activeSaveSlot,
-              lastSavedAt: widget.lastSavedAt,
-              onOpenGameMenu: widget.onOpenGameMenu,
-            ),
-          ),
-          Positioned(
-            left: 8,
-            top: 92,
-            right: 8,
-            child: _ApartmentDayGuideCard(
-              state: widget.state,
-              onPressed: _handleGuidanceAction,
-            ),
-          ),
-          if (!legacyMissionUiDisabled)
             Positioned(
-              right: 10,
-              bottom: 76,
-              child: _ApartmentMissionCard(
-                progress: missionProgress,
-                starBalance: widget.state.progression.starBalance,
-                onClaim: widget.onClaimMission,
+              left: 6,
+              right: 6,
+              bottom: 6,
+              child: _ApartmentLocationDock(current: _place, onMove: _moveTo),
+            ),
+            if (_tutorialVisible)
+              Positioned.fill(
+                child: _HubTutorialOverlay(onDone: _dismissTutorial),
               ),
-            ),
-          Positioned(
-            right: 7,
-            top: 151,
-            child: _ApartmentActionRail(
-              hasPendingDecision: widget.state.pendingDecisions.isNotEmpty,
-              campaignComplete: widget.state.campaignComplete,
-              marketMinute: widget.state.marketMinute,
-              messengerUnread: widget.state.phoneMessenger.totalUnread,
-              onOpenMessenger: widget.onOpenMessenger,
-              onOpenRelationships: widget.onOpenRelationships,
-              onOpenCalendar: widget.onOpenCalendar,
-              onAdvanceHour: widget.onAdvanceHour,
-              onAdvanceDay: widget.onAdvanceDay,
-              onAdvanceBatch: widget.onAdvanceBatch,
-              onOpenEnding: widget.onOpenEnding,
-              onHelp: () => setState(() => _tutorialVisible = true),
-            ),
-          ),
-          Positioned(
-            left: 6,
-            right: 6,
-            bottom: 6,
-            child: _ApartmentLocationDock(current: _place, onMove: _moveTo),
-          ),
-          if (_tutorialVisible)
-            Positioned.fill(
-              child: _HubTutorialOverlay(onDone: _dismissTutorial),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1087,6 +1582,103 @@ class _HubTutorialOverlay extends StatelessWidget {
   );
 }
 
+class _LobbyMotionPortrait extends StatelessWidget {
+  const _LobbyMotionPortrait({
+    required this.baseAsset,
+    required this.motionFrames,
+    required this.gesture,
+    required this.reacting,
+  });
+
+  final String baseAsset;
+  final List<String> motionFrames;
+  final Animation<double> gesture;
+  final bool reacting;
+
+  Widget _portraitImage(String asset, {Key? key}) => Image.asset(
+    asset,
+    key: key,
+    fit: BoxFit.contain,
+    alignment: Alignment.topCenter,
+    filterQuality: FilterQuality.high,
+    gaplessPlayback: true,
+    errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
+  );
+
+  double _motionOpacity(double value) {
+    if (reacting || value <= 0.001 || value >= 0.999) return 0;
+    if (value < 0.14) {
+      return Curves.easeInOutCubic.transform(value / 0.14);
+    }
+    if (value > 0.86) {
+      return Curves.easeInOutCubic.transform((1 - value) / 0.14);
+    }
+    return 1;
+  }
+
+  @override
+  Widget build(BuildContext context) => Stack(
+    fit: StackFit.expand,
+    children: [
+      AnimatedBuilder(
+        animation: gesture,
+        builder: (context, child) =>
+            Opacity(opacity: 1 - _motionOpacity(gesture.value), child: child),
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 420),
+          reverseDuration: const Duration(milliseconds: 520),
+          switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeInCubic,
+          transitionBuilder: (child, animation) =>
+              FadeTransition(opacity: animation, child: child),
+          child: _portraitImage(
+            baseAsset,
+            key: Key(
+              reacting
+                  ? 'lobby-heroine-reaction-image'
+                  : 'lobby-heroine-idle-image',
+            ),
+          ),
+        ),
+      ),
+      if (!reacting)
+        AnimatedBuilder(
+          animation: gesture,
+          builder: (context, child) {
+            final value = gesture.value;
+            if (value <= 0.001 || value >= 0.999) {
+              return const SizedBox.shrink(
+                key: Key('lobby-heroine-motion-frame-layer'),
+              );
+            }
+            const sequence = <int>[0, 0, 1, 2, 3, 3, 3, 2, 1, 0, 0];
+            final position = value * (sequence.length - 1);
+            final segment = position.floor().clamp(0, sequence.length - 2);
+            final mix = Curves.easeInOutCubic.transform(position - segment);
+            final currentAsset = motionFrames[sequence[segment]];
+            final nextAsset = motionFrames[sequence[segment + 1]];
+            final edgeOpacity = _motionOpacity(value);
+            return Opacity(
+              key: const Key('lobby-heroine-motion-frame-layer'),
+              opacity: edgeOpacity.clamp(0.0, 1.0),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Opacity(
+                    opacity: 1 - mix,
+                    child: _portraitImage(currentAsset),
+                  ),
+                  if (nextAsset != currentAsset)
+                    Opacity(opacity: mix, child: _portraitImage(nextAsset)),
+                ],
+              ),
+            );
+          },
+        ),
+    ],
+  );
+}
+
 class _LobbyHeroineStage extends StatefulWidget {
   const _LobbyHeroineStage({
     super.key,
@@ -1110,56 +1702,328 @@ class _LobbyHeroineStage extends StatefulWidget {
 }
 
 class _LobbyHeroineStageState extends State<_LobbyHeroineStage>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late final AnimationController _breathing = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 2400),
+    duration: const Duration(milliseconds: 3600),
+  );
+  late final AnimationController _blink = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 220),
+  );
+  late final AnimationController _gesture = AnimationController(vsync: this);
+  late final AnimationController _reaction = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 760),
+  );
+  late final AnimationController _entrance = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 820),
+  );
+  late final AnimationController _lookReturn = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 460),
   );
   Timer? _idleTimer;
+  Timer? _blinkTimer;
   Timer? _reactionTimer;
+  Timer? _gestureTimer;
+  Timer? _tapResetTimer;
+  Timer? _lookHoldTimer;
+  bool _animationsEnabled = false;
   bool _reacting = false;
+  bool _pressed = false;
+  bool _lookReturning = false;
+  bool _repeatedTouch = false;
+  int _motionCycle = 0;
+  int _blinkCycle = 0;
+  int _gestureCycle = 0;
+  int _tapStreak = 0;
+  double _swayDirection = 1;
+  double _touchDirection = 1;
+  Offset _lookOffset = Offset.zero;
+  Offset _lookStart = Offset.zero;
+  _LobbyIdleGesture _idleGesture = _LobbyIdleGesture.nod;
+  _LobbyTouchZone _touchZone = _LobbyTouchZone.torso;
+  _LobbyTouchZone? _lastTouchZone;
+  String? _reactionLine;
+  String? _precachedMotionProfile;
+
+  _LobbyMotionProfile get _motionProfile =>
+      _lobbyMotionProfiles[widget.profile.id]!;
+
+  int get _motionSeed => widget.profile.id.codeUnits.fold<int>(
+    0,
+    (value, unit) => (value * 31 + unit) & 0x7fffffff,
+  );
 
   @override
-  void initState() {
-    super.initState();
-    _playIdleMotion();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _precacheMotionFrames();
+    final animationsEnabled = !MediaQuery.of(context).disableAnimations;
+    _breathing.duration = Duration(
+      milliseconds: _lobbyBreathingDurationMs(widget.state.marketMinute),
+    );
+    if (_animationsEnabled == animationsEnabled) return;
+    _animationsEnabled = animationsEnabled;
+    if (_animationsEnabled) {
+      _entrance.forward(from: 0);
+      _playIdleMotion();
+      _scheduleBlink(initial: true);
+      _scheduleGesture(initial: true);
+    } else {
+      _idleTimer?.cancel();
+      _blinkTimer?.cancel();
+      _gestureTimer?.cancel();
+      _lookHoldTimer?.cancel();
+      _breathing
+        ..stop()
+        ..reset();
+      _blink
+        ..stop()
+        ..reset();
+      _gesture
+        ..stop()
+        ..reset();
+      _reaction
+        ..stop()
+        ..reset();
+      _lookReturn
+        ..stop()
+        ..reset();
+      _entrance
+        ..stop()
+        ..value = 1;
+      _lookOffset = Offset.zero;
+      _lookReturning = false;
+    }
+  }
+
+  void _precacheMotionFrames() {
+    if (_precachedMotionProfile == widget.profile.id) return;
+    _precachedMotionProfile = widget.profile.id;
+    for (final asset in _motionProfile.motionFrames) {
+      precacheImage(AssetImage(asset), context);
+    }
   }
 
   void _playIdleMotion() {
-    if (!mounted) return;
+    if (!mounted || !_animationsEnabled || _breathing.isAnimating) return;
+    _swayDirection = ((_motionSeed + _motionCycle) & 1) == 0 ? 1 : -1;
     _breathing.forward(from: 0).whenComplete(() {
-      if (!mounted) return;
+      if (!mounted || !_animationsEnabled) return;
+      _motionCycle += 1;
       _idleTimer?.cancel();
-      _idleTimer = Timer(const Duration(milliseconds: 7800), _playIdleMotion);
+      final pauseMs = 900 + ((_motionSeed + _motionCycle * 977) % 1200);
+      _idleTimer = Timer(Duration(milliseconds: pauseMs), _playIdleMotion);
+    });
+  }
+
+  void _scheduleBlink({required bool initial}) {
+    if (!mounted || !_animationsEnabled) return;
+    _blinkTimer?.cancel();
+    final delayMs = initial
+        ? 1500 + (_motionSeed % 900)
+        : 3200 + ((_motionSeed + _blinkCycle * 1381) % 3500);
+    _blinkTimer = Timer(
+      Duration(milliseconds: delayMs),
+      () => _playBlink(followUp: false),
+    );
+  }
+
+  void _playBlink({required bool followUp}) {
+    if (!mounted || !_animationsEnabled) return;
+    _blink.forward(from: 0).whenComplete(() {
+      if (!mounted || !_animationsEnabled) return;
+      final doubleBlink =
+          !followUp && ((_motionSeed + _blinkCycle * 17) % 6 == 0);
+      if (doubleBlink) {
+        _blinkTimer = Timer(
+          const Duration(milliseconds: 115),
+          () => _playBlink(followUp: true),
+        );
+        return;
+      }
+      _blinkCycle += 1;
+      _scheduleBlink(initial: false);
+    });
+  }
+
+  void _scheduleGesture({required bool initial}) {
+    if (!mounted || !_animationsEnabled) return;
+    _gestureTimer?.cancel();
+    final delayMs = initial
+        ? 4200 + (_motionSeed % 2800)
+        : 7200 +
+              ((_motionSeed + _gestureCycle * 1601) % 7000) +
+              _lobbyEveningMotionDelayMs(widget.state.marketMinute);
+    _gestureTimer = Timer(Duration(milliseconds: delayMs), _playGesture);
+  }
+
+  void _playGesture() {
+    if (!mounted || !_animationsEnabled) return;
+    if (_reacting || _pressed) {
+      _scheduleGesture(initial: false);
+      return;
+    }
+    final gestures = _motionProfile.gestures;
+    _idleGesture = gestures[(_motionSeed + _gestureCycle) % gestures.length];
+    _swayDirection = ((_motionSeed + _gestureCycle * 13) & 1) == 0 ? 1 : -1;
+    _gesture.duration = Duration(
+      milliseconds:
+          _motionProfile.tempoMs + ((_motionSeed + _gestureCycle * 173) % 260),
+    );
+    _gesture.forward(from: 0).whenComplete(() {
+      if (!mounted || !_animationsEnabled) return;
+      _gestureCycle += 1;
+      _scheduleGesture(initial: false);
+    });
+  }
+
+  void _updateLook(Offset localPosition, Size size) {
+    if (!mounted || !_animationsEnabled || size.isEmpty) return;
+    _lookHoldTimer?.cancel();
+    _lookReturn.stop();
+    final dx = ((localPosition.dx / size.width) * 2 - 1).clamp(-1.0, 1.0);
+    final dy = ((localPosition.dy / size.height) * 2 - 1).clamp(-1.0, 1.0);
+    final next = Offset(dx * 2.2, dy * 1.25);
+    if (next == _lookOffset && !_lookReturning) return;
+    setState(() {
+      _lookOffset = next;
+      _lookReturning = false;
+    });
+  }
+
+  void _releaseLook({Duration delay = const Duration(milliseconds: 280)}) {
+    if (!_animationsEnabled) return;
+    _lookHoldTimer?.cancel();
+    _lookHoldTimer = Timer(delay, () {
+      if (!mounted || _lookOffset == Offset.zero) return;
+      _lookStart = _lookOffset;
+      setState(() => _lookReturning = true);
+      _lookReturn.forward(from: 0).whenComplete(() {
+        if (!mounted) return;
+        setState(() {
+          _lookOffset = Offset.zero;
+          _lookReturning = false;
+        });
+      });
     });
   }
 
   @override
   void didUpdateWidget(covariant _LobbyHeroineStage oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.state.marketMinute != widget.state.marketMinute) {
+      _breathing.duration = Duration(
+        milliseconds: _lobbyBreathingDurationMs(widget.state.marketMinute),
+      );
+    }
     if (oldWidget.profile.id != widget.profile.id) {
+      _idleTimer?.cancel();
+      _blinkTimer?.cancel();
       _reactionTimer?.cancel();
+      _gestureTimer?.cancel();
+      _tapResetTimer?.cancel();
+      _lookHoldTimer?.cancel();
+      _breathing.reset();
+      _blink.reset();
+      _gesture.reset();
+      _reaction.reset();
+      _lookReturn.reset();
+      _entrance.reset();
+      _motionCycle = 0;
+      _blinkCycle = 0;
+      _gestureCycle = 0;
+      _tapStreak = 0;
       _reacting = false;
+      _pressed = false;
+      _lookReturning = false;
+      _repeatedTouch = false;
+      _lastTouchZone = null;
+      _reactionLine = null;
+      _lookOffset = Offset.zero;
+      _precachedMotionProfile = null;
+      _precacheMotionFrames();
+      if (_animationsEnabled) {
+        _entrance.forward(from: 0);
+        _playIdleMotion();
+        _scheduleBlink(initial: true);
+        _scheduleGesture(initial: true);
+      }
     }
   }
 
-  void _react() {
+  void _setPressed(bool pressed) {
+    if (!mounted || _pressed == pressed) return;
+    setState(() => _pressed = pressed);
+  }
+
+  void _react(Offset localPosition, Size size) {
     _reactionTimer?.cancel();
-    if (!_breathing.isAnimating) {
+    _gesture
+      ..stop()
+      ..value = 0;
+    final normalizedY = size.height <= 0
+        ? 0.5
+        : (localPosition.dy / size.height).clamp(0.0, 1.0);
+    final zone = normalizedY < 0.34
+        ? _LobbyTouchZone.face
+        : normalizedY < 0.67
+        ? _LobbyTouchZone.torso
+        : _LobbyTouchZone.accessory;
+    _touchDirection = localPosition.dx < size.width / 2 ? -1 : 1;
+    _tapStreak = _lastTouchZone == zone ? _tapStreak + 1 : 1;
+    _lastTouchZone = zone;
+    _tapResetTimer?.cancel();
+    _tapResetTimer = Timer(const Duration(seconds: 4), () {
+      _tapStreak = 0;
+      _lastTouchZone = null;
+    });
+    final repeated = _tapStreak >= 3;
+    final line = repeated
+        ? _motionProfile.repeatLine
+        : switch (zone) {
+            _LobbyTouchZone.face => _motionProfile.faceLine,
+            _LobbyTouchZone.torso => _motionProfile.torsoLine,
+            _LobbyTouchZone.accessory => _motionProfile.accessoryLine,
+          };
+    if (_animationsEnabled && !_breathing.isAnimating) {
       _idleTimer?.cancel();
       _playIdleMotion();
     }
-    setState(() => _reacting = true);
+    if (_animationsEnabled) _reaction.forward(from: 0);
+    setState(() {
+      _reacting = true;
+      _touchZone = zone;
+      _repeatedTouch = repeated;
+      _reactionLine = line;
+    });
     _reactionTimer = Timer(const Duration(milliseconds: 2600), () {
-      if (mounted) setState(() => _reacting = false);
+      if (!mounted) return;
+      setState(() {
+        _reacting = false;
+        _repeatedTouch = false;
+        _reactionLine = null;
+      });
     });
   }
 
   @override
   void dispose() {
     _idleTimer?.cancel();
+    _blinkTimer?.cancel();
     _reactionTimer?.cancel();
+    _gestureTimer?.cancel();
+    _tapResetTimer?.cancel();
+    _lookHoldTimer?.cancel();
     _breathing.dispose();
+    _blink.dispose();
+    _gesture.dispose();
+    _reaction.dispose();
+    _entrance.dispose();
+    _lookReturn.dispose();
     super.dispose();
   }
 
@@ -1185,79 +2049,256 @@ class _LobbyHeroineStageState extends State<_LobbyHeroineStage>
       children: [
         Positioned.fill(
           bottom: 54,
-          child: GestureDetector(
-            key: Key('daily-lobby-heroine-${profile.id}'),
-            behavior: HitTestBehavior.translucent,
-            onTap: _react,
-            child: Semantics(
-              button: true,
-              label: '${profile.name}, 눌러서 인사 듣기',
-              child: AnimatedBuilder(
-                animation: _breathing,
-                builder: (context, child) {
-                  final phase = _breathing.value * math.pi * 2;
-                  final breath = math.sin(phase);
-                  final sway = math.sin(phase * 0.5);
-                  return Transform.translate(
-                    key: const Key('lobby-heroine-breathing-motion'),
-                    offset: Offset(sway * 1.8, -breath.abs() * 2.2),
-                    child: Transform.rotate(
-                      angle: sway * 0.0026,
-                      alignment: Alignment.bottomCenter,
-                      child: Transform.scale(
-                        scale: 1 + (breath + 1) * 0.0024,
-                        alignment: Alignment.bottomCenter,
-                        child: child,
-                      ),
-                    ),
+          child: LayoutBuilder(
+            builder: (context, gestureConstraints) => MouseRegion(
+              onHover: (event) =>
+                  _updateLook(event.localPosition, gestureConstraints.biggest),
+              onExit: (_) => _releaseLook(),
+              child: GestureDetector(
+                key: Key('daily-lobby-heroine-${profile.id}'),
+                behavior: HitTestBehavior.translucent,
+                onTapDown: (details) {
+                  _setPressed(true);
+                  _updateLook(
+                    details.localPosition,
+                    gestureConstraints.biggest,
                   );
                 },
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    const portraitScale = 1.32;
-                    return Align(
-                      alignment: Alignment.topCenter,
-                      child: OverflowBox(
-                        alignment: Alignment.topCenter,
-                        minWidth: constraints.maxWidth * 1.18 * portraitScale,
-                        maxWidth: constraints.maxWidth * 1.18 * portraitScale,
-                        minHeight: constraints.maxHeight * portraitScale,
-                        maxHeight: constraints.maxHeight * portraitScale,
-                        child: SizedBox(
-                          width: constraints.maxWidth * 1.18 * portraitScale,
-                          height: constraints.maxHeight * portraitScale,
-                          child: RepaintBoundary(
-                            child: AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 420),
-                              reverseDuration: const Duration(
-                                milliseconds: 520,
-                              ),
-                              switchInCurve: Curves.easeOutCubic,
-                              switchOutCurve: Curves.easeInCubic,
-                              transitionBuilder: (child, animation) =>
-                                  FadeTransition(
-                                    opacity: animation,
-                                    child: child,
+                onTapCancel: () {
+                  _setPressed(false);
+                  _releaseLook();
+                },
+                onTapUp: (details) {
+                  _setPressed(false);
+                  _react(details.localPosition, gestureConstraints.biggest);
+                  _releaseLook(delay: const Duration(milliseconds: 650));
+                },
+                onPanStart: (details) => _updateLook(
+                  details.localPosition,
+                  gestureConstraints.biggest,
+                ),
+                onPanUpdate: (details) => _updateLook(
+                  details.localPosition,
+                  gestureConstraints.biggest,
+                ),
+                onPanEnd: (_) => _releaseLook(),
+                onPanCancel: _releaseLook,
+                child: Semantics(
+                  button: true,
+                  label: '${profile.name}, 눌러서 인사 듣기',
+                  child: AnimatedSlide(
+                    offset: Offset(
+                      0,
+                      _pressed ? 0.0015 : (_reacting ? -0.002 : 0),
+                    ),
+                    duration: Duration(milliseconds: _pressed ? 90 : 320),
+                    curve: Curves.easeOutCubic,
+                    child: AnimatedScale(
+                      key: const Key('lobby-heroine-touch-motion'),
+                      scale: _pressed ? 0.997 : (_reacting ? 1.004 : 1),
+                      duration: Duration(milliseconds: _pressed ? 90 : 360),
+                      curve: Curves.easeOutCubic,
+                      alignment: Alignment.bottomCenter,
+                      child: AnimatedScale(
+                        key: const Key('lobby-heroine-affection-distance'),
+                        scale: _lobbyAffectionDistanceScale(progress.stage),
+                        duration: const Duration(milliseconds: 650),
+                        curve: Curves.easeOutCubic,
+                        alignment: Alignment.bottomCenter,
+                        child: Transform.translate(
+                          offset: Offset(
+                            0,
+                            _lobbyAffectionDistanceY(progress.stage),
+                          ),
+                          child: AnimatedBuilder(
+                            animation: Listenable.merge(<Listenable>[
+                              _breathing,
+                              _gesture,
+                              _reaction,
+                              _entrance,
+                              _lookReturn,
+                            ]),
+                            builder: (context, child) {
+                              final phase = _breathing.value * math.pi * 2;
+                              final breath = (1 - math.cos(phase)) * 0.5;
+                              final weightShift =
+                                  math.sin(_breathing.value * math.pi) *
+                                  _swayDirection;
+                              final microSway = math.sin(phase) * 0.35;
+                              final gestureFrame = _lobbyIdleGestureFrame(
+                                gesture: _idleGesture,
+                                value: _gesture.value,
+                                direction: _swayDirection,
+                                strength: _motionProfile.strength,
+                              );
+                              final reactionFrame = _lobbyTouchReactionFrame(
+                                zone: _touchZone,
+                                value: _reaction.value,
+                                direction: _touchDirection,
+                                affection: progress.affection,
+                                repeated: _repeatedTouch,
+                              );
+                              final entrance = _animationsEnabled
+                                  ? Curves.easeOutCubic.transform(
+                                      _entrance.value,
+                                    )
+                                  : 1.0;
+                              final lookOffset = _lookReturning
+                                  ? Offset.lerp(
+                                      _lookStart,
+                                      Offset.zero,
+                                      Curves.easeOutCubic.transform(
+                                        _lookReturn.value,
+                                      ),
+                                    )!
+                                  : _lookOffset;
+                              return Opacity(
+                                key: const Key('lobby-heroine-entrance-motion'),
+                                opacity: 0.35 + entrance * 0.65,
+                                child: Transform.translate(
+                                  key: const Key('lobby-heroine-gaze-motion'),
+                                  offset:
+                                      lookOffset +
+                                      Offset(0, (1 - entrance) * 6),
+                                  child: Transform.translate(
+                                    key: const Key(
+                                      'lobby-heroine-idle-gesture-motion',
+                                    ),
+                                    offset: gestureFrame.offset,
+                                    child: Transform.translate(
+                                      key: const Key(
+                                        'lobby-heroine-zone-reaction-motion',
+                                      ),
+                                      offset: reactionFrame.offset,
+                                      child: Transform.translate(
+                                        key: const Key(
+                                          'lobby-heroine-breathing-motion',
+                                        ),
+                                        offset: Offset(
+                                          weightShift * 1.7 + microSway,
+                                          -breath * 1.5,
+                                        ),
+                                        child: Transform.rotate(
+                                          angle:
+                                              weightShift * 0.0022 +
+                                              gestureFrame.rotation +
+                                              reactionFrame.rotation,
+                                          alignment: Alignment.bottomCenter,
+                                          child: Transform(
+                                            alignment: Alignment.bottomCenter,
+                                            transform: Matrix4.diagonal3Values(
+                                              (1 + breath * 0.0012) *
+                                                  gestureFrame.scale *
+                                                  reactionFrame.scale,
+                                              (1 + breath * 0.0032) *
+                                                  gestureFrame.scale *
+                                                  reactionFrame.scale,
+                                              1,
+                                            ),
+                                            child: child,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
                                   ),
-                              child: Image.asset(
-                                asset,
-                                key: Key(
-                                  _reacting
-                                      ? 'lobby-heroine-reaction-image'
-                                      : 'lobby-heroine-idle-image',
                                 ),
-                                fit: BoxFit.contain,
-                                alignment: Alignment.topCenter,
-                                filterQuality: FilterQuality.high,
-                                errorBuilder: (context, error, stackTrace) =>
-                                    const SizedBox.shrink(),
-                              ),
+                              );
+                            },
+                            child: LayoutBuilder(
+                              builder: (context, constraints) {
+                                const portraitScale = 1.32;
+                                return Align(
+                                  alignment: Alignment.topCenter,
+                                  child: OverflowBox(
+                                    alignment: Alignment.topCenter,
+                                    minWidth:
+                                        constraints.maxWidth *
+                                        1.18 *
+                                        portraitScale,
+                                    maxWidth:
+                                        constraints.maxWidth *
+                                        1.18 *
+                                        portraitScale,
+                                    minHeight:
+                                        constraints.maxHeight * portraitScale,
+                                    maxHeight:
+                                        constraints.maxHeight * portraitScale,
+                                    child: SizedBox(
+                                      width:
+                                          constraints.maxWidth *
+                                          1.18 *
+                                          portraitScale,
+                                      height:
+                                          constraints.maxHeight * portraitScale,
+                                      child: RepaintBoundary(
+                                        child: Stack(
+                                          fit: StackFit.expand,
+                                          children: [
+                                            _LobbyMotionPortrait(
+                                              baseAsset: asset,
+                                              motionFrames:
+                                                  _motionProfile.motionFrames,
+                                              gesture: _gesture,
+                                              reacting: _reacting,
+                                            ),
+                                            Positioned.fill(
+                                              child: IgnorePointer(
+                                                child: AnimatedBuilder(
+                                                  animation: Listenable.merge(
+                                                    <Listenable>[
+                                                      _blink,
+                                                      _gesture,
+                                                    ],
+                                                  ),
+                                                  builder: (context, child) {
+                                                    final gestureVisible =
+                                                        _gesture.value >
+                                                            0.001 &&
+                                                        _gesture.value < 0.999;
+                                                    final amount =
+                                                        _reacting ||
+                                                            gestureVisible
+                                                        ? 0.0
+                                                        : widget.state.story
+                                                              .flagBool(
+                                                                'hubBlinkPreview',
+                                                              )
+                                                        ? 1.0
+                                                        : _lobbyBlinkAmount(
+                                                            _blink.value,
+                                                          );
+                                                    return Opacity(
+                                                      key: const Key(
+                                                        'lobby-heroine-blink-overlay',
+                                                      ),
+                                                      opacity: amount,
+                                                      child: CustomPaint(
+                                                        painter: _LobbyBlinkPainter(
+                                                          geometry:
+                                                              _lobbyBlinkGeometryByAsset[asset] ??
+                                                              _lobbyBlinkGeometry[profile
+                                                                  .id]!,
+                                                          closure: amount,
+                                                        ),
+                                                      ),
+                                                    );
+                                                  },
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
                             ),
                           ),
                         ),
                       ),
-                    );
-                  },
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -1333,7 +2374,7 @@ class _LobbyHeroineStageState extends State<_LobbyHeroineStage>
                       ),
                       const SizedBox(height: 5),
                       Text(
-                        greeting,
+                        _reactionLine ?? greeting,
                         key: const Key('lobby-heroine-greeting'),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
@@ -1370,6 +2411,238 @@ class _LobbyHeroineStageState extends State<_LobbyHeroineStage>
   }
 }
 
+double _lobbyBlinkAmount(double value) {
+  if (value <= 0 || value >= 1) return 0;
+  if (value < 0.38) {
+    return Curves.easeInCubic.transform(value / 0.38);
+  }
+  if (value <= 0.58) return 1;
+  return Curves.easeOutCubic.transform((1 - value) / 0.42);
+}
+
+class _LobbyBlinkPainter extends CustomPainter {
+  const _LobbyBlinkPainter({required this.geometry, required this.closure});
+
+  final _LobbyBlinkGeometry geometry;
+  final double closure;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (closure <= 0) return;
+    const sourceSize = Size(1024, 1536);
+    final fitted = applyBoxFit(BoxFit.contain, sourceSize, size);
+    final imageRect = Alignment.topCenter.inscribe(
+      fitted.destination,
+      Offset.zero & size,
+    );
+    final eyeWidth = imageRect.width * geometry.eyeWidth;
+    final eyeHeight = imageRect.height * geometry.eyeHeight;
+    final skinPaint = Paint()
+      ..color = geometry.skinColor
+      ..style = PaintingStyle.fill
+      ..maskFilter = MaskFilter.blur(
+        BlurStyle.normal,
+        math.max(0.35, imageRect.width * 0.0012),
+      )
+      ..isAntiAlias = true;
+    final lidPaint = Paint()
+      ..color = geometry.lidColor
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = math.max(1, imageRect.width * 0.0026)
+      ..isAntiAlias = true;
+
+    for (final anchor in <Offset>[geometry.leftEye, geometry.rightEye]) {
+      final center = Offset(
+        imageRect.left + imageRect.width * anchor.dx,
+        imageRect.top + imageRect.height * anchor.dy,
+      );
+      final cover = Rect.fromCenter(
+        center: center,
+        width: eyeWidth,
+        height: eyeHeight * (0.72 + closure * 0.28),
+      );
+      canvas.drawOval(cover, skinPaint);
+      final lid = Path()
+        ..moveTo(cover.left + eyeWidth * 0.08, center.dy)
+        ..quadraticBezierTo(
+          center.dx,
+          center.dy + eyeHeight * 0.20,
+          cover.right - eyeWidth * 0.08,
+          center.dy,
+        );
+      canvas.drawPath(lid, lidPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _LobbyBlinkPainter oldDelegate) =>
+      oldDelegate.geometry != geometry || oldDelegate.closure != closure;
+}
+
+Color _lobbyAmbientColor(int marketMinute) {
+  if (marketMinute < krxOpenMinute) return const Color(0xFFFFD58A);
+  if (marketMinute < krxCloseMinute) return const Color(0xFFFFF0C2);
+  if (marketMinute < 20 * 60) return const Color(0xFFFFB56B);
+  return const Color(0xFF9DB9E8);
+}
+
+class _LobbyAmbientBackground extends StatefulWidget {
+  const _LobbyAmbientBackground({required this.state, required this.child});
+
+  final GameState state;
+  final Widget child;
+
+  @override
+  State<_LobbyAmbientBackground> createState() =>
+      _LobbyAmbientBackgroundState();
+}
+
+class _LobbyAmbientBackgroundState extends State<_LobbyAmbientBackground>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _motion = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 7600),
+  );
+  Timer? _pauseTimer;
+  bool _animationsEnabled = false;
+  int _cycle = 0;
+
+  int get _seed => widget.state.simulationSeed.codeUnits.fold<int>(
+    widget.state.day,
+    (value, unit) => (value * 31 + unit) & 0x7fffffff,
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final enabled = !MediaQuery.of(context).disableAnimations;
+    if (_animationsEnabled == enabled) return;
+    _animationsEnabled = enabled;
+    if (enabled) {
+      _play();
+    } else {
+      _pauseTimer?.cancel();
+      _motion
+        ..stop()
+        ..value = 1;
+    }
+  }
+
+  void _play() {
+    if (!mounted || !_animationsEnabled || _motion.isAnimating) return;
+    _motion.forward(from: 0).whenComplete(() {
+      if (!mounted || !_animationsEnabled) return;
+      _cycle += 1;
+      final pauseMs = 2600 + ((_seed + _cycle * 761) % 3200);
+      _pauseTimer = Timer(Duration(milliseconds: pauseMs), _play);
+    });
+  }
+
+  @override
+  void dispose() {
+    _pauseTimer?.cancel();
+    _motion.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ambient = _lobbyAmbientColor(widget.state.marketMinute);
+    return RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: _motion,
+        builder: (context, child) {
+          final progress = _animationsEnabled ? _motion.value : 1.0;
+          final drift = math.sin(progress * math.pi);
+          final direction = ((_seed + _cycle) & 1) == 0 ? 1.0 : -1.0;
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              Transform.translate(
+                key: const Key('lobby-ambient-background-motion'),
+                offset: Offset(direction * drift * 1.8, -drift * 0.8),
+                child: Transform.scale(
+                  scale: 1.012 + drift * 0.0015,
+                  child: child,
+                ),
+              ),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      ambient.withValues(alpha: 0.075),
+                      Colors.transparent,
+                      const Color(0xFF0D1625).withValues(alpha: 0.045),
+                    ],
+                    stops: const [0, 0.52, 1],
+                  ),
+                ),
+              ),
+              IgnorePointer(
+                child: CustomPaint(
+                  key: const Key('lobby-ambient-particles'),
+                  painter: _LobbyAtmospherePainter(
+                    progress: progress,
+                    color: ambient,
+                    seed: _seed,
+                    enabled: _animationsEnabled,
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+        child: widget.child,
+      ),
+    );
+  }
+}
+
+class _LobbyAtmospherePainter extends CustomPainter {
+  const _LobbyAtmospherePainter({
+    required this.progress,
+    required this.color,
+    required this.seed,
+    required this.enabled,
+  });
+
+  final double progress;
+  final Color color;
+  final int seed;
+  final bool enabled;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (!enabled) return;
+    final fade = math.sin(progress * math.pi).clamp(0.0, 1.0);
+    for (var index = 0; index < 7; index += 1) {
+      final xRatio = ((seed + index * 137) % 947) / 947;
+      final yRatio = ((seed ~/ 7 + index * 211) % 887) / 887;
+      final rise = progress * size.height * (0.055 + index * 0.004);
+      final wobble = math.sin(progress * math.pi * 2 + index) * 2.2;
+      final center = Offset(
+        size.width * (0.08 + xRatio * 0.84) + wobble,
+        size.height * (0.18 + yRatio * 0.66) - rise,
+      );
+      final paint = Paint()
+        ..color = color.withValues(alpha: (0.035 + index * 0.007) * fade)
+        ..style = PaintingStyle.fill
+        ..isAntiAlias = true;
+      canvas.drawCircle(center, 0.7 + (index % 3) * 0.42, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _LobbyAtmospherePainter oldDelegate) =>
+      oldDelegate.progress != progress ||
+      oldDelegate.color != color ||
+      oldDelegate.seed != seed ||
+      oldDelegate.enabled != enabled;
+}
+
 class _ApartmentPlaceScene extends StatelessWidget {
   const _ApartmentPlaceScene({
     super.key,
@@ -1398,19 +2671,23 @@ class _ApartmentPlaceScene extends StatelessWidget {
   Widget build(BuildContext context) {
     final details = _ApartmentPlaceDetails.forPlace(place);
     final backgroundAsset = details.assetPath;
+    final background = Image.asset(
+      backgroundAsset,
+      key: Key('apartment-background-${details.id}'),
+      fit: BoxFit.cover,
+      alignment: Alignment.center,
+      filterQuality: FilterQuality.high,
+      errorBuilder: (context, error, stackTrace) =>
+          _ApartmentFallbackBackground(details: details),
+    );
     return Stack(
       key: Key('apartment-place-${details.id}'),
       fit: StackFit.expand,
       children: [
-        Image.asset(
-          backgroundAsset,
-          key: Key('apartment-background-${details.id}'),
-          fit: BoxFit.cover,
-          alignment: Alignment.center,
-          filterQuality: FilterQuality.high,
-          errorBuilder: (context, error, stackTrace) =>
-              _ApartmentFallbackBackground(details: details),
-        ),
+        if (place == _ApartmentPlace.bedroom)
+          _LobbyAmbientBackground(state: state, child: background)
+        else
+          background,
         if (place == _ApartmentPlace.livingRoom) ...[
           _ApartmentObjectHotspot(
             interactionKey: const Key('open-organization-button'),
@@ -1541,15 +2818,6 @@ class _ApartmentLocationHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final level = state.progression.level;
-    final currentLevelXp = experienceForLevel(level);
-    final nextLevelXp = level >= 10
-        ? currentLevelXp
-        : experienceForLevel(level + 1);
-    final levelProgress = level >= 10
-        ? 1.0
-        : ((state.progression.experience - currentLevelXp) /
-                  (nextLevelXp - currentLevelXp))
-              .clamp(0.0, 1.0);
     final weather = _ApartmentWeather.forState(state);
 
     return Semantics(
@@ -1684,18 +2952,6 @@ class _ApartmentLocationHeader extends StatelessWidget {
                                 ),
                               ),
                             ],
-                          ),
-                          const SizedBox(height: 5),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(99),
-                            child: LinearProgressIndicator(
-                              value: levelProgress,
-                              minHeight: 4,
-                              backgroundColor: const Color(0xFFD8CAB0),
-                              valueColor: AlwaysStoppedAnimation(
-                                details.accent,
-                              ),
-                            ),
                           ),
                         ],
                       ),

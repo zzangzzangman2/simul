@@ -448,9 +448,9 @@ test("fills the mobile viewport and provides an exact desktop phone preview", as
   assert.match(visualNovel, /key: Key\('story-stage-reading-scrim'\)/);
   assert.match(visualNovel, /Color\(0x52000000\)/);
   assert.doesNotMatch(visualNovel, /_dialoguePanelColor/);
-  assert.match(visualNovel, /BackdropFilter/);
-  assert.match(visualNovel, /_storyDialogueBackdropBlur = 3\.2/);
-  assert.match(visualNovel, /story-dialogue-backdrop-blur/);
+  assert.doesNotMatch(visualNovel, /BackdropFilter/);
+  assert.doesNotMatch(visualNovel, /_storyDialogueBackdropBlur = 3\.2/);
+  assert.doesNotMatch(visualNovel, /story-dialogue-backdrop-blur/);
   assert.doesNotMatch(visualNovel, /story-moving-light-beam/);
   assert.doesNotMatch(visualNovel, /story-dialogue-opacity-control/);
   assert.doesNotMatch(visualNovel, /project-decimal-dialogue-panel-opacity/);
@@ -657,7 +657,9 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
       ),
     )
   )
-    .filter((name) => name.endsWith(".png"))
+    .filter(
+      (name) => name.endsWith(".png") && !name.startsWith("10_lobby_"),
+    )
     .sort();
   const expectedHanSuaAssets = [
     "01_neutral_wavy_v3.png",
@@ -1002,9 +1004,9 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
   assert.match(onboarding, /character: asset\('character'\)/);
   assert.match(onboarding, /background: asset\('background'\)/);
   assert.match(onboarding, /_dialogueEndBeat = loaded\.keys\.reduce\(math\.max\)/);
-  assert.match(onboarding, /_storyCharacterBottomInset = -144\.0/);
+  assert.match(onboarding, /_storyCharacterBottomInset = -178\.0/);
   assert.match(onboarding, /_storyDialogueBottomInset = 44\.0/);
-  assert.match(onboarding, /_storyCharacterSceneScale = 1\.72/);
+  assert.match(onboarding, /_storyCharacterSceneScale = 1\.55/);
   assert.doesNotMatch(onboarding, /story-crt-scanline/);
   assert.doesNotMatch(onboarding, /orientation-dust-motes/);
   assert.doesNotMatch(onboarding, /_minhoCharacterScale|character_minho_farewell/);

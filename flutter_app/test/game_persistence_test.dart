@@ -855,6 +855,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('08:00'), findsWidgets);
 
+    await tester.tap(find.byKey(const Key('hub-time-actions-button')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('advance-hour-button')));
     await tester.pump();
     await writeStarted.future;
