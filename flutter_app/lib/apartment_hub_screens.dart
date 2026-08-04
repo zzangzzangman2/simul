@@ -14,6 +14,203 @@ String _apartmentHudDateLabel(DateTime date) {
   return '${date.month}월 ${date.day}일 ${weekdays[date.weekday - 1]}';
 }
 
+class _LobbyHeroinePresentation {
+  const _LobbyHeroinePresentation({
+    required this.smileAsset,
+    required this.closeAsset,
+    required this.morningLine,
+    required this.marketLine,
+    required this.eveningLine,
+    required this.weekendLine,
+    required this.friendlyAside,
+    required this.closeAside,
+    required this.trustedAside,
+  });
+
+  final String smileAsset;
+  final String closeAsset;
+  final String morningLine;
+  final String marketLine;
+  final String eveningLine;
+  final String weekendLine;
+  final String friendlyAside;
+  final String closeAside;
+  final String trustedAside;
+}
+
+const _lobbyHeroinePresentations = <String, _LobbyHeroinePresentation>{
+  'kim_seoa': _LobbyHeroinePresentation(
+    smileAsset:
+        'assets/images/production_soft_painted/kim_seoa/02_soft_smile_agree_v1.png',
+    closeAsset:
+        'assets/images/production_soft_painted/kim_seoa/04_shy_appreciative_v1.png',
+    morningLine: '오늘 날짜랑 할 일은 적어 뒀어. 빠진 약속이 있는지만 같이 보자.',
+    marketLine: '장중 기록은 나중에 기억으로 메우기 어렵더라. 지금 한 줄만 남겨 둘래?',
+    eveningLine: '오늘 장부는 여기까지 정리했어. 네가 마음에 걸리는 부분도 적어 줄까?',
+    weekendLine: '오늘은 평일 기록 말고, 쉬는 동안 지키고 싶은 약속부터 정해도 돼.',
+    friendlyAside: ' 전에 네가 말한 기준도 그대로 남겨 놨어.',
+    closeAside: ' 네 얘기는 대충 적고 싶지 않아서 기다리고 있었어.',
+    trustedAside: ' 네가 올 줄 알고 네 자리 옆은 비워 뒀어.',
+  ),
+  'lee_jian': _LobbyHeroinePresentation(
+    smileAsset:
+        'assets/images/production_soft_painted/lee_jian/02_playful_wink_v2.png',
+    closeAsset:
+        'assets/images/production_soft_painted/lee_jian/07_apologetic_boundary_v2.png',
+    morningLine: 'PC는 작업실에 있어. 켜기 전에 접촉 불량 없는지만 보고 가자.',
+    marketLine: '숫자 튀는 데는 원인이 있어. 차트보다 체결부터 보면 빨라.',
+    eveningLine: '기계는 껐고 공구도 셌어. 이제 네가 뭘 확인했는지 들으면 돼.',
+    weekendLine: '정비할 건 끝냈어. 부품 구경 갈 거면 사람 적을 때 가자.',
+    friendlyAside: ' 네가 옆에서 순서만 맞춰 주면 금방 끝나.',
+    closeAside: ' 네 몫은 남겨 뒀어. 같이 만지는 편이 더 빠르니까.',
+    trustedAside: ' 네가 오면 설명을 줄여도 돼서 편해.',
+  ),
+  'choi_iseo': _LobbyHeroinePresentation(
+    smileAsset:
+        'assets/images/production_soft_painted/choi_iseo/02_gentle_smile_v1.png',
+    closeAsset:
+        'assets/images/production_soft_painted/choi_iseo/04_shy_flustered_v1.png',
+    morningLine: '라운지 쿠션 위치를 조금 바꿨어. 네가 앉기 불편하면 다시 둘게.',
+    marketLine: '계속 보고 있으면 숫자 색만 남아. 잠깐 눈 쉬고 다시 골라도 돼.',
+    eveningLine: '오늘 쓰던 건 정리했어. 조용히 있고 싶으면 말 안 해도 괜찮아.',
+    weekendLine: '밖에 나가면 원단 가게 앞만 천천히 보고 싶어. 네 취향도 궁금하고.',
+    friendlyAside: ' 네가 편한 쪽을 먼저 말해 줘.',
+    closeAside: ' 네 자리는 내가 알아볼 수 있게 해 뒀어.',
+    trustedAside: ' 기다리는 동안 네 생각이 나서 하나 더 만들었어.',
+  ),
+  'jung_arin': _LobbyHeroinePresentation(
+    smileAsset:
+        'assets/images/production_soft_painted/jung_arin/02_confident_smile_v1.png',
+    closeAsset:
+        'assets/images/production_soft_painted/jung_arin/03_cheeky_laugh_v1.png',
+    morningLine: '지금부터 장 시작 전까지 할 일 세 개. 우선순위는 네가 골라.',
+    marketLine: '결정했으면 체결 조건까지 확인. 망설이는 시간도 비용이야.',
+    eveningLine: '마감됐어. 잘한 건 남기고 틀린 건 내일 순서에 넣자.',
+    weekendLine: '주말이라고 계획이 없는 건 아니야. 대신 네가 원하는 시간부터 말해.',
+    friendlyAside: ' 이번엔 내가 통보하지 않고 먼저 물어보는 거야.',
+    closeAside: ' 네 일정은 내 표에 따로 비워 뒀어.',
+    trustedAside: ' 너랑 맞춘 계획이면 중간에 바뀌어도 다시 짜면 돼.',
+  ),
+  'park_haeun': _LobbyHeroinePresentation(
+    smileAsset:
+        'assets/images/production_soft_painted/park_haeun/02_bright_smile_wave_v2.png',
+    closeAsset:
+        'assets/images/production_soft_painted/park_haeun/04_playful_wink_v2.png',
+    morningLine: '다들 바빠 보여도 도움을 원한다는 뜻은 아니야. 너부터 어떤지 말해 줘.',
+    marketLine: '손익 보기 전에 숨 한번 쉬자. 지금 필요한 게 정보인지 위로인지도 다르니까.',
+    eveningLine: '오늘은 네 얘기를 먼저 들을게. 나도 끝나면 내 얘기 조금 해도 돼?',
+    weekendLine: '주말 계획은 같이 정해야 즐겁지. 쉬고 싶은 마음도 일정에 넣자.',
+    friendlyAside: ' 네가 솔직하게 말해 주면 나도 덜 짐작해도 돼.',
+    closeAside: ' 네 앞에서는 나도 괜찮은 척을 조금 덜 하게 돼.',
+    trustedAside: ' 오늘 네가 오길 기다렸어. 그냥 같이 있고 싶어서.',
+  ),
+  'han_sua': _LobbyHeroinePresentation(
+    smileAsset:
+        'assets/images/production_soft_painted/han_sua/02_warm_smile_wave_v3.png',
+    closeAsset:
+        'assets/images/production_soft_painted/han_sua/03_bright_laugh_v3.png',
+    morningLine: '오늘 분위기 좀 다르지 않아? 장 열리기 전에 다들 표정부터 볼까?',
+    marketLine: '방금 다들 같은 숫자에서 멈췄어. 그게 기회인지 겁인지 확인해 보자.',
+    eveningLine: '끝났다! 이제 숫자 말고 오늘 진짜 놀란 순간 하나씩 말하기.',
+    weekendLine: '주말이면 새로운 데 가 보자. 당장 나가자는 건 아니고, 같이 계획부터!',
+    friendlyAside: ' 네 반응은 이상하게 제일 먼저 보이더라.',
+    closeAside: ' 사실 네가 오면 분위기가 어떻게 바뀔지 기다렸어.',
+    trustedAside: ' 너한테는 장난 말고 진짜 걱정한 것도 말할 수 있어.',
+  ),
+  'oh_jiwoo': _LobbyHeroinePresentation(
+    smileAsset:
+        'assets/images/production_soft_painted/oh_jiwoo/02_cheerful_fang_wave_v1.png',
+    closeAsset:
+        'assets/images/production_soft_painted/oh_jiwoo/04_playful_counterpoint_v1.png',
+    morningLine: '오늘 첫 가설. 다들 확신하는 종목일수록 한 번 더 의심해야 한다.',
+    marketLine: '속보처럼 보이는 잡음이 제일 위험하지. 반대 설명부터 하나 세워 볼래?',
+    eveningLine: '오늘 내 예측도 하나 틀렸어. 네가 웃기 전에 반례부터 같이 찾자.',
+    weekendLine: '주말 토론 주제 접수 중. 결론 없는 얘기도 재미있으면 합격.',
+    friendlyAside: ' 네 반론은 꽤 쓸 만해서 따로 적어 뒀고.',
+    closeAside: ' 너한테 틀린 걸 들키는 건 전보다 덜 싫어.',
+    trustedAside: ' 네 앞에서는 모른다고 말해도 다음 얘기가 이어지니까 좋아.',
+  ),
+  'yoon_chaea': _LobbyHeroinePresentation(
+    smileAsset:
+        'assets/images/production_soft_painted/yoon_chaea/02_soft_smile_wave_v1.png',
+    closeAsset:
+        'assets/images/production_soft_painted/yoon_chaea/04_shy_blush_v1.png',
+    morningLine: '오늘 일정은 어제와 같아 보여도 전제가 하나 달라. 먼저 찾으면 말해 줄게.',
+    marketLine: '가격 하나만 보면 늦어. 그 숫자를 만든 구조가 아직 유지되는지 봐.',
+    eveningLine: '오늘 결과는 정리했어. 결론보다 네가 중간에 버린 가정이 궁금해.',
+    weekendLine: '사람 적은 곳이면 나가도 괜찮아. 계획은 미리 세우는 편이 좋고.',
+    friendlyAside: ' 네 생각은 결론 전에 들어도 괜찮을 것 같아.',
+    closeAside: ' 아직 덜 정리됐지만 너한테는 중간부터 말해 볼게.',
+    trustedAside: ' 내 계획에 네가 있는 건 이제 별도 가정이 아니야.',
+  ),
+};
+
+int _lobbyDateOrdinal(DateTime date) =>
+    DateTime.utc(date.year, date.month, date.day).millisecondsSinceEpoch ~/
+    Duration.millisecondsPerDay;
+
+CohortGirlProfile _dailyLobbyHeroine(GameState state) {
+  final seedOffset = state.simulationSeed.codeUnits.fold<int>(
+    0,
+    (value, unit) => (value * 31 + unit) & 0x7fffffff,
+  );
+  final index =
+      (_lobbyDateOrdinal(state.currentDate) + seedOffset) %
+      cohortGirlProfiles.length;
+  return cohortGirlProfiles[index];
+}
+
+String _lobbyHeroineAsset({
+  required CohortGirlProfile profile,
+  required GirlRelationshipProgress progress,
+  required bool reacting,
+}) {
+  final presentation = _lobbyHeroinePresentations[profile.id]!;
+  if (reacting) {
+    return progress.affection >= 40
+        ? presentation.closeAsset
+        : presentation.smileAsset;
+  }
+  return switch (progress.stage) {
+    RelationshipStage.newClassmate => profile.portraitAsset!,
+    RelationshipStage.friendly ||
+    RelationshipStage.interested => presentation.smileAsset,
+    _ => presentation.closeAsset,
+  };
+}
+
+String _lobbyHeroineGreeting({
+  required GameState state,
+  required CohortGirlProfile profile,
+  required GirlRelationshipProgress progress,
+}) {
+  final presentation = _lobbyHeroinePresentations[profile.id]!;
+  final unread = state.phoneMessenger.unreadFor(profile.id);
+  String line;
+  if (unread > 0) {
+    line = '톡으로 남긴 말 아직 못 봤지? 급한 건 아니니까 편할 때 확인해.';
+  } else if (state.pendingDecisions.isNotEmpty) {
+    line = '새 기록이 와 있어. 먼저 확인하고 나면 오늘 할 일이 더 분명해질 거야.';
+  } else if (relationshipOutingAvailableOn(state.currentDate)) {
+    line = presentation.weekendLine;
+  } else if (state.marketMinute < krxOpenMinute) {
+    line = presentation.morningLine;
+  } else if (state.marketMinute < krxCloseMinute) {
+    line = presentation.marketLine;
+  } else {
+    line = presentation.eveningLine;
+  }
+  final aside = switch (progress.stage) {
+    RelationshipStage.newClassmate => '',
+    RelationshipStage.friendly ||
+    RelationshipStage.interested => presentation.friendlyAside,
+    RelationshipStage.close ||
+    RelationshipStage.special => presentation.closeAside,
+    RelationshipStage.trusted => presentation.trustedAside,
+  };
+  return '$line$aside';
+}
+
 class ApartmentHubScreen extends StatefulWidget {
   const ApartmentHubScreen({
     super.key,
@@ -127,12 +324,8 @@ class _ApartmentHubScreenState extends State<ApartmentHubScreen> {
     final missionProgress = legacyMissionUiDisabled
         ? null
         : const GameEngine().missionProgress(widget.state);
-    final placeIndex = _ApartmentPlace.values.indexOf(_place);
-    final previousPlace = placeIndex > 0
-        ? _ApartmentPlace.values[placeIndex - 1]
-        : null;
-    final nextPlace = placeIndex < _ApartmentPlace.values.length - 1
-        ? _ApartmentPlace.values[placeIndex + 1]
+    final lobbyHeroine = _place == _ApartmentPlace.bedroom
+        ? _dailyLobbyHeroine(widget.state)
         : null;
     return ClipRect(
       child: Stack(
@@ -168,6 +361,24 @@ class _ApartmentHubScreenState extends State<ApartmentHubScreen> {
           const Positioned.fill(
             child: IgnorePointer(child: _ApartmentSceneVignette()),
           ),
+          if (lobbyHeroine != null)
+            Positioned.fill(
+              top: 142,
+              bottom: 64,
+              child: _LobbyHeroineStage(
+                key: ValueKey(
+                  'daily-lobby-${widget.state.currentDate.toIso8601String()}-${lobbyHeroine.id}',
+                ),
+                state: widget.state,
+                profile: lobbyHeroine,
+                progress: widget.state.relationships.progressFor(
+                  lobbyHeroine.id,
+                ),
+                bottomInset: legacyMissionUiDisabled ? 0 : 68,
+                onOpenMessenger: widget.onOpenMessenger,
+                onOpenRelationships: widget.onOpenRelationships,
+              ),
+            ),
           Positioned(
             left: 6,
             top: 6,
@@ -182,8 +393,8 @@ class _ApartmentHubScreenState extends State<ApartmentHubScreen> {
           ),
           Positioned(
             left: 8,
-            top: 112,
-            right: 60,
+            top: 92,
+            right: 8,
             child: _ApartmentDayGuideCard(
               state: widget.state,
               onPressed: _handleGuidanceAction,
@@ -192,7 +403,7 @@ class _ApartmentHubScreenState extends State<ApartmentHubScreen> {
           if (!legacyMissionUiDisabled)
             Positioned(
               right: 10,
-              bottom: 100,
+              bottom: 76,
               child: _ApartmentMissionCard(
                 progress: missionProgress,
                 starBalance: widget.state.progression.starBalance,
@@ -200,26 +411,8 @@ class _ApartmentHubScreenState extends State<ApartmentHubScreen> {
               ),
             ),
           Positioned(
-            left: 10,
-            bottom: 24,
-            child: _ApartmentRoomArrow(
-              destination: previousPlace,
-              flipHorizontally: true,
-              onMove: _moveTo,
-            ),
-          ),
-          Positioned(
-            right: 10,
-            bottom: 24,
-            child: _ApartmentRoomArrow(
-              destination: nextPlace,
-              flipHorizontally: false,
-              onMove: _moveTo,
-            ),
-          ),
-          Positioned(
             right: 7,
-            top: 118,
+            top: 151,
             child: _ApartmentActionRail(
               hasPendingDecision: widget.state.pendingDecisions.isNotEmpty,
               campaignComplete: widget.state.campaignComplete,
@@ -234,6 +427,12 @@ class _ApartmentHubScreenState extends State<ApartmentHubScreen> {
               onOpenEnding: widget.onOpenEnding,
               onHelp: () => setState(() => _tutorialVisible = true),
             ),
+          ),
+          Positioned(
+            left: 6,
+            right: 6,
+            bottom: 6,
+            child: _ApartmentLocationDock(current: _place, onMove: _moveTo),
           ),
           if (_tutorialVisible)
             Positioned.fill(
@@ -854,11 +1053,10 @@ class _HubTutorialOverlay extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               const Text(
-                '• 데시멀 생활동 단말기: 시장·부동산·상권 앱\n'
-                '• 개인 장부함: 거래 근거·성과\n'
-                '• 트레이딩 플로어: 동기·운영관·운용 조직\n'
-                '• 기기 정비실: 단말기·통신 장비와 생활 설비\n'
-                '• 기록 보관실: 국가 회수금과 선발 과정의 봉인 기록\n'
+                '• 생활 라운지: 매일 바뀌는 동기와 오늘의 대화\n'
+                '• 투자실: 동기·운영관·운용 조직\n'
+                '• 작업실: PC·시장·부동산·상권 앱과 기기 정비\n'
+                '• 기록 보관실: 국가계좌 장부·안건·봉인 기록\n'
                 '• 본관 앞: 국가계좌 창구·원내 실습',
                 style: TextStyle(
                   fontSize: 13,
@@ -868,7 +1066,7 @@ class _HubTutorialOverlay extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               const Text(
-                '화면 아래 양옆의 화살표로 이전 방과 다음 방으로 이동해요. 노란 테두리는 확인할 안건이 있다는 뜻입니다.',
+                '아래 장소 메뉴로 바로 이동할 수 있어요. 라운지의 동기를 누르면 표정과 인사가 달라지고, 오른쪽 버튼에서는 톡·관계·시간 기능을 엽니다.',
                 style: TextStyle(fontSize: 12, height: 1.5),
               ),
               const SizedBox(height: 16),
@@ -887,6 +1085,303 @@ class _HubTutorialOverlay extends StatelessWidget {
       ),
     ),
   );
+}
+
+class _LobbyHeroineStage extends StatefulWidget {
+  const _LobbyHeroineStage({
+    super.key,
+    required this.state,
+    required this.profile,
+    required this.progress,
+    required this.bottomInset,
+    required this.onOpenMessenger,
+    required this.onOpenRelationships,
+  });
+
+  final GameState state;
+  final CohortGirlProfile profile;
+  final GirlRelationshipProgress progress;
+  final double bottomInset;
+  final VoidCallback onOpenMessenger;
+  final VoidCallback onOpenRelationships;
+
+  @override
+  State<_LobbyHeroineStage> createState() => _LobbyHeroineStageState();
+}
+
+class _LobbyHeroineStageState extends State<_LobbyHeroineStage>
+    with SingleTickerProviderStateMixin {
+  static const _motionBurst = Duration(milliseconds: 3600);
+  static const _motionRest = Duration(milliseconds: 4200);
+
+  late final AnimationController _breathing = AnimationController(
+    vsync: this,
+    duration: _motionBurst,
+  );
+
+  /// 메시 변형이 진행된 누적 시간. 재생 구간에서만 늘어나므로 쉬었다 다시 시작해도
+  /// 자세가 튀지 않는다.
+  double _motionSeconds = 0;
+  Timer? _idleTimer;
+  Timer? _reactionTimer;
+  bool _reacting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _playIdleMotion();
+  }
+
+  void _playIdleMotion() {
+    if (!mounted) return;
+    _breathing.forward(from: 0).whenComplete(() {
+      if (!mounted) return;
+      _motionSeconds +=
+          _motionBurst.inMilliseconds / Duration.millisecondsPerSecond;
+      _idleTimer?.cancel();
+      _idleTimer = Timer(_motionRest, _playIdleMotion);
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant _LobbyHeroineStage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.profile.id != widget.profile.id) {
+      _reactionTimer?.cancel();
+      _reacting = false;
+    }
+  }
+
+  void _react() {
+    _reactionTimer?.cancel();
+    if (!_breathing.isAnimating) {
+      _idleTimer?.cancel();
+      _playIdleMotion();
+    }
+    setState(() => _reacting = true);
+    _reactionTimer = Timer(const Duration(milliseconds: 2600), () {
+      if (mounted) setState(() => _reacting = false);
+    });
+  }
+
+  @override
+  void dispose() {
+    _idleTimer?.cancel();
+    _reactionTimer?.cancel();
+    _breathing.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final profile = widget.profile;
+    final progress = widget.progress;
+    final greeting = _lobbyHeroineGreeting(
+      state: widget.state,
+      profile: profile,
+      progress: progress,
+    );
+    final asset = _lobbyHeroineAsset(
+      profile: profile,
+      progress: progress,
+      reacting: _reacting,
+    );
+    final accent = Color(profile.accentValue);
+
+    return Stack(
+      key: const Key('daily-lobby-heroine-stage'),
+      fit: StackFit.expand,
+      children: [
+        Positioned.fill(
+          bottom: 54,
+          child: GestureDetector(
+            key: Key('daily-lobby-heroine-${profile.id}'),
+            behavior: HitTestBehavior.translucent,
+            onTap: _react,
+            child: Semantics(
+              button: true,
+              label: '${profile.name}, 눌러서 인사 듣기',
+              child: AnimatedBuilder(
+                animation: _breathing,
+                builder: (context, child) {
+                  // 호흡과 나팔거림은 이제 초상 안쪽의 격자 메시가 만든다
+                  // (`CharacterLivelinessView`). 이 겉 변환은 이미지를 통째로
+                  // 옮기므로 발까지 같이 떠서 접지가 흔들리고, 얼굴도 함께
+                  // 움직여 정체성 보호 상한을 넘긴다. 그래서 몸 전체가 아주
+                  // 천천히 자리를 고르는 정도만 남긴다.
+                  final phase = _breathing.value * math.pi * 2;
+                  final settle = math.sin(phase * 0.5);
+                  return Transform.translate(
+                    key: const Key('lobby-heroine-breathing-motion'),
+                    offset: Offset(settle * 0.45, 0),
+                    child: Transform.rotate(
+                      angle: settle * 0.0006,
+                      alignment: Alignment.bottomCenter,
+                      child: child,
+                    ),
+                  );
+                },
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    const portraitScale = 1.32;
+                    return Align(
+                      alignment: Alignment.topCenter,
+                      child: OverflowBox(
+                        alignment: Alignment.topCenter,
+                        minWidth: constraints.maxWidth * 1.18 * portraitScale,
+                        maxWidth: constraints.maxWidth * 1.18 * portraitScale,
+                        minHeight: constraints.maxHeight * portraitScale,
+                        maxHeight: constraints.maxHeight * portraitScale,
+                        child: SizedBox(
+                          width: constraints.maxWidth * 1.18 * portraitScale,
+                          height: constraints.maxHeight * portraitScale,
+                          child: RepaintBoundary(
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 420),
+                              reverseDuration: const Duration(
+                                milliseconds: 520,
+                              ),
+                              switchInCurve: Curves.easeOutCubic,
+                              switchOutCurve: Curves.easeInCubic,
+                              transitionBuilder: (child, animation) =>
+                                  FadeTransition(
+                                    opacity: animation,
+                                    child: child,
+                                  ),
+                              // 초상은 격자 메시로 그려 부위별로 다르게 움직인다.
+                              // 치맛단은 나팔거리고 머리끝은 늦게 따라오며 얼굴과
+                              // 발은 고정된다. 상한과 규칙은
+                              // `game/character_liveliness.dart`가 정한다.
+                              child: CharacterLivelinessView(
+                                key: Key(
+                                  _reacting
+                                      ? 'lobby-heroine-reaction-image'
+                                      : 'lobby-heroine-idle-image',
+                                ),
+                                asset: asset,
+                                seed: profile.id,
+                                seconds:
+                                    _motionSeconds +
+                                    _breathing.value *
+                                        (_motionBurst.inMilliseconds /
+                                            Duration.millisecondsPerSecond),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          left: 10,
+          right: 10,
+          bottom: 4 + widget.bottomInset,
+          child: Container(
+            key: const Key('lobby-heroine-greeting-card'),
+            padding: const EdgeInsets.fromLTRB(12, 9, 6, 9),
+            decoration: BoxDecoration(
+              color: const Color(0xF21B2639),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: accent.withValues(alpha: 0.95),
+                width: 1.5,
+              ),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x66070A12),
+                  blurRadius: 14,
+                  offset: Offset(0, 5),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            profile.name,
+                            key: const Key('lobby-heroine-name'),
+                            style: const TextStyle(
+                              fontFamily: _hubDisplayFont,
+                              color: Colors.white,
+                              fontSize: 13.5,
+                              height: 1,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            key: const Key('lobby-heroine-stage-label'),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: accent.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(
+                                color: accent.withValues(alpha: 0.7),
+                              ),
+                            ),
+                            child: Text(
+                              progress.stage.label,
+                              style: TextStyle(
+                                color: accent,
+                                fontSize: 8,
+                                height: 1,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        greeting,
+                        key: const Key('lobby-heroine-greeting'),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFFF8F2E6),
+                          fontSize: 10.2,
+                          height: 1.25,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  key: const Key('lobby-heroine-message-button'),
+                  tooltip: '${profile.name}에게 데시멀톡 보내기',
+                  onPressed: widget.onOpenMessenger,
+                  color: const Color(0xFFFFD66F),
+                  icon: const Icon(Icons.chat_bubble_rounded, size: 20),
+                ),
+                IconButton(
+                  key: const Key('lobby-heroine-relationship-button'),
+                  tooltip: '${profile.name} 관계 확인',
+                  onPressed: widget.onOpenRelationships,
+                  color: accent,
+                  icon: const Icon(Icons.favorite_rounded, size: 20),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 class _ApartmentPlaceScene extends StatelessWidget {
@@ -930,34 +1425,10 @@ class _ApartmentPlaceScene extends StatelessWidget {
           errorBuilder: (context, error, stackTrace) =>
               _ApartmentFallbackBackground(details: details),
         ),
-        if (place == _ApartmentPlace.bedroom) ...[
-          _ApartmentObjectHotspot(
-            interactionKey: const Key('open-market-button'),
-            alignment: const Alignment(-0.66, -0.20),
-            width: 118,
-            height: 112,
-            eyebrow: '공용 단말기 켜기',
-            label: '데시멀 홈 PC',
-            icon: Icons.computer_rounded,
-            accent: const Color(0xFF80D8FF),
-            onTap: onOpenMarket,
-          ),
-          _ApartmentObjectHotspot(
-            interactionKey: const Key('open-ledger-button'),
-            alignment: const Alignment(0.62, -0.08),
-            width: 94,
-            height: 126,
-            eyebrow: '개인 장부 꺼내기',
-            label: '국가계좌 장부',
-            icon: Icons.inventory_2_rounded,
-            accent: const Color(0xFFFFC78E),
-            onTap: onOpenLedger,
-          ),
-        ],
         if (place == _ApartmentPlace.livingRoom) ...[
           _ApartmentObjectHotspot(
             interactionKey: const Key('open-organization-button'),
-            alignment: const Alignment(-0.68, -0.08),
+            alignment: const Alignment(0, -0.08),
             width: 124,
             height: 148,
             eyebrow: '동기·지도관과 회의',
@@ -966,9 +1437,22 @@ class _ApartmentPlaceScene extends StatelessWidget {
             accent: const Color(0xFFFFD27A),
             onTap: onOpenOrganization,
           ),
+        ],
+        if (place == _ApartmentPlace.kitchen) ...[
+          _ApartmentObjectHotspot(
+            interactionKey: const Key('open-market-button'),
+            alignment: const Alignment(-0.66, -0.12),
+            width: 118,
+            height: 122,
+            eyebrow: '공용 단말기 켜기',
+            label: '작업실 PC',
+            icon: Icons.computer_rounded,
+            accent: const Color(0xFF80D8FF),
+            onTap: onOpenMarket,
+          ),
           _ApartmentObjectHotspot(
             interactionKey: const Key('open-home-improvements-button'),
-            alignment: const Alignment(0.68, 0.04),
+            alignment: const Alignment(0.66, -0.04),
             width: 122,
             height: 112,
             eyebrow: '공용 시설 정비',
@@ -978,10 +1462,10 @@ class _ApartmentPlaceScene extends StatelessWidget {
             onTap: onOpenHomeImprovements,
           ),
         ],
-        if (place == _ApartmentPlace.corridor)
+        if (place == _ApartmentPlace.corridor) ...[
           _ApartmentObjectHotspot(
             interactionKey: const Key('open-decisions-button'),
-            alignment: const Alignment(0.08, -0.20),
+            alignment: const Alignment(-0.58, -0.16),
             width: 106,
             height: 126,
             eyebrow: '봉인 기록함 열기',
@@ -995,6 +1479,18 @@ class _ApartmentPlaceScene extends StatelessWidget {
             attention: state.pendingDecisions.isNotEmpty,
             onTap: onOpenDecisions,
           ),
+          _ApartmentObjectHotspot(
+            interactionKey: const Key('open-ledger-button'),
+            alignment: const Alignment(0.60, -0.06),
+            width: 104,
+            height: 126,
+            eyebrow: '개인 장부 꺼내기',
+            label: '국가계좌 장부',
+            icon: Icons.inventory_2_rounded,
+            accent: const Color(0xFFFFC78E),
+            onTap: onOpenLedger,
+          ),
+        ],
         if (place == _ApartmentPlace.neighborhood) ...[
           _ApartmentObjectHotspot(
             interactionKey: const Key('open-bank-button'),
@@ -1075,11 +1571,11 @@ class _ApartmentLocationHeader extends StatelessWidget {
       label: '${details.title}, ${state.companyName}, $activeSaveSlot번 저장 슬롯',
       child: Container(
         key: const Key('room-company-sign'),
-        height: 100,
+        height: 80,
         padding: const EdgeInsets.all(3),
         decoration: BoxDecoration(
           color: const Color(0xFF243451),
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(color: const Color(0xFF18243A), width: 1.5),
           boxShadow: const [
             BoxShadow(
@@ -1090,14 +1586,14 @@ class _ApartmentLocationHeader extends StatelessWidget {
           ],
         ),
         child: Container(
-          padding: const EdgeInsets.fromLTRB(8, 6, 7, 6),
+          padding: const EdgeInsets.fromLTRB(7, 4, 6, 4),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [Color(0xFFFFF9EA), Color(0xFFF4E6C5)],
             ),
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(color: const Color(0xFFD99B2B), width: 1.5),
           ),
           child: Column(
@@ -1106,11 +1602,11 @@ class _ApartmentLocationHeader extends StatelessWidget {
                 child: Row(
                   children: [
                     Container(
-                      width: 76,
-                      height: 48,
+                      width: 64,
+                      height: 40,
                       decoration: BoxDecoration(
                         color: const Color(0xFFFFD66F),
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: const Color(0xFF9C681B),
                           width: 1.5,
@@ -1126,7 +1622,7 @@ class _ApartmentLocationHeader extends StatelessWidget {
                               style: TextStyle(
                                 fontFamily: _hubDisplayFont,
                                 color: Color(0xFF76501B),
-                                fontSize: 7.8,
+                                fontSize: 7,
                                 height: 1,
                                 fontWeight: FontWeight.w700,
                                 letterSpacing: -0.1,
@@ -1139,7 +1635,7 @@ class _ApartmentLocationHeader extends StatelessWidget {
                               style: const TextStyle(
                                 fontFamily: _hubDisplayFont,
                                 color: _ink,
-                                fontSize: 18,
+                                fontSize: 16,
                                 height: 1,
                                 fontWeight: FontWeight.w700,
                               ),
@@ -1148,7 +1644,7 @@ class _ApartmentLocationHeader extends StatelessWidget {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 9),
+                    const SizedBox(width: 7),
                     Expanded(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -1162,7 +1658,7 @@ class _ApartmentLocationHeader extends StatelessWidget {
                             style: const TextStyle(
                               fontFamily: _hubDisplayFont,
                               color: _ink,
-                              fontSize: 14.5,
+                              fontSize: 12.5,
                               height: 1.05,
                               fontWeight: FontWeight.w700,
                               letterSpacing: -0.4,
@@ -1183,7 +1679,7 @@ class _ApartmentLocationHeader extends StatelessWidget {
                                     style: const TextStyle(
                                       fontFamily: _hubDisplayFont,
                                       color: Color(0xFF8B5C17),
-                                      fontSize: 9.5,
+                                      fontSize: 8.5,
                                       height: 1,
                                       fontWeight: FontWeight.w700,
                                     ),
@@ -1196,7 +1692,7 @@ class _ApartmentLocationHeader extends StatelessWidget {
                                 style: const TextStyle(
                                   fontFamily: _hubDisplayFont,
                                   color: Color(0xFF59667D),
-                                  fontSize: 8.5,
+                                  fontSize: 7.8,
                                   height: 1,
                                   fontWeight: FontWeight.w700,
                                 ),
@@ -1208,7 +1704,7 @@ class _ApartmentLocationHeader extends StatelessWidget {
                             borderRadius: BorderRadius.circular(99),
                             child: LinearProgressIndicator(
                               value: levelProgress,
-                              minHeight: 5,
+                              minHeight: 4,
                               backgroundColor: const Color(0xFFD8CAB0),
                               valueColor: AlwaysStoppedAnimation(
                                 details.accent,
@@ -1218,7 +1714,7 @@ class _ApartmentLocationHeader extends StatelessWidget {
                         ],
                       ),
                     ),
-                    const SizedBox(width: 9),
+                    const SizedBox(width: 7),
                     Stack(
                       clipBehavior: Clip.none,
                       children: [
@@ -1229,13 +1725,13 @@ class _ApartmentLocationHeader extends StatelessWidget {
                           style: IconButton.styleFrom(
                             backgroundColor: const Color(0xFF243451),
                             foregroundColor: Colors.white,
-                            minimumSize: const Size(44, 44),
+                            minimumSize: const Size(40, 40),
                             side: const BorderSide(
                               color: Color(0xFFDCA538),
                               width: 1.5,
                             ),
                           ),
-                          icon: const Icon(Icons.menu_rounded, size: 23),
+                          icon: const Icon(Icons.menu_rounded, size: 21),
                         ),
                         if (lastSavedAt != null)
                           const Positioned(
@@ -1257,9 +1753,9 @@ class _ApartmentLocationHeader extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(height: 5),
+              const SizedBox(height: 4),
               Container(
-                height: 27,
+                height: 22,
                 decoration: BoxDecoration(
                   color: const Color(0xFF243451),
                   borderRadius: BorderRadius.circular(10),
@@ -1413,12 +1909,12 @@ class _ApartmentDayGuideCard extends StatelessWidget {
       child: InkWell(
         key: const Key('apartment-day-guide'),
         onTap: onPressed,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         child: Ink(
-          padding: const EdgeInsets.fromLTRB(11, 9, 9, 9),
+          padding: const EdgeInsets.fromLTRB(8, 6, 7, 6),
           decoration: BoxDecoration(
             color: const Color(0xF7FFF9EA),
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(color: const Color(0xFFD99B2B), width: 1.5),
             boxShadow: const [
               BoxShadow(
@@ -1431,20 +1927,20 @@ class _ApartmentDayGuideCard extends StatelessWidget {
           child: Row(
             children: [
               Container(
-                width: 38,
-                height: 38,
+                width: 34,
+                height: 34,
                 decoration: BoxDecoration(
                   color: const Color(0xFFFFD66F),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: const Color(0xFF9C681B)),
                 ),
                 child: const Icon(
                   Icons.flag_rounded,
                   color: Color(0xFF61451F),
-                  size: 22,
+                  size: 19,
                 ),
               ),
-              const SizedBox(width: 9),
+              const SizedBox(width: 8),
               Expanded(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -1458,12 +1954,12 @@ class _ApartmentDayGuideCard extends StatelessWidget {
                       style: const TextStyle(
                         fontFamily: _hubDisplayFont,
                         color: Color(0xFF9A6114),
-                        fontSize: 8.5,
+                        fontSize: 7.5,
                         height: 1,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    const SizedBox(height: 3),
+                    const SizedBox(height: 2),
                     Text(
                       guidance.title,
                       key: const Key('apartment-next-objective'),
@@ -1472,20 +1968,8 @@ class _ApartmentDayGuideCard extends StatelessWidget {
                       style: const TextStyle(
                         fontFamily: _hubDisplayFont,
                         color: _ink,
-                        fontSize: 11.5,
+                        fontSize: 10.5,
                         height: 1.05,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      guidance.body,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Color(0xFF59667D),
-                        fontSize: 8.3,
-                        height: 1.2,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -1499,7 +1983,7 @@ class _ApartmentDayGuideCard extends StatelessWidget {
                   const Icon(
                     Icons.arrow_forward_rounded,
                     color: Color(0xFF9A6114),
-                    size: 20,
+                    size: 18,
                   ),
                   const SizedBox(height: 2),
                   Text(
@@ -1508,7 +1992,7 @@ class _ApartmentDayGuideCard extends StatelessWidget {
                     style: const TextStyle(
                       fontFamily: _hubDisplayFont,
                       color: Color(0xFF76501B),
-                      fontSize: 7,
+                      fontSize: 6.5,
                       height: 1.05,
                       fontWeight: FontWeight.w700,
                     ),
@@ -2097,79 +2581,231 @@ class _ApartmentActionRail extends StatelessWidget {
   final VoidCallback onOpenEnding;
   final VoidCallback onHelp;
 
+  Future<void> _openTimeActions(BuildContext context) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: const Color(0xFFFFFBF2),
+      builder: (sheetContext) => _ApartmentTimeActionsSheet(
+        hasPendingDecision: hasPendingDecision,
+        campaignComplete: campaignComplete,
+        marketMinute: marketMinute,
+        onOpenCalendar: onOpenCalendar,
+        onAdvanceHour: onAdvanceHour,
+        onAdvanceDay: onAdvanceDay,
+        onAdvanceBatch: onAdvanceBatch,
+        onOpenEnding: onOpenEnding,
+        onHelp: onHelp,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => Column(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      _ApartmentRailButton(
+        buttonKey: const Key('phone-messenger-button'),
+        tooltip: messengerUnread > 0
+            ? '데시멀톡 · 새 메시지 $messengerUnread개'
+            : '데시멀톡 · 동기들과 대화',
+        icon: Icons.smartphone_rounded,
+        badgeCount: messengerUnread,
+        onPressed: onOpenMessenger,
+      ),
+      const SizedBox(height: 7),
+      _ApartmentRailButton(
+        buttonKey: const Key('relationship-status-button'),
+        tooltip: '캐릭터와 관계 보기',
+        icon: Icons.favorite_rounded,
+        onPressed: onOpenRelationships,
+      ),
+      const SizedBox(height: 7),
+      _ApartmentRailButton(
+        buttonKey: const Key('hub-time-actions-button'),
+        tooltip: '시간·일정·달력',
+        icon: Icons.more_time_rounded,
+        onPressed: () => _openTimeActions(context),
+      ),
+    ],
+  );
+}
+
+class _ApartmentTimeActionsSheet extends StatelessWidget {
+  const _ApartmentTimeActionsSheet({
+    required this.hasPendingDecision,
+    required this.campaignComplete,
+    required this.marketMinute,
+    required this.onOpenCalendar,
+    required this.onAdvanceHour,
+    required this.onAdvanceDay,
+    required this.onAdvanceBatch,
+    required this.onOpenEnding,
+    required this.onHelp,
+  });
+
+  final bool hasPendingDecision;
+  final bool campaignComplete;
+  final int marketMinute;
+  final VoidCallback onOpenCalendar;
+  final VoidCallback onAdvanceHour;
+  final VoidCallback onAdvanceDay;
+  final VoidCallback onAdvanceBatch;
+  final VoidCallback onOpenEnding;
+  final VoidCallback onHelp;
+
+  void _run(BuildContext context, VoidCallback action) {
+    Navigator.pop(context);
+    action();
+  }
+
   @override
   Widget build(BuildContext context) {
     final ended = marketMinute >= marketDayEndMinute;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _ApartmentRailButton(
-          buttonKey: const Key('phone-messenger-button'),
-          tooltip: messengerUnread > 0
-              ? '데시멀톡 · 새 메시지 $messengerUnread개'
-              : '데시멀톡 · 동기들과 대화',
-          icon: Icons.smartphone_rounded,
-          badgeCount: messengerUnread,
-          onPressed: onOpenMessenger,
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              '시간과 일정',
+              style: TextStyle(
+                fontFamily: _hubDisplayFont,
+                color: _ink,
+                fontSize: 19,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              '달력을 확인하거나 게임 시간을 진행합니다.',
+              style: TextStyle(
+                color: Color(0xFF65708A),
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 12),
+            _ApartmentTimeActionTile(
+              tileKey: const Key('life-calendar-button'),
+              icon: Icons.calendar_month_rounded,
+              title: '성장 달력',
+              subtitle: '날짜와 지난 사건 기록 확인',
+              onTap: () => _run(context, onOpenCalendar),
+            ),
+            _ApartmentTimeActionTile(
+              tileKey: const Key('advance-hour-button'),
+              icon: Icons.hourglass_bottom_rounded,
+              title: '1시간 보내기',
+              subtitle: hasPendingDecision
+                  ? '새 기록을 먼저 확인해야 합니다'
+                  : ended
+                  ? '오늘 진행 가능한 시간이 끝났습니다'
+                  : '게임 시간을 60분 진행',
+              onTap: hasPendingDecision || ended
+                  ? null
+                  : () => _run(context, onAdvanceHour),
+            ),
+            _ApartmentTimeActionTile(
+              tileKey: const Key('advance-day-button'),
+              icon: campaignComplete
+                  ? Icons.emoji_events_rounded
+                  : Icons.bedtime_rounded,
+              title: campaignComplete ? '최종 결산' : '하루 보내기',
+              subtitle: hasPendingDecision
+                  ? '새 기록을 먼저 확인해야 합니다'
+                  : campaignComplete
+                  ? '캠페인 결과 확인'
+                  : '오늘을 마치고 다음 날로 진행',
+              onTap: hasPendingDecision
+                  ? null
+                  : () => _run(
+                      context,
+                      campaignComplete ? onOpenEnding : onAdvanceDay,
+                    ),
+            ),
+            _ApartmentTimeActionTile(
+              tileKey: const Key('advance-batch-button'),
+              icon: Icons.fast_forward_rounded,
+              title: '빠르게 진행',
+              subtitle: '여러 날을 한 번에 진행',
+              onTap: hasPendingDecision || campaignComplete
+                  ? null
+                  : () => _run(context, onAdvanceBatch),
+            ),
+            _ApartmentTimeActionTile(
+              tileKey: const Key('hub-help-button'),
+              icon: Icons.help_outline_rounded,
+              title: '허브 사용법',
+              subtitle: '장소와 아이콘 설명 다시 보기',
+              onTap: () => _run(context, onHelp),
+            ),
+          ],
         ),
-        const SizedBox(height: 7),
-        _ApartmentRailButton(
-          buttonKey: const Key('relationship-status-button'),
-          tooltip: '캐릭터 10명',
-          assetPath: 'assets/images/hud_clean_letter.png',
-          onPressed: onOpenRelationships,
-        ),
-        const SizedBox(height: 7),
-        _ApartmentRailButton(
-          buttonKey: const Key('life-calendar-button'),
-          tooltip: '성장 달력 · 날짜와 지난 사건 기록',
-          icon: Icons.calendar_month_rounded,
-          onPressed: onOpenCalendar,
-        ),
-        const SizedBox(height: 7),
-        _ApartmentRailButton(
-          buttonKey: const Key('advance-hour-button'),
-          tooltip: '1시간 보내기 · 게임 시간 60분 진행',
-          assetPath: 'assets/images/hud_clean_hourglass.png',
-          disabled: hasPendingDecision || ended,
-          onPressed: hasPendingDecision || ended ? null : onAdvanceHour,
-        ),
-        const SizedBox(height: 7),
-        _ApartmentRailButton(
-          buttonKey: const Key('advance-day-button'),
-          tooltip: campaignComplete
-              ? '최종 결산 열기'
-              : '하루 보내기 · 신문 확인 후 다음 날 08:00',
-          assetPath: campaignComplete
-              ? 'assets/images/hud_clean_quest.png'
-              : 'assets/images/hud_clean_moon.png',
-          disabled: hasPendingDecision,
-          onPressed: hasPendingDecision
-              ? null
-              : campaignComplete
-              ? onOpenEnding
-              : onAdvanceDay,
-        ),
-        const SizedBox(height: 7),
-        _ApartmentRailButton(
-          buttonKey: const Key('advance-batch-button'),
-          tooltip: '빠르게 진행 · 여러 날을 한 번에',
-          assetPath: 'assets/images/hud_clean_fast.png',
-          disabled: hasPendingDecision || campaignComplete,
-          onPressed: hasPendingDecision || campaignComplete
-              ? null
-              : onAdvanceBatch,
-        ),
-        const SizedBox(height: 7),
-        _ApartmentRailButton(
-          buttonKey: const Key('hub-help-button'),
-          tooltip: '아이콘 사용법 보기',
-          assetPath: 'assets/images/hud_clean_quest.png',
-          onPressed: onHelp,
-        ),
-      ],
+      ),
     );
   }
+}
+
+class _ApartmentTimeActionTile extends StatelessWidget {
+  const _ApartmentTimeActionTile({
+    required this.tileKey,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final Key tileKey;
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) => ListTile(
+    key: tileKey,
+    enabled: onTap != null,
+    contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+    dense: true,
+    leading: Container(
+      width: 38,
+      height: 38,
+      decoration: BoxDecoration(
+        color: const Color(
+          0xFF243451,
+        ).withValues(alpha: onTap == null ? 0.08 : 0.14),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Icon(
+        icon,
+        color: onTap == null
+            ? const Color(0xFF9AA2B1)
+            : const Color(0xFF243451),
+      ),
+    ),
+    title: Text(
+      title,
+      style: TextStyle(
+        color: onTap == null ? const Color(0xFF8C939F) : _ink,
+        fontSize: 13,
+        fontWeight: FontWeight.w900,
+      ),
+    ),
+    subtitle: Text(
+      subtitle,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
+    ),
+    trailing: Icon(
+      onTap == null ? Icons.lock_rounded : Icons.chevron_right_rounded,
+      size: 20,
+    ),
+    onTap: onTap,
+  );
 }
 
 class _ApartmentRailButton extends StatelessWidget {
@@ -2180,7 +2816,6 @@ class _ApartmentRailButton extends StatelessWidget {
     this.assetPath,
     this.icon,
     this.badgeCount = 0,
-    this.disabled = false,
   }) : assert(assetPath != null || icon != null);
 
   final Key buttonKey;
@@ -2189,7 +2824,6 @@ class _ApartmentRailButton extends StatelessWidget {
   final IconData? icon;
   final int badgeCount;
   final VoidCallback? onPressed;
-  final bool disabled;
 
   @override
   Widget build(BuildContext context) => Tooltip(
@@ -2199,14 +2833,14 @@ class _ApartmentRailButton extends StatelessWidget {
       button: true,
       label: tooltip,
       child: SizedBox(
-        width: 50,
-        height: 50,
+        width: 46,
+        height: 46,
         child: ElevatedButton(
           key: buttonKey,
           onPressed: onPressed,
           style: ElevatedButton.styleFrom(
             padding: EdgeInsets.zero,
-            elevation: disabled ? 1 : 5,
+            elevation: 5,
             shadowColor: const Color(0x660B1423),
             backgroundColor: const Color(0xF7FFF8E9),
             foregroundColor: _ink,
@@ -2219,18 +2853,15 @@ class _ApartmentRailButton extends StatelessWidget {
           child: Stack(
             alignment: Alignment.center,
             children: [
-              Opacity(
-                opacity: disabled ? 0.34 : 1,
-                child: assetPath != null
-                    ? Image.asset(
-                        assetPath!,
-                        width: 37,
-                        height: 37,
-                        fit: BoxFit.contain,
-                        filterQuality: FilterQuality.high,
-                      )
-                    : Icon(icon, size: 28, color: const Color(0xFF243451)),
-              ),
+              assetPath != null
+                  ? Image.asset(
+                      assetPath!,
+                      width: 32,
+                      height: 32,
+                      fit: BoxFit.contain,
+                      filterQuality: FilterQuality.high,
+                    )
+                  : Icon(icon, size: 25, color: const Color(0xFF243451)),
               if (badgeCount > 0)
                 Positioned(
                   right: 0,
@@ -2258,21 +2889,6 @@ class _ApartmentRailButton extends StatelessWidget {
                     ),
                   ),
                 ),
-              if (disabled)
-                Container(
-                  width: 19,
-                  height: 19,
-                  decoration: BoxDecoration(
-                    color: const Color(0xE623314C),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: const Color(0xFFFFE7A8)),
-                  ),
-                  child: const Icon(
-                    Icons.lock_rounded,
-                    size: 11,
-                    color: Colors.white,
-                  ),
-                ),
             ],
           ),
         ),
@@ -2281,56 +2897,115 @@ class _ApartmentRailButton extends StatelessWidget {
   );
 }
 
-class _ApartmentRoomArrow extends StatelessWidget {
-  const _ApartmentRoomArrow({
-    required this.destination,
-    required this.flipHorizontally,
-    required this.onMove,
-  });
+class _ApartmentLocationDock extends StatelessWidget {
+  const _ApartmentLocationDock({required this.current, required this.onMove});
 
-  final _ApartmentPlace? destination;
-  final bool flipHorizontally;
+  final _ApartmentPlace current;
   final ValueChanged<_ApartmentPlace> onMove;
 
   @override
+  Widget build(BuildContext context) => SafeArea(
+    top: false,
+    child: Container(
+      key: const Key('apartment-location-dock'),
+      height: 58,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: const Color(0xF21B2639),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFD7A948), width: 1.4),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x73070A12),
+            blurRadius: 14,
+            offset: Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          for (final place in _ApartmentPlace.values)
+            Expanded(
+              child: _ApartmentLocationDockItem(
+                place: place,
+                selected: place == current,
+                onTap: () => onMove(place),
+              ),
+            ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _ApartmentLocationDockItem extends StatelessWidget {
+  const _ApartmentLocationDockItem({
+    required this.place,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final _ApartmentPlace place;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
   Widget build(BuildContext context) {
-    final target = destination;
-    final details = target == null
-        ? null
-        : _ApartmentPlaceDetails.forPlace(target);
-    final tooltip = details == null ? '더 이동할 방이 없어요' : '${details.title}으로 이동';
-    return Tooltip(
-      message: tooltip,
-      waitDuration: const Duration(milliseconds: 280),
-      child: Semantics(
-        button: true,
-        enabled: target != null,
-        label: tooltip,
-        child: Opacity(
-          opacity: target == null ? 0.22 : 1,
-          child: SizedBox.square(
-            dimension: 68,
-            child: Material(
-              color: Colors.transparent,
-              child: InkResponse(
-                key: details == null ? null : Key('apartment-go-${details.id}'),
-                onTap: target == null ? null : () => onMove(target),
-                radius: 34,
-                splashColor: const Color(0x44FFD76A),
-                highlightColor: Colors.transparent,
-                child: Center(
-                  child: Transform.flip(
-                    flipX: flipHorizontally,
-                    child: Image.asset(
-                      'assets/images/hud_clean_arrow_right.png',
-                      width: 56,
-                      height: 56,
-                      fit: BoxFit.contain,
-                      filterQuality: FilterQuality.high,
+    final details = _ApartmentPlaceDetails.forPlace(place);
+    return Semantics(
+      button: !selected,
+      selected: selected,
+      label: selected
+          ? '현재 장소 ${details.shortTitle}'
+          : '${details.shortTitle}으로 이동',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          key: Key(
+            selected
+                ? 'apartment-current-${details.id}'
+                : 'apartment-go-${details.id}',
+          ),
+          onTap: selected ? null : onTap,
+          borderRadius: BorderRadius.circular(13),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            decoration: BoxDecoration(
+              color: selected
+                  ? details.accent.withValues(alpha: 0.2)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(13),
+              border: selected
+                  ? Border.all(
+                      color: details.accent.withValues(alpha: 0.9),
+                      width: 1.2,
+                    )
+                  : null,
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  details.icon,
+                  size: 20,
+                  color: selected ? details.accent : const Color(0xFFDCE4F1),
+                ),
+                const SizedBox(height: 3),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    details.shortTitle,
+                    maxLines: 1,
+                    style: TextStyle(
+                      fontFamily: _hubDisplayFont,
+                      color: selected ? Colors.white : const Color(0xFFBAC4D4),
+                      fontSize: 7.8,
+                      height: 1,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
-              ),
+              ],
             ),
           ),
         ),
@@ -2392,8 +3067,8 @@ class _ApartmentPlaceDetails {
     _ApartmentPlace.bedroom => const _ApartmentPlaceDetails(
       id: 'bedroom',
       title: '프로젝트 데시멀 · 생활 라운지',
-      shortTitle: '생활 라운지',
-      hint: '공용 단말기 · 국가계좌 장부',
+      shortTitle: '라운지',
+      hint: '오늘의 동기 · 데시멀톡',
       assetPath:
           'assets/images/cinematic_soft_painted/decimal/bg_decimal_living_lounge_1999_v1.png',
       icon: Icons.bed_rounded,
@@ -2401,9 +3076,9 @@ class _ApartmentPlaceDetails {
     ),
     _ApartmentPlace.livingRoom => const _ApartmentPlaceDetails(
       id: 'living-room',
-      title: '프로젝트 데시멀 · 트레이딩 플로어',
+      title: '프로젝트 데시멀 · 투자실',
       shortTitle: '투자실',
-      hint: '동기 10명 · 운영관 · 운용 조직',
+      hint: '동기 10명 · 운영관 · 운용 회의',
       assetPath:
           'assets/images/cinematic_soft_painted/decimal/bg_decimal_trading_floor_dawn_2000_v1.png',
       icon: Icons.monitor_heart_rounded,
@@ -2411,9 +3086,9 @@ class _ApartmentPlaceDetails {
     ),
     _ApartmentPlace.kitchen => const _ApartmentPlaceDetails(
       id: 'kitchen',
-      title: '프로젝트 데시멀 · 기기 정비실',
-      shortTitle: '기기 정비실',
-      hint: '단말기 정비 · 통신 장비 · 공용 설비',
+      title: '프로젝트 데시멀 · 작업실',
+      shortTitle: '작업실',
+      hint: '공용 PC · 기기 정비 · 생활 설비',
       assetPath:
           'assets/images/cinematic_soft_painted/decimal/bg_decimal_electronics_workshop_2000_v1.png',
       icon: Icons.inventory_2_rounded,
@@ -2422,8 +3097,8 @@ class _ApartmentPlaceDetails {
     _ApartmentPlace.corridor => const _ApartmentPlaceDetails(
       id: 'corridor',
       title: '프로젝트 데시멀 · 기록 보관실',
-      shortTitle: '기록 보관실',
-      hint: '국가 회수금 · 선발 과정 · 봉인 안건',
+      shortTitle: '기록실',
+      hint: '국가계좌 장부 · 안건 · 봉인 기록',
       assetPath:
           'assets/images/cinematic_soft_painted/decimal/bg_decimal_records_archive_2000_v1.png',
       icon: Icons.folder_copy_rounded,

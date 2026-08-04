@@ -7,6 +7,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show debugPaintBaselinesEnabled;
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -16,6 +17,7 @@ import 'game/business_districts.dart';
 import 'game/business_engine.dart';
 import 'game/business_simulation.dart';
 import 'game/business_state.dart';
+import 'character_liveliness_view.dart';
 import 'game/character_profile.dart';
 import 'game/cohort_investment_state.dart';
 import 'game/game_engine.dart';
@@ -105,9 +107,13 @@ Route<T> _gameSceneRoute<T>(Widget page) => PageRouteBuilder<T>(
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  // Never leak Flutter's green/orange text-baseline diagnostics into the
+  // player-facing Web canvas, even if a connected inspector enabled them.
+  debugPaintBaselinesEnabled = false;
   runApp(
     MillenniumCapitalApp(
       stockTestMode: Uri.base.queryParameters['stockTest'] == '1',
+      hubPreviewMode: Uri.base.queryParameters['hubPreview'] == '1',
       dialoguePreviewMode: Uri.base.queryParameters['dialoguePreview'] == '1',
     ),
   );
@@ -132,6 +138,7 @@ class MillenniumCapitalApp extends StatefulWidget {
     this.persistence,
     this.campaignWorldPreparer,
     this.stockTestMode = false,
+    this.hubPreviewMode = false,
     this.dialoguePreviewMode = false,
     this.dialogueOverrideJson,
   });
@@ -139,6 +146,7 @@ class MillenniumCapitalApp extends StatefulWidget {
   final GamePersistence? persistence;
   final CampaignWorldPreparer? campaignWorldPreparer;
   final bool stockTestMode;
+  final bool hubPreviewMode;
   final bool dialoguePreviewMode;
   final String? dialogueOverrideJson;
 
@@ -181,6 +189,40 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
   void initState() {
     super.initState();
     _persistence = widget.persistence ?? GamePersistence();
+    if (widget.hubPreviewMode) {
+      final previewStory = StoryState.newDecimalPlayer(
+        playerName: '민재',
+        introChoice: 'stocks',
+        startingTrait: StoryTrait.analysis,
+        operatingPrinciple: OperatingPrinciple.reportLosses,
+      );
+      final previewState = _engine.createNewGame(
+        '데시멀 로비 검수',
+        story: previewStory.copyWith(
+          storyFlags: {...previewStory.storyFlags, 'hubTutorialSeen': true},
+        ),
+        worldSeed: 'daily-lobby-preview-v1',
+      );
+      _state = previewState.copyWith(
+        day: 4,
+        marketMinute: 17 * 60 + 40,
+        decisions: const [],
+        relationships: RelationshipState(
+          girls: {
+            for (final profile in cohortGirlProfiles)
+              profile.id: const GirlRelationshipProgress(
+                affection: 65,
+                trust: 65,
+                closeness: 65,
+                investmentRespect: 65,
+              ),
+          },
+        ),
+      );
+      _view = _AppView.game;
+      _isReady = true;
+      return;
+    }
     if (widget.stockTestMode) {
       final testState = _engine.createNewGame(
         '주식시장 테스트',
@@ -1555,6 +1597,33 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     );
   }
 
+  Widget _buildHubPreviewHome() {
+    return _GameFrame(
+      child: ApartmentHubScreen(
+        key: const Key('hub-preview-screen'),
+        state: _state!,
+        onOpenMarket: () {},
+        onOpenRealEstate: () {},
+        onOpenBank: () {},
+        onOpenDecisions: () {},
+        onOpenLedger: () {},
+        onOpenOrganization: () {},
+        onOpenRelationships: () {},
+        onOpenMessenger: () {},
+        onOpenCalendar: () {},
+        onOpenHomeImprovements: () {},
+        onOpenWork: () {},
+        activeSaveSlot: 1,
+        lastSavedAt: null,
+        onOpenGameMenu: () {},
+        onAdvanceHour: () {},
+        onAdvanceDay: () {},
+        onAdvanceBatch: () {},
+        onOpenEnding: () {},
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -1589,7 +1658,9 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
           ),
         ),
       ),
-      home: widget.stockTestMode && _state != null
+      home: widget.hubPreviewMode && _state != null
+          ? _buildHubPreviewHome()
+          : widget.stockTestMode && _state != null
           ? _buildStockTestHome()
           : !_isReady
           ? _GameFrame(
