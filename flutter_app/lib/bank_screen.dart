@@ -704,6 +704,8 @@ class _BankConsultationPanel extends StatelessWidget {
     required this.onTakeLoan,
     required this.onRepayLoan,
     required this.onTalk,
+    this.tutorialTermKey,
+    this.tutorialOpenKey,
   });
 
   final GameState state;
@@ -720,6 +722,8 @@ class _BankConsultationPanel extends StatelessWidget {
   final VoidCallback onTakeLoan;
   final ValueChanged<BankUnsecuredLoan> onRepayLoan;
   final VoidCallback onTalk;
+  final GlobalKey? tutorialTermKey;
+  final GlobalKey? tutorialOpenKey;
 
   @override
   Widget build(BuildContext context) {
@@ -825,6 +829,8 @@ class _BankConsultationPanel extends StatelessWidget {
                     onTermChanged: onDepositTermChanged,
                     onOpen: onOpenDeposit,
                     onRedeem: onRedeemDeposit,
+                    tutorialTermKey: tutorialTermKey,
+                    tutorialOpenKey: tutorialOpenKey,
                   )
                 : _BankLoanDesk(
                     state: state,
@@ -850,6 +856,8 @@ class _BankDepositDesk extends StatelessWidget {
     required this.onTermChanged,
     required this.onOpen,
     required this.onRedeem,
+    this.tutorialTermKey,
+    this.tutorialOpenKey,
   });
 
   final GameState state;
@@ -858,6 +866,8 @@ class _BankDepositDesk extends StatelessWidget {
   final ValueChanged<int> onTermChanged;
   final VoidCallback onOpen;
   final ValueChanged<BankTermDeposit> onRedeem;
+  final GlobalKey? tutorialTermKey;
+  final GlobalKey? tutorialOpenKey;
 
   @override
   Widget build(BuildContext context) {
@@ -889,34 +899,37 @@ class _BankDepositDesk extends StatelessWidget {
                 return Expanded(
                   child: Padding(
                     padding: EdgeInsets.only(right: months == 24 ? 0 : 6),
-                    child: ChoiceChip(
-                      key: Key('bank-deposit-term-$months'),
-                      label: SizedBox(
-                        width: double.infinity,
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text('$months개월'),
-                            Text(
-                              '게임 기준금리 ${(rate * 100).toStringAsFixed(2)}%',
-                              style: const TextStyle(
-                                fontSize: 7.7,
-                                fontWeight: FontWeight.w800,
+                    child: KeyedSubtree(
+                      key: months == 12 ? tutorialTermKey : null,
+                      child: ChoiceChip(
+                        key: Key('bank-deposit-term-$months'),
+                        label: SizedBox(
+                          width: double.infinity,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text('$months개월'),
+                              Text(
+                                '게임 기준금리 ${(rate * 100).toStringAsFixed(2)}%',
+                                style: const TextStyle(
+                                  fontSize: 7.7,
+                                  fontWeight: FontWeight.w800,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                      selected: selected,
-                      onSelected: busy ? null : (_) => onTermChanged(months),
-                      selectedColor: const Color(0xFFCDE7DE),
-                      labelStyle: const TextStyle(
-                        color: _ink,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w900,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(11),
+                        selected: selected,
+                        onSelected: busy ? null : (_) => onTermChanged(months),
+                        selectedColor: const Color(0xFFCDE7DE),
+                        labelStyle: const TextStyle(
+                          color: _ink,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(11),
+                        ),
                       ),
                     ),
                   ),
@@ -925,23 +938,26 @@ class _BankDepositDesk extends StatelessWidget {
               .toList(growable: false),
         ),
         const SizedBox(height: 7),
-        SizedBox(
-          height: 43,
-          child: FilledButton.icon(
-            key: const Key('bank-open-deposit'),
-            onPressed: busy || state.bankCash <= 0 ? null : onOpen,
-            icon: const Icon(Icons.add_card_rounded, size: 18),
-            label: Text(
-              '$selectedTerm개월 · 게임 기준금리 '
-              '${(bankTermDepositAnnualRateAt(state.currentDate, selectedTerm, cashManagementSkill: state.progression.hasSkill('cash_management')) * 100).toStringAsFixed(2)}% 가입',
-            ),
-            style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF2D7A67),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(13),
+        KeyedSubtree(
+          key: tutorialOpenKey,
+          child: SizedBox(
+            height: 43,
+            child: FilledButton.icon(
+              key: const Key('bank-open-deposit'),
+              onPressed: busy || state.bankCash <= 0 ? null : onOpen,
+              icon: const Icon(Icons.add_card_rounded, size: 18),
+              label: Text(
+                '$selectedTerm개월 · 게임 기준금리 '
+                '${(bankTermDepositAnnualRateAt(state.currentDate, selectedTerm, cashManagementSkill: state.progression.hasSkill('cash_management')) * 100).toStringAsFixed(2)}% 가입',
               ),
-              textStyle: const TextStyle(fontWeight: FontWeight.w900),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF2D7A67),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                textStyle: const TextStyle(fontWeight: FontWeight.w900),
+              ),
             ),
           ),
         ),

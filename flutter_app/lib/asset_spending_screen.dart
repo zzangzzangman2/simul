@@ -29,6 +29,7 @@ class AssetSpendingScreen extends StatefulWidget {
     this.onRenewMonthlyLease,
     this.onTerminateMonthlyLeaseEarly,
     this.realEstateOnly = false,
+    this.onCompleteTutorial,
   });
 
   final GameState state;
@@ -61,6 +62,7 @@ class AssetSpendingScreen extends StatefulWidget {
   final Future<FinanceActionResult> Function(String assetId)?
   onTerminateMonthlyLeaseEarly;
   final bool realEstateOnly;
+  final Future<GameState> Function()? onCompleteTutorial;
 
   @override
   State<AssetSpendingScreen> createState() => _AssetSpendingScreenState();
@@ -75,6 +77,77 @@ class _AssetSpendingScreenState extends State<AssetSpendingScreen> {
   _RealtorMood _realtorMood = _RealtorMood.welcome;
   bool _realtorGuideVisible = true;
   final Map<String, String> _realEstateNotes = <String, String>{};
+  int? _tutorialStep;
+  bool _tutorialCompleting = false;
+  final GlobalKey _realEstateFinanceTutorialKey = GlobalKey();
+  final GlobalKey _realEstateMarketTutorialKey = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.realEstateOnly &&
+        widget.onCompleteTutorial != null &&
+        !_state.story.realEstateTutorialSeen) {
+      _tutorialStep = 0;
+      _realtorGuideVisible = false;
+      _realtorMood = _RealtorMood.welcome;
+    }
+  }
+
+  GlobalKey? get _tutorialTargetKey => switch (_tutorialStep) {
+    1 => _realEstateMarketTutorialKey,
+    2 => _realEstateFinanceTutorialKey,
+    _ => null,
+  };
+
+  void _advanceRealEstateTutorial() {
+    final step = _tutorialStep;
+    if (step == null || _tutorialCompleting) return;
+    if (step >= 5) {
+      unawaited(_completeRealEstateTutorial());
+      return;
+    }
+    final nextStep = step + 1;
+    setState(() {
+      _tutorialStep = nextStep;
+      _realtorMood = switch (nextStep) {
+        1 => _RealtorMood.explain,
+        2 => _RealtorMood.finance,
+        3 => _RealtorMood.concerned,
+        4 => _RealtorMood.negotiate,
+        _ => _RealtorMood.approve,
+      };
+    });
+  }
+
+  Future<void> _completeRealEstateTutorial() async {
+    if (_tutorialCompleting) return;
+    final complete = widget.onCompleteTutorial;
+    if (complete == null) {
+      if (mounted) setState(() => _tutorialStep = null);
+      return;
+    }
+    setState(() => _tutorialCompleting = true);
+    try {
+      final next = await complete();
+      if (!mounted) return;
+      setState(() {
+        _state = next;
+        _tutorialStep = null;
+        _tutorialCompleting = false;
+        _realtorMood = _RealtorMood.approve;
+        _realtorGuideVisible = true;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _tutorialCompleting = false);
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('부동산 튜토리얼 저장에 실패했습니다. 다시 시도해 주세요.')),
+        );
+    }
+  }
 
   void _showRealtorMood(_RealtorMood mood) {
     if (!widget.realEstateOnly || !mounted) return;
