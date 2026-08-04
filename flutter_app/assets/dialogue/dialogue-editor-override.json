@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "contentVersion": 4,
+  "contentVersion": 5,
   "appearanceVersion": 19,
-  "updatedAt": "2026-08-04T01:42:48.067Z",
+  "updatedAt": "2026-08-04T08:53:54.470Z",
   "scenes": [
     {
       "id": "decimal-001",
@@ -1232,7 +1232,30 @@
       "character": "/play/assets/assets/images/production_soft_painted/kim_hakjun/04_surprised_hidden_clause_uniform_v4.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "choices": [
+        {
+          "id": "voice_loophole",
+          "label": "규칙에 안 적힌 걸 그대로 읽어 준다",
+          "targetSceneId": "",
+          "condition": "",
+          "effects": "decimalVoice=loophole"
+        },
+        {
+          "id": "voice_together",
+          "label": "열한 명 이름을 하나씩 부른다",
+          "targetSceneId": "",
+          "condition": "",
+          "effects": "decimalVoice=together"
+        },
+        {
+          "id": "voice_consent",
+          "label": "거절할 사람이 있는지 먼저 묻는다",
+          "targetSceneId": "",
+          "condition": "",
+          "effects": "decimalVoice=consent"
+        }
+      ]
     },
     {
       "id": "decimal-083",
@@ -1255,6 +1278,54 @@
       "chapter": "4장 · 불공정한 게임",
       "date": "1999.08.09 · 14:20",
       "location": "정부 임시 관찰실 · 2차 선발",
+      "speaker": "오지우",
+      "direction": "",
+      "line": "규칙을 읽어서 규칙을 이겼습니다. 제가 하려던 걸 먼저 하셨네요. 다음엔 제 몫도 남겨 주십시오.",
+      "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_unfair_game_1999_v1.png",
+      "character": "/play/assets/assets/images/production_soft_painted/oh_jiwoo/04_playful_counterpoint_v1.png",
+      "characterX": 0,
+      "characterY": 0,
+      "characterScale": 1,
+      "condition": "decimalVoice == loophole"
+    },
+    {
+      "id": "decimal-085",
+      "order": 85,
+      "chapter": "4장 · 불공정한 게임",
+      "date": "1999.08.09 · 14:20",
+      "location": "정부 임시 관찰실 · 2차 선발",
+      "speaker": "박하은",
+      "direction": "",
+      "line": "이름을 하나씩 부르니까 아무도 숫자가 안 됐어. 그게 제일 어려운 거야. 나는 그게 좋았어.",
+      "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_unfair_game_1999_v1.png",
+      "character": "/play/assets/assets/images/production_soft_painted/park_haeun/02_bright_smile_wave_v2.png",
+      "characterX": 0,
+      "characterY": 0,
+      "characterScale": 1,
+      "condition": "decimalVoice == together"
+    },
+    {
+      "id": "decimal-086",
+      "order": 86,
+      "chapter": "4장 · 불공정한 게임",
+      "date": "1999.08.09 · 14:20",
+      "location": "정부 임시 관찰실 · 2차 선발",
+      "speaker": "김서아",
+      "direction": "",
+      "line": "거절할 사람을 먼저 물어본 걸 적어 둘게. 나중에 우리가 잘돼도 오늘 그걸 물었다는 건 안 바뀌니까.",
+      "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_unfair_game_1999_v1.png",
+      "character": "/play/assets/assets/images/production_soft_painted/kim_seoa/09_explaining_ledger_v1.png",
+      "characterX": 0,
+      "characterY": 0,
+      "characterScale": 1,
+      "condition": "decimalVoice == consent"
+    },
+    {
+      "id": "decimal-087",
+      "order": 87,
+      "chapter": "4장 · 불공정한 게임",
+      "date": "1999.08.09 · 14:20",
+      "location": "정부 임시 관찰실 · 2차 선발",
       "speaker": "윤채아",
       "direction": "",
       "line": "문장만 보면 가능해. 다만 평가자가 단독 소유를 의도했다고 우길 수 있어.",
@@ -1265,8 +1336,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-085",
-      "order": 85,
+      "id": "decimal-088",
+      "order": 88,
       "chapter": "4장 · 불공정한 게임",
       "date": "1999.08.09 · 14:20",
       "location": "정부 임시 관찰실 · 2차 선발",
@@ -1280,8 +1351,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-086",
-      "order": 86,
+      "id": "decimal-089",
+      "order": 89,
       "chapter": "4장 · 불공정한 게임",
       "date": "1999.08.09 · 14:20",
       "location": "정부 임시 관찰실 · 2차 선발",
@@ -1295,8 +1366,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-087",
-      "order": 87,
+      "id": "decimal-090",
+      "order": 90,
       "chapter": "4장 · 불공정한 게임",
       "date": "1999.08.09 · 14:20",
       "location": "정부 임시 관찰실 · 2차 선발",
@@ -1310,8 +1381,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-088",
-      "order": 88,
+      "id": "decimal-091",
+      "order": 91,
       "chapter": "4장 · 불공정한 게임",
       "date": "1999.08.09 · 14:20",
       "location": "정부 임시 관찰실 · 2차 선발",
@@ -1325,8 +1396,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-089",
-      "order": 89,
+      "id": "decimal-092",
+      "order": 92,
       "chapter": "4장 · 불공정한 게임",
       "date": "1999.08.09 · 14:20",
       "location": "정부 임시 관찰실 · 2차 선발",
@@ -1340,8 +1411,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-090",
-      "order": 90,
+      "id": "decimal-093",
+      "order": 93,
       "chapter": "4장 · 불공정한 게임",
       "date": "1999.08.09 · 14:20",
       "location": "정부 임시 관찰실 · 2차 선발",
@@ -1355,8 +1426,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-091",
-      "order": 91,
+      "id": "decimal-094",
+      "order": 94,
       "chapter": "4장 · 불공정한 게임",
       "date": "1999.08.09 · 14:20",
       "location": "정부 임시 관찰실 · 2차 선발",
@@ -1370,8 +1441,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-092",
-      "order": 92,
+      "id": "decimal-095",
+      "order": 95,
       "chapter": "4장 · 불공정한 게임",
       "date": "1999.08.09 · 14:20",
       "location": "정부 임시 관찰실 · 2차 선발",
@@ -1385,8 +1456,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-093",
-      "order": 93,
+      "id": "decimal-096",
+      "order": 96,
       "chapter": "4장 · 불공정한 게임",
       "date": "1999.08.09 · 14:20",
       "location": "정부 임시 관찰실 · 2차 선발",
@@ -1400,8 +1471,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-094",
-      "order": 94,
+      "id": "decimal-097",
+      "order": 97,
       "chapter": "4장 · 불공정한 게임",
       "date": "1999.08.09 · 14:20",
       "location": "정부 임시 관찰실 · 2차 선발",
@@ -1415,8 +1486,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-095",
-      "order": 95,
+      "id": "decimal-098",
+      "order": 98,
       "chapter": "4장 · 불공정한 게임",
       "date": "1999.08.09 · 14:20",
       "location": "정부 임시 관찰실 · 2차 선발",
@@ -1430,8 +1501,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-096",
-      "order": 96,
+      "id": "decimal-099",
+      "order": 99,
       "chapter": "5장 · 무엇을 원하는 아이들인가",
       "date": "1999.10.23 · 18:10",
       "location": "비공개 식당 · 3차 선발",
@@ -1445,8 +1516,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-097",
-      "order": 97,
+      "id": "decimal-100",
+      "order": 100,
       "chapter": "5장 · 무엇을 원하는 아이들인가",
       "date": "1999.10.23 · 18:10",
       "location": "비공개 식당 · 3차 선발",
@@ -1460,8 +1531,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-098",
-      "order": 98,
+      "id": "decimal-101",
+      "order": 101,
       "chapter": "5장 · 무엇을 원하는 아이들인가",
       "date": "1999.10.23 · 18:10",
       "location": "비공개 식당 · 3차 선발",
@@ -1475,8 +1546,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-099",
-      "order": 99,
+      "id": "decimal-102",
+      "order": 102,
       "chapter": "5장 · 무엇을 원하는 아이들인가",
       "date": "1999.10.23 · 18:10",
       "location": "비공개 식당 · 3차 선발",
@@ -1490,8 +1561,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-100",
-      "order": 100,
+      "id": "decimal-103",
+      "order": 103,
       "chapter": "5장 · 무엇을 원하는 아이들인가",
       "date": "1999.10.23 · 18:10",
       "location": "비공개 식당 · 3차 선발",
@@ -1505,8 +1576,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-101",
-      "order": 101,
+      "id": "decimal-104",
+      "order": 104,
       "chapter": "5장 · 무엇을 원하는 아이들인가",
       "date": "1999.10.23 · 18:10",
       "location": "비공개 식당 · 3차 선발",
@@ -1517,11 +1588,82 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "choices": [
+        {
+          "id": "desire_meal",
+          "label": "그래도 내 몫은 따뜻한 한 끼",
+          "targetSceneId": "",
+          "condition": "",
+          "effects": "decimalDesire=meal"
+        },
+        {
+          "id": "desire_envelope",
+          "label": "나는 저축 봉투를 고른다",
+          "targetSceneId": "",
+          "condition": "",
+          "effects": "decimalDesire=envelope"
+        },
+        {
+          "id": "desire_none",
+          "label": "나는 아무것도 고르지 않는다",
+          "targetSceneId": "",
+          "condition": "",
+          "effects": "decimalDesire=none"
+        }
+      ]
     },
     {
-      "id": "decimal-102",
-      "order": 102,
+      "id": "decimal-105",
+      "order": 105,
+      "chapter": "5장 · 무엇을 원하는 아이들인가",
+      "date": "1999.10.23 · 18:10",
+      "location": "비공개 식당 · 3차 선발",
+      "speaker": "차은주 선발관",
+      "direction": "",
+      "line": "배고픔을 참지 않은 걸 기록합니다. 그게 감점이 아니라는 걸 확인시켜 드리려고 만든 시험입니다.",
+      "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_desire_test_1999_v1.png",
+      "character": "/play/assets/assets/images/cinematic_soft_painted/decimal_nis_1999/characters/cha_eunjoo_selection_officer_v2.png",
+      "characterX": 0,
+      "characterY": 0,
+      "characterScale": 1,
+      "condition": "decimalDesire == meal"
+    },
+    {
+      "id": "decimal-106",
+      "order": 106,
+      "chapter": "5장 · 무엇을 원하는 아이들인가",
+      "date": "1999.10.23 · 18:10",
+      "location": "비공개 식당 · 3차 선발",
+      "speaker": "윤채아",
+      "direction": "",
+      "line": "봉투를 고른 이유에 날짜를 같이 적어 둬. 그냥 모으기만 하면 선택을 미룬 거야. 나도 그럴 뻔했어.",
+      "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_desire_test_1999_v1.png",
+      "character": "/play/assets/assets/images/production_soft_painted/yoon_chaea/09_explaining_v1.png",
+      "characterX": 0,
+      "characterY": 0,
+      "characterScale": 1,
+      "condition": "decimalDesire == envelope"
+    },
+    {
+      "id": "decimal-107",
+      "order": 107,
+      "chapter": "5장 · 무엇을 원하는 아이들인가",
+      "date": "1999.10.23 · 18:10",
+      "location": "비공개 식당 · 3차 선발",
+      "speaker": "조민경 권익감사관",
+      "direction": "",
+      "line": "아무것도 고르지 않을 권리까지 있어야 시험입니다. 다만 참은 것을 미덕으로 적지는 않겠습니다.",
+      "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_desire_test_1999_v1.png",
+      "character": "/play/assets/assets/images/cinematic_soft_painted/decimal_nis_1999/characters/jo_mingyeong_rights_auditor_v1.png",
+      "characterX": 0,
+      "characterY": 0,
+      "characterScale": 1,
+      "condition": "decimalDesire == none"
+    },
+    {
+      "id": "decimal-108",
+      "order": 108,
       "chapter": "5장 · 무엇을 원하는 아이들인가",
       "date": "1999.10.23 · 18:10",
       "location": "비공개 식당 · 3차 선발",
@@ -1535,8 +1677,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-103",
-      "order": 103,
+      "id": "decimal-109",
+      "order": 109,
       "chapter": "5장 · 무엇을 원하는 아이들인가",
       "date": "1999.10.23 · 18:10",
       "location": "비공개 식당 · 3차 선발",
@@ -1550,8 +1692,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-104",
-      "order": 104,
+      "id": "decimal-110",
+      "order": 110,
       "chapter": "5장 · 무엇을 원하는 아이들인가",
       "date": "1999.10.23 · 18:10",
       "location": "비공개 식당 · 3차 선발",
@@ -1565,8 +1707,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-105",
-      "order": 105,
+      "id": "decimal-111",
+      "order": 111,
       "chapter": "5장 · 무엇을 원하는 아이들인가",
       "date": "1999.10.23 · 18:10",
       "location": "비공개 식당 · 3차 선발",
@@ -1580,8 +1722,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-106",
-      "order": 106,
+      "id": "decimal-112",
+      "order": 112,
       "chapter": "5장 · 무엇을 원하는 아이들인가",
       "date": "1999.10.23 · 18:10",
       "location": "비공개 식당 · 3차 선발",
@@ -1595,8 +1737,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-107",
-      "order": 107,
+      "id": "decimal-113",
+      "order": 113,
       "chapter": "5장 · 무엇을 원하는 아이들인가",
       "date": "1999.10.23 · 18:10",
       "location": "비공개 식당 · 3차 선발",
@@ -1610,8 +1752,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-108",
-      "order": 108,
+      "id": "decimal-114",
+      "order": 114,
       "chapter": "5장 · 무엇을 원하는 아이들인가",
       "date": "1999.10.23 · 18:10",
       "location": "비공개 식당 · 3차 선발",
@@ -1625,8 +1767,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-109",
-      "order": 109,
+      "id": "decimal-115",
+      "order": 115,
       "chapter": "5장 · 무엇을 원하는 아이들인가",
       "date": "1999.10.23 · 18:10",
       "location": "비공개 식당 · 3차 선발",
@@ -1640,8 +1782,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-110",
-      "order": 110,
+      "id": "decimal-116",
+      "order": 116,
       "chapter": "5장 · 무엇을 원하는 아이들인가",
       "date": "1999.10.23 · 18:10",
       "location": "비공개 식당 · 3차 선발",
@@ -1655,8 +1797,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-111",
-      "order": 111,
+      "id": "decimal-117",
+      "order": 117,
       "chapter": "5장 · 무엇을 원하는 아이들인가",
       "date": "1999.10.23 · 18:10",
       "location": "비공개 식당 · 3차 선발",
@@ -1670,8 +1812,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-112",
-      "order": 112,
+      "id": "decimal-118",
+      "order": 118,
       "chapter": "5장 · 무엇을 원하는 아이들인가",
       "date": "1999.10.23 · 18:10",
       "location": "비공개 식당 · 3차 선발",
@@ -1685,8 +1827,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-113",
-      "order": 113,
+      "id": "decimal-119",
+      "order": 119,
       "chapter": "5장 · 무엇을 원하는 아이들인가",
       "date": "1999.10.23 · 18:10",
       "location": "비공개 식당 · 3차 선발",
@@ -1700,8 +1842,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-114",
-      "order": 114,
+      "id": "decimal-120",
+      "order": 120,
       "chapter": "5장 · 무엇을 원하는 아이들인가",
       "date": "1999.10.23 · 18:10",
       "location": "비공개 식당 · 3차 선발",
@@ -1715,8 +1857,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-115",
-      "order": 115,
+      "id": "decimal-121",
+      "order": 121,
       "chapter": "5장 · 무엇을 원하는 아이들인가",
       "date": "1999.10.23 · 18:10",
       "location": "비공개 식당 · 3차 선발",
@@ -1730,8 +1872,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-116",
-      "order": 116,
+      "id": "decimal-122",
+      "order": 122,
       "chapter": "5장 · 무엇을 원하는 아이들인가",
       "date": "1999.10.23 · 18:10",
       "location": "비공개 식당 · 3차 선발",
@@ -1745,8 +1887,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-117",
-      "order": 117,
+      "id": "decimal-123",
+      "order": 123,
       "chapter": "5장 · 무엇을 원하는 아이들인가",
       "date": "1999.10.23 · 18:10",
       "location": "비공개 식당 · 3차 선발",
@@ -1760,8 +1902,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-118",
-      "order": 118,
+      "id": "decimal-124",
+      "order": 124,
       "chapter": "5장 · 무엇을 원하는 아이들인가",
       "date": "1999.10.23 · 18:10",
       "location": "비공개 식당 · 3차 선발",
@@ -1775,8 +1917,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-119",
-      "order": 119,
+      "id": "decimal-125",
+      "order": 125,
       "chapter": "5장 · 무엇을 원하는 아이들인가",
       "date": "1999.10.23 · 18:10",
       "location": "비공개 식당 · 3차 선발",
@@ -1790,8 +1932,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-120",
-      "order": 120,
+      "id": "decimal-126",
+      "order": 126,
       "chapter": "5장 · 무엇을 원하는 아이들인가",
       "date": "1999.10.23 · 18:10",
       "location": "비공개 식당 · 3차 선발",
@@ -1805,8 +1947,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-121",
-      "order": 121,
+      "id": "decimal-127",
+      "order": 127,
       "chapter": "5장 · 무엇을 원하는 아이들인가",
       "date": "1999.10.23 · 18:10",
       "location": "비공개 식당 · 3차 선발",
@@ -1820,8 +1962,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-122",
-      "order": 122,
+      "id": "decimal-128",
+      "order": 128,
       "chapter": "6장 · 눈 내리는 강남의 열 명",
       "date": "1999.12.31 · 21:47",
       "location": "서울 강남 · 무표지 건물 앞",
@@ -1835,8 +1977,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-123",
-      "order": 123,
+      "id": "decimal-129",
+      "order": 129,
       "chapter": "6장 · 눈 내리는 강남의 열 명",
       "date": "1999.12.31 · 21:47",
       "location": "서울 강남 · 무표지 건물 앞",
@@ -1850,8 +1992,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-124",
-      "order": 124,
+      "id": "decimal-130",
+      "order": 130,
       "chapter": "6장 · 눈 내리는 강남의 열 명",
       "date": "1999.12.31 · 21:47",
       "location": "서울 강남 · 무표지 건물 앞",
@@ -1865,8 +2007,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-125",
-      "order": 125,
+      "id": "decimal-131",
+      "order": 131,
       "chapter": "6장 · 눈 내리는 강남의 열 명",
       "date": "1999.12.31 · 21:47",
       "location": "서울 강남 · 무표지 건물 앞",
@@ -1880,8 +2022,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-126",
-      "order": 126,
+      "id": "decimal-132",
+      "order": 132,
       "chapter": "6장 · 눈 내리는 강남의 열 명",
       "date": "1999.12.31 · 21:47",
       "location": "서울 강남 · 무표지 건물 앞",
@@ -1895,8 +2037,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-127",
-      "order": 127,
+      "id": "decimal-133",
+      "order": 133,
       "chapter": "6장 · 눈 내리는 강남의 열 명",
       "date": "1999.12.31 · 21:47",
       "location": "서울 강남 · 무표지 건물 앞",
@@ -1910,8 +2052,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-128",
-      "order": 128,
+      "id": "decimal-134",
+      "order": 134,
       "chapter": "6장 · 눈 내리는 강남의 열 명",
       "date": "1999.12.31 · 21:55",
       "location": "데시멀 센터 · 보안 입구",
@@ -1925,8 +2067,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-129",
-      "order": 129,
+      "id": "decimal-135",
+      "order": 135,
       "chapter": "6장 · 눈 내리는 강남의 열 명",
       "date": "1999.12.31 · 21:55",
       "location": "데시멀 센터 · 보안 입구",
@@ -1940,8 +2082,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-130",
-      "order": 130,
+      "id": "decimal-136",
+      "order": 136,
       "chapter": "6장 · 눈 내리는 강남의 열 명",
       "date": "1999.12.31 · 21:55",
       "location": "데시멀 센터 · 보안 입구",
@@ -1955,8 +2097,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-131",
-      "order": 131,
+      "id": "decimal-137",
+      "order": 137,
       "chapter": "6장 · 눈 내리는 강남의 열 명",
       "date": "1999.12.31 · 21:55",
       "location": "데시멀 센터 · 보안 입구",
@@ -1970,8 +2112,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-132",
-      "order": 132,
+      "id": "decimal-138",
+      "order": 138,
       "chapter": "6장 · 눈 내리는 강남의 열 명",
       "date": "1999.12.31 · 21:55",
       "location": "데시멀 센터 · 보안 입구",
@@ -1985,8 +2127,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-133",
-      "order": 133,
+      "id": "decimal-139",
+      "order": 139,
       "chapter": "6장 · 눈 내리는 강남의 열 명",
       "date": "1999.12.31 · 21:55",
       "location": "데시멀 센터 · 보안 입구",
@@ -2000,8 +2142,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-134",
-      "order": 134,
+      "id": "decimal-140",
+      "order": 140,
       "chapter": "6장 · 눈 내리는 강남의 열 명",
       "date": "1999.12.31 · 21:55",
       "location": "데시멀 센터 · 보안 입구",
@@ -2015,8 +2157,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-135",
-      "order": 135,
+      "id": "decimal-141",
+      "order": 141,
       "chapter": "6장 · 눈 내리는 강남의 열 명",
       "date": "1999.12.31 · 21:55",
       "location": "데시멀 센터 · 보안 입구",
@@ -2030,8 +2172,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-136",
-      "order": 136,
+      "id": "decimal-142",
+      "order": 142,
       "chapter": "6장 · 눈 내리는 강남의 열 명",
       "date": "1999.12.31 · 21:55",
       "location": "데시멀 센터 · 보안 입구",
@@ -2045,8 +2187,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-137",
-      "order": 137,
+      "id": "decimal-143",
+      "order": 143,
       "chapter": "6장 · 눈 내리는 강남의 열 명",
       "date": "1999.12.31 · 21:55",
       "location": "데시멀 센터 · 보안 입구",
@@ -2060,8 +2202,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-138",
-      "order": 138,
+      "id": "decimal-144",
+      "order": 144,
       "chapter": "6장 · 눈 내리는 강남의 열 명",
       "date": "1999.12.31 · 21:55",
       "location": "데시멀 센터 · 보안 입구",
@@ -2075,8 +2217,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-139",
-      "order": 139,
+      "id": "decimal-145",
+      "order": 145,
       "chapter": "6장 · 눈 내리는 강남의 열 명",
       "date": "1999.12.31 · 21:55",
       "location": "데시멀 센터 · 보안 입구",
@@ -2090,8 +2232,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-140",
-      "order": 140,
+      "id": "decimal-146",
+      "order": 146,
       "chapter": "6장 · 눈 내리는 강남의 열 명",
       "date": "1999.12.31 · 21:55",
       "location": "데시멀 센터 · 보안 입구",
@@ -2105,8 +2247,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-141",
-      "order": 141,
+      "id": "decimal-147",
+      "order": 147,
       "chapter": "6장 · 눈 내리는 강남의 열 명",
       "date": "1999.12.31 · 21:55",
       "location": "데시멀 센터 · 보안 입구",
@@ -2120,8 +2262,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-142",
-      "order": 142,
+      "id": "decimal-148",
+      "order": 148,
       "chapter": "6장 · 눈 내리는 강남의 열 명",
       "date": "1999.12.31 · 21:55",
       "location": "데시멀 센터 · 보안 입구",
@@ -2135,8 +2277,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-143",
-      "order": 143,
+      "id": "decimal-149",
+      "order": 149,
       "chapter": "6장 · 눈 내리는 강남의 열 명",
       "date": "1999.12.31 · 21:55",
       "location": "데시멀 센터 · 보안 입구",
@@ -2150,8 +2292,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-144",
-      "order": 144,
+      "id": "decimal-150",
+      "order": 150,
       "chapter": "6장 · 눈 내리는 강남의 열 명",
       "date": "1999.12.31 · 21:55",
       "location": "데시멀 센터 · 보안 입구",
@@ -2165,8 +2307,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-145",
-      "order": 145,
+      "id": "decimal-151",
+      "order": 151,
       "chapter": "6장 · 눈 내리는 강남의 열 명",
       "date": "1999.12.31 · 21:55",
       "location": "데시멀 센터 · 보안 입구",
@@ -2180,8 +2322,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-146",
-      "order": 146,
+      "id": "decimal-152",
+      "order": 152,
       "chapter": "6장 · 눈 내리는 강남의 열 명",
       "date": "1999.12.31 · 21:55",
       "location": "데시멀 센터 · 보안 입구",
@@ -2195,8 +2337,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-147",
-      "order": 147,
+      "id": "decimal-153",
+      "order": 153,
       "chapter": "6장 · 눈 내리는 강남의 열 명",
       "date": "1999.12.31 · 21:55",
       "location": "데시멀 센터 · 보안 입구",
@@ -2210,8 +2352,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-148",
-      "order": 148,
+      "id": "decimal-154",
+      "order": 154,
       "chapter": "6장 · 눈 내리는 강남의 열 명",
       "date": "1999.12.31 · 22:08",
       "location": "데시멀 센터 · 생활 라운지",
@@ -2225,8 +2367,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-149",
-      "order": 149,
+      "id": "decimal-155",
+      "order": 155,
       "chapter": "6장 · 눈 내리는 강남의 열 명",
       "date": "1999.12.31 · 22:08",
       "location": "데시멀 센터 · 생활 라운지",
@@ -2240,8 +2382,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-150",
-      "order": 150,
+      "id": "decimal-156",
+      "order": 156,
       "chapter": "6장 · 눈 내리는 강남의 열 명",
       "date": "1999.12.31 · 22:08",
       "location": "데시멀 센터 · 생활 라운지",
@@ -2255,8 +2397,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-151",
-      "order": 151,
+      "id": "decimal-157",
+      "order": 157,
       "chapter": "6장 · 눈 내리는 강남의 열 명",
       "date": "1999.12.31 · 22:08",
       "location": "데시멀 센터 · 생활 라운지",
@@ -2270,8 +2412,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-152",
-      "order": 152,
+      "id": "decimal-158",
+      "order": 158,
       "chapter": "6장 · 눈 내리는 강남의 열 명",
       "date": "1999.12.31 · 22:08",
       "location": "데시멀 센터 · 생활 라운지",
@@ -2285,8 +2427,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-153",
-      "order": 153,
+      "id": "decimal-159",
+      "order": 159,
       "chapter": "6장 · 눈 내리는 강남의 열 명",
       "date": "1999.12.31 · 22:08",
       "location": "데시멀 센터 · 생활 라운지",
@@ -2300,8 +2442,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-154",
-      "order": 154,
+      "id": "decimal-160",
+      "order": 160,
       "chapter": "6장 · 눈 내리는 강남의 열 명",
       "date": "1999.12.31 · 22:08",
       "location": "데시멀 센터 · 생활 라운지",
@@ -2315,8 +2457,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-155",
-      "order": 155,
+      "id": "decimal-161",
+      "order": 161,
       "chapter": "6장 · 눈 내리는 강남의 열 명",
       "date": "1999.12.31 · 22:08",
       "location": "데시멀 센터 · 생활 라운지",
@@ -2330,8 +2472,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-156",
-      "order": 156,
+      "id": "decimal-162",
+      "order": 162,
       "chapter": "6장 · 눈 내리는 강남의 열 명",
       "date": "1999.12.31 · 22:08",
       "location": "데시멀 센터 · 생활 라운지",
@@ -2345,8 +2487,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-157",
-      "order": 157,
+      "id": "decimal-163",
+      "order": 163,
       "chapter": "6장 · 눈 내리는 강남의 열 명",
       "date": "1999.12.31 · 22:08",
       "location": "데시멀 센터 · 생활 라운지",
@@ -2360,8 +2502,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-158",
-      "order": 158,
+      "id": "decimal-164",
+      "order": 164,
       "chapter": "6장 · 눈 내리는 강남의 열 명",
       "date": "1999.12.31 · 22:08",
       "location": "데시멀 센터 · 생활 라운지",
@@ -2375,8 +2517,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-159",
-      "order": 159,
+      "id": "decimal-165",
+      "order": 165,
       "chapter": "6장 · 눈 내리는 강남의 열 명",
       "date": "1999.12.31 · 22:08",
       "location": "데시멀 센터 · 생활 라운지",
@@ -2390,8 +2532,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-160",
-      "order": 160,
+      "id": "decimal-166",
+      "order": 166,
       "chapter": "6장 · 눈 내리는 강남의 열 명",
       "date": "1999.12.31 · 22:08",
       "location": "데시멀 센터 · 생활 라운지",
@@ -2405,8 +2547,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-161",
-      "order": 161,
+      "id": "decimal-167",
+      "order": 167,
       "chapter": "6장 · 눈 내리는 강남의 열 명",
       "date": "1999.12.31 · 22:08",
       "location": "데시멀 센터 · 생활 라운지",
@@ -2420,8 +2562,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-162",
-      "order": 162,
+      "id": "decimal-168",
+      "order": 168,
       "chapter": "6장 · 눈 내리는 강남의 열 명",
       "date": "1999.12.31 · 22:08",
       "location": "데시멀 센터 · 생활 라운지",
@@ -2435,8 +2577,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-163",
-      "order": 163,
+      "id": "decimal-169",
+      "order": 169,
       "chapter": "6장 · 눈 내리는 강남의 열 명",
       "date": "1999.12.31 · 22:08",
       "location": "데시멀 센터 · 생활 라운지",
@@ -2450,8 +2592,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-164",
-      "order": 164,
+      "id": "decimal-170",
+      "order": 170,
       "chapter": "6장 · 눈 내리는 강남의 열 명",
       "date": "1999.12.31 · 22:08",
       "location": "데시멀 센터 · 생활 라운지",
@@ -2466,7 +2608,7 @@
     },
     {
       "id": "decimal-final-ten-roster",
-      "order": 165,
+      "order": 171,
       "chapter": "6장 · 눈 내리는 강남의 열 명",
       "date": "1999.12.31 · 22:08",
       "location": "데시멀 센터 · 생활 라운지",
@@ -2480,8 +2622,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-166",
-      "order": 166,
+      "id": "decimal-172",
+      "order": 172,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 22:42",
       "location": "데시멀 센터 · 수면동",
@@ -2495,8 +2637,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-167",
-      "order": 167,
+      "id": "decimal-173",
+      "order": 173,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 22:42",
       "location": "데시멀 센터 · 수면동",
@@ -2510,8 +2652,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-168",
-      "order": 168,
+      "id": "decimal-174",
+      "order": 174,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 22:42",
       "location": "데시멀 센터 · 수면동",
@@ -2525,8 +2667,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-169",
-      "order": 169,
+      "id": "decimal-175",
+      "order": 175,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 22:42",
       "location": "데시멀 센터 · 수면동",
@@ -2540,8 +2682,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-170",
-      "order": 170,
+      "id": "decimal-176",
+      "order": 176,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 22:42",
       "location": "데시멀 센터 · 수면동",
@@ -2555,8 +2697,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-171",
-      "order": 171,
+      "id": "decimal-177",
+      "order": 177,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 22:42",
       "location": "데시멀 센터 · 수면동",
@@ -2570,8 +2712,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-172",
-      "order": 172,
+      "id": "decimal-178",
+      "order": 178,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 22:42",
       "location": "데시멀 센터 · 수면동",
@@ -2585,8 +2727,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-173",
-      "order": 173,
+      "id": "decimal-179",
+      "order": 179,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 22:42",
       "location": "데시멀 센터 · 수면동",
@@ -2600,8 +2742,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-174",
-      "order": 174,
+      "id": "decimal-180",
+      "order": 180,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 22:42",
       "location": "데시멀 센터 · 수면동",
@@ -2615,8 +2757,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-175",
-      "order": 175,
+      "id": "decimal-181",
+      "order": 181,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 22:42",
       "location": "데시멀 센터 · 수면동",
@@ -2630,8 +2772,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-176",
-      "order": 176,
+      "id": "decimal-182",
+      "order": 182,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 22:42",
       "location": "데시멀 센터 · 수면동",
@@ -2645,8 +2787,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-177",
-      "order": 177,
+      "id": "decimal-183",
+      "order": 183,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 22:42",
       "location": "데시멀 센터 · 수면동",
@@ -2660,8 +2802,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-178",
-      "order": 178,
+      "id": "decimal-184",
+      "order": 184,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 22:42",
       "location": "데시멀 센터 · 수면동",
@@ -2675,8 +2817,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-179",
-      "order": 179,
+      "id": "decimal-185",
+      "order": 185,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 22:42",
       "location": "데시멀 센터 · 수면동",
@@ -2690,8 +2832,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-180",
-      "order": 180,
+      "id": "decimal-186",
+      "order": 186,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 22:42",
       "location": "데시멀 센터 · 수면동",
@@ -2705,8 +2847,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-181",
-      "order": 181,
+      "id": "decimal-187",
+      "order": 187,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 22:42",
       "location": "데시멀 센터 · 수면동",
@@ -2720,8 +2862,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-182",
-      "order": 182,
+      "id": "decimal-188",
+      "order": 188,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 22:42",
       "location": "데시멀 센터 · 수면동",
@@ -2735,8 +2877,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-183",
-      "order": 183,
+      "id": "decimal-189",
+      "order": 189,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 22:42",
       "location": "데시멀 센터 · 수면동",
@@ -2750,8 +2892,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-184",
-      "order": 184,
+      "id": "decimal-190",
+      "order": 190,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 22:42",
       "location": "데시멀 센터 · 수면동",
@@ -2765,8 +2907,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-185",
-      "order": 185,
+      "id": "decimal-191",
+      "order": 191,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 22:42",
       "location": "데시멀 센터 · 수면동",
@@ -2780,8 +2922,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-186",
-      "order": 186,
+      "id": "decimal-192",
+      "order": 192,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 23:06",
       "location": "데시멀 센터 · 생활 라운지",
@@ -2795,8 +2937,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-187",
-      "order": 187,
+      "id": "decimal-193",
+      "order": 193,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 23:06",
       "location": "데시멀 센터 · 생활 라운지",
@@ -2810,8 +2952,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-188",
-      "order": 188,
+      "id": "decimal-194",
+      "order": 194,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 23:06",
       "location": "데시멀 센터 · 생활 라운지",
@@ -2825,8 +2967,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-189",
-      "order": 189,
+      "id": "decimal-195",
+      "order": 195,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 23:06",
       "location": "데시멀 센터 · 생활 라운지",
@@ -2840,8 +2982,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-190",
-      "order": 190,
+      "id": "decimal-196",
+      "order": 196,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 23:06",
       "location": "데시멀 센터 · 생활 라운지",
@@ -2855,8 +2997,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-191",
-      "order": 191,
+      "id": "decimal-197",
+      "order": 197,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 23:06",
       "location": "데시멀 센터 · 생활 라운지",
@@ -2870,8 +3012,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-192",
-      "order": 192,
+      "id": "decimal-198",
+      "order": 198,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 23:06",
       "location": "데시멀 센터 · 생활 라운지",
@@ -2885,8 +3027,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-193",
-      "order": 193,
+      "id": "decimal-199",
+      "order": 199,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 23:06",
       "location": "데시멀 센터 · 생활 라운지",
@@ -2900,8 +3042,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-194",
-      "order": 194,
+      "id": "decimal-200",
+      "order": 200,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 23:06",
       "location": "데시멀 센터 · 생활 라운지",
@@ -2915,8 +3057,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-195",
-      "order": 195,
+      "id": "decimal-201",
+      "order": 201,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 23:06",
       "location": "데시멀 센터 · 생활 라운지",
@@ -2930,8 +3072,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-196",
-      "order": 196,
+      "id": "decimal-202",
+      "order": 202,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 23:06",
       "location": "데시멀 센터 · 생활 라운지",
@@ -2945,8 +3087,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-197",
-      "order": 197,
+      "id": "decimal-203",
+      "order": 203,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 23:06",
       "location": "데시멀 센터 · 생활 라운지",
@@ -2960,8 +3102,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-198",
-      "order": 198,
+      "id": "decimal-204",
+      "order": 204,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 23:06",
       "location": "데시멀 센터 · 생활 라운지",
@@ -2975,8 +3117,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-199",
-      "order": 199,
+      "id": "decimal-205",
+      "order": 205,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 23:06",
       "location": "데시멀 센터 · 생활 라운지",
@@ -2990,8 +3132,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-200",
-      "order": 200,
+      "id": "decimal-206",
+      "order": 206,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 23:06",
       "location": "데시멀 센터 · 생활 라운지",
@@ -3005,8 +3147,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-201",
-      "order": 201,
+      "id": "decimal-207",
+      "order": 207,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 23:06",
       "location": "데시멀 센터 · 생활 라운지",
@@ -3020,8 +3162,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-202",
-      "order": 202,
+      "id": "decimal-208",
+      "order": 208,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 23:06",
       "location": "데시멀 센터 · 생활 라운지",
@@ -3035,8 +3177,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-203",
-      "order": 203,
+      "id": "decimal-209",
+      "order": 209,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 23:06",
       "location": "데시멀 센터 · 생활 라운지",
@@ -3050,8 +3192,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-204",
-      "order": 204,
+      "id": "decimal-210",
+      "order": 210,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 23:06",
       "location": "데시멀 센터 · 생활 라운지",
@@ -3065,8 +3207,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-205",
-      "order": 205,
+      "id": "decimal-211",
+      "order": 211,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 23:06",
       "location": "데시멀 센터 · 생활 라운지",
@@ -3080,8 +3222,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-206",
-      "order": 206,
+      "id": "decimal-212",
+      "order": 212,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 23:06",
       "location": "데시멀 센터 · 생활 라운지",
@@ -3095,8 +3237,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-207",
-      "order": 207,
+      "id": "decimal-213",
+      "order": 213,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 23:06",
       "location": "데시멀 센터 · 생활 라운지",
@@ -3110,8 +3252,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-208",
-      "order": 208,
+      "id": "decimal-214",
+      "order": 214,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 23:06",
       "location": "데시멀 센터 · 생활 라운지",
@@ -3125,8 +3267,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-209",
-      "order": 209,
+      "id": "decimal-215",
+      "order": 215,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 23:38",
       "location": "데시멀 센터 · 생활 라운지",
@@ -3140,8 +3282,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-210",
-      "order": 210,
+      "id": "decimal-216",
+      "order": 216,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 23:38",
       "location": "데시멀 센터 · 생활 라운지",
@@ -3155,8 +3297,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-211",
-      "order": 211,
+      "id": "decimal-217",
+      "order": 217,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 23:38",
       "location": "데시멀 센터 · 생활 라운지",
@@ -3170,8 +3312,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-212",
-      "order": 212,
+      "id": "decimal-218",
+      "order": 218,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 23:38",
       "location": "데시멀 센터 · 생활 라운지",
@@ -3185,8 +3327,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-213",
-      "order": 213,
+      "id": "decimal-219",
+      "order": 219,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 23:38",
       "location": "데시멀 센터 · 생활 라운지",
@@ -3200,8 +3342,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-214",
-      "order": 214,
+      "id": "decimal-220",
+      "order": 220,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 23:38",
       "location": "데시멀 센터 · 생활 라운지",
@@ -3215,8 +3357,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-215",
-      "order": 215,
+      "id": "decimal-221",
+      "order": 221,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 23:38",
       "location": "데시멀 센터 · 생활 라운지",
@@ -3230,8 +3372,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-216",
-      "order": 216,
+      "id": "decimal-222",
+      "order": 222,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 23:38",
       "location": "데시멀 센터 · 생활 라운지",
@@ -3245,8 +3387,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-217",
-      "order": 217,
+      "id": "decimal-223",
+      "order": 223,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 23:38",
       "location": "데시멀 센터 · 생활 라운지",
@@ -3260,8 +3402,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-218",
-      "order": 218,
+      "id": "decimal-224",
+      "order": 224,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 23:38",
       "location": "데시멀 센터 · 생활 라운지",
@@ -3275,8 +3417,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-219",
-      "order": 219,
+      "id": "decimal-225",
+      "order": 225,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 23:38",
       "location": "데시멀 센터 · 생활 라운지",
@@ -3290,8 +3432,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-220",
-      "order": 220,
+      "id": "decimal-226",
+      "order": 226,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 23:38",
       "location": "데시멀 센터 · 생활 라운지",
@@ -3305,8 +3447,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-221",
-      "order": 221,
+      "id": "decimal-227",
+      "order": 227,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 23:38",
       "location": "데시멀 센터 · 생활 라운지",
@@ -3320,8 +3462,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-222",
-      "order": 222,
+      "id": "decimal-228",
+      "order": 228,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 23:38",
       "location": "데시멀 센터 · 생활 라운지",
@@ -3335,8 +3477,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-223",
-      "order": 223,
+      "id": "decimal-229",
+      "order": 229,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 23:38",
       "location": "데시멀 센터 · 생활 라운지",
@@ -3350,8 +3492,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-224",
-      "order": 224,
+      "id": "decimal-230",
+      "order": 230,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 23:38",
       "location": "데시멀 센터 · 생활 라운지",
@@ -3365,8 +3507,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-225",
-      "order": 225,
+      "id": "decimal-231",
+      "order": 231,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 23:38",
       "location": "데시멀 센터 · 생활 라운지",
@@ -3380,8 +3522,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-226",
-      "order": 226,
+      "id": "decimal-232",
+      "order": 232,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 23:38",
       "location": "데시멀 센터 · 생활 라운지",
@@ -3395,8 +3537,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-227",
-      "order": 227,
+      "id": "decimal-233",
+      "order": 233,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "1999.12.31 · 23:38",
       "location": "데시멀 센터 · 생활 라운지",
@@ -3410,8 +3552,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-228",
-      "order": 228,
+      "id": "decimal-234",
+      "order": 234,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "2000.01.01 · 00:07",
       "location": "데시멀 센터 · 수면동",
@@ -3425,8 +3567,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-229",
-      "order": 229,
+      "id": "decimal-235",
+      "order": 235,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "2000.01.01 · 00:07",
       "location": "데시멀 센터 · 수면동",
@@ -3440,8 +3582,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-230",
-      "order": 230,
+      "id": "decimal-236",
+      "order": 236,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "2000.01.01 · 00:07",
       "location": "데시멀 센터 · 수면동",
@@ -3455,8 +3597,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-231",
-      "order": 231,
+      "id": "decimal-237",
+      "order": 237,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "2000.01.01 · 00:07",
       "location": "데시멀 센터 · 수면동",
@@ -3470,8 +3612,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-232",
-      "order": 232,
+      "id": "decimal-238",
+      "order": 238,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "2000.01.01 · 00:07",
       "location": "데시멀 센터 · 수면동",
@@ -3485,8 +3627,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-233",
-      "order": 233,
+      "id": "decimal-239",
+      "order": 239,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "2000.01.01 · 00:07",
       "location": "데시멀 센터 · 수면동",
@@ -3500,8 +3642,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-234",
-      "order": 234,
+      "id": "decimal-240",
+      "order": 240,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "2000.01.01 · 00:07",
       "location": "데시멀 센터 · 수면동",
@@ -3515,8 +3657,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-235",
-      "order": 235,
+      "id": "decimal-241",
+      "order": 241,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "2000.01.01 · 00:07",
       "location": "데시멀 센터 · 수면동",
@@ -3530,8 +3672,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-236",
-      "order": 236,
+      "id": "decimal-242",
+      "order": 242,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "2000.01.01 · 00:07",
       "location": "데시멀 센터 · 수면동",
@@ -3545,8 +3687,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-237",
-      "order": 237,
+      "id": "decimal-243",
+      "order": 243,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "2000.01.01 · 00:07",
       "location": "데시멀 센터 · 수면동",
@@ -3560,8 +3702,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-238",
-      "order": 238,
+      "id": "decimal-244",
+      "order": 244,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "2000.01.01 · 00:07",
       "location": "데시멀 센터 · 수면동",
@@ -3575,8 +3717,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-239",
-      "order": 239,
+      "id": "decimal-245",
+      "order": 245,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "2000.01.01 · 00:07",
       "location": "데시멀 센터 · 수면동",
@@ -3590,8 +3732,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-240",
-      "order": 240,
+      "id": "decimal-246",
+      "order": 246,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "2000.01.01 · 00:07",
       "location": "데시멀 센터 · 수면동",
@@ -3605,8 +3747,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-241",
-      "order": 241,
+      "id": "decimal-247",
+      "order": 247,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "2000.01.01 · 00:07",
       "location": "데시멀 센터 · 수면동",
@@ -3620,8 +3762,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-242",
-      "order": 242,
+      "id": "decimal-248",
+      "order": 248,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "2000.01.01 · 00:07",
       "location": "데시멀 센터 · 수면동",
@@ -3635,8 +3777,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-243",
-      "order": 243,
+      "id": "decimal-249",
+      "order": 249,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "2000.01.01 · 00:07",
       "location": "데시멀 센터 · 수면동",
@@ -3650,8 +3792,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-244",
-      "order": 244,
+      "id": "decimal-250",
+      "order": 250,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "2000.01.01 · 00:07",
       "location": "데시멀 센터 · 수면동",
@@ -3665,8 +3807,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-245",
-      "order": 245,
+      "id": "decimal-251",
+      "order": 251,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "2000.01.01 · 00:07",
       "location": "데시멀 센터 · 수면동",
@@ -3680,8 +3822,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-246",
-      "order": 246,
+      "id": "decimal-252",
+      "order": 252,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "2000.01.01 · 00:07",
       "location": "데시멀 센터 · 수면동",
@@ -3695,8 +3837,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-247",
-      "order": 247,
+      "id": "decimal-253",
+      "order": 253,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "2000.01.01 · 00:07",
       "location": "데시멀 센터 · 수면동",
@@ -3710,8 +3852,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-248",
-      "order": 248,
+      "id": "decimal-254",
+      "order": 254,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "2000.01.01 · 00:07",
       "location": "데시멀 센터 · 수면동",
@@ -3725,8 +3867,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-249",
-      "order": 249,
+      "id": "decimal-255",
+      "order": 255,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "2000.01.01 · 00:07",
       "location": "데시멀 센터 · 수면동",
@@ -3740,8 +3882,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-250",
-      "order": 250,
+      "id": "decimal-256",
+      "order": 256,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "2000.01.01 · 00:07",
       "location": "데시멀 센터 · 수면동",
@@ -3755,8 +3897,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-251",
-      "order": 251,
+      "id": "decimal-257",
+      "order": 257,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "2000.01.01 · 00:07",
       "location": "데시멀 센터 · 수면동",
@@ -3770,8 +3912,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-252",
-      "order": 252,
+      "id": "decimal-258",
+      "order": 258,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "2000.01.01 · 00:07",
       "location": "데시멀 센터 · 수면동",
@@ -3785,8 +3927,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-253",
-      "order": 253,
+      "id": "decimal-259",
+      "order": 259,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "2000.01.01 · 00:07",
       "location": "데시멀 센터 · 수면동",
@@ -3800,8 +3942,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-254",
-      "order": 254,
+      "id": "decimal-260",
+      "order": 260,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "2000.01.01 · 00:07",
       "location": "데시멀 센터 · 수면동",
@@ -3815,8 +3957,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-255",
-      "order": 255,
+      "id": "decimal-261",
+      "order": 261,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "2000.01.01 · 00:07",
       "location": "데시멀 센터 · 수면동",
@@ -3830,8 +3972,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-256",
-      "order": 256,
+      "id": "decimal-262",
+      "order": 262,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "2000.01.01 · 00:07",
       "location": "데시멀 센터 · 수면동",
@@ -3845,8 +3987,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-257",
-      "order": 257,
+      "id": "decimal-263",
+      "order": 263,
       "chapter": "7장 · 첫날 밤의 공동 장부",
       "date": "2000.01.01 · 00:07",
       "location": "데시멀 센터 · 수면동",
@@ -3860,8 +4002,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-258",
-      "order": 258,
+      "id": "decimal-264",
+      "order": 264,
       "chapter": "8장 · 50,000원이 켜지는 아침",
       "date": "2000.01.03 · 08:42",
       "location": "데시멀 센터 · 생활 라운지",
@@ -3875,8 +4017,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-259",
-      "order": 259,
+      "id": "decimal-265",
+      "order": 265,
       "chapter": "8장 · 50,000원이 켜지는 아침",
       "date": "2000.01.03 · 08:42",
       "location": "데시멀 센터 · 생활 라운지",
@@ -3890,8 +4032,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-260",
-      "order": 260,
+      "id": "decimal-266",
+      "order": 266,
       "chapter": "8장 · 50,000원이 켜지는 아침",
       "date": "2000.01.03 · 08:42",
       "location": "데시멀 센터 · 생활 라운지",
@@ -3905,8 +4047,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-261",
-      "order": 261,
+      "id": "decimal-267",
+      "order": 267,
       "chapter": "8장 · 50,000원이 켜지는 아침",
       "date": "2000.01.03 · 08:42",
       "location": "데시멀 센터 · 생활 라운지",
@@ -3920,8 +4062,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-262",
-      "order": 262,
+      "id": "decimal-268",
+      "order": 268,
       "chapter": "8장 · 50,000원이 켜지는 아침",
       "date": "2000.01.03 · 08:42",
       "location": "데시멀 센터 · 생활 라운지",
@@ -3935,8 +4077,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-263",
-      "order": 263,
+      "id": "decimal-269",
+      "order": 269,
       "chapter": "8장 · 50,000원이 켜지는 아침",
       "date": "2000.01.03 · 08:42",
       "location": "데시멀 센터 · 생활 라운지",
@@ -3950,8 +4092,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-264",
-      "order": 264,
+      "id": "decimal-270",
+      "order": 270,
       "chapter": "8장 · 50,000원이 켜지는 아침",
       "date": "2000.01.03 · 08:42",
       "location": "데시멀 센터 · 생활 라운지",
@@ -3965,8 +4107,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-265",
-      "order": 265,
+      "id": "decimal-271",
+      "order": 271,
       "chapter": "8장 · 50,000원이 켜지는 아침",
       "date": "2000.01.03 · 08:42",
       "location": "데시멀 센터 · 생활 라운지",
@@ -3980,8 +4122,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-266",
-      "order": 266,
+      "id": "decimal-272",
+      "order": 272,
       "chapter": "8장 · 50,000원이 켜지는 아침",
       "date": "2000.01.03 · 08:42",
       "location": "데시멀 센터 · 생활 라운지",
@@ -3995,8 +4137,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-267",
-      "order": 267,
+      "id": "decimal-273",
+      "order": 273,
       "chapter": "8장 · 50,000원이 켜지는 아침",
       "date": "2000.01.03 · 08:42",
       "location": "데시멀 센터 · 생활 라운지",
@@ -4010,8 +4152,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-268",
-      "order": 268,
+      "id": "decimal-274",
+      "order": 274,
       "chapter": "8장 · 50,000원이 켜지는 아침",
       "date": "2000.01.03 · 08:42",
       "location": "데시멀 센터 · 생활 라운지",
@@ -4025,8 +4167,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-269",
-      "order": 269,
+      "id": "decimal-275",
+      "order": 275,
       "chapter": "8장 · 50,000원이 켜지는 아침",
       "date": "2000.01.03 · 08:42",
       "location": "데시멀 센터 · 생활 라운지",
@@ -4040,8 +4182,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-270",
-      "order": 270,
+      "id": "decimal-276",
+      "order": 276,
       "chapter": "8장 · 50,000원이 켜지는 아침",
       "date": "2000.01.03 · 08:55",
       "location": "데시멀 센터 · 트레이딩 플로어",
@@ -4055,8 +4197,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-271",
-      "order": 271,
+      "id": "decimal-277",
+      "order": 277,
       "chapter": "8장 · 50,000원이 켜지는 아침",
       "date": "2000.01.03 · 08:55",
       "location": "데시멀 센터 · 트레이딩 플로어",
@@ -4070,8 +4212,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-272",
-      "order": 272,
+      "id": "decimal-278",
+      "order": 278,
       "chapter": "8장 · 50,000원이 켜지는 아침",
       "date": "2000.01.03 · 08:55",
       "location": "데시멀 센터 · 트레이딩 플로어",
@@ -4085,8 +4227,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-273",
-      "order": 273,
+      "id": "decimal-279",
+      "order": 279,
       "chapter": "8장 · 50,000원이 켜지는 아침",
       "date": "2000.01.03 · 08:55",
       "location": "데시멀 센터 · 트레이딩 플로어",
@@ -4100,8 +4242,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-274",
-      "order": 274,
+      "id": "decimal-280",
+      "order": 280,
       "chapter": "8장 · 50,000원이 켜지는 아침",
       "date": "2000.01.03 · 08:55",
       "location": "데시멀 센터 · 트레이딩 플로어",
@@ -4115,8 +4257,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-275",
-      "order": 275,
+      "id": "decimal-281",
+      "order": 281,
       "chapter": "8장 · 50,000원이 켜지는 아침",
       "date": "2000.01.03 · 08:55",
       "location": "데시멀 센터 · 트레이딩 플로어",
@@ -4130,8 +4272,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-276",
-      "order": 276,
+      "id": "decimal-282",
+      "order": 282,
       "chapter": "8장 · 50,000원이 켜지는 아침",
       "date": "2000.01.03 · 08:55",
       "location": "데시멀 센터 · 트레이딩 플로어",
@@ -4145,8 +4287,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-277",
-      "order": 277,
+      "id": "decimal-283",
+      "order": 283,
       "chapter": "8장 · 50,000원이 켜지는 아침",
       "date": "2000.01.03 · 08:55",
       "location": "데시멀 센터 · 트레이딩 플로어",
@@ -4160,8 +4302,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-278",
-      "order": 278,
+      "id": "decimal-284",
+      "order": 284,
       "chapter": "8장 · 50,000원이 켜지는 아침",
       "date": "2000.01.03 · 08:55",
       "location": "데시멀 센터 · 트레이딩 플로어",
@@ -4175,8 +4317,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-279",
-      "order": 279,
+      "id": "decimal-285",
+      "order": 285,
       "chapter": "8장 · 50,000원이 켜지는 아침",
       "date": "2000.01.03 · 08:55",
       "location": "데시멀 센터 · 트레이딩 플로어",
@@ -4190,8 +4332,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-280",
-      "order": 280,
+      "id": "decimal-286",
+      "order": 286,
       "chapter": "8장 · 50,000원이 켜지는 아침",
       "date": "2000.01.03 · 08:55",
       "location": "데시멀 센터 · 트레이딩 플로어",
@@ -4205,8 +4347,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-281",
-      "order": 281,
+      "id": "decimal-287",
+      "order": 287,
       "chapter": "8장 · 50,000원이 켜지는 아침",
       "date": "2000.01.03 · 08:55",
       "location": "데시멀 센터 · 트레이딩 플로어",
@@ -4220,8 +4362,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-282",
-      "order": 282,
+      "id": "decimal-288",
+      "order": 288,
       "chapter": "8장 · 50,000원이 켜지는 아침",
       "date": "2000.01.03 · 08:55",
       "location": "데시멀 센터 · 트레이딩 플로어",
@@ -4235,8 +4377,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-283",
-      "order": 283,
+      "id": "decimal-289",
+      "order": 289,
       "chapter": "8장 · 50,000원이 켜지는 아침",
       "date": "2000.01.03 · 08:55",
       "location": "데시멀 센터 · 트레이딩 플로어",
@@ -4250,8 +4392,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-284",
-      "order": 284,
+      "id": "decimal-290",
+      "order": 290,
       "chapter": "8장 · 50,000원이 켜지는 아침",
       "date": "2000.01.03 · 08:55",
       "location": "데시멀 센터 · 트레이딩 플로어",
@@ -4265,8 +4407,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-285",
-      "order": 285,
+      "id": "decimal-291",
+      "order": 291,
       "chapter": "8장 · 50,000원이 켜지는 아침",
       "date": "2000.01.03 · 08:55",
       "location": "데시멀 센터 · 트레이딩 플로어",
@@ -4280,8 +4422,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-286",
-      "order": 286,
+      "id": "decimal-292",
+      "order": 292,
       "chapter": "8장 · 50,000원이 켜지는 아침",
       "date": "2000.01.03 · 08:55",
       "location": "데시멀 센터 · 트레이딩 플로어",
@@ -4295,8 +4437,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-287",
-      "order": 287,
+      "id": "decimal-293",
+      "order": 293,
       "chapter": "8장 · 50,000원이 켜지는 아침",
       "date": "2000.01.03 · 08:55",
       "location": "데시멀 센터 · 트레이딩 플로어",
@@ -4310,8 +4452,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-288",
-      "order": 288,
+      "id": "decimal-294",
+      "order": 294,
       "chapter": "8장 · 50,000원이 켜지는 아침",
       "date": "2000.01.03 · 08:55",
       "location": "데시멀 센터 · 트레이딩 플로어",
@@ -4325,8 +4467,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-289",
-      "order": 289,
+      "id": "decimal-295",
+      "order": 295,
       "chapter": "8장 · 50,000원이 켜지는 아침",
       "date": "2000.01.03 · 08:55",
       "location": "데시멀 센터 · 트레이딩 플로어",
@@ -4340,8 +4482,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-290",
-      "order": 290,
+      "id": "decimal-296",
+      "order": 296,
       "chapter": "8장 · 50,000원이 켜지는 아침",
       "date": "2000.01.03 · 08:55",
       "location": "데시멀 센터 · 트레이딩 플로어",
@@ -4355,8 +4497,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-291",
-      "order": 291,
+      "id": "decimal-297",
+      "order": 297,
       "chapter": "8장 · 50,000원이 켜지는 아침",
       "date": "2000.01.03 · 08:55",
       "location": "데시멀 센터 · 트레이딩 플로어",
@@ -4367,11 +4509,34 @@
       "character": "/play/assets/assets/images/production_soft_painted/kim_hakjun/07_determined_verification_uniform_v4.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "choices": [
+        {
+          "id": "vow_alone",
+          "label": "빈틈을 찾아도 혼자 빠져나가지 않기",
+          "targetSceneId": "",
+          "condition": "",
+          "effects": "decimalVow=together"
+        },
+        {
+          "id": "vow_loss",
+          "label": "잃은 날을 그날 안에 말하기",
+          "targetSceneId": "",
+          "condition": "",
+          "effects": "decimalVow=loss"
+        },
+        {
+          "id": "vow_refusal",
+          "label": "남의 거절을 끝까지 남겨 두기",
+          "targetSceneId": "",
+          "condition": "",
+          "effects": "decimalVow=refusal"
+        }
+      ]
     },
     {
-      "id": "decimal-292",
-      "order": 292,
+      "id": "decimal-298",
+      "order": 298,
       "chapter": "8장 · 50,000원이 켜지는 아침",
       "date": "2000.01.03 · 08:55",
       "location": "데시멀 센터 · 트레이딩 플로어",
@@ -4382,11 +4547,44 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "condition": "decimalVow == together"
     },
     {
-      "id": "decimal-293",
-      "order": 293,
+      "id": "decimal-299",
+      "order": 299,
+      "chapter": "8장 · 50,000원이 켜지는 아침",
+      "date": "2000.01.03 · 08:55",
+      "location": "데시멀 센터 · 트레이딩 플로어",
+      "speaker": "{{playerName}}",
+      "direction": "장난기 어린 표정이 잠깐 가라앉았다.",
+      "line": "잃은 날을 그날 안에 말하기. 숨기면 하루가 이틀이 되고, 이틀이 계좌가 되니까.",
+      "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_trading_floor_dawn_2000_v1.png",
+      "character": "",
+      "characterX": 0,
+      "characterY": 0,
+      "characterScale": 1,
+      "condition": "decimalVow == loss"
+    },
+    {
+      "id": "decimal-300",
+      "order": 300,
+      "chapter": "8장 · 50,000원이 켜지는 아침",
+      "date": "2000.01.03 · 08:55",
+      "location": "데시멀 센터 · 트레이딩 플로어",
+      "speaker": "{{playerName}}",
+      "direction": "장난기 어린 표정이 잠깐 가라앉았다.",
+      "line": "남의 거절을 끝까지 남겨 두기. 오늘 쟁반을 안 밀었던 그 애도 틀리지 않았으니까.",
+      "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_trading_floor_dawn_2000_v1.png",
+      "character": "",
+      "characterX": 0,
+      "characterY": 0,
+      "characterScale": 1,
+      "condition": "decimalVow == refusal"
+    },
+    {
+      "id": "decimal-301",
+      "order": 301,
       "chapter": "8장 · 50,000원이 켜지는 아침",
       "date": "2000.01.03 · 08:55",
       "location": "데시멀 센터 · 트레이딩 플로어",
@@ -4400,8 +4598,8 @@
       "characterScale": 1
     },
     {
-      "id": "decimal-294",
-      "order": 294,
+      "id": "decimal-302",
+      "order": 302,
       "chapter": "8장 · 50,000원이 켜지는 아침",
       "date": "2000.01.03 · 08:55",
       "location": "데시멀 센터 · 트레이딩 플로어",

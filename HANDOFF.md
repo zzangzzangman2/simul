@@ -5,7 +5,7 @@
 - 제품명: `10대부터 건물주`
 - 세계관 정본: `DECIMAL_WORLD.md`
 - 대사 정본: `flutter_app/assets/dialogue/dialogue-editor-override.json`
-- 현재 대사 버전: content 4 / appearance 19 / 294장면
+- 현재 대사 버전: content 5 / appearance 19 / 302장면
 
 ## 프롤로그
 
@@ -152,7 +152,7 @@ Flutter는 analyze와 `flutter_app/test/*.dart` 파일별 테스트를 실행한
 
 ## 문서 진입점
 
-- 루트 `README.md`는 현재 데시멀 정사, 8장 294장면, 구현 시스템, npm 실행법,
+- 루트 `README.md`는 현재 데시멀 정사, 8장 302장면, 구현 시스템, npm 실행법,
   대사 편집기와 CI 검증 흐름을 한 페이지에서 안내한다.
 
 ## 다음 한 가지 작업

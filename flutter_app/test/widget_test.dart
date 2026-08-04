@@ -308,7 +308,17 @@ void main() {
 
   Future<void> advanceDialogue(WidgetTester tester, int count) async {
     for (var index = 0; index < count; index++) {
-      await tester.tap(find.byKey(const Key('story-continue')));
+      // 선택지가 뜬 장면은 탭으로 넘어가지 않는다. 첫 항목을 골라 진행한다.
+      final choice = find.byWidgetPredicate(
+        (widget) =>
+            widget.key is ValueKey<String> &&
+            (widget.key as ValueKey<String>).value.startsWith('choice-'),
+      );
+      if (choice.evaluate().isNotEmpty) {
+        await tester.tap(choice.first);
+      } else {
+        await tester.tap(find.byKey(const Key('story-continue')));
+      }
       await tester.pumpAndSettle();
     }
   }
@@ -522,6 +532,13 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  Future<void> openHubTimeActions(WidgetTester tester) async {
+    await dismissHubTutorial(tester);
+    await tester.tap(find.byKey(const Key('hub-time-actions-button')));
+    await tester.pumpAndSettle();
+    expect(find.text('시간과 일정'), findsOneWidget);
+  }
+
   Future<void> completeOrientationPreview(WidgetTester tester) async {
     await startNewGame(tester);
     await skipAllPrologueSections(tester);
@@ -706,12 +723,19 @@ void main() {
       );
       await tester.pumpAndSettle();
       await startNewGame(tester);
-      // 장면을 추가·삭제해도 깨지지 않도록 대사 원문에서 beat를 찾는다.
-      final operatorBeat = canonicalDialogueScenes.indexWhere(
-        (scene) => (scene['line'] as String).contains('감당하지 않아도 될 위험'),
+      // 조건이 걸린 장면은 건너뛰어지므로 탭 횟수와 장면 번호가 일치하지 않는다.
+      // 목표 대사가 화면에 뜰 때까지 진행한다.
+      final operator = find.textContaining('감당하지 않아도 될 위험');
+      var steps = 0;
+      while (operator.evaluate().isEmpty && steps < 320) {
+        await advanceDialogue(tester, 1);
+        steps += 1;
+      }
+      expect(
+        operator,
+        findsOneWidget,
+        reason: '$steps번 진행해도 한서윤 장면에 닿지 못했다',
       );
-      expect(operatorBeat, greaterThan(0));
-      await advanceDialogue(tester, operatorBeat);
 
       expect(find.text('한서윤'), findsOneWidget);
       expect(find.text('프로젝트 데시멀 · 운영관'), findsOneWidget);
@@ -760,6 +784,42 @@ void main() {
     expect(find.text('한규진'), findsOneWidget);
     expect(find.text('국가정보원'), findsOneWidget);
     expect(find.textContaining('결정권이 넘어가는 순간'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('mobile right swipe returns at most four recent dialogue beats', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      const MillenniumCapitalApp(
+        campaignWorldPreparer: _skipCampaignWorldPreparation,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await startNewGame(tester);
+    await advanceDialogue(tester, 6);
+
+    expect(find.text('조민경'), findsOneWidget);
+    expect(
+      find.byKey(const Key('story-mobile-swipe-back-area')),
+      findsOneWidget,
+    );
+
+    for (var index = 0; index < 4; index++) {
+      await tester.flingFrom(const Offset(28, 390), const Offset(150, 0), 1000);
+      await tester.pumpAndSettle();
+    }
+
+    expect(find.text('임서희'), findsOneWidget);
+    expect(find.text('국가정보원 · 경제안보국'), findsOneWidget);
+
+    await tester.flingFrom(const Offset(28, 390), const Offset(150, 0), 1000);
+    await tester.pumpAndSettle();
+
+    expect(find.text('임서희'), findsOneWidget);
+    expect(find.text('국가정보원 · 경제안보국'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -1304,7 +1364,7 @@ void main() {
         find.byKey(const Key('orientation-exit-button')),
       );
       expect(exitButton.tooltip, '처음 화면으로 돌아가기');
-      expect((exitButton.icon! as Icon).icon, Icons.arrow_back_rounded);
+      expect((exitButton.icon as Icon).icon, Icons.arrow_back_rounded);
       expect(find.text('처음 화면으로'), findsNothing);
 
       await tester.tap(find.byKey(const Key('orientation-exit-button')));
@@ -1478,6 +1538,8 @@ void main() {
       );
       expect(find.textContaining('한빛통신 · 거래일 시세'), findsOneWidget);
       expect(find.textContaining('국가원금 50,000원'), findsOneWidget);
+      expect(find.text('계좌 개설 및 실습 시작'), findsOneWidget);
+      expect(find.text('국가계좌 만들고 실시간 주식 실습 시작'), findsNothing);
 
       final lockedPlayerName = tester.widget<TextField>(
         find.byKey(const Key('academy-player-name-input')),
@@ -1778,6 +1840,8 @@ void main() {
     await tester.pumpAndSettle();
     await continueFirstSave(tester);
     await dismissHubTutorial(tester);
+    await tester.tap(find.byKey(const Key('apartment-go-corridor')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('open-ledger-button')));
     await tester.pumpAndSettle();
 
@@ -8188,11 +8252,12 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('09:00'), findsOneWidget);
     expect(find.text('KRX 정규장'), findsNothing);
+    await openHubTimeActions(tester);
 
     final hourFinder = find.byKey(const Key('advance-hour-button'));
     final dayFinder = find.byKey(const Key('advance-day-button'));
-    expect(tester.widget<ElevatedButton>(hourFinder).onPressed, isNotNull);
-    expect(tester.widget<ElevatedButton>(dayFinder).onPressed, isNotNull);
+    expect(tester.widget<ListTile>(hourFinder).onTap, isNotNull);
+    expect(tester.widget<ListTile>(dayFinder).onTap, isNotNull);
 
     await tester.tap(hourFinder);
     await tester.pump();
@@ -8202,8 +8267,9 @@ void main() {
       buildOffice(state.copyWith(marketMinute: marketDayEndMinute)),
     );
     await tester.pumpAndSettle();
-    expect(tester.widget<ElevatedButton>(hourFinder).onPressed, isNull);
-    expect(tester.widget<ElevatedButton>(dayFinder).onPressed, isNotNull);
+    await openHubTimeActions(tester);
+    expect(tester.widget<ListTile>(hourFinder).onTap, isNull);
+    expect(tester.widget<ListTile>(dayFinder).onTap, isNotNull);
     expect(tester.takeException(), isNull);
   });
 
@@ -8248,6 +8314,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await openHubTimeActions(tester);
     await tester.tap(find.byKey(const Key('advance-day-button')));
     await tester.pump();
     expect(requestedMinute, krxCloseMinute);
@@ -8281,18 +8348,16 @@ void main() {
         );
         await tester.pumpAndSettle();
         await continueFirstSave(tester);
+        await openHubTimeActions(tester);
 
         final hourFinder = find.byKey(const Key('advance-hour-button'));
         final dayFinder = find.byKey(const Key('advance-day-button'));
         expect(hourFinder, findsOneWidget);
         expect(dayFinder, findsOneWidget);
-        expect(find.byTooltip('1시간 보내기 · 게임 시간 60분 진행'), findsOneWidget);
-        expect(find.byTooltip('하루 보내기 · 신문 확인 후 다음 날 08:00'), findsOneWidget);
-
-        final hourButton = tester.widget<ElevatedButton>(hourFinder);
-        final dayButton = tester.widget<ElevatedButton>(dayFinder);
-        expect(hourButton.onPressed, isNull);
-        expect(dayButton.onPressed, isNull);
+        final hourButton = tester.widget<ListTile>(hourFinder);
+        final dayButton = tester.widget<ListTile>(dayFinder);
+        expect(hourButton.onTap, isNull);
+        expect(dayButton.onTap, isNull);
         expect(tester.getSize(hourFinder).height, greaterThanOrEqualTo(48));
         expect(tester.getSize(dayFinder).height, greaterThanOrEqualTo(48));
         expect(tester.takeException(), isNull);

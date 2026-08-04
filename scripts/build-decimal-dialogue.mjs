@@ -105,12 +105,28 @@ const expressiveSprites = {
   "한서윤 운영관:emphasize": image("주식선생님/27_포즈6_주인공그림체_공통슬롯_투명.png"),
 };
 
+
+/// 선택지 한 칸. 다섯 키를 모두 채워야 파생 데이터 생성이 안전하다.
+const pick = (id, label, effects, targetSceneId = "") => ({
+  id,
+  label,
+  targetSceneId,
+  condition: "",
+  effects,
+});
+
 const scenes = [];
 let order = 0;
 
 function addChapter({ chapter, date, location, background, portraits = true }, entries) {
   for (const entry of entries) {
-    const [speaker, line, direction = "", expression = "", specialId = ""] = entry;
+    // 엔트리 마지막이 객체면 선택지·조건 같은 연출 필드로 본다. 그래야 앞쪽 항목을
+    // 빈 문자열로 채우지 않고도 붙일 수 있다.
+    const parts = [...entry];
+    const tail = parts[parts.length - 1];
+    const directing =
+      tail && typeof tail === "object" && !Array.isArray(tail) ? parts.pop() : {};
+    const [speaker, line, direction = "", expression = "", specialId = ""] = parts;
     order += 1;
     const character = portraits
       ? expressiveSprites[`${speaker}:${expression}`] ?? sprites[speaker] ?? ""
@@ -129,6 +145,7 @@ function addChapter({ chapter, date, location, background, portraits = true }, e
       characterX: 0,
       characterY: 0,
       characterScale: 1,
+      ...directing,
     });
   }
 }
@@ -255,8 +272,11 @@ addChapter(
     ["정아린", "반대안 있으면 삼십 초 안에 말해. 없으면 움직여."],
     ["한수아", "저쪽 관찰창 뒤에서 우리가 서로 뺏을 때만 펜이 빨리 움직여. 협력하면 감점이라고 믿게 만들려는 것 같아."],
     ["{{playerName}}", "그러면 가장 많은 토큰을 가진 ‘사람’을 없애면 되겠네."],
-    ["김학준", "무슨 말이야?", "", "surprised"],
+    ["김학준", "무슨 말이야?", "", "surprised", { choices: [pick("voice_loophole", "규칙에 안 적힌 걸 그대로 읽어 준다", "decimalVoice=loophole"), pick("voice_together", "열한 명 이름을 하나씩 부른다", "decimalVoice=together"), pick("voice_consent", "거절할 사람이 있는지 먼저 묻는다", "decimalVoice=consent")] }],
     ["{{playerName}}", "쟁반 열 개를 한 사람 소유가 아니라 공동 소유라고 선언하는 거지. 열 명 모두 같은 수를 가진 셈이야."],
+    ["오지우", "규칙을 읽어서 규칙을 이겼습니다. 제가 하려던 걸 먼저 하셨네요. 다음엔 제 몫도 남겨 주십시오.", "", "counter", "", { condition: "decimalVoice == loophole" }],
+    ["박하은", "이름을 하나씩 부르니까 아무도 숫자가 안 됐어. 그게 제일 어려운 거야. 나는 그게 좋았어.", "", "smile", "", { condition: "decimalVoice == together" }],
+    ["김서아", "거절할 사람을 먼저 물어본 걸 적어 둘게. 나중에 우리가 잘돼도 오늘 그걸 물었다는 건 안 바뀌니까.", "", "explain", "", { condition: "decimalVoice == consent" }],
     ["윤채아", "문장만 보면 가능해. 다만 평가자가 단독 소유를 의도했다고 우길 수 있어."],
     ["김서아", "그럴 때를 대비해서 우리 합의 시각과 이유를 적어 두자. 나중에 규칙을 바꾸면 알 수 있게."],
     ["박하은", "열둘 중 두 명은 아직 말을 못 했어. 공동 소유에 동의하는지 먼저 물어야 해."],
@@ -285,7 +305,10 @@ addChapter(
     ["오지우", "말하지 않아도 된다는 말은, 말하면 기록한다는 말이죠? 친절한 함정이네요."],
     ["차은주 선발관", "그렇게 생각해도 됩니다."],
     ["이야기", "{{playerName}}은 식판 앞에서 가장 오래 멈췄다. 배에서는 솔직한 소리가 났고, 눈은 봉투와 차표 사이의 간격을 재고 있었다."],
-    ["{{playerName}}", "하나를 고르라고 안 했잖아요. 식사를 열한 등분해서 지금 먹고, 봉투는 공동자금으로 두면 안 돼요?"],
+    ["{{playerName}}", "하나를 고르라고 안 했잖아요. 식사를 열한 등분해서 지금 먹고, 봉투는 공동자금으로 두면 안 돼요?", { choices: [pick("desire_meal", "그래도 내 몫은 따뜻한 한 끼", "decimalDesire=meal"), pick("desire_envelope", "나는 저축 봉투를 고른다", "decimalDesire=envelope"), pick("desire_none", "나는 아무것도 고르지 않는다", "decimalDesire=none")] }],
+    ["차은주 선발관", "배고픔을 참지 않은 걸 기록합니다. 그게 감점이 아니라는 걸 확인시켜 드리려고 만든 시험입니다.", "", "", "", { condition: "decimalDesire == meal" }],
+    ["윤채아", "봉투를 고른 이유에 날짜를 같이 적어 둬. 그냥 모으기만 하면 선택을 미룬 거야. 나도 그럴 뻔했어.", "", "explain", "", { condition: "decimalDesire == envelope" }],
+    ["조민경 권익감사관", "아무것도 고르지 않을 권리까지 있어야 시험입니다. 다만 참은 것을 미덕으로 적지는 않겠습니다.", "", "", "", { condition: "decimalDesire == none" }],
     ["김학준", "식판은 한 개고 숟가락도 한 개야. 위생 규칙부터 확인해야 해.", "", "explain"],
     ["이지안", "주방에 그릇 더 있어. 문은 잠겼는데 배식대 아래 반납구는 열려 있고."],
     ["정아린", "좋아. 그릇 꺼낼 사람 둘, 식사 나눌 사람 둘. 선택은 각자 하고, 남는 것만 공동으로 제안해."],
@@ -582,8 +605,10 @@ addChapter(
     ["박하은", "그리고 질문했는데 모른다고 말하는 사람을 창피하게 만들지 않기. 그래야 위험한 정보도 올라와요."],
     ["윤채아", "가설이 깨지면 사람 평가가 아니라 가설만 수정하기."],
     ["오지우", "반론을 재미로 던졌으면 돈 걸기 전에 한 번 더 확인하기. 이건 제가 적겠습니다.", "라디오 대신 연필을 들었다.", "explain"],
-    ["김학준", "주문 수량과 최악 손실을 먼저 검산하기.", "", "determined"],
-    ["{{playerName}}", "빈틈을 찾았다고 혼자 빠져나가지 않기. 다칠 사람이 있으면 먼저 말하기.", "장난기 어린 표정이 잠깐 가라앉았다.", "determined"],
+    ["김학준", "주문 수량과 최악 손실을 먼저 검산하기.", "", "determined", { choices: [pick("vow_alone", "빈틈을 찾아도 혼자 빠져나가지 않기", "decimalVow=together"), pick("vow_loss", "잃은 날을 그날 안에 말하기", "decimalVow=loss"), pick("vow_refusal", "남의 거절을 끝까지 남겨 두기", "decimalVow=refusal")] }],
+    ["{{playerName}}", "빈틈을 찾았다고 혼자 빠져나가지 않기. 다칠 사람이 있으면 먼저 말하기.", "장난기 어린 표정이 잠깐 가라앉았다.", "determined", { condition: "decimalVow == together" }],
+    ["{{playerName}}", "잃은 날을 그날 안에 말하기. 숨기면 하루가 이틀이 되고, 이틀이 계좌가 되니까.", "장난기 어린 표정이 잠깐 가라앉았다.", "", "", { condition: "decimalVow == loss" }],
+    ["{{playerName}}", "남의 거절을 끝까지 남겨 두기. 오늘 쟁반을 안 밀었던 그 애도 틀리지 않았으니까.", "장난기 어린 표정이 잠깐 가라앉았다.", "", "", { condition: "decimalVow == refusal" }],
     ["한서윤 운영관", "좋아요. 이제부터 숫자는 여러분을 평가하는 점수가 아니라, 선택이 남긴 흔적입니다. {{playerName}}, 6번 좌석 전원을 직접 켜세요.", "CRT 옆의 둥근 전원 버튼을 가리켰다.", "emphasize"],
     ["이야기", "아직 꺼진 CRT 유리에는 {{playerName}}과 아홉 동기의 얼굴이 희미하게 겹쳐 있었다. 50,000원은 화면 안에 있었고, 첫 판단은 전원 버튼 바깥에 남아 있었다."],
   ],
@@ -626,7 +651,7 @@ for (const name of [
 
 const payload = {
   version: 2,
-  contentVersion: 4,
+  contentVersion: 5,
   appearanceVersion: 19,
   updatedAt: new Date().toISOString(),
   scenes,

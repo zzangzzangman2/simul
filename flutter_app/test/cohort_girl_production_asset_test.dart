@@ -223,10 +223,10 @@ void main() {
             )
             as Map<String, dynamic>;
     expect(decoded['appearanceVersion'], 19);
-    expect(decoded['contentVersion'], 4);
+    expect(decoded['contentVersion'], 5);
     final scenes = (decoded['scenes'] as List<dynamic>)
         .cast<Map<String, dynamic>>();
-    expect(scenes.length, 294);
+    expect(scenes.length, 302);
     const speakerFolders = <String, String>{
       '김서아': 'kim_seoa',
       '이지안': 'lee_jian',

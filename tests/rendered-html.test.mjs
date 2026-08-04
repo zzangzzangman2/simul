@@ -105,6 +105,33 @@ test("opens the Flutter Project Decimal prologue from the default route", async 
   assert.match(dialogueBundleRaw, /주식선생님\/26_포즈5_주인공그림체_공통슬롯_투명\.png/);
   assert.match(dialogueBundleRaw, /주식선생님\/27_포즈6_주인공그림체_공통슬롯_투명\.png/);
   assert.match(dialogueText, /열 권의 얇은 장부 첫 장에는 모두 같은 숫자, 50,000원/);
+  // 프롤로그는 일방향 낭독이 아니어야 한다. 선택은 변수에 남고 뒤 대사가 조건으로 답한다.
+  const withChoices = dialogueBundle.scenes.filter(
+    (scene) => (scene.choices ?? []).length > 0,
+  );
+  assert.ok(withChoices.length >= 3, "프롤로그에 선택지 장면이 있어야 한다");
+  for (const scene of withChoices) {
+    assert.ok(scene.choices.length >= 2);
+    for (const choice of scene.choices) {
+      assert.match(choice.id, /^[a-z0-9_]+$/);
+      assert.ok(choice.label.length > 0);
+      assert.match(choice.effects, /^decimal[A-Za-z]+=[a-z]+$/);
+    }
+  }
+  // 선택마다 조건이 걸린 반응 대사가 따라와야 선택이 헛돌지 않는다.
+  const gated = dialogueBundle.scenes.filter((scene) => scene.condition);
+  assert.ok(gated.length >= 8, "조건이 걸린 반응 장면이 부족하다");
+  const recorded = new Set(
+    withChoices.flatMap((scene) =>
+      scene.choices.map((choice) => choice.effects.split("=")[0]),
+    ),
+  );
+  for (const key of recorded) {
+    assert.ok(
+      gated.some((scene) => scene.condition.includes(key)),
+      `${key} 선택에 반응하는 대사가 없다`,
+    );
+  }
   assert.match(main, /StoryState\.newDecimalPlayer/);
   assert.match(main, /academy-market-tutorial-screen/);
   assert.match(stockMarket, /selfRelianceReserve/);
@@ -762,12 +789,12 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
   assert.match(onboarding, /AudioPlayer/);
   assert.match(onboarding, /AssetSource/);
   assert.match(pubspec, /audioplayers: \^6\.8\.1/);
-  assert.equal(canonical.contentVersion, 4);
+  assert.equal(canonical.contentVersion, 5);
   assert.equal(canonical.appearanceVersion, 19);
   assert.deepEqual(hanSuaAssets, expectedHanSuaAssets);
   assert.deepEqual(hakjunAssets, expectedHakjunAssets);
-  assert.equal(canonical.scenes.length, 294);
-  assert.equal(new Set(canonical.scenes.map((scene) => scene.id)).size, 294);
+  assert.equal(canonical.scenes.length, 302);
+  assert.equal(new Set(canonical.scenes.map((scene) => scene.id)).size, 302);
   const playerScenes = canonical.scenes.filter(
     (scene) => scene.speaker === "{{playerName}}",
   );
@@ -814,7 +841,7 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
       );
     }),
   );
-  assert.equal((data.match(/"id": "decimal-/g) ?? []).length, 294);
+  assert.equal((data.match(/"id": "decimal-/g) ?? []).length, 302);
   for (const student of [
     "김서아",
     "이지안",
@@ -869,7 +896,7 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
   assert.doesNotMatch(generator, /_onboardingBeatCount/);
   assert.doesNotMatch(generator, /visual_novel_onboarding\.dart/);
   assert.match(generator, /appearanceVersion !== 19/);
-  assert.match(generator, /content 4 \/ appearance 19/);
+  assert.match(generator, /content 5 \/ appearance 19/);
   assert.match(generator, /Dialogue editor synced/);
   assert.match(validation, /DIALOGUE_MAX_TEXT_LENGTH = 6000/);
   assert.match(validation, /중복 장면 ID/);
