@@ -17,7 +17,6 @@ import 'game/business_districts.dart';
 import 'game/business_engine.dart';
 import 'game/business_simulation.dart';
 import 'game/business_state.dart';
-import 'character_liveliness_view.dart';
 import 'game/character_profile.dart';
 import 'game/cohort_investment_state.dart';
 import 'game/game_engine.dart';

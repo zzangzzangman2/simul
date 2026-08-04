@@ -1111,17 +1111,10 @@ class _LobbyHeroineStage extends StatefulWidget {
 
 class _LobbyHeroineStageState extends State<_LobbyHeroineStage>
     with SingleTickerProviderStateMixin {
-  static const _motionBurst = Duration(milliseconds: 3600);
-  static const _motionRest = Duration(milliseconds: 4200);
-
   late final AnimationController _breathing = AnimationController(
     vsync: this,
-    duration: _motionBurst,
+    duration: const Duration(milliseconds: 2400),
   );
-
-  /// 메시 변형이 진행된 누적 시간. 재생 구간에서만 늘어나므로 쉬었다 다시 시작해도
-  /// 자세가 튀지 않는다.
-  double _motionSeconds = 0;
   Timer? _idleTimer;
   Timer? _reactionTimer;
   bool _reacting = false;
@@ -1136,10 +1129,8 @@ class _LobbyHeroineStageState extends State<_LobbyHeroineStage>
     if (!mounted) return;
     _breathing.forward(from: 0).whenComplete(() {
       if (!mounted) return;
-      _motionSeconds +=
-          _motionBurst.inMilliseconds / Duration.millisecondsPerSecond;
       _idleTimer?.cancel();
-      _idleTimer = Timer(_motionRest, _playIdleMotion);
+      _idleTimer = Timer(const Duration(milliseconds: 7800), _playIdleMotion);
     });
   }
 
@@ -1204,20 +1195,20 @@ class _LobbyHeroineStageState extends State<_LobbyHeroineStage>
               child: AnimatedBuilder(
                 animation: _breathing,
                 builder: (context, child) {
-                  // 호흡과 나팔거림은 이제 초상 안쪽의 격자 메시가 만든다
-                  // (`CharacterLivelinessView`). 이 겉 변환은 이미지를 통째로
-                  // 옮기므로 발까지 같이 떠서 접지가 흔들리고, 얼굴도 함께
-                  // 움직여 정체성 보호 상한을 넘긴다. 그래서 몸 전체가 아주
-                  // 천천히 자리를 고르는 정도만 남긴다.
                   final phase = _breathing.value * math.pi * 2;
-                  final settle = math.sin(phase * 0.5);
+                  final breath = math.sin(phase);
+                  final sway = math.sin(phase * 0.5);
                   return Transform.translate(
                     key: const Key('lobby-heroine-breathing-motion'),
-                    offset: Offset(settle * 0.45, 0),
+                    offset: Offset(sway * 1.8, -breath.abs() * 2.2),
                     child: Transform.rotate(
-                      angle: settle * 0.0006,
+                      angle: sway * 0.0026,
                       alignment: Alignment.bottomCenter,
-                      child: child,
+                      child: Transform.scale(
+                        scale: 1 + (breath + 1) * 0.0024,
+                        alignment: Alignment.bottomCenter,
+                        child: child,
+                      ),
                     ),
                   );
                 },
@@ -1248,23 +1239,18 @@ class _LobbyHeroineStageState extends State<_LobbyHeroineStage>
                                     opacity: animation,
                                     child: child,
                                   ),
-                              // 초상은 격자 메시로 그려 부위별로 다르게 움직인다.
-                              // 치맛단은 나팔거리고 머리끝은 늦게 따라오며 얼굴과
-                              // 발은 고정된다. 상한과 규칙은
-                              // `game/character_liveliness.dart`가 정한다.
-                              child: CharacterLivelinessView(
+                              child: Image.asset(
+                                asset,
                                 key: Key(
                                   _reacting
                                       ? 'lobby-heroine-reaction-image'
                                       : 'lobby-heroine-idle-image',
                                 ),
-                                asset: asset,
-                                seed: profile.id,
-                                seconds:
-                                    _motionSeconds +
-                                    _breathing.value *
-                                        (_motionBurst.inMilliseconds /
-                                            Duration.millisecondsPerSecond),
+                                fit: BoxFit.contain,
+                                alignment: Alignment.topCenter,
+                                filterQuality: FilterQuality.high,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    const SizedBox.shrink(),
                               ),
                             ),
                           ),
