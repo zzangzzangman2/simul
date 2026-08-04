@@ -212,4 +212,104 @@ void main() {
     expect(cohortGirlProfiles, hasLength(8));
     expect(cohortGirlProfileById('han_sua'), isNotNull);
   });
+
+  test('opening a crisis is idempotent and picks the candidate', () {
+    final ready = _withReports(base, cohortWithdrawalStreakThreshold, {
+      'han_sua': cohortWithdrawalLossThreshold - 1000,
+    });
+    expect(activeCohortWithdrawalCrisis(ready), isNull);
+
+    final opened = openCohortWithdrawalCrisis(ready);
+    final crisis = activeCohortWithdrawalCrisis(opened);
+    expect(crisis, isNotNull);
+    expect(crisis!.girlId, 'han_sua');
+    expect(crisis.openedDay, ready.day);
+    // 두 번 열어도 같은 위기가 유지된다.
+    expect(
+      activeCohortWithdrawalCrisis(
+        openCohortWithdrawalCrisis(opened),
+      )!.openedDay,
+      crisis.openedDay,
+    );
+    // 후보가 없으면 아무것도 열지 않는다.
+    expect(
+      activeCohortWithdrawalCrisis(openCohortWithdrawalCrisis(base)),
+      isNull,
+    );
+  });
+
+  test('each response moves a different relationship axis', () {
+    final opened = openCohortWithdrawalCrisis(
+      _withReports(base, cohortWithdrawalStreakThreshold, {
+        'han_sua': cohortWithdrawalLossThreshold - 1000,
+      }),
+    );
+
+    final persuade = respondToCohortWithdrawal(
+      opened,
+      CohortWithdrawalResponse.persuade,
+    );
+    expect(persuade.success, isTrue);
+    expect(persuade.trustDelta, greaterThan(0));
+    expect(persuade.investmentRespectDelta, 0);
+
+    final respect = respondToCohortWithdrawal(
+      opened,
+      CohortWithdrawalResponse.respectRight,
+    );
+    expect(respect.trustDelta, 0);
+    expect(respect.investmentRespectDelta, greaterThan(0));
+
+    final share = respondToCohortWithdrawal(
+      opened,
+      CohortWithdrawalResponse.shareLedger,
+    );
+    expect(share.trustDelta, greaterThan(0));
+    expect(share.investmentRespectDelta, greaterThan(0));
+
+    // 세 응답이 서로 다른 말을 돌려준다.
+    final replies = <String>{persuade.reply, respect.reply, share.reply};
+    expect(replies, hasLength(3));
+    for (final reply in replies) {
+      expect(reply, isNotEmpty);
+    }
+  });
+
+  test('answering closes the crisis for good and survives a save', () {
+    final opened = openCohortWithdrawalCrisis(
+      _withReports(base, cohortWithdrawalStreakThreshold, {
+        'han_sua': cohortWithdrawalLossThreshold - 1000,
+      }),
+    );
+    final answered = respondToCohortWithdrawal(
+      opened,
+      CohortWithdrawalResponse.shareLedger,
+    ).state;
+
+    expect(activeCohortWithdrawalCrisis(answered), isNull);
+    expect(cohortWithdrawalHistory(answered), contains('han_sua'));
+    // 같은 인물의 위기는 다시 열리지 않는다.
+    expect(cohortWithdrawalCandidate(answered), isNull);
+    expect(
+      activeCohortWithdrawalCrisis(openCohortWithdrawalCrisis(answered)),
+      isNull,
+    );
+
+    final restored = GameState.fromJson(answered.toJson());
+    expect(cohortWithdrawalHistory(restored), contains('han_sua'));
+    expect(
+      restored.relationships.progressFor('han_sua').investmentRespect,
+      greaterThan(base.relationships.progressFor('han_sua').investmentRespect),
+    );
+    expect(GameState.schemaVersion, 26);
+  });
+
+  test('responding with no open crisis is rejected', () {
+    final result = respondToCohortWithdrawal(
+      base,
+      CohortWithdrawalResponse.persuade,
+    );
+    expect(result.success, isFalse);
+    expect(result.state, base);
+  });
 }

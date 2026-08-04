@@ -12,6 +12,7 @@ const cohortStandingLastPlaceThreshold = 3;
 const cohortStandingFirstPlaceThreshold = 3;
 const cohortStandingRivalThreshold = 5;
 const cohortStandingEventLogFlag = 'cohortStandingEventLog';
+const cohortStandingEventLogLimit = 128;
 
 enum CohortStandingEventKind {
   /// 연속 최하위. 한서윤이 중단권을 다시 확인한다. 처벌이 아니라 권리 안내다.
@@ -232,4 +233,26 @@ CohortStandingEvent? pendingCohortStandingEvent(GameState state) {
   final event = cohortStandingEventForState(state);
   if (event == null) return null;
   return cohortStandingEventSeen(state, event) ? null : event;
+}
+
+/// 사건을 확인한 것으로 기록한다. 같은 연속 길이로는 다시 열리지 않는다.
+///
+/// 오래된 기록은 앞에서 잘라 낸다. 27년 캠페인 동안 쌓여도 저장이 커지지 않는다.
+GameState acknowledgeCohortStandingEvent(
+  GameState state,
+  CohortStandingEvent event,
+) {
+  if (cohortStandingEventSeen(state, event)) return state;
+  final log = <String>[...cohortStandingEventLog(state), event.id];
+  final trimmed = log.length <= cohortStandingEventLogLimit
+      ? log
+      : log.sublist(log.length - cohortStandingEventLogLimit);
+  return state.copyWith(
+    story: state.story.copyWith(
+      storyFlags: <String, dynamic>{
+        ...state.story.storyFlags,
+        cohortStandingEventLogFlag: trimmed,
+      },
+    ),
+  );
 }

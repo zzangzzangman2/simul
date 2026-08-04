@@ -29,6 +29,8 @@ class OfficeScreen extends StatelessWidget {
     this.onLendToCohortInvestor,
     this.onBorrowFromCohortInvestor,
     this.onAcknowledgeCohortInvestmentReport,
+    this.onAcknowledgeCohortStandingEvent,
+    this.onRespondToCohortWithdrawal,
     this.onMarkPhoneThreadRead,
     this.onSendPhoneMessage,
     this.phoneAiService,
@@ -116,6 +118,14 @@ class OfficeScreen extends StatelessWidget {
   onBorrowFromCohortInvestor;
   final Future<CohortInvestmentActionResult> Function()?
   onAcknowledgeCohortInvestmentReport;
+
+  /// 수익률 순위표가 촉발한 사건을 확인 처리한다.
+  final Future<void> Function(CohortStandingEvent)?
+  onAcknowledgeCohortStandingEvent;
+
+  /// 동기가 꺼낸 중단권 이야기에 응답한다.
+  final Future<CohortWithdrawalOutcome> Function(CohortWithdrawalResponse)?
+  onRespondToCohortWithdrawal;
   final Future<PhoneMessengerActionResult> Function(String contactId)?
   onMarkPhoneThreadRead;
   final Future<PhoneMessengerActionResult> Function(
@@ -854,6 +864,25 @@ class OfficeScreen extends StatelessWidget {
       }
     }
 
+    // 결과표가 촉발한 사건을 바로 잇는다. 연속 최하위 면담은 중단권 안내이므로
+    // 다른 일정보다 먼저 나온다.
+    final acknowledgeStanding = onAcknowledgeCohortStandingEvent;
+    if (acknowledgeStanding != null) {
+      final standing = pendingCohortStandingEvent(closingState);
+      if (standing != null) {
+        final seen = await navigator.push<bool>(
+          _gameSceneRoute<bool>(
+            CohortStandingEventScreen(
+              event: standing,
+              onAcknowledge: () => acknowledgeStanding(standing),
+            ),
+          ),
+        );
+        if (seen != true || !context.mounted) return;
+        closingState = _latestState;
+      }
+    }
+
     final completeWeekendActivity = onCompleteWeekendActivity;
     if (isWeekendOutingDay(closingState.currentDate) &&
         completeWeekendActivity != null &&
@@ -874,6 +903,22 @@ class OfficeScreen extends StatelessWidget {
       closingState = await onSetMarketMinute(marketDayEndMinute);
     }
     if (!context.mounted) return;
+
+    // 20:00 관계 시간 전에 그 애가 먼저 말을 꺼낸다.
+    final respondWithdrawal = onRespondToCohortWithdrawal;
+    if (respondWithdrawal != null &&
+        activeCohortWithdrawalCrisis(closingState) != null) {
+      final answered = await navigator.push<bool>(
+        _gameSceneRoute<bool>(
+          CohortWithdrawalCrisisScreen(
+            state: closingState,
+            onRespond: respondWithdrawal,
+          ),
+        ),
+      );
+      if (answered != true || !context.mounted) return;
+      closingState = _latestState;
+    }
 
     final markPhoneRead = onMarkPhoneThreadRead;
     final sendPhone = onSendPhoneMessage;

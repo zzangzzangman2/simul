@@ -17,7 +17,10 @@ import 'game/business_districts.dart';
 import 'game/business_engine.dart';
 import 'game/business_simulation.dart';
 import 'game/business_state.dart';
+import 'cohort_event_screens.dart';
 import 'game/character_profile.dart';
+import 'game/cohort_standing_events.dart';
+import 'game/cohort_withdrawal_crisis.dart';
 import 'game/cohort_investment_state.dart';
 import 'game/game_engine.dart';
 import 'game/game_persistence.dart';
@@ -842,10 +845,34 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     final current = _state!;
     final result = _engine.acknowledgeCohortInvestmentReport(current);
     if (!result.success) return result;
-    await _persistence.save(result.state);
-    if (mounted) setState(() => _state = result.state);
+    // 오래 잃은 동기가 중단권을 꺼낼 차례인지 결과표 기준으로 확인한다.
+    final withCrisis = openCohortWithdrawalCrisis(result.state);
+    await _persistence.save(withCrisis);
+    if (mounted) setState(() => _state = withCrisis);
     return result;
   }
+
+  Future<void> _acknowledgeCohortStandingEvent(
+    CohortStandingEvent event,
+  ) async {
+    final current = _state!;
+    final next = acknowledgeCohortStandingEvent(current, event);
+    if (identical(next, current)) return;
+    await _persistence.save(next);
+    if (mounted) setState(() => _state = next);
+  }
+
+  Future<CohortWithdrawalOutcome> _respondToCohortWithdrawal(
+    CohortWithdrawalResponse response,
+  ) async {
+    final current = _state!;
+    final outcome = respondToCohortWithdrawal(current, response);
+    if (!outcome.success) return outcome;
+    await _persistence.save(outcome.state);
+    if (mounted) setState(() => _state = outcome.state);
+    return outcome;
+  }
+
 
   Future<PhoneMessengerActionResult> _markPhoneThreadRead(
     String contactId,
@@ -1750,6 +1777,9 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
                   onBorrowFromCohortInvestor: _borrowFromCohortInvestor,
                   onAcknowledgeCohortInvestmentReport:
                       _acknowledgeCohortInvestmentReport,
+                  onAcknowledgeCohortStandingEvent:
+                      _acknowledgeCohortStandingEvent,
+                  onRespondToCohortWithdrawal: _respondToCohortWithdrawal,
                   onMarkPhoneThreadRead: _markPhoneThreadRead,
                   onSendPhoneMessage: _sendPhoneMessage,
                   onHireEmployee: _hireEmployee,

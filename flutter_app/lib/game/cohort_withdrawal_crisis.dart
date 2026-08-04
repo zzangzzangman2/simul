@@ -231,3 +231,123 @@ List<String> cohortWithdrawalHistory(GameState state) =>
             const <dynamic>[])
         .whereType<String>()
         .toList(growable: false);
+
+GameState _withFlags(GameState state, Map<String, dynamic> patch) =>
+    state.copyWith(
+      story: state.story.copyWith(
+        storyFlags: <String, dynamic>{...state.story.storyFlags, ...patch},
+      ),
+    );
+
+/// 위기를 연다. 이미 진행 중이면 그대로 둔다.
+GameState openCohortWithdrawalCrisis(GameState state) {
+  if (activeCohortWithdrawalCrisis(state) != null) return state;
+  final candidate = cohortWithdrawalCandidate(state);
+  if (candidate == null) return state;
+  return _withFlags(state, <String, dynamic>{
+    cohortWithdrawalFlag: CohortWithdrawalCrisis(
+      girlId: candidate.girlId,
+      openedDay: state.day,
+    ).toJson(),
+  });
+}
+
+class CohortWithdrawalOutcome {
+  const CohortWithdrawalOutcome({
+    required this.state,
+    required this.success,
+    required this.message,
+    this.reply = '',
+    this.trustDelta = 0,
+    this.investmentRespectDelta = 0,
+  });
+
+  final GameState state;
+  final bool success;
+  final String message;
+
+  /// 그 애가 돌려준 말.
+  final String reply;
+  final int trustDelta;
+  final int investmentRespectDelta;
+}
+
+/// 위기에 응답한다. 관계가 바뀌고 그 인물의 위기는 캠페인 동안 다시 열리지 않는다.
+///
+/// 아무도 명단에서 빠지지 않는다. 바뀌는 것은 `남는 방식`이다.
+CohortWithdrawalOutcome respondToCohortWithdrawal(
+  GameState state,
+  CohortWithdrawalResponse response,
+) {
+  final crisis = activeCohortWithdrawalCrisis(state);
+  if (crisis == null) {
+    return CohortWithdrawalOutcome(
+      state: state,
+      success: false,
+      message: '지금은 응답할 이야기가 없습니다.',
+    );
+  }
+  final reason = cohortWithdrawalReasonFor(crisis.girlId);
+  if (reason == null) {
+    return CohortWithdrawalOutcome(
+      state: state,
+      success: false,
+      message: '데시멀 동기가 아닙니다.',
+    );
+  }
+
+  // 설득은 신뢰를, 권리 인정은 투자존중을, 장부 공유는 둘을 조금씩 올린다.
+  final (trustGain, respectGain) = switch (response) {
+    CohortWithdrawalResponse.persuade => (cohortWithdrawalTrustGain, 0),
+    CohortWithdrawalResponse.respectRight => (0, cohortWithdrawalRespectGain),
+    CohortWithdrawalResponse.shareLedger => (
+      cohortWithdrawalTrustGain - 2,
+      cohortWithdrawalRespectGain - 1,
+    ),
+  };
+
+  var relationships = state.relationships;
+  var trustDelta = 0;
+  var respectDelta = 0;
+  final progress = relationships.progressFor(crisis.girlId);
+  final nextTrust = (progress.trust + trustGain)
+      .clamp(relationshipDimensionMin, relationshipDimensionMax)
+      .toInt();
+  final nextRespect = (progress.investmentRespect + respectGain)
+      .clamp(relationshipDimensionMin, relationshipDimensionMax)
+      .toInt();
+  trustDelta = nextTrust - progress.trust;
+  respectDelta = nextRespect - progress.investmentRespect;
+  relationships = relationships.copyWith(
+    girls: <String, GirlRelationshipProgress>{
+      ...relationships.girls,
+      crisis.girlId: progress.copyWith(
+        trust: nextTrust,
+        investmentRespect: nextRespect,
+        lastInteractionDay: state.day,
+      ),
+    },
+  );
+
+  final resolved = <String>{
+    ...cohortWithdrawalHistory(state),
+    crisis.girlId,
+  }.toList(growable: false);
+
+  return CohortWithdrawalOutcome(
+    state: _withFlags(state.copyWith(relationships: relationships), {
+      cohortWithdrawalFlag: CohortWithdrawalCrisis(
+        girlId: crisis.girlId,
+        openedDay: crisis.openedDay,
+        respondedDay: state.day,
+        response: response,
+      ).toJson(),
+      cohortWithdrawalHistoryFlag: resolved,
+    }),
+    success: true,
+    message: '${reason.name}와 이야기를 마쳤습니다.',
+    reply: reason.replyFor(response),
+    trustDelta: trustDelta,
+    investmentRespectDelta: respectDelta,
+  );
+}
