@@ -14,6 +14,7 @@ void main() {
     required GameState state,
     required bool realEstateOnly,
     double textScale = 1,
+    Future<GameState> Function()? onCompleteTutorial,
   }) => MaterialApp(
     builder: (context, child) => MediaQuery(
       data: MediaQuery.of(
@@ -40,6 +41,7 @@ void main() {
         success: false,
         message: '테스트에서는 확률 게임을 실행하지 않습니다.',
       ),
+      onCompleteTutorial: onCompleteTutorial,
     ),
   );
 
@@ -121,6 +123,69 @@ void main() {
     expect(
       realtorAssetName(tester),
       'assets/images/character_realtor_welcome_v1.png',
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('부동산 튜토리얼은 여섯 자세로 매물·자금·위험·협상을 안내하고 완료를 저장한다', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(360, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    var latest = newState();
+
+    await tester.pumpWidget(
+      buildScreen(
+        state: latest,
+        realEstateOnly: true,
+        textScale: 1.2,
+        onCompleteTutorial: () async {
+          latest = engine.markRealEstateTutorialSeen(latest);
+          return latest;
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    String tutorialAsset() {
+      final image = tester.widget<Image>(
+        find.byKey(const Key('market-tutorial-student-upper-body')),
+      );
+      return (image.image as AssetImage).assetName;
+    }
+
+    Future<void> advanceStage({required bool usesTarget}) async {
+      await tester.tap(find.byKey(const Key('real-estate-tutorial-next')));
+      await tester.pumpAndSettle();
+      final actionKey = usesTarget
+          ? const Key('real-estate-tutorial-target')
+          : const Key('real-estate-tutorial-next');
+      expect(find.byKey(actionKey), findsOneWidget);
+      await tester.tap(find.byKey(actionKey));
+      await tester.pumpAndSettle();
+    }
+
+    expect(
+      find.byKey(const Key('real-estate-tutorial-overlay')),
+      findsOneWidget,
+    );
+    expect(tutorialAsset(), 'assets/images/character_realtor_welcome_v1.png');
+
+    await advanceStage(usesTarget: false);
+    expect(tutorialAsset(), 'assets/images/character_realtor_explain_v1.png');
+    await advanceStage(usesTarget: true);
+    expect(tutorialAsset(), 'assets/images/character_realtor_finance_v1.png');
+    await advanceStage(usesTarget: true);
+    expect(tutorialAsset(), 'assets/images/character_realtor_concerned_v1.png');
+    await advanceStage(usesTarget: false);
+    expect(tutorialAsset(), 'assets/images/character_realtor_negotiate_v1.png');
+    await advanceStage(usesTarget: false);
+    expect(tutorialAsset(), 'assets/images/character_realtor_approve_v1.png');
+    await advanceStage(usesTarget: false);
+
+    expect(latest.story.realEstateTutorialSeen, isTrue);
+    expect(find.byKey(const Key('real-estate-tutorial-overlay')), findsNothing);
+    expect(
+      find.byKey(const Key('real-estate-realtor-approve')),
+      findsOneWidget,
     );
     expect(tester.takeException(), isNull);
   });

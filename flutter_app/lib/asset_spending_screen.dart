@@ -1071,7 +1071,7 @@ class _AssetSpendingScreenState extends State<AssetSpendingScreen> {
                   cancelKey: const Key('real-estate-tutorial-skip-cancel'),
                   confirmKey: const Key('real-estate-tutorial-skip-confirm'),
                   description:
-                      '건너뛰어도 부동산 화면은 그대로 이용할 수 있고, 서민아 공인중개사의 설명은 완료로 저장됩니다.',
+                      '건너뛰어도 부동산 화면은 그대로 이용할 수 있고, 서하늘 공인중개사의 설명은 완료로 저장됩니다.',
                   onSkip: _completeRealEstateTutorial,
                 ),
               ),
@@ -1104,7 +1104,7 @@ class _RealEstateTutorialOverlay extends StatelessWidget {
 
   List<String> get _messages => switch (step) {
     0 => const [
-      '어서 오세요. 서민아 공인중개사예요. 부동산은 주식처럼 가격만 보고 바로 사는 자산이 아니에요.',
+      '어서 오세요. 서하늘 공인중개사예요. 부동산은 주식처럼 가격만 보고 바로 사는 자산이 아니에요.',
       '계약할 현금, 매달 들어오고 나가는 돈, 대출과 보증금까지 한 장부에서 같이 봐야 해요.',
     ],
     1 => const [
@@ -1136,15 +1136,15 @@ class _RealEstateTutorialOverlay extends StatelessWidget {
     targetActionKey: const Key('real-estate-tutorial-target'),
     targetKey: targetKey,
     messageId: 'real-estate-tutorial-$step',
-    speakers: const ['서민아 공인중개사', '서민아 공인중개사'],
+    speakers: const ['서하늘 공인중개사', '서하늘 공인중개사'],
     messages: _messages,
     actionLabel: step >= 5 ? '설명 마치기' : '다음 설명',
     teacherPoseAsset: _asset,
     characterAssets: [_asset, _asset],
     wrongTapFeedbacks: const [
-      '서민아: 노란 테두리로 표시한 곳부터 확인해 주세요.',
-      '서민아: 아직 계약은 되지 않아요. 강조한 항목만 눌러볼까요?',
-      '서민아: 서두르지 않아도 돼요. 숫자를 하나씩 확인하면 됩니다.',
+      '서하늘: 노란 테두리로 표시한 곳부터 확인해 주세요.',
+      '서하늘: 아직 계약은 되지 않아요. 강조한 항목만 눌러볼까요?',
+      '서하늘: 서두르지 않아도 돼요. 숫자를 하나씩 확인하면 됩니다.',
     ],
     onAction: onAction,
   );

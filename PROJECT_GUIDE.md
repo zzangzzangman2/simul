@@ -257,6 +257,7 @@ standing depth만 통과한다. 상승은 ask, 하락은 bid를 최우선부터 
 - 안내 인물: 홈 PC의 부동산 전용 화면(`AssetSpendingScreen(realEstateOnly: true)`)에서만 재무 개요 위에 **서하늘 공인중개사** 안내 카드를 표시한다. 일반 자산 지출 화면에는 노출하지 않는다.
 - 상태 전환: 첫 진입·재상담은 `character_realtor_welcome_v1.png`, 티어·지도·시장 안내는 `character_realtor_explain_v1.png`, 매입·담보대출 안내는 `character_realtor_finance_v1.png`, 실패·한도 부족·위험 경고는 `character_realtor_concerned_v1.png`, 매입 성공은 `character_realtor_approve_v1.png`, 매각·임대 협상은 `character_realtor_negotiate_v1.png`를 사용한다. 6종은 `_RealtorMood`와 1:1로 대응한다.
 - 화면 안정성: 안내 카드는 `real-estate-realtor-slot`, 캐릭터는 `real-estate-realtor-character`의 안정 키를 유지하고 상태 변경 때 같은 슬롯 안에서 이미지와 대사만 전환한다. `1024×1536` 투명 전신의 공통 발 기준선을 사용하며 360×800, 텍스트 배율 1.2에서도 카드·조작 UI가 넘치지 않아야 한다.
+- 최초 해금 튜토리얼: 부동산 전용 화면 첫 진입에서 주식 튜토리얼과 같은 암전·노란 강조·오조작 안내를 사용한다. 서하늘 공인중개사가 `welcome → explain → finance → concerned → negotiate → approve` 6개 자세로 매물/지도, 현금·취득비·LTV·DSR, 공실·수리·보유세, 임차보증금 부채와 매각 대기를 설명한다. 튜토리얼은 실제 매입을 강제하지 않고 완료 또는 건너뛰기 시 `realEstateTutorialSeen`과 완료일을 저장하며 재진입 때 자동 반복하지 않는다.
 - 단계: 수천만원대 오피스텔·빌라부터 구축 아파트, 경기 신도시, 서울 고가 아파트, 실제 매각 기준 빌딩, 랜드마크 지분까지 6단계 18개 기준 자산
 - 개별화: 기준 자산마다 층·면적·역거리·관리상태·임대수익·운영비·악재 민감도가 다른 3개 매물을 만들어 총 54개를 제공
 - 공간: 서울·경기 14개 권역과 가까운 최대 4개 권역의 지역 사건 영향을 거리 감쇠로 공유한다. 각 권역은 공통 경제 중앙 매핑으로 대응 사업 상권도 함께 사용한다.
@@ -336,6 +337,7 @@ standing depth만 통과한다. 상승은 ask, 하락은 bid를 최우선부터 
 - 윤하린 은행원의 얼굴·헤어·체형·의상·장신구는 정체성 보존 대상이다. 현재 4종은
   렌더링 전환 전 호환 런타임이며, 대표 포즈를 v3로 승인한 뒤 같은 디자인으로 4개
   상태를 다시 렌더링한다.
+- 최초 해금 튜토리얼: 은행 첫 진입에서 예금 탭을 바로 열고 주식 튜토리얼과 같은 암전·노란 강조·오조작 안내를 사용한다. 윤하린 은행원이 `welcome → explain → concerned → approve` 4개 자세로 회사 통장과 정기예금의 차이, 6·12·24개월 게임 기준금리, 운영자금과 중도해지 위험, 만기·보유목록을 설명한다. 12개월 선택과 가입 버튼은 직접 강조하되 튜토리얼만으로 금액 확인창이나 실제 가입을 실행하지 않는다. 완료 또는 건너뛰기 시 `bankDepositTutorialSeen`과 완료일을 저장하며 재진입 때 자동 반복하지 않는다.
 - 예금: 데시멀 국가계좌의 부속 금융상품으로 게임 시작일부터 6·12·24개월
   정기예금을 가입할 수 있다. 회사 통장 현금만 사용하고 계약 당시 금리를 만기까지
   고정한다. 가입은 현금 감소와 예금자산 증가를 동시에 기록하므로 순자산이 즉시
@@ -537,6 +539,18 @@ npm run build:release
 `npm run build:flutter-web`은 `flutter build web --release --base-href /play/` 산출물을 검증한 뒤 `public/play/`을 교체한다. `npm run build:release`는 Flutter Web과 Vinext를 함께 빌드한다.
 
 실기기 확인은 같은 Wi-Fi에서 개발 서버를 `0.0.0.0:8000`으로 열고 휴대폰에서 `http://<PC 내부 IP>:8000`으로 접속한다. 루트의 `public/index.html`이 쿼리와 해시를 보존한 채 `/play/index.html`로 자동 이동해야 하며, 파일 목록 화면이 나오면 실패다.
+
+### GitHub 푸시
+
+- 기존 저장소의 단순 커밋·푸시는 폴더에 설정된 `origin`과 Git 인증을 사용한다.
+  `git status -sb`와 현재 브랜치를 확인한 뒤 커밋하고
+  `git push -u origin <현재 브랜치>`를 실행한다.
+- 이 작업에는 GitHub CLI `gh`가 필요 없다. `gh`는 Pull Request 생성이나 GitHub API
+  기능을 사용할 때만 필요하다.
+- 사용자가 작업 트리 전체를 포함하라고 명시한 경우에만 `git add -A`를 쓴다. 푸시 뒤
+  로컬 HEAD와 원격 추적 브랜치가 같은지, 새 미커밋 변경이 생기지 않았는지 확인한다.
+- Gemini API 키와 다른 비밀값은 Git에 넣지 않는다. HTTPS 원격 주소에 임시 토큰을
+  직접 삽입하거나 저장소 설정에 자격 증명을 기록하지 않는다.
 
 ## 15. 지분·이사회·경영권
 

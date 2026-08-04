@@ -82,6 +82,96 @@ void main() {
     },
   );
 
+  testWidgets('예금 튜토리얼은 네 자세로 핵심 조작을 안내하고 완료를 저장한다', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(360, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    var latest = engine
+        .createNewGame('예금 튜토리얼 테스트', initialCash: 1000000)
+        .copyWith(brokerageCash: 0);
+
+    Future<FinanceActionResult> unavailable() async => FinanceActionResult(
+      state: latest,
+      success: false,
+      message: '테스트에서는 사용할 수 없습니다.',
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(
+            size: const Size(360, 800),
+            textScaler: const TextScaler.linear(1.2),
+          ),
+          child: child!,
+        ),
+        home: BankScreen(
+          state: latest,
+          onOpenDeposit: (_, _) => unavailable(),
+          onRedeemDeposit: (_) => unavailable(),
+          onTakeLoan: (_, _) => unavailable(),
+          onRepayLoan: (_, _) => unavailable(),
+          onCompleteTutorial: () async {
+            latest = engine.markBankDepositTutorialSeen(latest);
+            return latest;
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    String tutorialAsset() {
+      final image = tester.widget<Image>(
+        find.byKey(const Key('market-tutorial-student-upper-body')),
+      );
+      return (image.image as AssetImage).assetName;
+    }
+
+    Future<void> advanceStage({required bool usesTarget}) async {
+      await tester.tap(find.byKey(const Key('bank-deposit-tutorial-next')));
+      await tester.pumpAndSettle();
+      final actionKey = usesTarget
+          ? const Key('bank-deposit-tutorial-target')
+          : const Key('bank-deposit-tutorial-next');
+      expect(find.byKey(actionKey), findsOneWidget);
+      await tester.tap(find.byKey(actionKey));
+      await tester.pumpAndSettle();
+    }
+
+    expect(
+      find.byKey(const Key('bank-deposit-tutorial-overlay')),
+      findsOneWidget,
+    );
+    expect(
+      tutorialAsset(),
+      'assets/images/character_bank_clerk_title_style_v2.png',
+    );
+
+    await advanceStage(usesTarget: false);
+    expect(
+      tutorialAsset(),
+      'assets/images/character_bank_clerk_explain_v2.png',
+    );
+    await advanceStage(usesTarget: true);
+    expect(
+      tutorialAsset(),
+      'assets/images/character_bank_clerk_concerned_v2.png',
+    );
+    await advanceStage(usesTarget: true);
+    expect(
+      tutorialAsset(),
+      'assets/images/character_bank_clerk_approve_v2.png',
+    );
+    await advanceStage(usesTarget: false);
+
+    expect(latest.story.bankDepositTutorialSeen, isTrue);
+    expect(
+      find.byKey(const Key('bank-deposit-tutorial-overlay')),
+      findsNothing,
+    );
+    expect(find.byKey(const Key('bank-clerk-approve')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('정기예금 가입 뒤에도 장부 순자산이 사라지지 않는다', (tester) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
     addTearDown(() => tester.binding.setSurfaceSize(null));
