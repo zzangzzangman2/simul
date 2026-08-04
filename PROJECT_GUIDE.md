@@ -548,9 +548,10 @@ npm run build:release
 
 ### GitHub 푸시
 
-- 기존 저장소의 단순 커밋·푸시는 폴더에 설정된 `origin`과 Git 인증을 사용한다.
-  `git status -sb`와 현재 브랜치를 확인한 뒤 커밋하고
-  `git push -u origin <현재 브랜치>`를 실행한다.
+- 이 저장소는 활성 개발·푸시 브랜치로 `main`만 사용한다. 사용자가 별도 브랜치를
+  명시적으로 요구하지 않는 한 `agent/*`나 기능 브랜치를 만들지 않는다.
+- 단순 커밋·푸시는 폴더에 설정된 `origin`과 Git 인증을 사용한다. `git switch main`과
+  `git pull --ff-only origin main`으로 최신화한 뒤 커밋하고 `git push origin main`을 실행한다.
 - 이 작업에는 GitHub CLI `gh`가 필요 없다. `gh`는 Pull Request 생성이나 GitHub API
   기능을 사용할 때만 필요하다.
 - 사용자가 작업 트리 전체를 포함하라고 명시한 경우에만 `git add -A`를 쓴다. 푸시 뒤

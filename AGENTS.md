@@ -212,10 +212,12 @@ npm run build:release
 - 작업 트리에 여러 작업의 변경이 섞여 있으면 포함 범위를 확인한다. 사용자가 다른
   작업까지 전부 포함한다고 명시했을 때만 `git add -A`를 사용하고, 그렇지 않으면
   요청 범위의 경로만 명시적으로 스테이징한다.
-- 기본 순서는 `git add` → `git commit -m "<요약>"` →
-  `git push -u origin <현재 브랜치>`다. 기본 브랜치가 아닌 기존 작업 브랜치에서는
-  임의로 새 브랜치를 만들거나 강제 푸시하지 않는다.
-- 푸시 뒤 `git rev-parse HEAD`와 `git rev-parse origin/<현재 브랜치>`가 같은지,
+- 이 저장소의 활성 개발·푸시 브랜치는 `main` 하나만 사용한다. 사용자가 명시적으로
+  요구하지 않는 한 `agent/*`, `feature/*` 같은 작업 브랜치를 새로 만들지 않는다.
+- 기본 순서는 `git switch main` → `git pull --ff-only origin main` → `git add` →
+  `git commit -m "<요약>"` → `git push origin main`이다. 기존 작업 브랜치에 커밋이
+  남아 있으면 먼저 `main`에 안전하게 병합하고 원격 `main` 반영을 확인한 뒤 삭제한다.
+- 푸시 뒤 `git rev-parse HEAD`와 `git rev-parse origin/main`이 같은지,
   `git status -sb`에 미커밋 변경이 없는지 확인한다. 다른 작업이 동시에 새 변경을
   만들었다면 그 변경을 임의로 버리지 말고 별도 후속 커밋으로 보존해 다시 푸시한다.
 - API 키·토큰·개인 비밀값은 커밋하지 않는다. 특히 Gemini 키는 서버 비밀 환경변수나
