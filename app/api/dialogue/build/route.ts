@@ -160,7 +160,7 @@ async function persistDialogue(
   const payload = `${JSON.stringify(
     {
       version: 2,
-      contentVersion: 3,
+      contentVersion: 4,
       appearanceVersion: 19,
       updatedAt: builtAt,
       scenes,
@@ -306,7 +306,7 @@ export async function POST(request: Request) {
     }
     return NextResponse.json({
       ok: true,
-      contentVersion: 3,
+      contentVersion: 4,
       appearanceVersion: 19,
       ...result,
     });

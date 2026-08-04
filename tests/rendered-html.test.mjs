@@ -285,11 +285,15 @@ test("uses the deterministic local news combinator without a remote API", async 
   assert.match(campaignScenes, /NewsCombinator\(\)/);
 });
 
-test("keeps Gemini keys server-side and provides Flash-Lite plus local fallback", async () => {
-  const [route, service, engine, envExample] = await Promise.all([
+test("keeps Gemini keys out of source and provides secure device setup plus local fallback", async () => {
+  const [route, service, messenger, engine, envExample] = await Promise.all([
     readFile(new URL("../app/api/gemini/chat/route.ts", import.meta.url), "utf8"),
     readFile(
       new URL("../flutter_app/lib/game/phone_ai_service.dart", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../flutter_app/lib/phone_messenger_screens.dart", import.meta.url),
       "utf8",
     ),
     readFile(new URL("../flutter_app/lib/game/game_engine.dart", import.meta.url), "utf8"),
@@ -302,8 +306,18 @@ test("keeps Gemini keys server-side and provides Flash-Lite plus local fallback"
   assert.match(route, /APP_GLOBAL_MINUTE_LIMIT = 8/);
   assert.match(route, /APP_GLOBAL_DAY_LIMIT = 400/);
   assert.match(route, /x-goog-api-key/);
+  assert.match(route, /x-project-decimal-gemini-key/);
+  assert.match(route, /export async function GET/);
+  assert.match(route, /directMessagePrivate/);
+  assert.match(route, /ownerContactId === contactId/);
   assert.match(route, /CHARACTER_VOICES/);
   assert.match(service, /\/api\/gemini\/chat/);
+  assert.match(service, /FlutterSecureStorage/);
+  assert.match(service, /project_decimal_gemini_api_key_v1/);
+  assert.match(service, /relevantMemoriesFor/);
+  assert.match(messenger, /더 실감 나는 대화를 켤까요/);
+  assert.match(messenger, /키 없이 로컬 대화/);
+  assert.match(messenger, /1:1 기억/);
   assert.match(engine, /replyOverride/);
   assert.match(envExample, /^GEMINI_API_KEY=$/m);
   assert.doesNotMatch(`${route}${service}${envExample}`, /AIza[0-9A-Za-z_-]{20,}/);
@@ -692,12 +706,12 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
   assert.match(onboarding, /AudioPlayer/);
   assert.match(onboarding, /AssetSource/);
   assert.match(pubspec, /audioplayers: \^6\.8\.1/);
-  assert.equal(canonical.contentVersion, 3);
+  assert.equal(canonical.contentVersion, 4);
   assert.equal(canonical.appearanceVersion, 19);
   assert.deepEqual(hanSuaAssets, expectedHanSuaAssets);
   assert.deepEqual(hakjunAssets, expectedHakjunAssets);
-  assert.equal(canonical.scenes.length, 292);
-  assert.equal(new Set(canonical.scenes.map((scene) => scene.id)).size, 292);
+  assert.equal(canonical.scenes.length, 294);
+  assert.equal(new Set(canonical.scenes.map((scene) => scene.id)).size, 294);
   const playerScenes = canonical.scenes.filter(
     (scene) => scene.speaker === "{{playerName}}",
   );
@@ -744,7 +758,7 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
       );
     }),
   );
-  assert.equal((data.match(/"id": "decimal-/g) ?? []).length, 292);
+  assert.equal((data.match(/"id": "decimal-/g) ?? []).length, 294);
   for (const student of [
     "김서아",
     "이지안",
@@ -799,7 +813,7 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
   assert.doesNotMatch(generator, /_onboardingBeatCount/);
   assert.doesNotMatch(generator, /visual_novel_onboarding\.dart/);
   assert.match(generator, /appearanceVersion !== 19/);
-  assert.match(generator, /content 3 \/ appearance 19/);
+  assert.match(generator, /content 4 \/ appearance 19/);
   assert.match(generator, /Dialogue editor synced/);
   assert.match(validation, /DIALOGUE_MAX_TEXT_LENGTH = 6000/);
   assert.match(validation, /중복 장면 ID/);
