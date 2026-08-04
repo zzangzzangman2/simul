@@ -149,6 +149,18 @@ enum _LobbyIdleGesture { nod, lean, perk, settle, playful, shy }
 
 enum _LobbyTouchZone { face, torso, accessory }
 
+enum _LobbyCharacterMotionMode { blinkOnly, generatedFullBodyFrames }
+
+// The generated full-body frames remain catalogued below for later dialogue
+// scenes. They are not suitable for continuous lobby animation because every
+// frame redraws the whole character, so cross-fading them makes the body pop or
+// briefly disappear. Keep the lobby portrait still and animate only blinking.
+final _lobbyCharacterMotionMode = _LobbyCharacterMotionMode.blinkOnly;
+
+bool get _usesGeneratedLobbyFrames =>
+    _lobbyCharacterMotionMode ==
+    _LobbyCharacterMotionMode.generatedFullBodyFrames;
+
 class _LobbyMotionProfile {
   const _LobbyMotionProfile({
     required this.gestures,
@@ -1616,67 +1628,72 @@ class _LobbyMotionPortrait extends StatelessWidget {
     return 1;
   }
 
-  @override
-  Widget build(BuildContext context) => Stack(
-    fit: StackFit.expand,
-    children: [
-      AnimatedBuilder(
-        animation: gesture,
-        builder: (context, child) =>
-            Opacity(opacity: 1 - _motionOpacity(gesture.value), child: child),
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 420),
-          reverseDuration: const Duration(milliseconds: 520),
-          switchInCurve: Curves.easeOutCubic,
-          switchOutCurve: Curves.easeInCubic,
-          transitionBuilder: (child, animation) =>
-              FadeTransition(opacity: animation, child: child),
-          child: _portraitImage(
-            baseAsset,
-            key: Key(
-              reacting
-                  ? 'lobby-heroine-reaction-image'
-                  : 'lobby-heroine-idle-image',
-            ),
-          ),
-        ),
+  Widget _basePortrait() => AnimatedSwitcher(
+    duration: const Duration(milliseconds: 420),
+    reverseDuration: const Duration(milliseconds: 520),
+    switchInCurve: Curves.easeOutCubic,
+    switchOutCurve: Curves.easeInCubic,
+    transitionBuilder: (child, animation) =>
+        FadeTransition(opacity: animation, child: child),
+    child: _portraitImage(
+      baseAsset,
+      key: Key(
+        reacting ? 'lobby-heroine-reaction-image' : 'lobby-heroine-idle-image',
       ),
-      if (!reacting)
+    ),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_usesGeneratedLobbyFrames) {
+      return SizedBox.expand(child: _basePortrait());
+    }
+    return Stack(
+      fit: StackFit.expand,
+      children: [
         AnimatedBuilder(
           animation: gesture,
-          builder: (context, child) {
-            final value = gesture.value;
-            if (value <= 0.001 || value >= 0.999) {
-              return const SizedBox.shrink(
-                key: Key('lobby-heroine-motion-frame-layer'),
-              );
-            }
-            const sequence = <int>[0, 0, 1, 2, 3, 3, 3, 2, 1, 0, 0];
-            final position = value * (sequence.length - 1);
-            final segment = position.floor().clamp(0, sequence.length - 2);
-            final mix = Curves.easeInOutCubic.transform(position - segment);
-            final currentAsset = motionFrames[sequence[segment]];
-            final nextAsset = motionFrames[sequence[segment + 1]];
-            final edgeOpacity = _motionOpacity(value);
-            return Opacity(
-              key: const Key('lobby-heroine-motion-frame-layer'),
-              opacity: edgeOpacity.clamp(0.0, 1.0),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  Opacity(
-                    opacity: 1 - mix,
-                    child: _portraitImage(currentAsset),
-                  ),
-                  if (nextAsset != currentAsset)
-                    Opacity(opacity: mix, child: _portraitImage(nextAsset)),
-                ],
-              ),
-            );
-          },
+          builder: (context, child) =>
+              Opacity(opacity: 1 - _motionOpacity(gesture.value), child: child),
+          child: _basePortrait(),
         ),
-    ],
-  );
+        if (!reacting)
+          AnimatedBuilder(
+            animation: gesture,
+            builder: (context, child) {
+              final value = gesture.value;
+              if (value <= 0.001 || value >= 0.999) {
+                return const SizedBox.shrink(
+                  key: Key('lobby-heroine-motion-frame-layer'),
+                );
+              }
+              const sequence = <int>[0, 0, 1, 2, 3, 3, 3, 2, 1, 0, 0];
+              final position = value * (sequence.length - 1);
+              final segment = position.floor().clamp(0, sequence.length - 2);
+              final mix = Curves.easeInOutCubic.transform(position - segment);
+              final currentAsset = motionFrames[sequence[segment]];
+              final nextAsset = motionFrames[sequence[segment + 1]];
+              final edgeOpacity = _motionOpacity(value);
+              return Opacity(
+                key: const Key('lobby-heroine-motion-frame-layer'),
+                opacity: edgeOpacity.clamp(0.0, 1.0),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Opacity(
+                      opacity: 1 - mix,
+                      child: _portraitImage(currentAsset),
+                    ),
+                    if (nextAsset != currentAsset)
+                      Opacity(opacity: mix, child: _portraitImage(nextAsset)),
+                  ],
+                ),
+              );
+            },
+          ),
+      ],
+    );
+  }
 }
 
 class _LobbyHeroineStage extends StatefulWidget {
@@ -1768,10 +1785,14 @@ class _LobbyHeroineStageState extends State<_LobbyHeroineStage>
     if (_animationsEnabled == animationsEnabled) return;
     _animationsEnabled = animationsEnabled;
     if (_animationsEnabled) {
-      _entrance.forward(from: 0);
-      _playIdleMotion();
+      if (_usesGeneratedLobbyFrames) {
+        _entrance.forward(from: 0);
+        _playIdleMotion();
+        _scheduleGesture(initial: true);
+      } else {
+        _entrance.value = 1;
+      }
       _scheduleBlink(initial: true);
-      _scheduleGesture(initial: true);
     } else {
       _idleTimer?.cancel();
       _blinkTimer?.cancel();
@@ -1801,6 +1822,7 @@ class _LobbyHeroineStageState extends State<_LobbyHeroineStage>
   }
 
   void _precacheMotionFrames() {
+    if (!_usesGeneratedLobbyFrames) return;
     if (_precachedMotionProfile == widget.profile.id) return;
     _precachedMotionProfile = widget.profile.id;
     for (final asset in _motionProfile.motionFrames) {
@@ -1809,7 +1831,12 @@ class _LobbyHeroineStageState extends State<_LobbyHeroineStage>
   }
 
   void _playIdleMotion() {
-    if (!mounted || !_animationsEnabled || _breathing.isAnimating) return;
+    if (!_usesGeneratedLobbyFrames ||
+        !mounted ||
+        !_animationsEnabled ||
+        _breathing.isAnimating) {
+      return;
+    }
     _swayDirection = ((_motionSeed + _motionCycle) & 1) == 0 ? 1 : -1;
     _breathing.forward(from: 0).whenComplete(() {
       if (!mounted || !_animationsEnabled) return;
@@ -1851,7 +1878,7 @@ class _LobbyHeroineStageState extends State<_LobbyHeroineStage>
   }
 
   void _scheduleGesture({required bool initial}) {
-    if (!mounted || !_animationsEnabled) return;
+    if (!_usesGeneratedLobbyFrames || !mounted || !_animationsEnabled) return;
     _gestureTimer?.cancel();
     final delayMs = initial
         ? 4200 + (_motionSeed % 2800)
@@ -1862,7 +1889,7 @@ class _LobbyHeroineStageState extends State<_LobbyHeroineStage>
   }
 
   void _playGesture() {
-    if (!mounted || !_animationsEnabled) return;
+    if (!_usesGeneratedLobbyFrames || !mounted || !_animationsEnabled) return;
     if (_reacting || _pressed) {
       _scheduleGesture(initial: false);
       return;
@@ -1882,7 +1909,12 @@ class _LobbyHeroineStageState extends State<_LobbyHeroineStage>
   }
 
   void _updateLook(Offset localPosition, Size size) {
-    if (!mounted || !_animationsEnabled || size.isEmpty) return;
+    if (!_usesGeneratedLobbyFrames ||
+        !mounted ||
+        !_animationsEnabled ||
+        size.isEmpty) {
+      return;
+    }
     _lookHoldTimer?.cancel();
     _lookReturn.stop();
     final dx = ((localPosition.dx / size.width) * 2 - 1).clamp(-1.0, 1.0);
@@ -1896,7 +1928,7 @@ class _LobbyHeroineStageState extends State<_LobbyHeroineStage>
   }
 
   void _releaseLook({Duration delay = const Duration(milliseconds: 280)}) {
-    if (!_animationsEnabled) return;
+    if (!_usesGeneratedLobbyFrames || !_animationsEnabled) return;
     _lookHoldTimer?.cancel();
     _lookHoldTimer = Timer(delay, () {
       if (!mounted || _lookOffset == Offset.zero) return;
@@ -1947,10 +1979,14 @@ class _LobbyHeroineStageState extends State<_LobbyHeroineStage>
       _precachedMotionProfile = null;
       _precacheMotionFrames();
       if (_animationsEnabled) {
-        _entrance.forward(from: 0);
-        _playIdleMotion();
+        if (_usesGeneratedLobbyFrames) {
+          _entrance.forward(from: 0);
+          _playIdleMotion();
+          _scheduleGesture(initial: true);
+        } else {
+          _entrance.value = 1;
+        }
         _scheduleBlink(initial: true);
-        _scheduleGesture(initial: true);
       }
     }
   }
@@ -1989,7 +2025,9 @@ class _LobbyHeroineStageState extends State<_LobbyHeroineStage>
             _LobbyTouchZone.torso => _motionProfile.torsoLine,
             _LobbyTouchZone.accessory => _motionProfile.accessoryLine,
           };
-    if (_animationsEnabled && !_breathing.isAnimating) {
+    if (_usesGeneratedLobbyFrames &&
+        _animationsEnabled &&
+        !_breathing.isAnimating) {
       _idleTimer?.cancel();
       _playIdleMotion();
     }

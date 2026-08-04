@@ -19,6 +19,9 @@
 /play/flutter_service_worker.js
   Cache-Control: no-cache, must-revalidate
 
+/play/pwa_service_worker.js
+  Cache-Control: no-cache, must-revalidate
+
 /play/main.dart.js
   Cache-Control: public, max-age=31536000, immutable
 

@@ -225,6 +225,9 @@ test("keeps Flutter launch metadata aligned with the current starting conditions
   assert.match(flutterTemplate, /name="twitter:card" content="summary"/);
   assert.doesNotMatch(flutterTemplate, /초기자본 100만원/);
   assert.equal(parsedManifest.name, "10대부터 건물주");
+  assert.equal(parsedManifest.id, "/play/");
+  assert.equal(parsedManifest.start_url, "./index.html");
+  assert.equal(parsedManifest.scope, "./");
   assert.match(parsedManifest.description, /2000년 서울/);
   // 홈 화면 설치 없이는 주소창이 남아 게임처럼 보이지 않는다.
   assert.equal(parsedManifest.display, "fullscreen");
@@ -233,19 +236,31 @@ test("keeps Flutter launch metadata aligned with the current starting conditions
   assert.match(flutterTemplate, /<link rel="manifest" href="manifest\.json">/);
   assert.match(flutterTemplate, /name="mobile-web-app-capable" content="yes"/);
   assert.match(flutterTemplate, /name="apple-mobile-web-app-capable" content="yes"/);
-  // 설치 유도 배너와 iOS 공유 버튼 안내가 함께 있어야 한다.
+  // 설치 유도 배너와 모바일별 수동 설치 안내가 함께 있어야 한다.
   assert.match(flutterTemplate, /<script id="install-prompt">/);
   assert.match(flutterTemplate, /beforeinstallprompt/);
   assert.match(flutterTemplate, /display-mode: fullscreen/);
   assert.match(flutterTemplate, /navigator\.standalone/);
   assert.match(flutterTemplate, /홈 화면에 추가/);
+  assert.match(flutterTemplate, /브라우저 메뉴/);
+  assert.match(flutterTemplate, /현재 테스트 주소는 HTTP라 자동 설치가 차단됩니다/);
+  assert.match(flutterTemplate, /window\.isSecureContext/);
   assert.match(flutterTemplate, /install-banner-dismiss/);
+  assert.match(flutterTemplate, /<script id="pwa-worker-registration">/);
+  assert.match(flutterTemplate, /serviceWorker\.register\('pwa_service_worker\.js'/);
+  assert.match(flutterTemplate, /<script id="automatic-app-update">/);
+  assert.match(flutterTemplate, /content="\$DECIMAL_BUILD_ID"/);
+  assert.match(flutterTemplate, /fetch\(`version\.json\?check=/);
+  assert.match(flutterTemplate, /cache: 'no-store'/);
+  assert.match(flutterTemplate, /visibilitychange/);
+  assert.match(flutterTemplate, /window\.location\.replace/);
 
   // 진입 스크립트에 내용 해시가 붙어야 배포가 캐시를 넘어 유저에게 도달한다.
-  const [builtIndex, builtBootstrap, builtVersion, headers] = await Promise.all([
+  const [builtIndex, builtBootstrap, builtVersion, builtWorker, headers] = await Promise.all([
     readFile(new URL("../public/play/index.html", import.meta.url), "utf8"),
     readFile(new URL("../public/play/flutter_bootstrap.js", import.meta.url), "utf8"),
     readFile(new URL("../public/play/version.json", import.meta.url), "utf8"),
+    readFile(new URL("../public/play/pwa_service_worker.js", import.meta.url), "utf8"),
     readFile(new URL("../public/_headers", import.meta.url), "utf8"),
   ]);
   const stamped = builtIndex.match(/flutter_bootstrap\.js\?v=([0-9a-f]{12})"/);
@@ -255,6 +270,15 @@ test("keeps Flutter launch metadata aligned with the current starting conditions
     "bootstrap must load main.dart.js with the same build id",
   );
   assert.equal(JSON.parse(builtVersion).build_id, stamped[1]);
+  assert.match(
+    builtIndex,
+    new RegExp(`name="decimal-build-id" content="${stamped[1]}"`),
+  );
+  assert.match(
+    builtIndex,
+    new RegExp(`pwa_service_worker\\.js\\?v=${stamped[1]}`),
+  );
+  assert.match(builtWorker, /addEventListener\('fetch'/);
   // 고정 파일명인 진입 문서는 반드시 재검증해야 한다.
   const headerRule = (path) =>
     headers.split(path)[1]?.split("\n").slice(0, 2).join(" ") ?? "";
@@ -262,6 +286,10 @@ test("keeps Flutter launch metadata aligned with the current starting conditions
   assert.match(
     headerRule("/play/main.dart.js"),
     /Cache-Control: public, max-age=31536000, immutable/,
+  );
+  assert.match(
+    headerRule("/play/pwa_service_worker.js"),
+    /Cache-Control: no-cache/,
   );
 });
 

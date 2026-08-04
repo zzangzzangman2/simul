@@ -43,7 +43,7 @@ Widget _testHub({
 
 void main() {
   testWidgets(
-    'lounge rotates heroines daily and changes pose copy and motion by affection',
+    'lounge rotates heroines daily and changes pose copy and distance by affection',
     (tester) async {
       tester.view.physicalSize = const Size(390, 844);
       tester.view.devicePixelRatio = 1;
@@ -153,7 +153,7 @@ void main() {
           .transform
           .storage
           .toList();
-      expect(motionAfter, isNot(motionBefore));
+      expect(motionAfter, motionBefore);
 
       final nextDayState = closeState.copyWith(day: closeState.day + 1);
       await tester.pumpWidget(
@@ -173,7 +173,7 @@ void main() {
     },
   );
 
-  testWidgets('all eight lobby heroines receive a fitted blink layer', (
+  testWidgets('all eight lobby heroines keep a stable blink-only portrait', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(390, 844);
@@ -236,7 +236,7 @@ void main() {
       );
       expect(
         find.byKey(const Key('lobby-heroine-motion-frame-layer')),
-        findsOneWidget,
+        findsNothing,
       );
       expect(
         find.byKey(const Key('lobby-ambient-background-motion')),
@@ -263,10 +263,11 @@ void main() {
           .map((asset) => asset.assetName)
           .where((asset) => asset.contains('/10_lobby_'))
           .toList();
-      expect(activeMotionAssets, isNotEmpty);
+      expect(activeMotionAssets, isEmpty);
+      expect(find.byKey(const Key('lobby-heroine-idle-image')), findsOneWidget);
       expect(
-        activeMotionAssets.every((asset) => asset.contains('/${profile.id}/')),
-        isTrue,
+        find.byKey(const Key('lobby-heroine-motion-frame-layer')),
+        findsNothing,
       );
       expect(tester.takeException(), isNull);
     }

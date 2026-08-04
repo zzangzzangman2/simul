@@ -13,6 +13,7 @@
   <meta name="twitter:title" content="10대부터 건물주 — 프로젝트 데시멀 투자 생활 게임">
   <meta name="twitter:description" content="2000년 서울, 프로젝트 데시멀의 열 명이 국가원금 5만원으로 생존과 투자를 배워 가는 모바일 세로형 생활·투자 시뮬레이션">
   <meta name="theme-color" content="#061F2A">
+  <meta name="decimal-build-id" content="$DECIMAL_BUILD_ID">
   <meta name="mobile-web-app-capable" content="yes">
   <!-- iOS는 아직 레거시 이름만 읽는다. 이 둘이 없으면 홈 화면에서 열어도 사파리 주소창이 남는다. -->
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -284,7 +285,8 @@
     (() => {
       // 홈 화면에 설치해야 주소창이 사라진다. 설치 가능한 상태를 유저가 알 방법이
       // 없어서 게임이 브라우저처럼 보였다. 설치 뒤에는 이 배너를 다시 띄우지 않는다.
-      const dismissKey = 'decimal-install-banner-dismissed-v1';
+      const dismissKey = 'decimal-install-banner-dismissed-v3';
+      const dismissForMs = 24 * 60 * 60 * 1000;
       const banner = document.getElementById('install-banner');
       const text = document.getElementById('install-banner-text');
       const accept = document.getElementById('install-banner-accept');
@@ -298,7 +300,8 @@
 
       const suppressed = () => {
         try {
-          return window.localStorage.getItem(dismissKey) === '1';
+          const dismissedAt = Number(window.localStorage.getItem(dismissKey));
+          return Number.isFinite(dismissedAt) && Date.now() - dismissedAt < dismissForMs;
         } catch (_) {
           return false;
         }
@@ -311,13 +314,14 @@
       const show = (message, canInstall) => {
         if (installed() || suppressed()) return;
         text.textContent = message;
-        accept.hidden = !canInstall;
+        accept.textContent = canInstall ? '설치' : '설치 방법';
+        accept.hidden = false;
         banner.hidden = false;
       };
 
       dismiss.addEventListener('click', () => {
         try {
-          window.localStorage.setItem(dismissKey, '1');
+          window.localStorage.setItem(dismissKey, String(Date.now()));
         } catch (_) {
           // Storage can be unavailable in private or restricted browser contexts.
         }
@@ -332,7 +336,14 @@
       });
 
       accept.addEventListener('click', async () => {
-        if (!deferred) return hide();
+        if (!deferred) {
+          text.textContent = isIosSafari
+            ? 'Safari 아래의 공유 버튼을 누른 뒤 “홈 화면에 추가”를 선택해 주세요.'
+            : window.isSecureContext
+            ? '브라우저 메뉴에서 “앱 설치” 또는 “홈 화면에 추가”를 선택해 주세요.'
+            : '현재 HTTP 주소는 설치 버튼을 지원하지 않습니다. HTTPS 배포 주소에서 다시 열어 주세요.';
+          return;
+        }
         hide();
         deferred.prompt();
         try {
@@ -348,15 +359,86 @@
         hide();
       });
 
-      // iOS 사파리는 beforeinstallprompt를 쏘지 않으므로 공유 버튼 경로를 직접 안내한다.
+      // iOS 사파리와 설치 이벤트가 없는 모바일 브라우저에도 수동 경로를 안내한다.
       const isIosSafari =
         /iPad|iPhone|iPod/.test(window.navigator.userAgent) &&
         !/CriOS|FxiOS|EdgiOS/.test(window.navigator.userAgent);
-      if (isIosSafari) {
+      const isMobileBrowser =
+        /Android|iPad|iPhone|iPod|Mobile/i.test(window.navigator.userAgent) ||
+        window.matchMedia('(pointer: coarse)').matches;
+      if (isMobileBrowser) {
         window.setTimeout(() => {
-          show('공유 버튼을 눌러 “홈 화면에 추가”하면 주소창 없이 전체화면으로 플레이할 수 있어요.', false);
-        }, 4000);
+          if (deferred) return;
+          if (!window.isSecureContext) {
+            show('현재 테스트 주소는 HTTP라 자동 설치가 차단됩니다. 설치 방법을 확인해 주세요.', false);
+            return;
+          }
+          if (isIosSafari) {
+            show('공유 버튼을 눌러 “홈 화면에 추가”하면 주소창 없이 전체화면으로 플레이할 수 있어요.', false);
+            return;
+          }
+          show('브라우저 메뉴에서 “앱 설치” 또는 “홈 화면에 추가”를 선택하면 앱 화면으로 플레이할 수 있어요.', false);
+        }, 700);
       }
+    })();
+  </script>
+  <script id="pwa-worker-registration">
+    (() => {
+      if (!('serviceWorker' in window.navigator) || !window.isSecureContext) return;
+      window.addEventListener('load', () => {
+        window.navigator.serviceWorker.register('pwa_service_worker.js', {
+          scope: './',
+          updateViaCache: 'none',
+        }).catch(() => {
+          // 설치 지원이 없는 브라우저에서도 게임 실행은 계속한다.
+        });
+      });
+    })();
+  </script>
+  <script id="automatic-app-update">
+    (() => {
+      // 설치된 앱도 다시 열거나 백그라운드에서 돌아올 때 최신 빌드로 이동한다.
+      // 게임 중간에 갑자기 새로고침하지 않도록 활성 플레이 중에는 폴링하지 않는다.
+      const currentBuildId = document
+        .querySelector('meta[name="decimal-build-id"]')
+        ?.getAttribute('content');
+      if (!currentBuildId || !/^[0-9a-f]{12}$/.test(currentBuildId)) return;
+
+      let checking = false;
+      const checkForUpdate = async () => {
+        if (checking || !window.navigator.onLine) return;
+        checking = true;
+        try {
+          const response = await fetch(`version.json?check=${Date.now()}`, {
+            cache: 'no-store',
+            credentials: 'same-origin',
+          });
+          if (!response.ok) return;
+          const latest = await response.json();
+          const latestBuildId = latest?.build_id;
+          if (
+            typeof latestBuildId !== 'string' ||
+            latestBuildId === currentBuildId ||
+            !/^[0-9a-f]{12}$/.test(latestBuildId)
+          ) return;
+
+          const nextUrl = new URL(window.location.href);
+          if (nextUrl.searchParams.get('appBuild') === latestBuildId) return;
+          nextUrl.searchParams.set('appBuild', latestBuildId);
+          window.location.replace(nextUrl.toString());
+        } catch (_) {
+          // 오프라인이거나 배포 교체 중이면 다음 실행·복귀 때 다시 확인한다.
+        } finally {
+          checking = false;
+        }
+      };
+
+      window.setTimeout(checkForUpdate, 1200);
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') checkForUpdate();
+      });
+      window.addEventListener('pageshow', checkForUpdate);
+      window.addEventListener('online', checkForUpdate);
     })();
   </script>
   <script src="flutter_bootstrap.js" async></script>

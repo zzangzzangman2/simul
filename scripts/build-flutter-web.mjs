@@ -122,7 +122,12 @@ async function exists(path) {
 }
 
 async function validateBuild() {
-  for (const name of ["index.html", "flutter_bootstrap.js", "main.dart.js"]) {
+  for (const name of [
+    "index.html",
+    "flutter_bootstrap.js",
+    "main.dart.js",
+    "pwa_service_worker.js",
+  ]) {
     await access(resolve(buildOutput, name));
   }
   const index = await readFile(resolve(buildOutput, "index.html"), "utf8");
@@ -137,11 +142,47 @@ async function validateBuild() {
     throw new Error("Flutter build is missing the fixed mobile viewport host.");
   }
   if (
+    !index.includes('id="install-prompt"') ||
+    !index.includes('id="pwa-worker-registration"') ||
+    !index.includes('id="automatic-app-update"') ||
+    !index.includes('content="$DECIMAL_BUILD_ID"')
+  ) {
+    throw new Error("Flutter build is missing the install or automatic update shell.");
+  }
+  if (
     !bootstrap.includes("hostElement:") ||
     !bootstrap.includes("document.getElementById('flutter_host')")
   ) {
     throw new Error("Flutter bootstrap is not attached to the fixed host element.");
   }
+}
+
+async function hashBuildOutput() {
+  const files = [];
+  const queue = [buildOutput];
+  while (queue.length) {
+    const directory = queue.shift();
+    const entries = await readdir(directory, { withFileTypes: true });
+    entries.sort((left, right) => left.name.localeCompare(right.name));
+    for (const entry of entries) {
+      const path = resolve(directory, entry.name);
+      if (entry.isDirectory()) queue.push(path);
+      else if (entry.isFile()) files.push(path);
+    }
+  }
+
+  files.sort((left, right) => left.localeCompare(right));
+  const digest = createHash("sha256");
+  for (const path of files) {
+    const name = relative(buildOutput, path).replaceAll("\\", "/");
+    // This file receives build_id below. Excluding it keeps identical builds
+    // deterministic even when an earlier stamped output remains on disk.
+    if (name === "version.json") continue;
+    digest.update(name);
+    digest.update("\0");
+    digest.update(await readFile(path));
+  }
+  return digest.digest("hex").slice(0, 12);
 }
 
 /**
@@ -150,26 +191,20 @@ async function validateBuild() {
  * 등록 해제하는 스텁이다. 그래서 갱신 여부가 전적으로 HTTP 캐시에 달려 있고,
  * 5MB짜리 `main.dart.js`가 캐시에 붙어 있으면 유저는 배포 뒤에도 옛 게임을 본다.
  *
- * 두 진입 스크립트 URL에 내용 해시를 붙여 새 빌드가 반드시 새 URL이 되게 한다.
- * 타임스탬프가 아니라 내용 해시를 쓰므로 코드가 같으면 산출물도 같고,
- * `public/play/`가 커밋되는 저장소에 불필요한 diff가 쌓이지 않는다.
+ * 전체 Web 산출물의 내용 해시를 두 진입 스크립트 URL과 version.json에 붙인다.
+ * 따라서 Dart 코드뿐 아니라 이미지·manifest·HTML만 바뀐 빌드도 설치 앱이 감지한다.
+ * 타임스탬프가 아니라 내용 해시를 쓰므로 산출물이 같으면 ID도 같다.
  */
 async function stampBuildId() {
   const indexPath = resolve(buildOutput, "index.html");
   const bootstrapPath = resolve(buildOutput, "flutter_bootstrap.js");
-  const mainPath = resolve(buildOutput, "main.dart.js");
 
-  const [indexHtml, bootstrap, mainJs] = await Promise.all([
+  const [indexHtml, bootstrap] = await Promise.all([
     readFile(indexPath, "utf8"),
     readFile(bootstrapPath, "utf8"),
-    readFile(mainPath),
   ]);
 
-  const buildId = createHash("sha256")
-    .update(mainJs)
-    .update(bootstrap)
-    .digest("hex")
-    .slice(0, 12);
+  const buildId = await hashBuildOutput();
 
   if (!indexHtml.includes('src="flutter_bootstrap.js"')) {
     throw new Error("Flutter index.html no longer loads flutter_bootstrap.js by name.");
@@ -177,13 +212,25 @@ async function stampBuildId() {
   if (!bootstrap.includes('"main.dart.js"')) {
     throw new Error("Flutter bootstrap no longer references main.dart.js by name.");
   }
+  if (!indexHtml.includes('content="$DECIMAL_BUILD_ID"')) {
+    throw new Error("Flutter index.html is missing the build id placeholder.");
+  }
+  if (!indexHtml.includes("'pwa_service_worker.js'")) {
+    throw new Error("Flutter index.html no longer registers the PWA worker by name.");
+  }
 
   await writeFile(
     indexPath,
-    indexHtml.replaceAll(
-      'src="flutter_bootstrap.js"',
-      `src="flutter_bootstrap.js?v=${buildId}"`,
-    ),
+    indexHtml
+      .replaceAll(
+        'src="flutter_bootstrap.js"',
+        `src="flutter_bootstrap.js?v=${buildId}"`,
+      )
+      .replace('content="$DECIMAL_BUILD_ID"', `content="${buildId}"`)
+      .replace(
+        "'pwa_service_worker.js'",
+        `'pwa_service_worker.js?v=${buildId}'`,
+      ),
     "utf8",
   );
   await writeFile(
