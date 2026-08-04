@@ -209,12 +209,10 @@ const _lobbyMotionProfiles = <String, _LobbyMotionProfile>{
       _LobbyIdleGesture.settle,
       _LobbyIdleGesture.perk,
     ],
-    motionFrames: <String>[
-      'assets/images/production_soft_painted/lee_jian/10_lobby_tool_check_f0_v2.png',
-      'assets/images/production_soft_painted/lee_jian/10_lobby_tool_check_f1_v2.png',
-      'assets/images/production_soft_painted/lee_jian/10_lobby_tool_check_f2_v2.png',
-      'assets/images/production_soft_painted/lee_jian/10_lobby_tool_check_f3_v2.png',
-    ],
+    // The previous field-uniform tool-check frames were removed when Jian's
+    // approved casual athletic set replaced that outfit. The lobby remains a
+    // still portrait with blink-only motion.
+    motionFrames: <String>[],
     strength: 0.94,
     tempoMs: 2800,
     faceLine: '손보다 먼저 말해. 조금 놀랐잖아.',
@@ -304,12 +302,9 @@ const _lobbyMotionProfiles = <String, _LobbyMotionProfile>{
       _LobbyIdleGesture.lean,
       _LobbyIdleGesture.nod,
     ],
-    motionFrames: <String>[
-      'assets/images/production_soft_painted/oh_jiwoo/10_lobby_idea_f0_v2.png',
-      'assets/images/production_soft_painted/oh_jiwoo/10_lobby_idea_f1_v2.png',
-      'assets/images/production_soft_painted/oh_jiwoo/10_lobby_idea_f2_v2.png',
-      'assets/images/production_soft_painted/oh_jiwoo/10_lobby_idea_f3_v2.png',
-    ],
+    // Jiwoo's legacy field-uniform frames are kept only in the external
+    // backup. The active casual set uses the approved still poses and blink.
+    motionFrames: <String>[],
     strength: 1.04,
     tempoMs: 2800,
     faceLine: '가설 하나. 지금 내 반응을 관찰 중이지?',
@@ -418,8 +413,8 @@ const _lobbyBlinkGeometry = <String, _LobbyBlinkGeometry>{
     skinColor: Color(0xFFFDE9DB),
   ),
   'lee_jian': _LobbyBlinkGeometry(
-    leftEye: Offset(0.412, 0.138),
-    rightEye: Offset(0.483, 0.138),
+    leftEye: Offset(0.476, 0.131),
+    rightEye: Offset(0.549, 0.131),
     eyeWidth: 0.044,
     skinColor: Color(0xFFFDEDE3),
   ),
@@ -448,10 +443,10 @@ const _lobbyBlinkGeometry = <String, _LobbyBlinkGeometry>{
     skinColor: Color(0xFFFDEAE2),
   ),
   'oh_jiwoo': _LobbyBlinkGeometry(
-    leftEye: Offset(0.500, 0.133),
-    rightEye: Offset(0.573, 0.146),
+    leftEye: Offset(0.475, 0.132),
+    rightEye: Offset(0.544, 0.132),
     eyeWidth: 0.042,
-    skinColor: Color(0xFFFEE6D7),
+    skinColor: Color(0xFFFCE4DA),
   ),
   'yoon_chaea': _LobbyBlinkGeometry(
     leftEye: Offset(0.478, 0.135),
@@ -479,14 +474,14 @@ const _lobbyBlinkGeometryByAsset = <String, _LobbyBlinkGeometry>{
       ),
   'assets/images/production_soft_painted/lee_jian/01_neutral_screwdriver_v2.png':
       _LobbyBlinkGeometry(
-        leftEye: Offset(0.461, 0.139),
-        rightEye: Offset(0.534, 0.139),
+        leftEye: Offset(0.476, 0.131),
+        rightEye: Offset(0.550, 0.131),
         skinColor: Color(0xFFFDEDE3),
       ),
   'assets/images/production_soft_painted/lee_jian/07_apologetic_boundary_v2.png':
       _LobbyBlinkGeometry(
-        leftEye: Offset(0.416, 0.139),
-        rightEye: Offset(0.487, 0.139),
+        leftEye: Offset(0.467, 0.132),
+        rightEye: Offset(0.539, 0.132),
         skinColor: Color(0xFFFDEDE4),
       ),
   'assets/images/production_soft_painted/choi_iseo/01_base_thread_v1.png':
@@ -545,17 +540,17 @@ const _lobbyBlinkGeometryByAsset = <String, _LobbyBlinkGeometry>{
       ),
   'assets/images/production_soft_painted/oh_jiwoo/01_alert_neutral_v1.png':
       _LobbyBlinkGeometry(
-        leftEye: Offset(0.468, 0.141),
-        rightEye: Offset(0.538, 0.141),
+        leftEye: Offset(0.475, 0.132),
+        rightEye: Offset(0.544, 0.132),
         eyeWidth: 0.042,
-        skinColor: Color(0xFFFEE6D7),
+        skinColor: Color(0xFFFCE4DA),
       ),
   'assets/images/production_soft_painted/oh_jiwoo/04_playful_counterpoint_v1.png':
       _LobbyBlinkGeometry(
-        leftEye: Offset(0.477, 0.136),
-        rightEye: Offset(0.545, 0.149),
+        leftEye: Offset(0.456, 0.132),
+        rightEye: Offset(0.528, 0.132),
         eyeWidth: 0.042,
-        skinColor: Color(0xFFFEE6D7),
+        skinColor: Color(0xFFFCE4DA),
       ),
   'assets/images/production_soft_painted/yoon_chaea/01_neutral_tie_v1.png':
       _LobbyBlinkGeometry(

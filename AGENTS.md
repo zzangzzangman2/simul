@@ -70,12 +70,12 @@
 | 인물 | MBTI | 정체성 앵커 |
 | --- | --- | --- |
 | 김서아 | ISFJ | `art_references/kim_seoa_identity_anchor_v1.png` |
-| 이지안 | ISTP | `art_references/lee_jian_face_identity_anchor_v2.png`, `lee_jian_identity_anchor_v2.png` |
+| 이지안 | ISTP | `art_references/lee_jian_face_identity_anchor_v3.png`, `lee_jian_identity_anchor_v3.png` |
 | 최이서 | ISFP | `art_references/choi_iseo_identity_anchor_v1.png` |
 | 정아린 | ESTJ | `art_references/jung_arin_identity_anchor_v1.png` |
 | 박하은 | ENFJ | `art_references/park_haeun_face_identity_anchor_v2.png`, `park_haeun_identity_anchor_v2.png` |
 | 한수아 | ENFP | `art_references/han_sua_identity_anchor_v3.png`(1차 전신), `art_references/han_sua_face_identity_anchor_v3.png`(2차 얼굴 크롭) |
-| 오지우 | ENTP | `art_references/oh_jiwoo_identity_anchor_v1.png` |
+| 오지우 | ENTP | `art_references/oh_jiwoo_identity_anchor_v2.png` |
 | 윤채아 | INTJ | `art_references/yoon_chaea_identity_anchor_v1.png` |
 | 김학준 | ISTJ | `production_soft_painted/kim_hakjun/` v4 9종, `art_references/future_development_male_uniform_length_reference_v1.png` |
 | 한서윤 | INFJ | 외형 비보존. 23세 운영관 역할에서 v3 새 디자인 승인 필요 |
@@ -126,15 +126,17 @@
   새 의상으로 전면 재설계하지 않는다.
 - 김학준은 전면 재설계를 마쳤다. 이후 포즈는 현행 v4 9종의 얼굴·헤어·체형과 공식
   남자 데시멀 센터 지급 현장복을 고정하며, 남자 현장복 앵커의 디자인·핏·비율·길이를 따른다.
-- 여자 8명은 머리와 현장복을 가린 얼굴만 보아도, 얼굴을 가린 전신 실루엣만 보아도
+- 여자 8명은 머리와 개별 사복을 가린 얼굴만 보아도, 얼굴을 가린 전신 실루엣만 보아도
   서로 구분되어야 한다. 얼굴 골격, 이마·헤어라인, 눈, 눈썹, 코, 입, 인중, 턱,
   볼 중 최소 네 축을 뚜렷하게 다르게 설계한다.
 - 각 인물의 상대 키, 어깨 폭·경사, 몸통 길이, 허리·골반의 상대 폭, 팔다리 길이,
   건강한 다리 굵기, 체중 중심을 따로 정한다. 같은 마네킹에 얼굴만 바꾸지 않는다.
 - 체형 차이는 건강하고 비선정적인 14살 범위에서만 표현한다.
-- 여학생 공통 하복은 복부를 완전히 가리는 불투명 흰 반소매 단추 셔츠, 빨간 체크
-  넥타이, V형 허리단의 빨간 체크 주름치마, 산호분홍 통풍 클로그다. 클로그는
-  맨발로 신으며 양말·스타킹·타이츠, 긴소매, 크롭, 배 노출은 금지한다.
+- 여자 동기는 공통 교복이나 공통 센터 현장복을 사용하지 않는다. 인물별 사용자 승인
+  사복을 얼굴·헤어·체형과 함께 정체성으로 고정한다. 2026-08-04 기준 오지우는 검정
+  오버핏 홈웨어와 검정 슬라이드, 이지안은 흰색·남색 운동복과 운동화로 전환했다.
+  나머지 6명은 사용자가 새 사복 참조를 줄 때까지 현재 승인 런타임 의상을 임시 유지하되,
+  그 의상을 전원 공통 규칙이나 신규 캐릭터 템플릿으로 확장하지 않는다.
 - 같은 인물의 표정·동작 세트는 얼굴, 체형, 복장, 소품을 고정하되 고개·시선·몸의
   기울기·손동작·머리카락 관성을 자연스럽게 달리한다.
 - 여자 동기 8명과 1999년 국정원·정부 인물 6명은 v3 교체를 완료했다. 김학준의 새

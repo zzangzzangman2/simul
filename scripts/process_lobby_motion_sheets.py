@@ -11,12 +11,10 @@ SOURCES = ART / "lobby_motion_sources"
 
 MOTIONS = {
     "kim_seoa": ("kim_seoa_hair_tuck_sheet_v1.png", "hair_tuck", "grid"),
-    "lee_jian": ("lee_jian_tool_check_sheet_v1.png", "tool_check", "grid"),
     "choi_iseo": ("choi_iseo_thread_tidy_sheet_v1.png", "thread_tidy", "grid"),
     "jung_arin": ("jung_arin_tie_reset_sheet_v1.png", "tie_reset", "grid"),
     "park_haeun": ("park_haeun_welcome_sheet_v1.png", "welcome", "grid"),
     "han_sua": ("han_sua_stretch_strip_v2.png", "stretch", "strip"),
-    "oh_jiwoo": ("oh_jiwoo_idea_sheet_v1.png", "idea", "grid"),
     "yoon_chaea": ("yoon_chaea_uniform_tidy_sheet_v1.png", "uniform_tidy", "grid"),
 }
 

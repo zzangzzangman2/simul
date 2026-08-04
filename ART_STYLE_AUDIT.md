@@ -23,12 +23,12 @@
 | 인물 | 정체성 앵커 | 현행 런타임 세트 | v3 재제작 판정 |
 | --- | --- | --- | --- |
 | 김서아 | `kim_seoa_identity_anchor_v1.png` | `production_soft_painted/kim_seoa/` 새 v3 9종 | **완료·적용** — 기존 얼굴·헤어·체형·의상·포즈를 유지한 9종을 런타임 교체 |
-| 이지안 | `lee_jian_face_identity_anchor_v2.png`, `lee_jian_identity_anchor_v2.png` | `production_soft_painted/lee_jian/` 새 v3 9종 | **완료·적용** — 얼굴 앵커를 픽셀 최우선으로 사용한 9종을 런타임 교체 |
+| 이지안 | `lee_jian_face_identity_anchor_v3.png`, `lee_jian_identity_anchor_v3.png` | `production_soft_painted/lee_jian/` 승인 사복 v3 9종 | **완료·적용** — 2026-08-04 사용자 얼굴·흰/남색 운동복 참조를 반영해 9종과 앵커를 교체. 구형 체크 현장복·로비 4프레임은 백업 없이 삭제 |
 | 최이서 | `choi_iseo_identity_anchor_v1.png` | `production_soft_painted/choi_iseo/` 새 v3 9종 | **완료·적용** — 기존 얼굴·헤어·체형·의상·포즈를 유지한 9종을 런타임 교체 |
 | 정아린 | `jung_arin_identity_anchor_v1.png` | `production_soft_painted/jung_arin/` 새 v3 9종 | **완료·적용** — 9종 적용 후 1번 기본 표정도 사용자 승인 중립 얼굴 보정본으로 교체 |
 | 박하은 | `park_haeun_face_identity_anchor_v2.png`, `park_haeun_identity_anchor_v2.png` | `production_soft_painted/park_haeun/` 새 v3 9종 | **완료·적용** — 2026-08-03 사용자 승인 후 런타임 교체 |
 | 한수아 | `han_sua_identity_anchor_v3.png`(1차 전신), `han_sua_face_identity_anchor_v3.png`(2차 얼굴 크롭) | `production_soft_painted/han_sua/` 새 v3 9종 | **완료·적용** — 2026-08-03 사용자 승인. 구형 9종 제거 후 런타임 교체 |
-| 오지우 | `oh_jiwoo_identity_anchor_v1.png` | `production_soft_painted/oh_jiwoo/` 새 v3 9종 | **완료·적용** — 2026-08-03 사용자 승인. 1번은 웃음 없는 무표정으로 런타임 교체 |
+| 오지우 | `oh_jiwoo_identity_anchor_v2.png` | `production_soft_painted/oh_jiwoo/` 승인 사복 v3 9종 | **완료·적용** — 2026-08-04 흑청색 장발·파란 눈·검정 홈웨어 참조를 반영해 9종과 앵커를 교체. 구형 세트는 저장소 밖에 백업 |
 | 윤채아 | `yoon_chaea_identity_anchor_v1.png` | `production_soft_painted/yoon_chaea/` 새 v3 9종 | **완료·적용** — 웃음 없는 무표정 기본 1번을 포함해 런타임 교체 |
 
 위 경로는 모두 `flutter_app/assets/images/` 기준이다. 현재 편집기와 프롤로그는
@@ -70,14 +70,16 @@
 | 구형 역사 프롤로그 | 배경 10종·미참조 인물 5종 삭제. 버스 전환과 본관 앞은 현행 데시멀 외관으로 치환 |
 | 김학준 구형 호환 자산 | 새 v3 대표 디자인 연결 후 `legacy_quarantine/character_hakjun_orientation_v2.png`와 격리 폴더 삭제 |
 | 주인공 구형 포즈 | `protagonist_seed01/` 24종과 번들 선언 삭제. 대사·편집기·주식 실습·조직 기본값의 참조도 제거 |
+| 오지우 구형 현장복 | 기존 런타임 13종·v1 앵커·아이디어 동작 시트를 저장소 밖 `simul-backups/oh_jiwoo_uniform_v1_2026-08-04/`에 백업한 뒤 런타임과 재처리 목록에서 제거 |
+| 이지안 구형 현장복 | 기존 9종은 새 승인 사복 픽셀로 덮어쓰고 v2 앵커·공구 점검 4프레임·원본 시트를 사용자 지시에 따라 백업 없이 삭제 |
 ## 승인·재제작 검사
 
 - 여자 동기 8명은 기존 승인 얼굴과 픽셀 비교했을 때 동일인으로 즉시 읽히는가
-- 여자 동기 8명은 기존 헤어·체형·의상·표정·포즈·구도를 그대로 유지했는가
+- 여자 동기 8명은 각 인물의 최신 승인 헤어·체형·사복·표정·포즈·구도를 유지했는가
 - 다른 여학생과 얼굴 골격·눈·코·입·턱선 중 최소 네 축이 뚜렷하게 다른가
 - 비보존 인물은 구형 부적합 외형이나 여자 8명의 얼굴을 재활용하지 않고 새로 설계됐는가
 - 얼굴을 가린 전신 실루엣에서도 키·어깨·몸통·팔다리·체중 중심이 구분되는가
-- 해당 인물의 얼굴·머리·체형이 포즈마다 유지되는가
+- 해당 인물의 얼굴·머리·체형·개별 승인 사복이 포즈마다 유지되는가
 - 고개·시선·손동작·체중 이동·머리카락 관성이 장면별로 다른가
 - 여자 동기 8명은 복부를 가리는 흰 반소매 셔츠, 빨간 체크 넥타이·치마, 맨발
   산호분홍 통풍 클로그가 정확한가
