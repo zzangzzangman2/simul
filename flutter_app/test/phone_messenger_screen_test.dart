@@ -1,7 +1,52 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:millennium_capital/game/game_engine.dart';
+import 'package:millennium_capital/game/phone_ai_service.dart';
 import 'package:millennium_capital/main.dart';
+
+class _MemoryPhoneAiCredentialStore implements PhoneAiCredentialStore {
+  String? apiKey;
+  bool promptDismissed = false;
+
+  @override
+  Future<void> deleteApiKey() async => apiKey = null;
+
+  @override
+  Future<String?> readApiKey() async => apiKey;
+
+  @override
+  Future<bool> readPromptDismissed() async => promptDismissed;
+
+  @override
+  Future<bool> writeApiKey(String value) async {
+    apiKey = value;
+    return true;
+  }
+
+  @override
+  Future<void> writePromptDismissed(bool value) async {
+    promptDismissed = value;
+  }
+}
+
+PhoneAiService _phoneAiService({
+  required bool serverConfigured,
+  _MemoryPhoneAiCredentialStore? store,
+}) => PhoneAiService(
+  endpoint: Uri.parse('https://decimal.test/api/gemini/chat'),
+  credentialStore: store ?? _MemoryPhoneAiCredentialStore(),
+  client: MockClient(
+    (request) async => http.Response(
+      jsonEncode({'ok': true, 'configured': serverConfigured}),
+      200,
+      headers: const {'content-type': 'application/json'},
+    ),
+  ),
+);
 
 void main() {
   testWidgets('future-talk lists nine contacts and sends typed MBTI replies', (
@@ -34,6 +79,7 @@ void main() {
             if (result.success) state = result.state;
             return result;
           },
+          aiService: _phoneAiService(serverConfigured: true),
         ),
       ),
     );
@@ -122,6 +168,7 @@ void main() {
             if (result.success) state = result.state;
             return result;
           },
+          phoneAiService: _phoneAiService(serverConfigured: true),
           onCompleteWork: (_) async => state,
           onExecuteTrade: (_) async => TradeExecutionResult(
             state: state,
@@ -138,5 +185,86 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('phone-messenger-screen')), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('first entry explains and registers a missing Gemini key', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    const engine = GameEngine();
+    final state = engine.createNewGame(
+      'AI 등록 화면 테스트',
+      worldSeed: 'phone-ai-setup',
+    );
+    final store = _MemoryPhoneAiCredentialStore();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PhoneMessengerScreen(
+          state: state,
+          onMarkRead: (contactId) async =>
+              engine.markPhoneThreadRead(state, contactId: contactId),
+          onSend: (contactId, text) async =>
+              engine.sendPhoneMessage(state, contactId: contactId, text: text),
+          aiService: _phoneAiService(serverConfigured: false, store: store),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('phone-ai-registration-dialog')),
+      findsOneWidget,
+    );
+    expect(find.text('더 실감 나는 대화를 켤까요?'), findsOneWidget);
+    expect(find.textContaining('12만 가지 이상의 로컬 대화'), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const Key('phone-ai-key-input')),
+      'test-project-decimal-personal-key-1234567890',
+    );
+    await tester.tap(find.byKey(const Key('phone-ai-register-button')));
+    await tester.pumpAndSettle();
+
+    expect(store.apiKey, 'test-project-decimal-personal-key-1234567890');
+    expect(store.promptDismissed, isTrue);
+    expect(find.byKey(const Key('phone-ai-registration-dialog')), findsNothing);
+    expect(find.byKey(const Key('phone-ai-setup-banner')), findsNothing);
+    expect(find.textContaining('안전하게 등록했습니다'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('local dialogue remains available when key setup is skipped', (
+    tester,
+  ) async {
+    const engine = GameEngine();
+    final state = engine.createNewGame(
+      'AI 건너뛰기 테스트',
+      worldSeed: 'phone-ai-skip',
+    );
+    final store = _MemoryPhoneAiCredentialStore();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PhoneMessengerScreen(
+          state: state,
+          onMarkRead: (contactId) async =>
+              engine.markPhoneThreadRead(state, contactId: contactId),
+          onSend: (contactId, text) async =>
+              engine.sendPhoneMessage(state, contactId: contactId, text: text),
+          aiService: _phoneAiService(serverConfigured: false, store: store),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('phone-ai-local-only-button')));
+    await tester.pumpAndSettle();
+
+    expect(store.apiKey, isNull);
+    expect(store.promptDismissed, isTrue);
+    expect(find.byKey(const Key('phone-ai-setup-banner')), findsOneWidget);
+    expect(find.byKey(const Key('phone-messenger-screen')), findsOneWidget);
   });
 }

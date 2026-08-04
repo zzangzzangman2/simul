@@ -1,19 +1,19 @@
 # 서하늘 공인중개사 자산 규격
 
 이 문서는 부동산 전용 화면에 반복 등장하는 **서하늘 공인중개사**의 역할, 6개
-런타임 상태와 v3 전면 재설계 규칙을 정의한다. 서하늘은 여자 동기 8명이 아니므로
-기존 얼굴·헤어·체형·의상·장신구는 보존 대상이 아니다.
+런타임 상태와 v3 렌더링 전환 규칙을 정의한다. 서하늘의 기존 얼굴·헤어·체형·의상·
+장신구·신발·직업 소품은 정체성 보존 대상이다.
 
 ## 기준 참조의 역할
 
 - 최상위 목표 화풍: `SIMUL polished soft-render VN anime v3`
 - 화풍 참조: `art_references/simul_polished_soft_render_vn_style_anchor_v3.png`의 렌더링 문법만 사용
-- 아래 파일은 구형 외형 기록이며 새 정체성 앵커가 아니다.
+- 아래 파일은 서하늘의 정체성·의상·포즈 앵커다.
   - `art_references/realtor_identity_pose_reference_01.jpg`
   - `art_references/realtor_identity_pose_reference_02.jpg`
   - `art_references/realtor_identity_pose_reference_03.jpg`
-- 구형 참고 이미지의 얼굴·머리·장신구·의상·샌들을 복제하지 않는다. 역할과 포즈
-  기능을 이해하는 자료로만 제한하고 생성 입력에는 넣지 않는다.
+- 참고 이미지의 얼굴·머리·장신구·의상·샌들·체형을 동일 인물로 유지한다. 새 생성이나
+  편집에서는 이 자산을 정체성 입력으로 사용하고 렌더링 문법만 v3로 바꾼다.
 - 새 대표 디자인은 정식 앵커 속 한수아나 여자 동기 8명의 얼굴·머리·체형·의상을 복제하지 않는다.
 
 ## 유지할 서사 정체성
@@ -24,12 +24,11 @@
 - 여섯 상태에서 같은 새 인물로 읽히는 얼굴·헤어·체형·의상
 - 교복풍 얼굴·미성년 체형으로 줄이지 않는다.
 
-## 새 대표 디자인 승인
+## 기존 디자인 보존 v3 대표 렌더링 승인
 
-기존 오프숄더 프릴 원피스·가터·플랫폼 샌들·장식 과밀 디자인은 보존하지 않는다.
-1999~2000년 한국의 24세 공인중개사 역할과 화면 가독성에 맞는 새 얼굴·헤어·체형·
-복장·신발을 대표 전신 한 장으로 먼저 제안하고 사용자 승인을 받는다. 승인 뒤에는
-그 새 디자인을 6개 상태에서 동일하게 유지한다.
+기존 오프숄더 프릴 원피스·가터·플랫폼 샌들·장식, 얼굴·헤어·체형을 그대로 보존한다.
+대표 전신 한 장의 선화·채색·명암·재질감만 v3로 다시 렌더링해 먼저 승인받는다.
+승인 뒤에는 같은 디자인을 6개 상태에서 동일하게 유지한다.
 
 ## 런타임 자산과 상태 매핑
 
@@ -66,11 +65,11 @@ Canonical rendering reference: art_references/simul_polished_soft_render_vn_styl
 Use it for SIMUL polished soft-render VN anime v3 rendering only.
 Do not copy Sua's face, black wavy hair, body, uniform, pose or expression.
 
-Design a new 24-year-old adult Korean realtor, Seo Haneul, for her first
-representative full-body approval image. Keep only her name, occupation,
-professional and trustworthy role, age, and 1999-2000 Korean setting.
-Do not preserve the legacy face, indigo-to-cyan bob, ornaments, frilled dress,
-garter, or platform sandals. Do not reuse any of the eight cohort girls.
+Render the same existing 24-year-old adult Korean realtor, Seo Haneul, for her
+representative full-body approval image. Preserve her exact face identity,
+indigo-to-cyan bob, ornaments, off-shoulder frilled dress, garter, platform
+sandals, body silhouette and work props. Do not redesign or simplify them.
+Do not reuse any of the eight cohort girls.
 
 Use thin controlled dark colored linework, polished soft volume shading,
 layered irises, dense but controlled hair rendering, clean skin volume,
@@ -79,8 +78,8 @@ Standing full-body transparent sprite, 1024x1536, common baseline,
 no background, no cast shadow, no text, no logo, no watermark.
 ```
 
-대표 디자인 한 장이 승인되기 전에는 6개 상태를 대량 생성하지 않는다. 승인 뒤에는
-프롬프트를 `Design the same newly approved Seo Haneul`로 바꾸고 표의 표정·손동작·업무
+대표 v3 렌더링 한 장이 승인되기 전에는 6개 상태를 대량 생성하지 않는다. 승인 뒤에는
+프롬프트를 `Render the same approved Seo Haneul design`으로 바꾸고 표의 표정·손동작·업무
 소품만 상태별로 추가한다.
 
 ## 적용 전 회귀 확인

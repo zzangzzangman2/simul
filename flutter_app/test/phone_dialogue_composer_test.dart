@@ -240,7 +240,7 @@ void main() {
       );
       expect(reply.text, contains('손해'));
       expect(reply.text, isNot(contains('번 돈과')));
-      expect(reply.affectionDelta, 0);
+      expect(reply.affectionDelta, -1);
       expect(reply.trustDelta, -1);
       expect(reply.investmentRespectDelta, -1);
     },

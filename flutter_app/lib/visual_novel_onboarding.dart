@@ -1,9 +1,9 @@
 part of 'main.dart';
 
-const _onboardingBeatCount = 292;
+const _onboardingBeatCount = 294;
 const _maximumDialogueBeatCount = 320;
 const _dialogueAppearanceVersion = 19;
-const _dialogueContentVersion = 3;
+const _dialogueContentVersion = 4;
 const _dialogueRuntimeStorageKey = 'project-decimal-dialogue-runtime-v2';
 const _dialogueBundleAsset = 'assets/dialogue/dialogue-editor-override.json';
 const _orientationCompleteBeat = _onboardingBeatCount - 1;

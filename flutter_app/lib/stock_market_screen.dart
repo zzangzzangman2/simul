@@ -7519,11 +7519,22 @@ class _StockTutorialGuideOverlay extends StatefulWidget {
     required this.teacherPoseAsset,
     required this.onAction,
     this.characterAssets,
+    this.wrongTapFeedbacks = const <String>[
+      '수아: 어, 거기 아니야. 나도 방금 딴 데 눌렀어.',
+      '이지안: 그거 눌러도 아무 일 안 나. 확인 누르기 전엔 안 사져.',
+      '정아린: 노란 거. 노란 거 눌러.',
+      '김서아: 괜찮아. 나도 두 번 잘못 눌렀어.',
+      '오지우: 속보. 06번 동기, 화면 다른 데를 누름.',
+      '박하은: 천천히 해도 돼. 아직 아무도 안 끝났어.',
+      '윤채아: 지금 누른 데는 아무 기능 없어.',
+      '한서윤 운영관: 노란 테두리로 돌아오세요.',
+    ],
   }) : assert(messages.length > 0),
        assert(speakers.length == messages.length),
        assert(
          characterAssets == null || characterAssets.length == messages.length,
-       );
+       ),
+       assert(wrongTapFeedbacks.length > 0);
 
   final Key overlayKey;
   final Key actionKey;
@@ -7535,6 +7546,7 @@ class _StockTutorialGuideOverlay extends StatefulWidget {
   final String actionLabel;
   final String teacherPoseAsset;
   final List<String?>? characterAssets;
+  final List<String> wrongTapFeedbacks;
   final VoidCallback onAction;
   @override
   State<_StockTutorialGuideOverlay> createState() =>
@@ -7625,18 +7637,8 @@ class _StockTutorialGuideOverlayState
   }
 
   void _handleWrongTap() {
-    // 같은 문구가 반복되면 실수가 창피해진다. 같이 틀려 주는 대사를 섞어
-    // 오조작이 교실의 일상으로 읽히게 한다.
-    final feedback = switch (_wrongTapCount % 8) {
-      0 => '수아: 어, 거기 아니야. 나도 방금 딴 데 눌렀어.',
-      1 => '이지안: 그거 눌러도 아무 일 안 나. 확인 누르기 전엔 안 사져.',
-      2 => '정아린: 노란 거. 노란 거 눌러.',
-      3 => '김서아: 괜찮아. 나도 두 번 잘못 눌렀어.',
-      4 => '오지우: 속보. 06번 동기, 화면 다른 데를 누름.',
-      5 => '박하은: 천천히 해도 돼. 아직 아무도 안 끝났어.',
-      6 => '윤채아: 지금 누른 데는 아무 기능 없어.',
-      _ => '한서윤 운영관: 노란 테두리로 돌아오세요.',
-    };
+    final feedback = widget
+        .wrongTapFeedbacks[_wrongTapCount % widget.wrongTapFeedbacks.length];
     setState(() {
       _wrongTapCount += 1;
       _wrongTapFeedback = feedback;

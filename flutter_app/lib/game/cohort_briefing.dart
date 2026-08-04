@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'game_state.dart';
 import 'market_clock.dart';
 import 'market_data.dart';
@@ -353,17 +351,6 @@ class CohortBriefing {
   List<CohortBriefingChoice> get choices => definition.choices;
 }
 
-String _briefingMoney(num value) {
-  final rounded = value.round();
-  final digits = rounded.abs().toString();
-  final buffer = StringBuffer(rounded < 0 ? '-' : '');
-  for (var index = 0; index < digits.length; index += 1) {
-    if (index > 0 && (digits.length - index) % 3 == 0) buffer.write(',');
-    buffer.write(digits[index]);
-  }
-  return buffer.toString();
-}
-
 String _briefingSignedPercent(double value) =>
     '${value > 0 ? '+' : ''}${value.toStringAsFixed(1)}%';
 
@@ -422,6 +409,34 @@ CohortBriefing? buildCohortBriefing(
 }) {
   final definition = cohortBriefingForState(state);
   if (definition == null) return null;
+  return _buildCohortBriefingForDefinition(
+    state,
+    universe: universe,
+    definition: definition,
+  );
+}
+
+/// 데시멀톡에서 특정 동기의 능력으로 공개 정보만 읽을 때 사용한다.
+/// 일일 브리핑 순번과 무관하지만 정보 기준일은 똑같이 직전 거래일까지다.
+CohortBriefing? buildCohortAbilityBriefing(
+  GameState state, {
+  required FictionalMarketUniverse universe,
+  required String girlId,
+}) {
+  final definition = cohortBriefingByGirlId(girlId);
+  if (definition == null) return null;
+  return _buildCohortBriefingForDefinition(
+    state,
+    universe: universe,
+    definition: definition,
+  );
+}
+
+CohortBriefing _buildCohortBriefingForDefinition(
+  GameState state, {
+  required FictionalMarketUniverse universe,
+  required CohortBriefingDefinition definition,
+}) {
   final asOf = cohortBriefingPublicThrough(state.currentDate);
   final assets = _tradableAssets(universe, asOf);
   final byId = <String, FictionalMarketAsset>{
@@ -438,216 +453,205 @@ CohortBriefing? buildCohortBriefing(
     observation = text;
   }
 
-  switch (definition.girlId) {
-    // 실행 순서. 보유 종목에 나올 가격이 적혀 있는지 본다.
-    case 'jung_arin':
-      final held = state.positions.where((p) => p.units > 0).toList()
-        ..sort((a, b) => b.totalCost.compareTo(a.totalCost));
-      if (held.isNotEmpty) {
-        final position = held.first;
-        final asset = byId[position.assetId];
-        final close = asset?.quoteAtOrBefore(asOf)?.close;
-        final average = position.averageCost;
-        if (asset != null && close != null && average > 0) {
-          final gap = (close - average) / average * 100;
-          focus(
-            asset,
-            '${asset.name} ${position.units.round()}주, 평균 ${_briefingMoney(average)}원이야. '
-            '어제 종가 ${_briefingMoney(close)}원이면 ${_briefingSignedPercent(gap)}. '
-            '그런데 나올 가격은 아직 어디에도 안 적혀 있어.',
-          );
-        }
-      } else {
-        observation =
-            '아직 보유 종목이 없네. 그러면 오늘은 살 종목보다 팔 조건을 먼저 정하자. 순서를 정해 두면 급할 때 안 엉켜.';
-      }
+  // 어제 실제로 공개된 사건. 숨은 영향률(impactPct)과 조사보고서 힌트(signal,
+  // reportHint)는 유료·비공개이므로 해설에 쓰지 않는다.
+  final events = fictionalMarketEventsForDate(
+    state.simulationSeed,
+    asOf,
+  ).where((event) => byId.containsKey(event.companyId)).toList(growable: false);
 
-    // 신뢰 기록. 공개된 실적이 컨센서스 약속을 지켰는지 본다.
+  // 대표 사건은 어제 가장 크게 움직인 종목의 사건으로 고정한다.
+  FictionalMarketEvent? headline;
+  var headlineMove = 0.0;
+  for (final event in events) {
+    final change = _dailyChangePercent(byId[event.companyId]!, asOf);
+    if (change == null) continue;
+    if (headline == null || change.abs() > headlineMove.abs()) {
+      headline = event;
+      headlineMove = change;
+    }
+  }
+  final headlineAsset = headline == null ? null : byId[headline.companyId];
+  final moveLabel = _briefingSignedPercent(headlineMove);
+
+  switch (definition.girlId) {
+    // 신뢰 기록. 어제 소식이 난 회사가 전에도 말을 지켰는지로 설명한다.
     case 'kim_seoa':
-      final candidates = <FictionalMarketAsset>[
-        for (final position in state.positions)
-          if (byId[position.assetId] != null) byId[position.assetId]!,
-        ...assets,
-      ];
-      for (final asset in candidates) {
-        final published = asset.financials
+      if (headline != null && headlineAsset != null) {
+        final published = headlineAsset.financials
             .where((snapshot) => snapshot.consensusOperatingProfit != 0)
             .toList(growable: false);
-        if (published.isEmpty) continue;
-        final latest = published.last;
-        final surprise = latest.earningsSurprisePct;
-        final kept = surprise >= 0;
+        final surprise = published.isEmpty
+            ? null
+            : published.last.earningsSurprisePct;
+        final trail = surprise == null
+            ? '이 회사는 아직 대조할 실적 기록이 없어. 이번 말이 처음이야'
+            : surprise >= 0
+            ? '이 회사는 지난 실적에서도 컨센서스를 ${_briefingSignedPercent(surprise)} 넘겼어. 말한 걸 지켜 온 쪽이야'
+            : '그런데 이 회사는 지난 실적에서 컨센서스를 ${_briefingSignedPercent(surprise)} 밑돌았어. 말과 결과가 어긋난 적이 있어';
         focus(
-          asset,
-          '${asset.name}의 ${latest.period} 실적을 공책에 맞춰 봤어. '
-          '영업이익이 컨센서스보다 ${_briefingSignedPercent(surprise)}였으니 '
-          '${kept ? '말한 만큼은 지킨 쪽' : '말과 결과가 어긋난 쪽'}이야. 한 번으로 정하지는 말고.',
+          headlineAsset,
+          '어제 ${headlineAsset.name}에 「${headline.title}」 소식이 나고 $moveLabel였어. '
+          '$trail. 그래서 어제 오른 건 소식보다 기록을 믿은 사람들이야.',
         );
-        break;
+      } else {
+        observation = '어제는 공개된 소식이 없었어. 그런데도 가격이 움직였다면 기록이 아니라 분위기가 움직인 거야.';
       }
 
-    // 테마 전조. 어제 크게 오른 종목 중 내가 안 가진 것.
-    case 'han_sua':
-      final heldIds = state.positions.map((p) => p.assetId).toSet();
-      final mover = _sharpestMover(assets, asOf, excludeIds: heldIds);
-      final change = mover == null ? null : _dailyChangePercent(mover, asOf);
-      if (mover != null && change != null) {
-        focus(
-          mover,
-          '어제 ${mover.name}이 ${_briefingSignedPercent(change)}였는데 우리 중에 아무도 안 들고 있어. '
-          '${mover.sector} 쪽에서 이름이 돌기 시작한 것 같아. 아직 숫자로는 안 보이는 단계야.',
-        );
-      }
-
-    // 반대 가설. 어제 가장 오른 종목이 그 전에도 같은 식으로 올랐다가 되돌았는지.
-    case 'oh_jiwoo':
-      final mover = _sharpestMover(assets, asOf);
-      final change = mover == null ? null : _dailyChangePercent(mover, asOf);
-      if (mover != null && change != null) {
-        final history = mover.historyThrough(asOf, count: 5);
-        var pullbacks = 0;
-        for (var index = 1; index < history.length; index += 1) {
-          if (history[index].close < history[index - 1].close) pullbacks += 1;
-        }
-        final pullbackNote = pullbacks == 0
-            ? '최근 ${history.length}거래일 동안 한 번도 되돌지 않았어요. 그게 더 수상합니다'
-            : '그런데 최근 ${history.length}거래일 중 $pullbacks일은 되돌았어요';
-        focus(
-          mover,
-          '어제 ${mover.name}이 ${_briefingSignedPercent(change)}로 제일 많이 올랐습니다. '
-          '$pullbackNote. '
-          '오른 이유가 맞더라도, 그 이유가 오늘도 유효한지는 다른 질문입니다.',
-        );
-      }
-
-    // 구조. 계좌 집중도와 그게 틀렸을 때의 낙폭.
+    // 구조. 어제 움직임이 개별 회사 얘기였는지 업종 전체였는지로 설명한다.
     case 'yoon_chaea':
-      final prices = <String, double>{
-        for (final asset in assets)
-          if (asset.quoteAtOrBefore(asOf) != null)
-            asset.id: asset.quoteAtOrBefore(asOf)!.close,
-      };
-      final holdings = state.portfolioValue(prices);
-      final total = holdings + state.brokerageCash;
-      if (holdings > 0 && total > 0) {
-        PortfolioPosition? top;
-        var topValue = 0;
-        for (final position in state.positions) {
-          final price = prices[position.assetId];
-          if (price == null) continue;
-          final value = (position.units * price).round();
-          if (top == null || value > topValue) {
-            top = position;
-            topValue = value;
+      if (headline != null && headlineAsset != null) {
+        final peers = assets
+            .where(
+              (asset) =>
+                  asset.sector == headlineAsset.sector &&
+                  asset.id != headlineAsset.id,
+            )
+            .toList(growable: false);
+        var sameWay = 0;
+        for (final peer in peers) {
+          final change = _dailyChangePercent(peer, asOf);
+          if (change == null) continue;
+          if ((change >= 0) == (headlineMove >= 0) && change.abs() >= 1) {
+            sameWay += 1;
           }
         }
-        if (top != null) {
-          final share = topValue / total * 100;
-          final impact = share * 0.15;
-          final asset = byId[top.assetId];
-          final text =
-              '지금 계좌의 ${share.toStringAsFixed(1)}%가 ${top.name} 하나야. '
-              '그게 15% 빠지면 계좌 전체는 ${impact.toStringAsFixed(1)}% 줄어. '
-              '수익률보다 이 숫자를 먼저 보는 게 맞아.';
-          if (asset != null) {
-            focus(asset, text);
-          } else {
-            observation = text;
-          }
-        }
+        focus(
+          headlineAsset,
+          sameWay >= 2
+              ? '어제 움직인 건 ${headlineAsset.name} 하나가 아니야. ${headlineAsset.sector} 쪽에서 $sameWay종목이 같은 방향으로 갔어. 개별 회사 소식이 아니라 업종 구조 얘기라는 뜻이야.'
+              : '어제 ${headlineAsset.name}만 $moveLabel 갔고 같은 ${headlineAsset.sector} 종목들은 따라오지 않았어. 업종이 아니라 이 회사 하나의 사정이야. 그러면 소식이 틀렸을 때 되돌 폭도 이 회사만의 몫이야.',
+        );
       } else {
         observation =
-            '보유가 없으니 오늘 낙폭은 0이야. 대신 첫 매수를 얼마로 할지가 그대로 집중도가 돼. '
-            '예수금 ${_briefingMoney(state.brokerageCash)}원의 몇 퍼센트를 걸지 먼저 정해.';
+            '어제 공개된 사건이 없어. 사건 없이 움직인 날은 수급이 움직인 날이야. 이유를 회사에서 찾으면 못 찾아.';
       }
 
-    // 정보망. 어제 결과표에서 손실이 컸던 동기.
-    case 'park_haeun':
-      final report = state.cohortInvestments.reportForDay(state.day - 1);
-      final rows = report?.rows
-          .where((row) => !row.isPlayer && row.traded)
-          .toList();
-      if (rows != null && rows.isNotEmpty) {
-        rows.sort((a, b) => a.profitLoss.compareTo(b.profitLoss));
-        final worst = rows.first;
-        if (worst.profitLoss < 0) {
-          observation =
-              '어제 ${worst.name}이 ${_briefingMoney(worst.profitLoss)}원이었어. '
-              '${worst.assetName} 쪽이었는데, 결과표에서는 한 줄이라 아무도 안 물어봤을 거야. '
-              '먼저 말 걸어 주면 그 애 판단 이유도 같이 알 수 있어.';
-        } else {
-          observation =
-              '어제는 아홉 명 다 손실이 없었어. 이럴 때가 오히려 위험해. '
-              '아무도 반대하지 않은 자리가 어디였는지 같이 짚어 보자.';
-        }
-      }
-
-    // 체결 구조. 어제 내 주문의 체결가와 그날 종가 차이.
-    case 'lee_jian':
-      final trades = state.ledger
-          .where(
-            (entry) =>
-                entry.day == state.day - 1 &&
-                (entry.tradeSide == 'buy' || entry.tradeSide == 'sell') &&
-                entry.assetId.isNotEmpty &&
-                entry.tradeUnitPrice > 0,
-          )
-          .toList(growable: false);
-      LedgerEntry? worst;
-      var worstGap = 0.0;
-      for (final trade in trades) {
-        final close = byId[trade.assetId]?.quoteAtOrBefore(asOf)?.close;
-        if (close == null) continue;
-        final gap = trade.tradeSide == 'buy'
-            ? trade.tradeUnitPrice - close
-            : close - trade.tradeUnitPrice;
-        if (gap > worstGap) {
-          worst = trade;
-          worstGap = gap;
-        }
-      }
-      if (worst != null) {
-        final asset = byId[worst.assetId];
-        final close = asset?.quoteAtOrBefore(asOf)?.close ?? 0;
-        if (asset != null) {
-          focus(
-            asset,
-            '어제 ${asset.name}을 ${_briefingMoney(worst.tradeUnitPrice)}원에 '
-            '${worst.tradeSide == 'buy' ? '샀는데' : '팔았는데'} 그날 종가는 '
-            '${_briefingMoney(close)}원이었어. ${_briefingMoney(worstGap)}원 불리했어. '
-            '화면에 보인 값이랑 손에 잡힌 값은 달라.',
-          );
-        }
-      } else if (trades.isEmpty) {
+    // 반례. 어제 소식이 결과인지 계획인지 단계로 구분한다.
+    case 'oh_jiwoo':
+      if (headline != null && headlineAsset != null) {
+        final settled = headline.stage >= 2;
+        focus(
+          headlineAsset,
+          settled
+              ? '어제 ${headlineAsset.name} 소식은 결과가 나온 단계입니다. $moveLabel 움직인 건 그럴 만해요. 다만 결과 뒤에는 더 나올 소식이 없다는 것도 같이 봐야죠.'
+              : '어제 ${headlineAsset.name} 소식은 아직 계획 단계입니다. 「${headline.eyebrow}」라고 적혀 있지만 확정된 게 아니에요. 그런데 가격은 $moveLabel로 결과처럼 반응했습니다. 그게 반례입니다.',
+        );
+      } else {
         observation =
-            '어제 주문이 없었네. 그럼 오늘 첫 주문에서 표시된 호가랑 실제 체결가가 같은지만 봐 줘. 나는 그것만 봐.';
+            '어제 공개된 사건이 하나도 없습니다. 그런데도 다들 이유를 말하고 있어요. 그게 제일 흔한 반례입니다.';
       }
 
-    // 가격의 결. 어제 가장 급하게 꺾인 종목.
-    case 'choi_iseo':
-      final mover = _sharpestMover(assets, asOf, absolute: true);
-      final change = mover == null ? null : _dailyChangePercent(mover, asOf);
-      if (mover != null && change != null) {
-        final history = mover.historyThrough(asOf, count: 4);
-        var quietMoves = 0;
+    // 전조. 소식이 가격을 만들었는지, 가격이 소식을 앞질렀는지로 설명한다.
+    case 'han_sua':
+      if (headline != null && headlineAsset != null) {
+        final history = headlineAsset.historyThrough(asOf, count: 5);
+        var priorSameWay = 0;
         for (var index = 1; index < history.length - 1; index += 1) {
           final previous = history[index - 1].close;
           if (previous <= 0) continue;
           final step = (history[index].close - previous) / previous * 100;
-          if (step.abs() < 2) quietMoves += 1;
+          if ((step >= 0) == (headlineMove >= 0) && step.abs() >= 0.5) {
+            priorSameWay += 1;
+          }
         }
-        final priorDays = math.max(1, history.length - 2);
-        final quietNote = quietMoves >= priorDays
-            ? '그 앞 $priorDays거래일은 다 완만했는데'
-            : quietMoves == 0
-            ? '그 앞도 계속 급했어'
-            : '그 앞 $priorDays거래일 중 $quietMoves일은 완만했는데';
+        focus(
+          headlineAsset,
+          priorSameWay >= 2
+              ? '어제 ${headlineAsset.name} 소식이 났는데, 가격은 그 전 $priorSameWay거래일부터 이미 같은 방향이었어. 소식이 가격을 만든 게 아니라 누가 먼저 알고 있었다는 얘기야.'
+              : '어제 소식이 나고 그때 처음 $moveLabel 움직였어. 이건 진짜로 어제 알려진 소식이야. 이런 건 오늘도 더 번질 수 있어.',
+        );
+      } else {
+        observation =
+            '어제는 아무 소식도 없었어. 그런데 사람들이 어떤 이름을 말하기 시작하면 그게 소식보다 먼저 오는 거야.';
+      }
+
+    // 체결 구조. 어제 움직임의 크기를 그날 가격제한폭과 대조해 설명한다.
+    case 'lee_jian':
+      if (headline != null && headlineAsset != null) {
+        final limit = asOf.isBefore(DateTime(2015, 6, 15)) ? 15.0 : 30.0;
+        final ratio = headlineMove.abs() / limit * 100;
+        focus(
+          headlineAsset,
+          ratio >= 60
+              ? '어제 ${headlineAsset.name}은 $moveLabel이야. 그날 가격제한폭의 ${ratio.toStringAsFixed(0)}%까지 간 거야. 이 정도면 중간 호가가 비어서 한 번에 뛴 구간이 있었을 거야. 표시된 값으로 산 사람은 더 비싸게 샀어.'
+              : '어제 ${headlineAsset.name} $moveLabel은 제한폭의 ${ratio.toStringAsFixed(0)}% 정도야. 호가를 차례로 밟고 간 움직임이라 표시가랑 체결가가 크게 벌어지지는 않았어.',
+        );
+      } else {
+        observation = '어제 공개된 사건이 없어. 사건 없이 가격만 움직이면 호가가 얇아서 밀린 경우가 많아.';
+      }
+
+    // 결. 어제 움직임이 하루에 몰렸는지 여러 날에 걸쳤는지로 설명한다.
+    case 'choi_iseo':
+      final mover =
+          headlineAsset ?? _sharpestMover(assets, asOf, absolute: true);
+      final change = mover == null
+          ? null
+          : (headlineAsset != null
+                ? headlineMove
+                : _dailyChangePercent(mover, asOf));
+      if (mover != null && change != null) {
+        final history = mover.historyThrough(asOf, count: 4);
+        var quiet = 0;
+        for (var index = 1; index < history.length - 1; index += 1) {
+          final previous = history[index - 1].close;
+          if (previous <= 0) continue;
+          if (((history[index].close - previous) / previous * 100).abs() < 2) {
+            quiet += 1;
+          }
+        }
         focus(
           mover,
-          '${mover.name} 선이 어제 ${_briefingSignedPercent(change)}로 '
-          '${change >= 0 ? '급하게 솟았어' : '급하게 꺾였어'}. $quietNote. '
-          '결이 갑자기 달라진 자리는 이유가 없어도 티가 나.',
+          quiet >= 2
+              ? '${mover.name}은 앞 며칠 조용했는데 어제 하루에 ${_briefingSignedPercent(change)}가 다 몰렸어. 결이 갑자기 달라진 건 사람 손이 급했다는 뜻이야. 급한 선은 되돌기도 급해.'
+              : '${mover.name}은 어제 ${_briefingSignedPercent(change)}였는데 그 앞도 계속 같은 결이었어. 이건 하루짜리 놀람이 아니라 이어지는 흐름이야.',
         );
+      }
+
+    // 실행 순서. 어제 소식을 오늘 어떻게 다룰지 순서로 바꿔 준다.
+    case 'jung_arin':
+      if (headline != null && headlineAsset != null) {
+        focus(
+          headlineAsset,
+          '어제 ${headlineAsset.name} 소식이 나고 $moveLabel 움직였어. 어제 난 소식이면 오늘 들어가는 건 이미 한발 늦은 거야. '
+          '들어갈지 말지보다 어디서 나올지를 먼저 적어. 그 칸이 비어 있으면 오늘은 손대지 마.',
+        );
+      } else {
+        final held = state.positions.where((p) => p.units > 0).length;
+        observation = held > 0
+            ? '어제 소식이 없었으니 오늘 새로 살 이유도 없어. 대신 들고 있는 $held종목의 나올 조건부터 채워.'
+            : '어제 소식이 없었어. 살 이유가 없는 날은 순서를 정리하는 날이야.';
+      }
+
+    // 정보망. 어제 아홉 명이 한 방향으로 몰렸는지로 설명한다.
+    case 'park_haeun':
+      final report = state.cohortInvestments.reportForDay(state.day - 1);
+      final traded = report?.rows
+          .where((row) => !row.isPlayer && row.traded && row.assetId.isNotEmpty)
+          .toList();
+      if (traded != null && traded.isNotEmpty) {
+        final counts = <String, int>{};
+        final names = <String, String>{};
+        for (final row in traded) {
+          counts[row.assetId] = (counts[row.assetId] ?? 0) + 1;
+          names[row.assetId] = row.assetName;
+        }
+        var topId = '';
+        var topCount = 0;
+        for (final entry in counts.entries) {
+          if (entry.value > topCount ||
+              (entry.value == topCount && entry.key.compareTo(topId) < 0)) {
+            topId = entry.key;
+            topCount = entry.value;
+          }
+        }
+        observation = topCount >= 3
+            ? '어제 아홉 명 중 $topCount명이 ${names[topId]} 하나였어. 좋은 소식이 한 방향으로만 돈 거야. 반대로 본 사람이 없었다는 게 제일 위험한 신호야.'
+            : '어제는 아홉 명이 ${counts.length}종목으로 흩어졌어. 같은 소식을 서로 다르게 읽었다는 뜻이야. 이런 날은 누가 맞았는지보다 왜 갈렸는지가 남아.';
+      } else if (headline != null && headlineAsset != null) {
+        observation =
+            '어제 ${headlineAsset.name} 소식은 다들 같은 자리에서 들었을 거야. '
+            '같은 데서 들은 얘기는 이미 가격에 들어가 있어.';
       }
   }
 

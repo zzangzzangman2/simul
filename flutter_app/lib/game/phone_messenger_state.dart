@@ -2,7 +2,10 @@ const phoneMessengerPlayerId = 'player';
 const phoneMessengerDailySendLimit = 3;
 const phoneMessengerMaxMessageLength = 80;
 const phoneMessengerHistoryLimit = 256;
-const phoneConversationMemoryLimit = 512;
+const phoneConversationMemoryPerContactLimit = 512;
+const phoneConversationMemoryLimit = 4608;
+const phoneConversationRecallLimit = 8;
+const phoneDirectMessagePrivateScope = 'directMessagePrivate';
 
 class PhoneContactDefinition {
   const PhoneContactDefinition({
@@ -57,7 +60,7 @@ const phoneMessengerContacts = <PhoneContactDefinition>[
     casualReply: '공용 컵 채워 두고 있었어. 너 밥은 먹었어?',
     fallbackReply: '응, 기억해 둘게. 그런데 이건 오늘만 그런 건지 계속 그런 건지도 알려 줘.',
     boundaryReply: '그런 말은 기록으로 남겨도 괜찮은 말인지 한 번 생각해 줬으면 해.',
-    suggestions: ['오늘 종목 어땠어?', '실습 기록 보여 줘', '밥 먹었어?'],
+    suggestions: ['기록 힌트 하나 줘', '실습 기록 보여 줘', '밥 먹었어?'],
   ),
   PhoneContactDefinition(
     id: 'lee_jian',
@@ -70,7 +73,7 @@ const phoneMessengerContacts = <PhoneContactDefinition>[
     casualReply: '드라이버 찾는 중. 아까 여기 뒀는데 누가 옮겼나.',
     fallbackReply: '말로는 모르겠어. 확인할 수 있는 방법 있으면 해 보자.',
     boundaryReply: '그 얘긴 싫어. 계속하면 답 안 할 거야.',
-    suggestions: ['무슨 종목 봐?', '컴퓨터 좀 봐 줘', '뭐 하고 있어?'],
+    suggestions: ['체결 힌트 하나 줘', '컴퓨터 좀 봐 줘', '뭐 하고 있어?'],
   ),
   PhoneContactDefinition(
     id: 'choi_iseo',
@@ -83,7 +86,7 @@ const phoneMessengerContacts = <PhoneContactDefinition>[
     casualReply: '실 정리하고 있어. 조용해서 지금은 좀 좋다.',
     fallbackReply: '음… 나는 그건 별로야. 네가 좋아하는 이유는 듣고 싶어.',
     boundaryReply: '그 말 불편해. 내 선은 내가 정할게.',
-    suggestions: ['어떤 회사가 좋아?', '실습 어땠어?', '이름표 고마워'],
+    suggestions: ['가격선 힌트 있어?', '실습 어땠어?', '이름표 고마워'],
   ),
   PhoneContactDefinition(
     id: 'jung_arin',
@@ -96,7 +99,7 @@ const phoneMessengerContacts = <PhoneContactDefinition>[
     casualReply: '내일 시간표 짜는 중. 놀 거면 몇 시까지인지 먼저 정해.',
     fallbackReply: '그래서 지금 할 건 뭐야? 하나만 정하면 바로 도와줄게.',
     boundaryReply: '그 말 취소해. 장난이어도 안 되는 건 안 되는 거야.',
-    suggestions: ['오늘 투자 평가해 줘', '실습 복기 같이 해', '잠깐 놀자'],
+    suggestions: ['실행 힌트 하나 줘', '실습 복기 같이 해', '잠깐 놀자'],
   ),
   PhoneContactDefinition(
     id: 'park_haeun',
@@ -109,7 +112,7 @@ const phoneMessengerContacts = <PhoneContactDefinition>[
     casualReply: '다들 저녁 먹었는지 보고 있었어. 근데 나도 이제 좀 쉬려고.',
     fallbackReply: '네가 원하는 게 조언인지 그냥 들어 주는 건지 먼저 말해 줄래?',
     boundaryReply: '나는 그 말 듣기 불편해. 서로 싫다는 말은 멈춰 주자.',
-    suggestions: ['오늘 투자 어땠어?', '나 실습 막혔어', '하은이는 괜찮아?'],
+    suggestions: ['사람 쪽 힌트 있어?', '나 실습 막혔어', '하은이는 괜찮아?'],
   ),
   PhoneContactDefinition(
     id: 'han_sua',
@@ -122,7 +125,7 @@ const phoneMessengerContacts = <PhoneContactDefinition>[
     casualReply: '나 간식 뭐 먹을지 다섯 개째 고민 중. 이게 오늘 제일 어려운 선택이야.',
     fallbackReply: '오, 그러면 반대 가능성도 있지 않아? 잠깐만, 생각 하나 더 났어.',
     boundaryReply: '그건 안 웃겨. 장난 말고 다른 얘기하자.',
-    suggestions: ['오늘 종목 느낌 어때?', '나도 실습 헷갈려', '뭐 먹을래?'],
+    suggestions: ['수요 힌트 하나 줘', '나도 실습 헷갈려', '뭐 먹을래?'],
   ),
   PhoneContactDefinition(
     id: 'oh_jiwoo',
@@ -135,7 +138,7 @@ const phoneMessengerContacts = <PhoneContactDefinition>[
     casualReply: '라디오 주파수 잡는 중. 지금은 잡음 80, 음악 20. 그래도 제법 괜찮아.',
     fallbackReply: '반대로 생각하면 어때? 네 생각이 틀렸다고 인정할 때는 언제야?',
     boundaryReply: '방송 중단. 그건 토론거리도 장난도 아니야.',
-    suggestions: ['오늘 종목 반론해 봐', '실습 설명 이상하지?', '방송국 뭐 해?'],
+    suggestions: ['반례 힌트 하나 줘', '실습 설명 이상하지?', '방송국 뭐 해?'],
   ),
   PhoneContactDefinition(
     id: 'yoon_chaea',
@@ -148,7 +151,7 @@ const phoneMessengerContacts = <PhoneContactDefinition>[
     casualReply: '영수증 날짜별로 정리 중. 끝나면 잠깐은 이야기할 수 있어.',
     fallbackReply: '무슨 뜻인지는 알겠어. 왜 그렇게 생각했는지만 하나 더 말해 줘.',
     boundaryReply: '그 말에는 답하지 않을게. 서로 지켜야 할 기준이 있어.',
-    suggestions: ['오늘 가격 분석해 줘', '실습 핵심이 뭐야?', '잠깐 얘기할래?'],
+    suggestions: ['깨지는 조건 힌트 줘', '실습 핵심이 뭐야?', '잠깐 얘기할래?'],
   ),
 ];
 
@@ -230,6 +233,13 @@ class PhoneConversationMemory {
     this.trustDelta = 0,
     this.closenessDelta = 0,
     this.investmentRespectDelta = 0,
+    this.importance = 1,
+    this.abilityHintLevel = '',
+    this.abilityHintObservation = '',
+    this.abilityHintUsedResearchCredit = false,
+    this.marketMinute = 480,
+    this.situationSummary = '',
+    this.scheduleDecision = '',
   });
 
   final String id;
@@ -246,6 +256,17 @@ class PhoneConversationMemory {
   final int trustDelta;
   final int closenessDelta;
   final int investmentRespectDelta;
+  final int importance;
+  final String abilityHintLevel;
+  final String abilityHintObservation;
+  final bool abilityHintUsedResearchCredit;
+  final int marketMinute;
+  final String situationSummary;
+  final String scheduleDecision;
+
+  String get privacyScope => phoneDirectMessagePrivateScope;
+
+  bool isPrivateFor(String viewerContactId) => contactId == viewerContactId;
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -262,6 +283,14 @@ class PhoneConversationMemory {
     'trustDelta': trustDelta,
     'closenessDelta': closenessDelta,
     'investmentRespectDelta': investmentRespectDelta,
+    'importance': importance,
+    'abilityHintLevel': abilityHintLevel,
+    'abilityHintObservation': abilityHintObservation,
+    'abilityHintUsedResearchCredit': abilityHintUsedResearchCredit,
+    'marketMinute': marketMinute,
+    'situationSummary': situationSummary,
+    'scheduleDecision': scheduleDecision,
+    'privacyScope': privacyScope,
   };
 
   factory PhoneConversationMemory.fromJson(Map<String, dynamic> json) =>
@@ -285,6 +314,17 @@ class PhoneConversationMemory {
         closenessDelta: (json['closenessDelta'] as num?)?.toInt() ?? 0,
         investmentRespectDelta:
             (json['investmentRespectDelta'] as num?)?.toInt() ?? 0,
+        importance: ((json['importance'] as num?)?.toInt() ?? 1).clamp(1, 5),
+        abilityHintLevel: json['abilityHintLevel'] as String? ?? '',
+        abilityHintObservation: json['abilityHintObservation'] as String? ?? '',
+        abilityHintUsedResearchCredit:
+            json['abilityHintUsedResearchCredit'] == true,
+        marketMinute: ((json['marketMinute'] as num?)?.toInt() ?? 480).clamp(
+          0,
+          1439,
+        ),
+        situationSummary: json['situationSummary'] as String? ?? '',
+        scheduleDecision: json['scheduleDecision'] as String? ?? '',
       );
 }
 
@@ -407,8 +447,85 @@ class PhoneMessengerState {
       progressByContact[contactId] ?? PhoneThreadProgress(contactId: contactId);
 
   List<PhoneConversationMemory> memoriesFor(String contactId) => memories
-      .where((memory) => memory.contactId == contactId)
+      .where((memory) => memory.isPrivateFor(contactId))
       .toList(growable: false);
+
+  /// Selects a bounded private memory prompt for one direct-message thread.
+  ///
+  /// Adapted from the hybrid archive strategy in `Downloads/ai`: the latest
+  /// arc is always available, older memories compete by query relevance and
+  /// importance, and the first exchange survives as a continuity fallback.
+  /// No memory owned by another contact can enter the result.
+  List<PhoneConversationMemory> relevantMemoriesFor(
+    String contactId, {
+    required String queryText,
+    required int currentDay,
+    int limit = phoneConversationRecallLimit,
+  }) {
+    final boundedLimit = limit.clamp(1, 12);
+    final scoped = memoriesFor(
+      contactId,
+    ).where((memory) => memory.day <= currentDay).toList(growable: false);
+    if (scoped.length <= boundedLimit) {
+      return List<PhoneConversationMemory>.unmodifiable(scoped.reversed);
+    }
+
+    final picked = <PhoneConversationMemory>[];
+    final pickedIds = <String>{};
+    void add(PhoneConversationMemory memory) {
+      if (picked.length >= boundedLimit || !memory.isPrivateFor(contactId)) {
+        return;
+      }
+      if (pickedIds.add(memory.id)) picked.add(memory);
+    }
+
+    // Current arc: always keep the two newest exchanges.
+    add(scoped.last);
+    add(scoped[scoped.length - 2]);
+
+    final queryTokens = _phoneMemoryTokens(queryText);
+    final archive = scoped.sublist(0, scoped.length - 2);
+    final ranked =
+        <_PhoneMemoryCandidate>[
+          for (var index = 0; index < archive.length; index++)
+            _PhoneMemoryCandidate(
+              memory: archive[index],
+              index: index,
+              relevance: _phoneMemoryRelevance(
+                archive[index],
+                queryText: queryText,
+                queryTokens: queryTokens,
+              ),
+            ),
+        ]..sort((a, b) {
+          final relevance = b.relevance.compareTo(a.relevance);
+          if (relevance != 0) return relevance;
+          final importance = b.memory.importance.compareTo(a.memory.importance);
+          if (importance != 0) return importance;
+          return b.index.compareTo(a.index);
+        });
+
+    final related = ranked.where((candidate) => candidate.relevance > 0);
+    for (final candidate in related) {
+      add(candidate.memory);
+    }
+
+    // Important promises, apologies, boundaries and emotional disclosures are
+    // retained even when the current wording has no lexical overlap.
+    for (final candidate in ranked.where(
+      (candidate) => candidate.memory.importance >= 4,
+    )) {
+      add(candidate.memory);
+    }
+
+    if (!related.iterator.moveNext()) {
+      add(scoped.first);
+    }
+    for (final memory in archive.reversed) {
+      add(memory);
+    }
+    return List<PhoneConversationMemory>.unmodifiable(picked);
+  }
 
   PhoneMessengerState copyWith({
     List<PhoneMessage>? messages,
@@ -485,11 +602,7 @@ class PhoneMessengerState {
               validIds.contains(memory.contactId),
         )
         .toList(growable: false);
-    final memories = parsedMemories.length <= phoneConversationMemoryLimit
-        ? parsedMemories
-        : parsedMemories.sublist(
-            parsedMemories.length - phoneConversationMemoryLimit,
-          );
+    final memories = retainPhoneConversationMemories(parsedMemories);
     return PhoneMessengerState(
       messages: List<PhoneMessage>.unmodifiable(messages),
       progressByContact: Map<String, PhoneThreadProgress>.unmodifiable(
@@ -498,4 +611,114 @@ class PhoneMessengerState {
       memories: List<PhoneConversationMemory>.unmodifiable(memories),
     );
   }
+}
+
+class _PhoneMemoryCandidate {
+  const _PhoneMemoryCandidate({
+    required this.memory,
+    required this.index,
+    required this.relevance,
+  });
+
+  final PhoneConversationMemory memory;
+  final int index;
+  final int relevance;
+}
+
+final RegExp _phoneMemoryTokenPattern = RegExp(r'[가-힣A-Za-z0-9]{2,}');
+
+const _phoneMemorySemanticGroups = <List<String>>[
+  ['약속', '계획', '내일', '주말', '만날'],
+  ['주식', '투자', '종목', '매수', '매도', '손익', '수익', '손해'],
+  ['미안', '사과', '잘못', '실수'],
+  ['고마워', '고맙', '감사', '덕분'],
+  ['힘들', '불안', '무서', '속상', '위로'],
+  ['공부', '실습', '숙제', '복습', '컴퓨터'],
+  ['밥', '먹', '간식', '놀', '잘자'],
+];
+
+Set<String> _phoneMemoryTokens(String value) => _phoneMemoryTokenPattern
+    .allMatches(value.toLowerCase())
+    .map((match) => match.group(0)!)
+    .toSet();
+
+int _phoneMemoryRelevance(
+  PhoneConversationMemory memory, {
+  required String queryText,
+  required Set<String> queryTokens,
+}) {
+  final haystack = '${memory.playerText} ${memory.replyText} ${memory.intent}'
+      .toLowerCase();
+  var score = 0;
+  for (final token in queryTokens) {
+    if (!haystack.contains(token)) continue;
+    score += token.length >= 3 ? 6 : 3;
+  }
+  final loweredQuery = queryText.toLowerCase();
+  for (final group in _phoneMemorySemanticGroups) {
+    if (!group.any(loweredQuery.contains) || !group.any(haystack.contains)) {
+      continue;
+    }
+    score += 8;
+  }
+  return score;
+}
+
+int phoneMemoryImportanceForIntent(
+  String intent, {
+  int affectionDelta = 0,
+  int trustDelta = 0,
+  int closenessDelta = 0,
+}) {
+  if (intent == 'boundary') return 5;
+  if (intent == 'apology' ||
+      intent == 'emotionalSupport' ||
+      intent == 'planning') {
+    return 4;
+  }
+  if (affectionDelta.abs() >= 2 ||
+      trustDelta.abs() >= 2 ||
+      closenessDelta.abs() >= 2) {
+    return 4;
+  }
+  if (intent == 'gratitude' ||
+      intent == 'lossShare' ||
+      intent == 'gainShare' ||
+      intent == 'investmentReflection') {
+    return 3;
+  }
+  return intent == 'unknown' ? 1 : 2;
+}
+
+/// Keeps a deep per-contact archive without allowing one busy thread to evict
+/// every other character's private history.
+List<PhoneConversationMemory> retainPhoneConversationMemories(
+  List<PhoneConversationMemory> source,
+) {
+  final kept = <PhoneConversationMemory>[];
+  for (final contact in phoneMessengerContacts) {
+    final scoped = source
+        .where((memory) => memory.isPrivateFor(contact.id))
+        .toList(growable: false);
+    if (scoped.length <= phoneConversationMemoryPerContactLimit) {
+      kept.addAll(scoped);
+      continue;
+    }
+
+    final ids = <String>{};
+    for (final memory in scoped.take(8)) {
+      ids.add(memory.id);
+    }
+    var importantKept = 0;
+    for (final memory in scoped.reversed) {
+      if (memory.importance < 4 || importantKept >= 96) continue;
+      if (ids.add(memory.id)) importantKept += 1;
+    }
+    for (final memory in scoped.reversed) {
+      if (ids.length >= phoneConversationMemoryPerContactLimit) break;
+      ids.add(memory.id);
+    }
+    kept.addAll(scoped.where((memory) => ids.contains(memory.id)));
+  }
+  return List<PhoneConversationMemory>.unmodifiable(kept);
 }

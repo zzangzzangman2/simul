@@ -85,6 +85,8 @@ class StoryState {
   bool get tutorialSeen => flagBool('hubTutorialSeen');
   bool get marketTutorialEligible => flagBool('marketTutorialEligible');
   bool get marketTutorialSeen => flagBool('marketTutorialSeen');
+  bool get bankDepositTutorialSeen => flagBool('bankDepositTutorialSeen');
+  bool get realEstateTutorialSeen => flagBool('realEstateTutorialSeen');
   List<Map<String, dynamic>> get newsArchive {
     final raw = storyFlags['newsArchive'];
     if (raw is! List) return const <Map<String, dynamic>>[];
@@ -187,7 +189,12 @@ class StoryState {
         'legacyMissionUiDisabled': true,
         'marketTutorialEligible': true,
         'marketTutorialSeen': false,
+        'bankDepositTutorialSeen': false,
+        'realEstateTutorialSeen': false,
         'liveTradingStarted': false,
+        'facilityStoryGatesEnabled': true,
+        'bankAccessUnlocked': false,
+        'realEstateAccessUnlocked': false,
         'performanceHistory': <Map<String, dynamic>>[],
         'newsArchive': <Map<String, dynamic>>[],
       },
@@ -221,6 +228,9 @@ class StoryState {
         'prologueComplete': true,
         'marketTutorialEligible': false,
         'marketTutorialSeen': true,
+        'facilityStoryGatesEnabled': false,
+        'bankAccessUnlocked': true,
+        'realEstateAccessUnlocked': true,
         'legacyMissionUiDisabled': false,
         'migratedCompanyName': companyName,
       },
@@ -319,6 +329,11 @@ class StoryState {
       ..remove('guardianConsent')
       ..remove('fatherOperationsAdvisor')
       ..remove('seedMoneySourceLegacy');
+    migrated.putIfAbsent('facilityStoryGatesEnabled', () => false);
+    final facilityGatesEnabled = migrated['facilityStoryGatesEnabled'] == true;
+    migrated
+      ..putIfAbsent('bankAccessUnlocked', () => !facilityGatesEnabled)
+      ..putIfAbsent('realEstateAccessUnlocked', () => !facilityGatesEnabled);
     if (migrated['marketTutorialSeen'] == true) {
       migrated.putIfAbsent('liveTradingStarted', () => true);
       migrated.putIfAbsent(

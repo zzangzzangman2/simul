@@ -21,6 +21,7 @@ class BankScreen extends StatefulWidget {
     required this.onRedeemDeposit,
     required this.onTakeLoan,
     required this.onRepayLoan,
+    this.onCompleteTutorial,
   });
 
   final GameState state;
@@ -28,6 +29,7 @@ class BankScreen extends StatefulWidget {
   final BankRedeemDepositCallback onRedeemDeposit;
   final BankTakeLoanCallback onTakeLoan;
   final BankRepayLoanCallback onRepayLoan;
+  final Future<GameState> Function()? onCompleteTutorial;
 
   @override
   State<BankScreen> createState() => _BankScreenState();
@@ -42,6 +44,21 @@ class _BankScreenState extends State<BankScreen> {
   int _introBeat = 0;
   bool _busy = false;
   _BankClerkMood _clerkMood = _BankClerkMood.welcome;
+  int? _tutorialStep;
+  bool _tutorialCompleting = false;
+  final GlobalKey _depositTermTutorialKey = GlobalKey();
+  final GlobalKey _depositOpenTutorialKey = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.onCompleteTutorial != null &&
+        !_state.story.bankDepositTutorialSeen) {
+      _tutorialStep = 0;
+      _introVisible = false;
+      _clerkMood = _BankClerkMood.welcome;
+    }
+  }
 
   String get _clerkAsset => switch (_clerkMood) {
     _BankClerkMood.welcome =>
@@ -58,6 +75,61 @@ class _BankScreenState extends State<BankScreen> {
     _state,
     termMonths: _loanTermMonths,
   );
+
+  GlobalKey? get _tutorialTargetKey => switch (_tutorialStep) {
+    1 => _depositTermTutorialKey,
+    2 => _depositOpenTutorialKey,
+    _ => null,
+  };
+
+  void _advanceDepositTutorial() {
+    final step = _tutorialStep;
+    if (step == null || _tutorialCompleting) return;
+    if (step >= 3) {
+      unawaited(_completeDepositTutorial());
+      return;
+    }
+    setState(() {
+      _tutorialStep = step + 1;
+      if (_tutorialStep == 1) {
+        _depositTermMonths = 12;
+        _clerkMood = _BankClerkMood.explain;
+      } else if (_tutorialStep == 2) {
+        _clerkMood = _BankClerkMood.concerned;
+      } else {
+        _clerkMood = _BankClerkMood.approve;
+      }
+    });
+  }
+
+  Future<void> _completeDepositTutorial() async {
+    if (_tutorialCompleting) return;
+    final complete = widget.onCompleteTutorial;
+    if (complete == null) {
+      if (mounted) setState(() => _tutorialStep = null);
+      return;
+    }
+    setState(() => _tutorialCompleting = true);
+    try {
+      final next = await complete();
+      if (!mounted) return;
+      setState(() {
+        _state = next;
+        _tutorialStep = null;
+        _tutorialCompleting = false;
+        _introVisible = false;
+        _clerkMood = _BankClerkMood.approve;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _tutorialCompleting = false);
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('예금 튜토리얼 저장에 실패했습니다. 다시 시도해 주세요.')),
+        );
+    }
+  }
 
   Future<void> _apply(Future<FinanceActionResult> Function() action) async {
     if (_busy) return;
@@ -352,10 +424,12 @@ class _BankScreenState extends State<BankScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      key: const Key('bank-screen'),
-      backgroundColor: const Color(0xFF172231),
-      body: LayoutBuilder(
+    return PopScope(
+      canPop: _tutorialStep == null,
+      child: Scaffold(
+        key: const Key('bank-screen'),
+        backgroundColor: const Color(0xFF172231),
+        body: LayoutBuilder(
         builder: (context, constraints) {
           final panelTop = math.max(326.0, constraints.maxHeight * 0.42);
           return Stack(
@@ -379,27 +453,28 @@ class _BankScreenState extends State<BankScreen> {
                   ),
                 ),
               ),
-              Positioned.fill(
-                top: -_storyCharacterBottomInset,
-                bottom: _storyCharacterBottomInset,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    _OnboardingCharacterSlot(
-                      key: const Key('bank-clerk-slot'),
-                      asset: _clerkAsset,
-                      alignment: Alignment.bottomCenter,
-                      characterKey: const Key('bank-clerk-character'),
-                    ),
-                    Align(
-                      alignment: Alignment.topLeft,
-                      child: SizedBox.shrink(
-                        key: Key('bank-clerk-${_clerkMood.name}'),
+              if (_tutorialStep == null)
+                Positioned.fill(
+                  top: -_storyCharacterBottomInset,
+                  bottom: _storyCharacterBottomInset,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      _OnboardingCharacterSlot(
+                        key: const Key('bank-clerk-slot'),
+                        asset: _clerkAsset,
+                        alignment: Alignment.bottomCenter,
+                        characterKey: const Key('bank-clerk-character'),
                       ),
-                    ),
-                  ],
+                      Align(
+                        alignment: Alignment.topLeft,
+                        child: SizedBox.shrink(
+                          key: Key('bank-clerk-${_clerkMood.name}'),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
               Positioned(
                 left: 0,
                 top: 0,
@@ -508,6 +583,12 @@ class _BankScreenState extends State<BankScreen> {
                           _clerkMood = _BankClerkMood.welcome;
                         });
                       },
+                      tutorialTermKey: _tutorialStep == null
+                          ? null
+                          : _depositTermTutorialKey,
+                      tutorialOpenKey: _tutorialStep == null
+                          ? null
+                          : _depositOpenTutorialKey,
                     ),
                   ),
                 ),
@@ -518,12 +599,93 @@ class _BankScreenState extends State<BankScreen> {
                     child: Center(child: CircularProgressIndicator()),
                   ),
                 ),
+              if (_tutorialStep case final step?)
+                Positioned.fill(
+                  child: _BankDepositTutorialOverlay(
+                    step: step,
+                    targetKey: _tutorialTargetKey,
+                    onAction: _advanceDepositTutorial,
+                  ),
+                ),
+              if (_tutorialStep != null)
+                Positioned(
+                  top: 0,
+                  right: 0,
+                  child: _GuidedTutorialSkipButton(
+                    buttonKey: const Key('bank-deposit-tutorial-skip'),
+                    dialogKey: const Key('bank-deposit-tutorial-skip-dialog'),
+                    cancelKey: const Key('bank-deposit-tutorial-skip-cancel'),
+                    confirmKey: const Key('bank-deposit-tutorial-skip-confirm'),
+                    description:
+                        '건너뛰어도 예금 화면은 그대로 이용할 수 있고, 윤하린 은행원의 설명은 완료로 저장됩니다.',
+                    onSkip: _completeDepositTutorial,
+                  ),
+                ),
             ],
           );
         },
       ),
+      ),
     );
   }
+}
+
+class _BankDepositTutorialOverlay extends StatelessWidget {
+  const _BankDepositTutorialOverlay({
+    required this.step,
+    required this.targetKey,
+    required this.onAction,
+  });
+
+  final int step;
+  final GlobalKey? targetKey;
+  final VoidCallback onAction;
+
+  String get _asset => switch (step) {
+    0 => 'assets/images/character_bank_clerk_title_style_v2.png',
+    1 => 'assets/images/character_bank_clerk_explain_v2.png',
+    2 => 'assets/images/character_bank_clerk_concerned_v2.png',
+    _ => 'assets/images/character_bank_clerk_approve_v2.png',
+  };
+
+  List<String> get _messages => switch (step) {
+    0 => const [
+      '회사 통장에 남는 돈을 그냥 두지 않고, 정한 기간 동안 묶어 확정 이자를 받는 게 정기예금이에요.',
+      '주식처럼 가격이 움직이지는 않지만 중간에 꺼내면 약정 이자를 다 받지 못해요. 쓸 시점을 먼저 정해야 해요.',
+    ],
+    1 => const [
+      '6·12·24개월은 돈이 묶이는 기간이에요. 기간마다 화면에 표시된 게임 기준금리가 달라져요.',
+      '우선 12개월을 눌러 금리와 기간을 비교해 볼까요? 아직 예금은 가입되지 않아요.',
+    ],
+    2 => const [
+      '가입 전에는 운영자금과 저녁에 쓸 현금을 남겼는지 확인하세요. 예금 원금은 만기 전까지 바로 쓸 수 없어요.',
+      '이 버튼을 누르면 금액 확인창이 한 번 더 나와요. 확인 전에는 돈이 움직이지 않습니다.',
+    ],
+    _ => const [
+      '가입한 예금은 아래 보유 목록에서 원금·만기일·예상 수령액을 계속 확인할 수 있어요.',
+      '만기에는 원금과 세후 이자가 회사 통장으로 들어옵니다. 이제 필요한 금액만 직접 선택해 보세요.',
+    ],
+  };
+
+  @override
+  Widget build(BuildContext context) => _StockTutorialGuideOverlay(
+    overlayKey: const Key('bank-deposit-tutorial-overlay'),
+    actionKey: const Key('bank-deposit-tutorial-next'),
+    targetActionKey: const Key('bank-deposit-tutorial-target'),
+    targetKey: targetKey,
+    messageId: 'bank-deposit-tutorial-$step',
+    speakers: const ['윤하린 은행원', '윤하린 은행원'],
+    messages: _messages,
+    actionLabel: step >= 3 ? '설명 마치기' : '다음 설명',
+    teacherPoseAsset: _asset,
+    characterAssets: [_asset, _asset],
+    wrongTapFeedbacks: const [
+      '윤하린: 노란 테두리 안의 항목부터 확인해 주세요.',
+      '윤하린: 아직 돈은 움직이지 않았어요. 강조한 곳을 눌러볼까요?',
+      '윤하린: 천천히 보셔도 괜찮아요. 안내한 항목만 누르면 됩니다.',
+    ],
+    onAction: onAction,
+  );
 }
 
 class _BankConsultationPanel extends StatelessWidget {

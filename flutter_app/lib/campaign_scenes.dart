@@ -23,6 +23,7 @@ class OfficeScreen extends StatelessWidget {
     required this.onRequestAcademyHelp,
     this.onCompleteRelationshipEvening,
     this.onRestDuringRelationshipEvening,
+    this.onCompleteWeekdayActivity,
     this.onCompleteWeekendActivity,
     this.onSettleCohortInvestmentDay,
     this.onLendToCohortInvestor,
@@ -30,6 +31,7 @@ class OfficeScreen extends StatelessWidget {
     this.onAcknowledgeCohortInvestmentReport,
     this.onMarkPhoneThreadRead,
     this.onSendPhoneMessage,
+    this.phoneAiService,
     this.onHireEmployee,
     this.onLaunchFund,
     this.onPurchaseSpendingOption,
@@ -57,6 +59,8 @@ class OfficeScreen extends StatelessWidget {
     this.onPurchaseMarketReport,
     this.onCompleteHubTutorial,
     this.onCompleteMarketTutorial,
+    this.onCompleteBankDepositTutorial,
+    this.onCompleteRealEstateTutorial,
     this.onArchiveNews,
     this.onBuildDailyNewspaper,
     required this.onCompleteWork,
@@ -94,6 +98,8 @@ class OfficeScreen extends StatelessWidget {
   onCompleteRelationshipEvening;
   final Future<RelationshipActionResult> Function()?
   onRestDuringRelationshipEvening;
+  final Future<WeekdayActivityResult> Function(String activityId)?
+  onCompleteWeekdayActivity;
   final Future<WeekendActivityResult> Function(WeekendActivityRequest request)?
   onCompleteWeekendActivity;
   final Future<CohortInvestmentActionResult> Function()?
@@ -117,6 +123,7 @@ class OfficeScreen extends StatelessWidget {
     String text,
   )?
   onSendPhoneMessage;
+  final PhoneAiService? phoneAiService;
   final Future<GameState> Function(String)? onHireEmployee;
   final Future<GameState> Function()? onLaunchFund;
   final Future<FinanceActionResult> Function(String optionId)?
@@ -162,6 +169,8 @@ class OfficeScreen extends StatelessWidget {
   final Future<FinanceActionResult> Function()? onPurchaseMarketReport;
   final Future<void> Function()? onCompleteHubTutorial;
   final Future<GameState> Function()? onCompleteMarketTutorial;
+  final Future<GameState> Function()? onCompleteBankDepositTutorial;
+  final Future<GameState> Function()? onCompleteRealEstateTutorial;
   final Future<void> Function(String headline, List<String> eventIds)?
   onArchiveNews;
   final Future<DailyMarketNewspaper> Function(GameState)? onBuildDailyNewspaper;
@@ -205,6 +214,7 @@ class OfficeScreen extends StatelessWidget {
         AssetSpendingScreen(
           state: currentState,
           realEstateOnly: true,
+          onCompleteTutorial: onCompleteRealEstateTutorial,
           onPurchase:
               onPurchaseSpendingOption ??
               (optionId) async => FinanceActionResult(
@@ -246,17 +256,18 @@ class OfficeScreen extends StatelessWidget {
     );
   }
 
-  void _openBank(BuildContext context) {
+  Future<void> _openBank(BuildContext context, GameState currentState) async {
     FinanceActionResult unavailableResult() => FinanceActionResult(
-      state: state,
+      state: currentState,
       success: false,
       message: '이 화면에서는 은행 거래를 저장할 수 없습니다.',
     );
 
-    Navigator.of(context).push<void>(
+    await Navigator.of(context).push<void>(
       _gameSceneRoute<void>(
         BankScreen(
-          state: state,
+          state: currentState,
+          onCompleteTutorial: onCompleteBankDepositTutorial,
           onOpenDeposit:
               onOpenTimeDeposit ??
               (amount, termMonths) async => unavailableResult(),
@@ -271,6 +282,42 @@ class OfficeScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<GameState?> _useWeekdayEvening(
+    BuildContext context,
+    String activityId,
+  ) async {
+    final current = _latestState;
+    if (current.currentDate.weekday >= DateTime.saturday) return current;
+    final handler = onCompleteWeekdayActivity;
+    if (handler == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('이 화면에서는 평일 저녁 일정을 저장할 수 없습니다.')),
+      );
+      return null;
+    }
+    final result = await handler(activityId);
+    if (!context.mounted) return null;
+    if (!result.success) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(result.message)));
+      return null;
+    }
+    return result.state;
+  }
+
+  Future<void> _openBankForSchedule(BuildContext context) async {
+    final eveningState = await _useWeekdayEvening(context, 'bank');
+    if (eveningState == null || !context.mounted) return;
+    await _openBank(context, eveningState);
+  }
+
+  Future<void> _openRealEstateForSchedule(BuildContext context) async {
+    final eveningState = await _useWeekdayEvening(context, 'real_estate');
+    if (eveningState == null || !context.mounted) return;
+    await _openRealEstateMarket(context, eveningState);
   }
 
   Future<GameState> _openBusinessMarket(
@@ -384,7 +431,7 @@ class OfficeScreen extends StatelessWidget {
             return _latestState;
           },
           onOpenRealEstate: (currentState) async {
-            await _openRealEstateMarket(context, currentState);
+            await _openRealEstateForSchedule(context);
             return _latestState;
           },
           onOpenBusiness: (currentState) =>
@@ -431,7 +478,8 @@ class OfficeScreen extends StatelessWidget {
         state: state,
         onOpenDecisions: () => _openDecision(context),
         onOpenMarket: () => _openHomeComputer(context),
-        onOpenBank: () => _openBank(context),
+        onOpenRealEstate: () => _openRealEstateForSchedule(context),
+        onOpenBank: () => _openBankForSchedule(context),
         onOpenLedger: () => _openLedger(context),
         onOpenHomeImprovements: () => _openHomeImprovements(context),
         onOpenOrganization: () => Navigator.of(context).push(
@@ -460,6 +508,7 @@ class OfficeScreen extends StatelessWidget {
                 state: _latestState,
                 onMarkRead: markRead,
                 onSend: send,
+                aiService: phoneAiService,
               ),
             ),
           );
@@ -842,6 +891,7 @@ class OfficeScreen extends StatelessWidget {
                           state: _latestState,
                           onMarkRead: markPhoneRead,
                           onSend: sendPhone,
+                          aiService: phoneAiService,
                         ),
                       ),
                     );

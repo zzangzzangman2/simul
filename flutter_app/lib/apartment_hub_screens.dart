@@ -19,6 +19,7 @@ class ApartmentHubScreen extends StatefulWidget {
     super.key,
     required this.state,
     required this.onOpenMarket,
+    required this.onOpenRealEstate,
     required this.onOpenBank,
     required this.onOpenDecisions,
     required this.onOpenLedger,
@@ -41,6 +42,7 @@ class ApartmentHubScreen extends StatefulWidget {
 
   final GameState state;
   final VoidCallback onOpenMarket;
+  final VoidCallback onOpenRealEstate;
   final VoidCallback onOpenBank;
   final VoidCallback onOpenDecisions;
   final VoidCallback onOpenLedger;
@@ -78,6 +80,42 @@ class _ApartmentHubScreenState extends State<ApartmentHubScreen> {
   void _moveTo(_ApartmentPlace place) {
     if (place == _place) return;
     setState(() => _place = place);
+  }
+
+  Future<void> _openEveningChoice() async {
+    final selection = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: const Color(0xFFFFFBF2),
+      builder: (sheetContext) => _WeekdayEveningSheet(state: widget.state),
+    );
+    if (!mounted || selection == null) return;
+    switch (selection) {
+      case 'real_estate':
+        widget.onOpenRealEstate();
+        break;
+      case 'bank':
+        widget.onOpenBank();
+        break;
+    }
+  }
+
+  void _handleGuidanceAction() {
+    if (widget.state.pendingDecisions.isNotEmpty) {
+      widget.onOpenDecisions();
+      return;
+    }
+    if (widget.state.currentDate.weekday >= DateTime.saturday ||
+        widget.state.marketMinute >= marketDayEndMinute) {
+      widget.onAdvanceDay();
+      return;
+    }
+    if (widget.state.marketMinute < krxCloseMinute) {
+      widget.onOpenMarket();
+      return;
+    }
+    _openEveningChoice();
   }
 
   @override
@@ -140,6 +178,15 @@ class _ApartmentHubScreenState extends State<ApartmentHubScreen> {
               activeSaveSlot: widget.activeSaveSlot,
               lastSavedAt: widget.lastSavedAt,
               onOpenGameMenu: widget.onOpenGameMenu,
+            ),
+          ),
+          Positioned(
+            left: 8,
+            top: 112,
+            right: 60,
+            child: _ApartmentDayGuideCard(
+              state: widget.state,
+              onPressed: _handleGuidanceAction,
             ),
           ),
           if (!legacyMissionUiDisabled)
@@ -490,8 +537,18 @@ class _HomeComputerScreenState extends State<HomeComputerScreen> {
                                                 0xFFFFA45C,
                                               ),
                                               title: '한마음 부동산',
-                                              subtitle: '서울·경기 매물',
-                                              status: '지도 · 계약',
+                                              subtitle:
+                                                  realEstateAccessUnlocked(
+                                                    _state,
+                                                  )
+                                                  ? '서울·경기 매물'
+                                                  : '서하늘 소개 필요',
+                                              status:
+                                                  realEstateAccessUnlocked(
+                                                    _state,
+                                                  )
+                                                  ? '지도 · 계약'
+                                                  : '🔒 스토리 잠김',
                                               onTap: _openRealEstate,
                                             ),
                                             _ComputerAppTile(
@@ -945,9 +1002,10 @@ class _ApartmentPlaceScene extends StatelessWidget {
             width: 118,
             height: 144,
             eyebrow: '국가계좌 창구 가기',
-            label: '국가계좌 창구',
+            label: bankAccessUnlocked(state) ? '국가계좌 창구' : '잠김 · 윤하린 소개 필요',
             icon: Icons.account_balance_rounded,
             accent: const Color(0xFF86CBEA),
+            attention: !bankAccessUnlocked(state),
             onTap: onOpenBank,
           ),
           _ApartmentObjectHotspot(
@@ -1048,7 +1106,7 @@ class _ApartmentLocationHeader extends StatelessWidget {
                 child: Row(
                   children: [
                     Container(
-                      width: 47,
+                      width: 76,
                       height: 48,
                       decoration: BoxDecoration(
                         color: const Color(0xFFFFD66F),
@@ -1058,32 +1116,36 @@ class _ApartmentLocationHeader extends StatelessWidget {
                           width: 1.5,
                         ),
                       ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Text(
-                            'DAY',
-                            style: TextStyle(
-                              fontFamily: _hubDisplayFont,
-                              color: Color(0xFF76501B),
-                              fontSize: 7.5,
-                              height: 1,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.7,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text(
+                              '현재 시각',
+                              style: TextStyle(
+                                fontFamily: _hubDisplayFont,
+                                color: Color(0xFF76501B),
+                                fontSize: 7.8,
+                                height: 1,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: -0.1,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '${state.day}',
-                            style: const TextStyle(
-                              fontFamily: _hubDisplayFont,
-                              color: _ink,
-                              fontSize: 19,
-                              height: 1,
-                              fontWeight: FontWeight.w700,
+                            const SizedBox(height: 2),
+                            Text(
+                              marketTimeLabel(state.marketMinute),
+                              key: const Key('apartment-current-time'),
+                              style: const TextStyle(
+                                fontFamily: _hubDisplayFont,
+                                color: _ink,
+                                fontSize: 18,
+                                height: 1,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                     const SizedBox(width: 9),
@@ -1211,9 +1273,9 @@ class _ApartmentLocationHeader extends StatelessWidget {
                         icon: Icons.schedule_rounded,
                         iconColor: const Color(0xFFFFD66F),
                         label:
-                            '${_apartmentHudDateLabel(state.currentDate)} · ${marketTimeLabel(state.marketMinute)}',
+                            'DAY ${state.day} · ${_apartmentHudDateLabel(state.currentDate)}',
                         semanticLabel:
-                            '${_apartmentDateLabel(state.currentDate)} · ${marketTimeLabel(state.marketMinute)}',
+                            'DAY ${state.day} · ${_apartmentDateLabel(state.currentDate)}',
                       ),
                     ),
                     const _ApartmentStatusDivider(),
@@ -1335,6 +1397,347 @@ class _ApartmentWeather {
       _ => const _ApartmentWeather('맑음'),
     };
   }
+}
+
+class _ApartmentDayGuideCard extends StatelessWidget {
+  const _ApartmentDayGuideCard({required this.state, required this.onPressed});
+
+  final GameState state;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final guidance = gameDayGuidanceForState(state);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        key: const Key('apartment-day-guide'),
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(16),
+        child: Ink(
+          padding: const EdgeInsets.fromLTRB(11, 9, 9, 9),
+          decoration: BoxDecoration(
+            color: const Color(0xF7FFF9EA),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFD99B2B), width: 1.5),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x52070A12),
+                blurRadius: 10,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFD66F),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF9C681B)),
+                ),
+                child: const Icon(
+                  Icons.flag_rounded,
+                  color: Color(0xFF61451F),
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      guidance.phaseLabel,
+                      key: const Key('apartment-day-phase'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontFamily: _hubDisplayFont,
+                        color: Color(0xFF9A6114),
+                        fontSize: 8.5,
+                        height: 1,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      guidance.title,
+                      key: const Key('apartment-next-objective'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontFamily: _hubDisplayFont,
+                        color: _ink,
+                        fontSize: 11.5,
+                        height: 1.05,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      guidance.body,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFF59667D),
+                        fontSize: 8.3,
+                        height: 1.2,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 5),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.arrow_forward_rounded,
+                    color: Color(0xFF9A6114),
+                    size: 20,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    guidance.actionLabel,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontFamily: _hubDisplayFont,
+                      color: Color(0xFF76501B),
+                      fontSize: 7,
+                      height: 1.05,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _WeekdayEveningSheet extends StatelessWidget {
+  const _WeekdayEveningSheet({required this.state});
+
+  final GameState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final currentTime = marketTimeLabel(state.marketMinute);
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 22),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        '장 마감 후 저녁 업무',
+                        style: TextStyle(
+                          color: _ink,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        '${_apartmentDateLabel(state.currentDate)} · 현재 $currentTime',
+                        style: const TextStyle(
+                          color: Color(0xFF65708A),
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  key: const Key('weekday-sheet-current-time'),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 11,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF243451),
+                    borderRadius: BorderRadius.circular(13),
+                  ),
+                  child: Text(
+                    currentTime,
+                    style: const TextStyle(
+                      color: Color(0xFFFFD66F),
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(11),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEAF2FF),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFF8AA8D4)),
+              ),
+              child: const Text(
+                '오늘은 둘 중 하나만 선택할 수 있습니다. 선택한 화면에 들어가는 순간 남은 저녁을 사용하고 20:00으로 진행·저장됩니다.',
+                style: TextStyle(
+                  color: Color(0xFF40526D),
+                  fontSize: 11,
+                  height: 1.4,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            _WeekdayActivityTile(
+              tileKey: const Key('weekday-evening-real_estate'),
+              icon: Icons.apartment_rounded,
+              accent: const Color(0xFFB57A3D),
+              title: '부동산 시장 확인',
+              subtitle: realEstateAccessUnlocked(state)
+                  ? '$currentTime → 20:00 · 오늘 저녁 사용'
+                  : '🔒 서하늘 공인중개사 소개 이야기 필요',
+              description: realEstateAccessUnlocked(state)
+                  ? '매물·시세·보유 부동산을 검토하고 필요한 거래를 처리합니다.'
+                  : '첫 은행 상담 뒤 도착하는 소개장을 확인하면 열립니다.',
+              onTap: realEstateAccessUnlocked(state)
+                  ? () => Navigator.pop(context, 'real_estate')
+                  : null,
+            ),
+            const SizedBox(height: 8),
+            _WeekdayActivityTile(
+              tileKey: const Key('weekday-evening-bank'),
+              icon: Icons.account_balance_rounded,
+              accent: const Color(0xFF397FA8),
+              title: '은행 업무 확인',
+              subtitle: bankAccessUnlocked(state)
+                  ? '$currentTime → 20:00 · 오늘 저녁 사용'
+                  : '🔒 윤하린 은행원 소개 이야기 필요',
+              description: bankAccessUnlocked(state)
+                  ? '예금·대출·상환 조건과 현재 현금 흐름을 확인합니다.'
+                  : '주식장 첫 교육 뒤 도착하는 담당자 소개 기록을 확인하면 열립니다.',
+              onTap: bankAccessUnlocked(state)
+                  ? () => Navigator.pop(context, 'bank')
+                  : null,
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _WeekdayActivityTile extends StatelessWidget {
+  const _WeekdayActivityTile({
+    required this.tileKey,
+    required this.icon,
+    required this.accent,
+    required this.title,
+    required this.subtitle,
+    required this.description,
+    required this.onTap,
+  });
+
+  final Key tileKey;
+  final IconData icon;
+  final Color accent;
+  final String title;
+  final String subtitle;
+  final String description;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: Colors.white,
+    borderRadius: BorderRadius.circular(16),
+    child: InkWell(
+      key: tileKey,
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(11),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: onTap == null ? const Color(0xFFCCD1DA) : accent,
+            width: 1.5,
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: accent.withValues(alpha: onTap == null ? 0.08 : 0.16),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                icon,
+                color: onTap == null ? const Color(0xFF9AA2B1) : accent,
+                size: 21,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      color: onTap == null ? const Color(0xFF8A92A0) : _ink,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      color: onTap == null ? const Color(0xFF9AA2B1) : accent,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    description,
+                    style: const TextStyle(
+                      color: Color(0xFF65708A),
+                      fontSize: 10.5,
+                      height: 1.35,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              onTap == null ? Icons.check_rounded : Icons.chevron_right_rounded,
+              color: onTap == null ? const Color(0xFF9AA2B1) : accent,
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 class _ApartmentMissionCard extends StatefulWidget {

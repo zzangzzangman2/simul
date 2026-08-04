@@ -39,7 +39,9 @@ import 'game/real_estate_financing.dart';
 import 'game/real_estate_rental.dart';
 import 'game/real_estate_world.dart';
 import 'game/personal_finance_state.dart';
+import 'game/phone_ability_hint.dart';
 import 'game/phone_ai_service.dart';
+import 'game/phone_dialogue_composer.dart';
 import 'game/phone_messenger_state.dart';
 import 'game/real_estate_market.dart';
 import 'game/relationship_state.dart';
@@ -49,6 +51,7 @@ import 'game/story_state.dart';
 import 'game/world_bootstrapper.dart';
 import 'game/world_economy.dart';
 import 'game/weekend_activity.dart';
+import 'game/weekday_activity.dart';
 export 'game/world_bootstrapper.dart'
     show CampaignWorldPreparer, WorldLoadProgress, WorldLoadProgressCallback;
 
@@ -67,6 +70,7 @@ part 'stock_market_screen.dart';
 part 'stock_market_order_workspace.dart';
 part 'stock_market_order_book.dart';
 part 'stock_market_tutorial.dart';
+part 'guided_tutorial_controls.dart';
 part 'stock_market_corporate_actions.dart';
 part 'star_shop_screen.dart';
 part 'dialogue/canonical_dialogue_data.dart';
@@ -706,6 +710,24 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     return result;
   }
 
+  Future<WeekdayActivityResult> _completeWeekdayActivity(
+    String activityId,
+  ) async {
+    final current = _state!;
+    final result = _engine.completeWeekdayActivity(current, activityId);
+    if (!result.success || result.endMinute == null) return result;
+    final effectState = result.state.copyWith(
+      marketMinute: current.marketMinute,
+    );
+    final next = await _processStateThroughMarketMinute(
+      effectState,
+      result.endMinute!,
+    );
+    await _persistence.save(next);
+    if (mounted) setState(() => _state = next);
+    return result.withState(next);
+  }
+
   Future<WeekendActivityResult> _completeWeekendActivity(
     WeekendActivityRequest request,
   ) async {
@@ -791,10 +813,30 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     String text,
   ) async {
     final current = _state!;
+    PhoneAbilityHint? proposedAbilityHint;
+    if (classifyPhoneIntent(text) == PhonePlayerIntent.investmentAdvice &&
+        cohortGirlProfileById(contactId) != null) {
+      try {
+        final universe = await FictionalMarketUniverse.load(
+          seed: current.simulationSeed,
+          throughDate: current.currentDate,
+        );
+        proposedAbilityHint = buildPhoneAbilityHint(
+          current,
+          universe: universe,
+          contactId: contactId,
+          requestsResearchCredit: phoneMessageRequestsResearchCredit(text),
+        );
+      } catch (_) {
+        // The deterministic generic investment reply remains available when
+        // the cached public market view cannot be loaded.
+      }
+    }
     final localResult = _engine.sendPhoneMessage(
       current,
       contactId: contactId,
       text: text,
+      abilityHint: proposedAbilityHint,
     );
     if (!localResult.success) return localResult;
     var result = localResult;
@@ -805,6 +847,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
         contactId: contactId,
         playerText: text,
         localDraft: localDraft,
+        abilityHint: localResult.abilityHint,
       );
       if (aiReply != null) {
         final generated = _engine.sendPhoneMessage(
@@ -812,6 +855,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
           contactId: contactId,
           text: text,
           replyOverride: aiReply.text,
+          abilityHint: localResult.abilityHint,
         );
         if (generated.success) result = generated;
       }
@@ -1226,6 +1270,20 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     return next;
   }
 
+  Future<GameState> _completeBankDepositTutorial() async {
+    final next = _engine.markBankDepositTutorialSeen(_state!);
+    await _persistence.save(next);
+    if (mounted) setState(() => _state = next);
+    return next;
+  }
+
+  Future<GameState> _completeRealEstateTutorial() async {
+    final next = _engine.markRealEstateTutorialSeen(_state!);
+    await _persistence.save(next);
+    if (mounted) setState(() => _state = next);
+    return next;
+  }
+
   Future<void> _archiveNews(String headline, List<String> eventIds) async {
     final next = _engine.archiveNews(
       _state!,
@@ -1585,6 +1643,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
                   state: _state!,
                   stateReader: () => _state!,
                   engine: _engine,
+                  phoneAiService: _phoneAiService,
                   stockOrderBookSessionCache: _stockOrderBookSessionCache,
                   activeSaveSlot: _activeSlot,
                   lastSavedAt: _lastSavedAt,
@@ -1605,6 +1664,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
                   onCompleteRelationshipEvening: _completeRelationshipEvening,
                   onRestDuringRelationshipEvening:
                       _restDuringRelationshipEvening,
+                  onCompleteWeekdayActivity: _completeWeekdayActivity,
                   onCompleteWeekendActivity: _completeWeekendActivity,
                   onSettleCohortInvestmentDay: _settleCohortInvestmentDay,
                   onLendToCohortInvestor: _lendToCohortInvestor,
@@ -1641,6 +1701,9 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
                   onPurchaseMarketReport: _purchaseDailyMarketReport,
                   onCompleteHubTutorial: _completeHubTutorial,
                   onCompleteMarketTutorial: _completeMarketTutorial,
+                  onCompleteBankDepositTutorial:
+                      _completeBankDepositTutorial,
+                  onCompleteRealEstateTutorial: _completeRealEstateTutorial,
                   onArchiveNews: _archiveNews,
                   onCompleteWork: _completeWork,
                   onExecuteTrade: _executeTrade,

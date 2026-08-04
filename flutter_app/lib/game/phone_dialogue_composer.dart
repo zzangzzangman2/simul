@@ -1,4 +1,6 @@
 import 'phone_messenger_state.dart';
+import 'phone_ability_hint.dart';
+import 'phone_situation_context.dart';
 import 'relationship_state.dart';
 import 'stable_hash.dart';
 
@@ -83,6 +85,8 @@ class PhoneDialogueContext {
     required this.relationship,
     required this.investment,
     this.recentMemories = const <PhoneConversationMemory>[],
+    this.abilityHint,
+    this.situation,
   });
 
   final String worldSeed;
@@ -93,6 +97,8 @@ class PhoneDialogueContext {
   final GirlRelationshipProgress? relationship;
   final PhoneInvestmentConversationContext investment;
   final List<PhoneConversationMemory> recentMemories;
+  final PhoneAbilityHint? abilityHint;
+  final PhoneSituationContext? situation;
 }
 
 class PhoneComposedReply {
@@ -106,6 +112,7 @@ class PhoneComposedReply {
     required this.closenessDelta,
     required this.investmentRespectDelta,
     required this.combinationKey,
+    required this.abilityHintUsed,
   });
 
   final String text;
@@ -117,6 +124,7 @@ class PhoneComposedReply {
   final int closenessDelta;
   final int investmentRespectDelta;
   final String combinationKey;
+  final bool abilityHintUsed;
 }
 
 PhonePlayerIntent classifyPhoneIntent(String rawText) {
@@ -144,13 +152,36 @@ PhonePlayerIntent classifyPhoneIntent(String rawText) {
   if (hasAny(const ['벌었', '수익났', '플러스', '익절', '대박'])) {
     return PhonePlayerIntent.gainShare;
   }
-  if (hasAny(const ['추천', '뭘사', '뭐사', '매수할까', '매도할까', '조언'])) {
+  if (hasAny(const [
+    '추천',
+    '힌트',
+    '뭘사',
+    '뭐사',
+    '매수할까',
+    '매도할까',
+    '조언',
+  ])) {
     return PhonePlayerIntent.investmentAdvice;
   }
   if (hasAny(const ['왜올랐', '왜내렸', '복기', '분석', '손익', '투자', '주식', '종목'])) {
     return PhonePlayerIntent.investmentReflection;
   }
-  if (hasAny(const ['내일', '주말', '같이', '약속', '계획', '만날'])) {
+  if (hasAny(const [
+    '내일',
+    '주말',
+    '같이',
+    '약속',
+    '계획',
+    '만날',
+    '만나자',
+    '만날까',
+    '데이트',
+    '나갈까',
+    '나가자',
+    '놀러',
+    '외출',
+    '보자',
+  ])) {
     return PhonePlayerIntent.planning;
   }
   if (hasAny(const ['실습', '공부', '복습', '숙제', '컴퓨터', 'pc', '모르', '헷갈'])) {
@@ -182,6 +213,7 @@ PhoneComposedReply composePhoneReply(
   final claimConflict = _isInvestmentIntent(intent)
       ? _claimConflictLine(context.investment, intent, voice, playerText)
       : null;
+  var abilityHintUsed = false;
 
   final components = <String>[];
   if (intent == PhonePlayerIntent.boundary) {
@@ -200,6 +232,10 @@ PhoneComposedReply composePhoneReply(
     if (_isInvestmentIntent(intent)) {
       if (claimConflict != null) {
         components.add(claimConflict);
+      } else if (intent == PhonePlayerIntent.investmentAdvice &&
+          context.abilityHint != null) {
+        components.add(context.abilityHint!.localReply);
+        abilityHintUsed = true;
       } else {
         final intentLines =
             voice.investmentIntentLines[_investmentIntentIndex(intent)];
@@ -213,6 +249,11 @@ PhoneComposedReply composePhoneReply(
           components.add(followUp);
         }
       }
+    } else if (intent == PhonePlayerIntent.planning &&
+        context.situation?.invitationDetected == true) {
+      components.add(
+        context.situation!.localPlanningReply(context.contact.id),
+      );
     } else if (_isSocialIntent(intent)) {
       final investmentEmotion =
           intent == PhonePlayerIntent.emotionalSupport &&
@@ -251,12 +292,12 @@ PhoneComposedReply composePhoneReply(
   var closenessDelta = _closenessDelta(intent);
   var investmentRespectDelta = _investmentRespectDelta(intent);
   if (repeated) {
-    affectionDelta = 0;
+    affectionDelta = -1;
     trustDelta = 0;
-    closenessDelta = 0;
+    closenessDelta = -1;
     investmentRespectDelta = 0;
   } else if (claimConflict != null) {
-    affectionDelta = 0;
+    affectionDelta = -1;
     trustDelta = -1;
     closenessDelta = 0;
     investmentRespectDelta = -1;
@@ -266,12 +307,13 @@ PhoneComposedReply composePhoneReply(
     text: _fitReply(components),
     intent: intent,
     investmentSituation: situation,
-    meaningful: intent != PhonePlayerIntent.unknown,
+    meaningful: true,
     affectionDelta: affectionDelta,
     trustDelta: trustDelta,
     closenessDelta: closenessDelta,
     investmentRespectDelta: investmentRespectDelta,
     combinationKey: key,
+    abilityHintUsed: abilityHintUsed,
   );
 }
 
@@ -829,7 +871,7 @@ String? _claimConflictLine(
 
 int _affectionDelta(PhonePlayerIntent intent) => switch (intent) {
   PhonePlayerIntent.boundary => -2,
-  PhonePlayerIntent.unknown => 0,
+  PhonePlayerIntent.unknown => 1,
   _ => 1,
 };
 
@@ -861,7 +903,7 @@ int _investmentRespectDelta(PhonePlayerIntent intent) => switch (intent) {
 };
 
 PhoneConversationMemory? _latestPastMemory(PhoneDialogueContext context) {
-  for (final memory in context.recentMemories.reversed) {
+  for (final memory in context.recentMemories) {
     if (memory.day < context.day) return memory;
   }
   return null;

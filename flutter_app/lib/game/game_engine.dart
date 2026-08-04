@@ -18,14 +18,17 @@ import 'real_estate_market.dart';
 import 'real_estate_rental.dart';
 import 'real_estate_world.dart';
 import 'personal_finance_state.dart';
+import 'phone_ability_hint.dart';
 import 'phone_dialogue_composer.dart';
 import 'phone_messenger_state.dart';
+import 'phone_situation_context.dart';
 import 'relationship_state.dart';
 import 'seed_money_content.dart';
 import 'stable_hash.dart';
 import 'star_shop.dart';
 import 'story_state.dart';
 import 'weekend_activity.dart';
+import 'weekday_activity.dart';
 
 part 'game_engine_corporate_actions.dart';
 part 'game_engine_story_decisions.dart';
@@ -648,6 +651,7 @@ class PhoneMessengerActionResult {
     this.trustDelta = 0,
     this.closenessDelta = 0,
     this.investmentRespectDelta = 0,
+    this.abilityHint,
   });
 
   final GameState state;
@@ -658,6 +662,7 @@ class PhoneMessengerActionResult {
   final int trustDelta;
   final int closenessDelta;
   final int investmentRespectDelta;
+  final PhoneAbilityHint? abilityHint;
 
   bool get relationshipChanged =>
       affectionDelta != 0 ||
@@ -717,6 +722,7 @@ class GameEngine {
     required String contactId,
     required String text,
     String? replyOverride,
+    PhoneAbilityHint? abilityHint,
   }) {
     final contact = phoneContactById(contactId);
     if (contact == null) {
@@ -767,6 +773,17 @@ class GameEngine {
     final relationship = girlProfile == null
         ? null
         : state.relationships.progressFor(contactId);
+    final phoneSituation = buildPhoneSituationContext(
+      state,
+      contactId: contactId,
+      playerText: content,
+    );
+    final guardedAbilityHint = enforcePhoneAbilityHintForSend(
+      state,
+      contactId: contactId,
+      playerIntent: classifyPhoneIntent(content).name,
+      proposed: abilityHint,
+    );
     final composed = composePhoneReply(
       PhoneDialogueContext(
         worldSeed: state.simulationSeed,
@@ -786,10 +803,19 @@ class GameEngine {
           contactDailyProfitLoss: contactRow?.profitLoss ?? 0,
           contactRank: rankFor(contactId),
         ),
-        recentMemories: state.phoneMessenger.memoriesFor(contactId),
+        recentMemories: state.phoneMessenger.relevantMemoriesFor(
+          contactId,
+          queryText: content,
+          currentDay: state.day,
+        ),
+        abilityHint: guardedAbilityHint,
+        situation: phoneSituation,
       ),
       content,
     );
+    final appliedAbilityHint = composed.abilityHintUsed
+        ? guardedAbilityHint
+        : null;
     final playerMessage = PhoneMessage(
       id: 'phone-${state.day}-${state.marketMinute}-$contactId-$sequence-me',
       contactId: contactId,
@@ -799,11 +825,20 @@ class GameEngine {
       marketMinute: state.marketMinute,
       read: true,
     );
+    final normalizedOverride = _normalizedPhoneReply(replyOverride);
+    final safeOverride =
+        normalizedOverride != null &&
+            !phoneAiReplyViolatesSituationPolicy(
+              normalizedOverride,
+              situation: phoneSituation,
+            )
+        ? normalizedOverride
+        : null;
     final reply = PhoneMessage(
       id: 'phone-${state.day}-${state.marketMinute}-$contactId-$sequence-reply',
       contactId: contactId,
       senderId: contactId,
-      text: _normalizedPhoneReply(replyOverride) ?? composed.text,
+      text: safeOverride ?? composed.text,
       day: state.day,
       marketMinute: state.marketMinute,
       read: true,
@@ -834,9 +869,7 @@ class GameEngine {
     var closenessDelta = 0;
     var investmentRespectDelta = 0;
     var nextRelationships = state.relationships;
-    if (relationship != null &&
-        composed.meaningful &&
-        relationship.lastMeaningfulMessageDay != state.day) {
+    if (relationship != null && composed.meaningful) {
       final nextAffection = (relationship.affection + composed.affectionDelta)
           .clamp(relationshipMinAffection, relationshipMaxAffection)
           .toInt();
@@ -887,17 +920,38 @@ class GameEngine {
       trustDelta: trustDelta,
       closenessDelta: closenessDelta,
       investmentRespectDelta: investmentRespectDelta,
+      importance: math.max(
+        appliedAbilityHint?.isStrong == true ? 4 : 1,
+        phoneMemoryImportanceForIntent(
+          composed.intent.name,
+          affectionDelta: affectionDelta,
+          trustDelta: trustDelta,
+          closenessDelta: closenessDelta,
+        ),
+      ),
+      abilityHintLevel: appliedAbilityHint?.level.name ?? '',
+      abilityHintObservation: appliedAbilityHint?.observation ?? '',
+      abilityHintUsedResearchCredit:
+          appliedAbilityHint?.usesResearchCredit == true,
+      marketMinute: state.marketMinute,
+      situationSummary: phoneSituation.situationSummary,
+      scheduleDecision: phoneSituation.scheduleDecision.name,
     );
     final appendedMemories = <PhoneConversationMemory>[
       ...state.phoneMessenger.memories,
       memory,
     ];
-    final memories = appendedMemories.length <= phoneConversationMemoryLimit
-        ? appendedMemories
-        : appendedMemories.sublist(
-            appendedMemories.length - phoneConversationMemoryLimit,
-          );
+    final memories = retainPhoneConversationMemories(appendedMemories);
+    var nextStory = state.story;
+    if (appliedAbilityHint?.usesResearchCredit == true) {
+      final flags = <String, dynamic>{...state.story.storyFlags};
+      final credits =
+          (flags[weekendMarketResearchCreditsFlag] as num?)?.toInt() ?? 0;
+      flags[weekendMarketResearchCreditsFlag] = math.max(0, credits - 1);
+      nextStory = state.story.copyWith(storyFlags: flags);
+    }
     final next = state.copyWith(
+      story: nextStory,
       relationships: nextRelationships,
       phoneMessenger: state.phoneMessenger.copyWith(
         messages: messages,
@@ -914,6 +968,7 @@ class GameEngine {
       trustDelta: trustDelta,
       closenessDelta: closenessDelta,
       investmentRespectDelta: investmentRespectDelta,
+      abilityHint: appliedAbilityHint,
     );
   }
 
@@ -1684,6 +1739,106 @@ class GameEngine {
       state: next,
       success: true,
       message: '오늘은 혼자 쉬며 하루를 정리했습니다.',
+    );
+  }
+
+  WeekdayActivityResult completeWeekdayActivity(
+    GameState state,
+    String activityId,
+  ) {
+    if (state.currentDate.weekday >= DateTime.saturday) {
+      return WeekdayActivityResult(
+        state: state,
+        success: false,
+        message: '평일 저녁 업무는 월요일부터 금요일까지만 선택할 수 있습니다.',
+      );
+    }
+    if (state.pendingDecisions.isNotEmpty) {
+      return WeekdayActivityResult(
+        state: state,
+        success: false,
+        message: '새 기록을 먼저 확인하고 결정을 마쳐야 저녁 업무를 볼 수 있습니다.',
+      );
+    }
+    if (state.marketMinute < krxCloseMinute) {
+      return WeekdayActivityResult(
+        state: state,
+        success: false,
+        message: '15:00까지는 주식장 준비와 거래 시간입니다. 장 마감 후 이용하세요.',
+      );
+    }
+    if (state.marketMinute >= marketDayEndMinute) {
+      return WeekdayActivityResult(
+        state: state,
+        success: false,
+        message: '오늘 저녁 업무는 이미 끝났습니다. 다음 날로 넘어가세요.',
+      );
+    }
+    final activity = weekdayActivityById(activityId);
+    if (activity == null) {
+      return WeekdayActivityResult(
+        state: state,
+        success: false,
+        message: '선택할 수 없는 저녁 업무입니다.',
+      );
+    }
+    if (activity.id == 'bank' && !bankAccessUnlocked(state)) {
+      return WeekdayActivityResult(
+        state: state,
+        success: false,
+        message: '윤하린 은행원 소개 이야기를 먼저 확인해야 은행 업무가 열립니다.',
+        activity: activity,
+      );
+    }
+    if (activity.id == 'real_estate' && !realEstateAccessUnlocked(state)) {
+      return WeekdayActivityResult(
+        state: state,
+        success: false,
+        message: '서하늘 공인중개사 소개 이야기를 먼저 확인해야 부동산 업무가 열립니다.',
+        activity: activity,
+      );
+    }
+    if (weekdayEveningUsed(state)) {
+      return WeekdayActivityResult(
+        state: state,
+        success: false,
+        message: '오늘 저녁에는 이미 부동산이나 은행 업무를 확인했습니다.',
+        activity: activity,
+      );
+    }
+
+    final startMinute = state.marketMinute;
+    const endMinute = marketDayEndMinute;
+    final log = WeekdayActivityLog(
+      day: state.day,
+      activityId: activity.id,
+      title: activity.title,
+      startMinute: startMinute,
+      endMinute: endMinute,
+    );
+    final flags = Map<String, dynamic>.from(state.story.storyFlags);
+    final logs = <WeekdayActivityLog>[
+      ...weekdayActivityLogsForState(state),
+      log,
+    ];
+    final trimmed = logs.length <= 256 ? logs : logs.sublist(logs.length - 256);
+    flags[weekdayActivityLogFlag] = trimmed
+        .map((entry) => entry.toJson())
+        .toList(growable: false);
+    final progression = state.progression.record(weekdayActivityCounterMetric);
+    final next = state.copyWith(
+      marketMinute: endMinute,
+      progression: progression,
+      story: state.story.copyWith(storyFlags: flags),
+    );
+    return WeekdayActivityResult(
+      state: next,
+      success: true,
+      message:
+          '${activity.title} · 오늘 저녁 사용 · ${marketTimeLabel(startMinute)} → 20:00',
+      activity: activity,
+      startMinute: startMinute,
+      endMinute: endMinute,
     );
   }
 
@@ -4487,6 +4642,26 @@ class GameEngine {
     ),
   );
 
+  GameState markBankDepositTutorialSeen(GameState state) => state.copyWith(
+    story: state.story.copyWith(
+      storyFlags: {
+        ...state.story.storyFlags,
+        'bankDepositTutorialSeen': true,
+        'bankDepositTutorialCompletedDay': state.day,
+      },
+    ),
+  );
+
+  GameState markRealEstateTutorialSeen(GameState state) => state.copyWith(
+    story: state.story.copyWith(
+      storyFlags: {
+        ...state.story.storyFlags,
+        'realEstateTutorialSeen': true,
+        'realEstateTutorialCompletedDay': state.day,
+      },
+    ),
+  );
+
   GameState completeInitialPracticeDay(GameState state) {
     final marked = markMarketTutorialSeen(
       state.copyWith(marketMinute: krxCloseMinute),
@@ -4494,8 +4669,16 @@ class GameEngine {
     // The first research card remains available after the paper-trading day,
     // but it must not trap the player on the practice date.
     final advanced = advanceOneDay(marked.copyWith(decisions: const []));
+    final decisions = <DecisionCardData>[...marked.decisions];
+    if (facilityStoryGatesEnabled(advanced) &&
+        !bankAccessUnlocked(advanced) &&
+        !decisions.any(
+          (decision) => decision.id == 'facility-intro-bank-yoon-harin',
+        )) {
+      decisions.add(_bankAccessIntroduction(advanced.day));
+    }
     return advanced.copyWith(
-      decisions: marked.decisions,
+      decisions: decisions,
       story: advanced.story.copyWith(
         storyFlags: <String, dynamic>{
           ...advanced.story.storyFlags,
@@ -6351,6 +6534,48 @@ class GameEngine {
             ],
           ),
         );
+      case 'meet_bank_clerk_deposit':
+      case 'meet_bank_clerk_credit':
+        next = next.copyWith(
+          story: next.story.copyWith(
+            storyFlags: {
+              ...next.story.storyFlags,
+              bankAccessUnlockedFlag: true,
+              'bankAccessUnlockedDay': next.day,
+              'bankIntroductionFocus': optionId == 'meet_bank_clerk_deposit'
+                  ? 'deposit'
+                  : 'credit',
+            },
+            seenStoryEventIds: [
+              ...next.story.seenStoryEventIds,
+              if (!next.story.seenStoryEventIds.contains(
+                'BANK_CLERK_YOON_HARIN_INTRODUCED',
+              ))
+                'BANK_CLERK_YOON_HARIN_INTRODUCED',
+            ],
+          ),
+        );
+      case 'meet_realtor_home':
+      case 'meet_realtor_cashflow':
+        next = next.copyWith(
+          story: next.story.copyWith(
+            storyFlags: {
+              ...next.story.storyFlags,
+              realEstateAccessUnlockedFlag: true,
+              'realEstateAccessUnlockedDay': next.day,
+              'realtorIntroductionFocus': optionId == 'meet_realtor_home'
+                  ? 'home'
+                  : 'cashflow',
+            },
+            seenStoryEventIds: [
+              ...next.story.seenStoryEventIds,
+              if (!next.story.seenStoryEventIds.contains(
+                'REALTOR_SEO_HANEUL_INTRODUCED',
+              ))
+                'REALTOR_SEO_HANEUL_INTRODUCED',
+            ],
+          ),
+        );
       case 'acquire_board_observer':
         next = _acquireCompanyStake(
           next,
@@ -6988,6 +7213,7 @@ class GameEngine {
     next = _applyCampaignMilestones(next);
     next = _applyControlOpportunity(next);
     next = _applyEraTechnologyDecisions(next);
+    next = _applyFacilityUnlockStories(next);
     if (next.day % 30 == 0 &&
         next.project?.status == ProjectStatus.development) {
       const burn = 10000;
@@ -7986,6 +8212,23 @@ class GameEngine {
         ...state.decisions,
         _controlOffer(state.day, followUp: false),
       ],
+    );
+  }
+
+  GameState _applyFacilityUnlockStories(GameState state) {
+    const decisionId = 'facility-intro-realtor-seo-haneul';
+    if (!facilityStoryGatesEnabled(state) ||
+        state.pendingDecisions.isNotEmpty ||
+        !bankAccessUnlocked(state) ||
+        realEstateAccessUnlocked(state) ||
+        state.decisions.any((decision) => decision.id == decisionId) ||
+        !weekdayActivityLogsForState(
+          state,
+        ).any((log) => log.activityId == 'bank')) {
+      return state;
+    }
+    return state.copyWith(
+      decisions: [...state.decisions, _realEstateAccessIntroduction(state.day)],
     );
   }
 

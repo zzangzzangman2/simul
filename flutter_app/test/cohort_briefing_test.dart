@@ -224,10 +224,11 @@ void main() {
       universe,
     );
 
-    // 보유가 없을 때와 있을 때 아린의 문장이 달라야 한다.
+    // 어제 공개된 소식이 없는 날에도 아린은 그 사실을 말하고 계좌 상황에 맞게 순서를 준다.
     expect(empty, isNot(holding));
-    expect(holding, contains('한빛통신'));
-    expect(holding, contains('주'));
+    expect(empty, contains('살 이유가 없는 날'));
+    expect(holding, contains('1종목'));
+    expect(holding, contains('나올 조건'));
   });
 }
 

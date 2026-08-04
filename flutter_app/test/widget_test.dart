@@ -690,7 +690,12 @@ void main() {
       );
       await tester.pumpAndSettle();
       await startNewGame(tester);
-      await advanceDialogue(tester, 134);
+      // 장면을 추가·삭제해도 깨지지 않도록 대사 원문에서 beat를 찾는다.
+      final operatorBeat = canonicalDialogueScenes.indexWhere(
+        (scene) => (scene['line'] as String).contains('감당하지 않아도 될 위험'),
+      );
+      expect(operatorBeat, greaterThan(0));
+      await advanceDialogue(tester, operatorBeat);
 
       expect(find.text('한서윤'), findsOneWidget);
       expect(find.text('프로젝트 데시멀 · 운영관'), findsOneWidget);
@@ -1578,6 +1583,7 @@ void main() {
         home: ApartmentHubScreen(
           state: state,
           onOpenMarket: () {},
+          onOpenRealEstate: () {},
           onOpenBank: () {},
           onOpenDecisions: () {},
           onOpenLedger: () {},
@@ -1669,7 +1675,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('decision-inbox-screen')), findsNothing);
     expect(find.byKey(const Key('open-decisions-button')), findsOneWidget);
-    expect(find.text('1월 1일 토 · 08:30'), findsOneWidget);
+    expect(find.text('DAY 1 · 1월 1일 토'), findsOneWidget);
+    expect(
+      tester.widget<Text>(find.byKey(const Key('apartment-current-time'))).data,
+      '08:30',
+    );
     expect(find.byKey(const Key('hub-claim-mission-reward')), findsOneWidget);
     expect(
       find.descendant(

@@ -9,12 +9,13 @@ String _phoneClock(int minute) =>
     '${(minute % 60).toString().padLeft(2, '0')}';
 
 class PhoneMessengerScreen extends StatefulWidget {
-  const PhoneMessengerScreen({
+  PhoneMessengerScreen({
     super.key,
     required this.state,
     required this.onMarkRead,
     required this.onSend,
-  });
+    PhoneAiService? aiService,
+  }) : aiService = aiService ?? PhoneAiService();
 
   final GameState state;
   final Future<PhoneMessengerActionResult> Function(String contactId)
@@ -24,6 +25,7 @@ class PhoneMessengerScreen extends StatefulWidget {
     String text,
   )
   onSend;
+  final PhoneAiService aiService;
 
   @override
   State<PhoneMessengerScreen> createState() => _PhoneMessengerScreenState();
@@ -32,6 +34,84 @@ class PhoneMessengerScreen extends StatefulWidget {
 class _PhoneMessengerScreenState extends State<PhoneMessengerScreen> {
   late GameState _state = widget.state;
   bool _opening = false;
+  bool _checkingAiConfiguration = true;
+  PhoneAiConfiguration? _aiConfiguration;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_loadAiConfiguration(showPrompt: true));
+    });
+  }
+
+  Future<void> _loadAiConfiguration({required bool showPrompt}) async {
+    final configuration = await widget.aiService.loadConfiguration();
+    if (!mounted) return;
+    setState(() {
+      _aiConfiguration = configuration;
+      _checkingAiConfiguration = false;
+    });
+    if (showPrompt && configuration.shouldPrompt) {
+      await _showAiRegistration();
+    }
+  }
+
+  Future<void> _showAiRegistration() async {
+    final result = await showDialog<PhoneAiKeyRegistrationResult>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) =>
+          _PhoneAiRegistrationDialog(aiService: widget.aiService),
+    );
+    if (!mounted) return;
+    await _loadAiConfiguration(showPrompt: false);
+    if (!mounted || result == null) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(result.message)));
+  }
+
+  Future<void> _openAiSettings() async {
+    final configuration = _aiConfiguration;
+    if (configuration == null || !configuration.enabled) {
+      await _showAiRegistration();
+      return;
+    }
+
+    final removePersonalKey = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Gemini 자연 대화'),
+        content: Text(
+          configuration.serverConfigured
+              ? '서버에 Gemini가 연결되어 있어 동기별 성격과 최근 대화 맥락을 더 자연스럽게 반영합니다.'
+              : '이 기기에 등록한 개인 키로 동기별 성격과 최근 대화 맥락을 더 자연스럽게 반영합니다.',
+        ),
+        actions: [
+          if (configuration.personalKeyConfigured)
+            TextButton(
+              key: const Key('phone-ai-key-delete-button'),
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('개인 키 삭제'),
+            ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('확인'),
+          ),
+        ],
+      ),
+    );
+    if (removePersonalKey != true) return;
+    await widget.aiService.clearPersonalApiKey();
+    await widget.aiService.dismissRegistrationPrompt();
+    if (!mounted) return;
+    await _loadAiConfiguration(showPrompt: false);
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('이 기기의 Gemini 키를 삭제했습니다.')));
+  }
 
   Future<void> _openThread(PhoneContactDefinition contact) async {
     if (_opening) return;
@@ -92,6 +172,21 @@ class _PhoneMessengerScreenState extends State<PhoneMessengerScreen> {
                       ),
                     ),
                   ),
+                  IconButton(
+                    key: const Key('phone-ai-settings-button'),
+                    tooltip: 'Gemini 자연 대화 설정',
+                    onPressed: _checkingAiConfiguration
+                        ? null
+                        : _openAiSettings,
+                    icon: Icon(
+                      _aiConfiguration?.enabled == true
+                          ? Icons.auto_awesome_rounded
+                          : Icons.key_rounded,
+                      color: _aiConfiguration?.enabled == true
+                          ? const Color(0xFF256B50)
+                          : _messengerDark,
+                    ),
+                  ),
                   if (unread > 0)
                     Container(
                       key: const Key('phone-messenger-total-unread'),
@@ -128,6 +223,9 @@ class _PhoneMessengerScreenState extends State<PhoneMessengerScreen> {
                 ),
               ),
             ),
+            if (_aiConfiguration case final configuration?
+                when configuration.serverReachable && !configuration.enabled)
+              _PhoneAiSetupBanner(onTap: _showAiRegistration),
             Expanded(
               child: ListView.separated(
                 key: const Key('phone-messenger-contact-list'),
@@ -265,6 +363,202 @@ class _PhoneMessengerScreenState extends State<PhoneMessengerScreen> {
   }
 }
 
+class _PhoneAiSetupBanner extends StatelessWidget {
+  const _PhoneAiSetupBanner({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: const Color(0xFFFFF4C7),
+    child: InkWell(
+      key: const Key('phone-ai-setup-banner'),
+      onTap: onTap,
+      child: const Padding(
+        padding: EdgeInsets.fromLTRB(15, 9, 12, 9),
+        child: Row(
+          children: [
+            Icon(
+              Icons.auto_awesome_rounded,
+              size: 20,
+              color: Color(0xFF725C00),
+            ),
+            SizedBox(width: 9),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '더 실감 나는 대화 켜기',
+                    style: TextStyle(
+                      color: Color(0xFF4E4100),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  Text(
+                    'Gemini 키 등록 · 키가 없어도 로컬 대화는 계속됩니다.',
+                    style: TextStyle(
+                      color: Color(0xFF756A36),
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded, color: Color(0xFF725C00)),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+class _PhoneAiRegistrationDialog extends StatefulWidget {
+  const _PhoneAiRegistrationDialog({required this.aiService});
+
+  final PhoneAiService aiService;
+
+  @override
+  State<_PhoneAiRegistrationDialog> createState() =>
+      _PhoneAiRegistrationDialogState();
+}
+
+class _PhoneAiRegistrationDialogState
+    extends State<_PhoneAiRegistrationDialog> {
+  final TextEditingController _controller = TextEditingController();
+  bool _obscure = true;
+  bool _saving = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _register() async {
+    if (_saving) return;
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    final result = await widget.aiService.registerPersonalApiKey(
+      _controller.text,
+    );
+    if (!mounted) return;
+    if (!result.success) {
+      setState(() {
+        _saving = false;
+        _error = result.message;
+      });
+      return;
+    }
+    Navigator.of(context).pop(result);
+  }
+
+  Future<void> _continueLocally() async {
+    if (_saving) return;
+    await widget.aiService.dismissRegistrationPrompt();
+    if (mounted) Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    key: const Key('phone-ai-registration-dialog'),
+    insetPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 24),
+    title: const Row(
+      children: [
+        Icon(Icons.auto_awesome_rounded, color: Color(0xFF7A6500)),
+        SizedBox(width: 9),
+        Expanded(child: Text('더 실감 나는 대화를 켤까요?')),
+      ],
+    ),
+    content: SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Gemini가 동기별 성격, 관계, 오늘과 누적 손익, 최근 대화 맥락을 바탕으로 답장을 더 자연스럽게 다듬습니다.',
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            '키가 없어도 12만 가지 이상의 로컬 대화로 계속 플레이할 수 있습니다.',
+            style: TextStyle(fontSize: 12, color: Color(0xFF6B6B6B)),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            key: const Key('phone-ai-key-input'),
+            controller: _controller,
+            obscureText: _obscure,
+            autocorrect: false,
+            enableSuggestions: false,
+            onSubmitted: (_) => _register(),
+            decoration: InputDecoration(
+              labelText: 'Gemini API 키',
+              hintText: 'Google AI Studio에서 발급받은 키',
+              errorText: _error,
+              border: const OutlineInputBorder(),
+              suffixIcon: IconButton(
+                key: const Key('phone-ai-key-visibility-button'),
+                tooltip: _obscure ? '키 보기' : '키 숨기기',
+                onPressed: () => setState(() => _obscure = !_obscure),
+                icon: Icon(
+                  _obscure
+                      ? Icons.visibility_off_outlined
+                      : Icons.visibility_outlined,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 9),
+          const Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Icons.lock_outline_rounded,
+                size: 16,
+                color: Color(0xFF52705D),
+              ),
+              SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  '키는 이 기기의 보안 저장소에만 보관되며 Git, 게임 세이브, 대화 기록에는 저장되지 않습니다.',
+                  style: TextStyle(
+                    color: Color(0xFF52705D),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    ),
+    actions: [
+      TextButton(
+        key: const Key('phone-ai-local-only-button'),
+        onPressed: _saving ? null : _continueLocally,
+        child: const Text('키 없이 로컬 대화'),
+      ),
+      FilledButton.icon(
+        key: const Key('phone-ai-register-button'),
+        onPressed: _saving ? null : _register,
+        icon: _saving
+            ? const SizedBox.square(
+                dimension: 15,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.lock_rounded, size: 17),
+        label: Text(_saving ? '등록 중' : '등록하고 시작'),
+      ),
+    ],
+  );
+}
+
 class PhoneChatScreen extends StatefulWidget {
   const PhoneChatScreen({
     super.key,
@@ -361,6 +655,9 @@ class _PhoneChatScreenState extends State<PhoneChatScreen> {
     final relationship = cohortGirlProfileById(widget.contact.id) == null
         ? null
         : _state.relationships.progressFor(widget.contact.id);
+    final privateMemoryCount = _state.phoneMessenger
+        .memoriesFor(widget.contact.id)
+        .length;
     final used = _state.phoneMessenger
         .progressFor(widget.contact.id)
         .exchangesForDay(_state.day);
@@ -406,10 +703,12 @@ class _PhoneChatScreenState extends State<PhoneChatScreen> {
                           ),
                           Text(
                             relationship == null
-                                ? widget.contact.personalityLabel
+                                ? '${widget.contact.personalityLabel} · '
+                                      '1:1 기억 $privateMemoryCount'
                                 : '${widget.contact.personalityLabel} · '
                                       '호감 ${relationship.affection} · '
-                                      '신뢰 ${relationship.trust}',
+                                      '신뢰 ${relationship.trust} · '
+                                      '1:1 기억 $privateMemoryCount',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(

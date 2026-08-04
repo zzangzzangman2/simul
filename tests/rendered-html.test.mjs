@@ -286,7 +286,7 @@ test("uses the deterministic local news combinator without a remote API", async 
 });
 
 test("keeps Gemini keys out of source and provides secure device setup plus local fallback", async () => {
-  const [route, service, messenger, engine, envExample] = await Promise.all([
+  const [route, service, messenger, engine, abilityHint, situation, envExample] = await Promise.all([
     readFile(new URL("../app/api/gemini/chat/route.ts", import.meta.url), "utf8"),
     readFile(
       new URL("../flutter_app/lib/game/phone_ai_service.dart", import.meta.url),
@@ -297,6 +297,14 @@ test("keeps Gemini keys out of source and provides secure device setup plus loca
       "utf8",
     ),
     readFile(new URL("../flutter_app/lib/game/game_engine.dart", import.meta.url), "utf8"),
+    readFile(
+      new URL("../flutter_app/lib/game/phone_ability_hint.dart", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../flutter_app/lib/game/phone_situation_context.dart", import.meta.url),
+      "utf8",
+    ),
     readFile(new URL("../.env.example", import.meta.url), "utf8"),
   ]);
 
@@ -311,6 +319,14 @@ test("keeps Gemini keys out of source and provides secure device setup plus loca
   assert.match(route, /directMessagePrivate/);
   assert.match(route, /ownerContactId === contactId/);
   assert.match(route, /CHARACTER_VOICES/);
+  assert.match(route, /function userPrompt/);
+  assert.match(route, /이번 답장에 적용할 강제 힌트 규칙/);
+  assert.match(route, /engineObservation/);
+  assert.match(route, /replyViolatesAbilityHintPolicy/);
+  assert.match(route, /현재 게임 시간과 일정 강제 규칙/);
+  assert.match(route, /replyViolatesSituationPolicy/);
+  assert.match(route, /오늘은 평일이라 당일 외출·데이트를 수락하면 안 된다/);
+  assert.match(route, /정확한 종목 추천, 매수·매도 명령, 목표가/);
   assert.match(service, /\/api\/gemini\/chat/);
   assert.match(service, /FlutterSecureStorage/);
   assert.match(service, /project_decimal_gemini_api_key_v1/);
@@ -319,6 +335,11 @@ test("keeps Gemini keys out of source and provides secure device setup plus loca
   assert.match(messenger, /키 없이 로컬 대화/);
   assert.match(messenger, /1:1 기억/);
   assert.match(engine, /replyOverride/);
+  assert.match(abilityHint, /phoneAbilityHintDailyStrongLimit = 2/);
+  assert.match(abilityHint, /buildCohortAbilityBriefing/);
+  assert.match(abilityHint, /usesResearchCredit/);
+  assert.match(situation, /PhoneScheduleDecision\.todayWeekdayBlocked/);
+  assert.match(situation, /phoneAiReplyViolatesSituationPolicy/);
   assert.match(envExample, /^GEMINI_API_KEY=$/m);
   assert.doesNotMatch(`${route}${service}${envExample}`, /AIza[0-9A-Za-z_-]{20,}/);
 });

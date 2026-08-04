@@ -1,5 +1,67 @@
 part of 'game_engine.dart';
 
+DecisionCardData _bankAccessIntroduction(int day) => DecisionCardData(
+  id: 'facility-intro-bank-yoon-harin',
+  category: '시설 해금 이야기',
+  title: '국가계좌의 생활금융 담당자를 만나세요',
+  proposer: '한서윤 운영관',
+  body:
+      '주식 계좌와 생활 자금을 섞지 않도록 새천년은행 개인금융 창구를 연결했습니다. '
+      '예금과 신용 상담은 윤하린 은행원이 맡습니다. 첫 면담을 마치면 평일 장 마감 후 은행 업무를 볼 수 있습니다.',
+  createdDay: day,
+  dueDay: day + 7,
+  requestedFunds: 0,
+  benefit: '윤하린 은행원 소개 · 새천년은행 저녁 업무 해금',
+  risk: '예금과 대출은 현금흐름과 상환 조건을 직접 확인해야 합니다.',
+  advisorOpinions: const [
+    '한서윤: 증권 계좌와 생활 통장을 먼저 분리해 두세요.',
+    '김서아: 예금·대출 계약은 만기와 이자 지급일을 장부에 기록해야 해요.',
+  ],
+  options: const [
+    DecisionOptionData(
+      id: 'meet_bank_clerk_deposit',
+      label: '윤하린에게 예금부터 배운다',
+      description: '생활 자금과 만기 구조를 중심으로 첫 상담을 예약합니다.',
+    ),
+    DecisionOptionData(
+      id: 'meet_bank_clerk_credit',
+      label: '윤하린에게 신용부터 배운다',
+      description: '신용점수·대출한도·상환 조건을 중심으로 첫 상담을 예약합니다.',
+    ),
+  ],
+);
+
+DecisionCardData _realEstateAccessIntroduction(int day) => DecisionCardData(
+  id: 'facility-intro-realtor-seo-haneul',
+  category: '시설 해금 이야기',
+  title: '윤하린이 건넨 한마음부동산 소개장',
+  proposer: '윤하린 은행원',
+  body:
+      '첫 은행 상담을 마친 뒤 윤하린이 담보와 현금흐름을 함께 설명할 수 있는 중개사를 소개했습니다. '
+      '서하늘 공인중개사와 면담하면 평일 장 마감 후 부동산 시장을 확인할 수 있습니다.',
+  createdDay: day,
+  dueDay: day + 7,
+  requestedFunds: 0,
+  benefit: '서하늘 공인중개사 소개 · 한마음부동산 저녁 업무 해금',
+  risk: '매입가뿐 아니라 취득비·대출·공실·보유세를 함께 봐야 합니다.',
+  advisorOpinions: const [
+    '윤하린: 대출 가능액보다 매달 감당할 현금흐름을 먼저 보세요.',
+    '김학준: 계약서와 등기·임대 조건을 확인하기 전에는 돈을 보내면 안 돼.',
+  ],
+  options: const [
+    DecisionOptionData(
+      id: 'meet_realtor_home',
+      label: '서하늘에게 실거주 관점부터 배운다',
+      description: '주거비와 대출 부담을 기준으로 첫 매물을 살펴봅니다.',
+    ),
+    DecisionOptionData(
+      id: 'meet_realtor_cashflow',
+      label: '서하늘에게 임대 현금흐름부터 배운다',
+      description: '공실·보증금·월 순현금을 기준으로 첫 매물을 살펴봅니다.',
+    ),
+  ],
+);
+
 DecisionCardData _firstResearchNote(int day) => DecisionCardData(
   id: 'first-research-note',
   category: '처음 배우기',
