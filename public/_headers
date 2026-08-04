@@ -1,0 +1,32 @@
+# 배포 캐시 정책.
+#
+# 진입 문서 두 개는 파일명이 고정이라 반드시 재검증해야 한다. 이 둘이 캐시에 붙으면
+# 아래의 버전 붙은 URL을 아무도 보지 못하고 배포가 유저에게 도달하지 않는다.
+#
+# 반대로 `main.dart.js`와 `flutter_bootstrap.js`는 빌드마다 `?v=<내용해시>`가 붙으므로
+# 오래 캐시해도 안전하다. 새 빌드는 새 URL이 되고, 같은 내용이면 같은 URL이라 재다운로드도 없다.
+# 해시는 `scripts/build-flutter-web.mjs`의 `stampBuildId`가 찍는다.
+
+/play/index.html
+  Cache-Control: no-cache, must-revalidate
+
+/play/version.json
+  Cache-Control: no-cache, must-revalidate
+
+/play/manifest.json
+  Cache-Control: no-cache, must-revalidate
+
+/play/flutter_service_worker.js
+  Cache-Control: no-cache, must-revalidate
+
+/play/main.dart.js
+  Cache-Control: public, max-age=31536000, immutable
+
+/play/flutter_bootstrap.js
+  Cache-Control: public, max-age=31536000, immutable
+
+/play/assets/*
+  Cache-Control: public, max-age=604800
+
+/play/canvaskit/*
+  Cache-Control: public, max-age=31536000, immutable

@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
   access,
   cp,
@@ -7,6 +8,7 @@ import {
   readdir,
   rename,
   rm,
+  writeFile,
 } from "node:fs/promises";
 import { dirname, relative, resolve } from "node:path";
 import { homedir } from "node:os";
@@ -142,6 +144,65 @@ async function validateBuild() {
   }
 }
 
+/**
+ * Flutter Web은 `index.html`, `flutter_bootstrap.js`, `main.dart.js`를 모두 고정된
+ * 파일명으로 내보내고, 최신 Flutter의 서비스워커는 캐시를 하지 않고 자기 자신을
+ * 등록 해제하는 스텁이다. 그래서 갱신 여부가 전적으로 HTTP 캐시에 달려 있고,
+ * 5MB짜리 `main.dart.js`가 캐시에 붙어 있으면 유저는 배포 뒤에도 옛 게임을 본다.
+ *
+ * 두 진입 스크립트 URL에 내용 해시를 붙여 새 빌드가 반드시 새 URL이 되게 한다.
+ * 타임스탬프가 아니라 내용 해시를 쓰므로 코드가 같으면 산출물도 같고,
+ * `public/play/`가 커밋되는 저장소에 불필요한 diff가 쌓이지 않는다.
+ */
+async function stampBuildId() {
+  const indexPath = resolve(buildOutput, "index.html");
+  const bootstrapPath = resolve(buildOutput, "flutter_bootstrap.js");
+  const mainPath = resolve(buildOutput, "main.dart.js");
+
+  const [indexHtml, bootstrap, mainJs] = await Promise.all([
+    readFile(indexPath, "utf8"),
+    readFile(bootstrapPath, "utf8"),
+    readFile(mainPath),
+  ]);
+
+  const buildId = createHash("sha256")
+    .update(mainJs)
+    .update(bootstrap)
+    .digest("hex")
+    .slice(0, 12);
+
+  if (!indexHtml.includes('src="flutter_bootstrap.js"')) {
+    throw new Error("Flutter index.html no longer loads flutter_bootstrap.js by name.");
+  }
+  if (!bootstrap.includes('"main.dart.js"')) {
+    throw new Error("Flutter bootstrap no longer references main.dart.js by name.");
+  }
+
+  await writeFile(
+    indexPath,
+    indexHtml.replaceAll(
+      'src="flutter_bootstrap.js"',
+      `src="flutter_bootstrap.js?v=${buildId}"`,
+    ),
+    "utf8",
+  );
+  await writeFile(
+    bootstrapPath,
+    bootstrap.replaceAll('"main.dart.js"', `"main.dart.js?v=${buildId}"`),
+    "utf8",
+  );
+
+  // 배포 확인용. `version.json`은 Flutter가 pubspec 값만 담아 한 번도 바뀌지 않았다.
+  const versionPath = resolve(buildOutput, "version.json");
+  if (await exists(versionPath)) {
+    const version = JSON.parse(await readFile(versionPath, "utf8"));
+    version.build_id = buildId;
+    await writeFile(versionPath, `${JSON.stringify(version)}\n`, "utf8");
+  }
+
+  return buildId;
+}
+
 async function renameWithRetry(source, destination) {
   let lastError;
   for (let attempt = 0; attempt < 10; attempt += 1) {
@@ -185,8 +246,9 @@ try {
     flutterRoot,
   );
   await validateBuild();
+  const buildId = await stampBuildId();
   await syncBuild();
-  console.log("Flutter Web build synced to public/play.");
+  console.log(`Flutter Web build synced to public/play. build id ${buildId}`);
 } finally {
   await rm(staging, { recursive: true, force: true });
 }

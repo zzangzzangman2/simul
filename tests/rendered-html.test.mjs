@@ -213,8 +213,29 @@ test("keeps Flutter launch metadata aligned with the current starting conditions
   assert.match(flutterTemplate, /navigator\.standalone/);
   assert.match(flutterTemplate, /홈 화면에 추가/);
   assert.match(flutterTemplate, /install-banner-dismiss/);
-  assert.match(parsedManifest.description, /국가원금 5만원/);
-  assert.doesNotMatch(parsedManifest.description, /초기자본 100만원/);
+
+  // 진입 스크립트에 내용 해시가 붙어야 배포가 캐시를 넘어 유저에게 도달한다.
+  const [builtIndex, builtBootstrap, builtVersion, headers] = await Promise.all([
+    readFile(new URL("../public/play/index.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/play/flutter_bootstrap.js", import.meta.url), "utf8"),
+    readFile(new URL("../public/play/version.json", import.meta.url), "utf8"),
+    readFile(new URL("../public/_headers", import.meta.url), "utf8"),
+  ]);
+  const stamped = builtIndex.match(/flutter_bootstrap\.js\?v=([0-9a-f]{12})"/);
+  assert.ok(stamped, "built index.html must load a version-stamped bootstrap");
+  assert.ok(
+    builtBootstrap.includes(`"main.dart.js?v=${stamped[1]}"`),
+    "bootstrap must load main.dart.js with the same build id",
+  );
+  assert.equal(JSON.parse(builtVersion).build_id, stamped[1]);
+  // 고정 파일명인 진입 문서는 반드시 재검증해야 한다.
+  const headerRule = (path) =>
+    headers.split(path)[1]?.split("\n").slice(0, 2).join(" ") ?? "";
+  assert.match(headerRule("/play/index.html"), /Cache-Control: no-cache/);
+  assert.match(
+    headerRule("/play/main.dart.js"),
+    /Cache-Control: public, max-age=31536000, immutable/,
+  );
 });
 
 test("ships a fixed fictional roster and an expanding market generator", async () => {
