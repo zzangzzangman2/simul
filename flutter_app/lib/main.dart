@@ -252,7 +252,10 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
       _scaffoldMessengerKey.currentState
         ?..hideCurrentSnackBar()
         ..showSnackBar(
-          const SnackBar(content: Text('저장 슬롯 5개가 모두 찼어요. 하나를 삭제해 주세요.')),
+          const SnackBar(
+            duration: Duration(seconds: 3),
+            content: Text('저장 슬롯 5개가 모두 찼어요. 하나를 삭제해 주세요.'),
+          ),
         );
       return;
     }
@@ -430,12 +433,18 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
         _activeSlot = activeSlot;
       });
       _scaffoldMessengerKey.currentState?.showSnackBar(
-        SnackBar(content: Text('$slot번 저장을 삭제했습니다.')),
+        SnackBar(
+          duration: const Duration(seconds: 1),
+          content: Text('$slot번 저장을 삭제했습니다.'),
+        ),
       );
     } catch (error) {
       debugPrint('Failed to delete slot $slot: $error');
       _scaffoldMessengerKey.currentState?.showSnackBar(
-        const SnackBar(content: Text('저장을 삭제하지 못했어요. 다시 시도해 주세요.')),
+        const SnackBar(
+          duration: Duration(seconds: 3),
+          content: Text('저장을 삭제하지 못했어요. 다시 시도해 주세요.'),
+        ),
       );
     }
   }

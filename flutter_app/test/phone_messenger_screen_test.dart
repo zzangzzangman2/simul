@@ -79,7 +79,11 @@ void main() {
             if (result.success) state = result.state;
             return result;
           },
-          aiService: _phoneAiService(serverConfigured: true),
+          aiService: _phoneAiService(
+            serverConfigured: true,
+            store: _MemoryPhoneAiCredentialStore()
+              ..apiKey = 'test-project-decimal-personal-key-1234567890',
+          ),
         ),
       ),
     );
@@ -168,7 +172,11 @@ void main() {
             if (result.success) state = result.state;
             return result;
           },
-          phoneAiService: _phoneAiService(serverConfigured: true),
+          phoneAiService: _phoneAiService(
+            serverConfigured: true,
+            store: _MemoryPhoneAiCredentialStore()
+              ..apiKey = 'test-project-decimal-personal-key-1234567890',
+          ),
           onCompleteWork: (_) async => state,
           onExecuteTrade: (_) async => TradeExecutionResult(
             state: state,
@@ -208,7 +216,7 @@ void main() {
               engine.markPhoneThreadRead(state, contactId: contactId),
           onSend: (contactId, text) async =>
               engine.sendPhoneMessage(state, contactId: contactId, text: text),
-          aiService: _phoneAiService(serverConfigured: false, store: store),
+          aiService: _phoneAiService(serverConfigured: true, store: store),
         ),
       ),
     );

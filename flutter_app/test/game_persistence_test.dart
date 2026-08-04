@@ -722,6 +722,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('2번 저장을 삭제할까요?'), findsOneWidget);
     await tester.tap(find.byKey(const Key('confirm-delete-slot-2')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    final deleteNotice = tester.widget<SnackBar>(find.byType(SnackBar));
+    expect(deleteNotice.duration, const Duration(seconds: 1));
     await tester.pumpAndSettle();
 
     expect(preferences.getString(GamePersistence.saveKeyFor(2)), isNull);
@@ -746,6 +751,10 @@ void main() {
       );
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('new-game-button')));
+      await tester.pump();
+
+      final fullSlotsNotice = tester.widget<SnackBar>(find.byType(SnackBar));
+      expect(fullSlotsNotice.duration, const Duration(seconds: 3));
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('save-slot-screen')), findsOneWidget);

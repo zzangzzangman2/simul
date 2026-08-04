@@ -326,49 +326,52 @@ class _OrderBookPanel extends StatelessWidget {
               ],
             ),
           ),
-          Container(
-            key: tutorialHeaderKey,
-            height: 34,
-            color: const Color(0xFFF7F8FA),
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: const Row(
-              children: [
-                SizedBox(
-                  width: 124,
-                  child: Text(
-                    '매도잔량',
-                    textAlign: TextAlign.right,
-                    style: TextStyle(
-                      color: Color(0xFF356FE5),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
+          KeyedSubtree(
+            key: const Key('market-tutorial-order-book-header-source'),
+            child: Container(
+              key: tutorialHeaderKey,
+              height: 34,
+              color: const Color(0xFFF7F8FA),
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: const Row(
+                children: [
+                  SizedBox(
+                    width: 124,
+                    child: Text(
+                      '매도잔량',
+                      textAlign: TextAlign.right,
+                      style: TextStyle(
+                        color: Color(0xFF356FE5),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                   ),
-                ),
-                Expanded(
-                  child: Text(
-                    '가격',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Color(0xFF8A919E),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
+                  Expanded(
+                    child: Text(
+                      '가격',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Color(0xFF8A919E),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                   ),
-                ),
-                SizedBox(
-                  width: 124,
-                  child: Text(
-                    '매수잔량',
-                    textAlign: TextAlign.left,
-                    style: TextStyle(
-                      color: Color(0xFFF04452),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
+                  SizedBox(
+                    width: 124,
+                    child: Text(
+                      '매수잔량',
+                      textAlign: TextAlign.left,
+                      style: TextStyle(
+                        color: Color(0xFFF04452),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
           _OrderBookPriceLadder(
@@ -1337,6 +1340,12 @@ class _OrderBookPriceLadderState extends State<_OrderBookPriceLadder>
                                 ? askIndexByPrice[level.price]
                                 : bidIndexByPrice[level.price]) ??
                             0;
+                        final isBestAsk =
+                            isAsk &&
+                            _matchesPrice(
+                              level,
+                              widget.snapshot.asks.firstOrNull?.price,
+                            );
                         Widget row = _OrderBookLevelRow(
                           key: Key(
                             'order-book-${isAsk ? 'ask' : 'bid'}-$levelIndex',
@@ -1404,9 +1413,13 @@ class _OrderBookPriceLadderState extends State<_OrderBookPriceLadder>
                             child: row,
                           );
                         }
-                        if (!isAsk ||
-                            levelIndex != 0 ||
-                            widget.tutorialBestAskKey == null) {
+                        if (isBestAsk) {
+                          row = KeyedSubtree(
+                            key: const Key('order-book-best-ask'),
+                            child: row,
+                          );
+                        }
+                        if (!isBestAsk || widget.tutorialBestAskKey == null) {
                           return row;
                         }
                         return RepaintBoundary(

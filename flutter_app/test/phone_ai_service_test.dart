@@ -300,22 +300,25 @@ void main() {
     },
   );
 
-  test('server configuration suppresses the personal key prompt', () async {
-    final service = PhoneAiService(
-      endpoint: endpoint,
-      credentialStore: _MemoryPhoneAiCredentialStore(),
-      client: MockClient(
-        (_) async =>
-            http.Response(jsonEncode({'ok': true, 'configured': true}), 200),
-      ),
-    );
+  test(
+    'server configuration still requests a device key on first entry',
+    () async {
+      final service = PhoneAiService(
+        endpoint: endpoint,
+        credentialStore: _MemoryPhoneAiCredentialStore(),
+        client: MockClient(
+          (_) async =>
+              http.Response(jsonEncode({'ok': true, 'configured': true}), 200),
+        ),
+      );
 
-    final configuration = await service.loadConfiguration();
-    expect(configuration.serverReachable, isTrue);
-    expect(configuration.serverConfigured, isTrue);
-    expect(configuration.enabled, isTrue);
-    expect(configuration.shouldPrompt, isFalse);
-  });
+      final configuration = await service.loadConfiguration();
+      expect(configuration.serverReachable, isTrue);
+      expect(configuration.serverConfigured, isTrue);
+      expect(configuration.enabled, isTrue);
+      expect(configuration.shouldPrompt, isTrue);
+    },
+  );
 
   test('engine stores an approved remote reply but keeps local scoring', () {
     final state = engine.createNewGame(

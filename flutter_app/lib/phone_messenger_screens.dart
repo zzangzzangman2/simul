@@ -74,7 +74,7 @@ class _PhoneMessengerScreenState extends State<PhoneMessengerScreen> {
 
   Future<void> _openAiSettings() async {
     final configuration = _aiConfiguration;
-    if (configuration == null || !configuration.enabled) {
+    if (configuration == null || !configuration.personalKeyConfigured) {
       await _showAiRegistration();
       return;
     }
@@ -179,10 +179,10 @@ class _PhoneMessengerScreenState extends State<PhoneMessengerScreen> {
                         ? null
                         : _openAiSettings,
                     icon: Icon(
-                      _aiConfiguration?.enabled == true
+                      _aiConfiguration?.personalKeyConfigured == true
                           ? Icons.auto_awesome_rounded
                           : Icons.key_rounded,
-                      color: _aiConfiguration?.enabled == true
+                      color: _aiConfiguration?.personalKeyConfigured == true
                           ? const Color(0xFF256B50)
                           : _messengerDark,
                     ),
@@ -224,7 +224,7 @@ class _PhoneMessengerScreenState extends State<PhoneMessengerScreen> {
               ),
             ),
             if (_aiConfiguration case final configuration?
-                when configuration.serverReachable && !configuration.enabled)
+                when !configuration.personalKeyConfigured)
               _PhoneAiSetupBanner(onTap: _showAiRegistration),
             Expanded(
               child: ListView.separated(

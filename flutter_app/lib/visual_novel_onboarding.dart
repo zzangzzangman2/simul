@@ -7,12 +7,12 @@ const _dialogueContentVersion = 4;
 const _dialogueRuntimeStorageKey = 'project-decimal-dialogue-runtime-v2';
 const _dialogueBundleAsset = 'assets/dialogue/dialogue-editor-override.json';
 const _orientationCompleteBeat = _onboardingBeatCount - 1;
-const _storyCharacterBottomInset = -144.0;
+const _storyCharacterBottomInset = -178.0;
 const _storyDialogueBottomInset = 44.0;
 const _storyCharacterHeightFactor = 0.9;
 const _storyCharacterAspectRatio = 2 / 3;
-const _storyCharacterSceneScale = 1.72;
-const _storyDialogueBackdropBlur = 3.2;
+const _storyCharacterSceneScale = 1.55;
+const _storySceneControlsTopInset = 94.0;
 const _storyDialoguePanelMinHeight = 154.0;
 const _maximumWheelBackSteps = 12;
 const _wheelBackDebounce = Duration(milliseconds: 180);
@@ -1532,12 +1532,27 @@ class _VisualNovelOnboardingScreenState
                     child: Align(
                       alignment: Alignment.topRight,
                       child: Padding(
-                        padding: const EdgeInsets.only(top: 54, right: 10),
+                        padding: const EdgeInsets.only(
+                          top: _storySceneControlsTopInset,
+                          right: 12,
+                        ),
                         child: DecoratedBox(
+                          key: const Key('story-scene-controls'),
                           decoration: BoxDecoration(
-                            color: const Color(0xB8292B3A),
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(color: const Color(0x55FFFFFF)),
+                            gradient: const LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [Color(0xE9293142), Color(0xE5161B27)],
+                            ),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: const Color(0x52FFFFFF)),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color(0x66000000),
+                                blurRadius: 14,
+                                offset: Offset(0, 5),
+                              ),
+                            ],
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -1550,8 +1565,13 @@ class _VisualNovelOnboardingScreenState
                                 onPressed: _showBacklog,
                                 icon: const Icon(
                                   Icons.history_rounded,
-                                  size: 19,
+                                  size: 20,
                                 ),
+                              ),
+                              Container(
+                                width: 1,
+                                height: 22,
+                                color: const Color(0x26FFFFFF),
                               ),
                               IconButton(
                                 key: const Key('story-skip-button'),
@@ -1562,7 +1582,7 @@ class _VisualNovelOnboardingScreenState
                                 onPressed: _showSkipDialog,
                                 icon: const Icon(
                                   Icons.fast_forward_rounded,
-                                  size: 19,
+                                  size: 20,
                                 ),
                               ),
                             ],
@@ -2917,16 +2937,19 @@ class _AcademyPcTerminal extends StatelessWidget {
       const SizedBox(height: 10),
       Row(
         children: [
-          Expanded(
-            child: TextButton(
-              key: const Key('orientation-exit-button'),
-              onPressed: onExit,
-              child: const Text('처음 화면으로'),
+          IconButton.filledTonal(
+            key: const Key('orientation-exit-button'),
+            tooltip: '처음 화면으로 돌아가기',
+            onPressed: onExit,
+            icon: const Icon(Icons.arrow_back_rounded),
+            style: IconButton.styleFrom(
+              minimumSize: const Size(46, 46),
+              foregroundColor: const Color(0xFF34485F),
+              backgroundColor: const Color(0xFFE2E8EF),
             ),
           ),
           const SizedBox(width: 8),
           Expanded(
-            flex: 2,
             child: FilledButton.icon(
               key: const Key('academy-pc-power-toggle'),
               onPressed: onTogglePower,
@@ -3212,60 +3235,134 @@ class _SceneLabel extends StatelessWidget {
   final double progress;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
-    child: Column(
-      children: [
-        Row(
+  Widget build(BuildContext context) {
+    final dateParts = date.split('·');
+    final calendar = dateParts.first.trim();
+    final clock = dateParts.length > 1 ? dateParts.last.trim() : '';
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+      child: Container(
+        key: const Key('story-scene-header'),
+        padding: const EdgeInsets.fromLTRB(11, 9, 11, 9),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xEE202A38), Color(0xDD111823)],
+          ),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0x4DFFFFFF)),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x73000000),
+              blurRadius: 18,
+              offset: Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Flexible(
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 11,
-                  vertical: 7,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xD9292B3A),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: const Color(0x66FFFFFF)),
-                ),
-                child: Text(
-                  '⌂  $location',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
+            Row(
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: const Color(0x1AFFFFFF),
+                    borderRadius: BorderRadius.circular(11),
+                    border: Border.all(color: const Color(0x29FFFFFF)),
+                  ),
+                  child: const Icon(
+                    Icons.security_rounded,
+                    size: 17,
+                    color: Color(0xFFFFD86A),
                   ),
                 ),
-              ),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        '보안 구역',
+                        style: TextStyle(
+                          color: Color(0xB3FFFFFF),
+                          fontSize: 8,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        location,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          height: 1.15,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      calendar,
+                      style: const TextStyle(
+                        color: Color(0xBFFFFFFF),
+                        fontSize: 8.5,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.35,
+                      ),
+                    ),
+                    const SizedBox(height: 1),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.schedule_rounded,
+                          color: Color(0xFFFFD86A),
+                          size: 12,
+                        ),
+                        const SizedBox(width: 3),
+                        Text(
+                          clock,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.9,
+                            height: 1,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
             ),
-            const SizedBox(width: 8),
-            Text(
-              date,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 10,
-                fontWeight: FontWeight.w800,
-                shadows: [Shadow(color: Colors.black54, blurRadius: 6)],
+            const SizedBox(height: 8),
+            ClipRRect(
+              key: const Key('story-scene-progress'),
+              borderRadius: BorderRadius.circular(8),
+              child: LinearProgressIndicator(
+                minHeight: 3,
+                value: progress,
+                backgroundColor: const Color(0x29FFFFFF),
+                valueColor: const AlwaysStoppedAnimation(_yellow),
               ),
             ),
           ],
         ),
-        const SizedBox(height: 9),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: LinearProgressIndicator(
-            minHeight: 3,
-            value: progress,
-            backgroundColor: const Color(0x55FFFFFF),
-            valueColor: const AlwaysStoppedAnimation(_yellow),
-          ),
-        ),
-      ],
-    ),
-  );
+      ),
+    );
+  }
 }
 
 _NovelDialogueState? _activeNovelDialogueState;
@@ -3440,174 +3537,167 @@ class _NovelDialogueState extends State<_NovelDialogue>
       behavior: HitTestBehavior.opaque,
       onTap: _handleExternalTap,
       child: ClipRect(
-        child: BackdropFilter(
-          key: const Key('story-dialogue-backdrop-blur'),
-          filter: ui.ImageFilter.blur(
-            sigmaX: _storyDialogueBackdropBlur,
-            sigmaY: _storyDialogueBackdropBlur,
+        child: Container(
+          key: const Key('story-dialogue-panel'),
+          constraints: const BoxConstraints(
+            minHeight: _storyDialoguePanelMinHeight,
           ),
-          child: Container(
-            key: const Key('story-dialogue-panel'),
-            constraints: const BoxConstraints(
-              minHeight: _storyDialoguePanelMinHeight,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: <Color>[
+                Color(0x00000000),
+                Color(0x32000000),
+                Color(0x66000000),
+                Color(0x46000000),
+                Color(0x00000000),
+              ],
+              stops: <double>[0, 0.15, 0.58, 0.88, 1],
             ),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: <Color>[
-                  Color(0x00000000),
-                  Color(0x32000000),
-                  Color(0x66000000),
-                  Color(0x46000000),
-                  Color(0x00000000),
-                ],
-                stops: <double>[0, 0.15, 0.58, 0.88, 1],
-              ),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(18, 13, 18, 14),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Semantics(
-                    key: const Key('story-speaker-chip'),
-                    label: affiliation.isEmpty
-                        ? widget.speaker
-                        : '${widget.speaker}, $affiliation',
-                    child: ExcludeSemantics(
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.baseline,
-                        textBaseline: TextBaseline.alphabetic,
-                        children: [
-                          Text(
-                            speakerName,
-                            key: const Key('story-speaker-name'),
-                            style: const TextStyle(
-                              color: Color(0xFFF8FBFF),
-                              fontFamily: 'Pretendard',
-                              fontSize: 18,
-                              height: 1.1,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: -0.45,
-                              shadows: [
-                                Shadow(
-                                  color: Color(0xB8000000),
-                                  blurRadius: 4,
-                                  offset: Offset(0, 1),
-                                ),
-                              ],
-                            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 13, 18, 14),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Semantics(
+                  key: const Key('story-speaker-chip'),
+                  label: affiliation.isEmpty
+                      ? widget.speaker
+                      : '${widget.speaker}, $affiliation',
+                  child: ExcludeSemantics(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: [
+                        Text(
+                          speakerName,
+                          key: const Key('story-speaker-name'),
+                          style: const TextStyle(
+                            color: Color(0xFFF8FBFF),
+                            fontFamily: 'Pretendard',
+                            fontSize: 18,
+                            height: 1.1,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -0.45,
+                            shadows: [
+                              Shadow(
+                                color: Color(0xB8000000),
+                                blurRadius: 4,
+                                offset: Offset(0, 1),
+                              ),
+                            ],
                           ),
-                          if (affiliation.isNotEmpty) ...[
-                            const SizedBox(width: 7),
-                            Flexible(
-                              child: Text(
-                                affiliation,
-                                key: const Key('story-speaker-affiliation'),
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: Color(0xFF62C9F6),
-                                  fontFamily: 'Pretendard',
-                                  fontSize: 11.5,
-                                  height: 1.1,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: -0.25,
-                                  shadows: [
-                                    Shadow(
-                                      color: Color(0xB8000000),
-                                      blurRadius: 3,
-                                      offset: Offset(0, 1),
-                                    ),
-                                  ],
-                                ),
+                        ),
+                        if (affiliation.isNotEmpty) ...[
+                          const SizedBox(width: 7),
+                          Flexible(
+                            child: Text(
+                              affiliation,
+                              key: const Key('story-speaker-affiliation'),
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Color(0xFF62C9F6),
+                                fontFamily: 'Pretendard',
+                                fontSize: 11.5,
+                                height: 1.1,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -0.25,
+                                shadows: [
+                                  Shadow(
+                                    color: Color(0xB8000000),
+                                    blurRadius: 3,
+                                    offset: Offset(0, 1),
+                                  ),
+                                ],
                               ),
                             ),
-                          ],
+                          ),
                         ],
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                const SizedBox(
+                  key: Key('story-dialogue-divider'),
+                  width: double.infinity,
+                  height: 9,
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Color(0x99FFFFFF),
+                            Color(0x4DFFFFFF),
+                            Color(0x00FFFFFF),
+                          ],
+                          stops: [0, 0.7, 1],
+                        ),
                       ),
+                      child: SizedBox(width: double.infinity, height: 1),
+                    ),
+                  ),
+                ),
+                if (widget.stageDirection?.trim().isNotEmpty ?? false) ...[
+                  Text(
+                    widget.stageDirection!.trim(),
+                    key: const Key('story-stage-direction'),
+                    style: const TextStyle(
+                      color: Color(0xFFE8DDBF),
+                      fontFamily: 'Pretendard',
+                      fontSize: 12.5,
+                      height: 1.4,
+                      fontStyle: FontStyle.italic,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.2,
+                      shadows: <Shadow>[
+                        Shadow(color: Color(0xD9000000), blurRadius: 4),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 6),
-                  const SizedBox(
-                    key: Key('story-dialogue-divider'),
-                    width: double.infinity,
-                    height: 9,
-                    child: Align(
-                      alignment: Alignment.topCenter,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              Color(0x99FFFFFF),
-                              Color(0x4DFFFFFF),
-                              Color(0x00FFFFFF),
-                            ],
-                            stops: [0, 0.7, 1],
-                          ),
-                        ),
-                        child: SizedBox(width: double.infinity, height: 1),
-                      ),
-                    ),
-                  ),
-                  if (widget.stageDirection?.trim().isNotEmpty ?? false) ...[
-                    Text(
-                      widget.stageDirection!.trim(),
-                      key: const Key('story-stage-direction'),
-                      style: const TextStyle(
-                        color: Color(0xFFE8DDBF),
-                        fontFamily: 'Pretendard',
-                        fontSize: 12.5,
-                        height: 1.4,
-                        fontStyle: FontStyle.italic,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: -0.2,
-                        shadows: <Shadow>[
-                          Shadow(color: Color(0xD9000000), blurRadius: 4),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                  ],
-                  Semantics(
-                    liveRegion: true,
-                    label: widget.line,
-                    child: Text(
-                      visibleLine,
-                      key: const Key('story-line-text'),
-                      style: const TextStyle(
-                        color: Color(0xFFF9FCFF),
-                        fontFamily: 'Pretendard',
-                        fontSize: 15.5,
-                        height: 1.48,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: -0.3,
-                        shadows: [
-                          Shadow(
-                            color: Color(0xE8000000),
-                            blurRadius: 5,
-                            offset: Offset(0, 1.4),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  if (_typingComplete && widget.choices.isNotEmpty) ...[
-                    const SizedBox(height: 10),
-                    ...widget.choices.map(
-                      (choice) => Padding(
-                        padding: const EdgeInsets.only(bottom: 7),
-                        child: choice,
-                      ),
-                    ),
-                  ],
-                  if (_typingComplete && widget.child != null) ...[
-                    const SizedBox(height: 10),
-                    widget.child!,
-                  ],
                 ],
-              ),
+                Semantics(
+                  liveRegion: true,
+                  label: widget.line,
+                  child: Text(
+                    visibleLine,
+                    key: const Key('story-line-text'),
+                    style: const TextStyle(
+                      color: Color(0xFFF9FCFF),
+                      fontFamily: 'Pretendard',
+                      fontSize: 15.5,
+                      height: 1.48,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: -0.3,
+                      shadows: [
+                        Shadow(
+                          color: Color(0xE8000000),
+                          blurRadius: 5,
+                          offset: Offset(0, 1.4),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                if (_typingComplete && widget.choices.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  ...widget.choices.map(
+                    (choice) => Padding(
+                      padding: const EdgeInsets.only(bottom: 7),
+                      child: choice,
+                    ),
+                  ),
+                ],
+                if (_typingComplete && widget.child != null) ...[
+                  const SizedBox(height: 10),
+                  widget.child!,
+                ],
+              ],
             ),
           ),
         ),

@@ -3810,7 +3810,7 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
   bool _isDetailOverlayOpen = false;
   bool _isDetailTradeInFlight = false;
   final GlobalKey _tutorialPriceKey = GlobalKey();
-  final GlobalKey _tutorialChartKey = GlobalKey();
+  final GlobalKey _tutorialInfoTabKey = GlobalKey();
   final GlobalKey _tutorialOrderBookHeaderKey = GlobalKey();
   final GlobalKey _tutorialBestAskKey = GlobalKey();
   _StockDetailTab _detailTab = _StockDetailTab.quote;
@@ -5322,74 +5322,79 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
                               ),
                             ),
                             const SizedBox(width: 8),
-                            RepaintBoundary(
-                              key: _tutorialPriceKey,
-                              child: ValueListenableBuilder<int>(
-                                valueListenable: _orderBookPulseFrame,
-                                builder: (context, liquidityPulse, _) {
-                                  final snapshot = _continuousOrderBookSnapshot(
-                                    quote,
-                                    currentMinute,
-                                    liquidityPulse,
-                                  );
-                                  final displayPrice =
-                                      _displayedDetailTradePrice(
-                                        quote,
-                                        snapshot,
-                                        currentMinute,
-                                      );
-                                  final change =
-                                      displayPrice - quote.previousClose;
-                                  final rate =
-                                      change / quote.previousClose * 100;
-                                  final color = _priceColor(change);
-                                  return Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    crossAxisAlignment: CrossAxisAlignment.end,
-                                    children: [
-                                      Hero(
-                                        tag: 'stock-${definition.code}',
-                                        child: Material(
-                                          color: Colors.transparent,
-                                          child: Text(
-                                            _displayPrice(
-                                              displayPrice,
-                                              definition.currency,
-                                            ),
-                                            key: const Key(
-                                              'stock-detail-price',
-                                            ),
-                                            maxLines: 1,
-                                            style: TextStyle(
-                                              color: color,
-                                              fontSize: 20,
-                                              height: 1.1,
-                                              fontWeight: FontWeight.w900,
-                                              letterSpacing: -0.5,
-                                              fontFeatures:
-                                                  _marketNumberFeatures,
+                            KeyedSubtree(
+                              key: const Key('market-tutorial-price-source'),
+                              child: RepaintBoundary(
+                                key: _tutorialPriceKey,
+                                child: ValueListenableBuilder<int>(
+                                  valueListenable: _orderBookPulseFrame,
+                                  builder: (context, liquidityPulse, _) {
+                                    final snapshot =
+                                        _continuousOrderBookSnapshot(
+                                          quote,
+                                          currentMinute,
+                                          liquidityPulse,
+                                        );
+                                    final displayPrice =
+                                        _displayedDetailTradePrice(
+                                          quote,
+                                          snapshot,
+                                          currentMinute,
+                                        );
+                                    final change =
+                                        displayPrice - quote.previousClose;
+                                    final rate =
+                                        change / quote.previousClose * 100;
+                                    final color = _priceColor(change);
+                                    return Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.end,
+                                      children: [
+                                        Hero(
+                                          tag: 'stock-${definition.code}',
+                                          child: Material(
+                                            color: Colors.transparent,
+                                            child: Text(
+                                              _displayPrice(
+                                                displayPrice,
+                                                definition.currency,
+                                              ),
+                                              key: const Key(
+                                                'stock-detail-price',
+                                              ),
+                                              maxLines: 1,
+                                              style: TextStyle(
+                                                color: color,
+                                                fontSize: 20,
+                                                height: 1.1,
+                                                fontWeight: FontWeight.w900,
+                                                letterSpacing: -0.5,
+                                                fontFeatures:
+                                                    _marketNumberFeatures,
+                                              ),
                                             ),
                                           ),
                                         ),
-                                      ),
-                                      Text(
-                                        '${_signedDisplayPrice(change, definition.currency)}'
-                                        ' · ${_signedPercent(rate)}',
-                                        key: const Key(
-                                          'stock-detail-change-rate',
+                                        Text(
+                                          '${_signedDisplayPrice(change, definition.currency)}'
+                                          ' · ${_signedPercent(rate)}',
+                                          key: const Key(
+                                            'stock-detail-change-rate',
+                                          ),
+                                          maxLines: 1,
+                                          style: TextStyle(
+                                            color: color,
+                                            fontSize: 10,
+                                            height: 1.1,
+                                            fontWeight: FontWeight.w800,
+                                            fontFeatures: _marketNumberFeatures,
+                                          ),
                                         ),
-                                        maxLines: 1,
-                                        style: TextStyle(
-                                          color: color,
-                                          fontSize: 10,
-                                          height: 1.1,
-                                          fontWeight: FontWeight.w800,
-                                          fontFeatures: _marketNumberFeatures,
-                                        ),
-                                      ),
-                                    ],
-                                  );
-                                },
+                                      ],
+                                    );
+                                  },
+                                ),
                               ),
                             ),
                             IconButton(
@@ -5536,17 +5541,14 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
                                 ),
                               ],
                               _StockDetailTab.chart => <Widget>[
-                                RepaintBoundary(
-                                  key: _tutorialChartKey,
-                                  child: _MinuteChartPanel(
-                                    quote: quote,
-                                    code: definition.code,
-                                    market: definition.market,
-                                    minute: currentMinute,
-                                    asset: definition.asset,
-                                    simulationSeed: state.simulationSeed,
-                                    throughDate: state.currentDate,
-                                  ),
+                                _MinuteChartPanel(
+                                  quote: quote,
+                                  code: definition.code,
+                                  market: definition.market,
+                                  minute: currentMinute,
+                                  asset: definition.asset,
+                                  simulationSeed: state.simulationSeed,
+                                  throughDate: state.currentDate,
                                 ),
                                 const SizedBox(height: 24),
                                 _QuoteGrid(quote: quote),
@@ -5670,6 +5672,7 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
                       _StockDetailBottomNav(
                         selected: _detailTab,
                         onSelected: _selectDetailTab,
+                        tutorialInfoKey: _tutorialInfoTabKey,
                       ),
                     ],
                   );
@@ -5703,7 +5706,7 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
                 step: _tutorialStep!,
                 targetKey: switch (_tutorialStep) {
                   0 => _tutorialPriceKey,
-                  1 => _tutorialChartKey,
+                  1 => _tutorialInfoTabKey,
                   3 => _tutorialOrderBookHeaderKey,
                   4 => _tutorialBestAskKey,
                   _ => null,
@@ -5943,10 +5946,12 @@ class _StockDetailBottomNav extends StatelessWidget {
   const _StockDetailBottomNav({
     required this.selected,
     required this.onSelected,
+    this.tutorialInfoKey,
   });
 
   final _StockDetailTab selected;
   final ValueChanged<_StockDetailTab> onSelected;
+  final GlobalKey? tutorialInfoKey;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -5986,12 +5991,15 @@ class _StockDetailBottomNav extends StatelessWidget {
           selected: selected == _StockDetailTab.chart,
           onTap: () => onSelected(_StockDetailTab.chart),
         ),
-        _StockDetailTabButton(
-          key: const Key('stock-detail-tab-info'),
-          label: '정보',
-          icon: Icons.domain_rounded,
-          selected: selected == _StockDetailTab.info,
-          onTap: () => onSelected(_StockDetailTab.info),
+        KeyedSubtree(
+          key: tutorialInfoKey,
+          child: _StockDetailTabButton(
+            key: const Key('stock-detail-tab-info'),
+            label: '정보',
+            icon: Icons.domain_rounded,
+            selected: selected == _StockDetailTab.info,
+            onTap: () => onSelected(_StockDetailTab.info),
+          ),
         ),
       ],
     ),
@@ -7377,7 +7385,7 @@ class _MarketTutorialOverlay extends StatelessWidget {
       ],
     },
     actionLabel: switch (step) {
-      0 => '주식 탭 눌러 보기',
+      0 => '주식 탭 안내로 넘어가기',
       1 => '검색·분류 화면 열기',
       _ => '한빛통신 열기',
     },
@@ -7453,7 +7461,7 @@ class _MarketDetailTutorialOverlay extends StatelessWidget {
     actionLabel: switch (step) {
       0 => '현재가 확인하기',
       1 => '정보 탭 확인하기',
-      2 => '호가 탭으로 돌아가기',
+      2 => '매수 이유·매도 조건 작성하기',
       3 => '호가 가격과 수량 보기',
       4 => '가장 가까운 매도호가 누르기',
       _ => '1주 지정가 매수 연습 시작',

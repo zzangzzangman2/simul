@@ -881,7 +881,7 @@ export async function POST(request: Request) {
       429,
     );
   }
-  const apiKey = process.env.GEMINI_API_KEY?.trim() || personalApiKey(request);
+  const apiKey = personalApiKey(request) || process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) {
     return jsonResponse(
       {

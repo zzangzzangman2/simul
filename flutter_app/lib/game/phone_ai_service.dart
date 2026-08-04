@@ -34,7 +34,7 @@ class PhoneAiConfiguration {
 
   bool get enabled => serverConfigured || personalKeyConfigured;
 
-  bool get shouldPrompt => serverReachable && !enabled && !promptDismissed;
+  bool get shouldPrompt => !personalKeyConfigured && !promptDismissed;
 }
 
 class PhoneAiKeyRegistrationResult {

@@ -559,7 +559,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('dialogue uses an edgeless Blue Archive-style blur overlay', (
+  testWidgets('dialogue uses a clear edgeless Blue Archive-style overlay', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
@@ -589,6 +589,10 @@ void main() {
       ),
       isTrue,
     );
+    expect(
+      panelGradient.colors.any((color) => color.a > 0 && color.a < 1),
+      isTrue,
+    );
     final scrim = tester.widget<DecoratedBox>(
       find.byKey(const Key('story-stage-reading-scrim')),
     );
@@ -598,11 +602,8 @@ void main() {
     expect(find.byKey(const Key('story-moving-light-beam')), findsNothing);
     expect(find.byKey(const Key('story-crt-scanline')), findsNothing);
     expect(find.byKey(const Key('orientation-dust-motes')), findsNothing);
-    expect(find.byType(BackdropFilter), findsOneWidget);
-    expect(
-      find.byKey(const Key('story-dialogue-backdrop-blur')),
-      findsOneWidget,
-    );
+    expect(find.byType(BackdropFilter), findsNothing);
+    expect(find.byKey(const Key('story-dialogue-backdrop-blur')), findsNothing);
     expect(
       find.byKey(const Key('story-dialogue-opacity-control')),
       findsNothing,
@@ -623,7 +624,7 @@ void main() {
     );
     expect(
       characterScale.transform.getMaxScaleOnAxis(),
-      greaterThanOrEqualTo(1.72),
+      greaterThanOrEqualTo(1.55),
     );
     expect(
       tester.getRect(find.byKey(const Key('story-character-image'))).bottom,
@@ -631,6 +632,21 @@ void main() {
         tester.getRect(find.byKey(const Key('story-dialogue-panel'))).top,
       ),
     );
+    final headerRect = tester.getRect(
+      find.byKey(const Key('story-scene-header')),
+    );
+    final progressRect = tester.getRect(
+      find.byKey(const Key('story-scene-progress')),
+    );
+    final controlsRect = tester.getRect(
+      find.byKey(const Key('story-scene-controls')),
+    );
+    final characterRect = tester.getRect(
+      find.byKey(const Key('story-character-image')),
+    );
+    expect(headerRect.bottom, lessThan(controlsRect.top));
+    expect(progressRect.bottom, lessThan(controlsRect.top));
+    expect(characterRect.center.dy, greaterThan(controlsRect.bottom));
     expect(tester.takeException(), isNull);
   });
 
@@ -910,7 +926,8 @@ void main() {
     final scaleTransform = tester.widget<Transform>(
       find.byKey(const Key('story-character-scale')),
     );
-    expect(scaleTransform.transform.getMaxScaleOnAxis(), closeTo(1.29, 0.001));
+    expect(scaleTransform.transform.entry(0, 0), closeTo(1.1625, 0.001));
+    expect(scaleTransform.transform.entry(1, 1), closeTo(1.1625, 0.001));
     expect(
       (tester
                   .widget<Image>(
@@ -1283,6 +1300,12 @@ void main() {
         find.byKey(const Key('academy-market-tutorial-screen')),
         findsNothing,
       );
+      final exitButton = tester.widget<IconButton>(
+        find.byKey(const Key('orientation-exit-button')),
+      );
+      expect(exitButton.tooltip, '처음 화면으로 돌아가기');
+      expect((exitButton.icon! as Icon).icon, Icons.arrow_back_rounded);
+      expect(find.text('처음 화면으로'), findsNothing);
 
       await tester.tap(find.byKey(const Key('orientation-exit-button')));
       await tester.pumpAndSettle();
@@ -2186,11 +2209,11 @@ void main() {
       await tester.tap(find.byKey(const Key('market-detail-tutorial-target')));
       await tester.pump(const Duration(milliseconds: 600));
       expect(find.textContaining('위쪽 숫자를 누르면 그 값이 주문에 들어와요'), findsOneWidget);
-      expect(find.byKey(const Key('order-book-ask-0')), findsOneWidget);
+      expect(find.byKey(const Key('order-book-best-ask')), findsOneWidget);
       final bestAskPrice = tester
           .widgetList<Text>(
             find.descendant(
-              of: find.byKey(const Key('order-book-ask-0')),
+              of: find.byKey(const Key('order-book-best-ask')),
               matching: find.byType(Text),
             ),
           )
@@ -2460,7 +2483,7 @@ void main() {
       );
       expect(
         reviewTeacherRect.bottom,
-        closeTo(reviewStageRect.bottom + 144, 0.01),
+        closeTo(reviewStageRect.bottom + 178, 0.01),
       );
       expect(
         reviewTeacherRect.center.dx,
