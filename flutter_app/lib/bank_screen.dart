@@ -430,201 +430,203 @@ class _BankScreenState extends State<BankScreen> {
         key: const Key('bank-screen'),
         backgroundColor: const Color(0xFF172231),
         body: LayoutBuilder(
-        builder: (context, constraints) {
-          final panelTop = math.max(326.0, constraints.maxHeight * 0.42);
-          return Stack(
-            fit: StackFit.expand,
-            children: [
-              const _LivingBackground(
-                asset:
-                    'assets/images/bg_bank_branch_2000_portrait_cartoon_v2.png',
-              ),
-              const DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Color(0x660A1728),
-                      Color(0x080A1728),
-                      Color(0xB80A1728),
-                    ],
-                    stops: [0, 0.48, 1],
+          builder: (context, constraints) {
+            final panelTop = math.max(326.0, constraints.maxHeight * 0.42);
+            return Stack(
+              fit: StackFit.expand,
+              children: [
+                const _LivingBackground(
+                  asset:
+                      'assets/images/bg_bank_branch_2000_portrait_cartoon_v2.png',
+                ),
+                const DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Color(0x660A1728),
+                        Color(0x080A1728),
+                        Color(0xB80A1728),
+                      ],
+                      stops: [0, 0.48, 1],
+                    ),
                   ),
                 ),
-              ),
-              if (_tutorialStep == null)
-                Positioned.fill(
-                  top: -_storyCharacterBottomInset,
-                  bottom: _storyCharacterBottomInset,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      _OnboardingCharacterSlot(
-                        key: const Key('bank-clerk-slot'),
-                        asset: _clerkAsset,
-                        alignment: Alignment.bottomCenter,
-                        characterKey: const Key('bank-clerk-character'),
-                      ),
-                      Align(
-                        alignment: Alignment.topLeft,
-                        child: SizedBox.shrink(
-                          key: Key('bank-clerk-${_clerkMood.name}'),
+                if (_tutorialStep == null)
+                  Positioned.fill(
+                    top: -_storyCharacterBottomInset,
+                    bottom: _storyCharacterBottomInset,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        _OnboardingCharacterSlot(
+                          key: const Key('bank-clerk-slot'),
+                          asset: _clerkAsset,
+                          alignment: Alignment.bottomCenter,
+                          characterKey: const Key('bank-clerk-character'),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-              Positioned(
-                left: 0,
-                top: 0,
-                right: 0,
-                child: SafeArea(
-                  bottom: false,
-                  child: _SceneClockStrip(
-                    location: '새천년은행 · 개인금융 창구',
-                    caption: '예금과 신용을 숫자로 확인하는 곳',
-                    minute: _state.marketMinute,
-                    costLabel: '통장 ${_money(_state.bankCash)}원',
-                    onBack: () => Navigator.of(context).pop(),
-                  ),
-                ),
-              ),
-              if (_introVisible)
-                Positioned(
-                  left: 12,
-                  right: 12,
-                  bottom: 10,
-                  child: SafeArea(
-                    top: false,
-                    child: _NovelDialogue(
-                      key: const Key('bank-intro-dialogue'),
-                      speaker: '윤하린 은행원',
-                      line: _introBeat == 0
-                          ? '어서 오세요. 예금과 신용 상담을 맡은 윤하린이에요.'
-                          : '돈을 기간별로 맡기거나, 신용점수와 상환능력에 맞춰 대출을 받을 수 있어요.',
-                      choices: _introBeat == 0
-                          ? [
-                              _NovelChoice(
-                                key: const Key('bank-intro-continue'),
-                                label: '상담을 부탁할게요',
-                                onTap: _continueIntroduction,
-                              ),
-                            ]
-                          : [
-                              _NovelChoice(
-                                key: const Key('bank-intro-deposit'),
-                                label: '예금부터 알아볼게요',
-                                onTap: () =>
-                                    _startConsultation(_BankDeskTab.deposit),
-                              ),
-                              _NovelChoice(
-                                key: const Key('bank-intro-loan'),
-                                label: '제 신용과 대출한도를 볼게요',
-                                onTap: () =>
-                                    _startConsultation(_BankDeskTab.loan),
-                              ),
-                            ],
+                        Align(
+                          alignment: Alignment.topLeft,
+                          child: SizedBox.shrink(
+                            key: Key('bank-clerk-${_clerkMood.name}'),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                )
-              else
                 Positioned(
-                  left: 8,
-                  top: panelTop,
-                  right: 8,
-                  bottom: 8,
-                  child: SafeArea(
-                    top: false,
-                    child: _BankConsultationPanel(
-                      state: _state,
-                      tab: _tab,
-                      busy: _busy,
-                      selectedDepositTerm: _depositTermMonths,
-                      selectedLoanTerm: _loanTermMonths,
-                      loanOffer: _loanOffer,
-                      onTabChanged: (tab) {
-                        setState(() {
-                          _tab = tab;
-                          _clerkMood =
-                              tab == _BankDeskTab.loan && !_loanOffer.eligible
-                              ? _BankClerkMood.concerned
-                              : _BankClerkMood.explain;
-                        });
-                      },
-                      onDepositTermChanged: (months) {
-                        setState(() {
-                          _depositTermMonths = months;
-                          _clerkMood = _BankClerkMood.explain;
-                        });
-                      },
-                      onLoanTermChanged: (months) {
-                        setState(() {
-                          _loanTermMonths = months;
-                          _clerkMood =
-                              const GameEngine()
-                                  .unsecuredLoanOffer(
-                                    _state,
-                                    termMonths: months,
-                                  )
-                                  .eligible
-                              ? _BankClerkMood.explain
-                              : _BankClerkMood.concerned;
-                        });
-                      },
-                      onOpenDeposit: _openDeposit,
-                      onRedeemDeposit: _redeemDeposit,
-                      onTakeLoan: _takeLoan,
-                      onRepayLoan: _repayLoan,
-                      onTalk: () {
-                        setState(() {
-                          _introVisible = true;
-                          _introBeat = 0;
-                          _clerkMood = _BankClerkMood.welcome;
-                        });
-                      },
-                      tutorialTermKey: _tutorialStep == null
-                          ? null
-                          : _depositTermTutorialKey,
-                      tutorialOpenKey: _tutorialStep == null
-                          ? null
-                          : _depositOpenTutorialKey,
-                    ),
-                  ),
-                ),
-              if (_busy)
-                const Positioned.fill(
-                  child: ColoredBox(
-                    color: Color(0x33000000),
-                    child: Center(child: CircularProgressIndicator()),
-                  ),
-                ),
-              if (_tutorialStep case final step?)
-                Positioned.fill(
-                  child: _BankDepositTutorialOverlay(
-                    step: step,
-                    targetKey: _tutorialTargetKey,
-                    onAction: _advanceDepositTutorial,
-                  ),
-                ),
-              if (_tutorialStep != null)
-                Positioned(
+                  left: 0,
                   top: 0,
                   right: 0,
-                  child: _GuidedTutorialSkipButton(
-                    buttonKey: const Key('bank-deposit-tutorial-skip'),
-                    dialogKey: const Key('bank-deposit-tutorial-skip-dialog'),
-                    cancelKey: const Key('bank-deposit-tutorial-skip-cancel'),
-                    confirmKey: const Key('bank-deposit-tutorial-skip-confirm'),
-                    description:
-                        '건너뛰어도 예금 화면은 그대로 이용할 수 있고, 윤하린 은행원의 설명은 완료로 저장됩니다.',
-                    onSkip: _completeDepositTutorial,
+                  child: SafeArea(
+                    bottom: false,
+                    child: _SceneClockStrip(
+                      location: '새천년은행 · 개인금융 창구',
+                      caption: '예금과 신용을 숫자로 확인하는 곳',
+                      minute: _state.marketMinute,
+                      costLabel: '통장 ${_money(_state.bankCash)}원',
+                      onBack: () => Navigator.of(context).pop(),
+                    ),
                   ),
                 ),
-            ],
-          );
-        },
-      ),
+                if (_introVisible)
+                  Positioned(
+                    left: 12,
+                    right: 12,
+                    bottom: 10,
+                    child: SafeArea(
+                      top: false,
+                      child: _NovelDialogue(
+                        key: const Key('bank-intro-dialogue'),
+                        speaker: '윤하린 은행원',
+                        line: _introBeat == 0
+                            ? '어서 오세요. 예금과 신용 상담을 맡은 윤하린이에요.'
+                            : '돈을 기간별로 맡기거나, 신용점수와 상환능력에 맞춰 대출을 받을 수 있어요.',
+                        choices: _introBeat == 0
+                            ? [
+                                _NovelChoice(
+                                  key: const Key('bank-intro-continue'),
+                                  label: '상담을 부탁할게요',
+                                  onTap: _continueIntroduction,
+                                ),
+                              ]
+                            : [
+                                _NovelChoice(
+                                  key: const Key('bank-intro-deposit'),
+                                  label: '예금부터 알아볼게요',
+                                  onTap: () =>
+                                      _startConsultation(_BankDeskTab.deposit),
+                                ),
+                                _NovelChoice(
+                                  key: const Key('bank-intro-loan'),
+                                  label: '제 신용과 대출한도를 볼게요',
+                                  onTap: () =>
+                                      _startConsultation(_BankDeskTab.loan),
+                                ),
+                              ],
+                      ),
+                    ),
+                  )
+                else
+                  Positioned(
+                    left: 8,
+                    top: panelTop,
+                    right: 8,
+                    bottom: 8,
+                    child: SafeArea(
+                      top: false,
+                      child: _BankConsultationPanel(
+                        state: _state,
+                        tab: _tab,
+                        busy: _busy,
+                        selectedDepositTerm: _depositTermMonths,
+                        selectedLoanTerm: _loanTermMonths,
+                        loanOffer: _loanOffer,
+                        onTabChanged: (tab) {
+                          setState(() {
+                            _tab = tab;
+                            _clerkMood =
+                                tab == _BankDeskTab.loan && !_loanOffer.eligible
+                                ? _BankClerkMood.concerned
+                                : _BankClerkMood.explain;
+                          });
+                        },
+                        onDepositTermChanged: (months) {
+                          setState(() {
+                            _depositTermMonths = months;
+                            _clerkMood = _BankClerkMood.explain;
+                          });
+                        },
+                        onLoanTermChanged: (months) {
+                          setState(() {
+                            _loanTermMonths = months;
+                            _clerkMood =
+                                const GameEngine()
+                                    .unsecuredLoanOffer(
+                                      _state,
+                                      termMonths: months,
+                                    )
+                                    .eligible
+                                ? _BankClerkMood.explain
+                                : _BankClerkMood.concerned;
+                          });
+                        },
+                        onOpenDeposit: _openDeposit,
+                        onRedeemDeposit: _redeemDeposit,
+                        onTakeLoan: _takeLoan,
+                        onRepayLoan: _repayLoan,
+                        onTalk: () {
+                          setState(() {
+                            _introVisible = true;
+                            _introBeat = 0;
+                            _clerkMood = _BankClerkMood.welcome;
+                          });
+                        },
+                        tutorialTermKey: _tutorialStep == null
+                            ? null
+                            : _depositTermTutorialKey,
+                        tutorialOpenKey: _tutorialStep == null
+                            ? null
+                            : _depositOpenTutorialKey,
+                      ),
+                    ),
+                  ),
+                if (_busy)
+                  const Positioned.fill(
+                    child: ColoredBox(
+                      color: Color(0x33000000),
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                  ),
+                if (_tutorialStep case final step?)
+                  Positioned.fill(
+                    child: _BankDepositTutorialOverlay(
+                      step: step,
+                      targetKey: _tutorialTargetKey,
+                      onAction: _advanceDepositTutorial,
+                    ),
+                  ),
+                if (_tutorialStep != null)
+                  Positioned(
+                    top: 0,
+                    right: 0,
+                    child: _GuidedTutorialSkipButton(
+                      buttonKey: const Key('bank-deposit-tutorial-skip'),
+                      dialogKey: const Key('bank-deposit-tutorial-skip-dialog'),
+                      cancelKey: const Key('bank-deposit-tutorial-skip-cancel'),
+                      confirmKey: const Key(
+                        'bank-deposit-tutorial-skip-confirm',
+                      ),
+                      description:
+                          '건너뛰어도 예금 화면은 그대로 이용할 수 있고, 윤하린 은행원의 설명은 완료로 저장됩니다.',
+                      onSkip: _completeDepositTutorial,
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }

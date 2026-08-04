@@ -1701,8 +1701,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
                   onPurchaseMarketReport: _purchaseDailyMarketReport,
                   onCompleteHubTutorial: _completeHubTutorial,
                   onCompleteMarketTutorial: _completeMarketTutorial,
-                  onCompleteBankDepositTutorial:
-                      _completeBankDepositTutorial,
+                  onCompleteBankDepositTutorial: _completeBankDepositTutorial,
                   onCompleteRealEstateTutorial: _completeRealEstateTutorial,
                   onArchiveNews: _archiveNews,
                   onCompleteWork: _completeWork,

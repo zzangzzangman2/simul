@@ -22,8 +22,7 @@ class _GuidedTutorialSkipButton extends StatefulWidget {
       _GuidedTutorialSkipButtonState();
 }
 
-class _GuidedTutorialSkipButtonState
-    extends State<_GuidedTutorialSkipButton> {
+class _GuidedTutorialSkipButtonState extends State<_GuidedTutorialSkipButton> {
   bool _busy = false;
 
   Future<void> _requestSkip() async {

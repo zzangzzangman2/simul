@@ -869,169 +869,285 @@ class _AssetSpendingScreenState extends State<AssetSpendingScreen> {
     final finance = _state.personalFinance;
     final propertyValue = finance.estimatedPropertyValueAt(_state.day);
     final communityOption = spendingOptionById('cohort_field_day')!;
-    return Scaffold(
-      key: const Key('asset-spending-screen'),
-      backgroundColor: const Color(0xFFF3EBDD),
-      appBar: AppBar(
-        title: Text(widget.realEstateOnly ? '부동산 시장' : '자산·소비 계획'),
+    return PopScope(
+      canPop: _tutorialStep == null,
+      child: Scaffold(
+        key: const Key('asset-spending-screen'),
         backgroundColor: const Color(0xFFF3EBDD),
-      ),
-      body: SafeArea(
-        top: false,
-        child: KeyedSubtree(
-          key: widget.realEstateOnly
-              ? const Key('real-estate-market-screen')
-              : null,
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(14, 8, 14, 28),
-            children: [
-              if (widget.realEstateOnly) ...[
-                if (_realtorGuideVisible)
-                  _RealtorGuideCard(
-                    mood: _realtorMood,
-                    onConsult: () => _showRealtorMood(_RealtorMood.explain),
-                    onDismiss: () =>
-                        setState(() => _realtorGuideVisible = false),
-                  )
-                else
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: OutlinedButton.icon(
-                      key: const Key('real-estate-realtor-reopen'),
-                      onPressed: () => _showRealtorMood(_RealtorMood.welcome),
-                      icon: const Icon(Icons.support_agent_rounded, size: 18),
-                      label: const Text('중개사 상담 다시 열기'),
-                    ),
-                  ),
-                const SizedBox(height: 12),
-              ],
-              _FinanceOverviewCard(
-                cash: _state.cash,
-                propertyValue: propertyValue,
-                monthlyPropertyNet:
-                    finance.monthlyPropertyIncomeAt(_state.currentDate) -
-                    finance.monthlyPropertyCostAt(_state.currentDate) -
-                    finance.monthlyPropertyHoldingTaxAt(
-                      _state.day,
-                      _state.currentDate,
-                    ) -
-                    finance.monthlyMortgagePayment,
-                totalSpent: finance.totalSpent,
-                totalMortgageBalance: finance.totalMortgageBalance,
-                totalTenantDeposits: finance.totalTenantDepositLiability,
-                tenantDepositDebt: _state.story.flagInt('tenantDepositDebt'),
-                propertyEquity: finance.propertyEquityAt(_state.day),
-                totalKnownLiabilities: _state.totalKnownLiabilities,
-                netWorth: _state.balanceSheetNetWorth(),
-              ),
-              if (!widget.realEstateOnly) ...[
-                const SizedBox(height: 12),
-                const _FinanceNoticeCard(),
-                const SizedBox(height: 10),
-                _SpendingOptionCard(
-                  option: communityOption,
-                  lockReason: _lockReason(communityOption),
-                  busy: _busy,
-                  onTap: () => _purchase(communityOption),
-                ),
-              ],
-              const SizedBox(height: 18),
-              _RealEstateMarketSection(
-                selectedTier: _selectedPropertyTier,
-                selectedDistrictId: _selectedPropertyDistrictId,
-                currentDate: _state.currentDate,
-                worldSeed: _state.simulationSeed,
-                ownedHousingCount: finance.ownedHousingCount,
-                busy: _busy,
-                lockReason: _listingLockReason,
-                onTierSelected: (tier) => setState(() {
-                  _selectedPropertyTier = tier;
-                  _selectedPropertyDistrictId = null;
-                  if (widget.realEstateOnly) {
-                    _realtorMood = _RealtorMood.explain;
-                    _realtorGuideVisible = true;
-                  }
-                }),
-                onDistrictSelected: (districtId) => setState(() {
-                  _selectedPropertyDistrictId = districtId;
-                  if (widget.realEstateOnly) {
-                    _realtorMood = _RealtorMood.explain;
-                    _realtorGuideVisible = true;
-                  }
-                }),
-                onPurchase: _openListingDetail,
-              ),
-              if (!widget.realEstateOnly) ...[
-                const SizedBox(height: 18),
-                const _FinanceSectionTitle(
-                  icon: Icons.shopping_bag_rounded,
-                  title: '쓸 곳과 키울 곳',
-                  caption: '연도·법인·직원 조건에 따라 순서대로 열립니다.',
-                ),
-                const SizedBox(height: 8),
-                ...spendingCatalog
-                    .where(
-                      (option) =>
-                          option.marketAssetId == null &&
-                          option.id != communityOption.id,
-                    )
-                    .map(
-                      (option) => Padding(
-                        padding: const EdgeInsets.only(bottom: 9),
-                        child: _SpendingOptionCard(
-                          option: option,
-                          lockReason: _lockReason(option),
-                          busy: _busy,
-                          onTap: () => _purchase(option),
+        appBar: AppBar(
+          title: Text(widget.realEstateOnly ? '부동산 시장' : '자산·소비 계획'),
+          backgroundColor: const Color(0xFFF3EBDD),
+        ),
+        body: Stack(
+          children: [
+            SafeArea(
+              top: false,
+              child: KeyedSubtree(
+                key: widget.realEstateOnly
+                    ? const Key('real-estate-market-screen')
+                    : null,
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(14, 8, 14, 28),
+                  children: [
+                    if (widget.realEstateOnly) ...[
+                      if (_realtorGuideVisible)
+                        _RealtorGuideCard(
+                          mood: _realtorMood,
+                          onConsult: () =>
+                              _showRealtorMood(_RealtorMood.explain),
+                          onDismiss: () =>
+                              setState(() => _realtorGuideVisible = false),
+                        )
+                      else
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: OutlinedButton.icon(
+                            key: const Key('real-estate-realtor-reopen'),
+                            onPressed: () =>
+                                _showRealtorMood(_RealtorMood.welcome),
+                            icon: const Icon(
+                              Icons.support_agent_rounded,
+                              size: 18,
+                            ),
+                            label: const Text('중개사 상담 다시 열기'),
+                          ),
                         ),
+                      const SizedBox(height: 12),
+                    ],
+                    KeyedSubtree(
+                      key: widget.realEstateOnly
+                          ? _realEstateFinanceTutorialKey
+                          : null,
+                      child: _FinanceOverviewCard(
+                        cash: _state.cash,
+                        propertyValue: propertyValue,
+                        monthlyPropertyNet:
+                            finance.monthlyPropertyIncomeAt(
+                              _state.currentDate,
+                            ) -
+                            finance.monthlyPropertyCostAt(_state.currentDate) -
+                            finance.monthlyPropertyHoldingTaxAt(
+                              _state.day,
+                              _state.currentDate,
+                            ) -
+                            finance.monthlyMortgagePayment,
+                        totalSpent: finance.totalSpent,
+                        totalMortgageBalance: finance.totalMortgageBalance,
+                        totalTenantDeposits:
+                            finance.totalTenantDepositLiability,
+                        tenantDepositDebt: _state.story.flagInt(
+                          'tenantDepositDebt',
+                        ),
+                        propertyEquity: finance.propertyEquityAt(_state.day),
+                        totalKnownLiabilities: _state.totalKnownLiabilities,
+                        netWorth: _state.balanceSheetNetWorth(),
                       ),
                     ),
-              ],
-              const SizedBox(height: 10),
-              _FinanceSectionTitle(
-                icon: Icons.apartment_rounded,
-                title: '보유 부동산',
-                caption:
-                    '${finance.realEstate.length}건 · 추정가 ${_money(propertyValue)}원',
-              ),
-              const SizedBox(height: 8),
-              if (finance.realEstate.isEmpty)
-                const _FinanceEmptyCard(
-                  title: '아직 부동산이 없습니다',
-                  body: '수천만원대 오피스텔부터 시작해 월세와 시세 변동을 경험해 보세요.',
-                )
-              else
-                ...finance.realEstate.map(
-                  (asset) => Padding(
-                    padding: const EdgeInsets.only(bottom: 9),
-                    child: _OwnedPropertyCard(
-                      asset: asset,
-                      currentDay: _state.day,
+                    if (!widget.realEstateOnly) ...[
+                      const SizedBox(height: 12),
+                      const _FinanceNoticeCard(),
+                      const SizedBox(height: 10),
+                      _SpendingOptionCard(
+                        option: communityOption,
+                        lockReason: _lockReason(communityOption),
+                        busy: _busy,
+                        onTap: () => _purchase(communityOption),
+                      ),
+                    ],
+                    const SizedBox(height: 18),
+                    _RealEstateMarketSection(
+                      tutorialHeaderKey: widget.realEstateOnly
+                          ? _realEstateMarketTutorialKey
+                          : null,
+                      selectedTier: _selectedPropertyTier,
+                      selectedDistrictId: _selectedPropertyDistrictId,
                       currentDate: _state.currentDate,
                       worldSeed: _state.simulationSeed,
                       ownedHousingCount: finance.ownedHousingCount,
                       busy: _busy,
-                      onSell: () => _sell(asset),
-                      leaseManagementAvailable: widget.onConfigureLease != null,
-                      onManageLease: () => _manageLease(asset),
-                      onOpenDetail: () => _openOwnedDetail(asset),
+                      lockReason: _listingLockReason,
+                      onTierSelected: (tier) => setState(() {
+                        _selectedPropertyTier = tier;
+                        _selectedPropertyDistrictId = null;
+                        if (widget.realEstateOnly) {
+                          _realtorMood = _RealtorMood.explain;
+                          _realtorGuideVisible = true;
+                        }
+                      }),
+                      onDistrictSelected: (districtId) => setState(() {
+                        _selectedPropertyDistrictId = districtId;
+                        if (widget.realEstateOnly) {
+                          _realtorMood = _RealtorMood.explain;
+                          _realtorGuideVisible = true;
+                        }
+                      }),
+                      onPurchase: _openListingDetail,
                     ),
-                  ),
+                    if (!widget.realEstateOnly) ...[
+                      const SizedBox(height: 18),
+                      const _FinanceSectionTitle(
+                        icon: Icons.shopping_bag_rounded,
+                        title: '쓸 곳과 키울 곳',
+                        caption: '연도·법인·직원 조건에 따라 순서대로 열립니다.',
+                      ),
+                      const SizedBox(height: 8),
+                      ...spendingCatalog
+                          .where(
+                            (option) =>
+                                option.marketAssetId == null &&
+                                option.id != communityOption.id,
+                          )
+                          .map(
+                            (option) => Padding(
+                              padding: const EdgeInsets.only(bottom: 9),
+                              child: _SpendingOptionCard(
+                                option: option,
+                                lockReason: _lockReason(option),
+                                busy: _busy,
+                                onTap: () => _purchase(option),
+                              ),
+                            ),
+                          ),
+                    ],
+                    const SizedBox(height: 10),
+                    _FinanceSectionTitle(
+                      icon: Icons.apartment_rounded,
+                      title: '보유 부동산',
+                      caption:
+                          '${finance.realEstate.length}건 · 추정가 ${_money(propertyValue)}원',
+                    ),
+                    const SizedBox(height: 8),
+                    if (finance.realEstate.isEmpty)
+                      const _FinanceEmptyCard(
+                        title: '아직 부동산이 없습니다',
+                        body: '수천만원대 오피스텔부터 시작해 월세와 시세 변동을 경험해 보세요.',
+                      )
+                    else
+                      ...finance.realEstate.map(
+                        (asset) => Padding(
+                          padding: const EdgeInsets.only(bottom: 9),
+                          child: _OwnedPropertyCard(
+                            asset: asset,
+                            currentDay: _state.day,
+                            currentDate: _state.currentDate,
+                            worldSeed: _state.simulationSeed,
+                            ownedHousingCount: finance.ownedHousingCount,
+                            busy: _busy,
+                            onSell: () => _sell(asset),
+                            leaseManagementAvailable:
+                                widget.onConfigureLease != null,
+                            onManageLease: () => _manageLease(asset),
+                            onOpenDetail: () => _openOwnedDetail(asset),
+                          ),
+                        ),
+                      ),
+                    if (!widget.realEstateOnly) ...[
+                      const SizedBox(height: 10),
+                      _AdultChanceCard(
+                        state: _state,
+                        busy: _busy,
+                        onPlay: _playChance,
+                      ),
+                    ],
+                  ],
                 ),
-              if (!widget.realEstateOnly) ...[
-                const SizedBox(height: 10),
-                _AdultChanceCard(
-                  state: _state,
-                  busy: _busy,
-                  onPlay: _playChance,
+              ),
+            ),
+            if (_tutorialStep != null)
+              Positioned.fill(
+                child: _RealEstateTutorialOverlay(
+                  step: _tutorialStep!,
+                  targetKey: _tutorialTargetKey,
+                  onAction: _advanceRealEstateTutorial,
                 ),
-              ],
-            ],
-          ),
+              ),
+            if (_tutorialStep != null)
+              Positioned(
+                top: 0,
+                right: 0,
+                child: _GuidedTutorialSkipButton(
+                  buttonKey: const Key('real-estate-tutorial-skip'),
+                  dialogKey: const Key('real-estate-tutorial-skip-dialog'),
+                  cancelKey: const Key('real-estate-tutorial-skip-cancel'),
+                  confirmKey: const Key('real-estate-tutorial-skip-confirm'),
+                  description:
+                      '건너뛰어도 부동산 화면은 그대로 이용할 수 있고, 서민아 공인중개사의 설명은 완료로 저장됩니다.',
+                  onSkip: _completeRealEstateTutorial,
+                ),
+              ),
+          ],
         ),
       ),
     );
   }
+}
+
+class _RealEstateTutorialOverlay extends StatelessWidget {
+  const _RealEstateTutorialOverlay({
+    required this.step,
+    required this.targetKey,
+    required this.onAction,
+  });
+
+  final int step;
+  final GlobalKey? targetKey;
+  final VoidCallback onAction;
+
+  String get _asset => switch (step) {
+    0 => 'assets/images/character_realtor_welcome_v1.png',
+    1 => 'assets/images/character_realtor_explain_v1.png',
+    2 => 'assets/images/character_realtor_finance_v1.png',
+    3 => 'assets/images/character_realtor_concerned_v1.png',
+    4 => 'assets/images/character_realtor_negotiate_v1.png',
+    _ => 'assets/images/character_realtor_approve_v1.png',
+  };
+
+  List<String> get _messages => switch (step) {
+    0 => const [
+      '어서 오세요. 서민아 공인중개사예요. 부동산은 주식처럼 가격만 보고 바로 사는 자산이 아니에요.',
+      '계약할 현금, 매달 들어오고 나가는 돈, 대출과 보증금까지 한 장부에서 같이 봐야 해요.',
+    ],
+    1 => const [
+      '이곳에서 투자 등급과 지역을 고르면 현재 공개된 개별 매물이 나와요. 같은 단지라도 가격과 상태가 달라요.',
+      '먼저 서울·경기 매물 영역을 확인해 보세요. 지도 핀과 등급을 바꿔 비교할 수 있어요.',
+    ],
+    2 => const [
+      '매입가는 전부가 아니에요. 취득세·중개비는 현금으로 내고, 대출은 매달 원리금과 DSR을 만들어요.',
+      '위 자금 현황에서 현금, 담보대출, 임차보증금 부채와 순자산을 함께 확인하세요.',
+    ],
+    3 => const [
+      '공실, 수리, 보유세, 금리 상승이 겹치면 시세가 올라도 현금이 마를 수 있어요.',
+      '매물 상세의 수익·대출·세금·뉴스 탭을 보고 월 순현금이 버틸 수 있는지 먼저 판단하세요.',
+    ],
+    4 => const [
+      '임차보증금은 내 돈처럼 보여도 나중에 돌려줘야 하는 부채예요. 매각도 등록 즉시 끝나지 않아요.',
+      '보유 후에는 임대 조건, 공실, 매수자 제안과 반환할 보증금을 함께 협상하게 됩니다.',
+    ],
+    _ => const [
+      '좋아요. 매입 전에는 현금 여유, 월 순현금, LTV·DSR, 세금, 공실 위험을 차례로 확인하세요.',
+      '설명만으로 계약되지는 않아요. 마음에 드는 매물을 열고 숫자를 확인한 뒤 직접 결정하면 됩니다.',
+    ],
+  };
+
+  @override
+  Widget build(BuildContext context) => _StockTutorialGuideOverlay(
+    overlayKey: const Key('real-estate-tutorial-overlay'),
+    actionKey: const Key('real-estate-tutorial-next'),
+    targetActionKey: const Key('real-estate-tutorial-target'),
+    targetKey: targetKey,
+    messageId: 'real-estate-tutorial-$step',
+    speakers: const ['서민아 공인중개사', '서민아 공인중개사'],
+    messages: _messages,
+    actionLabel: step >= 5 ? '설명 마치기' : '다음 설명',
+    teacherPoseAsset: _asset,
+    characterAssets: [_asset, _asset],
+    wrongTapFeedbacks: const [
+      '서민아: 노란 테두리로 표시한 곳부터 확인해 주세요.',
+      '서민아: 아직 계약은 되지 않아요. 강조한 항목만 눌러볼까요?',
+      '서민아: 서두르지 않아도 돼요. 숫자를 하나씩 확인하면 됩니다.',
+    ],
+    onAction: onAction,
+  );
 }
 
 class _RealtorGuideCard extends StatelessWidget {
@@ -3473,6 +3589,7 @@ class _RealEstateMarketSection extends StatelessWidget {
     required this.onTierSelected,
     required this.onDistrictSelected,
     required this.onPurchase,
+    this.tutorialHeaderKey,
   });
 
   final RealEstateInvestmentTier selectedTier;
@@ -3485,6 +3602,7 @@ class _RealEstateMarketSection extends StatelessWidget {
   final ValueChanged<RealEstateInvestmentTier> onTierSelected;
   final ValueChanged<String?> onDistrictSelected;
   final Future<void> Function(GeneratedRealEstateListing listing) onPurchase;
+  final GlobalKey? tutorialHeaderKey;
 
   @override
   Widget build(BuildContext context) {
@@ -3519,10 +3637,13 @@ class _RealEstateMarketSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _FinanceSectionTitle(
-          icon: Icons.location_city_rounded,
-          title: '서울·경기 부동산 투자',
-          caption: '단지마다 3개 개별 매물 · 사건 결과는 확정 시점까지 비공개',
+        KeyedSubtree(
+          key: tutorialHeaderKey,
+          child: const _FinanceSectionTitle(
+            icon: Icons.location_city_rounded,
+            title: '서울·경기 부동산 투자',
+            caption: '단지마다 3개 개별 매물 · 사건 결과는 확정 시점까지 비공개',
+          ),
         ),
         const SizedBox(height: 10),
         SingleChildScrollView(
