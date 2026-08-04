@@ -31,6 +31,14 @@
 - **동기 9명도 플레이어와 같은 조건으로 확정 순이익의 20%를 국가에 환수당한다.** 한쪽만 환수하면 수익률 순위표에서 플레이어가 구조적으로 불리해진다. 환수율은 플레이어와 같은 `stateRecoveryRateBps`를 쓰고, 데시멀 캠페인이 아닌 구형 저장에서는 양쪽 모두 환수하지 않는다. 손실이거나 보합인 날은 환수가 없다.
 - 같은 날짜의 결과는 저장 후 다시 열어도 재추첨·재정산하지 않는다.
 - 최근 결과는 최대 64일분을 저장한다.
+- 저장된 결과표에서 **연속 기록을 파생해 후속 사건을 만든다.** 새 저장 필드는 쓰지 않는다.
+  - 3거래일 연속 최하위 → 한서윤 운영관의 **중단권 확인 면담**. 처벌이 아니라 권리 안내이며
+    그만두더라도 생활 조건이 나빠지지 않는다는 계약 첫 장을 다시 확인한다.
+  - 3거래일 연속 1위 → 조민경 권익감사관의 **기록 열람**. 수익률이 아니라 판단 이유를 보고,
+    운이었다고 적는 것이 감점 사유가 되지 않는다.
+  - 같은 동기에게 5거래일 연속 수익률로 밀림 → **라이벌 성립**. 그 동기가 자기 종목을 먼저 공개한다.
+  - 우선순위는 최하위 면담 → 1위 감사 → 라이벌이다. 같은 사건은 `cohortStandingEventLog`에
+    사건 ID를 남겨 한 번만 열고, 연속이 더 길어지면 새 ID가 되어 다시 열린다.
 - 실전 매도에서 수수료·거래세를 뺀 확정 순이익의 20%는 국가가 회수한다. 나머지 80%는 잠그지 않고 증권계좌 현금으로 남겨 다음 주문에 계속 재투자한다.
 - 실전 손실은 그대로 계좌에 누적된다. 보유 종목이 없고 출금 가능한 증권계좌 현금이 10,000원 미만이면 `재기 필요` 상태가 된다.
 
@@ -65,6 +73,7 @@
 ## 6. 주요 구현 파일
 
 - `flutter_app/lib/game/cohort_investment_state.dart`: 9명 계좌·10명 결과표·대여·저장 모델
+- `flutter_app/lib/game/cohort_standing_events.dart`: 저장 결과표에서 파생하는 연속 기록과 면담·감사·라이벌 사건
 - `flutter_app/lib/game/game_engine.dart`: 15:00 정산·손익·대여·자동 상환·중복 방지
 - `flutter_app/lib/game/game_state.dart`: v26 직렬화·마이그레이션과 대여채권·차입부채 합산
 - `flutter_app/lib/cohort_investment_screens.dart`: 결과표·순위·양방향 대여 UI
@@ -72,5 +81,6 @@
 - `flutter_app/lib/campaign_scenes.dart`: 15:00 결과표 → 20:00 관계 시간 → 다음 날 연결
 - `flutter_app/test/cohort_investment_state_test.dart`: 정산·대여·상환·저장 회귀와 열 명 환수 대칭, 이체·차입이 수익률을 올리지 못하는 회귀
 - `flutter_app/test/cohort_investment_screen_test.dart`: 10행 결과표·수익률 열·대여 UI 회귀
+- `flutter_app/test/cohort_standing_events_test.dart`: 연속 기록·사건 우선순위·단회 처리·저장 복원 회귀
 - `flutter_app/test/day_advance_flow_test.dart`: 하루 종료 전체 순서 회귀
 - `flutter_app/test/weekend_activity_test.dart`: 주말 알바와 재기 수당 이체 회귀
