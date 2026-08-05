@@ -1,11 +1,23 @@
 import 'dart:math' as math;
 
+import 'game_state.dart';
+
 const horseRaceBackgroundAsset =
-    'assets/images/horse_racing/bg_seoul_turf_afternoon_2000_v1.png';
+    'assets/images/horse_racing/bg_paddock_parade_softpainted_2000_v4.png';
+const horseRacePhotoFinishAsset =
+    'assets/images/horse_racing/bg_photo_finish_softpainted_2000_v2.png';
+const horseRaceOfficialResultBoardAsset =
+    'assets/images/horse_racing/ui_official_result_board_softpainted_v1.png';
+const horseRaceTellerWelcomeAsset =
+    'assets/images/horse_racing/teller_window_welcome_age20_v1.png';
+const horseRaceTellerGuideAsset =
+    'assets/images/horse_racing/teller_window_bet_guide_age20_v1.png';
+const horseRaceTellerAcceptAsset =
+    'assets/images/horse_racing/teller_window_bet_accept_age20_v1.png';
+const horseRaceTellerHandoverAsset =
+    'assets/images/horse_racing/teller_window_ticket_handover_age20_v1.png';
 const horseRaceStraightTrackAsset =
-    'assets/images/horse_racing/bg_straight_side_track_panorama_2000_v2.png';
-const horseRaceCurveTrackAsset =
-    'assets/images/horse_racing/bg_curve_rear_broadcast_2000_v1.png';
+    'assets/images/horse_racing/bg_straight_side_track_finish_panorama_2000_v4.png';
 const horseGallopChestnutAsset =
     'assets/images/horse_racing/horse_gallop_chestnut_red_v1.png';
 const horseGallopDarkBayAsset =
@@ -22,22 +34,6 @@ const horseGallopPintoAsset =
     'assets/images/horse_racing/horse_gallop_pinto_coral_v2.png';
 const horseGallopMahoganyAsset =
     'assets/images/horse_racing/horse_gallop_mahogany_cobalt_v2.png';
-const horseCurveChestnutAsset =
-    'assets/images/horse_racing/horse_curve_chestnut_red_v1.png';
-const horseCurveDarkBayAsset =
-    'assets/images/horse_racing/horse_curve_darkbay_blue_v1.png';
-const horseCurveGrayAsset =
-    'assets/images/horse_racing/horse_curve_gray_yellow_v1.png';
-const horseCurveWhiteAsset =
-    'assets/images/horse_racing/horse_curve_white_navyrose_v1.png';
-const horseCurveBlackAsset =
-    'assets/images/horse_racing/horse_curve_black_emerald_v1.png';
-const horseCurvePalominoAsset =
-    'assets/images/horse_racing/horse_curve_palomino_violet_v1.png';
-const horseCurvePintoAsset =
-    'assets/images/horse_racing/horse_curve_pinto_coral_v1.png';
-const horseCurveMahoganyAsset =
-    'assets/images/horse_racing/horse_curve_mahogany_cobalt_v1.png';
 
 const horseRaceGallopAssets = <String>[
   horseGallopChestnutAsset,
@@ -50,32 +46,47 @@ const horseRaceGallopAssets = <String>[
   horseGallopMahoganyAsset,
 ];
 
-const horseRaceCurveGallopAssets = <String>[
-  horseCurveChestnutAsset,
-  horseCurveDarkBayAsset,
-  horseCurveGrayAsset,
-  horseCurveWhiteAsset,
-  horseCurveBlackAsset,
-  horseCurvePalominoAsset,
-  horseCurvePintoAsset,
-  horseCurveMahoganyAsset,
-];
-
-String horseRaceCurveGallopAssetFor(String sideAsset) => switch (sideAsset) {
-  horseGallopChestnutAsset => horseCurveChestnutAsset,
-  horseGallopDarkBayAsset => horseCurveDarkBayAsset,
-  horseGallopGrayAsset => horseCurveGrayAsset,
-  horseGallopWhiteAsset => horseCurveWhiteAsset,
-  horseGallopBlackAsset => horseCurveBlackAsset,
-  horseGallopPalominoAsset => horseCurvePalominoAsset,
-  horseGallopPintoAsset => horseCurvePintoAsset,
-  horseGallopMahoganyAsset => horseCurveMahoganyAsset,
-  _ => throw ArgumentError.value(sideAsset, 'sideAsset', 'Unknown horse sheet'),
-};
-
 const horseRaceMinStake = 500;
 const horseRaceMaxStake = 5000;
+const horseRaceDailyBetLimit = 1;
 const horseRaceDefaultStateRecoveryRateBps = 2000;
+
+int horseRaceBetsForDay(GameState state, int day) => state.ledger
+    .where(
+      (entry) =>
+          entry.day == day &&
+          entry.counterAccount == 'horse_racing_wager_expense',
+    )
+    .map((entry) => entry.sourceId)
+    .toSet()
+    .length;
+
+int horseRaceBetsToday(GameState state) =>
+    horseRaceBetsForDay(state, state.day);
+
+bool horseRaceDailyLimitReached(GameState state) =>
+    horseRaceBetsToday(state) >= horseRaceDailyBetLimit;
+
+class HorseRaceActionResult {
+  const HorseRaceActionResult({
+    required this.state,
+    required this.success,
+    required this.message,
+    this.cashDelta = 0,
+  });
+
+  final GameState state;
+  final bool success;
+  final String message;
+  final int cashDelta;
+
+  HorseRaceActionResult withState(GameState next) => HorseRaceActionResult(
+    state: next,
+    success: success,
+    message: message,
+    cashDelta: cashDelta,
+  );
+}
 
 int horseRaceStateProfitFee({
   required int stake,
@@ -565,6 +576,194 @@ int horseRaceStableSeed(String value) {
     hash = (hash * 0x01000193) & 0x7FFFFFFF;
   }
   return hash;
+}
+
+const _horseRacePaceBreaks = <double>[0, 0.12, 0.30, 0.52, 0.70, 0.86, 1];
+
+/// Returns the runner's deterministic position in the straight-only broadcast.
+///
+/// The official result still comes from [HorseRaceCard.finishOrder]. Running
+/// style, ability and a stable per-runner burst only shape how that result is
+/// revealed, so early leaders, midfield moves and late closers all read clearly.
+double horseRaceBroadcastProgress({
+  required HorseRaceCard race,
+  required HorseRaceEntrant entrant,
+  required double time,
+}) {
+  final finishRank = race.finishOrder.indexOf(entrant.id);
+  if (finishRank < 0) return 0;
+
+  // Use the same varied margins as the official record sheet. Real fields do
+  // not arrive at mechanically even intervals: some places are a nose apart,
+  // while a fading runner can finish several lengths behind the horse ahead.
+  final finishAt = horseRaceBroadcastFinishAt(race: race, entrant: entrant);
+  final raceTime = (time.clamp(0.0, 1.0) / finishAt).clamp(0.0, 1.0);
+  if (raceTime <= 0) return 0;
+  if (raceTime >= 1) return 1;
+
+  final speeds = switch (entrant.runningStyle) {
+    '선행' => <double>[1.70, 1.35, 1.02, 0.90, 1.02, 1.10],
+    '선입' => <double>[0.98, 1.12, 1.48, 1.16, 1.03, 1.10],
+    '추입' => <double>[0.70, 0.78, 0.88, 1.03, 1.45, 1.82],
+    '지구력' => <double>[0.86, 0.98, 1.08, 1.18, 1.23, 1.25],
+    _ => <double>[1.02, 1.08, 1.12, 1.08, 1.05, 1.10],
+  };
+  final profileSeed = horseRaceStableSeed(
+    '${race.seed}:${entrant.id}:straight-pace',
+  );
+  final burstSegment = switch (entrant.runningStyle) {
+    '선행' => profileSeed.isEven ? 0 : 1,
+    '선입' => 2 + profileSeed % 2,
+    '추입' => 4 + profileSeed % 2,
+    '지구력' => 3 + profileSeed % 2,
+    _ => 1 + profileSeed % 4,
+  };
+
+  for (var segment = 0; segment < speeds.length; segment++) {
+    final segmentSeed = horseRaceStableSeed('$profileSeed:$segment');
+    final variation = ((segmentSeed % 2001) / 1000 - 1) * 0.055;
+    final accelerationFit = (entrant.acceleration - 85) / 15;
+    final speedFit = (entrant.speed - 85) / 15;
+    final staminaFit = (entrant.stamina - 85) / 15;
+    final kickFit = (entrant.finishingKick - 85) / 15;
+    final abilityFit = switch (segment) {
+      0 => accelerationFit * 0.11 + speedFit * 0.03,
+      1 => accelerationFit * 0.07 + speedFit * 0.06,
+      2 => speedFit * 0.10 + accelerationFit * 0.03,
+      3 => speedFit * 0.07 + staminaFit * 0.07,
+      4 => staminaFit * 0.07 + kickFit * 0.10,
+      _ => kickFit * 0.14 + staminaFit * 0.04,
+    };
+    final burst = segment == burstSegment
+        ? 0.28
+        : (segment - burstSegment).abs() == 1
+        ? 0.08
+        : 0.0;
+    speeds[segment] = math.max(
+      0.42,
+      speeds[segment] + variation + abilityFit + burst,
+    );
+  }
+
+  var totalDistance = 0.0;
+  var coveredDistance = 0.0;
+  for (var segment = 0; segment < speeds.length; segment++) {
+    final start = _horseRacePaceBreaks[segment];
+    final end = _horseRacePaceBreaks[segment + 1];
+    final segmentDistance = (end - start) * speeds[segment];
+    totalDistance += segmentDistance;
+    final coveredTime = (math.min(raceTime, end) - start).clamp(
+      0.0,
+      end - start,
+    );
+    coveredDistance += coveredTime * speeds[segment];
+  }
+  return (coveredDistance / totalDistance).clamp(0.0, 1.0);
+}
+
+/// Deterministic official elapsed time used by the racecourse result board.
+///
+/// A 1,200 m winner runs roughly 1:11, with small race-specific variation.
+/// Following runners receive stable, strictly increasing gaps so the same race
+/// card always produces the same broadcast record sheet.
+double horseRaceFinishTimeSeconds({
+  required HorseRaceCard race,
+  required HorseRaceEntrant entrant,
+}) {
+  final finishRank = race.finishOrder.indexOf(entrant.id);
+  if (finishRank < 0) return 0;
+
+  final recordSeed = horseRaceStableSeed('${race.seed}:${race.id}:record');
+  final standardWinnerSeconds = 70.85 + (recordSeed % 136) / 100;
+  final conditionAdjustment = switch (race.trackCondition) {
+    '불량' => 1.15,
+    '포화' => 0.72,
+    '다습' => 0.34,
+    _ => 0.0,
+  };
+  var elapsed =
+      standardWinnerSeconds * (race.distanceMeters / 1200) +
+      conditionAdjustment;
+  for (var position = 1; position <= finishRank; position++) {
+    elapsed += _horseRaceRecordGapSeconds(race, position);
+  }
+  return (elapsed * 100).round() / 100;
+}
+
+double _horseRaceRecordGapSeconds(HorseRaceCard race, int position) {
+  final gapSeed = horseRaceStableSeed(
+    '${race.seed}:${race.finishOrder[position]}:record-gap:$position',
+  );
+  final bucket = gapSeed % 100;
+  final jitter = (gapSeed ~/ 100) % 7;
+  final gap = switch (bucket) {
+    < 12 => 0.07 + jitter * 0.01,
+    < 38 => 0.14 + jitter * 0.015,
+    < 67 => 0.24 + jitter * 0.02,
+    < 86 => 0.38 + jitter * 0.03,
+    < 96 => 0.58 + jitter * 0.04,
+    < 99 => 0.88 + jitter * 0.05,
+    _ => 1.22 + jitter * 0.08,
+  };
+  return (gap * 100).round() / 100;
+}
+
+/// Normalized moment when [entrant] reaches the broadcast finish stripe.
+///
+/// One second on the official record is kept close to one second in the
+/// shortened 16-second broadcast. The winner is moved earlier when the field
+/// is widely spread, so late runners never have to bunch up at the stripe.
+double horseRaceBroadcastFinishAt({
+  required HorseRaceCard race,
+  required HorseRaceEntrant entrant,
+}) {
+  final finishRank = race.finishOrder.indexOf(entrant.id);
+  if (finishRank < 0) return 1;
+
+  var totalGapSeconds = 0.0;
+  var entrantGapSeconds = 0.0;
+  for (var position = 1; position < race.finishOrder.length; position++) {
+    final gap = _horseRaceRecordGapSeconds(race, position);
+    totalGapSeconds += gap;
+    if (position <= finishRank) entrantGapSeconds += gap;
+  }
+  const broadcastGapScaleSeconds = 14.0;
+  final winnerFinishAt = math.max(
+    0.68,
+    math.min(0.84, 0.995 - totalGapSeconds / broadcastGapScaleSeconds),
+  );
+  return math.min(
+    0.995,
+    winnerFinishAt + entrantGapSeconds / broadcastGapScaleSeconds,
+  );
+}
+
+String horseRaceMarginLabel(double gapSeconds) {
+  if (gapSeconds <= 0.06) return '코';
+  if (gapSeconds <= 0.10) return '머리';
+  if (gapSeconds <= 0.14) return '목';
+
+  final quarters = math.max(2, (gapSeconds / 0.17 * 4).round());
+  if (quarters >= 40) return '대차';
+  final whole = quarters ~/ 4;
+  final remainder = quarters % 4;
+  final fraction = switch (remainder) {
+    1 => '1/4',
+    2 => '1/2',
+    3 => '3/4',
+    _ => '',
+  };
+  if (whole == 0) return fraction;
+  return fraction.isEmpty ? '$whole' : '$whole $fraction';
+}
+
+String horseRaceRecordLabel(double seconds) {
+  final hundredths = (seconds * 100).round();
+  final minutes = hundredths ~/ 6000;
+  final secondsPart = (hundredths % 6000) ~/ 100;
+  final fraction = hundredths % 100;
+  return '$minutes:${secondsPart.toString().padLeft(2, '0')}.'
+      '${fraction.toString().padLeft(2, '0')}';
 }
 
 double horseRaceCompositeScore({

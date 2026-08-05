@@ -41,8 +41,8 @@ const defaultDirecting = {
 function loadCanonicalDialogue() {
   const raw = fs.readFileSync(canonicalPath, "utf8");
   const decoded = JSON.parse(raw);
-  if (decoded.contentVersion !== 5 || decoded.appearanceVersion !== 19) {
-    throw new Error("Canonical dialogue versions must be content 5 / appearance 19.");
+  if (decoded.contentVersion !== 5 || decoded.appearanceVersion !== 20) {
+    throw new Error("Canonical dialogue versions must be content 5 / appearance 20.");
   }
   if (
     !Array.isArray(decoded.scenes) ||

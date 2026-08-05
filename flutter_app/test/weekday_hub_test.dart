@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:millennium_capital/game/game_engine.dart';
 import 'package:millennium_capital/game/game_state.dart';
+import 'package:millennium_capital/game/market_clock.dart';
 import 'package:millennium_capital/game/relationship_state.dart';
 import 'package:millennium_capital/game/story_state.dart';
 import 'package:millennium_capital/main.dart';
@@ -43,6 +44,46 @@ Widget _testHub({
 );
 
 void main() {
+  testWidgets('adult weekday neighborhood has no physical racecourse entry', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    const engine = GameEngine();
+    final base = engine.createNewGame(
+      '현장 경마 테스트',
+      worldSeed: 'weekday-racecourse-entry',
+    );
+    var day = base.day;
+    while (base.dateForDay(day).isBefore(DateTime(2010, 1, 1)) ||
+        base.dateForDay(day).weekday >= DateTime.saturday) {
+      day += 1;
+    }
+    final state = base.copyWith(
+      day: day,
+      marketMinute: krxCloseMinute,
+      cash: base.cash + 5000,
+      decisions: const [],
+    );
+    await tester.pumpWidget(
+      _testHub(
+        state: state,
+        onOpenMarket: () {},
+        onOpenRealEstate: () {},
+        onOpenBank: () {},
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('apartment-go-neighborhood')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('open-horse-race-venue-button')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'lounge rotates heroines daily and changes pose copy and distance by affection',
     (tester) async {

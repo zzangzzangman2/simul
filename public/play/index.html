@@ -13,7 +13,7 @@
   <meta name="twitter:title" content="10대부터 건물주 — 프로젝트 데시멀 투자 생활 게임">
   <meta name="twitter:description" content="2000년 서울, 프로젝트 데시멀의 열 명이 국가원금 5만원으로 생존과 투자를 배워 가는 모바일 세로형 생활·투자 시뮬레이션">
   <meta name="theme-color" content="#061F2A">
-  <meta name="decimal-build-id" content="43faf50e6270">
+  <meta name="decimal-build-id" content="775679fa5aa7">
   <meta name="mobile-web-app-capable" content="yes">
   <!-- iOS는 아직 레거시 이름만 읽는다. 이 둘이 없으면 홈 화면에서 열어도 사파리 주소창이 남는다. -->
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -384,15 +384,59 @@
   </script>
   <script id="pwa-worker-registration">
     (() => {
+      window.decimalPwaWorkerReady = Promise.resolve();
       if (!('serviceWorker' in window.navigator) || !window.isSecureContext) return;
-      window.addEventListener('load', () => {
-        window.navigator.serviceWorker.register('pwa_service_worker.js?v=43faf50e6270', {
+
+      const currentBuildId = document
+        .querySelector('meta[name="decimal-build-id"]')
+        ?.getAttribute('content');
+      const expectedBuildId = /^[0-9a-f]{12}$/.test(currentBuildId ?? '')
+        ? currentBuildId
+        : null;
+      const controllerUsesCurrentBuild = () => {
+        const scriptUrl = window.navigator.serviceWorker.controller?.scriptURL;
+        if (!scriptUrl || !expectedBuildId) return false;
+        return new URL(scriptUrl).searchParams.get('v') === expectedBuildId;
+      };
+      const waitForCurrentController = (registration) => new Promise((resolve) => {
+        if (!expectedBuildId) {
+          resolve();
+          return;
+        }
+        if (controllerUsesCurrentBuild()) {
+          resolve();
+          return;
+        }
+
+        const finishIfCurrent = () => {
+          if (!controllerUsesCurrentBuild()) return;
+          window.navigator.serviceWorker.removeEventListener('controllerchange', finishIfCurrent);
+          resolve();
+        };
+        window.navigator.serviceWorker.addEventListener('controllerchange', finishIfCurrent);
+
+        const targetWorker = [
+          registration.installing,
+          registration.waiting,
+          registration.active,
+        ].find((worker) => {
+          if (!worker || !expectedBuildId) return false;
+          return new URL(worker.scriptURL).searchParams.get('v') === expectedBuildId;
+        });
+        targetWorker?.addEventListener('statechange', finishIfCurrent);
+      });
+      const timeout = new Promise((resolve) => window.setTimeout(resolve, 4000));
+
+      const activateCurrentWorker = window.navigator.serviceWorker
+        .register('pwa_service_worker.js?v=775679fa5aa7', {
           scope: './',
           updateViaCache: 'none',
-        }).catch(() => {
+        })
+        .then((registration) => waitForCurrentController(registration))
+        .catch(() => {
           // 설치 지원이 없는 브라우저에서도 게임 실행은 계속한다.
         });
-      });
+      window.decimalPwaWorkerReady = Promise.race([activateCurrentWorker, timeout]);
     })();
   </script>
   <script id="automatic-app-update">
@@ -403,6 +447,14 @@
         .querySelector('meta[name="decimal-build-id"]')
         ?.getAttribute('content');
       if (!currentBuildId || !/^[0-9a-f]{12}$/.test(currentBuildId)) return;
+
+      // Keep the controlling worker and this document on the same asset generation.
+      // This also protects the first reload while an older worker is being replaced.
+      const currentUrl = new URL(window.location.href);
+      if (currentUrl.searchParams.get('appBuild') !== currentBuildId) {
+        currentUrl.searchParams.set('appBuild', currentBuildId);
+        window.history.replaceState(window.history.state, '', currentUrl);
+      }
 
       let checking = false;
       const checkForUpdate = async () => {
@@ -441,6 +493,16 @@
       window.addEventListener('online', checkForUpdate);
     })();
   </script>
-  <script src="flutter_bootstrap.js?v=43faf50e6270" async></script>
+  <script id="flutter-bootstrap-loader">
+    (() => {
+      const loadFlutter = () => {
+        const script = document.createElement('script');
+        script.src = 'flutter_bootstrap.js?v=775679fa5aa7';
+        script.async = true;
+        document.body.appendChild(script);
+      };
+      Promise.resolve(window.decimalPwaWorkerReady).then(loadFlutter, loadFlutter);
+    })();
+  </script>
 </body>
 </html>

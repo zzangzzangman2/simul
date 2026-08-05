@@ -13,6 +13,7 @@ part 'market_corpus_daily_samples.dart';
 part 'market_corpus_events.dart';
 part 'market_arc_scenarios.dart';
 part 'market_era_events.dart';
+part 'corporate_disclosure.dart';
 
 const marketMaterialNewsHaltMinutes = 5;
 const marketCorporateActionAnnouncementTradingDays = 14;
@@ -157,6 +158,19 @@ class FictionalFinancialSnapshot {
     required this.equity,
     required this.sharesOutstanding,
     required this.orderBacklog,
+    this.publishedOn,
+    this.preliminaryOn,
+    this.auditOpinion = '적정',
+    this.guidanceRevenueLow = 0,
+    this.guidanceRevenueHigh = 0,
+    this.guidanceOperatingProfitLow = 0,
+    this.guidanceOperatingProfitHigh = 0,
+    this.consolidatedRevenue = 0,
+    this.consolidatedOperatingProfit = 0,
+    this.capex = 0,
+    this.payroll = 0,
+    this.impairmentLoss = 0,
+    this.distributableProfit = 0,
   });
 
   final String period;
@@ -170,6 +184,27 @@ class FictionalFinancialSnapshot {
   final int equity;
   final int sharesOutstanding;
   final int orderBacklog;
+  final String? publishedOn;
+  final String? preliminaryOn;
+  final String auditOpinion;
+  final int guidanceRevenueLow;
+  final int guidanceRevenueHigh;
+  final int guidanceOperatingProfitLow;
+  final int guidanceOperatingProfitHigh;
+  final int consolidatedRevenue;
+  final int consolidatedOperatingProfit;
+  final int capex;
+  final int payroll;
+  final int impairmentLoss;
+  final int distributableProfit;
+
+  DateTime get publicationDate => publishedOn == null
+      ? marketFinancialPublicationDateForPeriod(period)
+      : DateTime.parse(publishedOn!);
+
+  DateTime get preliminaryDate => preliminaryOn == null
+      ? marketFinancialPreliminaryDateForPeriod(period)
+      : DateTime.parse(preliminaryOn!);
 
   double get operatingMargin =>
       revenue <= 0 ? 0 : operatingProfit / revenue * 100;
@@ -195,23 +230,53 @@ class FictionalFinancialSnapshot {
     'equity': equity,
     'sharesOutstanding': sharesOutstanding,
     'orderBacklog': orderBacklog,
+    if (publishedOn != null) 'publishedOn': publishedOn,
+    if (preliminaryOn != null) 'preliminaryOn': preliminaryOn,
+    'auditOpinion': auditOpinion,
+    'guidanceRevenueLow': guidanceRevenueLow,
+    'guidanceRevenueHigh': guidanceRevenueHigh,
+    'guidanceOperatingProfitLow': guidanceOperatingProfitLow,
+    'guidanceOperatingProfitHigh': guidanceOperatingProfitHigh,
+    'consolidatedRevenue': consolidatedRevenue,
+    'consolidatedOperatingProfit': consolidatedOperatingProfit,
+    'capex': capex,
+    'payroll': payroll,
+    'impairmentLoss': impairmentLoss,
+    'distributableProfit': distributableProfit,
   };
 
-  factory FictionalFinancialSnapshot.fromJson(Map<String, dynamic> json) =>
-      FictionalFinancialSnapshot(
-        period: json['period'] as String? ?? '',
-        revenue: (json['revenue'] as num?)?.toInt() ?? 0,
-        operatingProfit: (json['operatingProfit'] as num?)?.toInt() ?? 0,
-        consensusOperatingProfit:
-            (json['consensusOperatingProfit'] as num?)?.toInt() ?? 0,
-        netIncome: (json['netIncome'] as num?)?.toInt() ?? 0,
-        operatingCashFlow: (json['operatingCashFlow'] as num?)?.toInt() ?? 0,
-        cash: (json['cash'] as num?)?.toInt() ?? 0,
-        debt: (json['debt'] as num?)?.toInt() ?? 0,
-        equity: (json['equity'] as num?)?.toInt() ?? 0,
-        sharesOutstanding: (json['sharesOutstanding'] as num?)?.toInt() ?? 0,
-        orderBacklog: (json['orderBacklog'] as num?)?.toInt() ?? 0,
-      );
+  factory FictionalFinancialSnapshot.fromJson(
+    Map<String, dynamic> json,
+  ) => FictionalFinancialSnapshot(
+    period: json['period'] as String? ?? '',
+    revenue: (json['revenue'] as num?)?.toInt() ?? 0,
+    operatingProfit: (json['operatingProfit'] as num?)?.toInt() ?? 0,
+    consensusOperatingProfit:
+        (json['consensusOperatingProfit'] as num?)?.toInt() ?? 0,
+    netIncome: (json['netIncome'] as num?)?.toInt() ?? 0,
+    operatingCashFlow: (json['operatingCashFlow'] as num?)?.toInt() ?? 0,
+    cash: (json['cash'] as num?)?.toInt() ?? 0,
+    debt: (json['debt'] as num?)?.toInt() ?? 0,
+    equity: (json['equity'] as num?)?.toInt() ?? 0,
+    sharesOutstanding: (json['sharesOutstanding'] as num?)?.toInt() ?? 0,
+    orderBacklog: (json['orderBacklog'] as num?)?.toInt() ?? 0,
+    publishedOn: json['publishedOn'] as String?,
+    preliminaryOn: json['preliminaryOn'] as String?,
+    auditOpinion: json['auditOpinion'] as String? ?? '적정',
+    guidanceRevenueLow: (json['guidanceRevenueLow'] as num?)?.toInt() ?? 0,
+    guidanceRevenueHigh: (json['guidanceRevenueHigh'] as num?)?.toInt() ?? 0,
+    guidanceOperatingProfitLow:
+        (json['guidanceOperatingProfitLow'] as num?)?.toInt() ?? 0,
+    guidanceOperatingProfitHigh:
+        (json['guidanceOperatingProfitHigh'] as num?)?.toInt() ?? 0,
+    consolidatedRevenue: (json['consolidatedRevenue'] as num?)?.toInt() ?? 0,
+    consolidatedOperatingProfit:
+        (json['consolidatedOperatingProfit'] as num?)?.toInt() ?? 0,
+    capex: (json['capex'] as num?)?.toInt() ?? 0,
+    payroll: (json['payroll'] as num?)?.toInt() ?? 0,
+    impairmentLoss: (json['impairmentLoss'] as num?)?.toInt() ?? 0,
+    distributableProfit: (json['distributableProfit'] as num?)?.toInt() ?? 0,
+  );
 }
 
 class MarketCorporateAction {
@@ -540,12 +605,9 @@ bool _financialSnapshotIsPublicAt(
   FictionalFinancialSnapshot snapshot,
   String asOfDateKey,
 ) {
-  final periodDate = DateTime.tryParse(snapshot.period);
   final asOfDate = DateTime.tryParse(asOfDateKey);
-  if (periodDate == null || asOfDate == null) return false;
-  final quarter = (periodDate.month - 1) ~/ 3 + 1;
-  final quarterEnd = DateTime(periodDate.year, quarter * 3 + 1, 0);
-  return quarterEnd.isBefore(asOfDate);
+  if (asOfDate == null) return false;
+  return !snapshot.publicationDate.isAfter(asOfDate);
 }
 
 class FictionalMarketAsset {
@@ -817,7 +879,7 @@ class FictionalMarketAsset {
     final key = _boundedDateKey(_dateKey(date));
     FictionalFinancialSnapshot? result;
     for (final snapshot in financials) {
-      if (snapshot.period.compareTo(key) > 0) break;
+      if (marketDateKey(snapshot.publicationDate).compareTo(key) > 0) break;
       result = snapshot;
     }
     return result;

@@ -1,5 +1,4 @@
 import 'game_state.dart';
-import 'horse_racing.dart';
 
 const weekendActionPointsPerDay = 2;
 const weekendActivityLogFlag = 'weekendActivityLog';
@@ -238,7 +237,6 @@ class WeekendActivityRequest {
     this.giftId,
     this.workScore,
     this.workMaxScore,
-    this.horseRaceResult,
   });
 
   final String activityId;
@@ -246,7 +244,6 @@ class WeekendActivityRequest {
   final String? giftId;
   final int? workScore;
   final int? workMaxScore;
-  final HorseRaceSessionResult? horseRaceResult;
 }
 
 class WeekendActivityLog {
@@ -362,11 +359,6 @@ int weekendActivityPointsRemaining(GameState state) =>
 
 bool weekendScheduleCompleteForState(GameState state) =>
     weekendActivityPointsRemaining(state) == 0;
-
-bool horseRaceAlreadyPlayedToday(GameState state) => weekendActivityLogsForDay(
-  state,
-  state.day,
-).any((log) => log.activityId == 'horse_racing');
 
 bool kBeautyGiftAlreadyGivenToday(GameState state) {
   if (state.relationships.memories.any(

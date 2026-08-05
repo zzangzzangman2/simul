@@ -54,10 +54,13 @@ class OfficeScreen extends StatelessWidget {
     this.onPrepayRealEstateMortgage,
     this.onRefinanceRealEstateMortgage,
     this.onPlayChanceGame,
+    this.onExchangeCasinoChips,
+    this.onCashOutCasinoChips,
     this.onPlayCasinoRound,
     this.onStartCasinoBlackjack,
     this.onCasinoBlackjackAction,
     this.onCasinoCrapsRoll,
+    this.onSettleHorseRace,
     this.onOpenTimeDeposit,
     this.onRedeemTimeDeposit,
     this.onTakeUnsecuredLoan,
@@ -186,11 +189,15 @@ class OfficeScreen extends StatelessWidget {
   })?
   onRefinanceRealEstateMortgage;
   final Future<FinanceActionResult> Function(int stake)? onPlayChanceGame;
+  final Future<CasinoActionResult> Function(int amount)? onExchangeCasinoChips;
+  final Future<CasinoActionResult> Function()? onCashOutCasinoChips;
   final Future<CasinoActionResult> Function(CasinoBet bet)? onPlayCasinoRound;
   final Future<CasinoActionResult> Function(int stake)? onStartCasinoBlackjack;
   final Future<CasinoActionResult> Function(BlackjackAction action)?
   onCasinoBlackjackAction;
   final Future<CasinoActionResult> Function()? onCasinoCrapsRoll;
+  final Future<HorseRaceActionResult> Function(HorseRaceSessionResult session)?
+  onSettleHorseRace;
   final BankOpenDepositCallback? onOpenTimeDeposit;
   final BankRedeemDepositCallback? onRedeemTimeDeposit;
   final BankTakeLoanCallback? onTakeUnsecuredLoan;
@@ -332,7 +339,6 @@ class OfficeScreen extends StatelessWidget {
 
   Future<void> _openCasino(BuildContext context) async {
     final currentState = _latestState;
-    final openedDay = currentState.day;
     CasinoActionResult unavailable() => CasinoActionResult(
       state: currentState,
       success: false,
@@ -342,6 +348,9 @@ class OfficeScreen extends StatelessWidget {
       _gameSceneRoute<void>(
         CasinoScreen(
           state: currentState,
+          onExchangeChips:
+              onExchangeCasinoChips ?? (amount) async => unavailable(),
+          onCashOutChips: onCashOutCasinoChips ?? () async => unavailable(),
           onPlayRound: onPlayCasinoRound ?? (bet) async => unavailable(),
           onStartBlackjack:
               onStartCasinoBlackjack ?? (stake) async => unavailable(),
@@ -351,20 +360,56 @@ class OfficeScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _openHorseRace(BuildContext context) async {
+    final currentState = _latestState;
+    final navigator = Navigator.of(context);
+    final session = await Navigator.of(context).push<HorseRaceSessionResult>(
+      _gameSceneRoute<HorseRaceSessionResult>(
+        HorseRacingMiniGame(
+          race: buildAfternoonHorseRace(
+            simulationSeed: currentState.simulationSeed,
+            day: currentState.day,
+          ),
+          availableCash: currentState.bankCash,
+          stateRecoveryRateBps: currentState.story.stateRecoveryRateBps,
+          onPowerOff: () {
+            navigator.pop();
+            if (navigator.canPop()) navigator.pop();
+          },
+        ),
+      ),
+    );
+    if (session == null || !context.mounted) return;
+    final settle = onSettleHorseRace;
+    final result = settle == null
+        ? HorseRaceActionResult(
+            state: currentState,
+            success: false,
+            message: '이 화면에서는 경마 결과를 저장할 수 없습니다.',
+          )
+        : await settle(session);
     if (!context.mounted) return;
-    final latest = _latestState;
-    final completeEvening = onCompleteWeekdayActivity;
-    if (completeEvening == null ||
-        latest.day != openedDay ||
-        weekdayEveningUsed(latest)) {
-      return;
-    }
-    final completed = await completeEvening('casino');
-    if (!completed.success && context.mounted) {
+    if (!result.success) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(completed.message)));
+      ).showSnackBar(SnackBar(content: Text(result.message)));
+      return;
     }
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('전자 마권 정산 완료'),
+        content: Text(result.message),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('20:00으로 돌아가기'),
+          ),
+        ],
+      ),
+    );
   }
 
   bool _weekdayFacilityAvailable(BuildContext context, String activityId) {
@@ -519,6 +564,10 @@ class OfficeScreen extends StatelessWidget {
               _openBusinessMarket(context, currentState: currentState),
           onOpenCasino: (currentState) async {
             await _openCasino(context);
+            return _latestState;
+          },
+          onOpenHorseRace: (currentState) async {
+            await _openHorseRace(context);
             return _latestState;
           },
         ),

@@ -121,6 +121,7 @@ class _PhoneMessengerScreenState extends State<PhoneMessengerScreen> {
 
   Future<void> _openThread(PhoneContactDefinition contact) async {
     if (_opening) return;
+    GameAudio.instance.playSfx(GameSfx.open);
     setState(() => _opening = true);
     final readResult = await widget.onMarkRead(contact.id);
     if (!mounted) return;
@@ -659,6 +660,7 @@ class _PhoneChatScreenState extends State<PhoneChatScreen> {
   Future<void> _openGiftShop() async {
     final sendGift = widget.onSendGift;
     if (_sending || sendGift == null) return;
+    GameAudio.instance.playSfx(GameSfx.coins);
     if (kBeautyGiftAlreadyGivenToday(_state)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('선물은 매장과 톡을 합쳐 하루에 한 번만 보낼 수 있어요.')),
@@ -693,6 +695,7 @@ class _PhoneChatScreenState extends State<PhoneChatScreen> {
 
   void _closeChat() {
     if (_allowPop) return;
+    GameAudio.instance.playSfx(GameSfx.back);
     setState(() => _allowPop = true);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) Navigator.of(context).pop(_state);

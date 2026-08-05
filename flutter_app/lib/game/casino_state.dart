@@ -3,6 +3,7 @@ import 'stable_hash.dart';
 const casinoUnlockDate = '2010-01-01';
 const casinoMinimumStake = 10000;
 const casinoMaximumStake = 100000;
+const casinoTestBankroll = 1000000;
 const casinoRoundMinutes = 30;
 const casinoDailyRoundLimit = 10;
 const casinoHistoryLimit = 80;
@@ -335,6 +336,7 @@ const _casinoUnset = Object();
 
 class CasinoState {
   const CasinoState({
+    required this.chipBalance,
     required this.monthKey,
     required this.monthBankrollBasis,
     required this.monthlyStake,
@@ -353,7 +355,8 @@ class CasinoState {
   });
 
   const CasinoState.initial()
-    : monthKey = '',
+    : chipBalance = 0,
+      monthKey = '',
       monthBankrollBasis = 0,
       monthlyStake = 0,
       monthlyPayout = 0,
@@ -369,6 +372,8 @@ class CasinoState {
       activeBlackjack = null,
       activeCraps = null;
 
+  /// 현금과 분리해 보관하는 카지노 전용 칩 잔액이다.
+  final int chipBalance;
   final String monthKey;
   final int monthBankrollBasis;
   final int monthlyStake;
@@ -403,6 +408,7 @@ class CasinoState {
   }
 
   CasinoState copyWith({
+    int? chipBalance,
     String? monthKey,
     int? monthBankrollBasis,
     int? monthlyStake,
@@ -419,6 +425,7 @@ class CasinoState {
     Object? activeBlackjack = _casinoUnset,
     Object? activeCraps = _casinoUnset,
   }) => CasinoState(
+    chipBalance: chipBalance ?? this.chipBalance,
     monthKey: monthKey ?? this.monthKey,
     monthBankrollBasis: monthBankrollBasis ?? this.monthBankrollBasis,
     monthlyStake: monthlyStake ?? this.monthlyStake,
@@ -441,6 +448,7 @@ class CasinoState {
   );
 
   Map<String, dynamic> toJson() => <String, dynamic>{
+    'chipBalance': chipBalance,
     'monthKey': monthKey,
     'monthBankrollBasis': monthBankrollBasis,
     'monthlyStake': monthlyStake,
@@ -476,6 +484,9 @@ class CasinoState {
         ? CrapsRoundState.fromJson(rawCraps.cast<String, dynamic>())
         : null;
     return CasinoState(
+      chipBalance: ((json['chipBalance'] as num?)?.toInt() ?? 0)
+          .clamp(0, 1 << 62)
+          .toInt(),
       monthKey: json['monthKey'] as String? ?? '',
       monthBankrollBasis: (json['monthBankrollBasis'] as num?)?.toInt() ?? 0,
       monthlyStake: (json['monthlyStake'] as num?)?.toInt() ?? 0,

@@ -1,19 +1,28 @@
+import 'dart:math' as math;
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:millennium_capital/game/game_engine.dart';
 import 'package:millennium_capital/game/game_state.dart';
 import 'package:millennium_capital/game/horse_racing.dart';
-import 'package:millennium_capital/game/weekend_activity.dart';
+import 'package:millennium_capital/game/market_clock.dart';
+import 'package:millennium_capital/game/weekday_activity.dart';
 
 void main() {
   const engine = GameEngine();
 
-  GameState weekendState(String seed) {
+  GameState weekdayState(String seed) {
     final base = engine.createNewGame('경마 테스트', worldSeed: seed);
     var day = base.day;
-    while (base.dateForDay(day).weekday != DateTime.saturday) {
+    while (base.dateForDay(day).isBefore(DateTime(2010, 1, 1)) ||
+        base.dateForDay(day).weekday >= DateTime.saturday) {
       day += 1;
     }
-    return base.copyWith(day: day, cash: base.cash + 10000);
+    return base.copyWith(
+      day: day,
+      cash: base.cash + 10000,
+      marketMinute: krxCloseMinute,
+      decisions: const [],
+    );
   }
 
   test('afternoon race card and finish order are deterministic', () {
@@ -34,13 +43,181 @@ void main() {
       first.entrants.map((horse) => horse.spriteAsset).toSet(),
       hasLength(8),
     );
+
+    final records = first.finishOrder
+        .map(first.entrantById)
+        .map(
+          (entrant) =>
+              horseRaceFinishTimeSeconds(race: first, entrant: entrant),
+        )
+        .toList(growable: false);
+    expect(records.first, inInclusiveRange(70.0, 74.0));
+    for (var index = 1; index < records.length; index++) {
+      expect(records[index], greaterThan(records[index - 1]));
+    }
+    expect(horseRaceRecordLabel(records.first), matches(r'^1:\d{2}\.\d{2}$'));
+    final finishMoments = first.finishOrder
+        .map(first.entrantById)
+        .map(
+          (entrant) =>
+              horseRaceBroadcastFinishAt(race: first, entrant: entrant),
+        )
+        .toList(growable: false);
+    for (var index = 1; index < finishMoments.length; index++) {
+      expect(finishMoments[index], greaterThan(finishMoments[index - 1]));
+    }
     expect(
-      first.entrants
-          .map((horse) => horseRaceCurveGallopAssetFor(horse.spriteAsset))
-          .toSet(),
-      hasLength(8),
+      records,
+      second.finishOrder
+          .map(second.entrantById)
+          .map(
+            (entrant) =>
+                horseRaceFinishTimeSeconds(race: second, entrant: entrant),
+          )
+          .toList(growable: false),
     );
-    expect(horseRaceCurveGallopAssets.toSet(), hasLength(8));
+  });
+
+  test('straight broadcast reveals early, middle, and late moves', () {
+    final races = <HorseRaceCard>[
+      for (var day = 1; day <= 20; day++)
+        buildAfternoonHorseRace(simulationSeed: 'broadcast-pace', day: day),
+    ];
+    final styleRace = races.firstWhere(
+      (race) =>
+          race.entrants.any((entrant) => entrant.runningStyle == '선행') &&
+          race.entrants.any((entrant) => entrant.runningStyle == '선입') &&
+          race.entrants.any((entrant) => entrant.runningStyle == '추입'),
+    );
+    final frontRunner = styleRace.entrants.firstWhere(
+      (entrant) => entrant.runningStyle == '선행',
+    );
+    final stalker = styleRace.entrants.firstWhere(
+      (entrant) => entrant.runningStyle == '선입',
+    );
+    final closer = styleRace.entrants.firstWhere(
+      (entrant) => entrant.runningStyle == '추입',
+    );
+
+    double progress(HorseRaceEntrant entrant, double time) =>
+        horseRaceBroadcastProgress(
+          race: styleRace,
+          entrant: entrant,
+          time: time,
+        );
+
+    expect(progress(frontRunner, 0.18), greaterThan(progress(closer, 0.18)));
+    expect(
+      progress(stalker, 0.52) - progress(stalker, 0.30),
+      greaterThan(progress(stalker, 0.30) - progress(stalker, 0.08)),
+    );
+    expect(
+      progress(closer, 0.92) - progress(closer, 0.70),
+      greaterThan(progress(closer, 0.30) - progress(closer, 0.08)),
+    );
+
+    for (final entrant in styleRace.entrants) {
+      var previous = 0.0;
+      for (var step = 0; step <= 100; step++) {
+        final current = progress(entrant, step / 100);
+        expect(current, greaterThanOrEqualTo(previous));
+        previous = current;
+      }
+      expect(progress(entrant, 1), 1);
+
+      final finishRank = styleRace.finishOrder.indexOf(entrant.id);
+      expect(finishRank, greaterThanOrEqualTo(0));
+      final finishAt = horseRaceBroadcastFinishAt(
+        race: styleRace,
+        entrant: entrant,
+      );
+      final approachSpeed =
+          progress(entrant, finishAt * 0.84) -
+          progress(entrant, finishAt * 0.82);
+      final finishSpeed =
+          progress(entrant, finishAt * 0.90) -
+          progress(entrant, finishAt * 0.88);
+      expect(
+        finishSpeed,
+        greaterThan(approachSpeed * 0.70),
+        reason: '${entrant.name} should not visibly halve speed near the line',
+      );
+    }
+
+    final winner = styleRace.entrantById(styleRace.finishOrder.first);
+    final runnerUp = styleRace.entrantById(styleRace.finishOrder[1]);
+    final betweenFirstAndSecond =
+        (horseRaceBroadcastFinishAt(race: styleRace, entrant: winner) +
+            horseRaceBroadcastFinishAt(race: styleRace, entrant: runnerUp)) /
+        2;
+    expect(progress(winner, betweenFirstAndSecond), 1);
+    expect(
+      styleRace.finishOrder
+          .skip(1)
+          .map(styleRace.entrantById)
+          .every((entrant) => progress(entrant, betweenFirstAndSecond) < 1),
+      isTrue,
+    );
+
+    final previewRace = buildAfternoonHorseRace(
+      simulationSeed: 'horse-race-preview-v1',
+      day: 8,
+    );
+    final leaders = <String>{
+      for (final time in <double>[0.10, 0.24, 0.40, 0.56, 0.72, 0.86, 0.94])
+        ([...previewRace.entrants]..sort(
+              (left, right) =>
+                  horseRaceBroadcastProgress(
+                    race: previewRace,
+                    entrant: right,
+                    time: time,
+                  ).compareTo(
+                    horseRaceBroadcastProgress(
+                      race: previewRace,
+                      entrant: left,
+                      time: time,
+                    ),
+                  ),
+            ))
+            .first
+            .id,
+    };
+    expect(leaders.length, greaterThan(1));
+    expect(leaders, contains(previewRace.finishOrder.first));
+  });
+
+  test('official margins include close photos and visibly spread fields', () {
+    var narrowestGap = double.infinity;
+    var widestGap = 0.0;
+    var widestField = 0.0;
+    for (var day = 1; day <= 40; day++) {
+      final race = buildAfternoonHorseRace(
+        simulationSeed: 'realistic-finish-margins',
+        day: day,
+      );
+      final records = race.finishOrder
+          .map(race.entrantById)
+          .map(
+            (entrant) =>
+                horseRaceFinishTimeSeconds(race: race, entrant: entrant),
+          )
+          .toList(growable: false);
+      widestField = math.max(widestField, records.last - records.first);
+      for (var index = 1; index < records.length; index++) {
+        final gap = records[index] - records[index - 1];
+        narrowestGap = math.min(narrowestGap, gap);
+        widestGap = math.max(widestGap, gap);
+      }
+    }
+
+    expect(narrowestGap, lessThanOrEqualTo(0.13));
+    expect(widestGap, greaterThanOrEqualTo(0.88));
+    expect(widestField, greaterThan(2.0));
+    expect(horseRaceMarginLabel(0.05), '코');
+    expect(horseRaceMarginLabel(0.09), '머리');
+    expect(horseRaceMarginLabel(0.13), '목');
+    expect(horseRaceMarginLabel(0.34), '2');
+    expect(horseRaceMarginLabel(1.80), '대차');
   });
 
   test(
@@ -207,7 +384,7 @@ void main() {
   test(
     'engine settles one validated afternoon race and records its ledger',
     () {
-      final state = weekendState('engine-horse-race');
+      final state = weekdayState('engine-horse-race');
       final race = buildAfternoonHorseRace(
         simulationSeed: state.simulationSeed,
         day: state.day,
@@ -219,20 +396,15 @@ void main() {
         primaryHorseId: winner,
         stake: 1000,
       );
-      final settled = engine.completeWeekendActivity(
-        state,
-        WeekendActivityRequest(
-          activityId: 'horse_racing',
-          horseRaceResult: HorseRaceSessionResult(
-            raceId: race.id,
-            betType: HorseBetType.win,
-            primaryHorseId: winner,
-            stake: 1000,
-            grossPayout: payout,
-            finishOrder: race.finishOrder,
-          ),
-        ),
+      final ticket = HorseRaceSessionResult(
+        raceId: race.id,
+        betType: HorseBetType.win,
+        primaryHorseId: winner,
+        stake: 1000,
+        grossPayout: payout,
+        finishOrder: race.finishOrder,
       );
+      final settled = engine.completeHorseRace(state, ticket);
 
       final stateFee = horseRaceStateProfitFee(
         stake: 1000,
@@ -243,10 +415,12 @@ void main() {
       expect(settled.success, isTrue);
       expect(settled.cashDelta, payout - 1000 - stateFee);
       expect(settled.state.cash, state.cash + payout - 1000 - stateFee);
-      expect(horseRaceAlreadyPlayedToday(settled.state), isTrue);
+      expect(settled.state.marketMinute, marketDayEndMinute);
+      expect(horseRaceBetsToday(settled.state), horseRaceDailyBetLimit);
+      expect(horseRaceDailyLimitReached(settled.state), isTrue);
       expect(
-        weekendActivityLogsForDay(settled.state, state.day).single.kind,
-        WeekendActivityKind.entertainment,
+        weekdayActivityLogsForDay(settled.state, state.day).single.activityId,
+        'horse_racing',
       );
       expect(
         settled.state.ledger.where((entry) => entry.id.contains('horse-race')),
@@ -261,45 +435,58 @@ void main() {
         -stateFee,
       );
 
-      final repeated = engine.completeWeekendActivity(
-        settled.state,
-        WeekendActivityRequest(
-          activityId: 'horse_racing',
-          horseRaceResult: HorseRaceSessionResult(
-            raceId: race.id,
-            betType: HorseBetType.win,
-            primaryHorseId: winner,
-            stake: 1000,
-            grossPayout: payout,
-            finishOrder: race.finishOrder,
-          ),
-        ),
-      );
+      final repeated = engine.completeHorseRace(settled.state, ticket);
       expect(repeated.success, isFalse);
+      expect(repeated.message, contains('한도 1회'));
     },
   );
 
   test('engine rejects a forged payout', () {
-    final state = weekendState('forged-horse-race');
+    final state = weekdayState('forged-horse-race');
     final race = buildAfternoonHorseRace(
       simulationSeed: state.simulationSeed,
       day: state.day,
     );
-    final result = engine.completeWeekendActivity(
+    final result = engine.completeHorseRace(
       state,
-      WeekendActivityRequest(
-        activityId: 'horse_racing',
-        horseRaceResult: HorseRaceSessionResult(
-          raceId: race.id,
-          betType: HorseBetType.win,
-          primaryHorseId: race.finishOrder.first,
-          stake: 1000,
-          grossPayout: 999999,
-          finishOrder: race.finishOrder,
-        ),
+      HorseRaceSessionResult(
+        raceId: race.id,
+        betType: HorseBetType.win,
+        primaryHorseId: race.finishOrder.first,
+        stake: 1000,
+        grossPayout: 999999,
+        finishOrder: race.finishOrder,
       ),
     );
     expect(result.success, isFalse);
     expect(result.state.cash, state.cash);
+  });
+
+  test('casino and horse racing are mutually exclusive weekday actions', () {
+    final state = weekdayState('horse-race-exclusive');
+    final casino = engine.completeWeekdayActivity(state, 'casino');
+    expect(casino.success, isTrue);
+
+    final race = buildAfternoonHorseRace(
+      simulationSeed: state.simulationSeed,
+      day: state.day,
+    );
+    final blocked = engine.completeHorseRace(
+      casino.state,
+      HorseRaceSessionResult(
+        raceId: race.id,
+        betType: HorseBetType.win,
+        primaryHorseId: race.finishOrder.first,
+        stake: 1000,
+        grossPayout: calculateHorseRacePayout(
+          race: race,
+          betType: HorseBetType.win,
+          primaryHorseId: race.finishOrder.first,
+          stake: 1000,
+        ),
+        finishOrder: race.finishOrder,
+      ),
+    );
+    expect(blocked.success, isFalse);
   });
 }

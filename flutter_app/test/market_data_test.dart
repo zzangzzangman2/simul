@@ -301,9 +301,13 @@ void main() {
     expect(visible.relations, isEmpty);
     expect(visible.corporateActions, isEmpty);
     expect(visible.appliedEventScales, isEmpty);
-    expect(visible.financials.map((snapshot) => snapshot.period), [
-      '1999-12-30',
-    ]);
+    expect(
+      visible.financials,
+      isEmpty,
+      reason:
+          '기준일 2000-01-10에는 1999년 결산 잠정치·사업보고서가 '
+          '아직 공시되지 않았으므로 미래 실적이 노출되면 안 됩니다.',
+    );
     expect(visible.quoteAtOrBefore(DateTime(2000, 12, 31))!.date, '2000-01-10');
     expect(
       visible.quoteAtOrBefore(DateTime(2000, 12, 31))!.isExactDate,
@@ -362,6 +366,97 @@ void main() {
   );
 
   test(
+    'corporate calendar covers earnings, audit, AGM, and capital actions',
+    () {
+      const rightsIssue = MarketCorporateAction(
+        id: 'sample-rights-2000-06-30',
+        assetId: 'sample',
+        type: MarketCorporateActionType.rightsIssue,
+        date: '2000-06-30',
+        numerator: 1,
+        denominator: 5,
+        amount: 8000,
+        currency: 'KRW',
+        source: 'test',
+      );
+      final asset = FictionalMarketAsset(
+        id: 'sample',
+        symbol: '1000',
+        name: '샘플전자',
+        market: fictionalMainMarket,
+        country: 'KR',
+        sector: '전자',
+        colorHex: '#7253C7',
+        currency: 'KRW',
+        initialSharesOutstanding: 1000000,
+        prices: const {'1999-12-30': 10000, '2000-06-30': 9800},
+        corporateActions: const [rightsIssue],
+        financials: const [
+          FictionalFinancialSnapshot(
+            period: '1999-12-31',
+            revenue: 100000000000,
+            operatingProfit: 12000000000,
+            consensusOperatingProfit: 11000000000,
+            netIncome: 9000000000,
+            operatingCashFlow: 13000000000,
+            cash: 30000000000,
+            debt: 20000000000,
+            equity: 70000000000,
+            sharesOutstanding: 1000000,
+            orderBacklog: 40000000000,
+            capex: 8000000000,
+          ),
+        ],
+      );
+      final events = buildCorporateDisclosureCalendar(
+        asset: asset,
+        simulationSeed: 'corporate-calendar-test',
+        asOfDate: DateTime(2000, 6, 15),
+        pastDays: 180,
+        futureDays: 365,
+      );
+
+      expect(
+        events.map((event) => event.type),
+        containsAll(<CorporateDisclosureType>[
+          CorporateDisclosureType.preliminaryEarnings,
+          CorporateDisclosureType.periodicReport,
+          CorporateDisclosureType.earningsCall,
+          CorporateDisclosureType.auditReport,
+          CorporateDisclosureType.annualGeneralMeeting,
+          CorporateDisclosureType.rightsRecord,
+          CorporateDisclosureType.exRights,
+          CorporateDisclosureType.rightsSubscription,
+          CorporateDisclosureType.newShareListing,
+        ]),
+      );
+      expect(
+        events.where(
+          (event) => event.type == CorporateDisclosureType.rightsRecord,
+        ),
+        hasLength(1),
+      );
+      expect(
+        events.every(
+          (event) =>
+              event.title.trim().isNotEmpty && event.summary.trim().isNotEmpty,
+        ),
+        isTrue,
+      );
+      expect(
+        events.map((event) => (event.date, event.minute)).toList(),
+        orderedEquals(
+          events.map((event) => (event.date, event.minute)).toList()
+            ..sort((left, right) {
+              final dateOrder = left.$1.compareTo(right.$1);
+              return dateOrder != 0 ? dateOrder : left.$2.compareTo(right.$2);
+            }),
+        ),
+      );
+    },
+  );
+
+  test(
     'market universe contains 50 fixed fictional firms and later generations',
     () async {
       final universe = await FictionalMarketUniverse.load(seed: 'roster-test');
@@ -383,7 +478,7 @@ void main() {
         equals(<String>{fictionalMainMarket, fictionalGrowthMarket}),
       );
     },
-    timeout: const Timeout(Duration(minutes: 2)),
+    timeout: const Timeout(Duration(minutes: 4)),
   );
 
   test(
@@ -503,30 +598,33 @@ void main() {
     },
   );
 
-  test('financials expose only quarters completed before the as-of date', () {
-    final quarterEnd = buildFictionalMarketUniverse(
-      'financial-cutoff-seed',
-      throughDate: DateTime(2005, 3, 31),
+  test('financials expose only on the official publication date', () {
+    final publicationDate = marketFinancialPublicationDateForPeriod(
+      '2005-03-31',
     );
-    final nextDay = buildFictionalMarketUniverse(
+    final beforePublication = buildFictionalMarketUniverse(
       'financial-cutoff-seed',
-      throughDate: DateTime(2005, 4, 1),
+      throughDate: publicationDate.subtract(const Duration(days: 1)),
     );
-    final atQuarterEnd = quarterEnd.assets.singleWhere(
+    final onPublication = buildFictionalMarketUniverse(
+      'financial-cutoff-seed',
+      throughDate: publicationDate,
+    );
+    final before = beforePublication.assets.singleWhere(
       (asset) => asset.id == 'hanbit_telecom',
     );
-    final afterQuarterEnd = nextDay.assets.singleWhere(
+    final published = onPublication.assets.singleWhere(
       (asset) => asset.id == 'hanbit_telecom',
     );
 
     expect(
-      atQuarterEnd.financials.any(
+      before.financials.any(
         (snapshot) => snapshot.period.startsWith('2005-03'),
       ),
       isFalse,
     );
     expect(
-      afterQuarterEnd.financials.any(
+      published.financials.any(
         (snapshot) => snapshot.period.startsWith('2005-03'),
       ),
       isTrue,

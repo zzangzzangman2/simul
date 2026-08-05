@@ -55,14 +55,7 @@ void main() {
     expect(find.byKey(const Key('weekend-action-gift')), findsOneWidget);
     expect(find.byKey(const Key('weekend-action-study')), findsOneWidget);
     expect(find.byKey(const Key('weekend-action-rest')), findsOneWidget);
-    expect(
-      find.byKey(const Key('weekend-action-afternoon-fun')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const Key('weekend-action-horse-racing')),
-      findsOneWidget,
-    );
+    expect(find.byKey(const Key('weekend-action-horse-racing')), findsNothing);
     expect(find.text('행동력 2칸 남음'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });

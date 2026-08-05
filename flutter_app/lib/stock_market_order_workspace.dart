@@ -11,6 +11,7 @@ class _InlineOrderWorkspace extends StatelessWidget {
     required this.marketSnapshotReader,
     required this.sweepPacketsReader,
     required this.onSweepPacketsAccepted,
+    required this.tapeCursor,
     required this.playerTrade,
     required this.availableHeight,
     required this.section,
@@ -39,6 +40,7 @@ class _InlineOrderWorkspace extends StatelessWidget {
   final ValueGetter<GameOrderBookSnapshot> marketSnapshotReader;
   final ValueGetter<List<_OrderBookSweepReplayPacket>> sweepPacketsReader;
   final ValueChanged<Iterable<String>> onSweepPacketsAccepted;
+  final ValueNotifier<_OrderBookSweepTapeCursor?> tapeCursor;
   final _PlayerTradeSignal? playerTrade;
   final double availableHeight;
   final _DetailedOrderSection section;
@@ -181,6 +183,7 @@ class _InlineOrderWorkspace extends StatelessWidget {
                     snapshot: snapshot,
                     sweepPackets: sweepPacketsReader(),
                     onSweepPacketsAccepted: onSweepPacketsAccepted,
+                    tapeCursor: tapeCursor,
                     playerTrade: playerTrade,
                     selectedPrice: isOrderForm ? selectedLimitPrice : null,
                     onSelectPrice: onSelectPrice,
@@ -253,22 +256,22 @@ class _InlineOrderSlidingBodyState extends State<_InlineOrderSlidingBody>
             key: const Key('inline-order-slide-transition'),
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              Expanded(child: widget.orderBookRail),
+              SizedBox(
+                width: progress,
+                child: const ColoredBox(color: Color(0x1F000000)),
+              ),
               SizedBox(
                 width: visiblePanelWidth,
                 child: ClipRect(
                   child: OverflowBox(
                     minWidth: panelWidth,
                     maxWidth: panelWidth,
-                    alignment: Alignment.centerRight,
+                    alignment: Alignment.centerLeft,
                     child: widget.orderPanel,
                   ),
                 ),
               ),
-              SizedBox(
-                width: progress,
-                child: const ColoredBox(color: Color(0x1F000000)),
-              ),
-              Expanded(child: widget.orderBookRail),
             ],
           );
         },
@@ -696,7 +699,6 @@ List<_OrderBookTapePrint> _orderBookTradeTapeAtCursor(
   _OrderBookSweepTapeCursor? cursor,
 ) {
   if (cursor == null) return latest;
-  if (!cursor.arrived) return const <_OrderBookTapePrint>[];
   final step = cursor.step;
   final side = step.side == GameOrderBookSide.ask
       ? TradeSide.buy
@@ -717,6 +719,30 @@ List<_OrderBookTapePrint> _orderBookTradeTapeAtCursor(
             print.quantity == step.consumedQuantity,
       )
       .firstOrNull;
+  final matchingIndex = matching == null
+      ? -1
+      : latest.indexWhere((print) => print.identity == matching.identity);
+  bool precedesActiveStep(_OrderBookTapePrint print) {
+    if (print.marketMinute != step.marketMinute) {
+      return print.marketMinute < step.marketMinute;
+    }
+    if (print.microstructureFrame != step.liquidityPulse) {
+      return print.microstructureFrame < step.liquidityPulse;
+    }
+    return print.sequence < step.sequence;
+  }
+
+  // Prints are stored newest-first. Their position is the canonical replay
+  // order even when a pulse sequence restarts inside the same market minute.
+  // Hide entries queued ahead of the active step, while retaining everything
+  // already completed after it. Numeric comparison remains a fallback only
+  // for a synthesized cursor whose print has not been captured yet.
+  final history = matchingIndex >= 0
+      ? latest.skip(matchingIndex + 1).toList(growable: false)
+      : latest.where(precedesActiveStep).toList(growable: false);
+  // Packet capture happens before its ladder animation. Keep already completed
+  // prints visible during arrival, but do not expose the pending print early.
+  if (!cursor.arrived) return history;
   final active =
       matching ??
       _OrderBookTapePrint(
@@ -733,9 +759,12 @@ List<_OrderBookTapePrint> _orderBookTradeTapeAtCursor(
         executionIdentity: cursor.identity,
       );
   // The canonical market can already be several packets ahead at 3x/10x.
-  // Expose only the packet currently receiving its border so a future print
-  // never appears before its own arrival -> drain playback.
-  return <_OrderBookTapePrint>[active];
+  // Put only the currently arrived print in front, followed by completed
+  // history. Future packet prints remain hidden until their own drain phase.
+  return <_OrderBookTapePrint>[
+    active,
+    ...history.where((print) => print.identity != active.identity),
+  ];
 }
 
 String _orderBookSweepReplayIdentity(
@@ -805,6 +834,30 @@ mixin _OrderBookSweepPlayback<T extends StatefulWidget> on State<T> {
   bool get _activeOrderBookSweepStepArrived =>
       _orderBookSweepPhase == _OrderBookSweepPhase.draining;
 
+  ({double? price, GameOrderBookSide? side})
+  get _orderBookSweepPresentationReference {
+    final batch = _activeOrderBookSweepBatch;
+    final active = _activeOrderBookSweepStep;
+    if (batch == null || active == null) return (price: null, side: null);
+    if (_activeOrderBookSweepStepArrived) {
+      return (price: active.price, side: active.side);
+    }
+    if (_orderBookSweepIndex > 0 &&
+        _orderBookSweepIndex <= batch.steps.length - 1) {
+      final previousStep = batch.steps[_orderBookSweepIndex - 1];
+      return (price: previousStep.price, side: previousStep.side);
+    }
+    final previousPrice = batch.previousSnapshot.sourceLastTradePrice;
+    final previousTrade = batch.previousSnapshot.lastSyntheticTrade;
+    final previousSide =
+        previousTrade != null &&
+            previousPrice != null &&
+            (previousTrade.price - previousPrice).abs() < 0.000001
+        ? previousTrade.levelSide
+        : null;
+    return (price: previousPrice, side: previousSide);
+  }
+
   Duration _scaledOrderBookSweepDuration(Duration duration) {
     final microseconds = math
         .max(
@@ -834,8 +887,8 @@ mixin _OrderBookSweepPlayback<T extends StatefulWidget> on State<T> {
     _orderBookPausedPresentationSnapshot = _orderBookSweepPlaybackPaused
         ? initialSnapshot
         : null;
-    if (playbackSpeed.minutesPerSecond > 0) {
-      _orderBookSweepPlaybackRate = playbackSpeed.minutesPerSecond;
+    if (playbackSpeed.orderBookAnimationRate > 0) {
+      _orderBookSweepPlaybackRate = playbackSpeed.orderBookAnimationRate;
     }
   }
 
@@ -844,8 +897,8 @@ mixin _OrderBookSweepPlayback<T extends StatefulWidget> on State<T> {
     GameOrderBookSnapshot currentSnapshot,
   ) {
     final paused = playbackSpeed == _MarketPlaybackSpeed.paused;
-    final rate = playbackSpeed.minutesPerSecond > 0
-        ? playbackSpeed.minutesPerSecond
+    final rate = playbackSpeed.orderBookAnimationRate > 0
+        ? playbackSpeed.orderBookAnimationRate
         : _orderBookSweepPlaybackRate;
     if (_orderBookSweepPlaybackPaused == paused &&
         _orderBookSweepPlaybackRate == rate) {
@@ -902,11 +955,6 @@ mixin _OrderBookSweepPlayback<T extends StatefulWidget> on State<T> {
       _scheduleOrderBookSweepArrival();
     }
   }
-
-  int get _activeOrderBookSweepStepNumber => _orderBookSweepIndex + 1;
-
-  int get _activeOrderBookSweepStepCount =>
-      _activeOrderBookSweepBatch?.steps.length ?? 0;
 
   GameOrderBookSnapshot _orderBookSweepPresentationSnapshot(
     GameOrderBookSnapshot latest,
@@ -1074,19 +1122,23 @@ mixin _OrderBookSweepPlayback<T extends StatefulWidget> on State<T> {
   }
 
   void _scheduleOrderBookSweepArrival() {
-    _scheduleOrderBookSweepTimerAfterFrame(_orderBookSweepMotionDuration, () {
-      final step = _activeOrderBookSweepStep;
-      setState(() {
-        _orderBookSweepPhase = _OrderBookSweepPhase.draining;
-        _activeOrderBookSweepBatch?.progress.arrived = true;
-      });
-      onOrderBookSweepPlaybackChanged();
-      if (step != null && step.remainingQuantity <= 0) {
-        _advanceOrderBookSweepAfterCurrentStep(skipFinalHold: true);
-        return;
-      }
-      _scheduleOrderBookSweepDrain();
-    });
+    // Keep the arrival interval as visible replay pacing, but retain the prior
+    // published price throughout it. At the boundary, price axis, border,
+    // header, tape, label, and flash all advance in the same rendered frame.
+    _scheduleOrderBookSweepTimerAfterFrame(
+      _orderBookSweepMotionDuration + _orderBookSweepArrivalSettleMargin,
+      () {
+        setState(() {
+          _orderBookSweepPhase = _OrderBookSweepPhase.draining;
+          _activeOrderBookSweepBatch?.progress.arrived = true;
+        });
+        onOrderBookSweepPlaybackChanged();
+        // A fully consumed level still has to survive a rendered `arrived` frame.
+        // The ladder row, detail header, and recent-trade tape all read this same
+        // cursor; advancing here would make the latter two skip the execution.
+        _scheduleOrderBookSweepDrain();
+      },
+    );
   }
 
   void _completeActiveOrderBookSweep() {
@@ -1111,7 +1163,7 @@ mixin _OrderBookSweepPlayback<T extends StatefulWidget> on State<T> {
     }
   }
 
-  void _advanceOrderBookSweepAfterCurrentStep({bool skipFinalHold = false}) {
+  void _advanceOrderBookSweepAfterCurrentStep() {
     final batch = _activeOrderBookSweepBatch;
     if (batch == null) return;
     final nextIndex = _orderBookSweepIndex + 1;
@@ -1125,10 +1177,6 @@ mixin _OrderBookSweepPlayback<T extends StatefulWidget> on State<T> {
       });
       onOrderBookSweepPlaybackChanged();
       _scheduleOrderBookSweepArrival();
-      return;
-    }
-    if (skipFinalHold) {
-      _completeActiveOrderBookSweep();
       return;
     }
     setState(() => _orderBookSweepAwaitingCompletion = true);
@@ -1167,16 +1215,12 @@ class _OrderBookSweepRowOverlay extends StatelessWidget {
   const _OrderBookSweepRowOverlay({
     required this.step,
     required this.stepDuration,
-    required this.stepNumber,
-    required this.stepCount,
     required this.maxDepth,
     this.compact = false,
   });
 
   final GameOrderBookSweepStep step;
   final Duration stepDuration;
-  final int stepNumber;
-  final int stepCount;
   final int maxDepth;
   final bool compact;
 
@@ -1188,30 +1232,8 @@ class _OrderBookSweepRowOverlay extends StatelessWidget {
       step: step,
       maxDepth: maxDepth,
     );
-    final queueLabel = isAskQueue ? '매도잔량' : '매수잔량';
     final aggressorLabel = isAskQueue ? '매수 체결' : '매도 체결';
-    final quantityLabel = step.remainingQuantity <= 0
-        ? '$queueLabel ${_money(step.consumedQuantity)}주 소진'
-        : '$queueLabel ${_money(step.consumedQuantity)}주 체결 · '
-              '잔 ${_money(step.remainingQuantity)}주';
-    final eventLabel = step.structuralBreach
-        ? '$quantityLabel · 구조 경계 돌파'
-        : step.boundaryCrossed
-        ? '$quantityLabel · 경계 통과'
-        : quantityLabel;
-
     final priceLabel = '${_money(step.price.round())}원';
-    final actionLabel = isAskQueue ? '매수' : '매도';
-    final fillLabel = step.remainingQuantity <= 0 ? '소진' : '체결';
-    final boundaryLabel = step.structuralBreach
-        ? '구조돌파'
-        : step.boundaryCrossed
-        ? '통과'
-        : '';
-    final statusLabel =
-        '$actionLabel ${_money(step.consumedQuantity)}주 $fillLabel'
-        '${boundaryLabel.isEmpty ? '' : '·$boundaryLabel'} '
-        '$stepNumber/$stepCount';
 
     Widget drainBar(Alignment alignment) => TweenAnimationBuilder<double>(
       key: ValueKey((
@@ -1239,33 +1261,13 @@ class _OrderBookSweepRowOverlay extends StatelessWidget {
       ),
     );
 
-    Widget statusCell() => Container(
-      key: const Key('order-book-sweep-status-cell'),
-      alignment: Alignment.center,
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFE9EDF2))),
-      ),
-      child: FittedBox(
-        fit: BoxFit.scaleDown,
-        child: Text(
-          statusLabel,
-          maxLines: 1,
-          style: TextStyle(
-            color: color,
-            fontSize: 9,
-            fontWeight: FontWeight.w900,
-            fontFeatures: _marketNumberFeatures,
-          ),
-        ),
-      ),
-    );
+    Widget blankExecutionCell() =>
+        const SizedBox.expand(key: Key('order-book-sweep-status-cell'));
 
     return Semantics(
       label:
           '$aggressorLabel ${_money(step.consumedQuantity)}주, '
-          '$priceLabel, $eventLabel, $stepNumber/$stepCount',
+          '$priceLabel',
       child: IgnorePointer(
         child: ClipRect(
           child: Container(
@@ -1290,13 +1292,13 @@ class _OrderBookSweepRowOverlay extends StatelessWidget {
                           width: 124,
                           child: isAskQueue
                               ? drainBar(Alignment.centerRight)
-                              : statusCell(),
+                              : blankExecutionCell(),
                         ),
                         const Expanded(child: SizedBox.shrink()),
                         SizedBox(
                           width: 124,
                           child: isAskQueue
-                              ? statusCell()
+                              ? blankExecutionCell()
                               : drainBar(Alignment.centerLeft),
                         ),
                       ],
@@ -1319,6 +1321,7 @@ class _CompactOrderBookRail extends StatefulWidget {
     required this.snapshot,
     required this.sweepPackets,
     required this.onSweepPacketsAccepted,
+    required this.tapeCursor,
     required this.playerTrade,
     required this.selectedPrice,
     required this.onSelectPrice,
@@ -1332,6 +1335,7 @@ class _CompactOrderBookRail extends StatefulWidget {
   final GameOrderBookSnapshot snapshot;
   final List<_OrderBookSweepReplayPacket> sweepPackets;
   final ValueChanged<Iterable<String>> onSweepPacketsAccepted;
+  final ValueNotifier<_OrderBookSweepTapeCursor?> tapeCursor;
   final _PlayerTradeSignal? playerTrade;
   final double? selectedPrice;
   final ValueChanged<double> onSelectPrice;
@@ -1344,6 +1348,7 @@ class _CompactOrderBookRailState extends State<_CompactOrderBookRail>
     with _OrderBookSweepPlayback<_CompactOrderBookRail> {
   String? _depthScaleAssetId;
   double _depthScale = 0;
+  int _tapeCursorPublishGeneration = 0;
 
   void _syncCurrentOrderBookSweep() {
     for (final packet in widget.sweepPackets) {
@@ -1369,6 +1374,30 @@ class _CompactOrderBookRailState extends State<_CompactOrderBookRail>
   @override
   void onOrderBookSweepBatchCompleted(String identity) {
     widget.onSweepPacketsAccepted(<String>[identity]);
+  }
+
+  @override
+  void onOrderBookSweepPlaybackChanged({bool deferUntilAfterFrame = false}) {
+    final generation = ++_tapeCursorPublishGeneration;
+    final batch = _activeOrderBookSweepBatch;
+    final step = _activeOrderBookSweepStep;
+    final cursor = batch == null || step == null
+        ? null
+        : _OrderBookSweepTapeCursor(
+            snapshot: batch.snapshot,
+            step: step,
+            source: batch.source,
+            identity: batch.identity,
+            arrived: _activeOrderBookSweepStepArrived,
+          );
+    if (!deferUntilAfterFrame) {
+      widget.tapeCursor.value = cursor;
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || generation != _tapeCursorPublishGeneration) return;
+      widget.tapeCursor.value = cursor;
+    });
   }
 
   @override
@@ -1404,6 +1433,7 @@ class _CompactOrderBookRailState extends State<_CompactOrderBookRail>
 
   @override
   void dispose() {
+    _tapeCursorPublishGeneration += 1;
     widget.playbackSpeed.removeListener(_handleOrderBookPlaybackSpeedChanged);
     _disposeOrderBookSweepPlayback();
     super.dispose();
@@ -1442,23 +1472,24 @@ class _CompactOrderBookRailState extends State<_CompactOrderBookRail>
   @override
   Widget build(BuildContext context) {
     final activeSweepStep = _activeOrderBookSweepStep;
+    final arrivedSweepStep = _activeOrderBookSweepStepArrived
+        ? activeSweepStep
+        : null;
+    final sweepPresentationReference = _orderBookSweepPresentationReference;
     final snapshot = _orderBookSweepPresentationSnapshot(widget.snapshot);
-    final levels = _orderBookSweepPresentationLevels(widget.snapshot);
-    final compactSweepHeaderLabel = activeSweepStep == null
-        ? '잔량'
-        : activeSweepStep.structuralBreach
-        ? '구조돌파 $_activeOrderBookSweepStepNumber/'
-              '$_activeOrderBookSweepStepCount'
-        : activeSweepStep.boundaryCrossed
-        ? '통과 $_activeOrderBookSweepStepNumber/'
-              '$_activeOrderBookSweepStepCount'
-        : '체결 $_activeOrderBookSweepStepNumber/'
-              '$_activeOrderBookSweepStepCount';
-    final compactSweepHeaderColor = activeSweepStep == null
-        ? _marketMuted
-        : activeSweepStep.side == GameOrderBookSide.ask
-        ? _marketAccent
-        : const Color(0xFFF04452);
+    final levels = stockOrderBookPresentationLevels(
+      snapshot,
+      marketLevels: _orderBookSweepPresentationLevels(widget.snapshot),
+      preserveEmptyMarketLevelPrices: activeSweepStep != null,
+      touchReferencePrice: activeSweepStep == null
+          ? null
+          : sweepPresentationReference.price,
+      touchReferenceSide: activeSweepStep == null
+          ? null
+          : sweepPresentationReference.side,
+    );
+    const compactSweepHeaderLabel = '잔량';
+    const compactSweepHeaderColor = _marketMuted;
     final currentPrice = marketSnapPrice(
       snapshot.sourceLastTradePrice ?? widget.quote.price,
       market: widget.definition.market,
@@ -1470,8 +1501,12 @@ class _CompactOrderBookRailState extends State<_CompactOrderBookRail>
         generatedTrade.marketMinute == widget.minute &&
         generatedTrade.liquidityPulse == snapshot.liquidityPulse &&
         levels.any((level) => _matches(level.price, generatedTrade.price));
-    double? outlinePrice = activeSweepStep?.price;
-    GameOrderBookSide? outlineSide = activeSweepStep?.side;
+    double? outlinePrice = activeSweepStep == null
+        ? null
+        : sweepPresentationReference.price;
+    GameOrderBookSide? outlineSide = activeSweepStep == null
+        ? null
+        : sweepPresentationReference.side;
     if (activeSweepStep == null && hasCurrentGeneratedTrade) {
       outlinePrice = generatedTrade.price;
       outlineSide = generatedTrade.levelSide;
@@ -1495,33 +1530,29 @@ class _CompactOrderBookRailState extends State<_CompactOrderBookRail>
             .firstOrNull
             ?.price ??
         snapshot.bids.firstOrNull?.price;
-    if (activeSweepStep == null) {
-      final bestAsk = levels
-          .where((level) => level.side == GameOrderBookSide.ask)
-          .lastOrNull;
-      final bestBid = levels
-          .where((level) => level.side == GameOrderBookSide.bid)
-          .firstOrNull;
-      final outlineIsAtTouch = levels.any(
-        (level) =>
-            _matches(level.price, outlinePrice) &&
-            (outlineSide == null || level.side == outlineSide) &&
-            (identical(level, bestAsk) || identical(level, bestBid)),
-      );
-      if (!outlineIsAtTouch) {
-        final touch = outlineSide == GameOrderBookSide.ask
-            ? bestAsk
-            : outlineSide == GameOrderBookSide.bid
-            ? bestBid
-            : outlinePrice != null &&
-                  bestAsk != null &&
-                  outlinePrice >= bestAsk.price
-            ? bestAsk
-            : bestBid ?? bestAsk;
-        outlinePrice = touch?.price;
-        outlineSide = touch?.side;
-      }
-    }
+    final activeSweepLevel = arrivedSweepStep == null
+        ? null
+        : levels
+                  .where(
+                    (level) =>
+                        level.side == arrivedSweepStep.side &&
+                        _matches(level.price, arrivedSweepStep.price),
+                  )
+                  .firstOrNull ??
+              levels
+                  .where(
+                    (level) => _matches(level.price, arrivedSweepStep.price),
+                  )
+                  .firstOrNull;
+    final outlineLevel =
+        activeSweepLevel ??
+        stockOrderBookCentralOutlineLevel(
+          levels: levels,
+          referencePrice: outlinePrice,
+          referenceSide: outlineSide,
+        );
+    outlinePrice = outlineLevel?.price;
+    outlineSide = outlineLevel?.side;
     final observedMaxDepth = levels.fold<int>(
       1,
       (maximum, level) => math.max(maximum, _displayQuantity(level)),
@@ -1589,7 +1620,7 @@ class _CompactOrderBookRailState extends State<_CompactOrderBookRail>
                         _matches(level.price, outlinePrice) &&
                         (outlineSide == null || level.side == outlineSide),
                   );
-                  final sweepIndex = activeSweepStep == null
+                  var sweepIndex = activeSweepStep == null
                       ? -1
                       : levels.indexWhere(
                           (level) =>
@@ -1597,6 +1628,13 @@ class _CompactOrderBookRailState extends State<_CompactOrderBookRail>
                               (level.price - activeSweepStep.price).abs() <
                                   0.000001,
                         );
+                  if (sweepIndex < 0 && activeSweepStep != null) {
+                    sweepIndex = levels.indexWhere(
+                      (level) =>
+                          (level.price - activeSweepStep.price).abs() <
+                          0.000001,
+                    );
+                  }
                   return Stack(
                     clipBehavior: Clip.hardEdge,
                     children: [
@@ -1668,8 +1706,6 @@ class _CompactOrderBookRailState extends State<_CompactOrderBookRail>
                           child: _OrderBookSweepRowOverlay(
                             step: activeSweepStep,
                             stepDuration: _orderBookSweepStepDuration,
-                            stepNumber: _activeOrderBookSweepStepNumber,
-                            stepCount: _activeOrderBookSweepStepCount,
                             maxDepth: maxDepth,
                             compact: true,
                           ),
@@ -1681,7 +1717,7 @@ class _CompactOrderBookRailState extends State<_CompactOrderBookRail>
                           ),
                           duration: activeSweepStep == null
                               ? _orderBookMotionDuration
-                              : _orderBookSweepMotionDuration,
+                              : Duration.zero,
                           curve: Curves.easeOutCubic,
                           top: outlineIndex * rowHeight,
                           left: 0,
@@ -1889,17 +1925,18 @@ class _CompactOrderBookQuantityLabelState
   Widget build(BuildContext context) => Row(
     mainAxisSize: MainAxisSize.min,
     children: [
-      Text(
-        _money(widget.quantity),
-        key: const Key('inline-order-book-quantity-value'),
-        maxLines: 1,
-        style: const TextStyle(
-          color: Color(0xFF343A45),
-          fontSize: 9,
-          fontWeight: FontWeight.w800,
-          fontFeatures: _marketNumberFeatures,
+      if (widget.quantity > 0)
+        Text(
+          _money(widget.quantity),
+          key: const Key('inline-order-book-quantity-value'),
+          maxLines: 1,
+          style: const TextStyle(
+            color: Color(0xFF343A45),
+            fontSize: 9,
+            fontWeight: FontWeight.w800,
+            fontFeatures: _marketNumberFeatures,
+          ),
         ),
-      ),
       if (_quantityDelta != 0 &&
           orderBookQuantityDeltaLabel(
             _quantityDelta,
@@ -1956,7 +1993,7 @@ class _StockInfoUnavailable extends StatelessWidget {
   );
 }
 
-enum _QuoteQuickAction { buy, sell, amendCancel }
+enum _QuoteQuickAction { buy, sell }
 
 enum _DetailedOrderSection { buy, sell, amendCancel, openOrders, balance }
 
@@ -2046,23 +2083,6 @@ class _QuoteQuickActionsDialog extends StatelessWidget {
                     ),
                   ),
                 ],
-              ),
-            ),
-            const SizedBox(height: 8),
-            FilledButton(
-              key: const Key('quote-quick-amend-cancel'),
-              onPressed: () =>
-                  Navigator.of(context).pop(_QuoteQuickAction.amendCancel),
-              style: FilledButton.styleFrom(
-                minimumSize: const Size.fromHeight(58),
-                backgroundColor: const Color(0xFF67CC8D),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: const Text(
-                '정정 / 취소',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
               ),
             ),
           ],

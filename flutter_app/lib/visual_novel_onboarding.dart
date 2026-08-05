@@ -2,7 +2,7 @@ part of 'main.dart';
 
 const _onboardingBeatCount = 302;
 const _maximumDialogueBeatCount = 320;
-const _dialogueAppearanceVersion = 19;
+const _dialogueAppearanceVersion = 20;
 const _dialogueContentVersion = 5;
 const _dialogueRuntimeStorageKey = 'project-decimal-dialogue-runtime-v2';
 const _dialogueBundleAsset = 'assets/dialogue/dialogue-editor-override.json';
@@ -30,6 +30,22 @@ const _hanSuaV2FilenameMigrations = <String, String>{
   '08_explaining_quality_v2.png': '09_explaining_v3.png',
 };
 const _hanSuaAssetDirectory = 'production_soft_painted/han_sua/';
+const _parkHaeunV2FilenameMigrations = <String, String>{
+  '01_neutral_soft_v2.png': '01_neutral_v3.png',
+  '02_bright_smile_wave_v2.png': '02_gentle_smile_v3.png',
+  '03_bright_laugh_v2.png': '03_bright_laugh_v3.png',
+  '04_playful_wink_v2.png': '07_embarrassed_v3.png',
+  '05_surprised_v2.png': '04_surprised_v3.png',
+  '06_worried_v2.png': '05_worried_v3.png',
+  '07_sulky_pout_v2.png': '06_angry_v3.png',
+  '08_determined_v2.png': '09_firm_v3.png',
+  '09_explaining_v2.png': '09_firm_v3.png',
+  '10_lobby_welcome_f0_v2.png': '01_neutral_v3.png',
+  '10_lobby_welcome_f1_v2.png': '02_gentle_smile_v3.png',
+  '10_lobby_welcome_f2_v2.png': '03_bright_laugh_v3.png',
+  '10_lobby_welcome_f3_v2.png': '02_gentle_smile_v3.png',
+};
+const _parkHaeunAssetDirectory = 'production_soft_painted/park_haeun/';
 
 typedef PrologueCheckpointSaver =
     Future<void> Function(
@@ -232,6 +248,20 @@ String _migrateHanSuaCharacterAsset(String asset) {
       : '${asset.substring(0, filenameIndex)}$migrated';
 }
 
+String _migrateParkHaeunCharacterAsset(String asset) {
+  final directoryIndex = asset.lastIndexOf(_parkHaeunAssetDirectory);
+  if (directoryIndex < 0) return asset;
+  final filenameIndex = directoryIndex + _parkHaeunAssetDirectory.length;
+  final migrated =
+      _parkHaeunV2FilenameMigrations[asset.substring(filenameIndex)];
+  return migrated == null
+      ? asset
+      : '${asset.substring(0, filenameIndex)}$migrated';
+}
+
+String _migrateCharacterAsset(String asset) =>
+    _migrateParkHaeunCharacterAsset(_migrateHanSuaCharacterAsset(asset));
+
 String _dialogueMapText(Map<dynamic, dynamic> source, String key) =>
     source[key] is String ? source[key] as String : '';
 
@@ -249,9 +279,7 @@ List<_StageCharacterOverride> _dialogueMapCharacters(
   final characters = <_StageCharacterOverride>[];
   for (final raw in rawCharacters) {
     if (raw is! Map) continue;
-    final asset = _migrateHanSuaCharacterAsset(
-      _canonicalDialogueAsset(raw['asset']),
-    );
+    final asset = _migrateCharacterAsset(_canonicalDialogueAsset(raw['asset']));
     if (asset.trim().isEmpty) continue;
     characters.add(
       _StageCharacterOverride(
@@ -378,7 +406,6 @@ class _VisualNovelOnboardingScreenState
     extends State<VisualNovelOnboardingScreen> {
   final _playerController = TextEditingController();
   final _companyController = TextEditingController();
-  AudioPlayer? _storyBgmPlayer;
   AudioPlayer? _storyEffectPlayer;
   AudioPlayer? _storyVoicePlayer;
   final List<String> _dialogueHistory = <String>[];
@@ -469,9 +496,7 @@ class _VisualNovelOnboardingScreenState
         final normalized = value.startsWith(webAssetPrefix)
             ? value.substring(webAssetPrefix.length)
             : value;
-        return character
-            ? _migrateHanSuaCharacterAsset(normalized)
-            : normalized;
+        return character ? _migrateCharacterAsset(normalized) : normalized;
       }
 
       String? asset(String key) {
@@ -736,10 +761,9 @@ class _VisualNovelOnboardingScreenState
   void dispose() {
     _playerController.dispose();
     _companyController.dispose();
-    final storyBgmPlayer = _storyBgmPlayer;
     final storyEffectPlayer = _storyEffectPlayer;
     final storyVoicePlayer = _storyVoicePlayer;
-    if (storyBgmPlayer != null) unawaited(storyBgmPlayer.dispose());
+    GameAudio.instance.clearDialogueBgm();
     if (storyEffectPlayer != null) unawaited(storyEffectPlayer.dispose());
     if (storyVoicePlayer != null) unawaited(storyVoicePlayer.dispose());
     super.dispose();
@@ -885,6 +909,7 @@ class _VisualNovelOnboardingScreenState
     final scene = _currentDialogue;
     if (scene == null) return;
     final volume = scene.audioVolume.clamp(0.0, 1.0).toDouble();
+    final effectVolume = (volume * 1.6).clamp(0.0, 1.0).toDouble();
     final bgm = scene.bgm.trim();
     final effect = scene.soundEffect.trim();
     final voice = scene.voice.trim();
@@ -897,22 +922,8 @@ class _VisualNovelOnboardingScreenState
       return;
     }
     try {
-      if (bgm != _activeStoryBgm) {
-        await _storyBgmPlayer?.stop();
-        _activeStoryBgm = bgm;
-        if (bgm.isNotEmpty) {
-          final player = _storyBgmPlayer ??= AudioPlayer(
-            playerId: 'project-decimal-story-bgm',
-          );
-          await player.setReleaseMode(ReleaseMode.loop);
-          await player.play(
-            AssetSource(_audioAssetSource(bgm)),
-            volume: volume,
-          );
-        }
-      } else if (bgm.isNotEmpty) {
-        await _storyBgmPlayer?.setVolume(volume);
-      }
+      _activeStoryBgm = bgm;
+      GameAudio.instance.setDialogueBgm(_audioAssetSource(bgm), volume: volume);
       if (_storyEffectActive) await _storyEffectPlayer?.stop();
       _storyEffectActive = effect.isNotEmpty;
       if (effect.isNotEmpty) {
@@ -921,7 +932,7 @@ class _VisualNovelOnboardingScreenState
         );
         await player.play(
           AssetSource(_audioAssetSource(effect)),
-          volume: volume,
+          volume: effectVolume,
         );
       }
       if (_storyVoiceActive) await _storyVoicePlayer?.stop();
@@ -3469,10 +3480,13 @@ class _NovelDialogue extends StatefulWidget {
     this.narration = false,
     this.mode = 'dialogue',
     this.charactersPerSecond = 32,
+    this.fontFamily = 'Pretendard',
     this.autoAdvanceMs = 0,
     this.stageDirection,
     this.onContinue,
     this.continueKey,
+    this.tapAdvancesImmediately = false,
+    this.compact = false,
     this.choices = const [],
     this.child,
   });
@@ -3483,10 +3497,13 @@ class _NovelDialogue extends StatefulWidget {
   final bool narration;
   final String mode;
   final double charactersPerSecond;
+  final String fontFamily;
   final int autoAdvanceMs;
   final String? stageDirection;
   final VoidCallback? onContinue;
   final Key? continueKey;
+  final bool tapAdvancesImmediately;
+  final bool compact;
   final List<_NovelChoice> choices;
   final Widget? child;
 
@@ -3550,7 +3567,7 @@ class _NovelDialogueState extends State<_NovelDialogue>
   void _handleExternalTap() {
     if (!_typingComplete) {
       _typingController.value = 1;
-      return;
+      if (!widget.tapAdvancesImmediately) return;
     }
     if (widget.choices.isNotEmpty) return;
     widget.onContinue?.call();
@@ -3589,8 +3606,10 @@ class _NovelDialogueState extends State<_NovelDialogue>
       child: ClipRect(
         child: Container(
           key: const Key('story-dialogue-panel'),
-          constraints: const BoxConstraints(
-            minHeight: _storyDialoguePanelMinHeight,
+          width: double.infinity,
+          constraints: BoxConstraints(
+            minHeight: widget.compact ? 100 : _storyDialoguePanelMinHeight,
+            maxHeight: widget.compact ? 112 : double.infinity,
           ),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
@@ -3607,7 +3626,9 @@ class _NovelDialogueState extends State<_NovelDialogue>
             ),
           ),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 13, 18, 14),
+            padding: widget.compact
+                ? const EdgeInsets.fromLTRB(14, 7, 14, 9)
+                : const EdgeInsets.fromLTRB(18, 13, 18, 14),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -3625,10 +3646,10 @@ class _NovelDialogueState extends State<_NovelDialogue>
                         Text(
                           speakerName,
                           key: const Key('story-speaker-name'),
-                          style: const TextStyle(
-                            color: Color(0xFFF8FBFF),
-                            fontFamily: 'Pretendard',
-                            fontSize: 18,
+                          style: TextStyle(
+                            color: const Color(0xFFF8FBFF),
+                            fontFamily: widget.fontFamily,
+                            fontSize: widget.compact ? 15 : 18,
                             height: 1.1,
                             fontWeight: FontWeight.w900,
                             letterSpacing: -0.45,
@@ -3648,10 +3669,10 @@ class _NovelDialogueState extends State<_NovelDialogue>
                               affiliation,
                               key: const Key('story-speaker-affiliation'),
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: Color(0xFF62C9F6),
-                                fontFamily: 'Pretendard',
-                                fontSize: 11.5,
+                              style: TextStyle(
+                                color: const Color(0xFF62C9F6),
+                                fontFamily: widget.fontFamily,
+                                fontSize: widget.compact ? 9.5 : 11.5,
                                 height: 1.1,
                                 fontWeight: FontWeight.w800,
                                 letterSpacing: -0.25,
@@ -3670,11 +3691,11 @@ class _NovelDialogueState extends State<_NovelDialogue>
                     ),
                   ),
                 ),
-                const SizedBox(height: 6),
-                const SizedBox(
+                SizedBox(height: widget.compact ? 3 : 6),
+                SizedBox(
                   key: Key('story-dialogue-divider'),
                   width: double.infinity,
-                  height: 9,
+                  height: widget.compact ? 5 : 9,
                   child: Align(
                     alignment: Alignment.topCenter,
                     child: DecoratedBox(
@@ -3696,9 +3717,9 @@ class _NovelDialogueState extends State<_NovelDialogue>
                   Text(
                     widget.stageDirection!.trim(),
                     key: const Key('story-stage-direction'),
-                    style: const TextStyle(
-                      color: Color(0xFFE8DDBF),
-                      fontFamily: 'Pretendard',
+                    style: TextStyle(
+                      color: const Color(0xFFE8DDBF),
+                      fontFamily: widget.fontFamily,
                       fontSize: 12.5,
                       height: 1.4,
                       fontStyle: FontStyle.italic,
@@ -3717,11 +3738,15 @@ class _NovelDialogueState extends State<_NovelDialogue>
                   child: Text(
                     visibleLine,
                     key: const Key('story-line-text'),
-                    style: const TextStyle(
-                      color: Color(0xFFF9FCFF),
-                      fontFamily: 'Pretendard',
-                      fontSize: 15.5,
-                      height: 1.48,
+                    maxLines: widget.compact ? 3 : null,
+                    overflow: widget.compact
+                        ? TextOverflow.ellipsis
+                        : TextOverflow.visible,
+                    style: TextStyle(
+                      color: const Color(0xFFF9FCFF),
+                      fontFamily: widget.fontFamily,
+                      fontSize: widget.compact ? 13.5 : 15.5,
+                      height: widget.compact ? 1.32 : 1.48,
                       fontWeight: FontWeight.w600,
                       letterSpacing: -0.3,
                       shadows: [

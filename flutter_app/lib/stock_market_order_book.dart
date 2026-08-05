@@ -16,11 +16,6 @@ class _OrderBookPanel extends StatelessWidget {
     required this.tradeTape,
     required this.tapeCursor,
     required this.selectedPrice,
-    required this.quantityPreset,
-    required this.onQuantityPresetChanged,
-    required this.onBuy,
-    required this.onSell,
-    required this.onAmendCancel,
     required this.onTapLevel,
     this.tutorialHeaderKey,
     this.tutorialBestAskKey,
@@ -40,11 +35,6 @@ class _OrderBookPanel extends StatelessWidget {
   final List<_OrderBookTapePrint> tradeTape;
   final ValueNotifier<_OrderBookSweepTapeCursor?> tapeCursor;
   final double? selectedPrice;
-  final _QuoteQuantityPreset quantityPreset;
-  final ValueChanged<_QuoteQuantityPreset> onQuantityPresetChanged;
-  final VoidCallback onBuy;
-  final VoidCallback onSell;
-  final VoidCallback onAmendCancel;
   final ValueChanged<GameOrderBookLevel> onTapLevel;
   final GlobalKey? tutorialHeaderKey;
   final GlobalKey? tutorialBestAskKey;
@@ -172,7 +162,6 @@ class _OrderBookPanel extends StatelessWidget {
     final compactPanel = availableHeight < 560;
     final marketSummaryHeight = compactPanel ? 28.0 : 44.0;
     final tapeHeight = compactPanel ? 34.0 : 80.0;
-    final orderDockHeight = compactPanel ? 38.0 : 48.0;
     const marketStatusBannerHeight = 36.0;
     final hasMarketStatusBanner =
         materialHalt != null ||
@@ -185,7 +174,6 @@ class _OrderBookPanel extends StatelessWidget {
         42.0 +
         2.0 +
         marketSummaryHeight +
-        orderDockHeight +
         (showTradeTape ? tapeHeight : 0);
     var activeTradeSide = !hasCurrentGeneratedTrade
         ? null
@@ -446,13 +434,10 @@ class _OrderBookPanel extends StatelessWidget {
                   cursor,
                   livePackets,
                 );
-                final presentationTape =
-                    livePackets.isNotEmpty && presentationCursor == null
-                    ? const <_OrderBookTapePrint>[]
-                    : _orderBookTradeTapeAtCursor(
-                        tradeTape,
-                        presentationCursor,
-                      );
+                final presentationTape = _orderBookTradeTapeAtCursor(
+                  tradeTape,
+                  presentationCursor,
+                );
                 return _OrderBookTradeTape(
                   height: tapeHeight,
                   compact: compactPanel,
@@ -461,19 +446,6 @@ class _OrderBookPanel extends StatelessWidget {
                 );
               },
             ),
-          _QuoteOrderDock(
-            height: orderDockHeight,
-            compact: compactPanel,
-            selectedPrice: selectedPrice,
-            quantityPreset: quantityPreset,
-            pendingOrderCount: state.pendingOrders
-                .where((order) => order.assetId == definition.id)
-                .length,
-            onQuantityPresetChanged: onQuantityPresetChanged,
-            onBuy: onBuy,
-            onSell: onSell,
-            onAmendCancel: onAmendCancel,
-          ),
         ],
       ),
     );
@@ -664,7 +636,7 @@ class _OrderBookMetric extends StatelessWidget {
   );
 }
 
-class _OrderBookTradeTape extends StatelessWidget {
+class _OrderBookTradeTape extends StatefulWidget {
   const _OrderBookTradeTape({
     required this.height,
     required this.compact,
@@ -678,18 +650,48 @@ class _OrderBookTradeTape extends StatelessWidget {
   final String currency;
 
   @override
+  State<_OrderBookTradeTape> createState() => _OrderBookTradeTapeState();
+}
+
+class _OrderBookTradeTapeState extends State<_OrderBookTradeTape> {
+  List<_OrderBookTapePrint> _retainedPrints = const <_OrderBookTapePrint>[];
+
+  @override
+  void initState() {
+    super.initState();
+    _mergePrints(widget.prints);
+  }
+
+  @override
+  void didUpdateWidget(covariant _OrderBookTradeTape oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _mergePrints(widget.prints);
+  }
+
+  void _mergePrints(List<_OrderBookTapePrint> incoming) {
+    if (incoming.isEmpty) return;
+    final identities = <String>{};
+    _retainedPrints = <_OrderBookTapePrint>[...incoming, ..._retainedPrints]
+        .where((print) => identities.add(print.identity))
+        .take(50)
+        .toList(growable: false);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final visible = prints.take(compact ? 1 : 3).toList(growable: false);
+    final visible = _retainedPrints
+        .take(widget.compact ? 1 : 3)
+        .toList(growable: false);
     return Container(
       key: const Key('order-book-trade-tape'),
-      height: height,
+      height: widget.height,
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(top: BorderSide(color: Color(0xFFE4E8EE))),
       ),
       child: Column(
         children: [
-          if (!compact)
+          if (!widget.compact)
             const SizedBox(
               height: 20,
               child: Padding(
@@ -739,8 +741,8 @@ class _OrderBookTradeTape extends StatelessWidget {
                           child: _OrderBookTradeTapeRow(
                             key: ValueKey('order-book-tape-${print.identity}'),
                             print: print,
-                            currency: currency,
-                            compact: compact,
+                            currency: widget.currency,
+                            compact: widget.compact,
                           ),
                         ),
                     ],
@@ -841,197 +843,6 @@ class _OrderBookTradeTapeRow extends StatelessWidget {
       ),
     );
   }
-}
-
-class _QuoteOrderDock extends StatelessWidget {
-  const _QuoteOrderDock({
-    required this.height,
-    required this.compact,
-    required this.selectedPrice,
-    required this.quantityPreset,
-    required this.pendingOrderCount,
-    required this.onQuantityPresetChanged,
-    required this.onBuy,
-    required this.onSell,
-    required this.onAmendCancel,
-  });
-
-  final double height;
-  final bool compact;
-  final double? selectedPrice;
-  final _QuoteQuantityPreset quantityPreset;
-  final int pendingOrderCount;
-  final ValueChanged<_QuoteQuantityPreset> onQuantityPresetChanged;
-  final VoidCallback onBuy;
-  final VoidCallback onSell;
-  final VoidCallback onAmendCancel;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    key: const Key('quote-order-dock'),
-    height: height,
-    padding: EdgeInsets.symmetric(
-      horizontal: compact ? 5 : 7,
-      vertical: compact ? 3 : 5,
-    ),
-    decoration: const BoxDecoration(
-      color: Color(0xFFF7F8FA),
-      border: Border(top: BorderSide(color: Color(0xFFDDE2E8))),
-    ),
-    child: Row(
-      children: [
-        _QuoteDockAction(
-          key: const Key('quote-order-dock-sell'),
-          label: '매도',
-          color: _marketAccent,
-          onTap: onSell,
-          compact: compact,
-        ),
-        const SizedBox(width: 4),
-        Expanded(
-          child: Row(
-            children: [
-              for (final preset in _QuoteQuantityPreset.values)
-                Expanded(
-                  child: _QuoteQuantityChip(
-                    key: ValueKey('quote-quantity-${preset.name}'),
-                    preset: preset,
-                    selected: quantityPreset == preset,
-                    onTap: () => onQuantityPresetChanged(preset),
-                    compact: compact,
-                  ),
-                ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 4),
-        Material(
-          color: Colors.transparent,
-          child: InkWell(
-            key: const Key('quote-order-dock-amend'),
-            onTap: onAmendCancel,
-            borderRadius: BorderRadius.circular(7),
-            child: Container(
-              width: compact ? 38 : 44,
-              height: double.infinity,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                border: Border.all(color: const Color(0xFFBBC3CE)),
-                borderRadius: BorderRadius.circular(7),
-              ),
-              child: Text(
-                pendingOrderCount > 0 ? '정정\n$pendingOrderCount' : '정정',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: const Color(0xFF4E5968),
-                  fontSize: compact ? 8 : 9,
-                  height: 1,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 4),
-        _QuoteDockAction(
-          key: const Key('quote-order-dock-buy'),
-          label: '매수',
-          color: const Color(0xFFF04452),
-          onTap: onBuy,
-          compact: compact,
-        ),
-      ],
-    ),
-  );
-}
-
-class _QuoteDockAction extends StatelessWidget {
-  const _QuoteDockAction({
-    super.key,
-    required this.label,
-    required this.color,
-    required this.onTap,
-    required this.compact,
-  });
-
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-  final bool compact;
-
-  @override
-  Widget build(BuildContext context) => Material(
-    color: color,
-    borderRadius: BorderRadius.circular(7),
-    child: InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(7),
-      child: SizedBox(
-        width: compact ? 46 : 54,
-        height: double.infinity,
-        child: Center(
-          child: Text(
-            label,
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: compact ? 10 : 12,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ),
-      ),
-    ),
-  );
-}
-
-class _QuoteQuantityChip extends StatelessWidget {
-  const _QuoteQuantityChip({
-    super.key,
-    required this.preset,
-    required this.selected,
-    required this.onTap,
-    required this.compact,
-  });
-
-  final _QuoteQuantityPreset preset;
-  final bool selected;
-  final VoidCallback onTap;
-  final bool compact;
-
-  String get label => switch (preset) {
-    _QuoteQuantityPreset.one => '1주',
-    _QuoteQuantityPreset.ten => '10주',
-    _QuoteQuantityPreset.quarter => '25%',
-    _QuoteQuantityPreset.maximum => '최대',
-  };
-
-  @override
-  Widget build(BuildContext context) => Material(
-    color: Colors.transparent,
-    child: InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(6),
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 1),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: selected ? const Color(0xFF353B78) : Colors.white,
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(
-            color: selected ? const Color(0xFF353B78) : const Color(0xFFD8DDE5),
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: selected ? Colors.white : const Color(0xFF5D6572),
-            fontSize: compact ? 8 : 9,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-      ),
-    ),
-  );
 }
 
 class _OrderBookPriceLadder extends StatefulWidget {
@@ -1201,9 +1012,24 @@ class _OrderBookPriceLadderState extends State<_OrderBookPriceLadder>
   @override
   Widget build(BuildContext context) {
     final activeSweepStep = _activeOrderBookSweepStep;
+    final arrivedSweepStep = _activeOrderBookSweepStepArrived
+        ? activeSweepStep
+        : null;
+    final sweepPresentationReference = _orderBookSweepPresentationReference;
     final snapshot = _orderBookSweepPresentationSnapshot(widget.snapshot);
+    final sweepLevels = _orderBookSweepPresentationLevels(widget.snapshot);
     final candidateLevels = orderBookPresentationLevelsWithPlayerOrders(
-      marketLevels: _orderBookSweepPresentationLevels(widget.snapshot),
+      marketLevels: stockOrderBookPresentationLevels(
+        snapshot,
+        marketLevels: sweepLevels,
+        preserveEmptyMarketLevelPrices: activeSweepStep != null,
+        touchReferencePrice: activeSweepStep == null
+            ? null
+            : sweepPresentationReference.price,
+        touchReferenceSide: activeSweepStep == null
+            ? null
+            : sweepPresentationReference.side,
+      ),
       playerOrders: widget.playerOrders,
     );
     if (candidateLevels.isNotEmpty) {
@@ -1218,23 +1044,24 @@ class _OrderBookPriceLadderState extends State<_OrderBookPriceLadder>
         ? snapshot.lastSyntheticTrade
         : null;
     final effectiveActiveTradePrice =
-        activeSweepStep?.price ??
+        (activeSweepStep == null ? null : sweepPresentationReference.price) ??
         (_orderBookSweepPlaybackPaused
             ? pausedTrade?.price ?? snapshot.sourceLastTradePrice
             : widget.activeTradePrice);
-    final effectiveActiveTradeSide = activeSweepStep == null
-        ? _orderBookSweepPlaybackPaused
-              ? pausedTrade == null
-                    ? null
-                    : pausedTrade.levelSide == GameOrderBookSide.ask
-                    ? TradeSide.buy
-                    : TradeSide.sell
-              : widget.activeTradeSide
-        : activeSweepStep.side == GameOrderBookSide.ask
-        ? TradeSide.buy
-        : TradeSide.sell;
+    final effectiveActiveTradeSide =
+        activeSweepStep != null && sweepPresentationReference.side != null
+        ? sweepPresentationReference.side == GameOrderBookSide.ask
+              ? TradeSide.buy
+              : TradeSide.sell
+        : _orderBookSweepPlaybackPaused
+        ? pausedTrade == null
+              ? null
+              : pausedTrade.levelSide == GameOrderBookSide.ask
+              ? TradeSide.buy
+              : TradeSide.sell
+        : widget.activeTradeSide;
     final effectiveActiveTradeLevelSide =
-        activeSweepStep?.side ??
+        (activeSweepStep == null ? null : sweepPresentationReference.side) ??
         (_orderBookSweepPlaybackPaused
             ? pausedTrade?.levelSide
             : widget.activeTradeLevelSide);
@@ -1272,10 +1099,7 @@ class _OrderBookPriceLadderState extends State<_OrderBookPriceLadder>
     final bestAskLevel = levels
         .where((level) => level.side == GameOrderBookSide.ask)
         .lastOrNull;
-    final bestBidLevel = levels
-        .where((level) => level.side == GameOrderBookSide.bid)
-        .firstOrNull;
-    final requestedOutlineLevel = levels
+    final exactActiveTradeLevel = levels
         .where(
           (level) =>
               _matchesPrice(level, requestedOutlinePrice) &&
@@ -1283,40 +1107,47 @@ class _OrderBookPriceLadderState extends State<_OrderBookPriceLadder>
                   level.side == effectiveActiveTradeLevelSide),
         )
         .firstOrNull;
-    final requestedOutlineIsAtTouch =
-        requestedOutlineLevel != null &&
-        (identical(requestedOutlineLevel, bestAskLevel) ||
-            identical(requestedOutlineLevel, bestBidLevel));
-    final outlineLevel = activeSweepStep != null || requestedOutlineIsAtTouch
-        ? requestedOutlineLevel
-        : effectiveActiveTradeLevelSide == GameOrderBookSide.ask
-        ? bestAskLevel
-        : effectiveActiveTradeLevelSide == GameOrderBookSide.bid
-        ? bestBidLevel
-        : requestedOutlinePrice != null &&
-              bestAskLevel != null &&
-              requestedOutlinePrice >= bestAskLevel.price
-        ? bestAskLevel
-        : bestBidLevel ?? bestAskLevel;
-    final outlinePrice = outlineLevel?.price;
-    final outlineLevelSide = outlineLevel?.side;
-    final currentRowIndex = outlineLevel == null
-        ? -1
-        : levels.indexOf(outlineLevel);
-    final fallbackTradeUsesOutline =
-        activeSweepStep == null &&
-        effectiveActiveTradePrice != null &&
-        outlineLevel != null &&
-        _matchesPrice(outlineLevel, effectiveActiveTradePrice) &&
-        (effectiveActiveTradeLevelSide == null ||
-            outlineLevelSide == effectiveActiveTradeLevelSide);
-    final sweepRowIndex = activeSweepStep == null
+    var sweepRowIndex = arrivedSweepStep == null
         ? -1
         : levels.indexWhere(
             (level) =>
-                level.side == activeSweepStep.side &&
-                _matchesPrice(level, activeSweepStep.price),
+                level.side == arrivedSweepStep.side &&
+                _matchesPrice(level, arrivedSweepStep.price),
           );
+    if (sweepRowIndex < 0 && arrivedSweepStep != null) {
+      // A fully consumed best level can immediately become the opposite-side
+      // boundary at the same absolute price. Keep every visual tied to that
+      // exact execution price instead of leaving the border at the touch.
+      sweepRowIndex = levels.indexWhere(
+        (level) => _matchesPrice(level, arrivedSweepStep.price),
+      );
+    }
+    final activeSweepLevel = sweepRowIndex < 0 ? null : levels[sweepRowIndex];
+    final outlineLevel =
+        activeSweepLevel ??
+        stockOrderBookCentralOutlineLevel(
+          levels: levels,
+          referencePrice: requestedOutlinePrice,
+          referenceSide: effectiveActiveTradeLevelSide,
+        );
+    final currentRowIndex = outlineLevel == null
+        ? -1
+        : levels.indexOf(outlineLevel);
+    final fallbackTradeHasVisibleLevel =
+        activeSweepStep == null &&
+        effectiveActiveTradePrice != null &&
+        exactActiveTradeLevel != null;
+    final activeTradeFlashToken = activeSweepStep != null
+        ? _activeOrderBookSweepStepArrived
+              ? '${_activeOrderBookSweepBatch?.identity}:'
+                    '${activeSweepStep.sequence}'
+              : null
+        : fallbackTradeHasVisibleLevel
+        ? 'trade:${snapshot.sourceMarketMinute}:${snapshot.liquidityPulse}:'
+              '${effectiveActiveTradeLevelSide?.name}:'
+              '${effectiveActiveTradePrice.toStringAsFixed(6)}:'
+              '$effectiveActiveTradeQuantity'
+        : null;
     final presentationAsks = levels
         .where((level) => level.side == GameOrderBookSide.ask)
         .toList(growable: false)
@@ -1407,16 +1238,24 @@ class _OrderBookPriceLadderState extends State<_OrderBookPriceLadder>
                                   activeSweepStep != null) &&
                               (activeSweepStep == null
                                   ? _activeOrderBookSweepBatch == null &&
-                                        fallbackTradeUsesOutline
+                                        fallbackTradeHasVisibleLevel
                                   : _activeOrderBookSweepStepArrived) &&
-                              _matchesPrice(level, outlinePrice) &&
-                              (outlineLevelSide == null ||
-                                  level.side == outlineLevelSide),
+                              (activeSweepStep == null
+                                  ? _matchesPrice(
+                                          level,
+                                          effectiveActiveTradePrice,
+                                        ) &&
+                                        (effectiveActiveTradeLevelSide ==
+                                                null ||
+                                            level.side ==
+                                                effectiveActiveTradeLevelSide)
+                                  : entry.key == sweepRowIndex),
                           isTradeDrain:
                               activeSweepStep != null &&
                               _activeOrderBookSweepStepArrived &&
                               level.side == activeSweepStep.side &&
                               _matchesPrice(level, activeSweepStep.price),
+                          tradeFlashToken: activeTradeFlashToken,
                           activeTradeSide: effectiveActiveTradeSide,
                           activeQuantity: effectiveActiveTradeQuantity,
                           onTap: widget.onTapLevel == null
@@ -1471,8 +1310,6 @@ class _OrderBookPriceLadderState extends State<_OrderBookPriceLadder>
                 child: _OrderBookSweepRowOverlay(
                   step: activeSweepStep,
                   stepDuration: _orderBookSweepStepDuration,
-                  stepNumber: _activeOrderBookSweepStepNumber,
-                  stepCount: _activeOrderBookSweepStepCount,
                   maxDepth: maxVisibleDepth,
                 ),
               ),
@@ -1481,7 +1318,7 @@ class _OrderBookPriceLadderState extends State<_OrderBookPriceLadder>
                 key: const Key('order-book-current-price-border'),
                 duration: activeSweepStep == null
                     ? _orderBookMotionDuration
-                    : _orderBookSweepMotionDuration,
+                    : Duration.zero,
                 curve: Curves.easeOutCubic,
                 top: currentRowIndex * rowHeight,
                 left: 132,
@@ -1520,6 +1357,7 @@ class _OrderBookLevelRow extends StatelessWidget {
     required this.isSelected,
     required this.isActive,
     required this.isTradeDrain,
+    required this.tradeFlashToken,
     required this.activeTradeSide,
     required this.activeQuantity,
     required this.onTap,
@@ -1537,6 +1375,7 @@ class _OrderBookLevelRow extends StatelessWidget {
   final bool isSelected;
   final bool isActive;
   final bool isTradeDrain;
+  final String? tradeFlashToken;
   final TradeSide? activeTradeSide;
   final int activeQuantity;
   final VoidCallback? onTap;
@@ -1628,6 +1467,24 @@ class _OrderBookLevelRow extends StatelessWidget {
                       child: Stack(
                         fit: StackFit.expand,
                         children: [
+                          if (isActive && tradeFlashToken != null)
+                            KeyedSubtree(
+                              key: const Key('order-book-trade-flash'),
+                              child: TweenAnimationBuilder<double>(
+                                key: ValueKey((
+                                  'order-book-trade-flash-animation',
+                                  tradeFlashToken,
+                                )),
+                                duration: const Duration(milliseconds: 420),
+                                curve: Curves.easeOutCubic,
+                                tween: Tween<double>(begin: 0.58, end: 0),
+                                builder: (context, opacity, _) => ColoredBox(
+                                  color: tradeColor.withValues(
+                                    alpha: opacity * 0.42,
+                                  ),
+                                ),
+                              ),
+                            ),
                           Center(
                             child: Padding(
                               padding: const EdgeInsets.symmetric(
@@ -1875,20 +1732,22 @@ class _OrderBookQuantityCellState extends State<_OrderBookQuantityCell> {
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Flexible(
-                  child: Text(
-                    _money(widget.quantity),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: const Color(0xFF2C3440),
-                      fontSize: widget.showSecondary ? 13 : 10,
-                      height: 1,
-                      fontWeight: FontWeight.w700,
-                      fontFeatures: _marketNumberFeatures,
+                if (widget.quantity > 0)
+                  Flexible(
+                    child: Text(
+                      _money(widget.quantity),
+                      key: const Key('order-book-quantity-label'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: const Color(0xFF2C3440),
+                        fontSize: widget.showSecondary ? 13 : 10,
+                        height: 1,
+                        fontWeight: FontWeight.w700,
+                        fontFeatures: _marketNumberFeatures,
+                      ),
                     ),
                   ),
-                ),
                 if (_quantityDelta != 0 &&
                     orderBookQuantityDeltaLabel(
                       _quantityDelta,
@@ -2230,6 +2089,14 @@ class _OrderSheetState extends State<_OrderSheet> {
 
   GameOrderBookSnapshot get _marketSnapshot => _marketView.snapshot;
 
+  double get _displayedCurrentPrice {
+    final snapshotPrice = _marketSnapshot.sourceLastTradePrice;
+    if (snapshotPrice != null && snapshotPrice.isFinite && snapshotPrice > 0) {
+      return snapshotPrice;
+    }
+    return _executionPrice;
+  }
+
   int get _liquidityPulse =>
       widget.liquidityPulseListenable?.value ?? widget.liquidityPulse;
 
@@ -2267,17 +2134,17 @@ class _OrderSheetState extends State<_OrderSheet> {
 
   double get _estimatedExecutionPrice {
     if (_orderType != TradeOrderType.market) {
-      return _limitPrice ?? _executionPrice;
+      return _limitPrice ?? _displayedCurrentPrice;
     }
     final plan = _marketFillPlan;
     if (plan != null && plan.hasFill) return plan.averagePrice;
     final levels = widget.isBuy ? _marketSnapshot.asks : _marketSnapshot.bids;
-    return levels.isEmpty ? _executionPrice : levels.first.price;
+    return levels.isEmpty ? _displayedCurrentPrice : levels.first.price;
   }
 
   double get _orderPrice => _orderType == TradeOrderType.limit
-      ? (_limitPrice ?? _executionPrice)
-      : _executionPrice;
+      ? (_limitPrice ?? _displayedCurrentPrice)
+      : _displayedCurrentPrice;
   int get _rawNotional => (_orderPrice * _quantity).round();
   int get _notional {
     if (_orderType != TradeOrderType.market) return _rawNotional;
@@ -2431,6 +2298,7 @@ class _OrderSheetState extends State<_OrderSheet> {
     late TradeExecutionResult result;
     try {
       final displayedSnapshot = _marketSnapshot;
+      final displayedCurrentPrice = _displayedCurrentPrice;
       result = await widget.onExecuteTrade(
         TradeOrder(
           side: widget.isBuy ? TradeSide.buy : TradeSide.sell,
@@ -2440,7 +2308,7 @@ class _OrderSheetState extends State<_OrderSheet> {
           market: widget.definition.market,
           currency: widget.definition.currency,
           quantity: _quantity,
-          unitPrice: _executionPrice,
+          unitPrice: displayedCurrentPrice,
           quoteDate: widget.state.currentDate
               .toIso8601String()
               .split('T')
@@ -2599,7 +2467,7 @@ class _OrderSheetState extends State<_OrderSheet> {
                 const Spacer(),
                 Flexible(
                   child: Text(
-                    '현재 ${_money(_executionPrice.round())}',
+                    '현재 ${_money(_displayedCurrentPrice.round())}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -2856,7 +2724,7 @@ class _OrderSheetState extends State<_OrderSheet> {
                       }
                       return Text(
                         _orderType == TradeOrderType.limit
-                            ? '오른쪽 호가를 누르면 주문 가격이 바뀝니다.'
+                            ? '왼쪽 호가를 누르면 주문 가격이 바뀝니다.'
                             : '시장가는 보이는 호가부터 즉시 체결됩니다.',
                         maxLines: 2,
                         style: const TextStyle(
@@ -2948,7 +2816,7 @@ class _OrderSheetState extends State<_OrderSheet> {
               ),
               const SizedBox(height: 7),
               Text(
-                '현재가 ${_displayPrice(_executionPrice, widget.definition.currency)}'
+                '현재가 ${_displayPrice(_displayedCurrentPrice, widget.definition.currency)}'
                 ' · 예상 체결가 ${_displayPrice(_estimatedExecutionPrice, widget.definition.currency)}'
                 ' · 수수료 ${(_feeRate * 100).toStringAsFixed(3)}%',
                 style: const TextStyle(

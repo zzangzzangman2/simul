@@ -426,6 +426,64 @@ void main() {
   });
 
   test(
+    'ordinary visible quotes receive gradual deterministic background churn',
+    () {
+      final initial = snapshot();
+      final initialVisible = visibleByPrice(initial);
+      final ordinaryPrices = initialVisible.entries
+          .where(
+            (entry) =>
+                entry.value.quantity > 0 &&
+                !entry.value.isWall &&
+                !entry.value.isStructuralWall &&
+                !entry.value.isStructuralBreached &&
+                entry.value.structuralVacuumMultiplier >= 0.999999,
+          )
+          .map((entry) => entry.key)
+          .toSet();
+      expect(ordinaryPrices, isNotEmpty);
+
+      var current = initial;
+      final changedEver = <double>{};
+      var sawPartiallyUnchangedFrame = false;
+      for (var pulse = 1; pulse <= 120; pulse += 1) {
+        final before = visibleByPrice(current);
+        final next = snapshot(pulse: pulse, previousSnapshot: current);
+        final after = visibleByPrice(next);
+        var changedThisFrame = 0;
+        for (final price in ordinaryPrices) {
+          final previous = before[price];
+          final following = after[price];
+          if (previous == null || following == null) continue;
+          if (following.quantity == previous.quantity) continue;
+          changedEver.add(price);
+          changedThisFrame += 1;
+          expect(
+            following.wasLiquidityPulseTouched,
+            isTrue,
+            reason: '$price원 잔량 변화는 해당 펄스의 실제 호가 이벤트여야 한다.',
+          );
+        }
+        if (changedThisFrame < ordinaryPrices.length) {
+          sawPartiallyUnchangedFrame = true;
+        }
+        current = next;
+      }
+
+      expect(
+        changedEver.length,
+        greaterThanOrEqualTo((ordinaryPrices.length * 0.8).ceil()),
+        reason: '일반 호가가 장시간 같은 수량으로 얼어붙어 있으면 안 된다.',
+      );
+      expect(
+        sawPartiallyUnchangedFrame,
+        isTrue,
+        reason: '한 프레임에 호가 전부를 재추첨하는 식으로 보여도 안 된다.',
+      );
+    },
+  );
+
+  test(
     'absolute-price carry preserves wall identity and structural metadata',
     () {
       GameOrderBookSnapshot structuralSnapshot({

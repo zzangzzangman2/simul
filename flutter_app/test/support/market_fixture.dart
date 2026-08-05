@@ -37,6 +37,8 @@ FictionalMarketUniverse testMarketUniverse({
         financials: const [
           FictionalFinancialSnapshot(
             period: '1999-12-30',
+            publishedOn: '1999-12-30',
+            preliminaryOn: '1999-12-23',
             revenue: 1200000000,
             operatingProfit: 150000000,
             consensusOperatingProfit: 140000000,

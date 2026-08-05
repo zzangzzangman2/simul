@@ -65,6 +65,7 @@ export 'game/world_bootstrapper.dart'
     show CampaignWorldPreparer, WorldLoadProgress, WorldLoadProgressCallback;
 
 part 'organization_screen.dart';
+part 'game_audio.dart';
 part 'apartment_hub_screens.dart';
 part 'apartment_ambient_layer.dart';
 part 'home_improvement_screen.dart';
@@ -102,22 +103,33 @@ const _yellow = Color(0xFFFFDF68);
 const _coral = Color(0xFFFF7D72);
 const _blue = Color(0xFF67C7EC);
 
-Route<T> _gameSceneRoute<T>(Widget page) => PageRouteBuilder<T>(
-  transitionDuration: const Duration(milliseconds: 300),
-  reverseTransitionDuration: const Duration(milliseconds: 280),
-  pageBuilder: (_, animation, secondaryAnimation) => _GameFrame(child: page),
-  transitionsBuilder: (_, animation, secondaryAnimation, child) {
-    final fade = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
-    final scale = Tween<double>(begin: 0.985, end: 1).animate(fade);
-    return FadeTransition(
-      opacity: fade,
-      child: ScaleTransition(scale: scale, child: child),
-    );
-  },
-);
+Route<T> _gameSceneRoute<T>(Widget page) {
+  final audioScene = gameAudioSceneForPage(page);
+  return PageRouteBuilder<T>(
+    transitionDuration: const Duration(milliseconds: 300),
+    reverseTransitionDuration: const Duration(milliseconds: 280),
+    pageBuilder: (_, animation, secondaryAnimation) => _GameFrame(
+      child: audioScene == null
+          ? page
+          : GameAudioSceneScope(scene: audioScene, child: page),
+    ),
+    transitionsBuilder: (_, animation, secondaryAnimation, child) {
+      final fade = CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeOutCubic,
+      );
+      final scale = Tween<double>(begin: 0.985, end: 1).animate(fade);
+      return FadeTransition(
+        opacity: fade,
+        child: ScaleTransition(scale: scale, child: child),
+      );
+    },
+  );
+}
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  final horseRacePreview = Uri.base.queryParameters['horseRacePreview'];
   runApp(
     MillenniumCapitalApp(
       stockTestMode: Uri.base.queryParameters['stockTest'] == '1',
@@ -130,7 +142,8 @@ void main() {
           65,
       dialoguePreviewMode: Uri.base.queryParameters['dialoguePreview'] == '1',
       newspaperPreviewMode: Uri.base.queryParameters['newspaperPreview'] == '1',
-      horseRacePreviewMode: Uri.base.queryParameters['horseRacePreview'] == '1',
+      horseRacePreviewMode:
+          horseRacePreview == '1' || horseRacePreview == 'venue',
       casinoTestMode: Uri.base.queryParameters['casinoTest'] == '1',
     ),
   );
@@ -212,6 +225,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
   bool _isPreparingNewGame = false;
   bool _isNewGameWorldPrepared = false;
   bool _marketTutorialLaunchScheduled = false;
+  bool _casinoTestOffline = false;
   WorldLoadProgress? _worldLoadProgress;
   Object? _restoreError;
 
@@ -222,7 +236,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     if (widget.casinoTestMode) {
       final testState = _engine.createNewGame(
         '카지노 테스트',
-        initialCash: 100000,
+        initialCash: casinoTestBankroll,
         worldSeed: 'casino-live-test-v1',
       );
       _state = testState.copyWith(
@@ -843,6 +857,24 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     return result;
   }
 
+  Future<HorseRaceActionResult> _settleHorseRace(
+    HorseRaceSessionResult session,
+  ) async {
+    final current = _state!;
+    final result = _engine.completeHorseRace(current, session);
+    if (!result.success) return result;
+    final effectState = result.state.copyWith(
+      marketMinute: current.marketMinute,
+    );
+    final next = await _processStateThroughMarketMinute(
+      effectState,
+      marketDayEndMinute,
+    );
+    await _persistence.save(next);
+    if (mounted) setState(() => _state = next);
+    return result.withState(next);
+  }
+
   Future<CohortInvestmentActionResult> _settleCohortInvestmentDay() async {
     final current = _state!;
     final universe = await FictionalMarketUniverse.load(
@@ -965,7 +997,11 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
       text: text,
       abilityHint: proposedAbilityHint,
     );
-    if (!localResult.success) return localResult;
+    if (!localResult.success) {
+      GameAudio.instance.playSfx(GameSfx.error);
+      return localResult;
+    }
+    GameAudio.instance.playSfx(GameSfx.messageSend);
     var result = localResult;
     final localDraft = localResult.reply?.text;
     if (localDraft != null) {
@@ -998,6 +1034,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     result = result.withState(next);
     await _persistence.save(next);
     if (mounted) setState(() => _state = next);
+    GameAudio.instance.playSfx(GameSfx.notification, volumeScale: 0.85);
     return result;
   }
 
@@ -1011,9 +1048,13 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
       contactId: contactId,
       giftId: giftId,
     );
-    if (!result.success) return result;
+    if (!result.success) {
+      GameAudio.instance.playSfx(GameSfx.error);
+      return result;
+    }
     await _persistence.save(result.state);
     if (mounted) setState(() => _state = result.state);
+    GameAudio.instance.playSfx(GameSfx.coins);
     return result;
   }
 
@@ -1226,9 +1267,19 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
   Future<FinanceActionResult> _persistFinanceAction(
     FinanceActionResult result,
   ) async {
-    if (!result.success) return result;
+    if (!result.success) {
+      GameAudio.instance.playSfx(GameSfx.error);
+      return result;
+    }
     await _persistence.save(result.state);
     if (mounted) setState(() => _state = result.state);
+    if (result.cashDelta == 0) {
+      GameAudio.instance.playSfx(GameSfx.confirm);
+    } else if (result.cashDelta.abs() >= 1000000) {
+      GameAudio.instance.playSfx(GameSfx.coinsLarge);
+    } else {
+      GameAudio.instance.playSfx(GameSfx.coins);
+    }
     return result;
   }
 
@@ -1411,7 +1462,10 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     GameState current,
     CasinoActionResult result,
   ) async {
-    if (!result.success) return result;
+    if (!result.success) {
+      GameAudio.instance.playSfx(GameSfx.error);
+      return result;
+    }
     var next = result.state;
     if (result.minutesElapsed > 0) {
       final target = advanceGameTime(
@@ -1430,28 +1484,40 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
 
   Future<CasinoActionResult> _playCasinoRound(CasinoBet bet) {
     final current = _state!;
-    return _persistCasinoAction(current, _engine.playCasinoRound(current, bet));
+    final result = _engine.playCasinoRound(current, bet);
+    return _persistCasinoAction(current, result);
+  }
+
+  Future<CasinoActionResult> _exchangeCasinoChips(int amount) {
+    final current = _state!;
+    final result = _engine.exchangeCasinoChips(current, amount);
+    if (result.success) GameAudio.instance.playSfx(GameSfx.chipsHandle);
+    return _persistCasinoAction(current, result);
+  }
+
+  Future<CasinoActionResult> _cashOutCasinoChips() {
+    final current = _state!;
+    final result = _engine.cashOutCasinoChips(current);
+    if (result.success) GameAudio.instance.playSfx(GameSfx.coinsLarge);
+    return _persistCasinoAction(current, result);
   }
 
   Future<CasinoActionResult> _startCasinoBlackjack(int stake) {
     final current = _state!;
-    return _persistCasinoAction(
-      current,
-      _engine.startCasinoBlackjack(current, stake),
-    );
+    final result = _engine.startCasinoBlackjack(current, stake);
+    return _persistCasinoAction(current, result);
   }
 
   Future<CasinoActionResult> _actCasinoBlackjack(BlackjackAction action) {
     final current = _state!;
-    return _persistCasinoAction(
-      current,
-      _engine.actCasinoBlackjack(current, action),
-    );
+    final result = _engine.actCasinoBlackjack(current, action);
+    return _persistCasinoAction(current, result);
   }
 
   Future<CasinoActionResult> _rollCasinoCraps() {
     final current = _state!;
-    return _persistCasinoAction(current, _engine.rollCasinoCraps(current));
+    final result = _engine.rollCasinoCraps(current);
+    return _persistCasinoAction(current, result);
   }
 
   Future<FinanceActionResult> _openTimeDeposit(
@@ -1777,7 +1843,10 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
       );
     }
     final result = _engine.executeTrade(current, order);
-    if (!result.success) return result;
+    if (!result.success) {
+      GameAudio.instance.playSfx(GameSfx.error);
+      return result;
+    }
     var next = result.filledQuantity > 0
         ? completeWeeklyPortfolioReview(
             result.state,
@@ -1808,6 +1877,9 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     );
     await _persistMarketState(next);
     if (mounted) setState(() => _state = next);
+    GameAudio.instance.playSfx(
+      result.filledQuantity > 0 ? GameSfx.coinsLarge : GameSfx.confirm,
+    );
     return completed;
   }
 
@@ -1816,6 +1888,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     if (!result.success) return result;
     await _persistMarketState(result.state);
     if (mounted) setState(() => _state = result.state);
+    GameAudio.instance.playSfx(GameSfx.paperRustle);
     return result;
   }
 
@@ -1831,6 +1904,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     if (!result.success) return result;
     await _persistMarketState(result.state);
     if (mounted) setState(() => _state = result.state);
+    GameAudio.instance.playSfx(GameSfx.coins);
     return result;
   }
 
@@ -1863,7 +1937,10 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     final engineState = current.copyWith(
       cash: math.max(current.bankCash, casinoMaximumStake * 100),
       personalFinance: current.personalFinance.copyWith(
-        casino: currentMonthCasino,
+        casino: currentMonthCasino.copyWith(
+          monthBankrollBasis: casinoTestBankroll * 50,
+          chipBalance: currentMonthCasino.chipBalance,
+        ),
       ),
     );
     final raw = action(engineState);
@@ -1886,6 +1963,11 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
       key: const Key('casino-test-screen'),
       state: _state!,
       testMode: true,
+      onExchangeChips: (amount) => _runCasinoTestAction(
+        (state) => _engine.exchangeCasinoChips(state, amount),
+      ),
+      onCashOutChips: () =>
+          _runCasinoTestAction((state) => _engine.cashOutCasinoChips(state)),
       onPlayRound: (bet) =>
           _runCasinoTestAction((state) => _engine.playCasinoRound(state, bet)),
       onStartBlackjack: (stake) => _runCasinoTestAction(
@@ -1896,6 +1978,9 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
       ),
       onCrapsRoll: () =>
           _runCasinoTestAction((state) => _engine.rollCasinoCraps(state)),
+      onGoOffline: () {
+        if (mounted) setState(() => _casinoTestOffline = true);
+      },
     ),
   );
 
@@ -1926,11 +2011,30 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     );
   }
 
+  GameAudioScene get _rootAudioScene {
+    if (widget.casinoTestMode) {
+      return _casinoTestOffline ? GameAudioScene.hub : GameAudioScene.casino;
+    }
+    if (widget.horseRacePreviewMode) return GameAudioScene.horseRacing;
+    if (widget.newspaperPreviewMode) return GameAudioScene.action;
+    if (widget.stockTestMode) return GameAudioScene.market;
+    if (widget.hubPreviewMode) return GameAudioScene.hub;
+    if (!_isReady) return GameAudioScene.title;
+    if (_restoreError != null) return GameAudioScene.somber;
+    return switch (_view) {
+      _AppView.onboarding => GameAudioScene.silent,
+      _AppView.game => GameAudioScene.hub,
+      _ => GameAudioScene.title,
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       scaffoldMessengerKey: _scaffoldMessengerKey,
       navigatorKey: _navigatorKey,
+      builder: (context, child) =>
+          GameAudioGestureLayer(child: child ?? const SizedBox.shrink()),
       debugShowCheckedModeBanner: false,
       title: '10대부터 건물주',
       theme: ThemeData(
@@ -1960,168 +2064,179 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
           ),
         ),
       ),
-      home: widget.casinoTestMode && _state != null
-          ? _buildCasinoTestHome()
-          : widget.horseRacePreviewMode
-          ? _GameFrame(
-              child: HorseRacingMiniGame(
-                race: buildAfternoonHorseRace(
-                  simulationSeed: 'horse-race-preview-v1',
-                  day: 8,
+      home: GameAudioSceneScope(
+        scene: _rootAudioScene,
+        child: widget.casinoTestMode && _state != null
+            ? _casinoTestOffline
+                  ? _buildHubPreviewHome()
+                  : _buildCasinoTestHome()
+            : widget.horseRacePreviewMode
+            ? _GameFrame(
+                child: HorseRacingMiniGame(
+                  race: buildAfternoonHorseRace(
+                    simulationSeed: 'horse-race-preview-v1',
+                    day: 8,
+                  ),
+                  availableCash: 50000,
+                  previewMode: true,
                 ),
-                availableCash: 50000,
-                previewMode: true,
+              )
+            : widget.newspaperPreviewMode
+            ? const _GameFrame(child: RiderMiniGame())
+            : widget.hubPreviewMode && _state != null
+            ? _buildHubPreviewHome()
+            : widget.stockTestMode && _state != null
+            ? _buildStockTestHome()
+            : !_isReady
+            ? _GameFrame(
+                child: _LoadingScreen(
+                  progress: _worldLoadProgress,
+                  creatingWorld: _isPreparingNewGame,
+                ),
+              )
+            : _restoreError != null
+            ? _GameFrame(
+                child: _RestoreFailureScreen(
+                  onRetry: () => unawaited(_restoreGame(retry: true)),
+                ),
+              )
+            : _GameFrame(
+                child: switch (_view) {
+                  _AppView.title => _GameTitleScreen(
+                    occupiedSlots: _slots.where((slot) => !slot.isEmpty).length,
+                    onNewGame: _startNewGame,
+                    onContinue: _showContinue,
+                  ),
+                  _AppView.continueGame => _SaveSlotScreen(
+                    slots: _slots,
+                    activeSlot: _activeSlot,
+                    onLoad: _continueSlot,
+                    onDelete: _deleteSaveSlot,
+                    onCreate: _startNewGameInSlot,
+                    onBack: _showTitle,
+                  ),
+                  _AppView.onboarding => VisualNovelOnboardingScreen(
+                    onCreate: _createCompany,
+                    onExit: _showTitle,
+                    onCheckpoint: _savePrologueCheckpoint,
+                    initialBeat:
+                        _newGameDraftState?.story.flagInt('prologueBeat') ?? 0,
+                    initialAcademyPcPoweredOn:
+                        _newGameDraftState?.story.flagBool(
+                          'prologueAcademyPcPoweredOn',
+                        ) ??
+                        false,
+                    initialAcademyStockAppOpen:
+                        _newGameDraftState?.story.flagBool(
+                          'prologueAcademyStockAppOpen',
+                        ) ??
+                        false,
+                    initialPlayerName:
+                        _newGameDraftState
+                                ?.story
+                                .storyFlags['prologuePlayerName']
+                            as String? ??
+                        '',
+                    initialCompanyName:
+                        _newGameDraftState
+                                ?.story
+                                .storyFlags['prologueCompanyName']
+                            as String? ??
+                        '',
+                    allowRuntimeDialoguePreview: widget.dialoguePreviewMode,
+                    dialogueOverrideJson: widget.dialogueOverrideJson,
+                  ),
+                  _AppView.game when _state != null => OfficeScreen(
+                    state: _state!,
+                    stateReader: () => _state!,
+                    engine: _engine,
+                    phoneAiService: _phoneAiService,
+                    stockOrderBookSessionCache: _stockOrderBookSessionCache,
+                    activeSaveSlot: _activeSlot,
+                    lastSavedAt: _lastSavedAt,
+                    onManualSave: _manualSave,
+                    onReturnToTitle: _returnToTitle,
+                    onAdvanceDay: _advanceDay,
+                    onAdvanceDays: _advanceDays,
+                    onAdvanceDaysQuiet: (days) =>
+                        _advanceDays(days, stopOnImportantNews: false),
+                    onSetMarketMinute: _setMarketMinute,
+                    onSaveMarketNotebook: _saveMarketNotebook,
+                    onSetMarketRightsIssuePreference:
+                        _setMarketRightsIssuePreference,
+                    onResolveDecision: _resolveDecision,
+                    onRequestAcademyHelp: _requestAcademyHelp,
+                    onCompleteRelationshipEvening: _completeRelationshipEvening,
+                    onRestDuringRelationshipEvening:
+                        _restDuringRelationshipEvening,
+                    onCompleteWeekdayActivity: _completeWeekdayActivity,
+                    onCompleteWeeklyPortfolioReview:
+                        _completeWeeklyPortfolioReview,
+                    onCompleteWeekendActivity: _completeWeekendActivity,
+                    onSettleCohortInvestmentDay: _settleCohortInvestmentDay,
+                    onLendToCohortInvestor: _lendToCohortInvestor,
+                    onBorrowFromCohortInvestor: _borrowFromCohortInvestor,
+                    onAcknowledgeCohortInvestmentReport:
+                        _acknowledgeCohortInvestmentReport,
+                    onAcknowledgeCohortStandingEvent:
+                        _acknowledgeCohortStandingEvent,
+                    onRespondToCohortWithdrawal: _respondToCohortWithdrawal,
+                    onMarkPhoneThreadRead: _markPhoneThreadRead,
+                    onSendPhoneMessage: _sendPhoneMessage,
+                    onSendPhoneGift: _sendPhoneGift,
+                    onHireEmployee: _hireEmployee,
+                    onLaunchFund: _launchFund,
+                    onPurchaseSpendingOption: _purchaseSpendingOption,
+                    onPurchaseHomeImprovement: _purchaseHomeImprovement,
+                    onAcquireBusiness: _acquireBusiness,
+                    onUpdateBusinessPolicy: _updateBusinessPolicy,
+                    onInvestInBusiness: _investInBusiness,
+                    onCloseBusiness: _closeBusiness,
+                    onChooseBusinessEvent: _chooseBusinessEvent,
+                    onSellRealEstate: _sellRealEstate,
+                    onConfigureRealEstateLease: _configureRealEstateLease,
+                    onCancelRealEstateSaleListing: _cancelRealEstateSaleListing,
+                    onSaveRealEstateInvestmentNote:
+                        _saveRealEstateInvestmentNote,
+                    onRenovateRealEstate: _renovateRealEstate,
+                    onSetRealEstateInsurance: _setRealEstateInsurance,
+                    onRenewRealEstateMonthlyLease: _renewRealEstateMonthlyLease,
+                    onTerminateRealEstateMonthlyLeaseEarly:
+                        _terminateRealEstateMonthlyLeaseEarly,
+                    onPrepayRealEstateMortgage: _prepayRealEstateMortgage,
+                    onRefinanceRealEstateMortgage: _refinanceRealEstateMortgage,
+                    onPlayChanceGame: _playAdultChanceGame,
+                    onExchangeCasinoChips: _exchangeCasinoChips,
+                    onCashOutCasinoChips: _cashOutCasinoChips,
+                    onPlayCasinoRound: _playCasinoRound,
+                    onStartCasinoBlackjack: _startCasinoBlackjack,
+                    onCasinoBlackjackAction: _actCasinoBlackjack,
+                    onCasinoCrapsRoll: _rollCasinoCraps,
+                    onSettleHorseRace: _settleHorseRace,
+                    onOpenTimeDeposit: _openTimeDeposit,
+                    onRedeemTimeDeposit: _redeemTimeDeposit,
+                    onTakeUnsecuredLoan: _takeUnsecuredLoan,
+                    onRepayUnsecuredLoan: _repayUnsecuredLoan,
+                    onPurchaseMarketReport: _purchaseDailyMarketReport,
+                    onCompleteHubTutorial: _completeHubTutorial,
+                    onCompleteMarketTutorial: _completeMarketTutorial,
+                    onCompleteBankDepositTutorial: _completeBankDepositTutorial,
+                    onCompleteRealEstateTutorial: _completeRealEstateTutorial,
+                    onArchiveNews: _archiveNews,
+                    onCompleteWork: _completeWork,
+                    onExecuteTrade: _executeTrade,
+                    onSaveGovernanceState: _saveShareholderGovernanceState,
+                    onCancelPendingOrder: _cancelPendingOrder,
+                    onTransferBrokerageCash: _transferBrokerageCash,
+                  ),
+                  _ => _GameTitleScreen(
+                    occupiedSlots: _slots.where((slot) => !slot.isEmpty).length,
+                    onNewGame: _startNewGame,
+                    onContinue: _showContinue,
+                  ),
+                },
               ),
-            )
-          : widget.newspaperPreviewMode
-          ? const _GameFrame(child: RiderMiniGame())
-          : widget.hubPreviewMode && _state != null
-          ? _buildHubPreviewHome()
-          : widget.stockTestMode && _state != null
-          ? _buildStockTestHome()
-          : !_isReady
-          ? _GameFrame(
-              child: _LoadingScreen(
-                progress: _worldLoadProgress,
-                creatingWorld: _isPreparingNewGame,
-              ),
-            )
-          : _restoreError != null
-          ? _GameFrame(
-              child: _RestoreFailureScreen(
-                onRetry: () => unawaited(_restoreGame(retry: true)),
-              ),
-            )
-          : _GameFrame(
-              child: switch (_view) {
-                _AppView.title => _GameTitleScreen(
-                  occupiedSlots: _slots.where((slot) => !slot.isEmpty).length,
-                  onNewGame: _startNewGame,
-                  onContinue: _showContinue,
-                ),
-                _AppView.continueGame => _SaveSlotScreen(
-                  slots: _slots,
-                  activeSlot: _activeSlot,
-                  onLoad: _continueSlot,
-                  onDelete: _deleteSaveSlot,
-                  onCreate: _startNewGameInSlot,
-                  onBack: _showTitle,
-                ),
-                _AppView.onboarding => VisualNovelOnboardingScreen(
-                  onCreate: _createCompany,
-                  onExit: _showTitle,
-                  onCheckpoint: _savePrologueCheckpoint,
-                  initialBeat:
-                      _newGameDraftState?.story.flagInt('prologueBeat') ?? 0,
-                  initialAcademyPcPoweredOn:
-                      _newGameDraftState?.story.flagBool(
-                        'prologueAcademyPcPoweredOn',
-                      ) ??
-                      false,
-                  initialAcademyStockAppOpen:
-                      _newGameDraftState?.story.flagBool(
-                        'prologueAcademyStockAppOpen',
-                      ) ??
-                      false,
-                  initialPlayerName:
-                      _newGameDraftState?.story.storyFlags['prologuePlayerName']
-                          as String? ??
-                      '',
-                  initialCompanyName:
-                      _newGameDraftState
-                              ?.story
-                              .storyFlags['prologueCompanyName']
-                          as String? ??
-                      '',
-                  allowRuntimeDialoguePreview: widget.dialoguePreviewMode,
-                  dialogueOverrideJson: widget.dialogueOverrideJson,
-                ),
-                _AppView.game when _state != null => OfficeScreen(
-                  state: _state!,
-                  stateReader: () => _state!,
-                  engine: _engine,
-                  phoneAiService: _phoneAiService,
-                  stockOrderBookSessionCache: _stockOrderBookSessionCache,
-                  activeSaveSlot: _activeSlot,
-                  lastSavedAt: _lastSavedAt,
-                  onManualSave: _manualSave,
-                  onReturnToTitle: _returnToTitle,
-                  onAdvanceDay: _advanceDay,
-                  onAdvanceDays: _advanceDays,
-                  onAdvanceDaysQuiet: (days) =>
-                      _advanceDays(days, stopOnImportantNews: false),
-                  onSetMarketMinute: _setMarketMinute,
-                  onSaveMarketNotebook: _saveMarketNotebook,
-                  onSetMarketRightsIssuePreference:
-                      _setMarketRightsIssuePreference,
-                  onResolveDecision: _resolveDecision,
-                  onRequestAcademyHelp: _requestAcademyHelp,
-                  onCompleteRelationshipEvening: _completeRelationshipEvening,
-                  onRestDuringRelationshipEvening:
-                      _restDuringRelationshipEvening,
-                  onCompleteWeekdayActivity: _completeWeekdayActivity,
-                  onCompleteWeeklyPortfolioReview:
-                      _completeWeeklyPortfolioReview,
-                  onCompleteWeekendActivity: _completeWeekendActivity,
-                  onSettleCohortInvestmentDay: _settleCohortInvestmentDay,
-                  onLendToCohortInvestor: _lendToCohortInvestor,
-                  onBorrowFromCohortInvestor: _borrowFromCohortInvestor,
-                  onAcknowledgeCohortInvestmentReport:
-                      _acknowledgeCohortInvestmentReport,
-                  onAcknowledgeCohortStandingEvent:
-                      _acknowledgeCohortStandingEvent,
-                  onRespondToCohortWithdrawal: _respondToCohortWithdrawal,
-                  onMarkPhoneThreadRead: _markPhoneThreadRead,
-                  onSendPhoneMessage: _sendPhoneMessage,
-                  onSendPhoneGift: _sendPhoneGift,
-                  onHireEmployee: _hireEmployee,
-                  onLaunchFund: _launchFund,
-                  onPurchaseSpendingOption: _purchaseSpendingOption,
-                  onPurchaseHomeImprovement: _purchaseHomeImprovement,
-                  onAcquireBusiness: _acquireBusiness,
-                  onUpdateBusinessPolicy: _updateBusinessPolicy,
-                  onInvestInBusiness: _investInBusiness,
-                  onCloseBusiness: _closeBusiness,
-                  onChooseBusinessEvent: _chooseBusinessEvent,
-                  onSellRealEstate: _sellRealEstate,
-                  onConfigureRealEstateLease: _configureRealEstateLease,
-                  onCancelRealEstateSaleListing: _cancelRealEstateSaleListing,
-                  onSaveRealEstateInvestmentNote: _saveRealEstateInvestmentNote,
-                  onRenovateRealEstate: _renovateRealEstate,
-                  onSetRealEstateInsurance: _setRealEstateInsurance,
-                  onRenewRealEstateMonthlyLease: _renewRealEstateMonthlyLease,
-                  onTerminateRealEstateMonthlyLeaseEarly:
-                      _terminateRealEstateMonthlyLeaseEarly,
-                  onPrepayRealEstateMortgage: _prepayRealEstateMortgage,
-                  onRefinanceRealEstateMortgage: _refinanceRealEstateMortgage,
-                  onPlayChanceGame: _playAdultChanceGame,
-                  onPlayCasinoRound: _playCasinoRound,
-                  onStartCasinoBlackjack: _startCasinoBlackjack,
-                  onCasinoBlackjackAction: _actCasinoBlackjack,
-                  onCasinoCrapsRoll: _rollCasinoCraps,
-                  onOpenTimeDeposit: _openTimeDeposit,
-                  onRedeemTimeDeposit: _redeemTimeDeposit,
-                  onTakeUnsecuredLoan: _takeUnsecuredLoan,
-                  onRepayUnsecuredLoan: _repayUnsecuredLoan,
-                  onPurchaseMarketReport: _purchaseDailyMarketReport,
-                  onCompleteHubTutorial: _completeHubTutorial,
-                  onCompleteMarketTutorial: _completeMarketTutorial,
-                  onCompleteBankDepositTutorial: _completeBankDepositTutorial,
-                  onCompleteRealEstateTutorial: _completeRealEstateTutorial,
-                  onArchiveNews: _archiveNews,
-                  onCompleteWork: _completeWork,
-                  onExecuteTrade: _executeTrade,
-                  onSaveGovernanceState: _saveShareholderGovernanceState,
-                  onCancelPendingOrder: _cancelPendingOrder,
-                  onTransferBrokerageCash: _transferBrokerageCash,
-                ),
-                _ => _GameTitleScreen(
-                  occupiedSlots: _slots.where((slot) => !slot.isEmpty).length,
-                  onNewGame: _startNewGame,
-                  onContinue: _showContinue,
-                ),
-              },
-            ),
+      ),
     );
   }
 }

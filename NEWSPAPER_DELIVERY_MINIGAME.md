@@ -60,3 +60,6 @@
 - `flutter_app/test/rider_mini_game_test.dart`: 점수 공식·7부 완주·360px·10칸 조향·ImageGen 에셋·실제 왼쪽 플릭
 - `flutter_app/test/weekend_activity_test.dart`: 미플레이 정산 차단·고득점 수당 증가
 - `flutter_app/test/weekend_activity_screen_test.dart`: 주말 카드에서 플레이 화면 진입
+
+직접 화면과 플릭 판정만 확인할 때는 `/play/index.html?newspaperPreview=1`을 연다.
+이 진입점은 미니게임 화면만 열며 본편 저장 슬롯을 정산하거나 덮어쓰지 않는다.

@@ -32,10 +32,10 @@
 | 분야 | 문서 |
 | --- | --- |
 | 프로젝트 데시멀 세계관·프롤로그 | `DECIMAL_WORLD.md` |
-| 플레이어·동기 연령과 장기 성장 | `PROTAGONIST_AGE_LINE.md` |
-| 월간 성장 달력·주말 행동력·알바·선물·외출·날짜 사건 | `CALENDAR_SYSTEM.md` |
+| 플레이어·동기 연령·실제 경험치/기술·월말/연말 회고 | `PROTAGONIST_AGE_LINE.md` |
+| 월간 성장 달력·주간 복기·주말 행동력·알바·선물·평일 경마·외출·날짜 사건 | `CALENDAR_SYSTEM.md` |
 | 새벽 신문배달 플릭 조작·점수·성과 수당·렌더링 | `NEWSPAPER_DELIVERY_MINIGAME.md` |
-| 요원 PC 카지노 LIVE·테이블 규칙·시간·한도·원장 | `CASINO_SYSTEM.md` |
+| 데시멀 카지노 현장·딜러·칩 교환·테이블 규칙·시간·한도·원장 | `CASINO_SYSTEM.md` |
 | 요원 PC 국가망 경마·전자 마권·수수료·실시간 중계 | `HORSE_RACING_SYSTEM.md` |
 | 여학생 8명 성격·대사 | `characters/cohort6_girls/README.md`와 인물별 문서 |
 | 관계 시스템 | `RELATIONSHIP_SYSTEM.md` — 호감도·신뢰·친밀·투자존중·주말 외출 |
@@ -43,7 +43,7 @@
 | 데시멀톡 | `PHONE_MESSENGER_SYSTEM.md` — Gemini 3.5 Flash-Lite·로컬 폴백·성격별 대화·투자 반응·장기기억 |
 | 대사 편집기 | `DIALOGUE_EDITOR_GUIDE.md` |
 | 시장·경제 수치 | `BALANCE_NOTES.md` |
-| 상장사 주주권·주주총회·경영권·자회사·발행/유통주식 호가원장 | `SHAREHOLDER_GOVERNANCE_SYSTEM.md` |
+| 상장사 실적/감사/주총 공시 일정·주주권·경영권·자회사·발행/유통주식 호가원장 | `SHAREHOLDER_GOVERNANCE_SYSTEM.md` |
 | 부동산 | `REAL_ESTATE_SYSTEM.md` |
 | 가상기업·사건 문법 | `CONTENT_GUIDE.md` |
 | 데이터·라이선스 | `DATA_SOURCES.md` |

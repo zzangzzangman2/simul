@@ -1,8 +1,8 @@
 {
   "version": 2,
   "contentVersion": 5,
-  "appearanceVersion": 19,
-  "updatedAt": "2026-08-04T08:53:54.470Z",
+  "appearanceVersion": 20,
+  "updatedAt": "2026-08-05T11:31:27.713Z",
   "scenes": [
     {
       "id": "decimal-001",
@@ -17,7 +17,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_hesitation.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/crt_glitch.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-002",
@@ -32,7 +36,11 @@
       "character": "/play/assets/assets/images/cinematic_soft_painted/decimal_nis_1999/characters/han_gyujin_nis_director_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_hesitation.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/paper_place.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-003",
@@ -47,7 +55,11 @@
       "character": "/play/assets/assets/images/cinematic_soft_painted/decimal_nis_1999/characters/lim_seohee_economic_security_chief_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_hesitation.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-004",
@@ -62,7 +74,11 @@
       "character": "/play/assets/assets/images/cinematic_soft_painted/decimal_nis_1999/characters/do_yunseok_planning_coordinator_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_hesitation.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-005",
@@ -77,7 +93,11 @@
       "character": "/play/assets/assets/images/cinematic_soft_painted/decimal_nis_1999/characters/jo_mingyeong_rights_auditor_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_hesitation.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-006",
@@ -92,7 +112,11 @@
       "character": "/play/assets/assets/images/cinematic_soft_painted/decimal_nis_1999/characters/han_gyujin_nis_director_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_hesitation.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/notification.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-007",
@@ -107,7 +131,11 @@
       "character": "/play/assets/assets/images/cinematic_soft_painted/decimal_nis_1999/characters/jo_mingyeong_rights_auditor_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_hesitation.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-008",
@@ -122,7 +150,11 @@
       "character": "/play/assets/assets/images/cinematic_soft_painted/decimal_nis_1999/characters/do_yunseok_planning_coordinator_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_hesitation.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-009",
@@ -137,7 +169,11 @@
       "character": "/play/assets/assets/images/cinematic_soft_painted/decimal_nis_1999/characters/lim_seohee_economic_security_chief_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_hesitation.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/page_flip.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-010",
@@ -152,7 +188,11 @@
       "character": "/play/assets/assets/images/cinematic_soft_painted/decimal_nis_1999/characters/han_gyujin_nis_director_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_hesitation.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-011",
@@ -167,7 +207,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_hesitation.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-012",
@@ -182,7 +226,11 @@
       "character": "/play/assets/assets/images/cinematic_soft_painted/decimal_nis_1999/characters/cha_eunjoo_selection_officer_v2.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_hesitation.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-013",
@@ -197,7 +245,11 @@
       "character": "/play/assets/assets/images/cinematic_soft_painted/decimal_nis_1999/characters/do_yunseok_planning_coordinator_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_hesitation.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/metal_latch.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-014",
@@ -212,7 +264,11 @@
       "character": "/play/assets/assets/images/cinematic_soft_painted/decimal_nis_1999/characters/han_gyujin_nis_director_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_hesitation.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-015",
@@ -227,7 +283,11 @@
       "character": "/play/assets/assets/images/cinematic_soft_painted/decimal_nis_1999/characters/cha_eunjoo_selection_officer_v2.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_hesitation.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-016",
@@ -242,7 +302,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_hesitation.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-017",
@@ -257,7 +321,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_hesitation.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/impact_soft.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-018",
@@ -272,7 +340,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_piano_sad.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/door_open.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-019",
@@ -287,7 +359,11 @@
       "character": "/play/assets/assets/images/cinematic_soft_painted/decimal_nis_1999/characters/do_yunseok_planning_coordinator_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_piano_sad.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/metal_latch.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-020",
@@ -302,7 +378,11 @@
       "character": "/play/assets/assets/images/cinematic_soft_painted/decimal_nis_1999/characters/lim_seohee_economic_security_chief_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_piano_sad.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/book_open.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-021",
@@ -317,7 +397,11 @@
       "character": "/play/assets/assets/images/cinematic_soft_painted/decimal_nis_1999/characters/jo_mingyeong_rights_auditor_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_piano_sad.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/page_flip.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-022",
@@ -332,7 +416,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_piano_sad.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-023",
@@ -347,7 +435,11 @@
       "character": "/play/assets/assets/images/cinematic_soft_painted/decimal_nis_1999/characters/do_yunseok_planning_coordinator_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_piano_sad.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-024",
@@ -362,7 +454,11 @@
       "character": "/play/assets/assets/images/cinematic_soft_painted/decimal_nis_1999/characters/cha_eunjoo_selection_officer_v2.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_piano_sad.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/page_flip.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-025",
@@ -377,7 +473,11 @@
       "character": "/play/assets/assets/images/cinematic_soft_painted/decimal_nis_1999/characters/lim_seohee_economic_security_chief_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_piano_sad.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-026",
@@ -392,7 +492,11 @@
       "character": "/play/assets/assets/images/cinematic_soft_painted/decimal_nis_1999/characters/do_yunseok_planning_coordinator_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_piano_sad.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-027",
@@ -407,7 +511,11 @@
       "character": "/play/assets/assets/images/cinematic_soft_painted/decimal_nis_1999/characters/lim_seohee_economic_security_chief_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_piano_sad.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-028",
@@ -422,7 +530,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_piano_sad.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/crt_glitch.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-029",
@@ -437,7 +549,11 @@
       "character": "/play/assets/assets/images/cinematic_soft_painted/decimal_nis_1999/characters/han_gyujin_nis_director_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_piano_sad.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-030",
@@ -452,7 +568,11 @@
       "character": "/play/assets/assets/images/cinematic_soft_painted/decimal_nis_1999/characters/cha_eunjoo_selection_officer_v2.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_piano_sad.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-031",
@@ -467,7 +587,11 @@
       "character": "/play/assets/assets/images/cinematic_soft_painted/decimal_nis_1999/characters/jo_mingyeong_rights_auditor_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_piano_sad.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/book_close.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-032",
@@ -482,7 +606,11 @@
       "character": "/play/assets/assets/images/cinematic_soft_painted/decimal_nis_1999/characters/han_gyujin_nis_director_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_piano_sad.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-033",
@@ -497,7 +625,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_piano_sad.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-034",
@@ -512,7 +644,11 @@
       "character": "/play/assets/assets/images/cinematic_soft_painted/decimal_nis_1999/characters/lim_seohee_economic_security_chief_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_piano_sad.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/door_close.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-035",
@@ -527,7 +663,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/finance_sakuya.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/paper_place.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-036",
@@ -542,7 +682,11 @@
       "character": "/play/assets/assets/images/cinematic_soft_painted/decimal_nis_1999/characters/cha_eunjoo_selection_officer_v2.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/finance_sakuya.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-037",
@@ -557,7 +701,11 @@
       "character": "/play/assets/assets/images/cinematic_soft_painted/decimal_nis_1999/characters/oh_gyeongtae_facilities_manager_v2.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/finance_sakuya.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-038",
@@ -572,7 +720,11 @@
       "character": "/play/assets/assets/images/cinematic_soft_painted/decimal_nis_1999/characters/cha_eunjoo_selection_officer_v2.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/finance_sakuya.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/page_flip.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-039",
@@ -587,7 +739,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/finance_sakuya.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-040",
@@ -602,7 +758,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/finance_sakuya.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-041",
@@ -617,7 +777,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/finance_sakuya.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-042",
@@ -632,7 +796,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/finance_sakuya.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/ui_tick.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-043",
@@ -647,7 +815,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/kim_hakjun/03_skeptical_condition_check_uniform_v4.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/finance_sakuya.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-044",
@@ -662,7 +834,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/finance_sakuya.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-045",
@@ -677,7 +853,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/kim_hakjun/01_neutral_crosscheck_uniform_v4.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/finance_sakuya.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-046",
@@ -692,7 +872,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/finance_sakuya.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/paper_rustle.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-047",
@@ -707,7 +891,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/kim_seoa/01_neutral_notebook_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/finance_sakuya.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-048",
@@ -722,7 +910,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/finance_sakuya.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-049",
@@ -737,7 +929,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/lee_jian/01_neutral_screwdriver_v2.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/finance_sakuya.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-050",
@@ -752,7 +948,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/finance_sakuya.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/ui_select.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-051",
@@ -767,7 +967,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/choi_iseo/01_base_thread_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/finance_sakuya.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-052",
@@ -782,7 +986,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/finance_sakuya.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-053",
@@ -797,7 +1005,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/jung_arin/01_base_cheeky_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/finance_sakuya.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-054",
@@ -812,7 +1024,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/finance_sakuya.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/page_flip.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-055",
@@ -824,10 +1040,14 @@
       "direction": "",
       "line": "저만 새 연필 받으면 제 점수도 믿을 수 없어요. 조건을 같이 말해 주세요.",
       "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_matrix_exam_1999_v1.png",
-      "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_neutral_soft_v2.png",
+      "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_neutral_v3.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/finance_sakuya.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-056",
@@ -842,7 +1062,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/finance_sakuya.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-057",
@@ -857,7 +1081,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/finance_sakuya.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-058",
@@ -872,7 +1100,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/finance_sakuya.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/ui_tick.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-059",
@@ -887,7 +1119,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/oh_jiwoo/01_alert_neutral_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/finance_sakuya.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-060",
@@ -902,7 +1138,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/finance_sakuya.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-061",
@@ -917,7 +1157,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/yoon_chaea/01_neutral_tie_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/finance_sakuya.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-062",
@@ -932,7 +1176,11 @@
       "character": "/play/assets/assets/images/cinematic_soft_painted/decimal_nis_1999/characters/cha_eunjoo_selection_officer_v2.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/finance_sakuya.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/ui_confirm.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-063",
@@ -947,7 +1195,11 @@
       "character": "/play/assets/assets/images/cinematic_soft_painted/decimal_nis_1999/characters/oh_gyeongtae_facilities_manager_v2.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/finance_sakuya.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-064",
@@ -962,7 +1214,11 @@
       "character": "/play/assets/assets/images/cinematic_soft_painted/decimal_nis_1999/characters/cha_eunjoo_selection_officer_v2.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/finance_sakuya.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/paper_place.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-065",
@@ -977,7 +1233,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/door_open.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-066",
@@ -992,7 +1252,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/jung_arin/01_base_cheeky_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-067",
@@ -1007,7 +1271,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/oh_jiwoo/01_alert_neutral_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/crt_glitch.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-068",
@@ -1022,7 +1290,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/kim_hakjun/03_skeptical_condition_check_uniform_v4.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-069",
@@ -1037,7 +1309,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-070",
@@ -1052,7 +1328,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/choi_iseo/01_base_thread_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/notification.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-071",
@@ -1067,7 +1347,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-072",
@@ -1082,7 +1366,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-073",
@@ -1097,7 +1385,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/yoon_chaea/01_neutral_tie_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/ui_tick.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-074",
@@ -1112,7 +1404,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/lee_jian/01_neutral_screwdriver_v2.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-075",
@@ -1127,7 +1423,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/kim_seoa/01_neutral_notebook_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-076",
@@ -1139,10 +1439,14 @@
       "direction": "",
       "line": "그럼 누가 먼저 열었다고 몰아갈 수도 있어. 열 거면 열 명이 같이 보고 열자.",
       "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_unfair_game_1999_v1.png",
-      "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_neutral_soft_v2.png",
+      "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_neutral_v3.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-077",
@@ -1157,7 +1461,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/jung_arin/01_base_cheeky_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/page_flip.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-078",
@@ -1172,7 +1480,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/oh_jiwoo/01_alert_neutral_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-079",
@@ -1187,7 +1499,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/jung_arin/01_base_cheeky_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-080",
@@ -1202,7 +1518,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-081",
@@ -1217,7 +1537,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/paper_rustle.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-082",
@@ -1255,7 +1579,11 @@
           "condition": "",
           "effects": "decimalVoice=consent"
         }
-      ]
+      ],
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-083",
@@ -1270,7 +1598,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-084",
@@ -1286,7 +1618,11 @@
       "characterX": 0,
       "characterY": 0,
       "characterScale": 1,
-      "condition": "decimalVoice == loophole"
+      "condition": "decimalVoice == loophole",
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-085",
@@ -1298,11 +1634,15 @@
       "direction": "",
       "line": "이름을 하나씩 부르니까 아무도 숫자가 안 됐어. 그게 제일 어려운 거야. 나는 그게 좋았어.",
       "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_unfair_game_1999_v1.png",
-      "character": "/play/assets/assets/images/production_soft_painted/park_haeun/02_bright_smile_wave_v2.png",
+      "character": "/play/assets/assets/images/production_soft_painted/park_haeun/02_gentle_smile_v3.png",
       "characterX": 0,
       "characterY": 0,
       "characterScale": 1,
-      "condition": "decimalVoice == together"
+      "condition": "decimalVoice == together",
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/impact_soft.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-086",
@@ -1318,7 +1658,11 @@
       "characterX": 0,
       "characterY": 0,
       "characterScale": 1,
-      "condition": "decimalVoice == consent"
+      "condition": "decimalVoice == consent",
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-087",
@@ -1333,7 +1677,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/yoon_chaea/01_neutral_tie_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-088",
@@ -1348,7 +1696,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/kim_seoa/01_neutral_notebook_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-089",
@@ -1360,10 +1712,14 @@
       "direction": "",
       "line": "열둘 중 두 명은 아직 말을 못 했어. 공동 소유에 동의하는지 먼저 물어야 해.",
       "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_unfair_game_1999_v1.png",
-      "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_neutral_soft_v2.png",
+      "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_neutral_v3.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/notification.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-090",
@@ -1378,7 +1734,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-091",
@@ -1393,7 +1753,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-092",
@@ -1408,7 +1772,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-093",
@@ -1423,7 +1791,11 @@
       "character": "/play/assets/assets/images/cinematic_soft_painted/decimal_nis_1999/characters/cha_eunjoo_selection_officer_v2.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/crt_glitch.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-094",
@@ -1438,7 +1810,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-095",
@@ -1453,7 +1829,11 @@
       "character": "/play/assets/assets/images/cinematic_soft_painted/decimal_nis_1999/characters/cha_eunjoo_selection_officer_v2.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-096",
@@ -1468,7 +1848,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-097",
@@ -1483,7 +1867,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/choi_iseo/01_base_thread_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/ui_confirm.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-098",
@@ -1498,7 +1886,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/kim_seoa/01_neutral_notebook_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/door_close.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-099",
@@ -1513,7 +1905,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/door_open.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-100",
@@ -1528,7 +1924,11 @@
       "character": "/play/assets/assets/images/cinematic_soft_painted/decimal_nis_1999/characters/cha_eunjoo_selection_officer_v2.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-101",
@@ -1543,7 +1943,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/oh_jiwoo/01_alert_neutral_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-102",
@@ -1558,7 +1962,11 @@
       "character": "/play/assets/assets/images/cinematic_soft_painted/decimal_nis_1999/characters/cha_eunjoo_selection_officer_v2.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/paper_rustle.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-103",
@@ -1573,7 +1981,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-104",
@@ -1611,7 +2023,11 @@
           "condition": "",
           "effects": "decimalDesire=none"
         }
-      ]
+      ],
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-105",
@@ -1627,7 +2043,11 @@
       "characterX": 0,
       "characterY": 0,
       "characterScale": 1,
-      "condition": "decimalDesire == meal"
+      "condition": "decimalDesire == meal",
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/ui_select.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-106",
@@ -1643,7 +2063,11 @@
       "characterX": 0,
       "characterY": 0,
       "characterScale": 1,
-      "condition": "decimalDesire == envelope"
+      "condition": "decimalDesire == envelope",
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-107",
@@ -1659,7 +2083,11 @@
       "characterX": 0,
       "characterY": 0,
       "characterScale": 1,
-      "condition": "decimalDesire == none"
+      "condition": "decimalDesire == none",
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-108",
@@ -1674,7 +2102,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/kim_hakjun/02_explaining_rules_uniform_v4.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-109",
@@ -1689,7 +2121,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/lee_jian/01_neutral_screwdriver_v2.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/coins.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-110",
@@ -1704,7 +2140,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/jung_arin/01_base_cheeky_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-111",
@@ -1719,7 +2159,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/choi_iseo/01_base_thread_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-112",
@@ -1731,10 +2175,14 @@
       "direction": "",
       "line": "그건 바로 골라도 돼. 필요한 걸 참는 게 훌륭한 건 아니잖아.",
       "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_desire_test_1999_v1.png",
-      "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_neutral_soft_v2.png",
+      "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_neutral_v3.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-113",
@@ -1749,7 +2197,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/choi_iseo/01_base_thread_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/notification.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-114",
@@ -1764,7 +2216,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/kim_seoa/01_neutral_notebook_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-115",
@@ -1779,7 +2235,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-116",
@@ -1791,10 +2251,14 @@
       "direction": "",
       "line": "나도 차표 확인에 같이 갈게. 네가 혼자 설명하게 두면 남는 선택도 벌처럼 될 수 있어.",
       "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_desire_test_1999_v1.png",
-      "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_neutral_soft_v2.png",
+      "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_neutral_v3.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-117",
@@ -1809,7 +2273,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/oh_jiwoo/01_alert_neutral_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/paper_place.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-118",
@@ -1824,7 +2292,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/yoon_chaea/01_neutral_tie_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-119",
@@ -1839,7 +2311,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/kim_hakjun/06_firm_objection_uniform_v4.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-120",
@@ -1854,7 +2330,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-121",
@@ -1869,7 +2349,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/kim_hakjun/09_restrained_team_smile_uniform_v4.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/ui_confirm.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-122",
@@ -1884,7 +2368,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-123",
@@ -1899,7 +2387,11 @@
       "character": "/play/assets/assets/images/cinematic_soft_painted/decimal_nis_1999/characters/do_yunseok_planning_coordinator_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-124",
@@ -1914,7 +2406,11 @@
       "character": "/play/assets/assets/images/cinematic_soft_painted/decimal_nis_1999/characters/cha_eunjoo_selection_officer_v2.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-125",
@@ -1929,7 +2425,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/coins_large.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-126",
@@ -1944,7 +2444,11 @@
       "character": "/play/assets/assets/images/cinematic_soft_painted/decimal_nis_1999/characters/jo_mingyeong_rights_auditor_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-127",
@@ -1959,7 +2463,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/door_close.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-128",
@@ -1974,7 +2482,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/title_gentle_theme.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/footstep_1.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-129",
@@ -1989,7 +2501,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/title_gentle_theme.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/footstep_2.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-130",
@@ -2004,7 +2520,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/oh_jiwoo/01_alert_neutral_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/title_gentle_theme.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-131",
@@ -2019,7 +2539,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/kim_hakjun/05_worried_unfair_loss_uniform_v4.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/title_gentle_theme.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/door_open.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-132",
@@ -2034,7 +2558,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/title_gentle_theme.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-133",
@@ -2049,7 +2577,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/title_gentle_theme.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/metal_latch.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-134",
@@ -2064,7 +2596,11 @@
       "character": "/play/assets/assets/images/cinematic_soft_painted/decimal_nis_1999/characters/oh_gyeongtae_facilities_manager_v2.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_hesitation.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/door_open.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-135",
@@ -2079,7 +2615,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_hesitation.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-136",
@@ -2094,7 +2634,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/kim_hakjun/01_neutral_crosscheck_uniform_v4.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_hesitation.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/metal_latch.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-137",
@@ -2109,7 +2653,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_hesitation.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-138",
@@ -2124,7 +2672,11 @@
       "character": "/play/assets/assets/images/cinematic_soft_painted/decimal_nis_1999/characters/oh_gyeongtae_facilities_manager_v2.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_hesitation.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/crt_glitch.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-139",
@@ -2139,7 +2691,11 @@
       "character": "/play/assets/assets/images/주식선생님/22_포즈1_주인공그림체_공통슬롯_투명.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_hesitation.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-140",
@@ -2151,10 +2707,14 @@
       "direction": "",
       "line": "싫다고 말하면 멈출 수 있는 것도 포함돼요?",
       "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_secure_entry_1999_v1.png",
-      "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_neutral_soft_v2.png",
+      "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_neutral_v3.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_hesitation.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-141",
@@ -2169,7 +2729,11 @@
       "character": "/play/assets/assets/images/주식선생님/26_포즈5_주인공그림체_공통슬롯_투명.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_hesitation.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/ui_select.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-142",
@@ -2184,7 +2748,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/yoon_chaea/01_neutral_tie_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_hesitation.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-143",
@@ -2199,7 +2767,11 @@
       "character": "/play/assets/assets/images/주식선생님/24_포즈3_주인공그림체_공통슬롯_투명.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_hesitation.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-144",
@@ -2214,7 +2786,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/kim_seoa/01_neutral_notebook_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_hesitation.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/ui_tick.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-145",
@@ -2229,7 +2805,11 @@
       "character": "/play/assets/assets/images/주식선생님/23_포즈2_주인공그림체_공통슬롯_투명.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_hesitation.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-146",
@@ -2244,7 +2824,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/kim_seoa/09_explaining_ledger_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_hesitation.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-147",
@@ -2259,7 +2843,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/lee_jian/01_neutral_screwdriver_v2.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_hesitation.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/ui_confirm.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-148",
@@ -2274,7 +2862,11 @@
       "character": "/play/assets/assets/images/cinematic_soft_painted/decimal_nis_1999/characters/oh_gyeongtae_facilities_manager_v2.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_hesitation.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-149",
@@ -2289,7 +2881,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/lee_jian/01_neutral_screwdriver_v2.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_hesitation.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-150",
@@ -2304,7 +2900,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_hesitation.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-151",
@@ -2319,7 +2919,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/oh_jiwoo/01_alert_neutral_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_hesitation.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/door_close.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-152",
@@ -2334,7 +2938,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/yoon_chaea/01_neutral_tie_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_hesitation.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-153",
@@ -2349,7 +2957,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/story_hesitation.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/door_open.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-154",
@@ -2364,7 +2976,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/door_open.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-155",
@@ -2379,7 +2995,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-156",
@@ -2394,7 +3014,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/kim_hakjun/08_calculating_notes_uniform_v4.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-157",
@@ -2409,7 +3033,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-158",
@@ -2424,7 +3052,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/oh_jiwoo/01_alert_neutral_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-159",
@@ -2439,7 +3071,11 @@
       "character": "/play/assets/assets/images/주식선생님/25_포즈4_주인공그림체_공통슬롯_투명.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/notification.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-160",
@@ -2454,7 +3090,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-161",
@@ -2469,7 +3109,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/kim_hakjun/07_determined_verification_uniform_v4.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-162",
@@ -2484,7 +3128,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/kim_seoa/02_soft_smile_agree_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-163",
@@ -2499,7 +3147,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/lee_jian/01_neutral_screwdriver_v2.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-164",
@@ -2514,7 +3166,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/choi_iseo/08_focused_mending_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-165",
@@ -2529,7 +3185,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/jung_arin/09_counting_explain_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/paper_rustle.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-166",
@@ -2541,10 +3201,14 @@
       "direction": "옆 사람들의 표정을 한 번씩 확인했다.",
       "line": "박하은. 괜찮냐고 물었을 때 바로 대답 안 해도 기다려 줘. 나도 도와주기 전에 어떤 도움이 필요한지 먼저 물을게.",
       "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_living_lounge_1999_v1.png",
-      "character": "/play/assets/assets/images/production_soft_painted/park_haeun/02_bright_smile_wave_v2.png",
+      "character": "/play/assets/assets/images/production_soft_painted/park_haeun/02_gentle_smile_v3.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-167",
@@ -2559,7 +3223,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/han_sua/03_bright_laugh_v3.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-168",
@@ -2574,7 +3242,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/oh_jiwoo/04_playful_counterpoint_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-169",
@@ -2589,7 +3261,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/yoon_chaea/09_explaining_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-170",
@@ -2604,7 +3280,11 @@
       "character": "/play/assets/assets/images/주식선생님/27_포즈6_주인공그림체_공통슬롯_투명.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-final-ten-roster",
@@ -2619,7 +3299,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/page_flip.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-172",
@@ -2634,7 +3318,11 @@
       "character": "/play/assets/assets/images/cinematic_soft_painted/decimal_nis_1999/characters/oh_gyeongtae_facilities_manager_v2.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/door_close.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-173",
@@ -2646,10 +3334,14 @@
       "direction": "",
       "line": "누가 아프거나 도움이 필요할 때는요? 잠긴 문을 억지로 열지 않고 확인할 방법이 있어야 해요.",
       "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_sleeping_wing_1999_v1.png",
-      "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_neutral_soft_v2.png",
+      "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_neutral_v3.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-174",
@@ -2664,7 +3356,11 @@
       "character": "/play/assets/assets/images/cinematic_soft_painted/decimal_nis_1999/characters/oh_gyeongtae_facilities_manager_v2.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-175",
@@ -2679,7 +3375,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/kim_hakjun/03_skeptical_condition_check_uniform_v4.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-176",
@@ -2694,7 +3394,11 @@
       "character": "/play/assets/assets/images/주식선생님/23_포즈2_주인공그림체_공통슬롯_투명.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/paper_rustle.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-177",
@@ -2709,7 +3413,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/jung_arin/01_base_cheeky_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-178",
@@ -2724,7 +3432,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-179",
@@ -2739,7 +3451,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/kim_hakjun/01_neutral_crosscheck_uniform_v4.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-180",
@@ -2754,7 +3470,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-181",
@@ -2769,7 +3489,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/yoon_chaea/01_neutral_tie_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/notification.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-182",
@@ -2784,7 +3508,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-183",
@@ -2799,7 +3527,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/kim_seoa/01_neutral_notebook_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-184",
@@ -2814,7 +3546,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/choi_iseo/01_base_thread_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-185",
@@ -2829,7 +3565,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/lee_jian/01_neutral_screwdriver_v2.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-186",
@@ -2844,7 +3584,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/oh_jiwoo/01_alert_neutral_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/footstep_1.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-187",
@@ -2856,10 +3600,14 @@
       "direction": "",
       "line": "나는 호출등이 잘 보이는 자리. 대신 누가 불 켜 둔다고 감시하지는 않을게.",
       "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_sleeping_wing_1999_v1.png",
-      "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_neutral_soft_v2.png",
+      "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_neutral_v3.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-188",
@@ -2874,7 +3622,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/jung_arin/01_base_cheeky_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-189",
@@ -2889,7 +3641,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-190",
@@ -2904,7 +3660,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/jung_arin/01_base_cheeky_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-191",
@@ -2919,7 +3679,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/page_flip.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-192",
@@ -2934,7 +3698,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-193",
@@ -2949,7 +3717,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/kim_seoa/01_neutral_notebook_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-194",
@@ -2964,7 +3736,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/kim_hakjun/02_explaining_rules_uniform_v4.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-195",
@@ -2979,7 +3755,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-196",
@@ -2994,7 +3774,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/oh_jiwoo/01_alert_neutral_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-197",
@@ -3009,7 +3793,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/yoon_chaea/01_neutral_tie_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/coins.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-198",
@@ -3024,7 +3812,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-199",
@@ -3039,7 +3831,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/yoon_chaea/01_neutral_tie_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-200",
@@ -3054,7 +3850,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-201",
@@ -3069,7 +3869,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/lee_jian/01_neutral_screwdriver_v2.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-202",
@@ -3084,7 +3888,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/choi_iseo/07_firm_boundary_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-203",
@@ -3099,7 +3907,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/lee_jian/01_neutral_screwdriver_v2.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/message_send.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-204",
@@ -3114,7 +3926,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/choi_iseo/01_base_thread_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-205",
@@ -3129,7 +3945,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-206",
@@ -3141,10 +3961,14 @@
       "direction": "",
       "line": "이서 말은 수리하지 말라는 뜻이 아니라, 자기 물건에 먼저 물어봐 달라는 뜻 맞아?",
       "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_living_lounge_1999_v1.png",
-      "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_neutral_soft_v2.png",
+      "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_neutral_v3.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-207",
@@ -3159,7 +3983,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/choi_iseo/01_base_thread_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-208",
@@ -3174,7 +4002,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/lee_jian/07_apologetic_boundary_v2.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-209",
@@ -3189,7 +4021,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/choi_iseo/02_gentle_smile_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/door_open.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-210",
@@ -3204,7 +4040,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/jung_arin/01_base_cheeky_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-211",
@@ -3219,7 +4059,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/kim_seoa/01_neutral_notebook_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-212",
@@ -3234,7 +4078,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/lee_jian/09_explaining_mechanism_v2.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-213",
@@ -3249,7 +4097,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/choi_iseo/01_base_thread_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-214",
@@ -3264,7 +4116,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-215",
@@ -3279,7 +4135,11 @@
       "character": "/play/assets/assets/images/cinematic_soft_painted/decimal_nis_1999/characters/oh_gyeongtae_facilities_manager_v2.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/notification.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-216",
@@ -3294,7 +4154,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-217",
@@ -3309,7 +4173,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/kim_hakjun/02_explaining_rules_uniform_v4.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-218",
@@ -3324,7 +4192,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-219",
@@ -3339,7 +4211,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/lee_jian/01_neutral_screwdriver_v2.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-220",
@@ -3354,7 +4230,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/oh_jiwoo/01_alert_neutral_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-221",
@@ -3369,7 +4249,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/han_sua/03_bright_laugh_v3.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/paper_place.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-222",
@@ -3384,7 +4268,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/yoon_chaea/01_neutral_tie_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-223",
@@ -3399,7 +4287,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/jung_arin/01_base_cheeky_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-224",
@@ -3411,10 +4303,14 @@
       "direction": "",
       "line": "졌다고 저녁을 굶는 내기는 금지. 설거지나 머그잔 정리 정도만 하자.",
       "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_living_lounge_1999_v1.png",
-      "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_neutral_soft_v2.png",
+      "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_neutral_v3.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-225",
@@ -3429,7 +4325,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/kim_seoa/01_neutral_notebook_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-226",
@@ -3444,7 +4344,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-227",
@@ -3459,7 +4363,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/kim_hakjun/08_calculating_notes_uniform_v4.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/page_flip.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-228",
@@ -3474,7 +4382,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-229",
@@ -3489,7 +4401,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/kim_hakjun/02_explaining_rules_uniform_v4.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-230",
@@ -3504,7 +4420,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-231",
@@ -3519,7 +4439,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/kim_hakjun/06_firm_objection_uniform_v4.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-232",
@@ -3534,7 +4458,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/oh_jiwoo/01_alert_neutral_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-233",
@@ -3549,7 +4477,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/coins_large.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-234",
@@ -3564,7 +4496,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-235",
@@ -3579,7 +4515,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/oh_jiwoo/01_alert_neutral_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-236",
@@ -3594,7 +4534,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-237",
@@ -3609,7 +4553,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/yoon_chaea/01_neutral_tie_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-238",
@@ -3624,7 +4572,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/lee_jian/01_neutral_screwdriver_v2.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/door_open.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-239",
@@ -3639,7 +4591,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/choi_iseo/01_base_thread_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-240",
@@ -3651,10 +4607,14 @@
       "direction": "",
       "line": "오늘 우리끼리 정한 것 중 내일 다시 확인할 건 세 개야. 자리 배치, 비상키 입회, 공동물품 알림선.",
       "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_sleeping_wing_1999_v1.png",
-      "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_neutral_soft_v2.png",
+      "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_neutral_v3.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-241",
@@ -3669,7 +4629,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/jung_arin/01_base_cheeky_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-242",
@@ -3684,7 +4648,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-243",
@@ -3699,7 +4667,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/jung_arin/01_base_cheeky_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/notification.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-244",
@@ -3714,7 +4686,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-245",
@@ -3729,7 +4705,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/jung_arin/01_base_cheeky_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-246",
@@ -3744,7 +4724,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/kim_seoa/01_neutral_notebook_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-247",
@@ -3759,7 +4743,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-248",
@@ -3774,7 +4762,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/kim_hakjun/02_explaining_rules_uniform_v4.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/paper_place.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-249",
@@ -3789,7 +4781,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-250",
@@ -3804,7 +4800,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/kim_hakjun/02_explaining_rules_uniform_v4.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-251",
@@ -3819,7 +4819,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/yoon_chaea/01_neutral_tie_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-252",
@@ -3834,7 +4838,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/oh_jiwoo/01_alert_neutral_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-253",
@@ -3849,7 +4857,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/kim_seoa/01_neutral_notebook_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/message_send.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-254",
@@ -3864,7 +4876,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/lee_jian/01_neutral_screwdriver_v2.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-255",
@@ -3879,7 +4895,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/choi_iseo/01_base_thread_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-256",
@@ -3894,7 +4914,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/jung_arin/01_base_cheeky_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-257",
@@ -3906,10 +4930,14 @@
       "direction": "",
       "line": "아린이 순서를 정하면 빠지는 사람이 생겨. 나는 회사 안에서 말 못 하는 사람이 생기는 구조인지 볼래.",
       "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_sleeping_wing_1999_v1.png",
-      "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_neutral_soft_v2.png",
+      "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_neutral_v3.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-258",
@@ -3924,7 +4952,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/impact_soft.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-259",
@@ -3939,7 +4971,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/yoon_chaea/01_neutral_tie_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-260",
@@ -3954,7 +4990,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-261",
@@ -3969,7 +5009,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/kim_hakjun/09_restrained_team_smile_uniform_v4.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-262",
@@ -3984,7 +5028,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-263",
@@ -3999,7 +5047,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/relationship_raindrop.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/door_close.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-264",
@@ -4014,7 +5066,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-265",
@@ -4029,7 +5085,11 @@
       "character": "/play/assets/assets/images/주식선생님/24_포즈3_주인공그림체_공통슬롯_투명.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-266",
@@ -4044,7 +5104,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/jung_arin/01_base_cheeky_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-267",
@@ -4059,7 +5123,11 @@
       "character": "/play/assets/assets/images/주식선생님/25_포즈4_주인공그림체_공통슬롯_투명.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-268",
@@ -4074,7 +5142,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/oh_jiwoo/01_alert_neutral_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-269",
@@ -4089,7 +5161,11 @@
       "character": "/play/assets/assets/images/주식선생님/23_포즈2_주인공그림체_공통슬롯_투명.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/ui_confirm.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-270",
@@ -4104,7 +5180,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/choi_iseo/01_base_thread_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-271",
@@ -4119,7 +5199,11 @@
       "character": "/play/assets/assets/images/주식선생님/24_포즈3_주인공그림체_공통슬롯_투명.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-272",
@@ -4134,7 +5218,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-273",
@@ -4149,7 +5237,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/kim_hakjun/07_determined_verification_uniform_v4.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-274",
@@ -4164,7 +5256,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-275",
@@ -4179,7 +5275,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/kim_hakjun/06_firm_objection_uniform_v4.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/hub_verdure.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/door_close.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-276",
@@ -4194,7 +5294,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/door_open.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-277",
@@ -4209,7 +5313,11 @@
       "character": "/play/assets/assets/images/cinematic_soft_painted/decimal_nis_1999/characters/oh_gyeongtae_facilities_manager_v2.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-278",
@@ -4224,7 +5332,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/lee_jian/09_explaining_mechanism_v2.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/crt_glitch.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-279",
@@ -4239,7 +5351,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/choi_iseo/01_base_thread_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-280",
@@ -4254,7 +5370,11 @@
       "character": "/play/assets/assets/images/주식선생님/26_포즈5_주인공그림체_공통슬롯_투명.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-281",
@@ -4269,7 +5389,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/yoon_chaea/01_neutral_tie_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/notification.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-282",
@@ -4284,7 +5408,11 @@
       "character": "/play/assets/assets/images/cinematic_soft_painted/decimal_nis_1999/characters/oh_gyeongtae_facilities_manager_v2.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-283",
@@ -4299,7 +5427,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/kim_seoa/06_worried_checking_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-284",
@@ -4314,7 +5446,11 @@
       "character": "/play/assets/assets/images/주식선생님/23_포즈2_주인공그림체_공통슬롯_투명.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/ui_tick.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-285",
@@ -4329,7 +5465,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-286",
@@ -4344,7 +5484,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/oh_jiwoo/01_alert_neutral_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-287",
@@ -4359,7 +5503,11 @@
       "character": "/play/assets/assets/images/cinematic_soft_painted/decimal_nis_1999/characters/oh_gyeongtae_facilities_manager_v2.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/coins.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-288",
@@ -4374,7 +5522,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/han_sua/01_neutral_wavy_v3.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-289",
@@ -4389,7 +5541,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/choi_iseo/07_firm_boundary_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-290",
@@ -4404,7 +5560,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/jung_arin/09_counting_explain_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/ui_confirm.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-291",
@@ -4419,7 +5579,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-292",
@@ -4434,7 +5598,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/jung_arin/01_base_cheeky_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-293",
@@ -4449,7 +5617,11 @@
       "character": "/play/assets/assets/images/주식선생님/27_포즈6_주인공그림체_공통슬롯_투명.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/crt_glitch.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-294",
@@ -4461,10 +5633,14 @@
       "direction": "",
       "line": "그리고 질문했는데 모른다고 말하는 사람을 창피하게 만들지 않기. 그래야 위험한 정보도 올라와요.",
       "background": "/play/assets/assets/images/cinematic_soft_painted/decimal/bg_decimal_trading_floor_dawn_2000_v1.png",
-      "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_neutral_soft_v2.png",
+      "character": "/play/assets/assets/images/production_soft_painted/park_haeun/01_neutral_v3.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-295",
@@ -4479,7 +5655,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/yoon_chaea/01_neutral_tie_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-296",
@@ -4494,7 +5674,11 @@
       "character": "/play/assets/assets/images/production_soft_painted/oh_jiwoo/09_explaining_report_v1.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/coins_large.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-297",
@@ -4532,7 +5716,11 @@
           "condition": "",
           "effects": "decimalVow=refusal"
         }
-      ]
+      ],
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-298",
@@ -4548,7 +5736,11 @@
       "characterX": 0,
       "characterY": 0,
       "characterScale": 1,
-      "condition": "decimalVow == together"
+      "condition": "decimalVow == together",
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-299",
@@ -4564,7 +5756,11 @@
       "characterX": 0,
       "characterY": 0,
       "characterScale": 1,
-      "condition": "decimalVow == loss"
+      "condition": "decimalVow == loss",
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/notification.ogg",
+      "voice": ""
     },
     {
       "id": "decimal-300",
@@ -4580,7 +5776,11 @@
       "characterX": 0,
       "characterY": 0,
       "characterScale": 1,
-      "condition": "decimalVow == refusal"
+      "condition": "decimalVow == refusal",
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-301",
@@ -4595,7 +5795,11 @@
       "character": "/play/assets/assets/images/주식선생님/27_포즈6_주인공그림체_공통슬롯_투명.png",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "",
+      "voice": ""
     },
     {
       "id": "decimal-302",
@@ -4610,7 +5814,11 @@
       "character": "",
       "characterX": 0,
       "characterY": 0,
-      "characterScale": 1
+      "characterScale": 1,
+      "bgm": "assets/audio/bgm/market_portside_cafe.ogg",
+      "audioVolume": 0.27,
+      "soundEffect": "assets/audio/sfx/ui_confirm.ogg",
+      "voice": ""
     }
   ]
 }

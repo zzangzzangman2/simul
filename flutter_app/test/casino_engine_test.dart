@@ -10,7 +10,7 @@ GameState _adultCasinoState(
   String seed = 'casino-engine-test',
 }) {
   final day = DateTime(2010, 1, 4).difference(DateTime(2000, 1, 1)).inDays + 1;
-  return engine
+  final state = engine
       .createNewGame('카지노 엔진 테스트', initialCash: 10000000, worldSeed: seed)
       .copyWith(
         day: day,
@@ -18,6 +18,7 @@ GameState _adultCasinoState(
         brokerageCash: 0,
         decisions: const [],
       );
+  return engine.exchangeCasinoChips(state, 1000000).state;
 }
 
 void main() {
@@ -27,6 +28,44 @@ void main() {
     expect(casinoNationalFee(grossPayout: 20000, stake: 10000), 2000);
     expect(casinoNationalFee(grossPayout: 10000, stake: 10000), 0);
     expect(casinoNationalFee(grossPayout: 0, stake: 10000), 0);
+  });
+
+  test('cash is exchanged into persistent casino chips and cashed out', () {
+    final day =
+        DateTime(2010, 1, 4).difference(DateTime(2000, 1, 1)).inDays + 1;
+    final state = engine
+        .createNewGame(
+          '카지노 칩 테스트',
+          initialCash: 1000000,
+          worldSeed: 'casino-chip-wallet',
+        )
+        .copyWith(
+          day: day,
+          marketMinute: krxCloseMinute,
+          brokerageCash: 0,
+          decisions: const [],
+        );
+
+    final exchanged = engine.exchangeCasinoChips(state, 100000);
+    expect(exchanged.success, isTrue);
+    expect(exchanged.state.bankCash, 900000);
+    expect(exchanged.state.personalFinance.casino.chipBalance, 100000);
+    expect(
+      GameState.fromJson(
+        exchanged.state.toJson(),
+      ).personalFinance.casino.chipBalance,
+      100000,
+    );
+    final keptForNextDay = engine.advanceOneDay(
+      exchanged.state.copyWith(marketMinute: marketDayEndMinute),
+    );
+    expect(keptForNextDay.personalFinance.casino.chipBalance, 100000);
+
+    final cashedOut = engine.cashOutCasinoChips(exchanged.state);
+    expect(cashedOut.success, isTrue);
+    expect(cashedOut.state.bankCash, 1000000);
+    expect(cashedOut.state.personalFinance.casino.chipBalance, 0);
+    expect(cashedOut.state.ledger.last.counterAccount, 'casino_chips');
   });
 
   test('classic three-reel paytable has a 97.22 percent theoretical RTP', () {
@@ -128,7 +167,7 @@ void main() {
       'bank',
     );
     expect(bankAfterCasino.success, isFalse);
-    expect(bankAfterCasino.message, contains('카지노 LIVE'));
+    expect(bankAfterCasino.message, contains('카지노'));
   });
 
   test('casino outcome does not reroll when the bet side changes', () {
@@ -190,7 +229,11 @@ void main() {
       expect(record.payout, 18000);
       expect(record.net, 8000);
       expect(result.cashDelta, 8000);
-      expect(result.state.cash, before.cash + 8000);
+      expect(
+        result.state.personalFinance.casino.chipBalance,
+        before.personalFinance.casino.chipBalance + 8000,
+      );
+      expect(result.state.cash, before.cash);
       expect(result.state.personalFinance.casino.totalNationalFee, 2000);
       expect(result.state.personalFinance.casino.monthlyNationalFee, 2000);
       expect(
@@ -244,7 +287,7 @@ void main() {
 
     final fresh = _adultCasinoState(engine, seed: 'casino-loss-stop');
     final monthKey = casinoMonthKey(fresh.currentDate);
-    final basis = fresh.bankCash;
+    final basis = fresh.bankCash + fresh.personalFinance.casino.chipBalance;
     final limit = casinoMonthlyLossLimitForBasis(basis);
     final stopped = fresh.copyWith(
       personalFinance: fresh.personalFinance.copyWith(

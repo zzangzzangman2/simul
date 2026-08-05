@@ -15,8 +15,12 @@
 거래일: 15:00 종가 확정·의미 있는 변화가 있을 때만 투자 결과표
 휴장일·무변화 거래일: 결과표 생략 또는 자동 확인
         ↓
+실제 체결이 없었던 주: 회사 조사 또는 손실 확인선 주간 복기 1회
+실제 체결이 있었던 주: 해당 체결로 주간 복기 자동 완료
+        ↓
 요일별 일정
         ├─ 월~금요일: 장 마감 결과 확인
+        │  └─ 2010년 성인 시점: 카지노 또는 국가망 경마 중 하나 선택
         └─ 토·일요일: 주말 자유 일정·행동력 2칸
            ├─ 새벽 신문배달 미니게임·식당 설거지·문구 창고·교환장터 알바
            ├─ 동기에게 취향별 선물
@@ -30,7 +34,8 @@
         ↓
 다음 날 08:00
         ├─ 해당 월 첫날이면 월초 히로인 해금 이야기
-        └─ 오늘 기록·투자 결과·조간신문 통합 요약
+        ├─ 오늘 기록·투자 결과·조간신문 통합 요약
+        └─ 월이 바뀌면 월말 점검, 연도가 바뀌면 연말·누적 성장 회고
 ```
 
 - 센터 밖 외출은 호감도 20 이상이고 토요일 또는 일요일일 때만 선택할 수 있다.
@@ -42,6 +47,12 @@
 - 은행·사업·부동산·주식 PC 화면을 둘러보는 것은 시간을 쓰지 않는다.
 - 달력은 하루마다 강제하지 않는다. 허브에서 다시 보고, 하루 종료에서는 핵심 생활 기록만
   통합 요약에 넣어 다음 날 조간과 함께 확인한다.
+- 주간 복기는 실제 체결이 없었던 거래일 주에만 연다. 보유·관심 종목을 먼저 두고
+  월드시드·주차로 회전하는 최대 12개 회사 중 하나를 조사하거나 손실 확인선
+  -3%·-5%·-8%를 기록한다. 실제 체결은 같은 주의 복기를 자동 완료한다.
+- 월이 바뀌는 하루 요약에는 해당 연도의 거래일·실제 거래일·누적 투자손익·회사 조사·
+  관계 기록·주말 능동 선택·장부가 순자산·성장 레벨을 함께 보여 준다. 12월 31일에는
+  해당 연도 회고를 최대 32개까지 보존하고 연도별 누적 경력 회고를 만든다.
 - 2000년 2~9월의 첫날에는 조간신문보다 월초 해금 이야기를 먼저 연다. 같은 날 기존 기술·
   캠페인 결정 카드가 겹치면 월초 이야기를 우선하고 다른 카드는 다음 진행일로 미룬다.
 - 월초 이야기는 필수 진행 카드지만 어떤 선택도 기능 해금을 실패시키지 않는다. 장면을 시작한
@@ -71,6 +82,10 @@
   상품은 `+2 → +1 → +0`으로 줄어든다. 상품을 바꾸면 새 상품의 첫 효과를 받을 수 있다.
 - 선물은 저녁 관계 시간을 대신하지 않는다. 낮에 선물을 준 뒤에도 이야기·외출·휴식을 고를 수 있다.
 - 주말 활동은 날짜·수입·선물·호감도 변화·배경 그림을 생활 기록으로 남긴다. 한 날짜에 기록이 여러 개면 달력 카드가 개수를 함께 표시한다.
+- 경마는 2010년부터 평일 15:00 이후 선택하는 PC 온라인 저녁 행동이다. 하루 1회
+  정산 뒤 즉시 20:00으로 이동하며 같은 날 카지노와 함께 이용할 수 없다. 출전표·배당·
+  착순은 엔진에서 다시 계산하고 확정 이익에만 20% 국가 수수료를 적용한다. 세부 규칙은
+  `HORSE_RACING_SYSTEM.md`를 따른다.
 
 주말 화면은 아래의 전용 배경 5종을 사용한다.
 
@@ -124,8 +139,13 @@
 
 - `flutter_app/lib/game/life_calendar.dart`: 날짜·성장 나이·월 그리드·사건 모델
 - `flutter_app/lib/game/weekend_activity.dart`: 행동력·알바·선물·시장 공부·기록 모델
+- `flutter_app/lib/game/weekly_portfolio_review.dart`: 주차 키·회전 후보·조사/손실선·복기 보관
+- `flutter_app/lib/game/progress_review.dart`: 월말·연말·누적 경력 회고와 연도별 보관
+- `flutter_app/lib/game/monthly_unlock_chapter.dart`: 2~9월 기능 해금과 5단계 관계 톤
+- `flutter_app/lib/game/player_progression.dart`: 경험치·9단계 성장·해금 기술
 - `flutter_app/lib/life_calendar_screen.dart`: 월간 달력과 사건 그림 카드
 - `flutter_app/lib/weekend_activity_screen.dart`: 390×844·360×800 주말 자유 일정·K-뷰티 매장 UI
+- `flutter_app/lib/horse_racing_mini_game.dart`: 국가망 전자 마권·실시간 8두 중계 UI
 - `flutter_app/lib/rider_mini_game.dart`: 실제 방향 플릭·투척 포물선·자전거 캔버스 애니메이션
 - `flutter_app/lib/campaign_scenes.dart`: 하루 마감과 다음 날 사이의 통합 하루 요약
 - `flutter_app/lib/relationship_screens.dart`: 수요일 대화·메신저와 주말 외출 표시
@@ -134,3 +154,9 @@
 - `flutter_app/test/life_calendar_test.dart`: 날짜·연령·사건 파생 규칙
 - `flutter_app/test/life_calendar_screen_test.dart`: 390×844·360×800 화면 회귀
 - `flutter_app/test/day_advance_flow_test.dart`: 거래일·휴장일과 신문 전환 순서
+- `flutter_app/test/weekly_portfolio_review_test.dart`: 주 1회 완료·회전 후보·경험치 회귀
+- `flutter_app/test/weekly_portfolio_review_screen_test.dart`: 실제 조사·손실선 선택 UI 회귀
+- `flutter_app/test/monthly_unlock_chapter_test.dart`: 8개월·8명·5단계 관계 톤과 해금 순서
+- `flutter_app/test/player_progression_test.dart`: 저장 필드·경험치·기술 효과·한국식 나이
+- `flutter_app/test/one_year_simulation_test.dart`, `ten_year_simulation_test.dart`: 연간·10년
+  활성 진행의 매매·관계·주말·회고·저장 복원

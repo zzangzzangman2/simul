@@ -57,7 +57,7 @@ const _lobbyHeroinePresentations = <String, _LobbyHeroinePresentation>{
         'assets/images/production_soft_painted/lee_jian/02_playful_wink_v2.png',
     closeAsset:
         'assets/images/production_soft_painted/lee_jian/07_apologetic_boundary_v2.png',
-    morningLine: 'PC는 작업실에 있어. 켜기 전에 접촉 불량 없는지만 보고 가자.',
+    morningLine: 'PC는 공용 컴퓨터실에 있어. 다 같이 쓰는 자리니까 정리하고 가자.',
     marketLine: '숫자 튀는 데는 원인이 있어. 차트보다 체결부터 보면 빨라.',
     eveningLine: '기계는 껐고 공구도 셌어. 이제 네가 뭘 확인했는지 들으면 돼.',
     weekendLine: '정비할 건 끝냈어. 부품 구경 갈 거면 사람 적을 때 가자.',
@@ -80,9 +80,9 @@ const _lobbyHeroinePresentations = <String, _LobbyHeroinePresentation>{
   ),
   'jung_arin': _LobbyHeroinePresentation(
     smileAsset:
-        'assets/images/production_soft_painted/jung_arin/02_confident_smile_v1.png',
+        'assets/images/production_soft_painted/jung_arin/01_base_cheeky_v1.png',
     closeAsset:
-        'assets/images/production_soft_painted/jung_arin/03_cheeky_laugh_v1.png',
+        'assets/images/production_soft_painted/jung_arin/01_base_cheeky_v1.png',
     morningLine: '지금부터 장 시작 전까지 할 일 세 개. 우선순위는 네가 골라.',
     marketLine: '결정했으면 체결 조건까지 확인. 망설이는 시간도 비용이야.',
     eveningLine: '마감됐어. 잘한 건 남기고 틀린 건 내일 순서에 넣자.',
@@ -93,9 +93,9 @@ const _lobbyHeroinePresentations = <String, _LobbyHeroinePresentation>{
   ),
   'park_haeun': _LobbyHeroinePresentation(
     smileAsset:
-        'assets/images/production_soft_painted/park_haeun/02_bright_smile_wave_v2.png',
+        'assets/images/production_soft_painted/park_haeun/02_gentle_smile_v3.png',
     closeAsset:
-        'assets/images/production_soft_painted/park_haeun/04_playful_wink_v2.png',
+        'assets/images/production_soft_painted/park_haeun/07_embarrassed_v3.png',
     morningLine: '다들 바빠 보여도 도움을 원한다는 뜻은 아니야. 너부터 어떤지 말해 줘.',
     marketLine: '손익 보기 전에 숨 한번 쉬자. 지금 필요한 게 정보인지 위로인지도 다르니까.',
     eveningLine: '오늘은 네 얘기를 먼저 들을게. 나도 끝나면 내 얘기 조금 해도 돼?',
@@ -262,12 +262,10 @@ const _lobbyMotionProfiles = <String, _LobbyMotionProfile>{
       _LobbyIdleGesture.shy,
       _LobbyIdleGesture.nod,
     ],
-    motionFrames: <String>[
-      'assets/images/production_soft_painted/park_haeun/10_lobby_welcome_f0_v2.png',
-      'assets/images/production_soft_painted/park_haeun/10_lobby_welcome_f1_v2.png',
-      'assets/images/production_soft_painted/park_haeun/10_lobby_welcome_f2_v2.png',
-      'assets/images/production_soft_painted/park_haeun/10_lobby_welcome_f3_v2.png',
-    ],
+    // The retired low-pigtail lobby frames were removed with the old
+    // identity. The approved ash-blonde set uses still poses and blink-only
+    // motion until a matching lobby sequence is approved.
+    motionFrames: <String>[],
     strength: 0.88,
     tempoMs: 3200,
     faceLine: '응? 무슨 일 있어? 표정부터 볼게.',
@@ -510,14 +508,14 @@ const _lobbyBlinkGeometryByAsset = <String, _LobbyBlinkGeometry>{
         eyeWidth: 0.047,
         skinColor: Color(0xFFFEE7DA),
       ),
-  'assets/images/production_soft_painted/park_haeun/01_neutral_soft_v2.png':
+  'assets/images/production_soft_painted/park_haeun/01_neutral_v3.png':
       _LobbyBlinkGeometry(
         leftEye: Offset(0.471, 0.128),
         rightEye: Offset(0.534, 0.128),
         eyeWidth: 0.042,
         skinColor: Color(0xFFFCD8CA),
       ),
-  'assets/images/production_soft_painted/park_haeun/04_playful_wink_v2.png':
+  'assets/images/production_soft_painted/park_haeun/07_embarrassed_v3.png':
       _LobbyBlinkGeometry(
         leftEye: Offset(0.469, 0.135),
         rightEye: Offset(0.532, 0.126),
@@ -918,6 +916,7 @@ class HomeComputerScreen extends StatefulWidget {
     required this.onOpenRealEstate,
     required this.onOpenBusiness,
     this.onOpenCasino,
+    this.onOpenHorseRace,
   });
 
   final GameState state;
@@ -926,6 +925,7 @@ class HomeComputerScreen extends StatefulWidget {
   final Future<GameState> Function(GameState state) onOpenRealEstate;
   final Future<GameState> Function(GameState state) onOpenBusiness;
   final Future<GameState> Function(GameState state)? onOpenCasino;
+  final Future<GameState> Function(GameState state)? onOpenHorseRace;
 
   @override
   State<HomeComputerScreen> createState() => _HomeComputerScreenState();
@@ -964,7 +964,34 @@ class _HomeComputerScreenState extends State<HomeComputerScreen> {
     if (_state.marketMinute > marketDayEndMinute - casinoRoundMinutes) {
       return '오늘 이용 종료';
     }
-    return '● LIVE · 1판 30분';
+    return '입장 가능 · 1판 30분';
+  }
+
+  bool get _horseRaceSessionAvailable =>
+      widget.onOpenHorseRace != null &&
+      !_state.currentDate.isBefore(DateTime(2010, 1, 1)) &&
+      _state.story.ageOn(_state.currentDate) >= 20 &&
+      _state.currentDate.weekday < DateTime.saturday &&
+      _state.marketMinute >= krxCloseMinute &&
+      _state.marketMinute < marketDayEndMinute &&
+      !weekdayEveningUsed(_state) &&
+      _state.personalFinance.casino.roundsForDay(_state.day) == 0 &&
+      !horseRaceDailyLimitReached(_state) &&
+      _state.bankCash >= horseRaceMinStake;
+
+  String get _horseRaceSessionStatus {
+    if (_state.currentDate.weekday >= DateTime.saturday) return '평일 장 마감 후';
+    if (_state.personalFinance.casino.roundsForDay(_state.day) > 0) {
+      return '오늘 카지노 선택';
+    }
+    if (horseRaceDailyLimitReached(_state)) {
+      return '오늘 $horseRaceDailyBetLimit/$horseRaceDailyBetLimit회 완료';
+    }
+    if (weekdayEveningUsed(_state)) return '오늘 저녁 행동 사용';
+    if (_state.marketMinute < krxCloseMinute) return '15:00 개장';
+    if (_state.marketMinute >= marketDayEndMinute) return '오늘 이용 종료';
+    if (_state.bankCash < horseRaceMinStake) return '생활비 잔액 부족';
+    return '베팅 ${horseRaceBetsToday(_state)}/$horseRaceDailyBetLimit회';
   }
 
   Future<void> _openStockMarket() async {
@@ -989,6 +1016,13 @@ class _HomeComputerScreenState extends State<HomeComputerScreen> {
 
   Future<void> _openCasino() async {
     final open = widget.onOpenCasino;
+    if (open == null) return;
+    final next = await open(_state);
+    if (mounted) setState(() => _state = next);
+  }
+
+  Future<void> _openHorseRace() async {
+    final open = widget.onOpenHorseRace;
     if (open == null) return;
     final next = await open(_state);
     if (mounted) setState(() => _state = next);
@@ -1340,24 +1374,68 @@ class _HomeComputerScreenState extends State<HomeComputerScreen> {
                                             ),
                                             if (_state.currentDate.year >=
                                                     2010 &&
-                                                widget.onOpenCasino !=
-                                                    null) ...[
+                                                (widget.onOpenCasino != null ||
+                                                    widget.onOpenHorseRace !=
+                                                        null)) ...[
                                               const SizedBox(height: 8),
                                               Expanded(
-                                                child: _ComputerAppTile(
-                                                  interactionKey: const Key(
-                                                    'computer-casino-live-app',
-                                                  ),
-                                                  icon: Icons.live_tv_rounded,
-                                                  iconColor: const Color(
-                                                    0xFFD5A64E,
-                                                  ),
-                                                  title: '카지노 LIVE',
-                                                  subtitle: '테이블 실시간 중계',
-                                                  status: _casinoSessionStatus,
-                                                  onTap: _casinoSessionAvailable
-                                                      ? _openCasino
-                                                      : null,
+                                                child: Row(
+                                                  children: [
+                                                    if (widget.onOpenCasino !=
+                                                        null)
+                                                      Expanded(
+                                                        child: _ComputerAppTile(
+                                                          interactionKey: const Key(
+                                                            'computer-casino-live-app',
+                                                          ),
+                                                          icon: Icons
+                                                              .casino_rounded,
+                                                          iconColor:
+                                                              const Color(
+                                                                0xFFD5A64E,
+                                                              ),
+                                                          title: '데시멀 카지노',
+                                                          subtitle:
+                                                              '현장 입장 · 테이블 이용',
+                                                          status:
+                                                              _casinoSessionStatus,
+                                                          onTap:
+                                                              _casinoSessionAvailable
+                                                              ? _openCasino
+                                                              : null,
+                                                        ),
+                                                      ),
+                                                    if (widget.onOpenCasino !=
+                                                            null &&
+                                                        widget.onOpenHorseRace !=
+                                                            null)
+                                                      const SizedBox(width: 8),
+                                                    if (widget
+                                                            .onOpenHorseRace !=
+                                                        null)
+                                                      Expanded(
+                                                        child: _ComputerAppTile(
+                                                          interactionKey: const Key(
+                                                            'computer-horse-racing-app',
+                                                          ),
+                                                          icon: Icons
+                                                              .emoji_events_rounded,
+                                                          iconColor:
+                                                              const Color(
+                                                                0xFF2E7D5A,
+                                                              ),
+                                                          title: '국가망 경마',
+                                                          subtitle:
+                                                              '15:10 경주 중계',
+                                                          status:
+                                                              _horseRaceSessionStatus,
+                                                          onTap:
+                                                              _horseRaceSessionAvailable
+                                                              ? _openHorseRace
+                                                              : null,
+                                                        ),
+                                                      ),
+                                                  ],
                                                 ),
                                               ),
                                             ],
@@ -1493,7 +1571,8 @@ class _ComputerAppTile extends StatelessWidget {
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
       final dense = constraints.maxWidth < 112 || constraints.maxHeight < 130;
-      final iconSize = dense ? 34.0 : 58.0;
+      final compact = constraints.maxHeight < 82;
+      final iconSize = compact ? 20.0 : (dense ? 34.0 : 58.0);
       return SizedBox.expand(
         child: Opacity(
           opacity: onTap == null ? 0.62 : 1,
@@ -1518,10 +1597,10 @@ class _ComputerAppTile extends StatelessWidget {
                 ),
                 child: Padding(
                   padding: EdgeInsets.fromLTRB(
-                    dense ? 5 : 9,
-                    dense ? 8 : 12,
-                    dense ? 5 : 9,
-                    dense ? 7 : 9,
+                    compact ? 4 : (dense ? 5 : 9),
+                    compact ? 2 : (dense ? 8 : 12),
+                    compact ? 4 : (dense ? 5 : 9),
+                    compact ? 2 : (dense ? 7 : 9),
                   ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -1531,16 +1610,18 @@ class _ComputerAppTile extends StatelessWidget {
                         height: iconSize,
                         decoration: BoxDecoration(
                           color: const Color(0xFF172C4A),
-                          borderRadius: BorderRadius.circular(dense ? 10 : 12),
+                          borderRadius: BorderRadius.circular(
+                            compact ? 6 : (dense ? 10 : 12),
+                          ),
                           border: Border.all(color: const Color(0xFF6E89AC)),
                         ),
                         child: Icon(
                           icon,
                           color: iconColor,
-                          size: dense ? 22 : 34,
+                          size: compact ? 14 : (dense ? 22 : 34),
                         ),
                       ),
-                      SizedBox(height: dense ? 7 : 10),
+                      SizedBox(height: compact ? 2 : (dense ? 7 : 10)),
                       Text(
                         title,
                         maxLines: 1,
@@ -1549,30 +1630,32 @@ class _ComputerAppTile extends StatelessWidget {
                         style: TextStyle(
                           fontFamily: _hubDisplayFont,
                           color: _ink,
-                          fontSize: dense ? 10 : 12,
+                          fontSize: compact ? 8.5 : (dense ? 10 : 12),
                           height: 1,
                           fontWeight: FontWeight.w700,
                           letterSpacing: -0.25,
                         ),
                       ),
-                      SizedBox(height: dense ? 4 : 5),
-                      Text(
-                        subtitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontFamily: _hubDisplayFont,
-                          color: Color(0xFF586476),
-                          fontSize: dense ? 8 : 9,
-                          height: 1,
+                      if (!compact) ...[
+                        SizedBox(height: dense ? 4 : 5),
+                        Text(
+                          subtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontFamily: _hubDisplayFont,
+                            color: Color(0xFF586476),
+                            fontSize: dense ? 8 : 9,
+                            height: 1,
+                          ),
                         ),
-                      ),
+                      ],
                       const Spacer(),
                       Container(
                         padding: EdgeInsets.symmetric(
-                          horizontal: dense ? 5 : 7,
-                          vertical: dense ? 3 : 4,
+                          horizontal: compact ? 4 : (dense ? 5 : 7),
+                          vertical: compact ? 1 : (dense ? 3 : 4),
                         ),
                         decoration: BoxDecoration(
                           color: const Color(0xFFE5E9E4),
@@ -1584,7 +1667,7 @@ class _ComputerAppTile extends StatelessWidget {
                           style: TextStyle(
                             fontFamily: _hubDisplayFont,
                             color: Color(0xFF486070),
-                            fontSize: dense ? 7.2 : 8,
+                            fontSize: compact ? 6.5 : (dense ? 7.2 : 8),
                             height: 1,
                             fontWeight: FontWeight.w700,
                           ),
@@ -1649,7 +1732,7 @@ class _HubTutorialOverlay extends StatelessWidget {
               const Text(
                 '• 생활 라운지: 매일 바뀌는 동기와 오늘의 대화\n'
                 '• 투자실: 동기·운영관·운용 조직\n'
-                '• 작업실: PC·시장·부동산·상권 앱과 기기 정비\n'
+                '• 컴퓨터실: 공용 PC·시장·부동산·상권 앱과 공동 작업\n'
                 '• 기록 보관실: 국가계좌 장부·신문 스크랩\n'
                 '• 본관 앞: 국가계좌 창구·원내 실습',
                 style: TextStyle(
@@ -2810,52 +2893,17 @@ class _ApartmentPlaceScene extends StatelessWidget {
         else
           background,
         if (place == _ApartmentPlace.livingRoom) ...[
-          _ApartmentObjectHotspot(
-            interactionKey: const Key('open-organization-button'),
-            alignment: const Alignment(0, -0.08),
-            width: 124,
-            height: 148,
-            eyebrow: '동기·지도관과 회의',
-            label: '데시멀·운용조직',
-            icon: Icons.groups_2_rounded,
-            accent: const Color(0xFFFFD27A),
-            onTap: onOpenOrganization,
-          ),
+          _InvestmentRoomActionPanel(onTap: onOpenOrganization),
         ],
         if (place == _ApartmentPlace.kitchen) ...[
-          _ApartmentObjectHotspot(
-            interactionKey: const Key('open-market-button'),
-            alignment: const Alignment(-0.66, -0.12),
-            width: 118,
-            height: 122,
-            eyebrow: '공용 단말기 켜기',
-            label: '작업실 PC',
-            icon: Icons.computer_rounded,
-            accent: const Color(0xFF80D8FF),
-            onTap: onOpenMarket,
-          ),
-          _ApartmentObjectHotspot(
-            interactionKey: const Key('open-home-improvements-button'),
-            alignment: const Alignment(0.66, -0.04),
-            width: 122,
-            height: 112,
-            eyebrow: '공용 시설 정비',
-            label: '생활환경 관리',
-            icon: Icons.home_work_rounded,
-            accent: const Color(0xFFFFA97A),
-            onTap: onOpenHomeImprovements,
+          _ComputerLabActionDock(
+            onOpenComputer: onOpenMarket,
+            onOpenHomeImprovements: onOpenHomeImprovements,
           ),
         ],
         if (place == _ApartmentPlace.corridor) ...[
-          _ApartmentObjectHotspot(
-            interactionKey: const Key('open-ledger-button'),
-            alignment: const Alignment(0.60, -0.06),
-            width: 104,
-            height: 126,
-            eyebrow: '개인 장부 꺼내기',
-            label: '국가계좌 장부',
-            icon: Icons.inventory_2_rounded,
-            accent: const Color(0xFFFFC78E),
+          _ArchiveRoomActionPanel(
+            pendingCount: state.pendingDecisions.length,
             onTap: onOpenLedger,
           ),
         ],
@@ -3352,6 +3400,815 @@ class _ApartmentDayGuideCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _InvestmentRoomActionPanel extends StatelessWidget {
+  const _InvestmentRoomActionPanel({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Align(
+    alignment: const Alignment(0, 0.04),
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Semantics(
+        button: true,
+        label: '데시멀 운용조직 열기',
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            key: const Key('open-organization-button'),
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(14),
+            child: Ink(
+              height: 108,
+              padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: <Color>[
+                    Color(0xFA242C3E),
+                    Color(0xFA111827),
+                    Color(0xFE090E18),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xD5C69B4A), width: 1.25),
+                boxShadow: const <BoxShadow>[
+                  BoxShadow(
+                    color: Color(0xB0000000),
+                    blurRadius: 18,
+                    offset: Offset(0, 9),
+                  ),
+                  BoxShadow(
+                    color: Color(0x2849A8D8),
+                    blurRadius: 2,
+                    offset: Offset(0, -1),
+                  ),
+                ],
+              ),
+              child: Stack(
+                children: <Widget>[
+                  Row(
+                    children: <Widget>[
+                      Container(
+                        width: 64,
+                        height: 92,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: <Color>[
+                              Color(0xFF353346),
+                              Color(0xFF151926),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(9),
+                          border: Border.all(color: const Color(0xB7C69B4A)),
+                          boxShadow: const <BoxShadow>[
+                            BoxShadow(
+                              color: Color(0x99000000),
+                              blurRadius: 5,
+                              offset: Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Center(
+                          child: Container(
+                            width: 43,
+                            height: 43,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: const Color(0x332D3548),
+                              border: Border.all(
+                                color: const Color(0xFFE0B965),
+                                width: 1.2,
+                              ),
+                            ),
+                            child: const Icon(
+                              Icons.groups_2_rounded,
+                              color: Color(0xFFFFD47A),
+                              size: 25,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: <Widget>[
+                              const Text(
+                                '전략 회의 · 교차검토',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontFamily: _hubDisplayFont,
+                                  color: Color(0xFFFFC969),
+                                  fontSize: 7.4,
+                                  height: 1,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.1,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Container(
+                                height: 1,
+                                color: const Color(0x554E668A),
+                              ),
+                              const SizedBox(height: 7),
+                              const Text(
+                                '데시멀 운용조직',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontFamily: _hubDisplayFont,
+                                  color: Colors.white,
+                                  fontSize: 13.2,
+                                  height: 1,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: -0.5,
+                                ),
+                              ),
+                              const SizedBox(height: 7),
+                              Text(
+                                '동기·운영관과 투자 판단 점검',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontFamily: _hubDisplayFont,
+                                  color: Colors.white.withValues(alpha: 0.66),
+                                  fontSize: 7.2,
+                                  height: 1,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 7),
+                      Container(
+                        width: 43,
+                        height: 92,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF131722),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0x887A6742)),
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: <Widget>[
+                            Container(
+                              width: 29,
+                              height: 35,
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: <Color>[
+                                    Color(0xFF806536),
+                                    Color(0xFF4D3A21),
+                                  ],
+                                ),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: const Color(0xFFD8AF5D),
+                                ),
+                              ),
+                              child: const Icon(
+                                Icons.arrow_forward_ios_rounded,
+                                color: Color(0xFFFFD47A),
+                                size: 16,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              '+30분',
+                              style: TextStyle(
+                                fontFamily: _hubDisplayFont,
+                                color: Color(0xFFFF806C),
+                                fontSize: 7.4,
+                                height: 1,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            const _ComputerLabIndicator(
+                              color: Color(0xFFFF625C),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Positioned(left: 3, top: 3, child: _ComputerLabBolt()),
+                  const Positioned(right: 3, top: 3, child: _ComputerLabBolt()),
+                  Positioned(
+                    left: 79,
+                    right: 55,
+                    bottom: 1,
+                    child: Container(
+                      height: 2,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(2),
+                        gradient: const LinearGradient(
+                          colors: <Color>[
+                            Colors.transparent,
+                            Color(0xFFFFC45C),
+                            Colors.transparent,
+                          ],
+                        ),
+                        boxShadow: const <BoxShadow>[
+                          BoxShadow(color: Color(0x99FFB83E), blurRadius: 5),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+class _ArchiveRoomActionPanel extends StatelessWidget {
+  const _ArchiveRoomActionPanel({
+    required this.pendingCount,
+    required this.onTap,
+  });
+
+  final int pendingCount;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final status = pendingCount > 0 ? '신규 $pendingCount건' : '열기';
+    final indicator = pendingCount > 0
+        ? const Color(0xFFFFC45E)
+        : const Color(0xFF88D879);
+    return Align(
+      alignment: const Alignment(0, 0.23),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 13),
+        child: Semantics(
+          button: true,
+          label: '국가계좌 장부 열기',
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              key: const Key('open-ledger-button'),
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(12),
+              child: Ink(
+                height: 104,
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: <Color>[
+                      Color(0xFA393B3B),
+                      Color(0xFA202322),
+                      Color(0xFE111413),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: const Color(0xD6A98A51),
+                    width: 1.2,
+                  ),
+                  boxShadow: const <BoxShadow>[
+                    BoxShadow(
+                      color: Color(0xB0000000),
+                      blurRadius: 18,
+                      offset: Offset(0, 9),
+                    ),
+                    BoxShadow(
+                      color: Color(0x2AFFD37A),
+                      blurRadius: 3,
+                      offset: Offset(0, -1),
+                    ),
+                  ],
+                ),
+                child: Stack(
+                  children: <Widget>[
+                    Row(
+                      children: <Widget>[
+                        Container(
+                          width: 57,
+                          height: 88,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: <Color>[
+                                Color(0xFF6E5630),
+                                Color(0xFF352817),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFFC09A58)),
+                          ),
+                          child: const Icon(
+                            Icons.inventory_2_rounded,
+                            color: Color(0xFFFFD88C),
+                            size: 29,
+                          ),
+                        ),
+                        const SizedBox(width: 7),
+                        Expanded(
+                          child: Container(
+                            height: 88,
+                            padding: const EdgeInsets.fromLTRB(10, 9, 8, 8),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: <Color>[
+                                  Color(0xFFF3E6C9),
+                                  Color(0xFFD8C39A),
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: const Color(0xFF826841),
+                              ),
+                              boxShadow: const <BoxShadow>[
+                                BoxShadow(
+                                  color: Color(0x77000000),
+                                  blurRadius: 4,
+                                  offset: Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: <Widget>[
+                                const Text(
+                                  '기록 보관함 · 열람',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontFamily: _hubDisplayFont,
+                                    color: Color(0xFF68502C),
+                                    fontSize: 7.2,
+                                    height: 1,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Container(
+                                  height: 1,
+                                  color: const Color(0x665E4929),
+                                ),
+                                const SizedBox(height: 7),
+                                const Text(
+                                  '국가계좌 장부',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontFamily: _hubDisplayFont,
+                                    color: Color(0xFF2A241C),
+                                    fontSize: 12.8,
+                                    height: 1,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: -0.45,
+                                  ),
+                                ),
+                                const SizedBox(height: 7),
+                                const Text(
+                                  '계좌 기록·오늘의 신문 스크랩',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontFamily: _hubDisplayFont,
+                                    color: Color(0xFF6E6049),
+                                    fontSize: 6.9,
+                                    height: 1,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 7),
+                        Container(
+                          width: 43,
+                          height: 88,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1B201E),
+                            borderRadius: BorderRadius.circular(7),
+                            border: Border.all(color: const Color(0xFF79633F)),
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: <Widget>[
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: <Widget>[
+                                  _ComputerLabIndicator(color: indicator),
+                                  const SizedBox(width: 4),
+                                  _ComputerLabIndicator(color: indicator),
+                                ],
+                              ),
+                              const SizedBox(height: 9),
+                              const Icon(
+                                Icons.arrow_forward_ios_rounded,
+                                color: Color(0xFFD8B36C),
+                                size: 20,
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                status,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontFamily: _hubDisplayFont,
+                                  color: indicator,
+                                  fontSize: 6.6,
+                                  height: 1,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Positioned(
+                      left: 3,
+                      top: 3,
+                      child: _ComputerLabBolt(),
+                    ),
+                    const Positioned(
+                      right: 3,
+                      top: 3,
+                      child: _ComputerLabBolt(),
+                    ),
+                    const Positioned(
+                      left: 3,
+                      bottom: 3,
+                      child: _ComputerLabBolt(),
+                    ),
+                    const Positioned(
+                      right: 3,
+                      bottom: 3,
+                      child: _ComputerLabBolt(),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ComputerLabActionDock extends StatelessWidget {
+  const _ComputerLabActionDock({
+    required this.onOpenComputer,
+    required this.onOpenHomeImprovements,
+  });
+
+  final VoidCallback onOpenComputer;
+  final VoidCallback onOpenHomeImprovements;
+
+  @override
+  Widget build(BuildContext context) => Align(
+    alignment: const Alignment(0, 0.42),
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: Stack(
+        children: <Widget>[
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: <Color>[
+                  Color(0xF52B3646),
+                  Color(0xF51A2331),
+                  Color(0xFA111925),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(19),
+              border: Border.all(color: const Color(0xC7C69B4A), width: 1.15),
+              boxShadow: const <BoxShadow>[
+                BoxShadow(
+                  color: Color(0xAA050A11),
+                  blurRadius: 22,
+                  offset: Offset(0, 10),
+                ),
+                BoxShadow(
+                  color: Color(0x2639B8E5),
+                  blurRadius: 2,
+                  offset: Offset(0, -1),
+                ),
+              ],
+            ),
+            child: Row(
+              children: <Widget>[
+                Expanded(
+                  child: _ComputerLabActionButton(
+                    interactionKey: const Key('open-market-button'),
+                    eyebrow: '공용 단말 · 8대',
+                    label: '공용 PC',
+                    description: '시장·업무 앱 실행',
+                    icon: Icons.computer_rounded,
+                    accent: const Color(0xFF67D6FF),
+                    onTap: onOpenComputer,
+                  ),
+                ),
+                const SizedBox(width: 7),
+                Expanded(
+                  child: _ComputerLabActionButton(
+                    interactionKey: const Key('open-home-improvements-button'),
+                    eyebrow: '생활 설비',
+                    label: '생활환경 관리',
+                    description: '조명·냉난방 상태 확인',
+                    icon: Icons.tune_rounded,
+                    accent: const Color(0xFFFFB95F),
+                    onTap: onOpenHomeImprovements,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Positioned(left: 5, top: 5, child: _ComputerLabBolt()),
+          const Positioned(right: 5, top: 5, child: _ComputerLabBolt()),
+          const Positioned(left: 5, bottom: 5, child: _ComputerLabBolt()),
+          const Positioned(right: 5, bottom: 5, child: _ComputerLabBolt()),
+        ],
+      ),
+    ),
+  );
+}
+
+class _ComputerLabBolt extends StatelessWidget {
+  const _ComputerLabBolt();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: 4,
+    height: 4,
+    decoration: BoxDecoration(
+      shape: BoxShape.circle,
+      color: const Color(0xFF8F7B56),
+      border: Border.all(color: const Color(0xFF322A20), width: 0.6),
+      boxShadow: const <BoxShadow>[
+        BoxShadow(
+          color: Color(0x66000000),
+          blurRadius: 1,
+          offset: Offset(0, 1),
+        ),
+      ],
+    ),
+  );
+}
+
+class _ComputerLabIconPanel extends StatelessWidget {
+  const _ComputerLabIconPanel({required this.icon, required this.accent});
+
+  final IconData icon;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: 43,
+    height: 68,
+    decoration: BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: <Color>[
+          accent.withValues(alpha: 0.22),
+          const Color(0xFF121D29),
+        ],
+      ),
+      borderRadius: BorderRadius.circular(9),
+      border: Border.all(color: accent.withValues(alpha: 0.56), width: 1),
+      boxShadow: <BoxShadow>[
+        const BoxShadow(
+          color: Color(0xA8000000),
+          blurRadius: 5,
+          offset: Offset(0, 3),
+        ),
+        BoxShadow(color: accent.withValues(alpha: 0.12), blurRadius: 8),
+      ],
+    ),
+    child: Stack(
+      alignment: Alignment.center,
+      children: <Widget>[
+        Positioned(
+          left: 6,
+          right: 6,
+          top: 8,
+          child: Container(height: 1, color: accent.withValues(alpha: 0.22)),
+        ),
+        Icon(icon, color: accent, size: 25),
+        Positioned(
+          bottom: 8,
+          child: Row(
+            children: <Widget>[
+              _ComputerLabIndicator(color: accent),
+              const SizedBox(width: 3),
+              const _ComputerLabIndicator(color: Color(0xFF536070)),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _ComputerLabIndicator extends StatelessWidget {
+  const _ComputerLabIndicator({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: 3.5,
+    height: 3.5,
+    decoration: BoxDecoration(
+      shape: BoxShape.circle,
+      color: color,
+      boxShadow: <BoxShadow>[
+        BoxShadow(color: color.withValues(alpha: 0.58), blurRadius: 4),
+      ],
+    ),
+  );
+}
+
+class _ComputerLabActionButton extends StatelessWidget {
+  const _ComputerLabActionButton({
+    required this.interactionKey,
+    required this.eyebrow,
+    required this.label,
+    required this.description,
+    required this.icon,
+    required this.accent,
+    required this.onTap,
+  });
+
+  final Key interactionKey;
+  final String eyebrow;
+  final String label;
+  final String description;
+  final IconData icon;
+  final Color accent;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    button: true,
+    label: '$label 열기',
+    child: Material(
+      color: Colors.transparent,
+      child: InkWell(
+        key: interactionKey,
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Ink(
+          height: 102,
+          padding: const EdgeInsets.fromLTRB(8, 9, 7, 8),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: <Color>[
+                accent.withValues(alpha: 0.16),
+                const Color(0xF51A2532),
+                const Color(0xF5101823),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: accent.withValues(alpha: 0.58)),
+            boxShadow: <BoxShadow>[
+              const BoxShadow(
+                color: Color(0x8A03070D),
+                blurRadius: 7,
+                offset: Offset(0, 4),
+              ),
+              BoxShadow(
+                color: accent.withValues(alpha: 0.08),
+                blurRadius: 6,
+                offset: const Offset(0, -1),
+              ),
+            ],
+          ),
+          child: Stack(
+            children: <Widget>[
+              Row(
+                children: <Widget>[
+                  _ComputerLabIconPanel(icon: icon, accent: accent),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: <Widget>[
+                        Text(
+                          eyebrow,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontFamily: _hubDisplayFont,
+                            color: accent,
+                            fontSize: 7.1,
+                            height: 1,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.15,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontFamily: _hubDisplayFont,
+                            color: Colors.white,
+                            fontSize: 11.2,
+                            height: 1,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.35,
+                          ),
+                        ),
+                        const SizedBox(height: 7),
+                        Text(
+                          description,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontFamily: _hubDisplayFont,
+                            color: Colors.white.withValues(alpha: 0.66),
+                            fontSize: 6.8,
+                            height: 1,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              Positioned(
+                top: 0,
+                right: 0,
+                child: Row(
+                  children: <Widget>[
+                    _ComputerLabIndicator(color: accent),
+                    const SizedBox(width: 5),
+                    Icon(
+                      Icons.arrow_forward_rounded,
+                      color: Colors.white.withValues(alpha: 0.62),
+                      size: 14,
+                    ),
+                  ],
+                ),
+              ),
+              Positioned(
+                left: 54,
+                right: 5,
+                bottom: 0,
+                child: Container(
+                  height: 2,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(2),
+                    gradient: LinearGradient(
+                      colors: <Color>[
+                        Colors.transparent,
+                        accent.withValues(alpha: 0.8),
+                        Colors.transparent,
+                      ],
+                    ),
+                    boxShadow: <BoxShadow>[
+                      BoxShadow(
+                        color: accent.withValues(alpha: 0.34),
+                        blurRadius: 5,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 class _ApartmentObjectHotspot extends StatelessWidget {
@@ -4026,13 +4883,13 @@ class _ApartmentPlaceDetails {
     ),
     _ApartmentPlace.kitchen => const _ApartmentPlaceDetails(
       id: 'kitchen',
-      title: '프로젝트 데시멀 · 작업실',
-      shortTitle: '작업실',
-      hint: '공용 PC · 기기 정비 · 생활 설비',
+      title: '프로젝트 데시멀 · 공용 컴퓨터실',
+      shortTitle: '컴퓨터실',
+      hint: '공용 PC 8대 · 공동 작업 · 생활설비',
       assetPath:
-          'assets/images/cinematic_soft_painted/decimal/bg_decimal_electronics_workshop_2000_v1.png',
-      icon: Icons.inventory_2_rounded,
-      accent: Color(0xFF8CE3BE),
+          'assets/images/cinematic_soft_painted/decimal/bg_decimal_communal_computer_lounge_2000_v2.png',
+      icon: Icons.computer_rounded,
+      accent: Color(0xFF78D9FF),
     ),
     _ApartmentPlace.corridor => const _ApartmentPlaceDetails(
       id: 'corridor',

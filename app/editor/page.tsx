@@ -44,7 +44,7 @@ const GAME_STORAGE_KEY = "project-decimal-dialogue-runtime-v2";
 const FLUTTER_GAME_STORAGE_KEY = `flutter.${GAME_STORAGE_KEY}`;
 const BUILD_STORAGE_KEY = "project-decimal-dialogue-built-v2";
 const CONTENT_VERSION = 3;
-const APPEARANCE_VERSION = 19;
+const APPEARANCE_VERSION = 20;
 
 const HAN_SUA_V2_FILENAME_MIGRATIONS = {
   "01_neutral_quality_v2.png": "01_neutral_wavy_v3.png",
@@ -57,6 +57,22 @@ const HAN_SUA_V2_FILENAME_MIGRATIONS = {
   "08_explaining_quality_v2.png": "09_explaining_v3.png",
 } as const;
 const HAN_SUA_ASSET_DIRECTORY = "production_soft_painted/han_sua/";
+const PARK_HAEUN_V2_FILENAME_MIGRATIONS = {
+  "01_neutral_soft_v2.png": "01_neutral_v3.png",
+  "02_bright_smile_wave_v2.png": "02_gentle_smile_v3.png",
+  "03_bright_laugh_v2.png": "03_bright_laugh_v3.png",
+  "04_playful_wink_v2.png": "07_embarrassed_v3.png",
+  "05_surprised_v2.png": "04_surprised_v3.png",
+  "06_worried_v2.png": "05_worried_v3.png",
+  "07_sulky_pout_v2.png": "06_angry_v3.png",
+  "08_determined_v2.png": "09_firm_v3.png",
+  "09_explaining_v2.png": "09_firm_v3.png",
+  "10_lobby_welcome_f0_v2.png": "01_neutral_v3.png",
+  "10_lobby_welcome_f1_v2.png": "02_gentle_smile_v3.png",
+  "10_lobby_welcome_f2_v2.png": "03_bright_laugh_v3.png",
+  "10_lobby_welcome_f3_v2.png": "02_gentle_smile_v3.png",
+} as const;
+const PARK_HAEUN_ASSET_DIRECTORY = "production_soft_painted/park_haeun/";
 
 type PublishStatus = "idle" | "building" | "success" | "error";
 type PublishMode = "quick" | "full";
@@ -167,13 +183,29 @@ function migrateHanSuaCharacterAsset(asset: string) {
   return migrated ? `${asset.slice(0, filenameIndex)}${migrated}` : asset;
 }
 
+function migrateParkHaeunCharacterAsset(asset: string) {
+  const directoryIndex = asset.lastIndexOf(PARK_HAEUN_ASSET_DIRECTORY);
+  if (directoryIndex < 0) return asset;
+  const filenameIndex = directoryIndex + PARK_HAEUN_ASSET_DIRECTORY.length;
+  const filename = asset.slice(filenameIndex);
+  const migrated =
+    PARK_HAEUN_V2_FILENAME_MIGRATIONS[
+      filename as keyof typeof PARK_HAEUN_V2_FILENAME_MIGRATIONS
+    ];
+  return migrated ? `${asset.slice(0, filenameIndex)}${migrated}` : asset;
+}
+
+function migrateCharacterAsset(asset: string) {
+  return migrateParkHaeunCharacterAsset(migrateHanSuaCharacterAsset(asset));
+}
+
 function normalizeScene(scene: DialogueScene): DialogueScene {
   return {
     ...DEFAULT_SCENE_DIRECTING,
     ...scene,
     direction: normalizeDialogueText(scene.direction),
     line: normalizeDialogueText(scene.line),
-    character: migrateHanSuaCharacterAsset(scene.character),
+    character: migrateCharacterAsset(scene.character),
     characterX:
       Math.round(clampNumber(scene.characterX, 0, CHARACTER_X_MIN, CHARACTER_X_MAX) * 10) /
       10,
@@ -187,7 +219,7 @@ function normalizeScene(scene: DialogueScene): DialogueScene {
       ...character,
       id: character.id || `layer-${index + 1}`,
       speaker: character.speaker || scene.speaker,
-      asset: migrateHanSuaCharacterAsset(character.asset || ""),
+      asset: migrateCharacterAsset(character.asset || ""),
       x: Math.round(clampNumber(character.x, 0, CHARACTER_X_MIN, CHARACTER_X_MAX) * 10) / 10,
       y: Math.round(clampNumber(character.y, 0, CHARACTER_Y_MIN, CHARACTER_Y_MAX) * 10) / 10,
       scale: Math.round(clampNumber(character.scale, 1, CHARACTER_SCALE_MIN, CHARACTER_SCALE_MAX) * 100) / 100,

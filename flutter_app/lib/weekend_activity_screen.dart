@@ -80,43 +80,6 @@ class _WeekendScheduleScreenState extends State<WeekendScheduleScreen> {
     );
   }
 
-  Future<void> _openHorseRace() async {
-    final race = buildAfternoonHorseRace(
-      simulationSeed: _state.simulationSeed,
-      day: _state.day,
-    );
-    final session = await Navigator.of(context).push<HorseRaceSessionResult>(
-      _gameSceneRoute<HorseRaceSessionResult>(
-        HorseRacingMiniGame(
-          race: race,
-          availableCash: _state.bankCash,
-          stateRecoveryRateBps: _state.story.stateRecoveryRateBps,
-        ),
-      ),
-    );
-    if (session == null || !mounted) return;
-    final result = await _run(
-      WeekendActivityRequest(
-        activityId: 'horse_racing',
-        horseRaceResult: session,
-      ),
-    );
-    if (result?.success != true || !mounted) return;
-    await showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('전자 마권 정산 완료'),
-        content: Text(result!.message),
-        actions: [
-          FilledButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('확인'),
-          ),
-        ],
-      ),
-    );
-  }
-
   Future<void> _confirmRest() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -267,35 +230,6 @@ class _WeekendScheduleScreenState extends State<WeekendScheduleScreen> {
                     ),
                     const SizedBox(height: 9),
                   ],
-                  const SizedBox(height: 4),
-                  const Text(
-                    key: Key('weekend-action-afternoon-fun'),
-                    '오후 온라인 활동',
-                    style: TextStyle(
-                      color: _ink,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  _WeekendActionCard(
-                    key: const Key('weekend-action-horse-racing'),
-                    title: '국가망 경마 중계',
-                    subtitle: '오후 15:10 · 데시멀 PC 온라인 접속',
-                    description: horseRaceAlreadyPlayedToday(_state)
-                        ? '오늘 국가망 경주 중계와 전자 마권 정산을 마쳤다.'
-                        : '센터를 나가지 않고 국가 전용망으로 원격 패독·배당·실시간 중계를 본다. 확정 이익의 20%는 국가 수수료다.',
-                    imageAsset: horseRaceBackgroundAsset,
-                    accent: const Color(0xFF2E7D5A),
-                    icon: Icons.emoji_events_rounded,
-                    onTap:
-                        _busy ||
-                            _remaining <= 0 ||
-                            horseRaceAlreadyPlayedToday(_state) ||
-                            _state.bankCash < horseRaceMinStake
-                        ? null
-                        : _openHorseRace,
-                  ),
                   const SizedBox(height: 13),
                   const Text(
                     '다른 일정',

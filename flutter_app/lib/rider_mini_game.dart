@@ -154,6 +154,7 @@ class _RiderMiniGameState extends State<RiderMiniGame> {
 
   void _start() {
     _timer?.cancel();
+    GameAudio.instance.playSfx(GameSfx.raceBell, volumeScale: 0.75);
     setState(() {
       _random = math.Random(widget.randomSeed);
       _phase = _RiderPhase.running;
@@ -246,7 +247,10 @@ class _RiderMiniGameState extends State<RiderMiniGame> {
 
       if (_elapsedSeconds >= _courseSeconds) completed = true;
     });
-    if (collided) HapticFeedback.heavyImpact();
+    if (collided) {
+      HapticFeedback.heavyImpact();
+      GameAudio.instance.playSfx(GameSfx.impactMetal);
+    }
     if (completed) _complete();
   }
 
@@ -293,6 +297,7 @@ class _RiderMiniGameState extends State<RiderMiniGame> {
 
   void _throwNewspaper({int? chosenSide, double power = 0.74}) {
     if (_phase != _RiderPhase.running || _throwCooldown > 0) return;
+    GameAudio.instance.playSfx(GameSfx.paperRustle);
     final visibleTargets = _targets
         .where(
           (target) =>
@@ -429,6 +434,7 @@ class _RiderMiniGameState extends State<RiderMiniGame> {
       _banner = '새벽 배달 마감!';
     });
     HapticFeedback.mediumImpact();
+    GameAudio.instance.playSfx(GameSfx.confirm);
   }
 
   @override

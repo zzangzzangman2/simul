@@ -104,15 +104,15 @@ const ohJiwooPoses = [
 );
 
 const parkHaeunPoses = [
-  ["01", "차분한 기본", "01_neutral_soft_v2.png"],
-  ["02", "밝은 미소와 인사", "02_bright_smile_wave_v2.png"],
-  ["03", "활짝 웃으며 인사", "03_bright_laugh_v2.png"],
-  ["04", "장난스러운 윙크", "04_playful_wink_v2.png"],
-  ["05", "깜짝 놀람", "05_surprised_v2.png"],
-  ["06", "조용한 걱정", "06_worried_v2.png"],
-  ["07", "살짝 삐친 표정", "07_sulky_pout_v2.png"],
-  ["08", "단단한 결심", "08_determined_v2.png"],
-  ["09", "차분한 설명", "09_explaining_v2.png"],
+  ["01", "차분한 기본", "01_neutral_v3.png"],
+  ["02", "부드러운 미소", "02_gentle_smile_v3.png"],
+  ["03", "활짝 웃음", "03_bright_laugh_v3.png"],
+  ["04", "깜짝 놀람", "04_surprised_v3.png"],
+  ["05", "조용한 걱정", "05_worried_v3.png"],
+  ["06", "화난 표정", "06_angry_v3.png"],
+  ["07", "부끄러운 표정", "07_embarrassed_v3.png"],
+  ["08", "슬픈 표정", "08_sad_v3.png"],
+  ["09", "단호한 표정", "09_firm_v3.png"],
 ].map(([id, label, file]) =>
   pose(id, label, `assets/images/production_soft_painted/park_haeun/${file}`),
 );

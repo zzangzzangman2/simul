@@ -13,6 +13,12 @@ flutter run -d chrome
 09:00·100만 원 테스트 계좌로 시작하며 실제 5슬롯 저장과 격리되고 새로고침하면
 테스트 상태만 초기화됩니다.
 
+개별 화면은 `/play/index.html?newspaperPreview=1`,
+`/play/index.html?horseRacePreview=1`, `/play/index.html?casinoTest=1`로 바로 확인합니다.
+신문배달·경마 미리보기는 화면 검수용이고,
+카지노 테스트는 2010-01-04 15:00·격리된 1,000,000원 메모리 상태를 사용해 본편
+5슬롯을 읽거나 쓰지 않습니다.
+
 ## 검증
 
 ```powershell
@@ -37,6 +43,10 @@ flutter build web --release --base-href /play/
 - `lib/phone_messenger_screens.dart`: 데시멀톡 채팅 목록·읽지 않음·자유 입력·좌우 말풍선 UI
 - `lib/game/cohort_investment_state.dart`: 데시멀 동기 9명 NPC 계좌·10인 일일 결과·대여·자동 상환 저장
 - `lib/cohort_investment_screens.dart`: 15:00 `오늘의 투자 결과` 10행 표와 하루 1회 대여 UI
+- `lib/game/player_progression.dart`: 의미 있는 행동 경험치·1~9단계 기술·행동 카운터 저장
+- `lib/game/weekly_portfolio_review.dart`: 주간 회사 조사·손실 확인선·실제 체결 완료와 회전 후보
+- `lib/game/progress_review.dart`: 월말·연말·10년 누적 거래·조사·관계·주말 회고
+- `lib/game/monthly_unlock_chapter.dart`: 2~9월 8명 기능 해금·5단계 관계 톤·후속 톡
 - `lib/game/relationship_state.dart`: 여학생 8명 프로필·호감도·단계·장면·최근 선택 저장
 - `lib/relationship_screens.dart`: 관계 목록과 하루 종료 대화·데이트 UI
 - `lib/game/game_engine.dart`: 거래·경제·기업행동·부동산·동네 사업·관계 일일 훅·마이그레이션
@@ -48,6 +58,11 @@ flutter build web --release --base-href /play/
 - `lib/game/world_economy.dart`: 주식의 공개 거시 사건을 사업·부동산 수치로 투영하고 14개 부동산 지역을 상권에 매핑
 - `lib/game/market_data.dart`: 시장 데이터 모델·2개 LRU·백그라운드 생성
 - `lib/game/order_book.dart`: 방향별 대기잔량·체결강도·분당 소화량·깊이 제한 가격 전이
+- `lib/game/shareholder_governance.dart`, `lib/game/shareholder_governance_engine.dart`: 상장사
+  주주권·주총·공개매수·CEO·자회사·기업재편 저장과 일일 처리
+- `lib/game/listed_company_management.dart`: 업종별 이사회·CEO 집행·합병·합작·분할·자산매각
+- `lib/shareholder_company_hub_screen.dart`, `lib/listed_governance_screen.dart`: 작업실 PC
+  회사관리 허브와 종목별 경영 화면
 - `lib/game/market_news.dart`: 공개된 전날 사실만 쓰는 신문 데이터
 - `lib/game/real_estate_market.dart`: 부동산 기준 자산·가격·거래비용
 - `lib/game/real_estate_world.dart`: 생성기 v4 개별 매물·지역 사건·공통 경제 투영·공간 영향과 v1~v3 보존
@@ -56,13 +71,26 @@ flutter build web --release --base-href /play/
 - `lib/stock_market_screen.dart`: 호가·주문·차트·배속·보고서·속보
 - `lib/business_management_screen.dart`: 동네상권넷 인수·점포·사건·월별 손익·상권판세 5탭 UI
 - `lib/rider_mini_game.dart`: 새벽 신문배달 방향 플릭·투척 포물선·자전거 캔버스 애니메이션·성과 점수
-- `lib/game/horse_racing.dart`, `lib/horse_racing_mini_game.dart`: 데시멀 PC 국가망 경마의 8두 결정론 경주·전자 마권·확정이익 20% 국가 수수료·실시간 중계
+- `lib/game/horse_racing.dart`, `lib/horse_racing_mini_game.dart`: 평일 데시멀 PC 국가망 경마의 8두 결정론 경주·하루 1회 전자 마권·20:00 종료·카지노 상호 배제·확정이익 20% 국가 수수료·실시간 중계
+- `lib/game/casino_state.dart`, `lib/casino_screen.dart`, `lib/casino_table_animation.dart`:
+  카지노 6게임·30분/10판·결정론 원장·블랙잭/크랩스 저장·현장 테이블 연출
 - `test/world_economy_test.dart`, `test/shared_economy_stock_export_test.dart`: 공통 사건 동일성·공개일·지역 매핑·주식 원천 비변경 회귀
 - `test/business_districts_test.dart`: 상권 카탈로그·국면·사건 비누설·순위·적합도·부동산 매핑·레거시 회귀
 - `test/business_simulation_test.dart`: 카탈로그·손익·사건·JSON 결정론 회귀
 - `test/business_engine_test.dart`: 인수·부동산 연결·정책·투자·월 정산·강제폐업 회귀
 - `test/business_long_run_balance_test.dart`: 2000~2026 다중 시드·18업종·6입지·32상권·4정책 장기 분포 감사
 - `test/business_ui_test.dart`: 390×844·360×800 앱 진입·5탭·상권판세·실제 인수·6축·투자·폐업 회귀
+- `test/casino_engine_test.dart`, `test/casino_screen_test.dart`, `test/casino_ten_round_playtest.dart`:
+  카지노 한도·수수료·저장·6게임 규칙·360px·게임별 10판 플레이
+- `test/horse_racing_test.dart`, `test/horse_racing_mini_game_test.dart`: 경마 결정론·배당·원장·
+  위조 방지·8두 중계·모바일 UI
+- `test/shareholder_governance_test.dart`, `test/listed_company_management_test.dart`,
+  `test/listed_governance_screen_test.dart`, `test/shareholder_company_hub_test.dart`: 지분 임계값·
+  주총·공개매수·CEO·기업재편·PC 허브
+- `test/order_book_inventory_conservation_test.dart`, `test/pending_order_queue_invariant_test.dart`,
+  `test/stock_market_player_order_level_test.dart`: 발행주식 보존·외부 재고/예산·FIFO·1주 주문
+- `test/player_progression_test.dart`, `test/weekly_portfolio_review_test.dart`,
+  `test/one_year_simulation_test.dart`, `test/ten_year_simulation_test.dart`: 성장·주간 복기·연간/10년 회고
 - `test/widget_test.dart`: 프롤로그, 대사 편집본 배경과 추가 장면을 포함한 위젯 회귀
 
 ## 공통 경제 규칙
@@ -152,12 +180,12 @@ flutter build web --release --base-href /play/
 - 구조벽은 가격 경계 통과 또는 최초·회복 기준 잔량 90% 이상 실제 소진 시 붕괴하며, 이후에는 원래 벽이 아니라 일반 호가 수준까지만 회복한다.
 - 호가 펄스는 게임분당 거래대금 기본 1·1·1·1·2·2·3·4·4회, 급변 5회,
   극단 7회다. 20~75억원 구간은 1회/분이고 75억원 미만은 체결강도 불균형만으로
-  가속하지 않는다. 75억원 이상도 최근 3시장분에 고유 `(시장분, 미세구조 프레임)` 표본 최소 3개와 체결대금 합계 0.10억원 이상이 있어야 불균형 가속하며, 부족하면 기본 슬롯을 유지한다. 실제 벽 잔량과 standing depth 계수 `0.45`는 그대로 두고 각 슬롯의 누적 체결 용량을 비례 확대해 마지막 슬롯에서 같은 목표가에 도달한다. 가격·잔량 숫자는 즉시 반영하고 잔량 막대·중앙 빨간 테두리만 144ms로 보간한다.
-- 현실 1초=게임 1분을 기본으로 정지·1배·3배·10배를 제공한다.
+  가속하지 않는다. 75억원 이상도 최근 3시장분에 고유 `(시장분, 미세구조 프레임)` 표본 최소 3개와 체결대금 합계 0.10억원 이상이 있어야 불균형 가속하며, 부족하면 기본 슬롯을 유지한다. 실제 벽 잔량과 standing depth 계수 `0.45`는 그대로 두고 각 슬롯의 누적 체결 용량을 비례 확대해 마지막 슬롯에서 같은 목표가에 도달한다. 가격·잔량 숫자는 즉시 반영하고 잔량 막대·대기 중 중앙 테두리는 144ms로 보간하며 활성 체결 테두리는 즉시 스냅한다.
+- 현실 1초=게임 5분을 기본으로 정지·5분·15분·50분을 제공한다.
 - 시장 저장은 직렬화하고 백그라운드 전환 시 현재 분을 저장한다.
 
 - 한 슬롯의 집계 합성 체결은 표시 큐에서 한 번만 차감한다. 수량이 충분하면 합계가 정확히 같은 7~12개 테이프 체결로 나누며 약 65%는 1~5주이고 10주 배수 스냅은 하지 않는다. 체결강도·거래대금은 자식 수량을 합산하지만 가속 표본은 고유 `(시장분, 미세구조 프레임)`으로 세고, 보합 방향은 결정론적 쌍으로 장기 50:50이다.
-- 정상 호가 이벤트 깊이는 최우선 46%, 2~3호가 32%, 4~10호가 22%로 선택한 뒤 평온 55%·급변 78% 게이트를 통과할 때만 바뀐다. 비구조벽 깊이는 최우선이 얇은 험프를 사용하고 고정 5틱 미시 벽은 만들지 않는다. 전체·압축 호가 모두 전일종가 대비 등락률을 표시하며 숫자는 즉시, 잔량 막대·중앙 체결 테두리는 144ms로 갱신한다. 20억원 이상 생성형 호가는 연속 양수, 20억원 미만은 결정론적 공백 정책이다.
+- 정상 호가 이벤트 깊이는 최우선 46%, 2~3호가 32%, 4~10호가 22%로 선택한 뒤 평온 55%·급변 78% 게이트를 통과할 때만 바뀐다. 비선택 비구조·비벽·비회복 가시 큐도 낮은 결정론적 확률로 작은 주문 유입·취소·정정을 받아 장시간 얼어붙지 않는다. 비구조벽 깊이는 최우선이 얇은 험프를 사용하고 고정 5틱 미시 벽은 만들지 않는다. 전체·압축 호가 모두 전일종가 대비 등락률을 표시하며 숫자는 즉시, 잔량 막대·대기 중 중앙 테두리는 144ms로 갱신하고 활성 체결 테두리는 즉시 스냅한다. 20억원 이상 생성형 호가는 연속 양수, 20억원 미만은 결정론적 공백 정책이다.
 
 ## 레이아웃
 

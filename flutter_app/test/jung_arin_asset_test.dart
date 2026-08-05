@@ -16,6 +16,10 @@ void main() {
     '07_deadline_annoyed_v1.png',
     '08_determined_ready_v1.png',
     '09_counting_explain_v1.png',
+    '10_lobby_tie_reset_f0_v2.png',
+    '10_lobby_tie_reset_f1_v2.png',
+    '10_lobby_tie_reset_f2_v2.png',
+    '10_lobby_tie_reset_f3_v2.png',
   ];
 
   test(

@@ -30,9 +30,11 @@
 
 ## 주주총회
 
-- 주식시장 화면은 시세·호가·주문·기업정보에 집중한다. 주주권 행사, 주주총회,
-  공개매수, 이사회 결정과 인수회사 운영은 작업실 PC의 `주주·회사관리` 앱에서
-  처리한다.
+- 주식시장 화면은 시세·호가·주문·기업정보에 집중한다. 기업정보 탭의
+  `기업 공시·주요 일정` 카드는 잠정/확정 실적, 컨퍼런스콜, 외부감사,
+  정기주주총회, 배당·증자·분할·합병·공개매수의 공시일과 진행 단계를 함께 보여 준다.
+  주주권 행사, 주주총회, 공개매수, 이사회 결정과 인수회사 운영은 작업실 PC의
+  `주주·회사관리` 앱에서 처리한다.
 - PC 허브는 보유회사, 경영권 확보회사, 예정 주주총회, 참석 등록 여부와
   미의결 안건을 한 화면에 모은다. 회사 카드를 열면 종목별 주주·경영관리
   상세 화면으로 이동한다.
@@ -173,6 +175,24 @@
   자회사 장부와 기업재편 기록을 하위 호환 형식으로 저장한다.
 - v26 이하 저장은 빈 주주권 상태로 안전하게 읽은 뒤 현재 보유주식으로 재구성한다.
 
+## 주요 구현
+
+- `flutter_app/lib/game/shareholder_governance.dart`: 회사·회의·안건·의결권·CEO·자회사·
+  기업재편의 v27 저장 모델과 다음 거래일 가격평가
+- `flutter_app/lib/game/shareholder_governance_engine.dart`: 일일 회의·집행·재편 처리와
+  지분/이사회/CEO 지위 동기화
+- `flutter_app/lib/game/listed_company_management.dart`: 업종별 플레이북·분기 안건·CEO 집행·
+  합병·합작·분할·자산매각 결과 계산
+- `flutter_app/lib/shareholder_company_hub_screen.dart`: 보유회사·정기/임시주총 일정·미의결 안건·
+  CEO·진행 중 재편을 모으는 작업실 PC 허브
+- `flutter_app/lib/listed_governance_screen.dart`: 회사별 권리·표결·공개매수·CEO·이사회·자회사 UI
+- `flutter_app/lib/game/order_book.dart`: 발행주식·외부 유통·잠금 지분과 외부 매수예산을
+  보존하는 호가 재고 프로필
+- `flutter_app/lib/game/corporate_disclosure.dart`: 실적·감사·주총·자본변동·경영권 사건의
+  발표일/효력일을 묶는 회사별 공시 캘린더
+- `flutter_app/lib/stock_market_screen.dart`: 기업정보 탭에서 과거 공시와 앞으로 확정된
+  일정을 상태별로 표시
+
 ## 회귀 검증
 
 `flutter_app/test/shareholder_governance_test.dart`와
@@ -193,6 +213,17 @@
 
 `listed_governance_screen_test.dart`는 360px 폭에서 주요 경영권 화면을
 스크롤하고 업종별 안건 의결 및 CEO 취임→합병 특별결의 흐름을 실제로 실행한다.
+
+`shareholder_company_hub_test.dart`는 보유회사와 결정론적 정기주총 일정을 한 화면에
+모으고 보유주식이 없는 저장에서도 안전한 빈 상태를 표시하는지 검사한다.
+
+`order_book_inventory_conservation_test.dart`, `pending_order_queue_invariant_test.dart`,
+`stock_market_player_order_level_test.dart`는 발행주식 보존, 100% 보유 시 외부 매도 제거,
+외부 현금예산 매수, 5%/1억주 주문 상한, 동일가 FIFO와 플레이어 1주 매도 노출을 고정한다.
+
+`market_data_test.dart`는 잠정/확정 실적·감사·정기주총·유상증자 권리락/청약/신주상장의
+일정 생성과 시간순 정렬을 검증하고, `widget_test.dart`는 이 캘린더가 실제 기업정보 탭에
+표시되는지 검증한다.
 
 ### 1년 분할인수 스트레스 감사
 

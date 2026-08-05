@@ -3662,8 +3662,8 @@ class _GameOrderBookCarryContext {
     required this.fastMarket,
     required int liquidityPulse,
     required bool adaptiveLiquidityPulses,
-    required String seededAssetId,
-    required int day,
+    required this.seededAssetId,
+    required this.day,
     required int minute,
     required double turnoverEok,
     required int executionCapacity,
@@ -3731,6 +3731,8 @@ class _GameOrderBookCarryContext {
                      .toDouble();
 
   final Map<double, GameOrderBookLevel> previousByPrice;
+  final String seededAssetId;
+  final int day;
   final bool fastMarket;
   final bool pulseAdvanced;
   final bool minuteAdvanced;
@@ -3751,6 +3753,90 @@ class _GameOrderBookCarryContext {
         currentLiquidityPulse == trade.liquidityPulse + 1 &&
         trade.levelSide == level.side &&
         (trade.price - level.price).abs() < 0.000001;
+  }
+
+  GameOrderBookLevel _withBackgroundQuoteChurn(
+    GameOrderBookLevel level,
+    GameOrderBookLevel previous, {
+    required int ticksFromTouch,
+    required bool isRecoveringOrdinaryQueue,
+    required bool isStructuralVacuum,
+  }) {
+    if (!pulseAdvanced ||
+        level.wasLiquidityPulseTouched ||
+        previous.quantity <= 0 ||
+        level.quantity <= 0 ||
+        level.isWall ||
+        previous.isWall ||
+        level.isStructuralWall ||
+        previous.isStructuralWall ||
+        isRecoveringOrdinaryQueue ||
+        isStructuralVacuum ||
+        ticksFromTouch >= gameOrderBookLevelCount) {
+      return level;
+    }
+
+    final priceSalt = (level.price * 100).round();
+    final sideSalt = level.side == GameOrderBookSide.ask ? 17011 : 29009;
+    final gate = _orderBookUnit(
+      seededAssetId,
+      day,
+      currentLiquidityPulse * 104729 + priceSalt * 31 + sideSalt,
+    );
+    // The main pulse still owns the conspicuous 1-3 row change. This smaller
+    // background gate represents ordinary amend/cancel/arrival traffic so a
+    // visible 126-share quote cannot remain frozen for dozens of game minutes.
+    if (gate >= (fastMarket ? 0.12 : 0.08)) return level;
+
+    final proximity = gameOrderBookQueueArrivalProximity(ticksFromTouch);
+    final scale = fastMarket ? 0.012 : 0.006;
+    final maximumStep = math.max(
+      1,
+      (previous.quantity * scale * (0.70 + proximity * 0.30)).round(),
+    );
+    final movementUnit = _orderBookUnit(
+      seededAssetId,
+      day,
+      currentLiquidityPulse * 130363 + priceSalt * 43 + sideSalt,
+    );
+    final step = 1 + (movementUnit * maximumStep).floor();
+    var movesUp =
+        _orderBookUnit(
+          seededAssetId,
+          day,
+          currentLiquidityPulse * 161803 + priceSalt * 59 + sideSalt,
+        ) >=
+        0.5;
+    // Keep the random walk loosely tethered to the regenerated depth profile,
+    // but never jump directly to that target: a background event must look like
+    // one small order amendment, not a wholesale redraw of the row.
+    if (previous.quantity < level.quantity * 0.82) movesUp = true;
+    if (previous.quantity > level.quantity * 1.18) movesUp = false;
+    var quantity = math.max(
+      gameOrderBookMinimumDisplayedQuantity,
+      previous.quantity + (movesUp ? step : -step),
+    );
+    if (quantity == previous.quantity) {
+      quantity = previous.quantity + step;
+    }
+    if (quantity == previous.quantity) return level;
+
+    return GameOrderBookLevel(
+      side: level.side,
+      price: level.price,
+      quantity: quantity,
+      isWall: level.isWall,
+      structuralKind: level.structuralKind,
+      structuralStrength: level.structuralStrength,
+      structuralHoldTicks: level.structuralHoldTicks,
+      isStructuralWall: level.isStructuralWall,
+      isStructuralBreached: level.isStructuralBreached,
+      structuralVacuumMultiplier: level.structuralVacuumMultiplier,
+      isPsychological: level.isPsychological,
+      technicalPeriods: level.technicalPeriods,
+      wasLiquidityPulseTouched: true,
+      queueRecoveryTargetQuantity: level.queueRecoveryTargetQuantity,
+    );
   }
 
   ({int quantity, int queueRecoveryTargetQuantity}) _carriedQueue(
@@ -4016,8 +4102,16 @@ class _GameOrderBookCarryContext {
     final carriesRecoveringOrdinaryQueue =
         previous.queueRecoveryTargetQuantity > previous.quantity &&
         !previous.isWall;
-    final carried = _carriedQueue(
+    final carriedLevel = _withBackgroundQuoteChurn(
       level,
+      previous,
+      ticksFromTouch: ticksFromTouch,
+      isRecoveringOrdinaryQueue: carriesRecoveringOrdinaryQueue,
+      isStructuralVacuum:
+          carriedStructuralBreach || carriedStructuralVacuum < 0.999999,
+    );
+    final carried = _carriedQueue(
+      carriedLevel,
       previous,
       ticksFromTouch: ticksFromTouch,
     );
@@ -4049,7 +4143,7 @@ class _GameOrderBookCarryContext {
           : carriedStructuralVacuum,
       isPsychological: level.isPsychological,
       technicalPeriods: level.technicalPeriods,
-      wasLiquidityPulseTouched: level.wasLiquidityPulseTouched,
+      wasLiquidityPulseTouched: carriedLevel.wasLiquidityPulseTouched,
       queueRecoveryTargetQuantity: carried.queueRecoveryTargetQuantity,
     );
   }

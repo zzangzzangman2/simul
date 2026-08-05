@@ -4908,7 +4908,7 @@ class _AdultChanceCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           const Text(
-            '바카라·블랙잭·유럽식 룰렛·다이사이·3릴은 작업실 PC의 전용 실시간 중계 앱에서 15:00 이후 이용합니다. 실제 돈·광고·결제 없음.',
+            '바카라·블랙잭·유럽식 룰렛·다이사이·3릴은 컴퓨터실 PC의 전용 실시간 중계 앱에서 15:00 이후 이용합니다. 실제 돈·광고·결제 없음.',
             style: TextStyle(
               color: Color(0xFFD8D3E6),
               fontSize: 11,

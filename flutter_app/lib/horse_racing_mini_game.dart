@@ -1,6 +1,14 @@
 part of 'main.dart';
 
-enum _HorseRacePhase { betting, racing, result }
+enum _HorseRacePhase {
+  welcome,
+  guide,
+  betting,
+  acceptance,
+  handover,
+  racing,
+  result,
+}
 
 const _boardHeaderStyle = TextStyle(
   color: Color(0xFF766E82),
@@ -96,13 +104,15 @@ class HorseRacingMiniGame extends StatefulWidget {
     required this.race,
     required this.availableCash,
     this.previewMode = false,
-    this.raceDuration = const Duration(seconds: 12),
+    this.onPowerOff,
+    this.raceDuration = const Duration(seconds: 16),
     this.stateRecoveryRateBps = horseRaceDefaultStateRecoveryRateBps,
   });
 
   final HorseRaceCard race;
   final int availableCash;
   final bool previewMode;
+  final VoidCallback? onPowerOff;
   final Duration raceDuration;
   final int stateRecoveryRateBps;
 
@@ -113,12 +123,14 @@ class HorseRacingMiniGame extends StatefulWidget {
 class _HorseRacingMiniGameState extends State<HorseRacingMiniGame>
     with SingleTickerProviderStateMixin {
   late final AnimationController _raceController;
-  _HorseRacePhase _phase = _HorseRacePhase.betting;
+  _HorseRacePhase _phase = _HorseRacePhase.welcome;
+  int _welcomeDialogueStep = 0;
   HorseBetType _betType = HorseBetType.win;
   late String _primaryHorseId = widget.race.entrants.first.id;
   String? _secondaryHorseId;
   bool _pickingQuinellaSecond = false;
   int _stake = horseRaceMinStake;
+  int _raceAudioCue = 0;
 
   HorseRaceEntrant get _primary => widget.race.entrantById(_primaryHorseId);
 
@@ -165,25 +177,76 @@ class _HorseRacingMiniGameState extends State<HorseRacingMiniGame>
   int get _estimatedNetDelta =>
       _estimatedGrossPayout - _stake - _estimatedStateProfitFee;
 
+  String get _tellerBettingLine => switch (_betType) {
+    HorseBetType.win => '오빠, ${_primary.name} 단승을 골랐네. 1등으로 들어오면 적중이야.',
+    HorseBetType.place => '오빠, ${_primary.name} 연승을 골랐네. 3등 안에 들어오면 적중이야.',
+    HorseBetType.quinella when _secondary == null =>
+      '오빠, 복승은 말 두 마리를 골라야 해. 두 번째 말을 선택해 줘.',
+    HorseBetType.quinella =>
+      '오빠, ${_primary.name}하고 ${_secondary!.name} 복승이네. 두 말이 1·2등이면 순서는 상관없어.',
+  };
+
+  String _tellerRaceLine(double time) {
+    if (time < 0.13) return '오빠, 출발했어. 아직 초반이니까 자리 잡는 걸 보자.';
+    if (time < 0.48) return '선두가 계속 바뀌고 있어. 오빠가 고른 말도 흐름을 타는 중이야.';
+    if (time < 0.76) return '이제 승부처야. 바깥으로 나오는 말들의 탄력을 봐.';
+    if (time < 0.93) return '직선 들어왔어! 선두가 결승선까지 버티는지 끝까지 봐.';
+    return '결승선 통과야. 잠깐만, 공식 착순하고 기록 확인해 줄게.';
+  }
+
   @override
   void initState() {
     super.initState();
     _raceController =
         AnimationController(vsync: this, duration: widget.raceDuration)
+          ..addListener(_handleRaceAudioProgress)
           ..addStatusListener((status) {
             if (status != AnimationStatus.completed || !mounted) return;
             HapticFeedback.heavyImpact();
+            GameAudio.instance.stopLoop(GameLoopSfx.horseGallop);
+            GameAudio.instance.stopLoop(GameLoopSfx.raceCrowd);
+            GameAudio.instance.playSfx(GameSfx.crowdVictory);
+            GameAudio.instance.playSfx(
+              _grossPayout > 0 ? GameSfx.coinsLarge : GameSfx.error,
+            );
             setState(() => _phase = _HorseRacePhase.result);
           });
   }
 
   @override
   void dispose() {
+    GameAudio.instance.stopLoop(GameLoopSfx.horseGallop);
+    GameAudio.instance.stopLoop(GameLoopSfx.raceCrowd);
     _raceController.dispose();
     super.dispose();
   }
 
+  void _handleRaceAudioProgress() {
+    if (_phase != _HorseRacePhase.racing) return;
+    final nextCue = _raceController.value >= 0.78
+        ? 3
+        : _raceController.value >= 0.52
+        ? 2
+        : _raceController.value >= 0.27
+        ? 1
+        : 0;
+    if (nextCue <= _raceAudioCue) return;
+    _raceAudioCue = nextCue;
+    if (nextCue == 3) {
+      HapticFeedback.heavyImpact();
+    } else if (nextCue == 2) {
+      HapticFeedback.mediumImpact();
+    } else {
+      HapticFeedback.selectionClick();
+    }
+    GameAudio.instance.playSfx(
+      nextCue == 2 ? GameSfx.notification : GameSfx.impactWood,
+      volumeScale: nextCue == 3 ? 0.8 : 0.55,
+    );
+  }
+
   void _changeBetType(HorseBetType type) {
+    GameAudio.instance.playSfx(GameSfx.toggle);
     setState(() {
       _betType = type;
       if (type == HorseBetType.quinella) {
@@ -197,6 +260,7 @@ class _HorseRacingMiniGameState extends State<HorseRacingMiniGame>
   }
 
   void _selectEntrant(String id) {
+    GameAudio.instance.playSfx(GameSfx.select);
     setState(() {
       if (_betType != HorseBetType.quinella) {
         _primaryHorseId = id;
@@ -213,9 +277,40 @@ class _HorseRacingMiniGameState extends State<HorseRacingMiniGame>
     });
   }
 
-  void _startRace() {
+  void _setStake(int stake) {
+    GameAudio.instance.playSfx(GameSfx.coins, volumeScale: 0.7);
+    setState(() => _stake = stake);
+  }
+
+  void _goOffline() {
+    GameAudio.instance.playSfx(GameSfx.toggle);
+    GameAudio.instance.stopLoop(GameLoopSfx.horseGallop);
+    GameAudio.instance.stopLoop(GameLoopSfx.raceCrowd);
+    final powerOff = widget.onPowerOff;
+    if (powerOff != null) {
+      powerOff();
+      return;
+    }
+    Navigator.of(context).maybePop();
+  }
+
+  void _reviewTicket() {
     if (!_canStart) return;
+    GameAudio.instance.playSfx(GameSfx.paperPlace);
+    setState(() => _phase = _HorseRacePhase.acceptance);
+  }
+
+  void _acceptTicket() {
+    GameAudio.instance.playSfx(GameSfx.paperRustle);
+    setState(() => _phase = _HorseRacePhase.handover);
+  }
+
+  void _beginRace() {
     HapticFeedback.mediumImpact();
+    _raceAudioCue = 0;
+    GameAudio.instance.playSfx(GameSfx.raceBell);
+    GameAudio.instance.startLoop(GameLoopSfx.horseGallop);
+    GameAudio.instance.startLoop(GameLoopSfx.raceCrowd);
     setState(() => _phase = _HorseRacePhase.racing);
     _raceController.forward(from: 0);
   }
@@ -241,14 +336,320 @@ class _HorseRacingMiniGameState extends State<HorseRacingMiniGame>
   }
 
   @override
-  Widget build(BuildContext context) => PopScope(
-    canPop: _phase != _HorseRacePhase.racing,
-    child: switch (_phase) {
-      _HorseRacePhase.betting => _buildBettingScreen(),
-      _HorseRacePhase.racing => _buildRacingScreen(),
-      _HorseRacePhase.result => _buildResultScreen(),
-    },
+  Widget build(BuildContext context) {
+    final baseTheme = Theme.of(context);
+    return Theme(
+      data: baseTheme.copyWith(
+        textTheme: baseTheme.textTheme.apply(fontFamily: 'Maplestory'),
+        primaryTextTheme: baseTheme.primaryTextTheme.apply(
+          fontFamily: 'Maplestory',
+        ),
+      ),
+      child: PopScope(
+        canPop: _phase != _HorseRacePhase.racing,
+        child: switch (_phase) {
+          _HorseRacePhase.welcome => _buildTellerWelcomeScreen(),
+          _HorseRacePhase.guide => _buildTellerGuideScreen(),
+          _HorseRacePhase.betting => _buildBettingScreen(),
+          _HorseRacePhase.acceptance => _buildTicketAcceptanceScreen(),
+          _HorseRacePhase.handover => _buildTicketHandoverScreen(),
+          _HorseRacePhase.racing => _buildRacingScreen(),
+          _HorseRacePhase.result => _buildResultScreen(),
+        },
+      ),
+    );
+  }
+
+  Widget _buildTellerWelcomeScreen() {
+    final firstLine = _welcomeDialogueStep == 0;
+    return _buildTellerStoryScreen(
+      screenKey: const Key('horse-race-teller-welcome-screen'),
+      asset: horseRaceTellerWelcomeAsset,
+      title: '국가망 경마 · 전자 마권 창구',
+      line: firstLine
+          ? '오빠, 오늘 경주 중계도 보러 접속했네.'
+          : '잘 왔어. 출전표 보기 전에 마권 적는 법부터 같이 볼까?',
+      continueKey: firstLine
+          ? const Key('horse-race-teller-welcome-next')
+          : const Key('horse-race-teller-open-guide-anywhere'),
+      onContinue: firstLine
+          ? () => setState(() => _welcomeDialogueStep = 1)
+          : () => setState(() => _phase = _HorseRacePhase.guide),
+      child: firstLine
+          ? null
+          : _tellerActionButton(
+              key: const Key('horse-race-teller-open-guide'),
+              icon: Icons.description_outlined,
+              label: '마권 작성법 보기',
+              onPressed: () => setState(() => _phase = _HorseRacePhase.guide),
+            ),
+    );
+  }
+
+  Widget _buildTellerGuideScreen() => _buildTellerStoryScreen(
+    screenKey: const Key('horse-race-teller-guide-screen'),
+    asset: horseRaceTellerGuideAsset,
+    title: '마권 작성 안내',
+    line: '오빠, 단승은 고른 말이 1등, 연승은 3등 안에 들면 적중이야. 복승은 1·2등 두 마리를 순서 없이 고르면 돼.',
+    continueKey: const Key('horse-race-teller-open-card-anywhere'),
+    onContinue: () => setState(() => _phase = _HorseRacePhase.betting),
+    child: _tellerActionButton(
+      key: const Key('horse-race-teller-open-card'),
+      icon: Icons.format_list_numbered_rounded,
+      label: '출전표 보고 마권 작성하기',
+      onPressed: () => setState(() => _phase = _HorseRacePhase.betting),
+    ),
   );
+
+  Widget _buildTicketAcceptanceScreen() => _buildTellerStoryScreen(
+    screenKey: const Key('horse-race-teller-acceptance-screen'),
+    asset: horseRaceTellerAcceptAsset,
+    title: '마권 접수',
+    line:
+        '오빠, ${_betType.label} ${_primary.name}${_secondary == null ? '' : '·${_secondary!.name}'}에 ${_money(_stake)}원 맞지? 확인했어. 지금 접수할게.',
+    continueKey: const Key('horse-race-teller-confirm-ticket-anywhere'),
+    onContinue: _acceptTicket,
+    child: _tellerActionButton(
+      key: const Key('horse-race-teller-confirm-ticket'),
+      icon: Icons.point_of_sale_rounded,
+      label: '이 내용으로 접수하기',
+      onPressed: _acceptTicket,
+    ),
+  );
+
+  Widget _buildTicketHandoverScreen() => _buildTellerStoryScreen(
+    screenKey: const Key('horse-race-teller-handover-screen'),
+    asset: horseRaceTellerHandoverAsset,
+    title: '전자 마권 발권 완료',
+    line: '오빠, 전자 마권 나왔어. 내가 끝까지 같이 볼 테니까 이제 중계 화면으로 가자.',
+    continueKey: const Key('horse-race-teller-watch-race-anywhere'),
+    onContinue: _beginRace,
+    child: _tellerActionButton(
+      key: const Key('horse-race-teller-watch-race'),
+      icon: Icons.sensors_rounded,
+      label: '마권 받고 중계 보기',
+      onPressed: _beginRace,
+    ),
+  );
+
+  Widget _buildTellerStoryScreen({
+    required Key screenKey,
+    required String asset,
+    required String title,
+    required String line,
+    required Widget? child,
+    Key? continueKey,
+    VoidCallback? onContinue,
+  }) => Scaffold(
+    key: screenKey,
+    backgroundColor: const Color(0xFF171713),
+    body: SafeArea(
+      child: GestureDetector(
+        key: const Key('horse-race-teller-fullscreen-continue'),
+        behavior: HitTestBehavior.translucent,
+        onTap: () => _activeNovelDialogueState?._handleExternalTap(),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Image.asset(
+              asset,
+              key: Key('horse-race-teller-image-$asset'),
+              fit: BoxFit.cover,
+              alignment: Alignment.topCenter,
+              filterQuality: FilterQuality.high,
+            ),
+            const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Color(0x08000000),
+                    Color(0x24000000),
+                    Color(0xE8161411),
+                  ],
+                  stops: [0, 0.58, 1],
+                ),
+              ),
+            ),
+            Positioned(
+              left: 10,
+              right: 10,
+              top: 8,
+              child: _HorseRaceTellerHeader(
+                title: title,
+                onBack: () {
+                  if (_phase == _HorseRacePhase.welcome) {
+                    Navigator.of(context).maybePop();
+                  } else if (_phase == _HorseRacePhase.guide) {
+                    setState(() {
+                      _phase = _HorseRacePhase.welcome;
+                      _welcomeDialogueStep = 1;
+                    });
+                  } else {
+                    setState(() => _phase = _HorseRacePhase.betting);
+                  }
+                },
+              ),
+            ),
+            Positioned(
+              right: 12,
+              top: 62,
+              child: Container(
+                key: const Key('horse-race-access-mode-badge'),
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xE6352D50),
+                  borderRadius: BorderRadius.circular(7),
+                  border: Border.all(color: const Color(0xFFB9A8D9)),
+                ),
+                child: Text(
+                  '국가망 · 온라인',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 8,
+              child: _NovelDialogue(
+                key: ValueKey<String>('horse-race-teller-$line'),
+                speaker: '창구 직원',
+                line: line,
+                charactersPerSecond: 42,
+                fontFamily: 'Maplestory',
+                continueKey: continueKey,
+                onContinue: onContinue,
+                child: child,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+
+  Widget _tellerActionButton({
+    required Key key,
+    required IconData icon,
+    required String label,
+    required VoidCallback onPressed,
+  }) => SizedBox(
+    width: double.infinity,
+    height: 50,
+    child: FilledButton.icon(
+      key: key,
+      onPressed: onPressed,
+      style: FilledButton.styleFrom(
+        backgroundColor: const Color(0xFF254F42),
+        foregroundColor: const Color(0xFFFFF5DD),
+        side: const BorderSide(color: Color(0xFFBA9860)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
+      ),
+      icon: Icon(icon, size: 19),
+      label: Text(
+        label,
+        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
+      ),
+    ),
+  );
+
+  Widget _buildAccessModeSelector() => Container(
+    key: const Key('horse-race-access-mode-selector'),
+    margin: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+    padding: const EdgeInsets.all(4),
+    decoration: BoxDecoration(
+      color: const Color(0xFFE7E3EC),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: const Color(0xFFCFC7D9)),
+    ),
+    child: Row(
+      children: [
+        Expanded(
+          child: _buildConnectionButton(
+            key: const Key('horse-race-mode-online'),
+            icon: Icons.sensors_rounded,
+            title: '온라인',
+            subtitle: '국가망 접속 중',
+            active: true,
+          ),
+        ),
+        const SizedBox(width: 5),
+        Expanded(
+          child: _buildConnectionButton(
+            key: const Key('horse-race-mode-offline'),
+            icon: Icons.power_settings_new_rounded,
+            title: '오프라인',
+            subtitle: 'PC 전원 끄기',
+            active: false,
+            onTap: _goOffline,
+          ),
+        ),
+      ],
+    ),
+  );
+
+  Widget _buildConnectionButton({
+    required Key key,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required bool active,
+    VoidCallback? onTap,
+  }) {
+    return Material(
+      color: active ? const Color(0xFF514379) : Colors.transparent,
+      borderRadius: BorderRadius.circular(9),
+      child: InkWell(
+        key: key,
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(9),
+        child: SizedBox(
+          height: 49,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 18,
+                color: active ? Colors.white : const Color(0xFF625B70),
+              ),
+              const SizedBox(width: 7),
+              Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      color: active ? Colors.white : const Color(0xFF302944),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      color: active
+                          ? const Color(0xFFDCEFE6)
+                          : const Color(0xFF777080),
+                      fontSize: 7.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   Widget _buildBettingScreen() {
     final stakeOptions = <int>{
@@ -271,26 +672,30 @@ class _HorseRacingMiniGameState extends State<HorseRacingMiniGame>
           children: [
             const _RaceHubEmblem(),
             const SizedBox(width: 9),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  '오늘의 경주',
-                  style: TextStyle(
-                    fontSize: 16,
-                    letterSpacing: -0.2,
-                    fontWeight: FontWeight.w900,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '오늘의 경주',
+                    style: TextStyle(
+                      fontSize: 16,
+                      letterSpacing: -0.2,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
-                ),
-                Text(
-                  '제6경주  ·  ${widget.race.postTime} 출발',
-                  style: const TextStyle(
-                    color: Color(0xFFD7D0E7),
-                    fontSize: 9.5,
-                    fontWeight: FontWeight.w700,
+                  Text(
+                    '국가망 · 온라인  ·  ${widget.race.postTime} 출발',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFFD7D0E7),
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ],
         ),
@@ -334,9 +739,10 @@ class _HorseRacingMiniGameState extends State<HorseRacingMiniGame>
       body: ListView(
         padding: const EdgeInsets.only(bottom: 188),
         children: [
+          _buildAccessModeSelector(),
           Container(
             key: const Key('horse-race-venue-hero'),
-            height: 154,
+            height: 182,
             clipBehavior: Clip.antiAlias,
             decoration: const BoxDecoration(
               border: Border(bottom: BorderSide(color: Color(0xFFCFC8DC))),
@@ -347,7 +753,7 @@ class _HorseRacingMiniGameState extends State<HorseRacingMiniGame>
                 Image.asset(
                   horseRaceBackgroundAsset,
                   fit: BoxFit.cover,
-                  alignment: const Alignment(0, -0.18),
+                  alignment: const Alignment(0.12, 0.08),
                   filterQuality: FilterQuality.high,
                   cacheWidth: 900,
                 ),
@@ -464,6 +870,10 @@ class _HorseRacingMiniGameState extends State<HorseRacingMiniGame>
                 ),
               ],
             ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+            child: _HorseRaceTellerHint(line: _tellerBettingLine),
           ),
           Container(
             color: Colors.white,
@@ -655,8 +1065,7 @@ class _HorseRacingMiniGameState extends State<HorseRacingMiniGame>
                         value: stakeOptions[index],
                         selected: _stake == stakeOptions[index],
                         enabled: stakeOptions[index] <= widget.availableCash,
-                        onTap: () =>
-                            setState(() => _stake = stakeOptions[index]),
+                        onTap: () => _setStake(stakeOptions[index]),
                       ),
                     ),
                     if (index != stakeOptions.length - 1)
@@ -670,7 +1079,7 @@ class _HorseRacingMiniGameState extends State<HorseRacingMiniGame>
                 height: 49,
                 child: FilledButton.icon(
                   key: const Key('horse-race-start'),
-                  onPressed: _canStart ? _startRace : null,
+                  onPressed: _canStart ? _reviewTicket : null,
                   style: FilledButton.styleFrom(
                     backgroundColor: const Color(0xFF2DAA78),
                     disabledBackgroundColor: const Color(0xFFC9C5CE),
@@ -715,9 +1124,9 @@ class _HorseRacingMiniGameState extends State<HorseRacingMiniGame>
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         '국가망 실시간 중계',
-                        style: TextStyle(
+                        style: const TextStyle(
                           color: Color(0xFFFF9AAF),
                           fontSize: 10,
                           fontWeight: FontWeight.w900,
@@ -756,6 +1165,15 @@ class _HorseRacingMiniGameState extends State<HorseRacingMiniGame>
               ),
             ),
           ),
+          AnimatedBuilder(
+            animation: _raceController,
+            builder: (context, _) => Padding(
+              padding: const EdgeInsets.fromLTRB(10, 6, 10, 8),
+              child: _HorseRaceLiveDialogue(
+                line: _tellerRaceLine(_raceController.value),
+              ),
+            ),
+          ),
         ],
       ),
     ),
@@ -772,68 +1190,19 @@ class _HorseRacingMiniGameState extends State<HorseRacingMiniGame>
         automaticallyImplyLeading: false,
         backgroundColor: const Color(0xFF352D50),
         foregroundColor: Colors.white,
-        title: const Text(
-          '제6경주 결과',
-          style: TextStyle(fontWeight: FontWeight.w900),
+        title: Text(
+          '서울경마공원 · 공식 확정',
+          style: const TextStyle(fontWeight: FontWeight.w900),
         ),
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(12, 12, 12, 110),
         children: [
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF4C3E71), Color(0xFF76528D)],
-              ),
-              borderRadius: BorderRadius.circular(14),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x22000000),
-                  blurRadius: 12,
-                  offset: Offset(0, 5),
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                const Text(
-                  '우승',
-                  style: TextStyle(
-                    color: Color(0xFFFFD972),
-                    fontSize: 11,
-                    letterSpacing: 2,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                SizedBox(
-                  height: 105,
-                  child: _GallopSprite(
-                    key: const Key('horse-race-winner-sprite'),
-                    asset: winner.spriteAsset,
-                    frame: 6,
-                    width: 176,
-                    height: 105,
-                  ),
-                ),
-                Text(
-                  '${winner.gate}번 ${winner.name}',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                Text(
-                  '${winner.jockey} 기수 · ${winner.runningStyle} · 단승 ${winner.winOdds.toStringAsFixed(1)}배',
-                  style: const TextStyle(
-                    color: Color(0xFFD9EAE3),
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
+          _OfficialRaceBroadcastHeader(race: widget.race, winner: winner),
+          const SizedBox(height: 11),
+          _OfficialRaceRecordBoard(
+            race: widget.race,
+            selectedIds: <String>{_primaryHorseId, ?_secondaryHorseId},
           ),
           const SizedBox(height: 11),
           Container(
@@ -902,50 +1271,193 @@ class _HorseRacingMiniGameState extends State<HorseRacingMiniGame>
               ],
             ),
           ),
-          const SizedBox(height: 14),
-          const Text(
-            '최종 순위',
-            style: TextStyle(
-              color: _ink,
-              fontSize: 17,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 7),
-          for (var index = 0; index < widget.race.finishOrder.length; index++)
-            _FinishOrderRow(
-              position: index + 1,
-              entrant: widget.race.entrantById(widget.race.finishOrder[index]),
-              selected:
-                  widget.race.finishOrder[index] == _primaryHorseId ||
-                  widget.race.finishOrder[index] == _secondaryHorseId,
-            ),
         ],
       ),
       bottomNavigationBar: SafeArea(
         top: false,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-          child: FilledButton.icon(
-            key: const Key('horse-race-confirm-result'),
-            onPressed: _finish,
-            style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF4C3E71),
-              foregroundColor: Colors.white,
-              minimumSize: const Size.fromHeight(52),
-            ),
-            icon: Icon(
-              widget.previewMode ? Icons.replay_rounded : Icons.check_rounded,
-            ),
-            label: Text(
-              widget.previewMode ? '중계 다시 보기' : '전자 마권 정산하기',
-              style: const TextStyle(fontWeight: FontWeight.w900),
-            ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _HorseRaceLiveDialogue(
+                key: const Key('horse-race-teller-result-dialogue'),
+                line: hit
+                    ? '오빠, 적중이야. 축하해. 배당하고 수수료까지 정확히 정산해 뒀어.'
+                    : '오빠, 이번에는 조금 아쉽게 비켜갔어. 공식 기록은 남겨 뒀으니까 차분히 확인해 봐.',
+              ),
+              const SizedBox(height: 7),
+              FilledButton.icon(
+                key: const Key('horse-race-confirm-result'),
+                onPressed: _finish,
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF4C3E71),
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size.fromHeight(52),
+                ),
+                icon: const Icon(Icons.home_rounded),
+                label: const Text(
+                  '메인으로 가기',
+                  style: TextStyle(fontWeight: FontWeight.w900),
+                ),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
+}
+
+class _HorseRaceTellerHeader extends StatelessWidget {
+  const _HorseRaceTellerHeader({required this.title, required this.onBack});
+
+  final String title;
+  final VoidCallback onBack;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    height: 58,
+    padding: const EdgeInsets.symmetric(horizontal: 5),
+    decoration: BoxDecoration(
+      color: const Color(0xE9181815),
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: const Color(0x99BA9860)),
+      boxShadow: const [
+        BoxShadow(
+          color: Color(0x66000000),
+          blurRadius: 14,
+          offset: Offset(0, 6),
+        ),
+      ],
+    ),
+    child: Row(
+      children: [
+        IconButton(
+          key: const Key('horse-race-teller-back'),
+          onPressed: onBack,
+          icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+        ),
+        const Icon(
+          Icons.confirmation_number_outlined,
+          color: Color(0xFFE0C07C),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Colors.white,
+              fontFamily: 'Maplestory',
+              fontSize: 15,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _HorseRaceTellerHint extends StatelessWidget {
+  const _HorseRaceTellerHint({required this.line});
+
+  final String line;
+
+  @override
+  Widget build(BuildContext context) => AnimatedSwitcher(
+    duration: const Duration(milliseconds: 220),
+    child: Container(
+      key: ValueKey<String>(line),
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 11),
+      decoration: BoxDecoration(
+        color: const Color(0xFF253B35),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFB9975F)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '창구 직원',
+            style: TextStyle(
+              color: Color(0xFFFFD98B),
+              fontFamily: 'Maplestory',
+              fontSize: 10,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            line,
+            style: const TextStyle(
+              color: Colors.white,
+              fontFamily: 'Maplestory',
+              fontSize: 11,
+              height: 1.38,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _HorseRaceLiveDialogue extends StatelessWidget {
+  const _HorseRaceLiveDialogue({super.key, required this.line});
+
+  final String line;
+
+  @override
+  Widget build(BuildContext context) => IgnorePointer(
+    key: const Key('horse-race-live-dialogue'),
+    child: AnimatedSwitcher(
+      duration: const Duration(milliseconds: 240),
+      child: Container(
+        key: ValueKey<String>(line),
+        padding: const EdgeInsets.fromLTRB(11, 8, 11, 9),
+        decoration: BoxDecoration(
+          color: const Color(0xDA17131F),
+          borderRadius: BorderRadius.circular(11),
+          border: Border.all(color: const Color(0x88E0C07C)),
+          boxShadow: const [
+            BoxShadow(color: Color(0x77000000), blurRadius: 10),
+          ],
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '창구 직원',
+              style: TextStyle(
+                color: Color(0xFFFFD98B),
+                fontFamily: 'Maplestory',
+                fontSize: 9,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                line,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontFamily: 'Maplestory',
+                  fontSize: 9.5,
+                  height: 1.3,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 class _RaceHubEmblem extends StatelessWidget {
@@ -1495,40 +2007,56 @@ class _LiveHorseRaceTrack extends StatelessWidget {
   final Set<String> selectedIds;
   final Duration duration;
 
+  // Finish the official order before the broadcast itself ends. That leaves
+  // enough live track time for every runner to gallop through the embedded
+  // stripe instead of stopping on it while only the sprite frames keep moving.
+  static const _officialRaceFraction = 0.92;
+
+  double get _officialTime => (time / _officialRaceFraction).clamp(0.0, 1.0);
+
   double _progress(HorseRaceEntrant entrant) {
-    final rank = race.finishOrder.indexOf(entrant.id);
-    // Keep the broadcast moving at race speed until the actual finish. The
-    // former power curve made every runner visibly coast in the middle and
-    // then left the winner frozen for the last fifth of the broadcast.
-    final finishAt = 0.965 + rank * 0.0045;
-    final base = (time / finishAt).clamp(0.0, 1.0);
-    final phase = entrant.gate * 0.77;
-    final stride =
-        math.sin(time * math.pi * 13 + phase) *
-        0.006 *
-        (1 - time) *
-        (1 + (90 - entrant.consistency) / 50);
-    final style = switch (entrant.runningStyle) {
-      '선행' => time < 0.56 ? 0.028 * math.sin(time * math.pi / 0.56) : 0.0,
-      '추입' => time < 0.48 ? -0.018 * math.sin(time * math.pi / 0.48) : 0.0,
-      '지구력' => 0.009 * math.sin(time * math.pi),
-      _ => 0.0,
-    };
-    final normalizedTime = (time / finishAt).clamp(0.0, 1.0);
-    final abilityEnvelope = math.sin(math.pi * normalizedTime);
-    final abilityProfile =
-        (entrant.acceleration - 85) *
-            0.0008 *
-            abilityEnvelope *
-            (1 - normalizedTime) +
-        (entrant.speed - 85) * 0.0005 * abilityEnvelope +
-        (entrant.stamina - 85) * 0.0006 * abilityEnvelope * normalizedTime +
-        (entrant.finishingKick - 85) *
-            0.0007 *
-            abilityEnvelope *
-            normalizedTime *
-            normalizedTime;
-    return (base + stride + style + abilityProfile).clamp(0.0, 1.0);
+    return horseRaceBroadcastProgress(
+      race: race,
+      entrant: entrant,
+      time: _officialTime,
+    );
+  }
+
+  double _extendedProgress(HorseRaceEntrant entrant, double raceProgress) {
+    final officialFinishAt = horseRaceBroadcastFinishAt(
+      race: race,
+      entrant: entrant,
+    );
+    final visualFinishAt = officialFinishAt * _officialRaceFraction;
+    if (time <= visualFinishAt) return raceProgress;
+
+    const speedSampleWindow = 0.018;
+    final sampleOfficialTime = officialFinishAt - speedSampleWindow;
+    final sampleProgress = horseRaceBroadcastProgress(
+      race: race,
+      entrant: entrant,
+      time: sampleOfficialTime,
+    );
+    final sampleVisualTime = sampleOfficialTime * _officialRaceFraction;
+    final incomingProgressSpeed =
+        (1 - sampleProgress) / (visualFinishAt - sampleVisualTime);
+    final elapsed = time - visualFinishAt;
+    const runOutProgressSpeed = 3.2;
+    const accelerationWindow = 0.018;
+    if (elapsed <= accelerationWindow) {
+      final blend = elapsed / accelerationWindow;
+      final currentSpeed = ui.lerpDouble(
+        incomingProgressSpeed,
+        runOutProgressSpeed,
+        blend,
+      )!;
+      return 1 + elapsed * (incomingProgressSpeed + currentSpeed) / 2;
+    }
+    final rampDistance =
+        accelerationWindow * (incomingProgressSpeed + runOutProgressSpeed) / 2;
+    return 1 +
+        rampDistance +
+        (elapsed - accelerationWindow) * runOutProgressSpeed;
   }
 
   @override
@@ -1536,39 +2064,55 @@ class _LiveHorseRaceTrack extends StatelessWidget {
     final progress = <String, double>{
       for (final entrant in race.entrants) entrant.id: _progress(entrant),
     };
-    final liveOrder = [
-      ...race.entrants,
-    ]..sort((left, right) => progress[right.id]!.compareTo(progress[left.id]!));
+    final extendedProgress = <String, double>{
+      for (final entrant in race.entrants)
+        entrant.id: _extendedProgress(entrant, progress[entrant.id]!),
+    };
+    final liveOrder = [...race.entrants]
+      ..sort((left, right) {
+        final progressOrder = progress[right.id]!.compareTo(progress[left.id]!);
+        if (progressOrder != 0) return progressOrder;
+        return race.finishOrder
+            .indexOf(left.id)
+            .compareTo(race.finishOrder.indexOf(right.id));
+      });
     final leader = liveOrder.first;
     final remaining = (race.distanceMeters * (1 - progress[leader.id]!))
         .round()
         .clamp(0, race.distanceMeters);
-    final announcement = time < 0.045
+    final previousTime = math.max(0.0, _officialTime - 0.065);
+    final mover = [...race.entrants]
+      ..sort((left, right) {
+        final leftGain =
+            progress[left.id]! -
+            horseRaceBroadcastProgress(
+              race: race,
+              entrant: left,
+              time: previousTime,
+            );
+        final rightGain =
+            progress[right.id]! -
+            horseRaceBroadcastProgress(
+              race: race,
+              entrant: right,
+              time: previousTime,
+            );
+        return rightGain.compareTo(leftGain);
+      });
+    final stageLabel = _officialTime < 0.26
+        ? '초반 선행'
+        : _officialTime < 0.68
+        ? '중반 승부'
+        : '결승 직선 총력전';
+    final announcement = _officialTime < 0.045
         ? '출발했습니다! 8두가 일제히 게이트를 나섭니다.'
-        : remaining > 700
-        ? '${leader.name} 선두, 바깥쪽에서 ${liveOrder[1].name}이 따라붙습니다.'
-        : remaining > 250
-        ? '직선 중반! ${leader.name}, ${liveOrder[1].name}, ${liveOrder[2].name} 접전!'
+        : _officialTime < 0.26
+        ? '${leader.name} 초반 선두! ${liveOrder[1].name}이 바로 압박합니다.'
+        : _officialTime < 0.68
+        ? '${mover.first.name} 중간에서 치고 나옵니다! 선두 ${leader.name}과 접전!'
         : remaining > 0
-        ? '마지막 $remaining미터! 결승선 앞 전력 질주입니다!'
+        ? '마지막 $remaining미터! ${mover.first.name} 막판 스퍼트, ${leader.name} 버팁니다!'
         : '결승선 통과! 공식 착순을 확인합니다.';
-
-    // Broadcast-style hard cuts preserve the quality of both authored sprite
-    // angles. The middle shot follows the pack through the bend; the start and
-    // home straight stay on the original side camera.
-    if (time >= 0.16 && time < 0.62) {
-      return _CurveHorseRaceTrack(
-        race: race,
-        time: time,
-        selectedIds: selectedIds,
-        duration: duration,
-        progress: progress,
-        liveOrder: liveOrder,
-        leader: leader,
-        remaining: remaining,
-        announcement: announcement,
-      );
-    }
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -1581,18 +2125,30 @@ class _LiveHorseRaceTrack extends StatelessWidget {
         final laneHeight = height * 0.55 / race.entrants.length;
         final spriteHeight = math.min(51.0, laneHeight * 0.9);
         final spriteWidth = spriteHeight * 1.72;
-        final leaderProgress = progress[leader.id]!;
         final startAnchor = spriteWidth * 0.92 + 4;
-        final cruiseAnchor = width * 0.63;
-        final finishX = width - 32;
-        // Pan the world at a constant rate. Once the final panorama is fully
-        // in view the camera locks, so the finish line stays planted in the
-        // dirt while the field runs through it.
-        final cameraProgress = ((time - 0.08) / 0.68).clamp(0.0, 1.0);
-        final backgroundWidth = math.max(width, height * 1774 / 887);
-        final backgroundTravel = math.max(0.0, backgroundWidth - width);
-        final backgroundOffset = -backgroundTravel * cameraProgress;
-        final finishLineX = backgroundWidth - 32 + backgroundOffset;
+        final gateExitTime = (360 / duration.inMilliseconds).clamp(
+          0.018,
+          0.055,
+        );
+        // The finish stripe is painted into the generated panorama rather
+        // than drawn as a screen-space layer. The camera follows the field
+        // across that single background, revealing the physical finish near
+        // the end and settling before the horses reach it.
+        final fixedFinishLineX = (width * 0.82).roundToDouble();
+        const cameraOffset = 0.0;
+        final leaderCameraProgress = progress[leader.id]!;
+        // Follow the leader all the way to the stripe. Stopping the panorama
+        // early removes half of the perceived motion and makes the field look
+        // as if it suddenly slows before the finish.
+        final cameraPan = leaderCameraProgress;
+        const embeddedFinishTopRatio = 0.843;
+        const embeddedFinishBottomRatio = 0.860;
+        const embeddedFinishCenterRatio =
+            (embeddedFinishTopRatio + embeddedFinishBottomRatio) / 2;
+        final backgroundWidth = width * 1.8;
+        final settledBackgroundOffset =
+            fixedFinishLineX - backgroundWidth * embeddedFinishCenterRatio;
+        final backgroundOffset = settledBackgroundOffset * cameraPan;
         return Stack(
           key: const Key('horse-race-live-track'),
           fit: StackFit.expand,
@@ -1631,13 +2187,6 @@ class _LiveHorseRaceTrack extends StatelessWidget {
                 laneTop: laneTop,
                 laneHeight: laneHeight,
                 laneCount: race.entrants.length,
-              ),
-            ),
-            CustomPaint(
-              painter: _TrackSpeedPainter(
-                time: time,
-                trackTop: laneTop,
-                trackBottom: laneTop + laneHeight * race.entrants.length,
               ),
             ),
             Positioned(
@@ -1697,24 +2246,25 @@ class _LiveHorseRaceTrack extends StatelessWidget {
               left: 10,
               top: 69,
               child: Container(
+                key: const Key('horse-race-course-label'),
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                 decoration: BoxDecoration(
                   color: const Color(0xE6352D50),
                   borderRadius: BorderRadius.circular(7),
                   border: Border.all(color: const Color(0x779C8BBD)),
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      Icons.wifi_rounded,
+                    const Icon(
+                      Icons.straighten_rounded,
                       size: 11,
                       color: Color(0xFFFF9AAF),
                     ),
-                    SizedBox(width: 4),
+                    const SizedBox(width: 4),
                     Text(
-                      '국가망 중계',
-                      style: TextStyle(
+                      '${race.distanceMeters}m 직선 · $stageLabel',
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 8,
                         fontWeight: FontWeight.w900,
@@ -1753,14 +2303,6 @@ class _LiveHorseRaceTrack extends StatelessWidget {
                 ),
               ),
             ),
-            Positioned(
-              key: const Key('horse-race-fixed-finish-line'),
-              left: finishLineX - 8,
-              top: laneTop - 10,
-              height: laneHeight * race.entrants.length + 24,
-              width: 18,
-              child: const CustomPaint(painter: _FinishLinePainter()),
-            ),
             for (var index = 0; index < race.entrants.length; index++)
               _buildRunner(
                 race.entrants[index],
@@ -1770,27 +2312,38 @@ class _LiveHorseRaceTrack extends StatelessWidget {
                 spriteWidth: spriteWidth,
                 spriteHeight: spriteHeight,
                 startAnchor: startAnchor,
-                cruiseAnchor: cruiseAnchor,
-                finishX: finishX,
-                leaderProgress: leaderProgress,
-                progress: progress[race.entrants[index].id]!,
+                trackSpan:
+                    settledBackgroundOffset +
+                    backgroundWidth *
+                        ui.lerpDouble(
+                          embeddedFinishTopRatio,
+                          embeddedFinishBottomRatio,
+                          (index + 0.5) / race.entrants.length,
+                        )! -
+                    startAnchor,
+                cameraOffset: cameraOffset,
+                extendedProgress: extendedProgress[race.entrants[index].id]!,
               ),
-            if (time < 0.09)
+            if (time < gateExitTime)
               Positioned(
+                key: const Key('horse-race-starting-gate'),
                 left: startAnchor - spriteWidth * 0.92 - 5,
                 top: laneTop - 3,
                 width: 30,
                 height: laneHeight * race.entrants.length + 12,
-                child: CustomPaint(
-                  painter: _StartingGatePainter(
-                    opening: (time / 0.09).clamp(0.0, 1.0),
+                child: Opacity(
+                  opacity: (1 - time / gateExitTime).clamp(0.0, 1.0),
+                  child: CustomPaint(
+                    painter: _StartingGatePainter(
+                      opening: (time / (gateExitTime * 0.55)).clamp(0.0, 1.0),
+                    ),
                   ),
                 ),
               ),
             Positioned(
               left: 10,
               right: 10,
-              bottom: 14,
+              top: 101,
               child: Container(
                 key: const Key('horse-race-announcer'),
                 padding: const EdgeInsets.symmetric(
@@ -1839,25 +2392,56 @@ class _LiveHorseRaceTrack extends StatelessWidget {
     required double spriteWidth,
     required double spriteHeight,
     required double startAnchor,
-    required double cruiseAnchor,
-    required double finishX,
-    required double leaderProgress,
-    required double progress,
+    required double trackSpan,
+    required double cameraOffset,
+    required double extendedProgress,
   }) {
-    final launch = Curves.easeOutCubic.transform(
-      (leaderProgress / 0.2).clamp(0.0, 1.0),
+    final officialFinishAt = horseRaceBroadcastFinishAt(
+      race: race,
+      entrant: entrant,
     );
-    final packAnchor = ui.lerpDouble(startAnchor, cruiseAnchor, launch)!;
-    final packPoint =
-        packAnchor + (progress - leaderProgress) * cruiseAnchor * 1.35;
-    // The home straight must not drop into a second ease-in phase: that read
-    // as an unintended slow-motion shot halfway through the race.
-    final finishRun = ((progress - 0.78) / 0.22).clamp(0.0, 1.0);
-    final racePoint = ui.lerpDouble(packPoint, finishX + 8, finishRun)!;
-    final left = racePoint - spriteWidth * 0.92;
-    final strideFrames = math.max(1, duration.inMilliseconds ~/ 70);
+    final visualFinishAt = officialFinishAt * _officialRaceFraction;
+    final baseRacePoint =
+        startAnchor + extendedProgress * trackSpan - cameraOffset;
+    final approachBlend = Curves.easeInOutCubic.transform(
+      ((_officialTime - 0.50) / math.max(0.08, officialFinishAt - 0.50)).clamp(
+        0.0,
+        1.0,
+      ),
+    );
+    const nominalBroadcastSeconds = 16.0;
+    final secondsToFinish = math.max(
+      0.0,
+      (officialFinishAt - _officialTime) *
+          _officialRaceFraction *
+          nominalBroadcastSeconds,
+    );
+    final separatedApproachPoint =
+        startAnchor +
+        trackSpan -
+        secondsToFinish * spriteWidth * 4.8 -
+        cameraOffset;
+    final racePoint = extendedProgress > 1
+        ? baseRacePoint
+        : ui.lerpDouble(baseRacePoint, separatedApproachPoint, approachBlend)!;
+    final showWinnerBadge =
+        race.finishOrder.first == entrant.id && time >= visualFinishAt;
+    final winnerBadgeArrival = ((time - visualFinishAt) / 0.028).clamp(
+      0.0,
+      1.0,
+    );
+    final urgency = Curves.easeInCubic.transform(
+      ((_officialTime - 0.52) / 0.48).clamp(0.0, 1.0),
+    );
+    final strideFrames = math.max(1, duration.inMilliseconds ~/ 54);
     final frame = ((time * strideFrames + entrant.gate * 0.7).floor()) % 8;
-    final bob = math.sin(time * math.pi * 26 + entrant.gate) * 0.8;
+    final stridePhase = time * math.pi * (29 + urgency * 13) + entrant.gate;
+    final bob = math.sin(stridePhase) * (0.8 + urgency * 1.35);
+    final surge =
+        math.sin(time * math.pi * (11 + entrant.gate % 3) + entrant.gate) *
+        (0.45 + urgency * 1.7);
+    final tilt = math.sin(stridePhase * 0.5) * 0.014;
+    final left = racePoint + surge - spriteWidth * 0.92;
     final selected = selectedIds.contains(entrant.id);
     return Positioned(
       key: Key('horse-live-${entrant.id}'),
@@ -1865,456 +2449,170 @@ class _LiveHorseRaceTrack extends StatelessWidget {
       top: laneTop + index * laneHeight + (laneHeight - spriteHeight) / 2 + bob,
       width: spriteWidth,
       height: spriteHeight,
-      child: Stack(
+      child: Transform.rotate(
+        angle: tilt,
         alignment: Alignment.bottomCenter,
-        clipBehavior: Clip.none,
-        children: [
-          Positioned(
-            left: spriteWidth * 0.12,
-            bottom: 1,
-            child: Container(
-              width: spriteWidth * 0.7,
-              height: 4,
-              decoration: BoxDecoration(
-                color: const Color(0x66000000),
-                borderRadius: BorderRadius.circular(99),
-                boxShadow: const [
-                  BoxShadow(color: Color(0x55000000), blurRadius: 5),
-                ],
-              ),
-            ),
-          ),
-          if (time > 0.05 && progress < 0.99)
+        child: Stack(
+          alignment: Alignment.bottomCenter,
+          clipBehavior: Clip.none,
+          children: [
             Positioned(
-              left: -6,
-              bottom: 0,
-              child: _HorseDust(
-                phase: time * 18 + entrant.gate,
-                color: const Color(0x99DAB783),
+              left: spriteWidth * 0.12,
+              bottom: 1,
+              child: Container(
+                width: spriteWidth * 0.7,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0x66000000),
+                  borderRadius: BorderRadius.circular(99),
+                  boxShadow: const [
+                    BoxShadow(color: Color(0x55000000), blurRadius: 5),
+                  ],
+                ),
               ),
             ),
-          _GallopSprite(
-            asset: entrant.spriteAsset,
-            frame: frame,
-            width: spriteWidth,
-            height: spriteHeight,
-          ),
-          Positioned(
-            left: 1,
-            top: 0,
-            child: Container(
-              width: 19,
-              height: 19,
-              decoration: BoxDecoration(
-                color: Color(entrant.accentValue),
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: selected
-                      ? const Color(0xFFFFD76D)
-                      : const Color(0xAAFFFFFF),
-                  width: selected ? 2.5 : 1,
+            if (time > 0.035 && _officialTime < 0.99)
+              Positioned(
+                left: -10 - urgency * 8,
+                bottom: -1,
+                child: _HorseDust(
+                  phase: time * (20 + urgency * 18) + entrant.gate,
+                  intensity: urgency,
+                  color: const Color(0x99DAB783),
                 ),
-                boxShadow: selected
-                    ? const [BoxShadow(color: Color(0xAAFFD76D), blurRadius: 7)]
-                    : null,
               ),
-              child: Center(
-                child: Text(
-                  '${entrant.gate}',
-                  style: TextStyle(
-                    color: entrant.gate == 1 || entrant.gate == 5
-                        ? const Color(0xFF202A26)
-                        : Colors.white,
-                    fontSize: 8,
-                    fontWeight: FontWeight.w900,
+            _GallopSprite(
+              asset: entrant.spriteAsset,
+              frame: frame,
+              width: spriteWidth,
+              height: spriteHeight,
+            ),
+            if (showWinnerBadge)
+              Positioned(
+                left: spriteWidth * 0.28,
+                top: -27,
+                child: _WinnerFinishBadge(
+                  key: const Key('horse-race-winner-badge'),
+                  arrival: winnerBadgeArrival,
+                  floatPhase: stridePhase,
+                ),
+              ),
+            Positioned(
+              left: 1,
+              top: 0,
+              child: Container(
+                width: 19,
+                height: 19,
+                decoration: BoxDecoration(
+                  color: Color(entrant.accentValue),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: selected
+                        ? const Color(0xFFFFD76D)
+                        : const Color(0xAAFFFFFF),
+                    width: selected ? 2.5 : 1,
+                  ),
+                  boxShadow: selected
+                      ? [
+                          BoxShadow(
+                            color: const Color(0xCCFFD76D),
+                            blurRadius: 7 + urgency * 5,
+                            spreadRadius:
+                                0.5 + math.sin(stridePhase).abs() * 1.2,
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Center(
+                  child: Text(
+                    '${entrant.gate}',
+                    style: TextStyle(
+                      color: entrant.gate == 1 || entrant.gate == 5
+                          ? const Color(0xFF202A26)
+                          : Colors.white,
+                      fontSize: 8,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
-Offset _curveLanePoint(Size size, double lane, double progress) {
-  final t = progress.clamp(0.0, 1.0);
-  final start = Offset(size.width * (0.135 + lane * 0.106), size.height * 0.91);
-  final control = Offset(
-    size.width * (0.22 + lane * 0.070),
-    size.height * 0.60,
-  );
-  final end = Offset(size.width * (0.33 + lane * 0.042), size.height * 0.30);
-  final inverse = 1 - t;
-  return Offset(
-    inverse * inverse * start.dx +
-        2 * inverse * t * control.dx +
-        t * t * end.dx,
-    inverse * inverse * start.dy +
-        2 * inverse * t * control.dy +
-        t * t * end.dy,
-  );
-}
-
-class _CurveHorseRaceTrack extends StatelessWidget {
-  const _CurveHorseRaceTrack({
-    required this.race,
-    required this.time,
-    required this.selectedIds,
-    required this.duration,
-    required this.progress,
-    required this.liveOrder,
-    required this.leader,
-    required this.remaining,
-    required this.announcement,
+class _WinnerFinishBadge extends StatelessWidget {
+  const _WinnerFinishBadge({
+    super.key,
+    required this.arrival,
+    required this.floatPhase,
   });
 
-  final HorseRaceCard race;
-  final double time;
-  final Set<String> selectedIds;
-  final Duration duration;
-  final Map<String, double> progress;
-  final List<HorseRaceEntrant> liveOrder;
-  final HorseRaceEntrant leader;
-  final int remaining;
-  final String announcement;
+  final double arrival;
+  final double floatPhase;
 
   @override
-  Widget build(BuildContext context) => LayoutBuilder(
-    builder: (context, constraints) {
-      final width = constraints.maxWidth;
-      final height = constraints.maxHeight;
-      final size = Size(width, height);
-      final curveTime = ((time - 0.16) / 0.46).clamp(0.0, 1.0);
-      final leaderProgress = progress[leader.id]!;
-      final strideFrames = math.max(1, duration.inMilliseconds ~/ 70);
-      final placements = <MapEntry<double, Widget>>[];
-
-      for (var index = 0; index < race.entrants.length; index++) {
-        final entrant = race.entrants[index];
-        // Every runner stays on the exact center curve of its own lane. Race
-        // order only changes how far along that curve the runner has travelled.
-        final raceGap = (progress[entrant.id]! - leaderProgress) * 2.1;
-        final laneProgress = (0.08 + curveTime * 0.74 + raceGap).clamp(
-          0.04,
-          0.86,
-        );
-        final point = _curveLanePoint(size, index + 0.5, laneProgress);
-        final perspective = ui.lerpDouble(1.0, 0.57, laneProgress)!;
-        final spriteHeight =
-            math.min(height * 0.18, width * 0.245) * perspective;
-        final spriteWidth = spriteHeight * 0.92;
-        final frame = ((time * strideFrames + entrant.gate * 0.7).floor()) % 8;
-        final selected = selectedIds.contains(entrant.id);
-        placements.add(
-          MapEntry(
-            point.dy,
-            Positioned(
-              key: Key('horse-curve-${entrant.id}'),
-              left: point.dx - spriteWidth * 0.5,
-              top: point.dy - spriteHeight * 0.82,
-              width: spriteWidth,
-              height: spriteHeight,
-              child: Stack(
-                alignment: Alignment.bottomCenter,
-                clipBehavior: Clip.none,
-                children: [
-                  Positioned(
-                    left: spriteWidth * 0.18,
-                    bottom: 1,
-                    child: Container(
-                      width: spriteWidth * 0.62,
-                      height: math.max(2.0, spriteHeight * 0.045),
-                      decoration: BoxDecoration(
-                        color: const Color(0x4D14250E),
-                        borderRadius: BorderRadius.circular(99),
-                        boxShadow: const [
-                          BoxShadow(color: Color(0x33000000), blurRadius: 4),
-                        ],
-                      ),
-                    ),
-                  ),
-                  _GallopSprite(
-                    asset: horseRaceCurveGallopAssetFor(entrant.spriteAsset),
-                    frame: frame,
-                    width: spriteWidth,
-                    height: spriteHeight,
-                  ),
-                  Positioned(
-                    right: 0,
-                    top: 0,
-                    child: Container(
-                      width: math.max(15.0, spriteWidth * 0.22),
-                      height: math.max(15.0, spriteWidth * 0.22),
-                      decoration: BoxDecoration(
-                        color: Color(entrant.accentValue),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: selected
-                              ? const Color(0xFFFFD76D)
-                              : const Color(0xCCFFFFFF),
-                          width: selected ? 2.5 : 1,
-                        ),
-                        boxShadow: selected
-                            ? const [
-                                BoxShadow(
-                                  color: Color(0xAAFFD76D),
-                                  blurRadius: 7,
-                                ),
-                              ]
-                            : null,
-                      ),
-                      child: Center(
-                        child: Text(
-                          '${entrant.gate}',
-                          style: TextStyle(
-                            color: entrant.gate == 1 || entrant.gate == 5
-                                ? const Color(0xFF202A26)
-                                : Colors.white,
-                            fontSize: math.max(7.0, spriteWidth * 0.09),
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+  Widget build(BuildContext context) {
+    final pop = Curves.easeOutBack.transform(arrival);
+    return Transform.translate(
+      offset: Offset(0, -math.sin(floatPhase * 0.42).abs() * 1.4),
+      child: Transform.scale(
+        scale: ui.lerpDouble(0.68, 1, pop)!,
+        alignment: Alignment.bottomCenter,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(6, 3, 7, 3),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFD45C),
+            borderRadius: BorderRadius.circular(7),
+            border: Border.all(color: Colors.white, width: 1.3),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x99000000),
+                blurRadius: 7,
+                offset: Offset(0, 3),
               ),
-            ),
+              BoxShadow(
+                color: Color(0x99FFD45C),
+                blurRadius: 8,
+                spreadRadius: 0.5,
+              ),
+            ],
           ),
-        );
-      }
-      // Distant runners paint first so converging lanes overlap naturally.
-      placements.sort((left, right) => left.key.compareTo(right.key));
-
-      return Stack(
-        key: const Key('horse-race-live-track'),
-        fit: StackFit.expand,
-        clipBehavior: Clip.hardEdge,
-        children: [
-          Positioned.fill(
-            key: const Key('horse-race-curve-track'),
-            child: Image.asset(
-              horseRaceCurveTrackAsset,
-              key: const Key('horse-race-curve-background'),
-              fit: BoxFit.fill,
-              filterQuality: FilterQuality.high,
-              cacheWidth: 1600,
-            ),
-          ),
-          const DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Color(0x12000000),
-                  Color(0x02000000),
-                  Color(0x4513250D),
-                ],
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.emoji_events_rounded,
+                size: 11,
+                color: Color(0xFF5A3511),
               ),
-            ),
-          ),
-          const CustomPaint(painter: _BroadcastScanlinePainter()),
-          CustomPaint(
-            key: const Key('horse-race-curve-lanes'),
-            painter: _CurveLanePainter(laneCount: race.entrants.length),
-          ),
-          for (final placement in placements) placement.value,
-          Positioned(
-            left: 9,
-            right: 9,
-            top: 9,
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-              decoration: BoxDecoration(
-                color: const Color(0xF2FFFFFF),
-                borderRadius: BorderRadius.circular(9),
-                border: Border.all(color: const Color(0xFFD1C9DB)),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '선두 ${leader.name}',
-                          style: const TextStyle(
-                            color: Color(0xFF302944),
-                            fontSize: 12,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(99),
-                          child: LinearProgressIndicator(
-                            minHeight: 5,
-                            value: leaderProgress,
-                            backgroundColor: const Color(0xFFE2DDE7),
-                            valueColor: const AlwaysStoppedAnimation(
-                              Color(0xFF2DAA78),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    '남은 $remaining m',
-                    style: const TextStyle(
-                      color: Color(0xFFE95778),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          Positioned(
-            left: 10,
-            top: 69,
-            child: Container(
-              key: const Key('horse-race-camera-label'),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-              decoration: BoxDecoration(
-                color: const Color(0xE6352D50),
-                borderRadius: BorderRadius.circular(7),
-                border: Border.all(color: const Color(0x779C8BBD)),
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.videocam_rounded,
-                    size: 11,
-                    color: Color(0xFFFFD972),
-                  ),
-                  SizedBox(width: 4),
-                  Text(
-                    '3코너 · 후방 카메라',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 8,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          Positioned(
-            right: 10,
-            top: 69,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-              decoration: BoxDecoration(
-                color: const Color(0xE6352D50),
-                borderRadius: BorderRadius.circular(7),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  for (var index = 0; index < 3; index++) ...[
-                    if (index > 0) const SizedBox(width: 5),
-                    Text(
-                      '${index + 1} ${liveOrder[index].gate}',
-                      style: TextStyle(
-                        color: index == 0
-                            ? const Color(0xFFFFD972)
-                            : Colors.white,
-                        fontSize: 9,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
+              SizedBox(width: 3),
+              Text(
+                '1등!',
+                style: TextStyle(
+                  color: Color(0xFF35200B),
+                  fontFamily: 'Maplestory',
+                  fontSize: 10,
+                  height: 1,
+                  fontWeight: FontWeight.w900,
+                  shadows: [
+                    Shadow(color: Color(0x55FFFFFF), offset: Offset(0, 1)),
                   ],
-                ],
+                ),
               ),
-            ),
+            ],
           ),
-          Positioned(
-            left: 10,
-            right: 10,
-            bottom: 14,
-            child: Container(
-              key: const Key('horse-race-announcer'),
-              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
-              decoration: BoxDecoration(
-                color: const Color(0xF2FFFFFF),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFD1C9DB)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.campaign_rounded,
-                    color: Color(0xFFE95778),
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      announcement,
-                      style: const TextStyle(
-                        color: Color(0xFF302944),
-                        fontSize: 10,
-                        height: 1.35,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      );
-    },
-  );
-}
-
-class _CurveLanePainter extends CustomPainter {
-  const _CurveLanePainter({required this.laneCount});
-
-  final int laneCount;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final shadow = Paint()
-      ..color = const Color(0x2E254411)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.4;
-    final highlight = Paint()
-      ..color = const Color(0xA6FFF5D5)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2;
-    for (var lane = 0; lane <= laneCount; lane++) {
-      final start = _curveLanePoint(size, lane.toDouble(), 0);
-      final control = Offset(
-        size.width * (0.22 + lane * 0.070),
-        size.height * 0.60,
-      );
-      final end = _curveLanePoint(size, lane.toDouble(), 1);
-      final path = Path()
-        ..moveTo(start.dx, start.dy)
-        ..quadraticBezierTo(control.dx, control.dy, end.dx, end.dy);
-      canvas.drawPath(path.shift(const Offset(0, 1.2)), shadow);
-      canvas.drawPath(path, highlight);
-    }
+        ),
+      ),
+    );
   }
-
-  @override
-  bool shouldRepaint(covariant _CurveLanePainter oldDelegate) =>
-      oldDelegate.laneCount != laneCount;
 }
 
 class _GallopSprite extends StatelessWidget {
   const _GallopSprite({
-    super.key,
     required this.asset,
     required this.frame,
     required this.width,
@@ -2382,26 +2680,35 @@ class _HorseFramePainter extends CustomPainter {
 }
 
 class _HorseDust extends StatelessWidget {
-  const _HorseDust({required this.phase, required this.color});
+  const _HorseDust({
+    required this.phase,
+    required this.intensity,
+    required this.color,
+  });
 
   final double phase;
+  final double intensity;
   final Color color;
 
   @override
   Widget build(BuildContext context) => SizedBox(
-    width: 28,
-    height: 16,
+    width: 28 + intensity * 20,
+    height: 16 + intensity * 6,
     child: Stack(
-      children: List.generate(5, (index) {
-        final drift = (phase * 7 + index * 9) % 18;
+      children: List.generate(5 + (intensity * 6).round(), (index) {
+        final trail = 18 + intensity * 24;
+        final drift = (phase * (7 + intensity * 4) + index * 9) % trail;
+        final size = 3.5 + index % 3 * 1.6 + intensity * 1.2;
         return Positioned(
-          left: 20 - drift,
-          bottom: 1 + index % 3 * 3,
+          left: trail - drift,
+          bottom: 1 + index % 4 * (2.5 + intensity),
           child: Container(
-            width: 3.5 + index % 2 * 2,
-            height: 3.5 + index % 2 * 2,
+            width: size,
+            height: size,
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.72 - index * 0.09),
+              color: color.withValues(
+                alpha: (0.72 - index * 0.055).clamp(0.16, 0.72),
+              ),
               shape: BoxShape.circle,
             ),
           ),
@@ -2409,41 +2716,6 @@ class _HorseDust extends StatelessWidget {
       }),
     ),
   );
-}
-
-class _TrackSpeedPainter extends CustomPainter {
-  const _TrackSpeedPainter({
-    required this.time,
-    required this.trackTop,
-    required this.trackBottom,
-  });
-
-  final double time;
-  final double trackTop;
-  final double trackBottom;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = const Color(0x22FFF3D5)
-      ..strokeWidth = 1.2
-      ..strokeCap = StrokeCap.round;
-    for (var index = 0; index < 30; index++) {
-      final x = ((index * 53.0 - time * size.width * 5) % size.width);
-      final y = ui.lerpDouble(
-        trackTop + 4,
-        trackBottom - 4,
-        (index % 12) / 11,
-      )!;
-      canvas.drawLine(Offset(x, y), Offset(x + 18, y), paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _TrackSpeedPainter oldDelegate) =>
-      oldDelegate.time != time ||
-      oldDelegate.trackTop != trackTop ||
-      oldDelegate.trackBottom != trackBottom;
 }
 
 class _StraightLanePainter extends CustomPainter {
@@ -2502,37 +2774,6 @@ class _BroadcastScanlinePainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-class _FinishLinePainter extends CustomPainter {
-  const _FinishLinePainter();
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    const rows = 20;
-    const columns = 2;
-    final cellHeight = size.height / rows;
-    final cellWidth = size.width / columns;
-    for (var row = 0; row < rows; row++) {
-      for (var column = 0; column < columns; column++) {
-        canvas.drawRect(
-          Rect.fromLTWH(
-            column * cellWidth,
-            row * cellHeight,
-            cellWidth,
-            cellHeight,
-          ),
-          Paint()
-            ..color = (row + column).isEven
-                ? Colors.white
-                : const Color(0xFF1C2A27),
-        );
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
 class _StartingGatePainter extends CustomPainter {
   const _StartingGatePainter({required this.opening});
 
@@ -2564,79 +2805,493 @@ class _StartingGatePainter extends CustomPainter {
       oldDelegate.opening != opening;
 }
 
-class _FinishOrderRow extends StatelessWidget {
-  const _FinishOrderRow({
+class _OfficialRaceBroadcastHeader extends StatelessWidget {
+  const _OfficialRaceBroadcastHeader({
+    required this.race,
+    required this.winner,
+  });
+
+  final HorseRaceCard race;
+  final HorseRaceEntrant winner;
+
+  @override
+  Widget build(BuildContext context) {
+    final record = horseRaceRecordLabel(
+      horseRaceFinishTimeSeconds(race: race, entrant: winner),
+    );
+    return Container(
+      key: const Key('horse-race-official-broadcast-header'),
+      decoration: BoxDecoration(
+        color: const Color(0xFF101924),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFF536475), width: 1.2),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          Container(
+            height: 29,
+            padding: const EdgeInsets.symmetric(horizontal: 9),
+            color: const Color(0xFF1D2A38),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 3,
+                  ),
+                  color: const Color(0xFFC72432),
+                  child: const Text(
+                    'KRA 중계',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    '서울경마공원  제6경주',
+                    style: TextStyle(
+                      color: Color(0xFFDCE5EC),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                const Text(
+                  '공식 확정',
+                  style: TextStyle(
+                    color: Color(0xFFFFD65A),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(
+            height: 78,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Image.asset(
+                  horseRacePhotoFinishAsset,
+                  key: const Key('horse-race-photo-finish-image'),
+                  fit: BoxFit.cover,
+                  alignment: const Alignment(0.4, 0.12),
+                  filterQuality: FilterQuality.high,
+                  cacheWidth: 1000,
+                ),
+                const DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Color(0x0A000000), Color(0xA8000000)],
+                      stops: [0.4, 1],
+                    ),
+                  ),
+                ),
+                const Positioned(
+                  left: 9,
+                  bottom: 6,
+                  child: Text(
+                    '포토피니시 판독 영상',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
+            color: const Color(0xFF101924),
+            child: Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  alignment: Alignment.center,
+                  color: Color(winner.accentValue),
+                  child: Text(
+                    '${winner.gate}',
+                    style: TextStyle(
+                      color: winner.gate == 1 || winner.gate == 5
+                          ? const Color(0xFF182027)
+                          : Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '1위  ${winner.name}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      Text(
+                        '${winner.jockey} 기수 · 단승 ${winner.winOdds.toStringAsFixed(1)}배',
+                        style: const TextStyle(
+                          color: Color(0xFF9FB0BD),
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    const Text(
+                      '우승 기록',
+                      style: TextStyle(
+                        color: Color(0xFF9FB0BD),
+                        fontSize: 8,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    Text(
+                      record,
+                      key: const Key('horse-race-winning-record'),
+                      style: const TextStyle(
+                        color: Color(0xFFFFD65A),
+                        fontSize: 22,
+                        fontFeatures: [ui.FontFeature.tabularFigures()],
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            color: const Color(0xFF0A1119),
+            child: Text(
+              '${race.distanceMeters}m  |  출발 ${race.postTime}  |  '
+              '날씨 ${race.weather}  |  주로 ${race.trackCondition}',
+              style: const TextStyle(
+                color: Color(0xFFB9C5CE),
+                fontSize: 9,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OfficialRaceRecordBoard extends StatelessWidget {
+  const _OfficialRaceRecordBoard({
+    required this.race,
+    required this.selectedIds,
+  });
+
+  final HorseRaceCard race;
+  final Set<String> selectedIds;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    key: const Key('horse-race-official-record-board'),
+    decoration: BoxDecoration(
+      color: const Color(0xFFF6F2E8),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: const Color(0xFFC99A3D), width: 1.5),
+      boxShadow: const [
+        BoxShadow(
+          color: Color(0x280B1824),
+          blurRadius: 12,
+          offset: Offset(0, 5),
+        ),
+      ],
+    ),
+    clipBehavior: Clip.antiAlias,
+    child: Column(
+      children: [
+        Container(
+          height: 54,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: const BoxDecoration(
+            color: Color(0xFF172838),
+            border: Border(
+              bottom: BorderSide(color: Color(0xFFC99A3D), width: 1.5),
+            ),
+          ),
+          child: const Row(
+            children: [
+              Icon(
+                Icons.emoji_events_rounded,
+                color: Color(0xFFFFD66F),
+                size: 23,
+              ),
+              SizedBox(width: 9),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '공식 경주 성적',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    Text(
+                      '서울경마공원 · 제6경주',
+                      style: TextStyle(
+                        color: Color(0xFFB9C7D2),
+                        fontSize: 8,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              _OfficialStatusBadge(),
+            ],
+          ),
+        ),
+        const SizedBox(height: 30, child: _OfficialRecordColumns()),
+        for (var index = 0; index < race.finishOrder.length; index++)
+          _OfficialRecordRow(
+            position: index + 1,
+            entrant: race.entrantById(race.finishOrder[index]),
+            recordSeconds: horseRaceFinishTimeSeconds(
+              race: race,
+              entrant: race.entrantById(race.finishOrder[index]),
+            ),
+            previousSeconds: index == 0
+                ? null
+                : horseRaceFinishTimeSeconds(
+                    race: race,
+                    entrant: race.entrantById(race.finishOrder[index - 1]),
+                  ),
+            selected: selectedIds.contains(race.finishOrder[index]),
+          ),
+      ],
+    ),
+  );
+}
+
+class _OfficialStatusBadge extends StatelessWidget {
+  const _OfficialStatusBadge();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+    decoration: BoxDecoration(
+      color: const Color(0xFF2E8B66),
+      borderRadius: BorderRadius.circular(5),
+      border: Border.all(color: const Color(0xFF8EE0BC)),
+    ),
+    child: const Text(
+      '공식 확정',
+      style: TextStyle(
+        color: Colors.white,
+        fontSize: 8,
+        fontWeight: FontWeight.w900,
+      ),
+    ),
+  );
+}
+
+class _OfficialRecordColumns extends StatelessWidget {
+  const _OfficialRecordColumns();
+
+  @override
+  Widget build(BuildContext context) => const ColoredBox(
+    color: Color(0xFFE7D8B4),
+    child: Row(
+      children: [
+        SizedBox(width: 26, child: _RecordHeading('착순')),
+        SizedBox(width: 36, child: _RecordHeading('마번')),
+        Expanded(child: _RecordHeading('마명 / 기수', align: TextAlign.left)),
+        SizedBox(width: 60, child: _RecordHeading('기록')),
+        SizedBox(width: 38, child: _RecordHeading('착차')),
+        SizedBox(width: 44, child: _RecordHeading('단승')),
+      ],
+    ),
+  );
+}
+
+class _RecordHeading extends StatelessWidget {
+  const _RecordHeading(this.label, {this.align = TextAlign.center});
+
+  final String label;
+  final TextAlign align;
+
+  @override
+  Widget build(BuildContext context) => Text(
+    label,
+    textAlign: align,
+    style: const TextStyle(
+      color: Color(0xFF374656),
+      fontSize: 7.5,
+      fontWeight: FontWeight.w900,
+    ),
+  );
+}
+
+class _OfficialRecordRow extends StatelessWidget {
+  const _OfficialRecordRow({
     required this.position,
     required this.entrant,
+    required this.recordSeconds,
+    required this.previousSeconds,
     required this.selected,
   });
 
   final int position;
   final HorseRaceEntrant entrant;
+  final double recordSeconds;
+  final double? previousSeconds;
   final bool selected;
+
+  String get _margin {
+    if (previousSeconds == null) return '-';
+    return horseRaceMarginLabel(recordSeconds - previousSeconds!);
+  }
 
   @override
   Widget build(BuildContext context) => Container(
-    margin: const EdgeInsets.only(bottom: 6),
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+    key: Key('horse-result-record-${entrant.id}'),
+    height: 44,
     decoration: BoxDecoration(
-      color: selected ? const Color(0xFFE8F7F0) : Colors.white,
-      borderRadius: BorderRadius.circular(8),
-      border: Border.all(
-        color: selected ? const Color(0xFF2DAA78) : const Color(0xFFD8D2DF),
+      color: selected
+          ? const Color(0xFFE1F3E9)
+          : position == 1
+          ? const Color(0xFFFFF4CF)
+          : position.isEven
+          ? const Color(0xFFF1F4F2)
+          : const Color(0xFFFBFAF6),
+      border: const Border(
+        top: BorderSide(color: Color(0xFFC9D1D4), width: 0.7),
       ),
     ),
     child: Row(
       children: [
         SizedBox(
-          width: 32,
+          width: 26,
           child: Text(
-            '$position위',
+            '$position',
+            textAlign: TextAlign.center,
             style: TextStyle(
-              color: position == 1 ? const Color(0xFFB98100) : _ink,
-              fontSize: 13,
+              color: position == 1
+                  ? const Color(0xFFB27811)
+                  : const Color(0xFF263746),
+              fontSize: 11,
               fontWeight: FontWeight.w900,
             ),
           ),
         ),
-        Container(
-          width: 24,
-          height: 24,
-          decoration: BoxDecoration(
-            color: Color(entrant.accentValue),
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: const Color(0x33000000)),
-          ),
+        SizedBox(
+          width: 36,
           child: Center(
-            child: Text(
-              '${entrant.gate}',
-              style: TextStyle(
-                color: entrant.gate == 1 || entrant.gate == 5
-                    ? const Color(0xFF202A26)
-                    : Colors.white,
-                fontSize: 10,
-                fontWeight: FontWeight.w900,
+            child: Container(
+              width: 26,
+              height: 26,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: Color(entrant.accentValue),
+                borderRadius: BorderRadius.circular(3),
+                border: Border.all(color: const Color(0x33000000)),
+              ),
+              child: Text(
+                '${entrant.gate}',
+                style: TextStyle(
+                  color: entrant.gate == 1 || entrant.gate == 5
+                      ? const Color(0xFF182027)
+                      : Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
             ),
           ),
         ),
-        const SizedBox(width: 8),
         Expanded(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                entrant.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Color(0xFF24374A),
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              Text(
+                entrant.jockey,
+                style: const TextStyle(
+                  color: Color(0xFF708090),
+                  fontSize: 7,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(
+          width: 60,
           child: Text(
-            entrant.name,
+            horseRaceRecordLabel(recordSeconds),
+            textAlign: TextAlign.center,
             style: const TextStyle(
-              color: _ink,
-              fontSize: 12,
+              color: Color(0xFF24374A),
+              fontSize: 9,
+              fontFeatures: [ui.FontFeature.tabularFigures()],
               fontWeight: FontWeight.w900,
             ),
           ),
         ),
-        Text(
-          entrant.jockey,
-          style: const TextStyle(
-            color: Color(0xFF6D766F),
-            fontSize: 9,
-            fontWeight: FontWeight.w700,
+        SizedBox(
+          width: 38,
+          child: Text(
+            _margin,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Color(0xFF6D7780),
+              fontSize: 7.5,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        SizedBox(
+          width: 44,
+          child: Text(
+            entrant.winOdds.toStringAsFixed(1),
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Color(0xFFB04462),
+              fontSize: 9,
+              fontWeight: FontWeight.w900,
+            ),
           ),
         ),
       ],

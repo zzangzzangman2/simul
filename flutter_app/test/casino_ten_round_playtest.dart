@@ -10,7 +10,7 @@ const _stake = 10000;
 
 GameState _session(String seed) {
   final day = DateTime(2010, 1, 4).difference(DateTime(2000, 1, 1)).inDays + 1;
-  return _engine
+  final state = _engine
       .createNewGame('카지노 10판 실전 테스트', initialCash: 10000000, worldSeed: seed)
       .copyWith(
         day: day,
@@ -18,6 +18,7 @@ GameState _session(String seed) {
         brokerageCash: 0,
         decisions: const [],
       );
+  return _engine.exchangeCasinoChips(state, 1000000).state;
 }
 
 GameState _advanceAfterRound(GameState state, CasinoActionResult result) {
@@ -43,7 +44,12 @@ void _verifyAndPrint(String label, GameState before, GameState after) {
     0,
     (sum, record) => sum + record.nationalFee,
   );
-  expect(after.bankCash - before.bankCash, totalNet);
+  expect(
+    after.personalFinance.casino.chipBalance -
+        before.personalFinance.casino.chipBalance,
+    totalNet,
+  );
+  expect(after.bankCash, before.bankCash);
   expect(casino.totalNationalFee, totalFee);
   for (final record in records) {
     expect(

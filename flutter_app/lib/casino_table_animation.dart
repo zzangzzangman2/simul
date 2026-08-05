@@ -56,21 +56,40 @@ class _CasinoLiveTableStageState extends State<_CasinoLiveTableStage>
     vsync: this,
     value: 1,
   );
+  Timer? _resultToastTimer;
+  CasinoRoundRecord? _visibleLatest;
+  bool _awaitingResult = false;
 
   @override
   void didUpdateWidget(covariant _CasinoLiveTableStage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.motionToken == oldWidget.motionToken) return;
-    _motion.duration = _casinoTableMotionDuration(widget.motion);
-    if (widget.reduceMotion || widget.motion == _CasinoTableMotion.idle) {
-      _motion.value = 1;
-    } else {
-      _motion.forward(from: 0);
+    if (widget.motionToken != oldWidget.motionToken) {
+      _resultToastTimer?.cancel();
+      _visibleLatest = null;
+      _awaitingResult = widget.motion != _CasinoTableMotion.idle;
+      _motion.duration = _casinoTableMotionDuration(widget.motion);
+      if (widget.reduceMotion || widget.motion == _CasinoTableMotion.idle) {
+        _motion.value = 1;
+      } else {
+        _motion.forward(from: 0);
+      }
+    }
+    if (_awaitingResult &&
+        widget.motion == _CasinoTableMotion.idle &&
+        widget.latest != null &&
+        !identical(widget.latest, oldWidget.latest)) {
+      _awaitingResult = false;
+      _visibleLatest = widget.latest;
+      _resultToastTimer?.cancel();
+      _resultToastTimer = Timer(const Duration(milliseconds: 2400), () {
+        if (mounted) setState(() => _visibleLatest = null);
+      });
     }
   }
 
   @override
   void dispose() {
+    _resultToastTimer?.cancel();
     _motion.dispose();
     super.dispose();
   }
@@ -105,7 +124,7 @@ class _CasinoLiveTableStageState extends State<_CasinoLiveTableStage>
               return Stack(
                 clipBehavior: Clip.hardEdge,
                 children: [
-                  const Positioned.fill(child: _CasinoFeltSurface()),
+                  Positioned.fill(child: _CasinoFeltSurface(game: widget.game)),
                   _buildCameraBar(),
                   Positioned(
                     top: 42,
@@ -129,17 +148,20 @@ class _CasinoLiveTableStageState extends State<_CasinoLiveTableStage>
                     ),
                   ),
                   if (_usesDealerHands) ..._buildDealerMotion(size),
-                  if (!_usesDealerHands && _movesBettingChips)
+                  if (!_usesDealerHands &&
+                      _movesBettingChips &&
+                      widget.game != CasinoGameType.slots)
                     ..._buildChipDealerMotion(size),
-                  if (widget.latest != null &&
+                  if (_visibleLatest != null &&
                       widget.motion == _CasinoTableMotion.idle)
                     Positioned(
                       left: 12,
                       right: 12,
-                      bottom: 8,
+                      top: 31,
                       child: IgnorePointer(
                         child: Center(
                           child: Container(
+                            key: const Key('casino-round-result-toast'),
                             padding: const EdgeInsets.symmetric(
                               horizontal: 10,
                               vertical: 5,
@@ -152,7 +174,7 @@ class _CasinoLiveTableStageState extends State<_CasinoLiveTableStage>
                               ),
                             ),
                             child: Text(
-                              widget.latest!.outcome,
+                              _visibleLatest!.outcome,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
@@ -534,64 +556,54 @@ class _CasinoLiveTableStageState extends State<_CasinoLiveTableStage>
 }
 
 class _CasinoFeltSurface extends StatelessWidget {
-  const _CasinoFeltSurface();
+  const _CasinoFeltSurface({required this.game});
+
+  final CasinoGameType game;
+
+  String get _asset => switch (game) {
+    CasinoGameType.baccarat =>
+      'assets/images/casino/live_table_baccarat_v1.webp',
+    CasinoGameType.blackjack =>
+      'assets/images/casino/live_table_blackjack_v1.webp',
+    CasinoGameType.roulette =>
+      'assets/images/casino/live_table_roulette_v1.webp',
+    CasinoGameType.craps => 'assets/images/casino/live_table_craps_v1.webp',
+    CasinoGameType.sicBo => 'assets/images/casino/live_table_sicbo_v1.webp',
+    CasinoGameType.slots => 'assets/images/casino/live_table_slots_v1.webp',
+  };
 
   @override
-  Widget build(BuildContext context) => CustomPaint(
-    foregroundPainter: _CasinoFeltPainter(),
-    child: const DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: RadialGradient(
-          center: Alignment(0, -0.35),
-          radius: 1.2,
-          colors: [Color(0xFF176A50), Color(0xFF0A4434), Color(0xFF06281F)],
-          stops: [0, 0.58, 1],
+  Widget build(BuildContext context) => Stack(
+    fit: StackFit.expand,
+    children: [
+      Image.asset(
+        _asset,
+        key: Key('casino-live-table-image-${game.name}'),
+        fit: BoxFit.cover,
+        alignment: const Alignment(0, -0.02),
+        filterQuality: FilterQuality.high,
+      ),
+      const DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0x30000000), Color(0x08000000), Color(0x52000000)],
+            stops: [0, 0.54, 1],
+          ),
         ),
       ),
-    ),
+      const DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: RadialGradient(
+            radius: 0.92,
+            colors: [Color(0x00000000), Color(0x4A000000)],
+            stops: [0.62, 1],
+          ),
+        ),
+      ),
+    ],
   );
-}
-
-class _CasinoFeltPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final gold = Paint()
-      ..color = _casinoGold.withValues(alpha: 0.30)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2;
-    final center = Offset(size.width / 2, size.height * 0.58);
-    canvas.drawArc(
-      Rect.fromCenter(
-        center: center,
-        width: size.width * 0.86,
-        height: size.height * 0.82,
-      ),
-      math.pi,
-      math.pi,
-      false,
-      gold,
-    );
-    canvas.drawArc(
-      Rect.fromCenter(
-        center: center,
-        width: size.width * 0.60,
-        height: size.height * 0.52,
-      ),
-      math.pi,
-      math.pi,
-      false,
-      gold,
-    );
-    final line = Paint()
-      ..color = Colors.white.withValues(alpha: 0.035)
-      ..strokeWidth = 0.6;
-    for (var y = 40.0; y < size.height; y += 8) {
-      canvas.drawLine(Offset.zero.translate(0, y), Offset(size.width, y), line);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _CasinoSeatLabel extends StatelessWidget {
@@ -924,6 +936,7 @@ class _CasinoChipStack extends StatelessWidget {
         ? const Color(0xFF285E9E)
         : const Color(0xFFE8E1D1);
     return Transform.translate(
+      key: const Key('casino-chip-stack'),
       offset: Offset(0, (1 - move) * 64),
       child: Opacity(
         opacity: active ? progress.clamp(0.0, 1.0) : 1,
@@ -1004,63 +1017,46 @@ class _CasinoRouletteSurface extends StatelessWidget {
     return Center(
       child: Padding(
         padding: const EdgeInsets.only(top: 28, bottom: 28),
-        child: Transform.rotate(
-          angle: turns,
-          child: CustomPaint(
-            key: const Key('casino-roulette-wheel'),
-            size: const Size.square(170),
-            painter: _CasinoRoulettePainter(ballAngle: -turns * 1.42),
+        child: SizedBox.square(
+          key: const Key('casino-roulette-wheel'),
+          dimension: 176,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Transform.rotate(
+                angle: turns,
+                child: ClipOval(
+                  child: Image.asset(
+                    'assets/images/casino/live_roulette_wheel_v1.webp',
+                    fit: BoxFit.cover,
+                    filterQuality: FilterQuality.high,
+                  ),
+                ),
+              ),
+              Transform.rotate(
+                angle: -turns * 1.42,
+                child: Align(
+                  alignment: const Alignment(0.78, 0),
+                  child: Container(
+                    width: 10,
+                    height: 10,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFFFF8E3),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(color: Color(0x99000000), blurRadius: 4),
+                        BoxShadow(color: Color(0x66FFFFFF), blurRadius: 2),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
-}
-
-class _CasinoRoulettePainter extends CustomPainter {
-  const _CasinoRoulettePainter({required this.ballAngle});
-  final double ballAngle;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = size.center(Offset.zero);
-    final radius = size.shortestSide / 2;
-    final gold = Paint()..color = _casinoGold;
-    canvas.drawCircle(center, radius, Paint()..color = const Color(0xFF211612));
-    for (var index = 0; index < 18; index++) {
-      final paint = Paint()
-        ..color = index.isEven
-            ? const Color(0xFF8A1D31)
-            : const Color(0xFF171717)
-        ..style = PaintingStyle.fill;
-      canvas.drawArc(
-        Rect.fromCircle(center: center, radius: radius - 7),
-        index * math.pi * 2 / 18,
-        math.pi * 2 / 18 - 0.015,
-        true,
-        paint,
-      );
-    }
-    canvas.drawCircle(
-      center,
-      radius * 0.52,
-      Paint()..color = const Color(0xFF5B371E),
-    );
-    canvas.drawCircle(center, radius * 0.24, gold);
-    canvas.drawCircle(
-      center,
-      radius * 0.12,
-      Paint()..color = const Color(0xFF24150E),
-    );
-    final ballCenter =
-        center +
-        Offset(math.cos(ballAngle), math.sin(ballAngle)) * radius * 0.74;
-    canvas.drawCircle(ballCenter, 5, Paint()..color = const Color(0xFFF8F1DA));
-  }
-
-  @override
-  bool shouldRepaint(covariant _CasinoRoulettePainter oldDelegate) =>
-      oldDelegate.ballAngle != ballAngle;
 }
 
 class _CasinoCrapsSurface extends StatelessWidget {
@@ -1397,7 +1393,6 @@ class _CasinoReelSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const symbols = <String>['7', 'BAR', '★', '●', '♣', '♦'];
     final parts = (detail ?? '')
         .split('|')
         .map((value) => value.trim())
@@ -1448,23 +1443,75 @@ class _CasinoReelSurface extends StatelessWidget {
                               (1 - progress)
                         : 0,
                   ),
-                  child: Text(
-                    active
-                        ? symbols[((progress * 30).floor() + index * 2) %
-                              symbols.length]
+                  child: _CasinoSlotSymbol(
+                    key: Key('casino-slot-symbol-$index'),
+                    reelIndex: index,
+                    symbolIndex: active
+                        ? ((progress * 30).floor() + index * 2) %
+                              casinoSlotSymbols.length
                         : index < parts.length
-                        ? parts[index].split(' ').first
-                        : symbols[index],
-                    style: TextStyle(
-                      color: index == 0 ? _casinoWine : const Color(0xFF1E1A16),
-                      fontSize: 22,
-                      fontWeight: FontWeight.w900,
-                    ),
+                        ? math.max(
+                            0,
+                            casinoSlotSymbols.indexOf(
+                              parts[index].split(' ').first,
+                            ),
+                          )
+                        : index,
                   ),
                 ),
               ),
             ],
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CasinoSlotSymbol extends StatelessWidget {
+  const _CasinoSlotSymbol({
+    super.key,
+    required this.reelIndex,
+    required this.symbolIndex,
+    this.dimension = _cellSize,
+  });
+
+  static const _atlasAsset = 'assets/images/casino/slot_symbol_atlas_v1.png';
+  static const double _cellSize = 56;
+
+  final int reelIndex;
+  final int symbolIndex;
+  final double dimension;
+
+  @override
+  Widget build(BuildContext context) {
+    final safeIndex = symbolIndex
+        .clamp(0, casinoSlotSymbols.length - 1)
+        .toInt();
+    final column = safeIndex % 3;
+    final row = safeIndex ~/ 3;
+    return Semantics(
+      image: true,
+      label: '${reelIndex + 1}번 릴 ${casinoSlotSymbols[safeIndex]}',
+      child: SizedBox.square(
+        dimension: dimension,
+        child: ClipRect(
+          child: Stack(
+            children: [
+              Positioned(
+                left: -column * dimension,
+                top: -row * dimension,
+                width: dimension * 3,
+                height: dimension * 2,
+                child: Image.asset(
+                  _atlasAsset,
+                  fit: BoxFit.fill,
+                  filterQuality: FilterQuality.high,
+                  gaplessPlayback: true,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

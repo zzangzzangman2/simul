@@ -406,6 +406,7 @@ class _BankScreenState extends State<BankScreen> {
   }
 
   void _startConsultation(_BankDeskTab tab) {
+    GameAudio.instance.playSfx(GameSfx.bookOpen);
     setState(() {
       _tab = tab;
       _introVisible = false;
@@ -416,6 +417,7 @@ class _BankScreenState extends State<BankScreen> {
   }
 
   void _continueIntroduction() {
+    GameAudio.instance.playSfx(GameSfx.pageFlip);
     setState(() {
       _introBeat = 1;
       _clerkMood = _BankClerkMood.explain;

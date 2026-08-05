@@ -7,15 +7,15 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   const assets = <String>[
-    '01_neutral_soft_v2.png',
-    '02_bright_smile_wave_v2.png',
-    '03_bright_laugh_v2.png',
-    '04_playful_wink_v2.png',
-    '05_surprised_v2.png',
-    '06_worried_v2.png',
-    '07_sulky_pout_v2.png',
-    '08_determined_v2.png',
-    '09_explaining_v2.png',
+    '01_neutral_v3.png',
+    '02_gentle_smile_v3.png',
+    '03_bright_laugh_v3.png',
+    '04_surprised_v3.png',
+    '05_worried_v3.png',
+    '06_angry_v3.png',
+    '07_embarrassed_v3.png',
+    '08_sad_v3.png',
+    '09_firm_v3.png',
   ];
 
   test(

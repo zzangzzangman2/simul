@@ -155,7 +155,7 @@ test("bridges a legacy React save before Flutter starts without overwriting Flut
   assert.ok(script, "legacy save bridge should be present");
   assert.ok(
     flutterTemplate.indexOf('id="legacy-save-bridge"') <
-      flutterTemplate.indexOf('src="flutter_bootstrap.js"'),
+      flutterTemplate.indexOf('id="flutter-bootstrap-loader"'),
     "legacy save bridge must run before Flutter bootstrap",
   );
 
@@ -247,13 +247,20 @@ test("keeps Flutter launch metadata aligned with the current starting conditions
   assert.match(flutterTemplate, /window\.isSecureContext/);
   assert.match(flutterTemplate, /install-banner-dismiss/);
   assert.match(flutterTemplate, /<script id="pwa-worker-registration">/);
-  assert.match(flutterTemplate, /serviceWorker\.register\('pwa_service_worker\.js'/);
+  assert.match(
+    flutterTemplate,
+    /serviceWorker\s*\.register\('pwa_service_worker\.js'/,
+  );
+  assert.match(flutterTemplate, /decimalPwaWorkerReady/);
+  assert.match(flutterTemplate, /controllerUsesCurrentBuild/);
+  assert.match(flutterTemplate, /<script id="flutter-bootstrap-loader">/);
   assert.match(flutterTemplate, /<script id="automatic-app-update">/);
   assert.match(flutterTemplate, /content="\$DECIMAL_BUILD_ID"/);
   assert.match(flutterTemplate, /fetch\(`version\.json\?check=/);
   assert.match(flutterTemplate, /cache: 'no-store'/);
   assert.match(flutterTemplate, /visibilitychange/);
   assert.match(flutterTemplate, /window\.location\.replace/);
+  assert.match(flutterTemplate, /window\.history\.replaceState/);
 
   // 진입 스크립트에 내용 해시가 붙어야 배포가 캐시를 넘어 유저에게 도달한다.
   const [builtIndex, builtBootstrap, builtVersion, builtWorker, headers] = await Promise.all([
@@ -263,7 +270,7 @@ test("keeps Flutter launch metadata aligned with the current starting conditions
     readFile(new URL("../public/play/pwa_service_worker.js", import.meta.url), "utf8"),
     readFile(new URL("../public/_headers", import.meta.url), "utf8"),
   ]);
-  const stamped = builtIndex.match(/flutter_bootstrap\.js\?v=([0-9a-f]{12})"/);
+  const stamped = builtIndex.match(/flutter_bootstrap\.js\?v=([0-9a-f]{12})'/);
   assert.ok(stamped, "built index.html must load a version-stamped bootstrap");
   assert.ok(
     builtBootstrap.includes(`"main.dart.js?v=${stamped[1]}"`),
@@ -278,7 +285,10 @@ test("keeps Flutter launch metadata aligned with the current starting conditions
     builtIndex,
     new RegExp(`pwa_service_worker\\.js\\?v=${stamped[1]}`),
   );
-  assert.match(builtWorker, /addEventListener\('fetch'/);
+  assert.match(builtWorker, /CACHE_PREFIX = 'decimal-static-'/);
+  assert.match(builtWorker, /requestUrl\.searchParams\.set\('v', buildId\)/);
+  assert.match(builtWorker, /cache\.match\(versionedRequest\)/);
+  assert.match(builtWorker, /caches\.delete\(name\)/);
   // 고정 파일명인 진입 문서는 반드시 재검증해야 한다.
   const headerRule = (path) =>
     headers.split(path)[1]?.split("\n").slice(0, 2).join(" ") ?? "";
@@ -291,6 +301,7 @@ test("keeps Flutter launch metadata aligned with the current starting conditions
     headerRule("/play/pwa_service_worker.js"),
     /Cache-Control: no-cache/,
   );
+  assert.match(headerRule("/play/assets/*"), /Cache-Control: no-cache/);
 });
 
 test("ships a fixed fictional roster and an expanding market generator", async () => {
@@ -466,13 +477,14 @@ test("fills the mobile viewport and provides an exact desktop phone preview", as
   assert.match(fontManifest, /"family":"Maplestory"/);
   assert.match(fontManifest, /MaplestoryLight\.ttf/);
   assert.match(fontManifest, /MaplestoryBold\.ttf/);
+  assert.match(visualNovel, /this\.fontFamily = 'Pretendard'/);
   assert.match(
     visualNovel,
-    /key: const Key\('story-line-text'\),[\s\S]*?fontFamily: 'Pretendard'/,
+    /key: const Key\('story-line-text'\),[\s\S]*?fontFamily: widget\.fontFamily/,
   );
   assert.match(
     visualNovel,
-    /key: const Key\('story-speaker-name'\),[\s\S]*?fontFamily: 'Pretendard'/,
+    /key: const Key\('story-speaker-name'\),[\s\S]*?fontFamily: widget\.fontFamily/,
   );
   assert.match(visualNovel, /key: const Key\('story-speaker-affiliation'\)/);
   assert.match(visualNovel, /key: Key\('story-dialogue-divider'\)/);
@@ -823,7 +835,7 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
   assert.match(onboarding, /AssetSource/);
   assert.match(pubspec, /audioplayers: \^6\.8\.1/);
   assert.equal(canonical.contentVersion, 5);
-  assert.equal(canonical.appearanceVersion, 19);
+  assert.equal(canonical.appearanceVersion, 20);
   assert.deepEqual(hanSuaAssets, expectedHanSuaAssets);
   assert.deepEqual(hakjunAssets, expectedHakjunAssets);
   assert.equal(canonical.scenes.length, 302);
@@ -919,7 +931,7 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
   assert.doesNotMatch(data, /단팥빵 얘기 들은 다음부터 계속 배고파/);
   assert.match(data, /bg_decimal_gangnam_exterior_winter_1999_v1\.png/);
   assert.match(editor, /const CONTENT_VERSION = 3/);
-  assert.match(editor, /const APPEARANCE_VERSION = 19/);
+  assert.match(editor, /const APPEARANCE_VERSION = 20/);
   assert.equal(data.includes("\\\\n"), false);
   assert.match(data, /production_soft_painted\/kim_hakjun\/01_neutral_crosscheck_uniform_v4\.png/);
   assert.doesNotMatch(data, /01_neutral_crosscheck_v3\.png/);
@@ -928,8 +940,8 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
   assert.match(generator, /loadCanonicalDialogue/);
   assert.doesNotMatch(generator, /_onboardingBeatCount/);
   assert.doesNotMatch(generator, /visual_novel_onboarding\.dart/);
-  assert.match(generator, /appearanceVersion !== 19/);
-  assert.match(generator, /content 5 \/ appearance 19/);
+  assert.match(generator, /appearanceVersion !== 20/);
+  assert.match(generator, /content 5 \/ appearance 20/);
   assert.match(generator, /Dialogue editor synced/);
   assert.match(validation, /DIALOGUE_MAX_TEXT_LENGTH = 6000/);
   assert.match(validation, /중복 장면 ID/);
@@ -962,7 +974,7 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
   assert.match(packageJson, /prebuild:flutter-web/);
   assert.match(packageJson, /dialogue:sync/);
   assert.match(buildRoute, /dialogue-editor-override\.json/);
-  assert.match(buildRoute, /appearanceVersion: 19/);
+  assert.match(buildRoute, /appearanceVersion: 20/);
   assert.match(buildRoute, /validateDialogueScenes/);
   assert.match(buildRoute, /DIALOGUE_BUILD_TOKEN/);
   assert.match(buildRoute, /requiresToken:\s*true/);
@@ -992,9 +1004,9 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
   assert.match(catalog, /speaker: "오지우"[\s\S]*?poses: ohJiwooPoses/);
   assert.match(
     catalog,
-    /const parkHaeunPoses[\s\S]*09_explaining_v2\.png[\s\S]*production_soft_painted\/park_haeun/,
+    /const parkHaeunPoses[\s\S]*09_firm_v3\.png[\s\S]*production_soft_painted\/park_haeun/,
   );
-  assert.match(data, /park_haeun\/02_bright_smile_wave_v2\.png/);
+  assert.match(data, /park_haeun\/02_gentle_smile_v3\.png/);
   assert.match(data, /yoon_chaea\/09_explaining_v1\.png/);
   assert.match(data, /kim_seoa\/01_neutral_notebook_v1\.png/);
   assert.match(data, /lee_jian\/09_explaining_mechanism_v2\.png/);
@@ -1015,12 +1027,23 @@ test("ships an intuitive dialogue editor and builds saved dialogue into the game
     assert.ok(editor.includes(`"${legacy}": "${current}"`), legacy);
     assert.ok(onboarding.includes(`'${legacy}': '${current}'`), legacy);
   }
-  assert.match(editor, /character: migrateHanSuaCharacterAsset\(scene\.character\)/);
-  assert.match(onboarding, /_migrateHanSuaCharacterAsset\(normalized\)/);
+  for (const [legacy, current] of [
+    ["01_neutral_soft_v2.png", "01_neutral_v3.png"],
+    ["02_bright_smile_wave_v2.png", "02_gentle_smile_v3.png"],
+    ["04_playful_wink_v2.png", "07_embarrassed_v3.png"],
+    ["06_worried_v2.png", "05_worried_v3.png"],
+    ["09_explaining_v2.png", "09_firm_v3.png"],
+    ["10_lobby_welcome_f0_v2.png", "01_neutral_v3.png"],
+  ]) {
+    assert.ok(editor.includes(`"${legacy}": "${current}"`), legacy);
+    assert.ok(onboarding.includes(`'${legacy}': '${current}'`), legacy);
+  }
+  assert.match(editor, /character: migrateCharacterAsset\(scene\.character\)/);
+  assert.match(onboarding, /_migrateCharacterAsset\(normalized\)/);
   assert.match(buildRoute, /persistDialogue\(validation\.scenes, mode\)/);
   assert.match(buildRoute, /scripts\/build-flutter-web\.mjs/);
   assert.match(onboarding, /_dialogueBundleAsset/);
-  assert.match(onboarding, /_dialogueAppearanceVersion = 19/);
+  assert.match(onboarding, /_dialogueAppearanceVersion = 20/);
   assert.match(onboarding, /_mergeCurrentAppearance/);
   assert.match(onboarding, /rootBundle\.loadString/);
   assert.match(

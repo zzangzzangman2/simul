@@ -62,6 +62,11 @@ const weekdayActivities = <WeekdayActivityDefinition>[
     description: '요원 전용 중계에서 테이블을 고르고 저녁 시간을 사용합니다.',
   ),
   WeekdayActivityDefinition(
+    id: 'horse_racing',
+    title: '국가망 경마 중계',
+    description: '전자 마권 한 장을 정산하고 오늘의 저녁 시간을 사용합니다.',
+  ),
+  WeekdayActivityDefinition(
     id: 'real_estate',
     title: '부동산 시장 확인',
     description: '매물·시세·보유 부동산을 검토하고 필요한 거래를 처리합니다.',
@@ -217,14 +222,14 @@ GameDayGuidance gameDayGuidanceForState(GameState state) {
     );
   }
   if (state.marketMinute < marketDayEndMinute) {
-    final casinoLive =
+    final adultEveningEntertainment =
         !state.currentDate.isBefore(DateTime(2010, 1, 1)) &&
         state.story.ageOn(state.currentDate) >= 20;
     return GameDayGuidance(
       phaseLabel: '15:00 · 장 마감 후',
       title: '오늘 손익을 확인하고 오후 일정을 고르세요',
-      body: casinoLive
-          ? '종가와 보유 현황을 확인한 뒤 작업실 PC의 카지노 LIVE나 저녁 일정을 선택합니다.'
+      body: adultEveningEntertainment
+          ? '종가와 보유 현황을 확인한 뒤 컴퓨터실 PC의 카지노·경마 중 하나나 다른 저녁 일정을 선택합니다.'
           : '종가와 보유 현황을 확인한 뒤 동기들과 보낼 시간을 선택합니다.',
       actionLabel: '장 마감 결과 보기',
     );

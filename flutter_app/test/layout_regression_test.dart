@@ -118,9 +118,9 @@ void main() {
     final workspaceRect = tester.getRect(
       find.byKey(const Key('inline-order-workspace')),
     );
-    expect(ticketRect.left, greaterThanOrEqualTo(0));
-    expect(ticketRect.right, lessThanOrEqualTo(railRect.left));
-    expect(railRect.right, lessThanOrEqualTo(phoneSize.width));
+    expect(railRect.left, greaterThanOrEqualTo(0));
+    expect(railRect.right, lessThanOrEqualTo(ticketRect.left));
+    expect(ticketRect.right, lessThanOrEqualTo(phoneSize.width));
     expect(
       workspaceRect.bottom,
       lessThanOrEqualTo(

@@ -26,7 +26,7 @@ void main() {
     'lee_jian': 9,
     'choi_iseo': 13,
     'jung_arin': 13,
-    'park_haeun': 13,
+    'park_haeun': 9,
     'han_sua': 13,
     'oh_jiwoo': 9,
     'yoon_chaea': 13,
@@ -222,8 +222,32 @@ void main() {
       expect(flutter, contains(entry.key), reason: entry.key);
       expect(flutter, contains(entry.value), reason: entry.value);
     }
-    expect(editor, contains('character: migrateHanSuaCharacterAsset'));
-    expect(flutter, contains('_migrateHanSuaCharacterAsset(normalized)'));
+    expect(editor, contains('character: migrateCharacterAsset'));
+    expect(flutter, contains('_migrateCharacterAsset(normalized)'));
+  });
+
+  test('legacy Park Haeun filenames migrate in both editor runtimes', () {
+    final editor = File('../app/editor/page.tsx').readAsStringSync();
+    final flutter = File('lib/visual_novel_onboarding.dart').readAsStringSync();
+    const migrations = <String, String>{
+      '01_neutral_soft_v2.png': '01_neutral_v3.png',
+      '02_bright_smile_wave_v2.png': '02_gentle_smile_v3.png',
+      '04_playful_wink_v2.png': '07_embarrassed_v3.png',
+      '05_surprised_v2.png': '04_surprised_v3.png',
+      '06_worried_v2.png': '05_worried_v3.png',
+      '07_sulky_pout_v2.png': '06_angry_v3.png',
+      '08_determined_v2.png': '09_firm_v3.png',
+      '09_explaining_v2.png': '09_firm_v3.png',
+      '10_lobby_welcome_f0_v2.png': '01_neutral_v3.png',
+    };
+    for (final entry in migrations.entries) {
+      expect(editor, contains(entry.key), reason: entry.key);
+      expect(editor, contains(entry.value), reason: entry.value);
+      expect(flutter, contains(entry.key), reason: entry.key);
+      expect(flutter, contains(entry.value), reason: entry.value);
+    }
+    expect(editor, contains('migrateParkHaeunCharacterAsset'));
+    expect(flutter, contains('_migrateParkHaeunCharacterAsset'));
   });
 
   test('Project Decimal dialogue keeps all eight approved identities', () {
@@ -234,7 +258,7 @@ void main() {
               ).readAsStringSync(),
             )
             as Map<String, dynamic>;
-    expect(decoded['appearanceVersion'], 19);
+    expect(decoded['appearanceVersion'], 20);
     expect(decoded['contentVersion'], 5);
     final scenes = (decoded['scenes'] as List<dynamic>)
         .cast<Map<String, dynamic>>();

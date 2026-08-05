@@ -130,8 +130,22 @@ async function validateBuild() {
   ]) {
     await access(resolve(buildOutput, name));
   }
-  const index = await readFile(resolve(buildOutput, "index.html"), "utf8");
-  const bootstrap = await readFile(resolve(buildOutput, "flutter_bootstrap.js"), "utf8");
+  for (const name of [
+    "assets/assets/audio/bgm/title_gentle_theme.ogg",
+    "assets/assets/audio/bgm/market_portside_cafe.ogg",
+    "assets/assets/audio/bgm/horse_racing_prairie4.ogg",
+    "assets/assets/audio/bgm/casino_taisho.ogg",
+    "assets/assets/audio/sfx/card_shuffle.ogg",
+    "assets/assets/audio/sfx/horse_gallop_loop.ogg",
+    "assets/assets/audio/sfx/crowd_ambience.ogg",
+  ]) {
+    await access(resolve(buildOutput, name));
+  }
+  const [index, bootstrap, pwaWorker] = await Promise.all([
+    readFile(resolve(buildOutput, "index.html"), "utf8"),
+    readFile(resolve(buildOutput, "flutter_bootstrap.js"), "utf8"),
+    readFile(resolve(buildOutput, "pwa_service_worker.js"), "utf8"),
+  ]);
   if (!index.includes('<base href="/play/">')) {
     throw new Error("Flutter build does not use the required /play/ base href.");
   }
@@ -145,6 +159,7 @@ async function validateBuild() {
     !index.includes('id="install-prompt"') ||
     !index.includes('id="pwa-worker-registration"') ||
     !index.includes('id="automatic-app-update"') ||
+    !index.includes('id="flutter-bootstrap-loader"') ||
     !index.includes('content="$DECIMAL_BUILD_ID"')
   ) {
     throw new Error("Flutter build is missing the install or automatic update shell.");
@@ -154,6 +169,13 @@ async function validateBuild() {
     !bootstrap.includes("document.getElementById('flutter_host')")
   ) {
     throw new Error("Flutter bootstrap is not attached to the fixed host element.");
+  }
+  if (
+    !pwaWorker.includes("CACHE_PREFIX = 'decimal-static-'") ||
+    !pwaWorker.includes("requestUrl.searchParams.set('v', buildId)") ||
+    !pwaWorker.includes("caches.delete(name)")
+  ) {
+    throw new Error("PWA worker is missing build-versioned asset caching.");
   }
 }
 
@@ -185,6 +207,59 @@ async function hashBuildOutput() {
   return digest.digest("hex").slice(0, 12);
 }
 
+async function normalizeBuildIdPlaceholders() {
+  const indexPath = resolve(buildOutput, "index.html");
+  const bootstrapPath = resolve(buildOutput, "flutter_bootstrap.js");
+  const [indexHtml, bootstrap] = await Promise.all([
+    readFile(indexPath, "utf8"),
+    readFile(bootstrapPath, "utf8"),
+  ]);
+
+  // Flutter's incremental web build can retain an index/bootstrap pair stamped by
+  // the previous run when the source shell itself did not change. Normalize those
+  // generated files before validation and hashing so the next content hash is not
+  // self-referential and the new build id is always written to every entry point.
+  const normalizedIndex = indexHtml
+    .replace(/<base href="[^"]*">/, '<base href="/play/">')
+    .replace(
+      /content="(?:\$DECIMAL_BUILD_ID|[0-9a-f]{12})"/,
+      'content="$DECIMAL_BUILD_ID"',
+    )
+    .replaceAll(
+      /script\.src = 'flutter_bootstrap\.js(?:\?v=[0-9a-f]{12})?'/g,
+      "script.src = 'flutter_bootstrap.js'",
+    )
+    .replaceAll(
+      /'pwa_service_worker\.js(?:\?v=[0-9a-f]{12})?'/g,
+      "'pwa_service_worker.js'",
+    );
+  const normalizedBootstrap = bootstrap.replaceAll(
+    /"main\.dart\.js(?:\?v=[0-9a-f]{12})?"/g,
+    '"main.dart.js"',
+  );
+
+  await Promise.all([
+    writeFile(indexPath, normalizedIndex, "utf8"),
+    writeFile(bootstrapPath, normalizedBootstrap, "utf8"),
+  ]);
+}
+
+async function waitForBuildShell(timeoutMs = 15000) {
+  const requiredPaths = [
+    resolve(buildOutput, "index.html"),
+    resolve(buildOutput, "flutter_bootstrap.js"),
+    resolve(buildOutput, "main.dart.js"),
+  ];
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if ((await Promise.all(requiredPaths.map(exists))).every(Boolean)) return;
+    await new Promise((resolveWait) => setTimeout(resolveWait, 100));
+  }
+  const error = new Error("Flutter web shell did not settle after compilation.");
+  error.code = "ENOENT";
+  throw error;
+}
+
 /**
  * Flutter Web은 `index.html`, `flutter_bootstrap.js`, `main.dart.js`를 모두 고정된
  * 파일명으로 내보내고, 최신 Flutter의 서비스워커는 캐시를 하지 않고 자기 자신을
@@ -206,10 +281,10 @@ async function stampBuildId() {
 
   const buildId = await hashBuildOutput();
 
-  if (!indexHtml.includes('src="flutter_bootstrap.js"')) {
+  if (!indexHtml.includes("script.src = 'flutter_bootstrap.js'")) {
     throw new Error("Flutter index.html no longer loads flutter_bootstrap.js by name.");
   }
-  if (!bootstrap.includes('"main.dart.js"')) {
+  if (!bootstrap.includes("main.dart.js")) {
     throw new Error("Flutter bootstrap no longer references main.dart.js by name.");
   }
   if (!indexHtml.includes('content="$DECIMAL_BUILD_ID"')) {
@@ -223,8 +298,8 @@ async function stampBuildId() {
     indexPath,
     indexHtml
       .replaceAll(
-        'src="flutter_bootstrap.js"',
-        `src="flutter_bootstrap.js?v=${buildId}"`,
+        "script.src = 'flutter_bootstrap.js'",
+        `script.src = 'flutter_bootstrap.js?v=${buildId}'`,
       )
       .replace('content="$DECIMAL_BUILD_ID"', `content="${buildId}"`)
       .replace(
@@ -235,7 +310,10 @@ async function stampBuildId() {
   );
   await writeFile(
     bootstrapPath,
-    bootstrap.replaceAll('"main.dart.js"', `"main.dart.js?v=${buildId}"`),
+    bootstrap.replaceAll(
+      /"main\.dart\.js(?:\?v=[0-9a-f]{12})?"/g,
+      `"main.dart.js?v=${buildId}"`,
+    ),
     "utf8",
   );
 
@@ -290,12 +368,56 @@ try {
   // 이전 릴리스에서 찍은 build id가 Flutter의 증분 빌드에 남으면 아래 검증이
   // 새 템플릿의 자리표시자로 오인하지 못한다. 생성물만 비우고 항상 깨끗이 빌드한다.
   await rm(buildOutput, { recursive: true, force: true });
+  // Removing only build/web can leave Flutter's incremental asset target
+  // believing fonts and other copied assets still exist. Clear that generated
+  // target cache with the output so every release bundle is self-contained.
+  await rm(resolve(flutterRoot, ".dart_tool", "flutter_build"), {
+    recursive: true,
+    force: true,
+  });
   await run(
     flutterCommand,
-    ["build", "web", "--release", "--base-href", "/play/"],
+    [
+      "build",
+      "web",
+      "--release",
+      "--base-href",
+      "/play/",
+      "--no-wasm-dry-run",
+      "--no-tree-shake-icons",
+    ],
     flutterRoot,
   );
-  await validateBuild();
+  // On Windows the Flutter tool can exit a fraction before the generated web
+  // shell becomes visible to a following filesystem read.
+  await new Promise((resolveWait) => setTimeout(resolveWait, 1000));
+  try {
+    await waitForBuildShell();
+    await normalizeBuildIdPlaceholders();
+    await validateBuild();
+  } catch (error) {
+    // 일부 Windows Flutter 환경은 깨끗한 첫 웹 빌드에서 정적 셸 파일 복사를
+    // 늦게 끝내는 경우가 있다. 생성된 증분 캐시로 한 번 더 빌드하면 정상화된다.
+    if (error?.code !== "ENOENT") throw error;
+    console.warn("Flutter web shell was incomplete; retrying once.");
+    await run(
+      flutterCommand,
+      [
+        "build",
+        "web",
+        "--release",
+        "--base-href",
+        "/play/",
+        "--no-wasm-dry-run",
+        "--no-tree-shake-icons",
+      ],
+      flutterRoot,
+    );
+    await new Promise((resolveWait) => setTimeout(resolveWait, 1000));
+    await waitForBuildShell();
+    await normalizeBuildIdPlaceholders();
+    await validateBuild();
+  }
   const buildId = await stampBuildId();
   await syncBuild();
   console.log(`Flutter Web build synced to public/play. build id ${buildId}`);

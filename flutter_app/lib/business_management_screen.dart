@@ -153,6 +153,7 @@ class _BusinessManagementScreenState extends State<BusinessManagementScreen> {
   }
 
   Future<void> _openListing(BusinessListing listing) async {
+    GameAudio.instance.playSfx(GameSfx.bookOpen);
     final locationIds = businessLocationCatalog
         .map((location) => location.id)
         .toList(growable: false);
@@ -240,6 +241,7 @@ class _BusinessManagementScreenState extends State<BusinessManagementScreen> {
     BusinessEventInstance event,
     BusinessEventChoice choice,
   ) async {
+    GameAudio.instance.playSfx(GameSfx.paperRustle);
     await _runAction(
       () => widget.onChooseEvent(event.id, choice.id),
       confirmationTitle: event.title,
