@@ -40,9 +40,12 @@ flutter:
     - assets/images/cinematic_soft_painted/decimal_nis_1999/backgrounds/
     - assets/images/cinematic_soft_painted/decimal_nis_1999/characters/
     - assets/images/minigames/
+    - assets/images/horse_racing/
     - assets/images/gameplay_map/
     - assets/images/gameplay_ambient/
     - assets/images/real_estate/
+    - assets/images/kbeauty_gifts/
+    - assets/images/casino/
     - assets/images/주식선생님/22_포즈1_주인공그림체_공통슬롯_투명.png
     - assets/images/주식선생님/23_포즈2_주인공그림체_공통슬롯_투명.png
     - assets/images/주식선생님/24_포즈3_주인공그림체_공통슬롯_투명.png

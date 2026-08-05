@@ -6,10 +6,10 @@ import 'package:millennium_capital/game/phone_messenger_state.dart';
 void main() {
   const engine = GameEngine();
 
-  test('new and migrated saves have nine distinct phone contacts in v26', () {
+  test('new and migrated saves have nine distinct phone contacts in v27', () {
     final state = engine.createNewGame('미래톡 테스트', worldSeed: 'phone-initial');
 
-    expect(GameState.schemaVersion, 26);
+    expect(GameState.schemaVersion, 27);
     expect(phoneMessengerContacts.length, 9);
     expect(state.phoneMessenger.messages.length, 9);
     expect(state.phoneMessenger.totalUnread, 9);
@@ -88,6 +88,51 @@ void main() {
     );
     expect(reopened.success, isTrue);
   });
+
+  test(
+    'each exchange takes thirty minutes and bedtime blocks new messages',
+    () {
+      final base = engine
+          .createNewGame('취침 시간 테스트', worldSeed: 'phone-bedtime')
+          .copyWith(marketMinute: phoneMessengerLastSendMinute);
+
+      final lastExchange = engine.sendPhoneMessage(
+        base,
+        contactId: 'han_sua',
+        text: '자기 전에 마지막으로 확인할게',
+      );
+
+      expect(lastExchange.success, isTrue);
+      expect(lastExchange.state.marketMinute, phoneMessengerBedtimeMinute);
+      expect(lastExchange.reply?.marketMinute, phoneMessengerBedtimeMinute);
+      expect(
+        lastExchange.state.phoneMessenger
+            .messagesFor('han_sua')
+            .last
+            .marketMinute,
+        phoneMessengerBedtimeMinute,
+      );
+
+      final sleeping = engine.sendPhoneMessage(
+        lastExchange.state,
+        contactId: 'kim_seoa',
+        text: '아직 안 자?',
+      );
+      expect(sleeping.success, isFalse);
+      expect(sleeping.message, contains('모두 잠들었습니다'));
+
+      final tooLateToFinish = engine.sendPhoneMessage(
+        base.copyWith(marketMinute: phoneMessengerLastSendMinute + 1),
+        contactId: 'kim_seoa',
+        text: '짧게 이야기할래?',
+      );
+      expect(tooLateToFinish.success, isFalse);
+      expect(tooLateToFinish.message, contains('30분'));
+
+      final restored = GameState.fromJson(lastExchange.state.toJson());
+      expect(restored.marketMinute, phoneMessengerBedtimeMinute);
+    },
+  );
 
   test('every direct message can raise or lower the detailed relationship', () {
     var state = engine.createNewGame('관계 톡 테스트', worldSeed: 'phone-relation');
@@ -249,6 +294,31 @@ void main() {
     expect(seoa.map((memory) => memory.id), contains('kim_seoa-0'));
     expect(seoa.map((memory) => memory.id), contains('kim_seoa-100'));
     expect(seoa.map((memory) => memory.id), contains('kim_seoa-529'));
+  });
+
+  test('visible chat retention keeps a year-scale tail for every contact', () {
+    PhoneMessage message(String contactId, int index) => PhoneMessage(
+      id: '$contactId-$index',
+      contactId: contactId,
+      senderId: index.isEven ? phoneMessengerPlayerId : contactId,
+      text: '대화 $index',
+      day: index ~/ 6 + 1,
+      marketMinute: 480 + index % 60,
+      read: true,
+    );
+
+    final retained = retainPhoneMessages([
+      for (var index = 0; index < 2400; index++) message('kim_seoa', index),
+      for (var index = 0; index < 40; index++) message('lee_jian', index),
+    ]);
+    final seoa = retained.where((item) => item.contactId == 'kim_seoa');
+    final jian = retained.where((item) => item.contactId == 'lee_jian');
+
+    expect(seoa, hasLength(phoneMessengerPerContactHistoryLimit));
+    expect(jian, hasLength(40));
+    expect(seoa.first.id, 'kim_seoa-100');
+    expect(seoa.last.id, 'kim_seoa-2399');
+    expect(jian.first.id, 'lee_jian-0');
   });
 
   test(

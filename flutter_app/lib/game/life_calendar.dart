@@ -18,6 +18,7 @@ class LifeCalendarEvent {
     required this.kind,
     required this.accentValue,
     this.imageAsset,
+    this.isAuthored = false,
   });
 
   final DateTime date;
@@ -27,6 +28,7 @@ class LifeCalendarEvent {
   final LifeCalendarEventKind kind;
   final int accentValue;
   final String? imageAsset;
+  final bool isAuthored;
 }
 
 class LifeCalendarEventDefinition {
@@ -58,6 +60,7 @@ class LifeCalendarEventDefinition {
       kind: kind,
       accentValue: accentValue,
       imageAsset: imageAsset,
+      isAuthored: true,
     );
   }
 }

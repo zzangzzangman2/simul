@@ -26,6 +26,8 @@ const gameOrderBookPulseFrameStride = 64;
 const gameOrderBookSparseFullDayTurnoverEok = 75.0;
 const gameOrderBookSeverelySparseFullDayTurnoverEok = 20.0;
 const gameOrderBookMinimumDisplayedQuantity = 10;
+const gameMaximumQuoteOutstandingRate = 0.05;
+const gameMaximumQuoteAbsoluteUnits = 100000000;
 const gameOrderBookStructuralConsumptionBreachRatio = 0.90;
 const gameOrderBookMinimumImbalanceSamplePrints = 3;
 const gameOrderBookMinimumImbalanceSampleTurnoverEok = 0.10;
@@ -37,7 +39,7 @@ const _gameOrderBookFlatBoundaryHoldMinutes = 6;
 const _gameOrderBookFullSessionMinutes = krxCloseMinute - krxOpenMinute;
 const _gameOrderBookFastMoveTicks = 3;
 const _gameOrderBookTrendActivationRate = 0.04;
-const gamePlayerMarketImpactDurationMinutes = 6;
+const gamePlayerMarketImpactDurationMinutes = 20;
 
 /// Returns deterministic microstructure slots assigned to one market minute.
 ///
@@ -227,12 +229,171 @@ double gameOrderBookExecutionStrength({
   return safeBuys / safeSells * 100;
 }
 
+/// KRX regular-session maximum for one stock order.
+///
+/// A displayed price level may aggregate several investors, so this is an
+/// account-order limit rather than a cap on an entire visible row.
+int gameMaximumQuoteQuantity(int? sharesOutstanding) {
+  if (sharesOutstanding == null || sharesOutstanding <= 0) {
+    return gameMaximumQuoteAbsoluteUnits;
+  }
+  return math.max(
+    1,
+    math.min(
+      gameMaximumQuoteAbsoluteUnits,
+      (sharesOutstanding * gameMaximumQuoteOutstandingRate).floor(),
+    ),
+  );
+}
+
+/// Conserved ownership and funding envelope used by the synthetic market.
+///
+/// External holders are split into tradable and locked buckets. Together with
+/// the player's position they always add back to [sharesOutstanding]. Bids use
+/// a separate cash-backed budget because demand is not itself share ownership.
+class GameMarketInventoryProfile {
+  const GameMarketInventoryProfile({
+    required this.hasIssuedShareLedger,
+    required this.sharesOutstanding,
+    required this.estimatedFreeFloatShares,
+    required this.playerOwnedShares,
+    required this.playerTenderAcquiredShares,
+    required this.playerOpenMarketShares,
+    required this.nonPlayerTradableShares,
+    required this.nonPlayerLockedShares,
+    required this.maximumQuoteQuantity,
+    required this.maximumAggregateLevelQuantity,
+    required this.visibleAskSupplyLimit,
+    required this.externalBidCash,
+    required this.visibleBidDemandLimit,
+  });
+
+  final bool hasIssuedShareLedger;
+  final int sharesOutstanding;
+  final int estimatedFreeFloatShares;
+  final int playerOwnedShares;
+  final int playerTenderAcquiredShares;
+  final int playerOpenMarketShares;
+  final int nonPlayerTradableShares;
+  final int nonPlayerLockedShares;
+  final int maximumQuoteQuantity;
+  final int maximumAggregateLevelQuantity;
+  final int visibleAskSupplyLimit;
+  final int externalBidCash;
+  final int visibleBidDemandLimit;
+
+  int get conservedShares =>
+      playerOwnedShares + nonPlayerTradableShares + nonPlayerLockedShares;
+
+  int get turnoverEligibleShares => math.min(
+    estimatedFreeFloatShares,
+    nonPlayerTradableShares + playerOwnedShares,
+  );
+}
+
+GameMarketInventoryProfile gameMarketInventoryProfile({
+  required String assetId,
+  required int day,
+  required double referencePrice,
+  String simulationSeed = '',
+  int? sharesOutstanding,
+  double playerOwnedUnits = 0,
+  double playerTenderAcquiredUnits = 0,
+}) {
+  final outstanding = math.max(0, sharesOutstanding ?? 0);
+  if (outstanding <= 0) {
+    return const GameMarketInventoryProfile(
+      hasIssuedShareLedger: false,
+      sharesOutstanding: 0,
+      estimatedFreeFloatShares: 0,
+      playerOwnedShares: 0,
+      playerTenderAcquiredShares: 0,
+      playerOpenMarketShares: 0,
+      nonPlayerTradableShares: 0,
+      nonPlayerLockedShares: 0,
+      maximumQuoteQuantity: gameMaximumQuoteAbsoluteUnits,
+      maximumAggregateLevelQuantity: 0x7fffffff,
+      visibleAskSupplyLimit: 0x7fffffff,
+      // Keep the legacy "effectively unlimited" fallback exact on Flutter Web.
+      externalBidCash: 0x1fffffffffffff,
+      visibleBidDemandLimit: 0x7fffffff,
+    );
+  }
+
+  final seededAssetId = simulationSeed.isEmpty
+      ? assetId
+      : '$simulationSeed:$assetId';
+  final identityUnit = _orderBookUnit(seededAssetId, 0, 28657);
+  final freeFloatRatio = (0.32 + math.pow(identityUnit, 0.82) * 0.56).clamp(
+    0.32,
+    0.88,
+  );
+  final estimatedFreeFloat = (outstanding * freeFloatRatio).round().clamp(
+    1,
+    outstanding,
+  );
+  final safeOwned = (playerOwnedUnits.isFinite ? playerOwnedUnits : 0)
+      .round()
+      .clamp(0, outstanding);
+  final tenderOwned =
+      (playerTenderAcquiredUnits.isFinite ? playerTenderAcquiredUnits : 0)
+          .round()
+          .clamp(0, safeOwned);
+  final openMarketOwned = safeOwned - tenderOwned;
+  final remainingShares = outstanding - safeOwned;
+  final remainingFloat = math.max(0, estimatedFreeFloat - openMarketOwned);
+  final nonPlayerTradable = math.min(remainingShares, remainingFloat);
+  final nonPlayerLocked = remainingShares - nonPlayerTradable;
+  final maximumQuote = gameMaximumQuoteQuantity(outstanding);
+  final maximumAggregateLevel = math.min(
+    outstanding,
+    math.max(maximumQuote, maximumQuote * 4),
+  );
+
+  final safeReference = referencePrice.isFinite && referencePrice > 0
+      ? referencePrice
+      : 1.0;
+  final demandUnit = _smoothOrderBookUnit(
+    seededAssetId,
+    day,
+    krxOpenMinute,
+    28711,
+    windowMinutes: 30,
+  );
+  final cashRatio = 0.012 + demandUnit * 0.108;
+  final rawBidCash = outstanding * safeReference * cashRatio;
+  final externalBidCash = !rawBidCash.isFinite || rawBidCash <= 0
+      ? 0
+      : rawBidCash.round();
+  final visibleBidDemand = math.max(
+    0,
+    (externalBidCash / safeReference).floor(),
+  );
+
+  return GameMarketInventoryProfile(
+    hasIssuedShareLedger: true,
+    sharesOutstanding: outstanding,
+    estimatedFreeFloatShares: estimatedFreeFloat,
+    playerOwnedShares: safeOwned,
+    playerTenderAcquiredShares: tenderOwned,
+    playerOpenMarketShares: openMarketOwned,
+    nonPlayerTradableShares: nonPlayerTradable,
+    nonPlayerLockedShares: nonPlayerLocked,
+    maximumQuoteQuantity: maximumQuote,
+    maximumAggregateLevelQuantity: maximumAggregateLevel,
+    visibleAskSupplyLimit: nonPlayerTradable,
+    externalBidCash: externalBidCash,
+    visibleBidDemandLimit: visibleBidDemand,
+  );
+}
+
 int gameEstimatedFullDayVolumeUnits({
   required String assetId,
   required int day,
   required double referencePrice,
   String simulationSeed = '',
   int? sharesOutstanding,
+  int? freeFloatShares,
 }) {
   if (assetId.isEmpty || !referencePrice.isFinite || referencePrice <= 0) {
     return 0;
@@ -248,7 +409,15 @@ int gameEstimatedFullDayVolumeUnits({
         ? 0.18 + _orderBookUnit(seededAssetId, day, 8117) * 0.24
         : 0.0;
     final turnoverRate = (baseTurnoverRate + eventPulse).clamp(0.008, 0.65);
-    return math.max(1, (sharesOutstanding * turnoverRate).round());
+    final estimated = math.max(1, (sharesOutstanding * turnoverRate).round());
+    if (freeFloatShares == null) return estimated;
+    final availableFloat = freeFloatShares.clamp(0, sharesOutstanding);
+    if (availableFloat <= 0) return 0;
+    // The same share may change hands repeatedly, so volume is not capped at
+    // one turn of free float. It is nevertheless finite and inventory-linked.
+    final velocity = 1.25 + activity * 2.75 + (eventPulse > 0 ? 0.75 : 0);
+    final floatCapacity = math.max(1, (availableFloat * velocity).round());
+    return math.min(estimated, floatCapacity);
   }
 
   // 이전 저장·테스트처럼 발행주식 수가 없는 호출도 결정적으로 동작한다.
@@ -264,6 +433,7 @@ double gameEstimatedFullDayTurnoverEok({
   required double referencePrice,
   String simulationSeed = '',
   int? sharesOutstanding,
+  int? freeFloatShares,
 }) {
   final units = gameEstimatedFullDayVolumeUnits(
     assetId: assetId,
@@ -271,6 +441,7 @@ double gameEstimatedFullDayTurnoverEok({
     referencePrice: referencePrice,
     simulationSeed: simulationSeed,
     sharesOutstanding: sharesOutstanding,
+    freeFloatShares: freeFloatShares,
   );
   return units <= 0 ? 0 : units * referencePrice / 100000000;
 }
@@ -345,6 +516,7 @@ int gameEstimatedContinuousMinuteVolumeUnits({
   required double referencePrice,
   String simulationSeed = '',
   int? sharesOutstanding,
+  int? freeFloatShares,
 }) {
   if (minute < krxOpenMinute ||
       minute >= krxContinuousEndMinute ||
@@ -359,6 +531,7 @@ int gameEstimatedContinuousMinuteVolumeUnits({
     referencePrice: referencePrice,
     simulationSeed: simulationSeed,
     sharesOutstanding: sharesOutstanding,
+    freeFloatShares: freeFloatShares,
   );
   if (fullDayVolume <= 0) return 0;
   if (minute == krxOpenMinute) {
@@ -445,6 +618,16 @@ class GameOrderBookSnapshot {
     this.syntheticTradePrints = const <GameOrderBookSyntheticTrade>[],
     this.sweepSteps = const <GameOrderBookSweepStep>[],
     this.syntheticTradeBudgetUsed = 0,
+    this.sharesOutstanding = 0,
+    this.estimatedFreeFloatShares = 0,
+    this.playerOwnedShares = 0,
+    this.playerTenderAcquiredShares = 0,
+    this.nonPlayerTradableShares = 0,
+    this.nonPlayerLockedShares = 0,
+    this.maximumQuoteQuantity = gameMaximumQuoteAbsoluteUnits,
+    this.externalBidCash = 0,
+    this.visibleAskSupplyLimit = 0,
+    this.visibleBidDemandLimit = 0,
   });
 
   final List<GameOrderBookLevel> asks;
@@ -514,6 +697,26 @@ class GameOrderBookSnapshot {
   /// budget. It is not part of the player's shared execution-capacity
   /// watermark and resets when the builder advances to a new minute.
   final int syntheticTradeBudgetUsed;
+
+  /// Conserved ownership and cash envelope used to create this snapshot.
+  /// Zero [sharesOutstanding] means a legacy/manual snapshot with no ledger.
+  final int sharesOutstanding;
+  final int estimatedFreeFloatShares;
+  final int playerOwnedShares;
+  final int playerTenderAcquiredShares;
+  final int nonPlayerTradableShares;
+  final int nonPlayerLockedShares;
+  final int maximumQuoteQuantity;
+  final int externalBidCash;
+  final int visibleAskSupplyLimit;
+  final int visibleBidDemandLimit;
+
+  bool get hasIssuedShareLedger => sharesOutstanding > 0;
+
+  bool get ownershipIsConserved =>
+      !hasIssuedShareLedger ||
+      playerOwnedShares + nonPlayerTradableShares + nonPlayerLockedShares ==
+          sharesOutstanding;
 
   /// Standing liquidity already visited during this asset's current session.
   ///
@@ -1028,6 +1231,7 @@ double gameEstimatedTurnoverEok({
   double previousClose = 0,
   String simulationSeed = '',
   int? sharesOutstanding,
+  int? freeFloatShares,
 }) {
   if (assetId.isEmpty || !unitPrice.isFinite || unitPrice <= 0) return 0;
   if (minute < krxOpenMinute) return 0;
@@ -1040,6 +1244,7 @@ double gameEstimatedTurnoverEok({
     referencePrice: stableReference,
     simulationSeed: simulationSeed,
     sharesOutstanding: sharesOutstanding,
+    freeFloatShares: freeFloatShares,
   );
   return fullDayTurnover * gameTurnoverProgressAtMinute(minute);
 }
@@ -1090,6 +1295,7 @@ int gameOrderBookExecutionCapacity({
   String simulationSeed = '',
   double? cumulativeTurnoverEok,
   int? sharesOutstanding,
+  int? freeFloatShares,
 }) {
   if (assetId.isEmpty ||
       !unitPrice.isFinite ||
@@ -1110,6 +1316,7 @@ int gameOrderBookExecutionCapacity({
         previousClose: previousClose,
         simulationSeed: simulationSeed,
         sharesOutstanding: sharesOutstanding,
+        freeFloatShares: freeFloatShares,
       );
   if (!turnoverEok.isFinite || turnoverEok <= 0) return 0;
   final elapsed = (minute - krxOpenMinute + 1)
@@ -1153,6 +1360,7 @@ int gameOrderBookExecutionCapacity({
     referencePrice: stableReference,
     simulationSeed: simulationSeed,
     sharesOutstanding: sharesOutstanding,
+    freeFloatShares: freeFloatShares,
   );
   if (actualMinuteVolume > 0) {
     cappedMaximum = math.min(cappedMaximum, actualMinuteVolume);
@@ -1529,6 +1737,35 @@ GameOrderBookLevel _gameOrderBookLevelWithQuantity(
   );
 }
 
+List<GameOrderBookLevel> _gameOrderBookLevelsWithinBudget({
+  required List<GameOrderBookLevel> levels,
+  required int totalBudget,
+  required int maximumAggregateLevelQuantity,
+}) {
+  var remaining = math.max(0, totalBudget);
+  final perLevelMaximum = math.max(0, maximumAggregateLevelQuantity);
+  return List<GameOrderBookLevel>.unmodifiable([
+    for (final level in levels)
+      (() {
+        final quantity = math.min(
+          math.min(level.quantity, perLevelMaximum),
+          remaining,
+        );
+        remaining -= quantity;
+        return _gameOrderBookLevelWithQuantity(
+          level,
+          quantity,
+          queueRecoveryTargetQuantity: math.min(
+            math.min(perLevelMaximum, totalBudget),
+            level.queueRecoveryTargetQuantity,
+          ),
+          isWall: quantity > 0 ? null : false,
+          isStructuralWall: quantity > 0 ? null : false,
+        );
+      })(),
+  ]);
+}
+
 int _gameOrderBookStructuralRecoveryCeiling(
   GameOrderBookLevel level, {
   required int baselineQuantity,
@@ -1821,6 +2058,16 @@ GameOrderBookSnapshot gameOrderBookSnapshotAfterSyntheticTrade({
             ),
           ]),
     syntheticTradeBudgetUsed: used + actualQuantity,
+    sharesOutstanding: snapshot.sharesOutstanding,
+    estimatedFreeFloatShares: snapshot.estimatedFreeFloatShares,
+    playerOwnedShares: snapshot.playerOwnedShares,
+    playerTenderAcquiredShares: snapshot.playerTenderAcquiredShares,
+    nonPlayerTradableShares: snapshot.nonPlayerTradableShares,
+    nonPlayerLockedShares: snapshot.nonPlayerLockedShares,
+    maximumQuoteQuantity: snapshot.maximumQuoteQuantity,
+    externalBidCash: snapshot.externalBidCash,
+    visibleAskSupplyLimit: snapshot.visibleAskSupplyLimit,
+    visibleBidDemandLimit: snapshot.visibleBidDemandLimit,
   );
 }
 
@@ -2398,6 +2645,16 @@ GameOrderBookSnapshot gameOrderBookSnapshotAfterConsumption({
     syntheticTradePrints: snapshot.syntheticTradePrints,
     sweepSteps: snapshot.sweepSteps,
     syntheticTradeBudgetUsed: snapshot.syntheticTradeBudgetUsed,
+    sharesOutstanding: snapshot.sharesOutstanding,
+    estimatedFreeFloatShares: snapshot.estimatedFreeFloatShares,
+    playerOwnedShares: snapshot.playerOwnedShares,
+    playerTenderAcquiredShares: snapshot.playerTenderAcquiredShares,
+    nonPlayerTradableShares: snapshot.nonPlayerTradableShares,
+    nonPlayerLockedShares: snapshot.nonPlayerLockedShares,
+    maximumQuoteQuantity: snapshot.maximumQuoteQuantity,
+    externalBidCash: snapshot.externalBidCash,
+    visibleAskSupplyLimit: snapshot.visibleAskSupplyLimit,
+    visibleBidDemandLimit: snapshot.visibleBidDemandLimit,
   );
 }
 
@@ -2428,6 +2685,8 @@ GameOrderBookSnapshot buildGameOrderBookSnapshot({
   int levelCount = gameOrderBookLevelCount,
   bool tradingDay = true,
   int? sharesOutstanding,
+  double playerOwnedUnits = 0,
+  double playerTenderAcquiredUnits = 0,
   bool isIpoFirstTradingDay = false,
   double? sessionLow,
   double? sessionHigh,
@@ -2468,6 +2727,15 @@ GameOrderBookSnapshot buildGameOrderBookSnapshot({
   final safePreviousClose = previousClose.isFinite && previousClose > 0
       ? previousClose
       : currentPrice;
+  final inventory = gameMarketInventoryProfile(
+    assetId: assetId,
+    day: day,
+    referencePrice: safePreviousClose,
+    simulationSeed: simulationSeed,
+    sharesOutstanding: sharesOutstanding,
+    playerOwnedUnits: playerOwnedUnits,
+    playerTenderAcquiredUnits: playerTenderAcquiredUnits,
+  );
   final range = marketDailyPriceRange(
     previousClose: safePreviousClose,
     date: date,
@@ -2556,6 +2824,9 @@ GameOrderBookSnapshot buildGameOrderBookSnapshot({
     referencePrice: safePreviousClose,
     simulationSeed: simulationSeed,
     sharesOutstanding: sharesOutstanding,
+    freeFloatShares: inventory.hasIssuedShareLedger
+        ? inventory.turnoverEligibleShares
+        : null,
   );
   final turnoverEok = gameEstimatedTurnoverEok(
     assetId: assetId,
@@ -2565,6 +2836,9 @@ GameOrderBookSnapshot buildGameOrderBookSnapshot({
     previousClose: safePreviousClose,
     simulationSeed: simulationSeed,
     sharesOutstanding: sharesOutstanding,
+    freeFloatShares: inventory.hasIssuedShareLedger
+        ? inventory.turnoverEligibleShares
+        : null,
   );
   final executionCapacity = tradable
       ? gameOrderBookExecutionCapacity(
@@ -2576,6 +2850,9 @@ GameOrderBookSnapshot buildGameOrderBookSnapshot({
           simulationSeed: simulationSeed,
           cumulativeTurnoverEok: turnoverEok,
           sharesOutstanding: sharesOutstanding,
+          freeFloatShares: inventory.hasIssuedShareLedger
+              ? inventory.turnoverEligibleShares
+              : null,
         )
       : 0;
   final baseDepth = _gameOrderBookStandingBaseDepth(
@@ -2584,6 +2861,9 @@ GameOrderBookSnapshot buildGameOrderBookSnapshot({
     minute: minute,
     referencePrice: safePreviousClose,
     sharesOutstanding: sharesOutstanding,
+    freeFloatShares: inventory.hasIssuedShareLedger
+        ? inventory.turnoverEligibleShares
+        : null,
   );
   final previousForRegime =
       carriedSourceLastTradePrice ??
@@ -2924,10 +3204,26 @@ GameOrderBookSnapshot buildGameOrderBookSnapshot({
   // tick with usable depth, so filtering here cannot turn 32,200...32,450 into
   // a false 32,150 / 32,500 spread. Production snapshots still expose only
   // executable rows instead of the old numeric `0주` bug.
-  final displayedAsks = asks
+  final budgetedAsks = inventory.hasIssuedShareLedger
+      ? _gameOrderBookLevelsWithinBudget(
+          levels: asks,
+          totalBudget: inventory.visibleAskSupplyLimit,
+          maximumAggregateLevelQuantity:
+              inventory.maximumAggregateLevelQuantity,
+        )
+      : List<GameOrderBookLevel>.unmodifiable(asks);
+  final budgetedBids = inventory.hasIssuedShareLedger
+      ? _gameOrderBookLevelsWithinBudget(
+          levels: bids,
+          totalBudget: inventory.visibleBidDemandLimit,
+          maximumAggregateLevelQuantity:
+              inventory.maximumAggregateLevelQuantity,
+        )
+      : List<GameOrderBookLevel>.unmodifiable(bids);
+  final displayedAsks = budgetedAsks
       .where((level) => level.quantity > 0)
       .toList(growable: false);
-  final displayedBids = bids
+  final displayedBids = budgetedBids
       .where((level) => level.quantity > 0)
       .toList(growable: false);
   final totalAsk = displayedAsks.fold<int>(
@@ -2948,7 +3244,7 @@ GameOrderBookSnapshot buildGameOrderBookSnapshot({
     if (carriesPreviousBook)
       for (final level in [...previousSnapshot.asks, ...previousSnapshot.bids])
         level.price: level,
-    for (final level in [...asks, ...bids]) level.price: level,
+    for (final level in [...budgetedAsks, ...budgetedBids]) level.price: level,
   };
   final sourceLastTradePrice = carriesPreviousBook && elapsedMinutes == 0
       ? previousSnapshot.sourceLastTradePrice ?? lastTradePrice
@@ -3055,6 +3351,16 @@ GameOrderBookSnapshot buildGameOrderBookSnapshot({
     syntheticTradeBudgetUsed: carriesSameMinuteBatch
         ? previousSnapshot.syntheticTradeBudgetUsed
         : minuteTransition?.consumedUnits ?? 0,
+    sharesOutstanding: inventory.sharesOutstanding,
+    estimatedFreeFloatShares: inventory.estimatedFreeFloatShares,
+    playerOwnedShares: inventory.playerOwnedShares,
+    playerTenderAcquiredShares: inventory.playerTenderAcquiredShares,
+    nonPlayerTradableShares: inventory.nonPlayerTradableShares,
+    nonPlayerLockedShares: inventory.nonPlayerLockedShares,
+    maximumQuoteQuantity: inventory.maximumQuoteQuantity,
+    externalBidCash: inventory.externalBidCash,
+    visibleAskSupplyLimit: inventory.visibleAskSupplyLimit,
+    visibleBidDemandLimit: inventory.visibleBidDemandLimit,
   );
 }
 
@@ -3234,11 +3540,9 @@ _gameOrderBookWallBreath({
     marketMinute: minute,
     liquidityPulse: liquidityPulse,
   );
-  final minuteOffset = math.max(0, minute - krxOpenMinute);
-  // Every fresh quote pulse may alter one dominant visible wall. The selected
-  // side alternates by logical slot, so busy books react several times within
-  // one market minute while one-pulse books still update both sides within two
-  // minutes. This flow is independent from the last-trade/boundary cursor.
+  // Every fresh quote pulse may alter one dominant visible wall. Side selection
+  // follows persistent institutional/pension/micro flow clusters; it must not
+  // alternate mechanically between bid and ask.
   if (pulseSlot <= 0) return null;
 
   final healthyLevels =
@@ -3255,48 +3559,6 @@ _gameOrderBookWallBreath({
           .toList(growable: false);
   if (healthyLevels.isEmpty) return null;
 
-  final previousSide = previousSnapshot.lastBreathingWallSide;
-  final GameOrderBookSide preferredSide;
-  if (previousSide != null) {
-    preferredSide = previousSide == GameOrderBookSide.ask
-        ? GameOrderBookSide.bid
-        : GameOrderBookSide.ask;
-  } else {
-    final initialCycle =
-        minuteOffset +
-        pulseSlot +
-        (_orderBookMixedHash(seededAssetId, day, 15401) & 1);
-    preferredSide = initialCycle.isEven
-        ? GameOrderBookSide.ask
-        : GameOrderBookSide.bid;
-  }
-  final preferredLevels = healthyLevels
-      .where((level) => level.side == preferredSide)
-      .toList(growable: false);
-  final sideCandidates = preferredLevels.isEmpty
-      ? healthyLevels
-      : preferredLevels;
-  final flaggedWalls = sideCandidates
-      .where((level) => level.isWall)
-      .toList(growable: false);
-  final candidates = flaggedWalls.isNotEmpty ? flaggedWalls : sideCandidates;
-  final stickyPrice = preferredSide == GameOrderBookSide.ask
-      ? previousSnapshot.breathingAskWallPrice
-      : previousSnapshot.breathingBidWallPrice;
-  GameOrderBookLevel? stickyWall;
-  if (stickyPrice != null) {
-    for (final candidate in candidates) {
-      if ((candidate.price - stickyPrice).abs() < 0.000001) {
-        stickyWall = candidate;
-        break;
-      }
-    }
-  }
-  final selected =
-      stickyWall ??
-      candidates.reduce(
-        (largest, level) => level.quantity > largest.quantity ? level : largest,
-      );
   final pulseHash = _orderBookMixedHash(
     seededAssetId,
     day,
@@ -3334,9 +3596,56 @@ _gameOrderBookWallBreath({
       (institutionalFlow * 0.55 + pensionFlow * 0.25 + microFlow * 0.20)
           .clamp(-1.0, 1.0)
           .toDouble();
-  final addsLiquidity = selected.side == GameOrderBookSide.bid
-      ? netFlow >= 0
-      : netFlow < 0;
+  final selectionDraw = _orderBookUnit(
+    seededAssetId,
+    day,
+    liquidityPulse * 28603 + 19751,
+  );
+  final neutralFlow = netFlow.abs() < 0.12;
+  final pressureSide = netFlow >= 0
+      ? GameOrderBookSide.bid
+      : GameOrderBookSide.ask;
+  final selectsPressureSide = neutralFlow
+      ? selectionDraw < 0.5
+      : selectionDraw < 0.68 + netFlow.abs() * 0.14;
+  final preferredSide = neutralFlow
+      ? (selectionDraw < 0.5 ? GameOrderBookSide.ask : GameOrderBookSide.bid)
+      : selectsPressureSide
+      ? pressureSide
+      : pressureSide == GameOrderBookSide.bid
+      ? GameOrderBookSide.ask
+      : GameOrderBookSide.bid;
+  final preferredLevels = healthyLevels
+      .where((level) => level.side == preferredSide)
+      .toList(growable: false);
+  final sideCandidates = preferredLevels.isEmpty
+      ? healthyLevels
+      : preferredLevels;
+  final flaggedWalls = sideCandidates
+      .where((level) => level.isWall)
+      .toList(growable: false);
+  final candidates = flaggedWalls.isNotEmpty ? flaggedWalls : sideCandidates;
+  final stickyPrice = preferredSide == GameOrderBookSide.ask
+      ? previousSnapshot.breathingAskWallPrice
+      : previousSnapshot.breathingBidWallPrice;
+  GameOrderBookLevel? stickyWall;
+  if (stickyPrice != null) {
+    for (final candidate in candidates) {
+      if ((candidate.price - stickyPrice).abs() < 0.000001) {
+        stickyWall = candidate;
+        break;
+      }
+    }
+  }
+  final selected =
+      stickyWall ??
+      candidates.reduce(
+        (largest, level) => level.quantity > largest.quantity ? level : largest,
+      );
+  final addsLiquidity = neutralFlow
+      ? _orderBookUnit(seededAssetId, day, liquidityPulse * 32771 + 19937) >=
+            0.5
+      : selectsPressureSide;
   final flowMagnitude = 0.45 + netFlow.abs() * 0.55;
   final amplitude = fastMarket ? 0.020 : 0.012;
   return (
@@ -3464,6 +3773,7 @@ class _GameOrderBookCarryContext {
     final isLiveWall =
         previous.isWall && previous.quantity > 0 && !isStructuralVacuum;
     final isBreathingWall =
+        !isRecoveringOrdinaryQueue &&
         previous.quantity > 0 &&
         !isStructuralVacuum &&
         activeWallBreath != null &&
@@ -4082,12 +4392,14 @@ int _gameOrderBookStandingBaseDepth({
   required int minute,
   required double referencePrice,
   int? sharesOutstanding,
+  int? freeFloatShares,
 }) {
   final fullDayUnits = gameEstimatedFullDayVolumeUnits(
     assetId: assetId,
     day: day,
     referencePrice: referencePrice,
     sharesOutstanding: sharesOutstanding,
+    freeFloatShares: freeFloatShares,
   );
   if (fullDayUnits <= 0) return 20;
 

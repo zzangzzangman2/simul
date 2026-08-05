@@ -34,6 +34,7 @@ const relationshipMinAffection = 1;
 const relationshipMaxAffection = 100;
 const relationshipDimensionMin = 1;
 const relationshipDimensionMax = 100;
+const relationshipMemoryHistoryLimit = 400;
 
 bool relationshipOutingAvailableOn(DateTime date) =>
     date.weekday == DateTime.saturday || date.weekday == DateTime.sunday;
@@ -842,10 +843,74 @@ RelationshipSceneDefinition relationshipSceneFor({
   required CohortGirlProfile profile,
   required RelationshipActivity activity,
   required int day,
+  int interactionCount = 0,
+  int affection = relationshipMinAffection,
 }) {
-  if (activity == RelationshipActivity.date) return profile.dateScene;
-  final index = (day - 1).abs() % profile.conversationScenes.length;
-  return profile.conversationScenes[index];
+  final scenes = activity == RelationshipActivity.date
+      ? <RelationshipSceneDefinition>[profile.dateScene]
+      : profile.conversationScenes;
+  final safeCount = interactionCount.clamp(0, 0x7fffffff);
+  final base = scenes[safeCount % scenes.length];
+  final variation = safeCount ~/ scenes.length;
+  if (variation == 0) return base;
+  final date = DateTime(
+    2000,
+    1,
+    1,
+  ).add(Duration(days: (day - 1).clamp(0, 0x7fffffff)));
+  final season = switch (date.month) {
+    12 || 1 || 2 => '겨울',
+    3 || 4 || 5 => '봄',
+    6 || 7 || 8 => '여름',
+    _ => '가을',
+  };
+  final themeIndex = variation % 12;
+  final suffix = switch (themeIndex) {
+    0 => '지난 약속의 결과',
+    1 => '손실 뒤의 기준',
+    2 => '뜻밖의 수익 이후',
+    3 => '말하지 못한 걱정',
+    4 => '서로 다른 계산',
+    5 => '생활과 투자의 경계',
+    6 => '다음 계절의 계획',
+    7 => '친구들 사이의 소문',
+    8 => '쉬어 가는 선택',
+    9 => '지켜야 할 선',
+    10 => '함께 남긴 기록',
+    _ => '새로 생긴 목표',
+  };
+  final themeContext = switch (themeIndex) {
+    0 => '지난번에 나눈 약속이 실제 생활에서 어떻게 달라졌는지부터 확인한다.',
+    1 => '손실을 숨기지 않고, 다음에는 무엇을 먼저 지킬지 차분히 묻는다.',
+    2 => '수익이 난 기쁨보다 그 돈으로 무엇을 할지 서로의 생각을 듣는다.',
+    3 => '계산표 뒤에 미뤄 둔 걱정을 꺼내도 괜찮은 분위기를 만든다.',
+    4 => '같은 숫자를 보고도 달랐던 판단의 이유를 끊지 않고 들어 본다.',
+    5 => '돈을 버는 일과 오늘을 사는 일 사이에서 놓친 것이 없는지 돌아본다.',
+    6 => '다음 계절이 오기 전에 함께 해 보고 싶은 작은 계획을 하나 정한다.',
+    7 => '친구들 사이에 돈 이야기가 퍼졌을 때 서로를 어떻게 지킬지 의논한다.',
+    8 => '아무것도 하지 않는 하루도 필요한지 솔직한 상태부터 나눈다.',
+    9 => '가까워졌어도 넘지 말아야 할 선과 지켜 줬으면 하는 태도를 확인한다.',
+    10 => '함께 견딘 선택 가운데 오래 기억하고 싶은 순간을 하나씩 고른다.',
+    _ => '예전에는 없던 목표를 말하고, 둘의 속도가 달라도 함께 갈 방법을 찾는다.',
+  };
+  final stage = relationshipStageFor(affection);
+  final stageContext = switch (stage) {
+    RelationshipStage.newClassmate => '아직 서로를 단정하지 않고 답을 기다린다.',
+    RelationshipStage.friendly => '조금 편해진 만큼 농담 뒤의 진심도 놓치지 않는다.',
+    RelationshipStage.interested => '서로를 의식하지만 결론을 서두르지 않는다.',
+    RelationshipStage.close => '익숙함에 기대지 않고 달라진 마음을 다시 묻는다.',
+    RelationshipStage.special => '중요한 사람에게만 말할 수 있는 책임까지 나눈다.',
+    RelationshipStage.trusted => '오래 쌓인 신뢰를 당연하게 여기지 않고 현재의 마음을 확인한다.',
+  };
+  final elapsedYear = date.year - 1999;
+  return RelationshipSceneDefinition(
+    id: '${base.id}_${date.year}_${date.month}_${date.day}_n$safeCount',
+    activity: base.activity,
+    location: base.location,
+    title: '${base.title} · $elapsedYear년 차 $season · $suffix',
+    prompt: '$themeContext $stageContext ${base.prompt}',
+    choices: base.choices,
+  );
 }
 
 class GirlRelationshipProgress {
@@ -1089,9 +1154,9 @@ class RelationshipState {
       girls: parsedGirls,
       lastEveningEventDay: ((json['lastEveningEventDay'] as num?)?.toInt() ?? 0)
           .clamp(0, 0x7fffffff),
-      memories: memories.length <= 64
+      memories: memories.length <= relationshipMemoryHistoryLimit
           ? memories
-          : memories.sublist(memories.length - 64),
+          : memories.sublist(memories.length - relationshipMemoryHistoryLimit),
     );
   }
 }

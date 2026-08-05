@@ -3,6 +3,7 @@ import 'market_clock.dart';
 
 const weekdayActivityLogFlag = 'weekdayActivityLog';
 const weekdayActivityCounterMetric = 'weekday_evening_actions';
+const weekdayActivityHistoryLimit = 260;
 const facilityStoryGatesEnabledFlag = 'facilityStoryGatesEnabled';
 const bankAccessUnlockedFlag = 'bankAccessUnlocked';
 const realEstateAccessUnlockedFlag = 'realEstateAccessUnlocked';
@@ -18,6 +19,30 @@ bool realEstateAccessUnlocked(GameState state) =>
     !facilityStoryGatesEnabled(state) ||
     state.story.flagBool(realEstateAccessUnlockedFlag);
 
+bool businessMarketAccessUnlocked(GameState state) =>
+    !facilityStoryGatesEnabled(state) ||
+    state.story.flagBool('businessMarketAccessUnlocked');
+
+bool businessOperationsUnlocked(GameState state) =>
+    !facilityStoryGatesEnabled(state) ||
+    state.story.flagBool('businessOperationsUnlocked');
+
+bool realEstateTransactionsUnlocked(GameState state) =>
+    !facilityStoryGatesEnabled(state) ||
+    state.story.flagBool('realEstateTransactionsUnlocked');
+
+bool realEstateOperationsUnlocked(GameState state) =>
+    !facilityStoryGatesEnabled(state) ||
+    state.story.flagBool('realEstateOperationsUnlocked');
+
+bool propertyBusinessLinkUnlocked(GameState state) =>
+    !facilityStoryGatesEnabled(state) ||
+    state.story.flagBool('propertyBusinessLinkUnlocked');
+
+bool advancedCorporateActionsUnlocked(GameState state) =>
+    !facilityStoryGatesEnabled(state) ||
+    state.story.flagBool('advancedCorporateActionsUnlocked');
+
 class WeekdayActivityDefinition {
   const WeekdayActivityDefinition({
     required this.id,
@@ -31,6 +56,11 @@ class WeekdayActivityDefinition {
 }
 
 const weekdayActivities = <WeekdayActivityDefinition>[
+  WeekdayActivityDefinition(
+    id: 'casino',
+    title: '카지노 LIVE 이용',
+    description: '요원 전용 중계에서 테이블을 고르고 저녁 시간을 사용합니다.',
+  ),
   WeekdayActivityDefinition(
     id: 'real_estate',
     title: '부동산 시장 확인',
@@ -186,28 +216,17 @@ GameDayGuidance gameDayGuidanceForState(GameState state) {
       actionLabel: '주식 PC 열기',
     );
   }
-  if (state.marketMinute < marketDayEndMinute && !weekdayEveningUsed(state)) {
-    if (!bankAccessUnlocked(state)) {
-      return const GameDayGuidance(
-        phaseLabel: '시설 잠김 · 담당자 소개 필요',
-        title: '기록 보관실의 은행 담당자 소개를 먼저 확인하세요',
-        body: '윤하린 은행원을 소개받은 뒤부터 저녁 은행 업무가 열립니다.',
-        actionLabel: '해금 이야기 확인',
-      );
-    }
-    if (!realEstateAccessUnlocked(state)) {
-      return const GameDayGuidance(
-        phaseLabel: '장 마감 후 · 첫 은행 상담',
-        title: '윤하린 은행원에게 생활금융 상담을 받으세요',
-        body: '첫 은행 저녁을 마치면 다음 날 서하늘 공인중개사 소개장이 도착합니다.',
-        actionLabel: '은행 업무 선택',
-      );
-    }
-    return const GameDayGuidance(
-      phaseLabel: '장 마감 후 · 저녁 업무',
-      title: '부동산 또는 은행 중 하나를 확인하세요',
-      body: '선택한 화면에 들어가면 오늘 저녁을 사용하고 20:00이 됩니다.',
-      actionLabel: '저녁 업무 선택',
+  if (state.marketMinute < marketDayEndMinute) {
+    final casinoLive =
+        !state.currentDate.isBefore(DateTime(2010, 1, 1)) &&
+        state.story.ageOn(state.currentDate) >= 20;
+    return GameDayGuidance(
+      phaseLabel: '15:00 · 장 마감 후',
+      title: '오늘 손익을 확인하고 오후 일정을 고르세요',
+      body: casinoLive
+          ? '종가와 보유 현황을 확인한 뒤 작업실 PC의 카지노 LIVE나 저녁 일정을 선택합니다.'
+          : '종가와 보유 현황을 확인한 뒤 동기들과 보낼 시간을 선택합니다.',
+      actionLabel: '장 마감 결과 보기',
     );
   }
   return const GameDayGuidance(

@@ -164,6 +164,12 @@ void main() {
 
       expect(find.text('한수아가 먼저 말을 꺼냈다'), findsOneWidget);
       expect(find.textContaining('먼저 말한 게 계속 틀렸어'), findsOneWidget);
+      expect(
+        find.byKey(const Key('cohort-withdrawal-deadline')),
+        findsOneWidget,
+      );
+      expect(find.textContaining('오늘 답하지 않아도 됩니다'), findsOneWidget);
+      expect(find.byKey(const Key('cohort-withdrawal-defer')), findsOneWidget);
       // 응답 셋이 모두 있어야 선택에 의미가 있다.
       for (final response in CohortWithdrawalResponse.values) {
         expect(
@@ -249,6 +255,23 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+
+    crisis = crisis.copyWith(
+      day: activeCohortWithdrawalCrisis(crisis)!.deadlineDay,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CohortWithdrawalCrisisScreen(
+          state: crisis,
+          onRespond: (response) async =>
+              respondToCohortWithdrawal(crisis, response),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.textContaining('오늘은 답을 정해야 합니다'), findsOneWidget);
+    expect(find.byKey(const Key('cohort-withdrawal-defer')), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

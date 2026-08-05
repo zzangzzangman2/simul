@@ -18,11 +18,6 @@
 - `bg_gameplay_kitchen_tier1_2000_portrait_cartoon_v1.png`
 - `bg_gameplay_kitchen_tier2_2000_portrait_cartoon_v1.png`
 
-## 잼민 라이더
-
-- `bg_minigame_rider_venue_2000_portrait_cartoon_v1.png`
-- `bg_minigame_rider_course_2000_portrait_cartoon_v1.png`
-
 미니게임 투명 소품은 `../minigames/`, 생활 애니메이션 배우는
 `../gameplay_ambient/`에 둔다. 신규 배경은 2000년 한국의 생활감, 모바일 세로
 구도, 실제 상호작용 물건 위치를 유지하고 사람·문자·로고·실사·3D를 넣지 않는다.

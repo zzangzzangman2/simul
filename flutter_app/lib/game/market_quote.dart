@@ -448,6 +448,103 @@ List<double> generatedMarketDayPathForAsset({
   );
 }
 
+/// Applies the player's real fills to the same deterministic path used by UI,
+/// pending-order replay, and headless simulations.
+List<double> marketSessionPathWithPlayerImpact({
+  required GameState state,
+  required FictionalMarketAsset asset,
+  required List<double> sourcePath,
+  required double previousClose,
+  Iterable<LedgerEntry>? entries,
+}) {
+  if (sourcePath.isEmpty || previousClose <= 0) {
+    return List<double>.from(sourcePath);
+  }
+  final impacted = List<double>.from(sourcePath);
+  final range = marketDailyPriceRange(
+    previousClose: previousClose,
+    date: state.currentDate,
+    market: asset.market,
+    isIpoFirstTradingDay: asset.isIpoFirstTradingDay(state.currentDate),
+  );
+  final sharesOutstanding = asset.sharesOutstandingAtOrBefore(
+    state.currentDate,
+  );
+  final playerOwnedUnits = state.positions
+      .where((position) => position.assetId == asset.id)
+      .fold<double>(0, (sum, position) => sum + position.units);
+  final tenderAcquiredUnits =
+      state.shareholderGovernance.companyById(asset.id)?.tenderAcquiredShares ??
+      0;
+  final inventory = gameMarketInventoryProfile(
+    assetId: asset.id,
+    day: marketLiquidityDayKey(state.currentDate),
+    referencePrice: previousClose,
+    simulationSeed: state.simulationSeed,
+    sharesOutstanding: sharesOutstanding,
+    playerOwnedUnits: playerOwnedUnits,
+    playerTenderAcquiredUnits: tenderAcquiredUnits,
+  );
+  for (final entry in entries ?? state.ledger) {
+    final isBuy = entry.tradeSide == 'buy';
+    final isSell = entry.tradeSide == 'sell';
+    if (entry.day != state.day ||
+        entry.assetId != asset.id ||
+        (!isBuy && !isSell) ||
+        !entry.tradeQuantity.isFinite ||
+        entry.tradeQuantity <= 0 ||
+        entry.marketMinute < krxOpenMinute ||
+        entry.marketMinute >= krxContinuousEndMinute) {
+      continue;
+    }
+    final referencePrice =
+        entry.tradeUnitPrice.isFinite && entry.tradeUnitPrice > 0
+        ? entry.tradeUnitPrice
+        : previousClose;
+    final executionCapacity = gameOrderBookExecutionCapacity(
+      assetId: asset.id,
+      day: marketLiquidityDayKey(state.currentDate),
+      minute: entry.marketMinute,
+      unitPrice: referencePrice,
+      previousClose: previousClose,
+      simulationSeed: state.simulationSeed,
+      sharesOutstanding: sharesOutstanding,
+      freeFloatShares: inventory.hasIssuedShareLedger
+          ? inventory.turnoverEligibleShares
+          : null,
+    );
+    final initialTicks = gamePlayerMarketImpactInitialTicks(
+      filledQuantity: entry.tradeQuantity,
+      executionCapacity: executionCapacity,
+    );
+    if (initialTicks <= 0) continue;
+    for (
+      var ageMinutes = 1;
+      ageMinutes <= gamePlayerMarketImpactDurationMinutes;
+      ageMinutes += 1
+    ) {
+      final affectedMinute = entry.marketMinute + ageMinutes;
+      if (affectedMinute >= krxContinuousEndMinute) break;
+      final pathIndex = marketTickForMinute(affectedMinute);
+      if (pathIndex < 0 || pathIndex >= impacted.length) continue;
+      final decayedTicks = gamePlayerMarketImpactTicksAtAge(
+        initialTicks: initialTicks,
+        ageMinutes: ageMinutes,
+      );
+      final shifted = gameOrderBookPriceAfterTickImpact(
+        basePrice: impacted[pathIndex],
+        signedTicks: isBuy ? decayedTicks : -decayedTicks,
+        market: asset.market,
+      );
+      impacted[pathIndex] = marketSnapPrice(
+        shifted.clamp(range.lower, range.upper).toDouble(),
+        market: asset.market,
+      );
+    }
+  }
+  return impacted;
+}
+
 class MarketPreviousSessionSeries {
   const MarketPreviousSessionSeries({
     required this.date,
@@ -573,15 +670,46 @@ MarketTradeQuote? resolveMarketTradeQuote(
   if (quote == null) return null;
   final previousClose = asset.unadjustedReferenceCloseFor(quote.date);
   final isTradingDay = quote.isExactDate;
-  final unitPrice = isTradingDay
-      ? generatedMarketDayPathForAsset(
-          asset: asset,
-          simulationSeed: state.simulationSeed,
-          date: state.currentDate,
+  late final double unitPrice;
+  if (isTradingDay) {
+    final currentMultiplier = state.shareholderGovernance.priceMultiplierFor(
+      assetId,
+      state.day,
+    );
+    final previousMultiplier = state.shareholderGovernance.priceMultiplierFor(
+      assetId,
+      state.day - 1,
+    );
+    final rawPath = generatedMarketDayPathForAsset(
+      asset: asset,
+      simulationSeed: state.simulationSeed,
+      date: state.currentDate,
+      previousClose: previousClose,
+      officialClose: quote.close,
+    );
+    final managementAdjustedPath = rawPath
+        .map((price) => price * currentMultiplier)
+        .toList(growable: false);
+    final marketReferenceClose =
+        asset.marketReferenceCloseOn(
+          state.currentDate,
           previousClose: previousClose,
-          officialClose: quote.close,
-        )[marketTickForMinute(state.marketMinute)]
-      : quote.close;
+        ) *
+        previousMultiplier;
+    final impactedPath = marketSessionPathWithPlayerImpact(
+      state: state,
+      asset: asset,
+      sourcePath: managementAdjustedPath,
+      previousClose: marketReferenceClose,
+    );
+    unitPrice = impactedPath[marketTickForMinute(state.marketMinute)];
+  } else {
+    unitPrice = state.shareholderGovernance.adjustedPrice(
+      assetId,
+      state.day,
+      quote.close,
+    );
+  }
   return MarketTradeQuote(
     asset: asset,
     quoteDate: state.currentDate.toIso8601String().split('T').first,

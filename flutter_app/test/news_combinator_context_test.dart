@@ -8,14 +8,9 @@ void main() {
 
   test('기사 조합 입력에는 플레이어 행동과 미래 사건 정보가 없다', () async {
     final initial = engine.createNewGame('민수의 투자연구소');
-    final resolved = engine.resolveDecision(
-      initial,
-      'first-research-note',
-      'research_products',
-    );
-    final newspaper = await buildDailyMarketNewspaper(resolved);
+    final newspaper = await buildDailyMarketNewspaper(initial);
     final input = newsCombinatorInputForState(
-      resolved,
+      initial,
       newspaper.brief,
       newspaper: newspaper,
     );
@@ -30,6 +25,5 @@ void main() {
     expect(snapshot, isNot(contains('futureEvents')));
     expect(snapshot, isNot(contains('futurePrices')));
     expect(values, isNot(contains('민수의 투자연구소')));
-    expect(values, isNot(contains('research_products')));
   });
 }

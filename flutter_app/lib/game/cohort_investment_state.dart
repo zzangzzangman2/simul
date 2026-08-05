@@ -6,7 +6,9 @@ const cohortLoanInterestRateBps = 1200;
 const cohortPlayerRecoveryCashThreshold = 10000;
 const cohortPlayerBorrowingLimit = 30000;
 const cohortNpcEmergencyReserve = 10000;
-const cohortInvestmentHistoryLimit = 64;
+// Keep a complete leap-year trading tail so the year-end archive never loses
+// the first sessions of a 261/262-session year before it is summarized.
+const cohortInvestmentHistoryLimit = 270;
 
 enum CohortLoanDirection { playerLends, playerBorrows }
 

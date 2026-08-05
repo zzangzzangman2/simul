@@ -16,6 +16,7 @@ import 'game/business_districts.dart';
 import 'game/business_engine.dart';
 import 'game/business_simulation.dart';
 import 'game/business_state.dart';
+import 'game/casino_state.dart';
 import 'cohort_event_screens.dart';
 import 'game/character_profile.dart';
 import 'game/cohort_standing_events.dart';
@@ -24,8 +25,12 @@ import 'game/cohort_investment_state.dart';
 import 'game/game_engine.dart';
 import 'game/game_persistence.dart';
 import 'game/game_state.dart';
+import 'game/shareholder_governance.dart';
+import 'game/shareholder_governance_engine.dart';
+import 'game/listed_company_management.dart';
 import 'game/life_calendar.dart';
 import 'game/home_improvement_state.dart';
+import 'game/horse_racing.dart';
 import 'game/investor_flow.dart';
 
 import 'game/market_clock.dart';
@@ -35,7 +40,7 @@ import 'game/market_tick.dart';
 import 'game/market_news.dart';
 import 'game/order_book.dart';
 import 'game/market_quote.dart';
-import 'game/mission_progression.dart';
+import 'game/monthly_unlock_chapter.dart';
 import 'game/organization_state.dart';
 import 'game/real_estate_analysis.dart';
 import 'game/real_estate_financing.dart';
@@ -46,15 +51,16 @@ import 'game/phone_ability_hint.dart';
 import 'game/phone_ai_service.dart';
 import 'game/phone_dialogue_composer.dart';
 import 'game/phone_messenger_state.dart';
+import 'game/progress_review.dart';
 import 'game/real_estate_market.dart';
 import 'game/relationship_state.dart';
 import 'game/seed_money_content.dart';
-import 'game/star_shop.dart';
 import 'game/story_state.dart';
 import 'game/world_bootstrapper.dart';
 import 'game/world_economy.dart';
 import 'game/weekend_activity.dart';
 import 'game/weekday_activity.dart';
+import 'game/weekly_portfolio_review.dart';
 export 'game/world_bootstrapper.dart'
     show CampaignWorldPreparer, WorldLoadProgress, WorldLoadProgressCallback;
 
@@ -64,18 +70,22 @@ part 'apartment_ambient_layer.dart';
 part 'home_improvement_screen.dart';
 part 'business_management_screen.dart';
 part 'bank_screen.dart';
+part 'casino_screen.dart';
+part 'casino_table_animation.dart';
 part 'rider_mini_game.dart';
+part 'horse_racing_mini_game.dart';
 part 'save_menu_screens.dart';
 part 'asset_spending_screen.dart';
 part 'room_screens.dart';
 part 'seed_money_screen.dart';
 part 'stock_market_screen.dart';
+part 'listed_governance_screen.dart';
+part 'shareholder_company_hub_screen.dart';
 part 'stock_market_order_workspace.dart';
 part 'stock_market_order_book.dart';
 part 'stock_market_tutorial.dart';
 part 'guided_tutorial_controls.dart';
 part 'stock_market_corporate_actions.dart';
-part 'star_shop_screen.dart';
 part 'dialogue/canonical_dialogue_data.dart';
 part 'visual_novel_onboarding.dart';
 part 'campaign_scenes.dart';
@@ -119,6 +129,9 @@ void main() {
           int.tryParse(Uri.base.queryParameters['hubPreviewAffection'] ?? '') ??
           65,
       dialoguePreviewMode: Uri.base.queryParameters['dialoguePreview'] == '1',
+      newspaperPreviewMode: Uri.base.queryParameters['newspaperPreview'] == '1',
+      horseRacePreviewMode: Uri.base.queryParameters['horseRacePreview'] == '1',
+      casinoTestMode: Uri.base.queryParameters['casinoTest'] == '1',
     ),
   );
 }
@@ -147,6 +160,9 @@ class MillenniumCapitalApp extends StatefulWidget {
     this.hubPreviewDay = 4,
     this.hubPreviewAffection = 65,
     this.dialoguePreviewMode = false,
+    this.newspaperPreviewMode = false,
+    this.horseRacePreviewMode = false,
+    this.casinoTestMode = false,
     this.dialogueOverrideJson,
   });
 
@@ -158,6 +174,9 @@ class MillenniumCapitalApp extends StatefulWidget {
   final int hubPreviewDay;
   final int hubPreviewAffection;
   final bool dialoguePreviewMode;
+  final bool newspaperPreviewMode;
+  final bool horseRacePreviewMode;
+  final bool casinoTestMode;
   final String? dialogueOverrideJson;
 
   @override
@@ -166,6 +185,7 @@ class MillenniumCapitalApp extends StatefulWidget {
 
 class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
   static const _engine = GameEngine();
+  static const _shareholderGovernanceEngine = ShareholderGovernanceEngine();
   static const _businessEngine = LocalBusinessEngine();
   final _phoneAiService = PhoneAiService();
   final _scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
@@ -199,6 +219,22 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
   void initState() {
     super.initState();
     _persistence = widget.persistence ?? GamePersistence();
+    if (widget.casinoTestMode) {
+      final testState = _engine.createNewGame(
+        '카지노 테스트',
+        initialCash: 100000,
+        worldSeed: 'casino-live-test-v1',
+      );
+      _state = testState.copyWith(
+        day: DateTime(2010, 1, 4).difference(DateTime(2000, 1, 1)).inDays + 1,
+        marketMinute: krxCloseMinute,
+        brokerageCash: 0,
+        decisions: const [],
+      );
+      _view = _AppView.game;
+      _isReady = true;
+      return;
+    }
     if (widget.hubPreviewMode) {
       final previewStory = StoryState.newDecimalPlayer(
         playerName: '민재',
@@ -691,6 +727,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
                   onPurchaseReport: _purchaseDailyMarketReport,
                   onCompleteTutorial: _completeMarketTutorial,
                   onExecuteTrade: _executeTrade,
+                  onSaveGovernanceState: _saveShareholderGovernanceState,
                   onCancelPendingOrder: _cancelPendingOrder,
                   onTransferCash: _transferBrokerageCash,
                   orderBookSessionCache: _stockOrderBookSessionCache,
@@ -713,24 +750,6 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     await _persistence.save(next);
     if (!mounted) return;
     setState(() => _state = next);
-  }
-
-  Future<MissionClaimResult> _claimMission() async {
-    final current = _state!;
-    final result = _engine.claimMission(current);
-    if (!result.success) return result;
-    await _persistence.save(result.state);
-    if (mounted) setState(() => _state = result.state);
-    return result;
-  }
-
-  Future<StarShopPurchaseResult> _purchaseStarShopItem(String productId) async {
-    final current = _state!;
-    final result = _engine.purchaseStarShopItem(current, productId);
-    if (!result.success) return result;
-    await _persistence.save(result.state);
-    if (mounted) setState(() => _state = result.state);
-    return result;
   }
 
   Future<GameState> _completeWork(WorkSessionResult result) async {
@@ -791,6 +810,26 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     await _persistence.save(next);
     if (mounted) setState(() => _state = next);
     return result.withState(next);
+  }
+
+  Future<GameState> _completeWeeklyPortfolioReview({
+    required WeeklyPortfolioReviewAction action,
+    required String assetId,
+    required String assetName,
+    required int riskLimitBps,
+  }) async {
+    final current = _state!;
+    final next = completeWeeklyPortfolioReview(
+      current,
+      action: action,
+      assetId: assetId,
+      assetName: assetName,
+      riskLimitBps: riskLimitBps,
+    );
+    if (identical(next, current)) return current;
+    await _persistence.save(next);
+    if (mounted) setState(() => _state = next);
+    return next;
   }
 
   Future<WeekendActivityResult> _completeWeekendActivity(
@@ -948,6 +987,31 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
         if (generated.success) result = generated;
       }
     }
+    final targetMinute = result.state.marketMinute;
+    final effectState = result.state.copyWith(
+      marketMinute: current.marketMinute,
+    );
+    final next = await _processStateThroughMarketMinute(
+      effectState,
+      targetMinute,
+    );
+    result = result.withState(next);
+    await _persistence.save(next);
+    if (mounted) setState(() => _state = next);
+    return result;
+  }
+
+  Future<PhoneMessengerActionResult> _sendPhoneGift(
+    String contactId,
+    String giftId,
+  ) async {
+    final current = _state!;
+    final result = _engine.sendPhoneGift(
+      current,
+      contactId: contactId,
+      giftId: giftId,
+    );
+    if (!result.success) return result;
     await _persistence.save(result.state);
     if (mounted) setState(() => _state = result.state);
     return result;
@@ -1022,6 +1086,69 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
         }
       }
       final beforeUniverse = universeWindow.asOf(before.currentDate);
+      if (requestedDays > 1) {
+        if (before.pendingOrders.isNotEmpty) {
+          before = _engine.processPendingOrdersThroughMarketMinute(
+            before,
+            targetMinute: krxCloseMinute,
+            quotePaths: _pendingOrderQuotePaths(before, beforeUniverse),
+          );
+        }
+        if (before.marketMinute < krxCloseMinute) {
+          before = before.copyWith(marketMinute: krxCloseMinute);
+        }
+        if (isMarketTradingDay(before.currentDate) &&
+            !before.cohortInvestments.settledForDay(before.day)) {
+          final settlement = _engine.settleCohortInvestmentDay(
+            before,
+            universe: beforeUniverse,
+          );
+          if (settlement.success) before = settlement.state;
+        }
+        if (before.cohortInvestments.settledForDay(before.day) &&
+            !before.cohortInvestments.acknowledgedForDay(before.day)) {
+          final acknowledged = _engine.acknowledgeCohortInvestmentReport(
+            before,
+          );
+          if (acknowledged.success) before = acknowledged.state;
+        }
+        before = openCohortWithdrawalCrisis(before);
+        final standing = pendingCohortStandingEvent(before);
+        if (standing != null) {
+          before = acknowledgeCohortStandingEvent(before, standing);
+        }
+        final crisis = activeCohortWithdrawalCrisis(before);
+        if (crisis != null && before.day >= crisis.deadlineDay) {
+          final outcome = respondToCohortWithdrawal(
+            before,
+            CohortWithdrawalResponse.respectRight,
+          );
+          if (outcome.success) before = outcome.state;
+        }
+        if (weeklyPortfolioReviewDue(before)) {
+          before = completeWeeklyPortfolioReview(
+            before,
+            action: WeeklyPortfolioReviewAction.riskRule,
+            riskLimitBps: before.story.flagInt(
+              'weeklyPortfolioRiskLimitBps',
+              500,
+            ),
+            automatic: true,
+          );
+        }
+        if (isWeekendOutingDay(before.currentDate) &&
+            !weekendScheduleCompleteForState(before)) {
+          final rested = _engine.completeWeekendActivity(
+            before,
+            const WeekendActivityRequest(activityId: 'rest'),
+          );
+          if (rested.success) before = rested.state;
+        }
+        if (!before.relationships.completedEveningForDay(before.day)) {
+          final rested = _engine.restDuringRelationshipEvening(before);
+          if (rested.success) before = rested.state;
+        }
+      }
       next = _engine.advanceOneDay(
         before,
         pendingOrderQuotePaths: _pendingOrderQuotePaths(before, beforeUniverse),
@@ -1033,6 +1160,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
         next,
         nextUniverse.corporateActionsOn(next.currentDate),
       );
+      next = _shareholderGovernanceEngine.processDay(next, nextUniverse);
       next = next.copyWith(marketMinute: marketDayStartMinute);
       if (stopAfterClosing) {
         next = next.copyWith(
@@ -1048,6 +1176,17 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
           stopAfterClosing ||
           next.pendingDecisions.isNotEmpty ||
           next.campaignComplete;
+      if (!stopAfterClosing && next.pendingDecisions.isNotEmpty) {
+        next = next.copyWith(
+          story: next.story.copyWith(
+            storyFlags: <String, dynamic>{
+              ...next.story.storyFlags,
+              'fastForwardStopReason':
+                  '${marketDateKey(next.currentDate)} 중요한 선택 ${next.pendingDecisions.length}건 앞에서 멈췄습니다.',
+            },
+          ),
+        );
+      }
       final shouldCheckpoint =
           requestedDays == 1 ||
           (i + 1) % 7 == 0 ||
@@ -1084,6 +1223,15 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     return next;
   }
 
+  Future<FinanceActionResult> _persistFinanceAction(
+    FinanceActionResult result,
+  ) async {
+    if (!result.success) return result;
+    await _persistence.save(result.state);
+    if (mounted) setState(() => _state = result.state);
+    return result;
+  }
+
   Future<FinanceActionResult> _persistBusinessAction(
     BusinessActionResult action,
   ) async {
@@ -1093,10 +1241,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
       message: action.message,
       cashDelta: action.cashDelta,
     );
-    if (!action.success) return result;
-    await _persistence.save(action.state);
-    if (mounted) setState(() => _state = action.state);
-    return result;
+    return _persistFinanceAction(result);
   }
 
   Future<FinanceActionResult> _acquireBusiness({
@@ -1145,8 +1290,13 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
   );
 
   Future<FinanceActionResult> _purchaseSpendingOption(String optionId) async {
-    final result = _engine.purchaseSpendingOption(_state!, optionId);
+    final current = _state!;
+    final result = _engine.purchaseSpendingOption(current, optionId);
     if (!result.success) return result;
+    if (result.state.personalFinance.realEstate.length >
+        current.personalFinance.realEstate.length) {
+      return _persistFinanceAction(result);
+    }
     await _persistence.save(result.state);
     if (mounted) setState(() => _state = result.state);
     return result;
@@ -1164,10 +1314,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
 
   Future<FinanceActionResult> _sellRealEstate(String assetId) async {
     final result = _engine.sellRealEstate(_state!, assetId);
-    if (!result.success) return result;
-    await _persistence.save(result.state);
-    if (mounted) setState(() => _state = result.state);
-    return result;
+    return _persistFinanceAction(result);
   }
 
   Future<FinanceActionResult> _configureRealEstateLease(
@@ -1179,20 +1326,14 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
       assetId,
       leaseType,
     );
-    if (!result.success) return result;
-    await _persistence.save(result.state);
-    if (mounted) setState(() => _state = result.state);
-    return result;
+    return _persistFinanceAction(result);
   }
 
   Future<FinanceActionResult> _cancelRealEstateSaleListing(
     String assetId,
   ) async {
     final result = _engine.cancelRealEstateSaleListing(_state!, assetId);
-    if (!result.success) return result;
-    await _persistence.save(result.state);
-    if (mounted) setState(() => _state = result.state);
-    return result;
+    return _persistFinanceAction(result);
   }
 
   Future<FinanceActionResult> _saveRealEstateInvestmentNote(
@@ -1208,10 +1349,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
 
   Future<FinanceActionResult> _renovateRealEstate(String assetId) async {
     final result = _engine.renovateRealEstate(_state!, assetId);
-    if (!result.success) return result;
-    await _persistence.save(result.state);
-    if (mounted) setState(() => _state = result.state);
-    return result;
+    return _persistFinanceAction(result);
   }
 
   Future<FinanceActionResult> _setRealEstateInsurance(
@@ -1219,20 +1357,14 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     bool active,
   ) async {
     final result = _engine.setRealEstateInsurance(_state!, assetId, active);
-    if (!result.success) return result;
-    await _persistence.save(result.state);
-    if (mounted) setState(() => _state = result.state);
-    return result;
+    return _persistFinanceAction(result);
   }
 
   Future<FinanceActionResult> _renewRealEstateMonthlyLease(
     String assetId,
   ) async {
     final result = _engine.renewRealEstateMonthlyLease(_state!, assetId);
-    if (!result.success) return result;
-    await _persistence.save(result.state);
-    if (mounted) setState(() => _state = result.state);
-    return result;
+    return _persistFinanceAction(result);
   }
 
   Future<FinanceActionResult> _terminateRealEstateMonthlyLeaseEarly(
@@ -1242,10 +1374,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
       _state!,
       assetId,
     );
-    if (!result.success) return result;
-    await _persistence.save(result.state);
-    if (mounted) setState(() => _state = result.state);
-    return result;
+    return _persistFinanceAction(result);
   }
 
   Future<FinanceActionResult> _prepayRealEstateMortgage(
@@ -1253,10 +1382,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     int amount,
   ) async {
     final result = _engine.prepayRealEstateMortgage(_state!, assetId, amount);
-    if (!result.success) return result;
-    await _persistence.save(result.state);
-    if (mounted) setState(() => _state = result.state);
-    return result;
+    return _persistFinanceAction(result);
   }
 
   Future<FinanceActionResult> _refinanceRealEstateMortgage(
@@ -1270,10 +1396,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
       variableRate: variableRate,
       termMonths: termMonths,
     );
-    if (!result.success) return result;
-    await _persistence.save(result.state);
-    if (mounted) setState(() => _state = result.state);
-    return result;
+    return _persistFinanceAction(result);
   }
 
   Future<FinanceActionResult> _playAdultChanceGame(int stake) async {
@@ -1282,6 +1405,53 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     await _persistence.save(result.state);
     if (mounted) setState(() => _state = result.state);
     return result;
+  }
+
+  Future<CasinoActionResult> _persistCasinoAction(
+    GameState current,
+    CasinoActionResult result,
+  ) async {
+    if (!result.success) return result;
+    var next = result.state;
+    if (result.minutesElapsed > 0) {
+      final target = advanceGameTime(
+        current.marketMinute,
+        result.minutesElapsed,
+      );
+      next = await _processStateThroughMarketMinute(
+        next.copyWith(marketMinute: current.marketMinute),
+        target,
+      );
+    }
+    await _persistence.save(next);
+    if (mounted) setState(() => _state = next);
+    return result.withState(next);
+  }
+
+  Future<CasinoActionResult> _playCasinoRound(CasinoBet bet) {
+    final current = _state!;
+    return _persistCasinoAction(current, _engine.playCasinoRound(current, bet));
+  }
+
+  Future<CasinoActionResult> _startCasinoBlackjack(int stake) {
+    final current = _state!;
+    return _persistCasinoAction(
+      current,
+      _engine.startCasinoBlackjack(current, stake),
+    );
+  }
+
+  Future<CasinoActionResult> _actCasinoBlackjack(BlackjackAction action) {
+    final current = _state!;
+    return _persistCasinoAction(
+      current,
+      _engine.actCasinoBlackjack(current, action),
+    );
+  }
+
+  Future<CasinoActionResult> _rollCasinoCraps() {
+    final current = _state!;
+    return _persistCasinoAction(current, _engine.rollCasinoCraps(current));
   }
 
   Future<FinanceActionResult> _openTimeDeposit(
@@ -1293,18 +1463,12 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
       amount: amount,
       termMonths: termMonths,
     );
-    if (!result.success) return result;
-    await _persistence.save(result.state);
-    if (mounted) setState(() => _state = result.state);
-    return result;
+    return _persistFinanceAction(result);
   }
 
   Future<FinanceActionResult> _redeemTimeDeposit(String depositId) async {
     final result = _engine.redeemTimeDeposit(_state!, depositId);
-    if (!result.success) return result;
-    await _persistence.save(result.state);
-    if (mounted) setState(() => _state = result.state);
-    return result;
+    return _persistFinanceAction(result);
   }
 
   Future<FinanceActionResult> _takeUnsecuredLoan(
@@ -1316,10 +1480,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
       amount: amount,
       termMonths: termMonths,
     );
-    if (!result.success) return result;
-    await _persistence.save(result.state);
-    if (mounted) setState(() => _state = result.state);
-    return result;
+    return _persistFinanceAction(result);
   }
 
   Future<FinanceActionResult> _repayUnsecuredLoan(
@@ -1331,10 +1492,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
       loanId: loanId,
       amount: amount,
     );
-    if (!result.success) return result;
-    await _persistence.save(result.state);
-    if (mounted) setState(() => _state = result.state);
-    return result;
+    return _persistFinanceAction(result);
   }
 
   Future<FinanceActionResult> _purchaseDailyMarketReport() async {
@@ -1389,8 +1547,10 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     final paths = <String, GamePendingOrderQuotePath>{};
     for (final assetId
         in state.pendingOrders.map((order) => order.assetId).toSet()) {
+      final governanceMultiplier = state.shareholderGovernance
+          .priceMultiplierFor(assetId, state.day);
       final cacheKey =
-          '${state.simulationSeed}|${marketDateKey(state.currentDate)}|$assetId';
+          '${state.simulationSeed}|${marketDateKey(state.currentDate)}|$assetId|${governanceMultiplier.toStringAsFixed(6)}';
       final cached = _pendingQuotePathCache.remove(cacheKey);
       if (cached != null) {
         _pendingQuotePathCache[cacheKey] = cached;
@@ -1404,20 +1564,28 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
       final quote = asset.quoteAtOrBefore(state.currentDate);
       if (quote == null) continue;
       final rawPreviousClose = asset.unadjustedReferenceCloseFor(quote.date);
-      final marketReferenceClose = asset.marketReferenceCloseOn(
-        DateTime.parse(quote.date),
-        previousClose: rawPreviousClose,
-      );
+      final marketReferenceClose =
+          asset.marketReferenceCloseOn(
+            DateTime.parse(quote.date),
+            previousClose: rawPreviousClose,
+          ) *
+          state.shareholderGovernance.priceMultiplierFor(
+            assetId,
+            state.day - 1,
+          );
+      final rawPath = quote.isExactDate
+          ? generatedMarketDayPathForAsset(
+              asset: asset,
+              simulationSeed: state.simulationSeed,
+              date: state.currentDate,
+              previousClose: rawPreviousClose,
+              officialClose: quote.close,
+            )
+          : <double>[quote.close];
       final path = GamePendingOrderQuotePath(
-        prices: quote.isExactDate
-            ? generatedMarketDayPathForAsset(
-                asset: asset,
-                simulationSeed: state.simulationSeed,
-                date: state.currentDate,
-                previousClose: rawPreviousClose,
-                officialClose: quote.close,
-              )
-            : <double>[quote.close],
+        prices: rawPath
+            .map((price) => price * governanceMultiplier)
+            .toList(growable: false),
         previousClose: marketReferenceClose,
         isTradingDay: quote.isExactDate,
         isIpoFirstTradingDay: asset.isIpoFirstTradingDay(state.currentDate),
@@ -1441,9 +1609,18 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     await _persistence.save(state);
   }
 
+  Future<GameState> _saveShareholderGovernanceState(GameState next) async {
+    await _persistMarketState(next);
+    if (mounted) setState(() => _state = next);
+    return next;
+  }
+
   Future<GameState> _setMarketMinute(int minute) async {
     final current = _state!;
-    final target = minute.clamp(marketDayStartMinute, marketDayEndMinute);
+    final target = minute.clamp(
+      marketDayStartMinute,
+      phoneMessengerBedtimeMinute,
+    );
     final next = await _processStateThroughMarketMinute(current, target);
     final lastSavedDay = _lastDurablySavedMarketDay;
     final lastSavedMinute = _lastDurablySavedMarketMinute;
@@ -1484,17 +1661,25 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     GameState current,
     int targetMinute,
   ) async {
-    final target = targetMinute.clamp(marketDayStartMinute, marketDayEndMinute);
-    if (target > current.marketMinute && current.pendingOrders.isNotEmpty) {
+    final target = targetMinute.clamp(
+      marketDayStartMinute,
+      phoneMessengerBedtimeMinute,
+    );
+    if (target > current.marketMinute &&
+        current.marketMinute < marketDayEndMinute &&
+        current.pendingOrders.isNotEmpty) {
       final universe = await FictionalMarketUniverse.load(
         seed: current.simulationSeed,
         throughDate: current.currentDate,
       );
-      return _engine.processPendingOrdersThroughMarketMinute(
+      final processed = _engine.processPendingOrdersThroughMarketMinute(
         current,
-        targetMinute: target,
+        targetMinute: math.min(target, marketDayEndMinute),
         quotePaths: _pendingOrderQuotePaths(current, universe),
       );
+      return target > marketDayEndMinute
+          ? processed.copyWith(marketMinute: target)
+          : processed;
     }
     return current.copyWith(marketMinute: target);
   }
@@ -1528,35 +1713,39 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
 
   Future<GameState> _setMarketRightsIssuePreference(bool subscribe) async {
     final current = _state!;
-    final next = current.copyWith(
+    if (!advancedCorporateActionsUnlocked(current)) return current;
+    final preference = subscribe
+        ? marketRightsIssueSubscribePreference
+        : marketRightsIssueAutoSellPreference;
+    if (current.story.storyFlags[marketRightsIssuePreferenceFlag] ==
+        preference) {
+      return current;
+    }
+    final updated = current.copyWith(
       story: current.story.copyWith(
         storyFlags: <String, dynamic>{
           ...current.story.storyFlags,
-          marketRightsIssuePreferenceFlag: subscribe
-              ? marketRightsIssueSubscribePreference
-              : marketRightsIssueAutoSellPreference,
+          marketRightsIssuePreferenceFlag: preference,
         },
       ),
     );
-    await _persistMarketState(next);
+    await _persistMarketState(updated);
     if (mounted) {
-      setState(() => _state = next);
+      setState(() => _state = updated);
     }
-    return next;
+    return updated;
   }
 
   Future<TradeExecutionResult> _executeTrade(TradeOrder order) async {
     final current = _state!;
     MarketTradeQuote? quote;
+    FictionalMarketUniverse? marketUniverse;
     try {
-      quote = resolveMarketTradeQuote(
-        await FictionalMarketUniverse.load(
-          seed: current.simulationSeed,
-          throughDate: current.currentDate,
-        ),
-        current,
-        order.assetId,
+      marketUniverse = await FictionalMarketUniverse.load(
+        seed: current.simulationSeed,
+        throughDate: current.currentDate,
       );
+      quote = resolveMarketTradeQuote(marketUniverse, current, order.assetId);
     } catch (_) {
       return TradeExecutionResult(
         state: current,
@@ -1589,9 +1778,37 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     }
     final result = _engine.executeTrade(current, order);
     if (!result.success) return result;
-    await _persistMarketState(result.state);
-    if (mounted) setState(() => _state = result.state);
-    return result;
+    var next = result.filledQuantity > 0
+        ? completeWeeklyPortfolioReview(
+            result.state,
+            action: WeeklyPortfolioReviewAction.trade,
+            assetId: order.assetId,
+            assetName: order.name,
+            automatic: true,
+          )
+        : result.state;
+    if (result.filledQuantity > 0) {
+      next = _shareholderGovernanceEngine.processDay(
+        next,
+        marketUniverse.asOf(next.currentDate),
+      );
+    }
+    final completed = TradeExecutionResult(
+      state: next,
+      success: result.success,
+      message: result.message,
+      notional: result.notional,
+      fee: result.fee,
+      transactionTax: result.transactionTax,
+      realizedPnl: result.realizedPnl,
+      orderId: result.orderId,
+      filledQuantity: result.filledQuantity,
+      pendingQuantity: result.pendingQuantity,
+      averageFillPrice: result.averageFillPrice,
+    );
+    await _persistMarketState(next);
+    if (mounted) setState(() => _state = next);
+    return completed;
   }
 
   Future<FinanceActionResult> _cancelPendingOrder(String orderId) async {
@@ -1627,12 +1844,60 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
         onSetRightsIssuePreference: _setMarketRightsIssuePreference,
         onPurchaseReport: _purchaseDailyMarketReport,
         onExecuteTrade: _executeTrade,
+        onSaveGovernanceState: _saveShareholderGovernanceState,
         onCancelPendingOrder: _cancelPendingOrder,
         onTransferCash: _transferBrokerageCash,
         orderBookSessionCache: _stockOrderBookSessionCache,
       ),
     );
   }
+
+  Future<CasinoActionResult> _runCasinoTestAction(
+    CasinoActionResult Function(GameState state) action,
+  ) async {
+    final current = _state!;
+    final currentMonthCasino = current.personalFinance.casino.forMonth(
+      casinoMonthKey(current.currentDate),
+      current.bankCash,
+    );
+    final engineState = current.copyWith(
+      cash: math.max(current.bankCash, casinoMaximumStake * 100),
+      personalFinance: current.personalFinance.copyWith(
+        casino: currentMonthCasino,
+      ),
+    );
+    final raw = action(engineState);
+    if (!raw.success) return raw.withState(current);
+    final cashDelta = raw.state.bankCash - engineState.bankCash;
+    var next = raw.state.copyWith(
+      cash: math.max(0, current.bankCash + cashDelta),
+    );
+    if (raw.minutesElapsed > 0) {
+      next = next.copyWith(
+        marketMinute: advanceGameTime(current.marketMinute, raw.minutesElapsed),
+      );
+    }
+    if (mounted) setState(() => _state = next);
+    return raw.withState(next);
+  }
+
+  Widget _buildCasinoTestHome() => _GameFrame(
+    child: CasinoScreen(
+      key: const Key('casino-test-screen'),
+      state: _state!,
+      testMode: true,
+      onPlayRound: (bet) =>
+          _runCasinoTestAction((state) => _engine.playCasinoRound(state, bet)),
+      onStartBlackjack: (stake) => _runCasinoTestAction(
+        (state) => _engine.startCasinoBlackjack(state, stake),
+      ),
+      onBlackjackAction: (action) => _runCasinoTestAction(
+        (state) => _engine.actCasinoBlackjack(state, action),
+      ),
+      onCrapsRoll: () =>
+          _runCasinoTestAction((state) => _engine.rollCasinoCraps(state)),
+    ),
+  );
 
   Widget _buildHubPreviewHome() {
     return _GameFrame(
@@ -1642,7 +1907,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
         onOpenMarket: () {},
         onOpenRealEstate: () {},
         onOpenBank: () {},
-        onOpenDecisions: () {},
+        onOpenPendingChoice: () {},
         onOpenLedger: () {},
         onOpenOrganization: () {},
         onOpenRelationships: () {},
@@ -1695,7 +1960,22 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
           ),
         ),
       ),
-      home: widget.hubPreviewMode && _state != null
+      home: widget.casinoTestMode && _state != null
+          ? _buildCasinoTestHome()
+          : widget.horseRacePreviewMode
+          ? _GameFrame(
+              child: HorseRacingMiniGame(
+                race: buildAfternoonHorseRace(
+                  simulationSeed: 'horse-race-preview-v1',
+                  day: 8,
+                ),
+                availableCash: 50000,
+                previewMode: true,
+              ),
+            )
+          : widget.newspaperPreviewMode
+          ? const _GameFrame(child: RiderMiniGame())
+          : widget.hubPreviewMode && _state != null
           ? _buildHubPreviewHome()
           : widget.stockTestMode && _state != null
           ? _buildStockTestHome()
@@ -1775,13 +2055,13 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
                   onSetMarketRightsIssuePreference:
                       _setMarketRightsIssuePreference,
                   onResolveDecision: _resolveDecision,
-                  onClaimMission: _claimMission,
-                  onPurchaseStarShopItem: _purchaseStarShopItem,
                   onRequestAcademyHelp: _requestAcademyHelp,
                   onCompleteRelationshipEvening: _completeRelationshipEvening,
                   onRestDuringRelationshipEvening:
                       _restDuringRelationshipEvening,
                   onCompleteWeekdayActivity: _completeWeekdayActivity,
+                  onCompleteWeeklyPortfolioReview:
+                      _completeWeeklyPortfolioReview,
                   onCompleteWeekendActivity: _completeWeekendActivity,
                   onSettleCohortInvestmentDay: _settleCohortInvestmentDay,
                   onLendToCohortInvestor: _lendToCohortInvestor,
@@ -1793,6 +2073,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
                   onRespondToCohortWithdrawal: _respondToCohortWithdrawal,
                   onMarkPhoneThreadRead: _markPhoneThreadRead,
                   onSendPhoneMessage: _sendPhoneMessage,
+                  onSendPhoneGift: _sendPhoneGift,
                   onHireEmployee: _hireEmployee,
                   onLaunchFund: _launchFund,
                   onPurchaseSpendingOption: _purchaseSpendingOption,
@@ -1814,6 +2095,10 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
                   onPrepayRealEstateMortgage: _prepayRealEstateMortgage,
                   onRefinanceRealEstateMortgage: _refinanceRealEstateMortgage,
                   onPlayChanceGame: _playAdultChanceGame,
+                  onPlayCasinoRound: _playCasinoRound,
+                  onStartCasinoBlackjack: _startCasinoBlackjack,
+                  onCasinoBlackjackAction: _actCasinoBlackjack,
+                  onCasinoCrapsRoll: _rollCasinoCraps,
                   onOpenTimeDeposit: _openTimeDeposit,
                   onRedeemTimeDeposit: _redeemTimeDeposit,
                   onTakeUnsecuredLoan: _takeUnsecuredLoan,
@@ -1826,6 +2111,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
                   onArchiveNews: _archiveNews,
                   onCompleteWork: _completeWork,
                   onExecuteTrade: _executeTrade,
+                  onSaveGovernanceState: _saveShareholderGovernanceState,
                   onCancelPendingOrder: _cancelPendingOrder,
                   onTransferBrokerageCash: _transferBrokerageCash,
                 ),
@@ -2069,102 +2355,6 @@ class _AdvanceMenuChoice {
   final bool stopOnImportantNews;
 }
 
-class _RoomButton extends StatelessWidget {
-  const _RoomButton({
-    super.key,
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.color,
-    required this.onTap,
-    this.compact = false,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final Color color;
-  final VoidCallback onTap;
-  final bool compact;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: '$title, $subtitle 열기',
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(17),
-          child: Container(
-            constraints: const BoxConstraints(minHeight: 58),
-            padding: EdgeInsets.all(compact ? 8 : 11),
-            decoration: BoxDecoration(
-              color: color,
-              border: Border.all(color: _ink, width: 2),
-              borderRadius: BorderRadius.circular(17),
-              boxShadow: const [BoxShadow(color: _ink, offset: Offset(0, 4))],
-            ),
-            child: Row(
-              children: [
-                Icon(icon, color: _ink, size: compact ? 21 : 27),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: _ink,
-                          fontSize: compact ? 10 : 13,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      Text(
-                        subtitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Color(0xFF6D7892),
-                          fontSize: 9,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _CartoonRoomBackground extends StatelessWidget {
-  const _CartoonRoomBackground();
-
-  @override
-  Widget build(BuildContext context) {
-    return const DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color(0xFFE5F8FF), Color(0xFFFFEDBE), Color(0xFFC98B62)],
-          stops: [0, 0.66, 1],
-        ),
-      ),
-    );
-  }
-}
-
 class _Sticker extends StatelessWidget {
   const _Sticker({required this.icon, required this.label});
 
@@ -2333,7 +2523,11 @@ double? _portfolioPriceAtCurrentTime(
 ) {
   final quote = asset.quoteAtOrBefore(state.currentDate);
   if (quote == null) return null;
-  if (!quote.isExactDate) return quote.close;
+  final multiplier = state.shareholderGovernance.priceMultiplierFor(
+    asset.id,
+    state.day,
+  );
+  if (!quote.isExactDate) return quote.close * multiplier;
   final previousClose = asset.unadjustedReferenceCloseFor(quote.date);
   final path = generatedMarketDayPathForAsset(
     asset: asset,
@@ -2343,8 +2537,9 @@ double? _portfolioPriceAtCurrentTime(
     officialClose: quote.close,
   );
   return path[marketTickForMinute(
-    state.marketMinute,
-  ).clamp(0, path.length - 1)];
+        state.marketMinute,
+      ).clamp(0, path.length - 1)] *
+      multiplier;
 }
 
 String _projectLabel(ProjectStatus status) => switch (status) {

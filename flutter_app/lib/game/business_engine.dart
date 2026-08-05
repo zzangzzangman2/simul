@@ -7,6 +7,7 @@ import 'game_state.dart';
 import 'personal_finance_state.dart';
 import 'real_estate_market.dart';
 import 'real_estate_rental.dart';
+import 'weekday_activity.dart';
 
 /// Player input for starting a new shop or acquiring an existing one.
 ///
@@ -63,6 +64,9 @@ class LocalBusinessEngine {
     GameState state,
     BusinessLaunchRequest request,
   ) {
+    if (!businessOperationsUnlocked(state)) {
+      return _failure(state, '4월 가게 운영 이야기를 마친 뒤 인수·창업할 수 있습니다.');
+    }
     final listingId = request.listingId.trim();
     if (listingId.isEmpty) {
       return _failure(state, '선택한 사업 매물이 없습니다.');
@@ -105,6 +109,12 @@ class LocalBusinessEngine {
 
     OwnedRealEstate? linkedProperty;
     if (request.premiseMode == BusinessPremiseMode.ownedProperty) {
+      if (!propertyBusinessLinkUnlocked(state)) {
+        return _failure(
+          state,
+          '8월 빈 점포 활용 이야기를 마친 뒤 보유 부동산을 직영점으로 연결할 수 있습니다.',
+        );
+      }
       final propertyId = request.linkedRealEstateId?.trim() ?? '';
       if (propertyId.isEmpty) {
         return _failure(state, '입점할 보유 상가나 오피스 빌딩을 선택해 주세요.');

@@ -17,6 +17,32 @@ void main() {
     expect(state.relationships.lastEveningEventDay, 0);
   });
 
+  test('conversation selection keeps ten years of weekly scenes distinct', () {
+    final profile = cohortGirlProfileById('kim_seoa')!;
+    final sceneIds = <String>{
+      for (var count = 0; count < 522; count += 1)
+        relationshipSceneFor(
+          profile: profile,
+          activity: RelationshipActivity.conversation,
+          day: count * 7 + 1,
+          interactionCount: count,
+          affection: 100,
+        ).id,
+    };
+
+    expect(sceneIds, hasLength(522));
+    expect(
+      relationshipSceneFor(
+        profile: profile,
+        activity: RelationshipActivity.conversation,
+        day: 3653,
+        interactionCount: 12,
+        affection: 100,
+      ).id,
+      isNot(sceneIds.first),
+    );
+  });
+
   test('one conversation is saved once per day and uses authored outcome', () {
     final state = engine.createNewGame('관계 테스트', worldSeed: 'relation-2');
     final result = engine.completeRelationshipEvening(

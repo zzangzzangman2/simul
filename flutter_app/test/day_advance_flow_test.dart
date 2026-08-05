@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:millennium_capital/game/game_engine.dart';
+import 'package:millennium_capital/game/game_state.dart';
 import 'package:millennium_capital/game/market_clock.dart';
 import 'package:millennium_capital/game/market_news.dart';
 import 'package:millennium_capital/main.dart';
@@ -62,15 +63,16 @@ void main() {
     await openHubTimeActions(tester);
     await tester.tap(find.byKey(const Key('advance-batch-button')));
     await tester.pumpAndSettle();
-    expect(find.text('1년 저개입 진행'), findsOneWidget);
-    expect(find.textContaining('중요뉴스는 장부에 보관'), findsOneWidget);
+    expect(find.text('다음 중요 선택까지 (최대 1년)'), findsOneWidget);
+    expect(find.textContaining('주간 복기·주말 휴식·관계 휴식'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('advance-year-quiet-option')));
     await tester.pumpAndSettle();
 
     expect(quietDays, 365);
     expect(normalDays, isNull);
-    expect(find.textContaining('365일 진행했습니다.'), findsOneWidget);
+    expect(find.byKey(const Key('fast-forward-summary-title')), findsOneWidget);
+    expect(find.textContaining('365일 진행'), findsWidgets);
     expect(tester.takeException(), isNull);
   });
 
@@ -91,6 +93,21 @@ void main() {
             day: 3,
             decisions: const [],
             marketMinute: marketDayStartMinute,
+            ledger: const [
+              LedgerEntry(
+                id: 'day-flow-trade',
+                day: 3,
+                amount: -1000,
+                account: 'brokerage_cash',
+                counterAccount: 'market_security',
+                description: '결과 화면 검증용 체결',
+                sourceId: 'day-flow-trade',
+                assetId: 'hanbit_telecom',
+                tradeSide: 'buy',
+                tradeQuantity: 1,
+                tradeUnitPrice: 1000,
+              ),
+            ],
           );
       late StateSetter updateHarness;
 
@@ -106,13 +123,30 @@ void main() {
                 lastSavedAt: null,
                 onManualSave: () async {},
                 onReturnToTitle: () {},
-                onAdvanceDay: () async => currentState,
+                onAdvanceDay: () async {
+                  currentState = engine.advanceOneDay(currentState);
+                  updateHarness(() {});
+                  return currentState;
+                },
                 onSetMarketMinute: (minute) async {
                   currentState = currentState.copyWith(marketMinute: minute);
                   updateHarness(() {});
                   return currentState;
                 },
                 onSaveMarketNotebook: (_, _) async => currentState,
+                onBuildDailyNewspaper: (closingState) async =>
+                    DailyMarketNewspaper(
+                      date: closingState.currentDate,
+                      brief: buildDailyBrief(closingState),
+                      total: 0,
+                      advancers: 0,
+                      decliners: 0,
+                      unchanged: 0,
+                      topGainers: const [],
+                      topLosers: const [],
+                      headline: '하루 결산 테스트',
+                      summary: '테스트 신문',
+                    ),
                 onResolveDecision: (_, _) async {},
                 onRequestAcademyHelp: (_) async => currentState,
                 onSettleCohortInvestmentDay: () async {
@@ -203,154 +237,142 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(CohortDailyResultScreen), findsNothing);
-      expect(find.byType(RelationshipEveningScreen), findsOneWidget);
-      expect(currentState.marketMinute, marketDayEndMinute);
-      expect(
-        currentState.cohortInvestments.acknowledgedForDay(currentState.day),
-        isTrue,
-      );
+      expect(find.byType(RelationshipEveningScreen), findsNothing);
+      expect(find.byType(DailyWrapUpScreen), findsOneWidget);
+      expect(currentState.marketMinute, marketDayStartMinute);
+      expect(currentState.cohortInvestments.acknowledgedForDay(3), isTrue);
       expect(tester.takeException(), isNull);
+
+      await tester.tap(find.byKey(const Key('newspaper-next-day-button')));
+      await tester.pumpAndSettle();
+      expect(find.byType(DailyWrapUpScreen), findsNothing);
     },
   );
 
-  for (final closeMethod in ['신문 X', '상단 뒤로가기', '시스템 뒤로가기']) {
-    testWidgets(
-      'closing daily newspaper starts next day at 08:00: $closeMethod',
-      (tester) async {
-        await tester.binding.setSurfaceSize(const Size(360, 800));
-        addTearDown(() => tester.binding.setSurfaceSize(null));
+  testWidgets(
+    'daily wrap combines calendar records and newspaper before next-day 08:00',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(360, 800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
 
-        const engine = GameEngine();
-        var currentState = engine
-            .createNewGame('다음 날 시각 테스트', initialCash: 0)
-            .copyWith(decisions: const [], marketMinute: marketDayStartMinute);
-        final initialDay = currentState.day;
-        late StateSetter updateHarness;
+      const engine = GameEngine();
+      var currentState = engine
+          .createNewGame('다음 날 시각 테스트', initialCash: 0)
+          .copyWith(decisions: const [], marketMinute: marketDayStartMinute);
+      final initialDay = currentState.day;
+      late StateSetter updateHarness;
 
-        await tester.pumpWidget(
-          StatefulBuilder(
-            builder: (context, setState) {
-              updateHarness = setState;
-              return MaterialApp(
-                home: OfficeScreen(
+      await tester.pumpWidget(
+        StatefulBuilder(
+          builder: (context, setState) {
+            updateHarness = setState;
+            return MaterialApp(
+              home: OfficeScreen(
+                state: currentState,
+                engine: engine,
+                activeSaveSlot: 1,
+                lastSavedAt: null,
+                onManualSave: () async {},
+                onReturnToTitle: () {},
+                onAdvanceDay: () async {
+                  currentState = engine.advanceOneDay(currentState);
+                  updateHarness(() {});
+                  return currentState;
+                },
+                onSetMarketMinute: (minute) async {
+                  currentState = currentState.copyWith(marketMinute: minute);
+                  updateHarness(() {});
+                  return currentState;
+                },
+                onSaveMarketNotebook: (_, _) async => currentState,
+                onBuildDailyNewspaper: (closingState) async =>
+                    DailyMarketNewspaper(
+                      date: closingState.currentDate,
+                      brief: buildDailyBrief(closingState),
+                      total: 0,
+                      advancers: 0,
+                      decliners: 0,
+                      unchanged: 0,
+                      topGainers: const [],
+                      topLosers: const [],
+                      headline: '하루 결산 테스트',
+                      summary: '테스트 신문',
+                    ),
+                onResolveDecision: (_, _) async {},
+                onRequestAcademyHelp: (_) async => currentState,
+                onCompleteRelationshipEvening:
+                    (girlId, activity, choiceId) async {
+                      final result = engine.completeRelationshipEvening(
+                        currentState,
+                        girlId: girlId,
+                        activity: activity,
+                        choiceId: choiceId,
+                      );
+                      currentState = result.state;
+                      updateHarness(() {});
+                      return result;
+                    },
+                onRestDuringRelationshipEvening: () async {
+                  final result = engine.restDuringRelationshipEvening(
+                    currentState,
+                  );
+                  currentState = result.state;
+                  updateHarness(() {});
+                  return result;
+                },
+                onCompleteWork: (_) async => currentState,
+                onExecuteTrade: (_) async => TradeExecutionResult(
                   state: currentState,
-                  engine: engine,
-                  activeSaveSlot: 1,
-                  lastSavedAt: null,
-                  onManualSave: () async {},
-                  onReturnToTitle: () {},
-                  onAdvanceDay: () async {
-                    currentState = engine.advanceOneDay(currentState);
-                    updateHarness(() {});
-                    return currentState;
-                  },
-                  onSetMarketMinute: (minute) async {
-                    currentState = currentState.copyWith(marketMinute: minute);
-                    updateHarness(() {});
-                    return currentState;
-                  },
-                  onSaveMarketNotebook: (_, _) async => currentState,
-                  onBuildDailyNewspaper: (closingState) async =>
-                      DailyMarketNewspaper(
-                        date: closingState.currentDate,
-                        brief: buildDailyBrief(closingState),
-                        total: 0,
-                        advancers: 0,
-                        decliners: 0,
-                        unchanged: 0,
-                        topGainers: const [],
-                        topLosers: const [],
-                        headline: '하루 결산 테스트',
-                        summary: '테스트 신문',
-                      ),
-                  onResolveDecision: (_, _) async {},
-                  onRequestAcademyHelp: (_) async => currentState,
-                  onCompleteRelationshipEvening:
-                      (girlId, activity, choiceId) async {
-                        final result = engine.completeRelationshipEvening(
-                          currentState,
-                          girlId: girlId,
-                          activity: activity,
-                          choiceId: choiceId,
-                        );
-                        currentState = result.state;
-                        updateHarness(() {});
-                        return result;
-                      },
-                  onRestDuringRelationshipEvening: () async {
-                    final result = engine.restDuringRelationshipEvening(
-                      currentState,
-                    );
-                    currentState = result.state;
-                    updateHarness(() {});
-                    return result;
-                  },
-                  onCompleteWork: (_) async => currentState,
-                  onExecuteTrade: (_) async => TradeExecutionResult(
-                    state: currentState,
-                    success: false,
-                    message: 'test',
-                  ),
+                  success: false,
+                  message: 'test',
                 ),
-              );
-            },
-          ),
-        );
-        await tester.pumpAndSettle();
+              ),
+            );
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
 
-        await openHubTimeActions(tester);
-        await tester.tap(find.byKey(const Key('advance-day-button')));
-        await tester.pumpAndSettle();
-        expect(find.byType(RelationshipEveningScreen), findsOneWidget);
-        await tester.tap(find.byKey(const Key('relationship-rest-button')));
-        await tester.pumpAndSettle();
-        expect(find.byType(LifeCalendarScreen), findsOneWidget);
-        expect(currentState.day, initialDay);
-        expect(
-          find.byKey(const Key('life-calendar-continue-button')),
-          findsOneWidget,
-        );
-        await tester.tap(
-          find.byKey(const Key('life-calendar-continue-button')),
-        );
+      await openHubTimeActions(tester);
+      await tester.tap(find.byKey(const Key('advance-day-button')));
+      await tester.pumpAndSettle();
+      expect(find.byType(RelationshipEveningScreen), findsOneWidget);
+      await tester.tap(find.byKey(const Key('relationship-rest-button')));
+      for (
+        var attempt = 0;
+        attempt < 30 && find.byType(DailyWrapUpScreen).evaluate().isEmpty;
+        attempt++
+      ) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      await tester.pump();
 
-        for (
-          var attempt = 0;
-          attempt < 30 &&
-              find.byType(KoreaEconomicNewspaperSheet).evaluate().isEmpty;
-          attempt++
-        ) {
-          await tester.pump(const Duration(milliseconds: 100));
-        }
-        await tester.pump();
+      expect(currentState.day, initialDay + 1);
+      expect(currentState.marketMinute, marketDayStartMinute);
+      final hidden = currentState.story.storyFlags['hiddenMarketScenario'];
+      expect(hidden, isA<Map>());
+      expect((hidden as Map)['date'], marketDateKey(currentState.currentDate));
+      expect(find.byType(LifeCalendarScreen), findsNothing);
+      expect(find.byType(KoreaEconomicNewspaperSheet), findsNothing);
+      expect(find.byType(DailyWrapUpScreen), findsOneWidget);
+      expect(find.text('오늘 기록 · 내일 아침'), findsOneWidget);
+      await tester.drag(
+        find.byKey(const Key('daily-wrap-up-scroll')),
+        const Offset(0, -900),
+      );
+      await tester.pumpAndSettle();
+      expect(find.textContaining('테스트 신문'), findsOneWidget);
 
-        expect(currentState.day, initialDay + 1);
-        expect(currentState.marketMinute, marketDayStartMinute);
-        final hidden = currentState.story.storyFlags['hiddenMarketScenario'];
-        expect(hidden, isA<Map>());
-        expect(
-          (hidden as Map)['date'],
-          marketDateKey(currentState.currentDate),
-        );
-        expect(find.byType(KoreaEconomicNewspaperSheet), findsOneWidget);
+      await tester.tap(find.byKey(const Key('newspaper-next-day-button')));
+      await tester.pumpAndSettle();
 
-        if (closeMethod == '신문 X') {
-          await tester.tap(find.byIcon(Icons.close_rounded).first);
-        } else if (closeMethod == '상단 뒤로가기') {
-          await tester.tap(find.byIcon(Icons.arrow_back_ios_new_rounded).first);
-        } else {
-          await tester.binding.handlePopRoute();
-        }
-        await tester.pumpAndSettle();
-
-        expect(currentState.day, initialDay + 1);
-        expect(currentState.marketMinute, marketDayStartMinute);
-        expect(find.textContaining('08:00'), findsOneWidget);
-        expect(find.byType(KoreaEconomicNewspaperSheet), findsNothing);
-        expect(tester.takeException(), isNull);
-      },
-    );
-  }
+      expect(currentState.day, initialDay + 1);
+      expect(currentState.marketMinute, marketDayStartMinute);
+      expect(find.textContaining('08:00'), findsOneWidget);
+      expect(find.byType(DailyWrapUpScreen), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
   testWidgets('weekend day end skips the closed-market result screen', (
     tester,
   ) async {

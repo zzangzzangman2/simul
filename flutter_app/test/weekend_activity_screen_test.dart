@@ -55,7 +55,47 @@ void main() {
     expect(find.byKey(const Key('weekend-action-gift')), findsOneWidget);
     expect(find.byKey(const Key('weekend-action-study')), findsOneWidget);
     expect(find.byKey(const Key('weekend-action-rest')), findsOneWidget);
+    expect(
+      find.byKey(const Key('weekend-action-afternoon-fun')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('weekend-action-horse-racing')),
+      findsOneWidget,
+    );
     expect(find.text('행동력 2칸 남음'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('newspaper job opens the playable delivery route', (
+    tester,
+  ) async {
+    await setPhoneSurface(tester);
+    var state = weekendState('weekend-newspaper-ui');
+    await tester.pumpWidget(
+      MaterialApp(
+        home: WeekendScheduleScreen(
+          state: state,
+          onComplete: (request) async {
+            final result = engine.completeWeekendActivity(state, request);
+            if (result.success) state = result.state;
+            return result;
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final newspaperJob = find.byKey(
+      const Key('weekend-job-newspaper_delivery'),
+    );
+    await tester.ensureVisible(newspaperJob);
+    await tester.tap(newspaperJob);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 350));
+
+    expect(find.text('새벽 신문배달'), findsOneWidget);
+    expect(find.byKey(const Key('rider-course')), findsOneWidget);
+    expect(find.byKey(const Key('newspaper-throw')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

@@ -88,7 +88,6 @@ void main() {
     expect(state.ledger.single.account, 'brokerage_cash');
     expect(state.ledger.single.counterAccount, 'state_seed_capital');
     expect(state.ledger.single.description, contains('데시멀 기금'));
-    expect(state.story.flagBool('legacyMissionUiDisabled'), isTrue);
     expect(state.pendingDecisions, isEmpty);
   });
 
@@ -192,23 +191,7 @@ void main() {
       expect(completed.story.flagInt('practiceTradingDay'), 3);
       expect(completed.story.flagInt('liveTradingStartDay'), 4);
       expect(completed.story.flagBool('liveTradingStarted'), isTrue);
-      expect(completed.pendingDecisions.single.id, 'first-research-note');
-    },
-  );
-
-  test(
-    'first research choice changes cohort trust and is applied only once',
-    () {
-      var state = engine.createNewGame('조사 연구소');
-      final decisionId = state.pendingDecisions.first.id;
-      final trustBefore = state.story.flagInt('cohortTrust', 30);
-      state = engine.resolveDecision(state, decisionId, 'research_cashflow');
-      final afterFirst = state;
-      state = engine.resolveDecision(state, decisionId, 'research_cashflow');
-
-      expect(afterFirst.story.flagInt('cohortTrust'), trustBefore + 1);
-      expect(afterFirst.story.storyFlags['firstResearchFocus'], 'cashflow');
-      expect(state.toJson(), afterFirst.toJson());
+      expect(completed.pendingDecisions, isEmpty);
     },
   );
 
@@ -321,7 +304,6 @@ void main() {
 
   test('academy helper fatigue, daily limit, and recovery are persisted', () {
     var state = engine.createNewGame('제6기 연구소');
-    state = resolveFirst(state, 'research_products');
     final helperBefore = state.organization.academyHelpers.first;
 
     state = engine.requestAcademyHelp(state, 'hakjun');
@@ -329,6 +311,13 @@ void main() {
     expect(afterHelp.fatigue, helperBefore.fatigue + 12);
     expect(afterHelp.helpCount, 1);
     expect(state.organization.helpLog, hasLength(1));
+
+    final restored = GameState.fromJson(state.toJson());
+    expect(
+      restored.organization.academyHelpers.first.toJson(),
+      afterHelp.toJson(),
+    );
+    expect(restored.organization.helpLog, state.organization.helpLog);
 
     final duplicate = engine.requestAcademyHelp(state, 'hakjun');
     expect(duplicate.toJson(), state.toJson());
@@ -1359,6 +1348,32 @@ void main() {
     );
     expect(overReserved.success, isFalse);
     expect(overReserved.message, contains('발행주식'));
+  });
+
+  test('one regular order cannot exceed five percent of listed shares', () {
+    final base = engine.createNewGame(
+      '최대 호가수량',
+      initialCash: 1000000000,
+      worldSeed: 'maximum-quote-quantity',
+    );
+    final state = base.copyWith(
+      day: 4,
+      marketMinute: krxOpenMinute,
+      story: base.story.copyWith(accountAuthorityLevel: 5),
+    );
+
+    final result = engine.executeTrade(
+      state,
+      hanbitOrder(
+        side: TradeSide.buy,
+        quantity: 51,
+        maximumPositionUnits: 1000,
+      ),
+    );
+
+    expect(result.success, isFalse);
+    expect(result.message, contains('5%'));
+    expect(result.state.toJson(), state.toJson());
   });
 
   test(
@@ -2569,7 +2584,7 @@ void main() {
       });
 
       expect(state.version, GameState.schemaVersion);
-      expect(GameState.schemaVersion, 26);
+      expect(GameState.schemaVersion, 27);
       expect(state.businesses.businesses, isEmpty);
       expect(state.day, 5);
       expect(state.cash, 765432);
@@ -3787,14 +3802,11 @@ void main() {
     expect(migrated.company.leadershipModel, CompanyLeadershipModel.unassigned);
   });
 
-  test('semiannual era choices make the 20-decision mission attainable', () {
-    var state = resolveFirst(
-      engine.createNewGame(
-        '시대 결정 테스트',
-        initialCash: 0,
-        worldSeed: 'era-decision-world',
-      ),
-      'research_products',
+  test('semiannual era choices continue across the campaign', () {
+    var state = engine.createNewGame(
+      '시대 결정 테스트',
+      initialCash: 0,
+      worldSeed: 'era-decision-world',
     );
 
     for (var year = 2000; year <= 2010; year++) {
@@ -3823,10 +3835,7 @@ void main() {
   test(
     'prudent office milestone does not force rent, while expansion does',
     () {
-      final initial = resolveFirst(
-        engine.createNewGame('사무실 선택 테스트', initialCash: 1000000),
-        'research_products',
-      );
+      final initial = engine.createNewGame('사무실 선택 테스트', initialCash: 1000000);
       final officeDate = DateTime(2004, 1, 2);
       final beforeOfficeDay = officeDate
           .difference(initial.campaignStartDate)

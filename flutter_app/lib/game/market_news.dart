@@ -139,7 +139,14 @@ const _fallbackLenses = <String>[
 (String, String) _flavorFor(DateTime date, {required bool weekend}) {
   final day = _daySince2000(date);
   if (weekend) {
-    return _weekend[day % _weekend.length];
+    final base = _weekend[day % _weekend.length];
+    final week = day ~/ 7;
+    final angle =
+        _fallbackAngles[(week + date.weekday) % _fallbackAngles.length];
+    final lens =
+        _fallbackLenses[(week ~/ _fallbackAngles.length + date.weekday) %
+            _fallbackLenses.length];
+    return ('${base.$1} · $angle', '${base.$2} $lens');
   }
   final List<(String, String)> pool;
   final month = date.month;
@@ -329,15 +336,22 @@ Future<DailyMarketNewspaper> buildDailyMarketNewspaper(
     if (quote == null || !quote.isExactDate) continue;
     final rawPrevious = asset.unadjustedReferenceCloseFor(quote.date);
     if (rawPrevious <= 0) continue;
-    final previous = asset.marketReferenceCloseOn(
-      DateTime.parse(quote.date),
-      previousClose: rawPrevious,
-    );
+    final previous =
+        asset.marketReferenceCloseOn(
+          DateTime.parse(quote.date),
+          previousClose: rawPrevious,
+        ) *
+        state.shareholderGovernance.priceMultiplierFor(asset.id, state.day - 1);
     if (previous <= 0) continue;
+    final current = state.shareholderGovernance.adjustedPrice(
+      asset.id,
+      state.day,
+      quote.close,
+    );
     movers.add(
       DailyMarketMover(
         name: asset.name,
-        changeRate: (quote.close - previous) / previous * 100,
+        changeRate: (current - previous) / previous * 100,
       ),
     );
   }

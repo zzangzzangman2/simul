@@ -425,6 +425,62 @@ List<GameOrderBookLevel> _symmetricVisibleOrderBookLevels(
   ...snapshot.bids.take(_visibleOrderBookSideRows),
 ];
 
+/// Adds resting player orders to the visible ladder without treating them as
+/// synthetic external inventory.
+///
+/// The generated snapshot intentionally contains external liquidity only. A
+/// player quote at a price where no external participant is resting therefore
+/// needs a zero-depth presentation row of its own. This is especially important
+/// after a full takeover, when external asks can legitimately be empty.
+List<GameOrderBookLevel> orderBookPresentationLevelsWithPlayerOrders({
+  required Iterable<GameOrderBookLevel> marketLevels,
+  required Iterable<PendingTradeOrder> playerOrders,
+  int visibleSideRows = _visibleOrderBookSideRows,
+}) {
+  final levels = marketLevels.toList(growable: true);
+  for (final order in playerOrders) {
+    if (!order.limitPrice.isFinite ||
+        order.limitPrice <= 0 ||
+        !order.remainingQuantity.isFinite ||
+        order.remainingQuantity <= 0) {
+      continue;
+    }
+    final side = order.side == PendingOrderSide.sell
+        ? GameOrderBookSide.ask
+        : GameOrderBookSide.bid;
+    final alreadyVisible = levels.any(
+      (level) =>
+          level.side == side &&
+          (level.price - order.limitPrice).abs() < 0.000001,
+    );
+    if (alreadyVisible) continue;
+    levels.add(
+      GameOrderBookLevel(
+        side: side,
+        price: order.limitPrice,
+        quantity: 0,
+        isWall: false,
+      ),
+    );
+  }
+
+  final sideRows = math.max(0, visibleSideRows);
+  final asks =
+      levels
+          .where((level) => level.side == GameOrderBookSide.ask)
+          .toList(growable: false)
+        ..sort((left, right) => left.price.compareTo(right.price));
+  final bids =
+      levels
+          .where((level) => level.side == GameOrderBookSide.bid)
+          .toList(growable: false)
+        ..sort((left, right) => right.price.compareTo(left.price));
+  return List<GameOrderBookLevel>.unmodifiable([
+    ...asks.take(sideRows).toList(growable: false).reversed,
+    ...bids.take(sideRows),
+  ]);
+}
+
 /// Keeps the last complete ladder visible while a FIFO cancellation packet
 /// briefly carries no rows of its own.
 ///
@@ -1362,6 +1418,7 @@ class StockMarketScreen extends StatefulWidget {
     super.key,
     required this.state,
     this.onExecuteTrade,
+    this.onSaveGovernanceState,
     this.onCancelPendingOrder,
     this.onTransferCash,
     this.onSetMarketMinute,
@@ -1382,6 +1439,7 @@ class StockMarketScreen extends StatefulWidget {
   final Future<FinanceActionResult> Function()? onPurchaseReport;
   final Future<GameState> Function()? onCompleteTutorial;
   final Future<TradeExecutionResult> Function(TradeOrder)? onExecuteTrade;
+  final Future<GameState> Function(GameState)? onSaveGovernanceState;
   final Future<FinanceActionResult> Function(String orderId)?
   onCancelPendingOrder;
   final Future<FinanceActionResult> Function(int amount, bool deposit)?
@@ -1429,6 +1487,13 @@ class _StockMarketScreenState extends State<StockMarketScreen>
   late final ValueNotifier<GameState> _marketStateNotifier;
   GameState get _state => _marketStateNotifier.value;
   set _state(GameState value) => _marketStateNotifier.value = value;
+
+  Future<GameState> _saveGovernanceState(GameState next) async {
+    final saver = widget.onSaveGovernanceState;
+    final saved = saver == null ? next : await saver(next);
+    if (mounted) setState(() => _state = saved);
+    return saved;
+  }
 
   int _tab = 0;
   _MarketSort _sort = _MarketSort.turnover;
@@ -1703,77 +1768,13 @@ class _StockMarketScreenState extends State<StockMarketScreen>
     required double previousClose,
     required Iterable<LedgerEntry> entries,
   }) {
-    if (sourcePath.isEmpty || previousClose <= 0) {
-      return List<double>.from(sourcePath);
-    }
-    final impacted = List<double>.from(sourcePath);
-    final range = marketDailyPriceRange(
+    return marketSessionPathWithPlayerImpact(
+      state: _state,
+      asset: stock.asset,
+      sourcePath: sourcePath,
       previousClose: previousClose,
-      date: _state.currentDate,
-      market: stock.market,
-      isIpoFirstTradingDay: stock.asset.isIpoFirstTradingDay(
-        _state.currentDate,
-      ),
+      entries: entries,
     );
-    final sharesOutstanding = stock.asset.sharesOutstandingAtOrBefore(
-      _state.currentDate,
-    );
-    for (final entry in entries) {
-      final isBuy = entry.tradeSide == TradeSide.buy.name;
-      final isSell = entry.tradeSide == TradeSide.sell.name;
-      if (entry.day != _state.day ||
-          entry.assetId != stock.id ||
-          (!isBuy && !isSell) ||
-          !entry.tradeQuantity.isFinite ||
-          entry.tradeQuantity <= 0 ||
-          entry.marketMinute < krxOpenMinute ||
-          entry.marketMinute >= krxContinuousEndMinute) {
-        continue;
-      }
-      final referencePrice =
-          entry.tradeUnitPrice.isFinite && entry.tradeUnitPrice > 0
-          ? entry.tradeUnitPrice
-          : previousClose;
-      final executionCapacity = gameOrderBookExecutionCapacity(
-        assetId: stock.id,
-        day: marketLiquidityDayKey(_state.currentDate),
-        minute: entry.marketMinute,
-        unitPrice: referencePrice,
-        previousClose: previousClose,
-        simulationSeed: _state.simulationSeed,
-        sharesOutstanding: sharesOutstanding,
-      );
-      final initialTicks = gamePlayerMarketImpactInitialTicks(
-        filledQuantity: entry.tradeQuantity,
-        executionCapacity: executionCapacity,
-      );
-      if (initialTicks <= 0) continue;
-      for (
-        var ageMinutes = 1;
-        ageMinutes <= gamePlayerMarketImpactDurationMinutes;
-        ageMinutes += 1
-      ) {
-        final affectedMinute = entry.marketMinute + ageMinutes;
-        if (affectedMinute >= krxContinuousEndMinute) break;
-        final pathIndex = marketTickForMinute(affectedMinute);
-        if (pathIndex < 0 || pathIndex >= impacted.length) continue;
-        final decayedTicks = gamePlayerMarketImpactTicksAtAge(
-          initialTicks: initialTicks,
-          ageMinutes: ageMinutes,
-        );
-        final signedTicks = isBuy ? decayedTicks : -decayedTicks;
-        final shifted = gameOrderBookPriceAfterTickImpact(
-          basePrice: impacted[pathIndex],
-          signedTicks: signedTicks,
-          market: stock.market,
-        );
-        impacted[pathIndex] = marketSnapPrice(
-          shifted.clamp(range.lower, range.upper).toDouble(),
-          market: stock.market,
-        );
-      }
-    }
-    return impacted;
   }
 
   void _applyNewPlayerMarketImpact(Iterable<LedgerEntry> entries) {
@@ -1910,6 +1911,11 @@ class _StockMarketScreenState extends State<StockMarketScreen>
                   forceRefresh: forceRefresh,
                 ));
       final universe = loadedUniverse.asOf(_state.currentDate);
+      final governanceState = const ShareholderGovernanceEngine().processDay(
+        _state,
+        universe,
+      );
+      _state = await _saveGovernanceState(governanceState);
       if (!mounted) return;
       setState(() {
         _loadProgress = 0.62;
@@ -1927,14 +1933,36 @@ class _StockMarketScreenState extends State<StockMarketScreen>
           final rawPreviousClose = asset.unadjustedReferenceCloseFor(
             quote.date,
           );
-          final marketReferenceClose = asset.marketReferenceCloseOn(
-            DateTime.parse(quote.date),
-            previousClose: rawPreviousClose,
-          );
+          final currentManagementMultiplier = _state.shareholderGovernance
+              .priceMultiplierFor(asset.id, _state.day);
+          final previousManagementMultiplier = _state.shareholderGovernance
+              .priceMultiplierFor(asset.id, _state.day - 1);
+          final marketReferenceClose =
+              asset.marketReferenceCloseOn(
+                DateTime.parse(quote.date),
+                previousClose: rawPreviousClose,
+              ) *
+              previousManagementMultiplier;
           // The live list needs 13 displayed flow rows, their predecessor for
           // the oldest return, and today's possibly hidden pre-open point.
           // Long-range charts query the asset directly.
-          final history = asset.historyThrough(_state.currentDate, count: 15);
+          final history = asset
+              .historyThrough(_state.currentDate, count: 15)
+              .map(
+                (point) => MarketPoint(
+                  date: point.date,
+                  close:
+                      point.close *
+                      _state.shareholderGovernance.priceMultiplierFor(
+                        asset.id,
+                        point.parsedDate
+                                .difference(_state.campaignStartDate)
+                                .inDays +
+                            1,
+                      ),
+                ),
+              )
+              .toList(growable: false);
           loaded.add(stock);
           final rawPath = quote.isExactDate
               ? generatedMarketDayPathForAsset(
@@ -1945,14 +1973,17 @@ class _StockMarketScreenState extends State<StockMarketScreen>
                   officialClose: quote.close,
                 )
               : <double>[quote.close];
+          final managementAdjustedPath = rawPath
+              .map((price) => price * currentManagementMultiplier)
+              .toList(growable: false);
           final path = quote.isExactDate
               ? _sessionPathWithPlayerMarketImpact(
                   stock: stock,
-                  sourcePath: rawPath,
+                  sourcePath: managementAdjustedPath,
                   previousClose: marketReferenceClose,
                   entries: _state.ledger,
                 )
-              : rawPath;
+              : managementAdjustedPath;
           final pathIndex = quote.isExactDate
               ? _tick.clamp(0, path.length - 1)
               : 0;
@@ -1973,10 +2004,12 @@ class _StockMarketScreenState extends State<StockMarketScreen>
               settledPath.length,
               generatedPreOpenTicks + generatedContinuousTradingTicks,
             );
-            tradingHistory = settledPath.sublist(
-              generatedPreOpenTicks,
-              continuousEnd,
-            )..add(quote.close);
+            tradingHistory =
+                settledPath
+                    .sublist(generatedPreOpenTicks, continuousEnd)
+                    .map((price) => price * currentManagementMultiplier)
+                    .toList()
+                  ..add(quote.close * currentManagementMultiplier);
           } else {
             tradingHistory = <double>[marketReferenceClose];
           }
@@ -1984,7 +2017,7 @@ class _StockMarketScreenState extends State<StockMarketScreen>
             _LiveStock(
               price: startingPrice,
               previousClose: marketReferenceClose,
-              officialClose: quote.close,
+              officialClose: quote.close * currentManagementMultiplier,
               isTradingDay: quote.isExactDate,
               open: tradingHistory.first,
               high: tradingHistory.reduce(math.max),
@@ -3081,6 +3114,7 @@ class _StockMarketScreenState extends State<StockMarketScreen>
             playbackSpeed: _playbackSpeedNotifier,
             onPlaybackSpeedChanged: _setPlaybackSpeed,
             onExecuteTrade: _executeTrade,
+            onSaveGovernanceState: _saveGovernanceState,
             onCancelPendingOrder: widget.onCancelPendingOrder == null
                 ? null
                 : _cancelPendingOrder,
@@ -3380,7 +3414,10 @@ class _StockMarketScreenState extends State<StockMarketScreen>
           actions: announcedActions,
           subscribeRights: subscribeRights,
           savingPreference: _isSavingRightsPreference,
-          preferenceEnabled: widget.onSetRightsIssuePreference != null,
+          preferenceEnabled:
+              advancedCorporateActionsUnlocked(_state) &&
+              widget.onSetRightsIssuePreference != null,
+          rightsChoiceUnlocked: advancedCorporateActionsUnlocked(_state),
           onPreferenceChanged: (value) =>
               unawaited(_setRightsIssuePreference(value)),
         ),
@@ -3739,6 +3776,7 @@ class _StockDetailScreen extends StatefulWidget {
     required this.playbackSpeed,
     required this.onPlaybackSpeedChanged,
     required this.onExecuteTrade,
+    required this.onSaveGovernanceState,
     required this.onCancelPendingOrder,
     required this.onToggleFavorite,
     required this.onSaveResearchNote,
@@ -3764,6 +3802,7 @@ class _StockDetailScreen extends StatefulWidget {
   final ValueNotifier<_MarketPlaybackSpeed> playbackSpeed;
   final ValueChanged<_MarketPlaybackSpeed> onPlaybackSpeedChanged;
   final Future<TradeExecutionResult> Function(TradeOrder) onExecuteTrade;
+  final Future<GameState> Function(GameState)? onSaveGovernanceState;
   final Future<void> Function(String orderId)? onCancelPendingOrder;
   final Future<GameState> Function(String) onToggleFavorite;
   final Future<GameState> Function(String, String) onSaveResearchNote;
@@ -3834,6 +3873,14 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
   ValueNotifier<_LiveStock> get live => widget.live;
   GameState get state => _state;
   ValueNotifier<int> get minute => widget.minute;
+  double get _playerOwnedUnits => state.positions
+      .where((position) => position.assetId == definition.id)
+      .fold<double>(0, (sum, position) => sum + position.units);
+  double get _playerTenderAcquiredUnits =>
+      state.shareholderGovernance
+          .companyById(definition.id)
+          ?.tenderAcquiredShares ??
+      0;
   String get _orderBookSessionKey =>
       '${state.simulationSeed}:${marketDateKey(state.currentDate)}';
 
@@ -4150,6 +4197,8 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
       sharesOutstanding: definition.asset.sharesOutstandingAtOrBefore(
         state.currentDate,
       ),
+      playerOwnedUnits: _playerOwnedUnits,
+      playerTenderAcquiredUnits: _playerTenderAcquiredUnits,
       isIpoFirstTradingDay: definition.asset.isIpoFirstTradingDay(
         state.currentDate,
       ),
@@ -4270,7 +4319,9 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
     final day = marketLiquidityDayKey(state.currentDate);
     final cacheKey =
         '${state.simulationSeed}:${definition.id}:$day:'
-        '$currentMinute:$microstructureFrame';
+        '$currentMinute:$microstructureFrame:'
+        '${_playerOwnedUnits.toStringAsFixed(6)}:'
+        '${_playerTenderAcquiredUnits.toStringAsFixed(6)}';
     final currentPrice = _intraMinuteWalkPrice(
       quote,
       currentMinute,
@@ -4312,6 +4363,8 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
       sharesOutstanding: definition.asset.sharesOutstandingAtOrBefore(
         state.currentDate,
       ),
+      playerOwnedUnits: _playerOwnedUnits,
+      playerTenderAcquiredUnits: _playerTenderAcquiredUnits,
       isIpoFirstTradingDay: definition.asset.isIpoFirstTradingDay(
         state.currentDate,
       ),
@@ -5549,6 +5602,8 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
                                   asset: definition.asset,
                                   simulationSeed: state.simulationSeed,
                                   throughDate: state.currentDate,
+                                  campaignStartDate: state.campaignStartDate,
+                                  governance: state.shareholderGovernance,
                                 ),
                                 const SizedBox(height: 24),
                                 _QuoteGrid(quote: quote),
@@ -10145,6 +10200,8 @@ class _MinuteChartPanel extends StatefulWidget {
     required this.asset,
     required this.simulationSeed,
     required this.throughDate,
+    required this.campaignStartDate,
+    required this.governance,
   });
 
   final _LiveStock quote;
@@ -10154,6 +10211,8 @@ class _MinuteChartPanel extends StatefulWidget {
   final FictionalMarketAsset asset;
   final String simulationSeed;
   final DateTime throughDate;
+  final DateTime campaignStartDate;
+  final ShareholderGovernanceState governance;
 
   @override
   State<_MinuteChartPanel> createState() => _MinuteChartPanelState();
@@ -10199,19 +10258,43 @@ class _MinuteChartPanelState extends State<_MinuteChartPanel> {
     return (prices: prices, startMinute: 0, previousSessionPointCount: 0);
   }
 
-  List<MarketDatedCandle> _dailyCandles() => recentMarketDailyCandles(
-    asset: widget.asset,
-    simulationSeed: widget.simulationSeed,
-    throughDate: widget.throughDate,
-    visibleThroughMinute: widget.minute,
-    count: switch (period) {
-      _ChartPeriod.day => 120,
-      _ChartPeriod.week => 280,
-      _ChartPeriod.month => 1380,
-      _ChartPeriod.year => 3100,
-      _ChartPeriod.minute => 0,
-    },
-  );
+  List<MarketDatedCandle> _dailyCandles() =>
+      recentMarketDailyCandles(
+            asset: widget.asset,
+            simulationSeed: widget.simulationSeed,
+            throughDate: widget.throughDate,
+            visibleThroughMinute: widget.minute,
+            count: switch (period) {
+              _ChartPeriod.day => 120,
+              _ChartPeriod.week => 280,
+              _ChartPeriod.month => 1380,
+              _ChartPeriod.year => 3100,
+              _ChartPeriod.minute => 0,
+            },
+          )
+          .map((item) {
+            final date = DateTime.tryParse(item.date);
+            final day = date == null
+                ? 0
+                : date.difference(widget.campaignStartDate).inDays + 1;
+            final multiplier = widget.governance.priceMultiplierFor(
+              widget.asset.id,
+              day,
+            );
+            final candle = item.candle;
+            return MarketDatedCandle(
+              date: item.date,
+              candle: MarketCandle(
+                open: candle.open * multiplier,
+                high: candle.high * multiplier,
+                low: candle.low * multiplier,
+                close: candle.close * multiplier,
+                startMinute: candle.startMinute,
+                volume: candle.volume,
+              ),
+            );
+          })
+          .toList(growable: false);
 
   List<MarketCandle> _currentMinuteCandles({
     required List<double> prices,
@@ -10407,8 +10490,20 @@ class _MinuteChartPanelState extends State<_MinuteChartPanel> {
         );
         final previousSession = previousSessionSeries?.prices;
         if (previousSession != null && previousSession.isNotEmpty) {
+          final previousDay =
+              previousSessionSeries!.date
+                  .difference(widget.campaignStartDate)
+                  .inDays +
+              1;
+          final previousMultiplier = widget.governance.priceMultiplierFor(
+            widget.asset.id,
+            previousDay,
+          );
           minuteSeries = (
-            prices: <double>[...previousSession, ...minuteSeries.prices],
+            prices: <double>[
+              ...previousSession.map((price) => price * previousMultiplier),
+              ...minuteSeries.prices,
+            ],
             startMinute: -previousSession.length,
             previousSessionPointCount: previousSession.length,
           );
@@ -11091,6 +11186,8 @@ class _LiveStock {
 
   _LiveStock copyWith({
     double? price,
+    double? previousClose,
+    double? officialClose,
     double? open,
     double? high,
     double? low,
@@ -11099,8 +11196,8 @@ class _LiveStock {
     List<double>? sessionPath,
   }) => _LiveStock(
     price: price ?? this.price,
-    previousClose: previousClose,
-    officialClose: officialClose,
+    previousClose: previousClose ?? this.previousClose,
+    officialClose: officialClose ?? this.officialClose,
     isTradingDay: isTradingDay,
     open: open ?? this.open,
     high: high ?? this.high,

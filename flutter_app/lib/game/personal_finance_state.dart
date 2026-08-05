@@ -1,3 +1,4 @@
+import 'casino_state.dart';
 import 'real_estate_market.dart';
 import 'real_estate_financing.dart';
 import 'real_estate_rental.dart';
@@ -669,6 +670,7 @@ class PersonalFinanceState {
     required this.chancePlayCount,
     required this.totalChanceStake,
     required this.totalChancePayout,
+    required this.casino,
   });
 
   factory PersonalFinanceState.initial() => const PersonalFinanceState(
@@ -681,6 +683,7 @@ class PersonalFinanceState {
     chancePlayCount: 0,
     totalChanceStake: 0,
     totalChancePayout: 0,
+    casino: CasinoState.initial(),
   );
 
   final List<OwnedRealEstate> realEstate;
@@ -692,6 +695,7 @@ class PersonalFinanceState {
   final int chancePlayCount;
   final int totalChanceStake;
   final int totalChancePayout;
+  final CasinoState casino;
 
   bool ownsRealEstate(String optionId) =>
       realEstate.any((asset) => asset.optionId == optionId);
@@ -781,6 +785,7 @@ class PersonalFinanceState {
     int? chancePlayCount,
     int? totalChanceStake,
     int? totalChancePayout,
+    CasinoState? casino,
   }) => PersonalFinanceState(
     realEstate: realEstate ?? this.realEstate,
     permanentPurchases: permanentPurchases ?? this.permanentPurchases,
@@ -791,6 +796,7 @@ class PersonalFinanceState {
     chancePlayCount: chancePlayCount ?? this.chancePlayCount,
     totalChanceStake: totalChanceStake ?? this.totalChanceStake,
     totalChancePayout: totalChancePayout ?? this.totalChancePayout,
+    casino: casino ?? this.casino,
   );
 
   Map<String, dynamic> toJson() => {
@@ -803,6 +809,7 @@ class PersonalFinanceState {
     'chancePlayCount': chancePlayCount,
     'totalChanceStake': totalChanceStake,
     'totalChancePayout': totalChancePayout,
+    'casino': casino.toJson(),
   };
 
   factory PersonalFinanceState.fromJson(Map<String, dynamic> json) {
@@ -829,6 +836,11 @@ class PersonalFinanceState {
       chancePlayCount: (json['chancePlayCount'] as num?)?.toInt() ?? 0,
       totalChanceStake: (json['totalChanceStake'] as num?)?.toInt() ?? 0,
       totalChancePayout: (json['totalChancePayout'] as num?)?.toInt() ?? 0,
+      casino: json['casino'] is Map
+          ? CasinoState.fromJson(
+              (json['casino'] as Map).cast<String, dynamic>(),
+            )
+          : const CasinoState.initial(),
     );
   }
 }

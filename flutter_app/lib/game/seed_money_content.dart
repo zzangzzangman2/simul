@@ -28,11 +28,11 @@ class WorkActivityInfo {
 
 const workActivities = <WorkActivityInfo>[
   WorkActivityInfo(
-    id: 'rider',
-    title: '잼민 라이더',
-    subtitle: '슬라이드 회피 · 크리티컬 콤보 · 완주 수당',
-    periodPay: '완주 점수에 따라 700~2,200원 + 실기 특성 수당',
+    id: 'newspaper_delivery',
+    title: '새벽 신문배달',
+    subtitle: '좌우 주행 · 방향 플릭 · 정확도 콤보',
+    periodPay: '배달 점수에 따라 900~2,500원 + 실기 특성 수당',
     description:
-        '데시멀 센터 실기 훈련장의 폐쇄된 킥보드 코스를 달립니다. 장애물을 피하고 모의 배달 지점을 모두 통과해야 활동 수당을 받습니다.',
+        '겨울 새벽 주택가를 자전거로 돌며 우편함 방향으로 신문을 직접 플릭합니다. 투척 방향·세기·타이밍과 연속 배달이 수당을 결정합니다.',
   ),
 ];

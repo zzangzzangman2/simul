@@ -2295,42 +2295,6 @@ footer {
   white-space: nowrap;
 }
 
-.room-mission {
-  position: absolute;
-  z-index: 5;
-  top: 106px;
-  left: 14px;
-  max-width: 240px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 11px 13px;
-  border-left: 3px solid #ff794d;
-  border-radius: 0 10px 10px 0;
-  background: rgba(5, 11, 17, 0.75);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.23);
-  backdrop-filter: blur(7px);
-}
-
-.room-mission > span {
-  color: #ff936d;
-  font: 800 8px/1 var(--font-geist-mono), monospace;
-  letter-spacing: 0.08em;
-}
-
-.room-mission strong {
-  color: #fffdf5;
-  font-size: 17px;
-  line-height: 1.18;
-  letter-spacing: -0.045em;
-}
-
-.room-mission small {
-  color: #a8b7b1;
-  font-size: 9px;
-  line-height: 1.4;
-}
-
 .room-hotspot {
   position: absolute;
   z-index: 6;
@@ -2769,10 +2733,6 @@ footer {
 }
 
 @media (max-width: 360px) {
-  .room-mission {
-    max-width: 218px;
-  }
-
   .hotspot-label {
     min-width: 82px;
     padding-inline: 8px;

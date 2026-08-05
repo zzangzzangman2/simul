@@ -18,12 +18,11 @@ class OfficeScreen extends StatelessWidget {
     required this.onSaveMarketNotebook,
     this.onSetMarketRightsIssuePreference,
     required this.onResolveDecision,
-    this.onClaimMission,
-    this.onPurchaseStarShopItem,
     required this.onRequestAcademyHelp,
     this.onCompleteRelationshipEvening,
     this.onRestDuringRelationshipEvening,
     this.onCompleteWeekdayActivity,
+    this.onCompleteWeeklyPortfolioReview,
     this.onCompleteWeekendActivity,
     this.onSettleCohortInvestmentDay,
     this.onLendToCohortInvestor,
@@ -33,6 +32,7 @@ class OfficeScreen extends StatelessWidget {
     this.onRespondToCohortWithdrawal,
     this.onMarkPhoneThreadRead,
     this.onSendPhoneMessage,
+    this.onSendPhoneGift,
     this.phoneAiService,
     this.onHireEmployee,
     this.onLaunchFund,
@@ -54,6 +54,10 @@ class OfficeScreen extends StatelessWidget {
     this.onPrepayRealEstateMortgage,
     this.onRefinanceRealEstateMortgage,
     this.onPlayChanceGame,
+    this.onPlayCasinoRound,
+    this.onStartCasinoBlackjack,
+    this.onCasinoBlackjackAction,
+    this.onCasinoCrapsRoll,
     this.onOpenTimeDeposit,
     this.onRedeemTimeDeposit,
     this.onTakeUnsecuredLoan,
@@ -67,6 +71,7 @@ class OfficeScreen extends StatelessWidget {
     this.onBuildDailyNewspaper,
     required this.onCompleteWork,
     required this.onExecuteTrade,
+    this.onSaveGovernanceState,
     this.onCancelPendingOrder,
     this.onTransferBrokerageCash,
   });
@@ -88,9 +93,6 @@ class OfficeScreen extends StatelessWidget {
   final Future<GameState> Function(bool subscribe)?
   onSetMarketRightsIssuePreference;
   final Future<void> Function(String, String) onResolveDecision;
-  final Future<MissionClaimResult> Function()? onClaimMission;
-  final Future<StarShopPurchaseResult> Function(String productId)?
-  onPurchaseStarShopItem;
   final Future<GameState> Function(String) onRequestAcademyHelp;
   final Future<RelationshipActionResult> Function(
     String girlId,
@@ -102,6 +104,13 @@ class OfficeScreen extends StatelessWidget {
   onRestDuringRelationshipEvening;
   final Future<WeekdayActivityResult> Function(String activityId)?
   onCompleteWeekdayActivity;
+  final Future<GameState> Function({
+    required WeeklyPortfolioReviewAction action,
+    required String assetId,
+    required String assetName,
+    required int riskLimitBps,
+  })?
+  onCompleteWeeklyPortfolioReview;
   final Future<WeekendActivityResult> Function(WeekendActivityRequest request)?
   onCompleteWeekendActivity;
   final Future<CohortInvestmentActionResult> Function()?
@@ -133,6 +142,11 @@ class OfficeScreen extends StatelessWidget {
     String text,
   )?
   onSendPhoneMessage;
+  final Future<PhoneMessengerActionResult> Function(
+    String contactId,
+    String giftId,
+  )?
+  onSendPhoneGift;
   final PhoneAiService? phoneAiService;
   final Future<GameState> Function(String)? onHireEmployee;
   final Future<GameState> Function()? onLaunchFund;
@@ -172,6 +186,11 @@ class OfficeScreen extends StatelessWidget {
   })?
   onRefinanceRealEstateMortgage;
   final Future<FinanceActionResult> Function(int stake)? onPlayChanceGame;
+  final Future<CasinoActionResult> Function(CasinoBet bet)? onPlayCasinoRound;
+  final Future<CasinoActionResult> Function(int stake)? onStartCasinoBlackjack;
+  final Future<CasinoActionResult> Function(BlackjackAction action)?
+  onCasinoBlackjackAction;
+  final Future<CasinoActionResult> Function()? onCasinoCrapsRoll;
   final BankOpenDepositCallback? onOpenTimeDeposit;
   final BankRedeemDepositCallback? onRedeemTimeDeposit;
   final BankTakeLoanCallback? onTakeUnsecuredLoan;
@@ -186,6 +205,7 @@ class OfficeScreen extends StatelessWidget {
   final Future<DailyMarketNewspaper> Function(GameState)? onBuildDailyNewspaper;
   final Future<GameState> Function(WorkSessionResult) onCompleteWork;
   final Future<TradeExecutionResult> Function(TradeOrder) onExecuteTrade;
+  final Future<GameState> Function(GameState)? onSaveGovernanceState;
   final Future<FinanceActionResult> Function(String orderId)?
   onCancelPendingOrder;
   final Future<FinanceActionResult> Function(int amount, bool deposit)?
@@ -207,12 +227,28 @@ class OfficeScreen extends StatelessWidget {
           onPurchaseReport: onPurchaseMarketReport,
           onCompleteTutorial: onCompleteMarketTutorial,
           onExecuteTrade: onExecuteTrade,
+          onSaveGovernanceState: onSaveGovernanceState,
           onCancelPendingOrder: onCancelPendingOrder,
           onTransferCash: onTransferBrokerageCash,
           orderBookSessionCache: stockOrderBookSessionCache,
         ),
       ),
     );
+  }
+
+  Future<GameState> _openShareholderCompanyHub(
+    BuildContext context,
+    GameState currentState,
+  ) async {
+    final updated = await Navigator.of(context).push<GameState>(
+      _gameSceneRoute<GameState>(
+        ShareholderCompanyHubScreen(
+          state: currentState,
+          onSaveState: onSaveGovernanceState,
+        ),
+      ),
+    );
+    return updated ?? _latestState;
   }
 
   Future<void> _openRealEstateMarket(
@@ -294,40 +330,73 @@ class OfficeScreen extends StatelessWidget {
     );
   }
 
-  Future<GameState?> _useWeekdayEvening(
-    BuildContext context,
-    String activityId,
-  ) async {
+  Future<void> _openCasino(BuildContext context) async {
+    final currentState = _latestState;
+    final openedDay = currentState.day;
+    CasinoActionResult unavailable() => CasinoActionResult(
+      state: currentState,
+      success: false,
+      message: '이 화면에서는 카지노 결과를 저장할 수 없습니다.',
+    );
+    await Navigator.of(context).push<void>(
+      _gameSceneRoute<void>(
+        CasinoScreen(
+          state: currentState,
+          onPlayRound: onPlayCasinoRound ?? (bet) async => unavailable(),
+          onStartBlackjack:
+              onStartCasinoBlackjack ?? (stake) async => unavailable(),
+          onBlackjackAction:
+              onCasinoBlackjackAction ?? (action) async => unavailable(),
+          onCrapsRoll: onCasinoCrapsRoll ?? () async => unavailable(),
+        ),
+      ),
+    );
+    if (!context.mounted) return;
+    final latest = _latestState;
+    final completeEvening = onCompleteWeekdayActivity;
+    if (completeEvening == null ||
+        latest.day != openedDay ||
+        weekdayEveningUsed(latest)) {
+      return;
+    }
+    final completed = await completeEvening('casino');
+    if (!completed.success && context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(completed.message)));
+    }
+  }
+
+  bool _weekdayFacilityAvailable(BuildContext context, String activityId) {
     final current = _latestState;
-    if (current.currentDate.weekday >= DateTime.saturday) return current;
-    final handler = onCompleteWeekdayActivity;
-    if (handler == null) {
+    final available = switch (activityId) {
+      'bank' => bankAccessUnlocked(current),
+      'real_estate' => realEstateAccessUnlocked(current),
+      _ => false,
+    };
+    if (!available) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('이 화면에서는 평일 저녁 일정을 저장할 수 없습니다.')),
+        SnackBar(
+          content: Text(
+            activityId == 'bank'
+                ? '2월 김서아·윤하린 예금 이야기를 마친 뒤 은행이 열립니다.'
+                : '5월 윤채아·서하늘 매물 이야기를 마친 뒤 부동산 시장이 열립니다.',
+          ),
+        ),
       );
-      return null;
+      return false;
     }
-    final result = await handler(activityId);
-    if (!context.mounted) return null;
-    if (!result.success) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(result.message)));
-      return null;
-    }
-    return result.state;
+    return true;
   }
 
   Future<void> _openBankForSchedule(BuildContext context) async {
-    final eveningState = await _useWeekdayEvening(context, 'bank');
-    if (eveningState == null || !context.mounted) return;
-    await _openBank(context, eveningState);
+    if (!_weekdayFacilityAvailable(context, 'bank')) return;
+    await _openBank(context, _latestState);
   }
 
   Future<void> _openRealEstateForSchedule(BuildContext context) async {
-    final eveningState = await _useWeekdayEvening(context, 'real_estate');
-    if (eveningState == null || !context.mounted) return;
-    await _openRealEstateMarket(context, eveningState);
+    if (!_weekdayFacilityAvailable(context, 'real_estate')) return;
+    await _openRealEstateMarket(context, _latestState);
   }
 
   Future<GameState> _openBusinessMarket(
@@ -440,44 +509,21 @@ class OfficeScreen extends StatelessWidget {
             await _openStockMarket(context, currentState);
             return _latestState;
           },
+          onOpenCompanyManagement: (currentState) =>
+              _openShareholderCompanyHub(context, currentState),
           onOpenRealEstate: (currentState) async {
             await _openRealEstateForSchedule(context);
             return _latestState;
           },
           onOpenBusiness: (currentState) =>
               _openBusinessMarket(context, currentState: currentState),
-          onOpenStarShop: (currentState) =>
-              _openStarShop(context, currentState),
-        ),
-      ),
-    );
-  }
-
-  Future<GameState> _openStarShop(
-    BuildContext context,
-    GameState currentState,
-  ) async {
-    var latestState = currentState;
-    await Navigator.of(context).push<void>(
-      _gameSceneRoute<void>(
-        StarShopScreen(
-          state: latestState,
-          onPurchase: (productId) async {
-            final handler = onPurchaseStarShopItem;
-            final result = handler == null
-                ? StarShopPurchaseResult(
-                    state: latestState,
-                    success: false,
-                    message: '이 화면에서는 별빛 상점 구매를 저장할 수 없습니다.',
-                  )
-                : await handler(productId);
-            if (result.success) latestState = result.state;
-            return result;
+          onOpenCasino: (currentState) async {
+            await _openCasino(context);
+            return _latestState;
           },
         ),
       ),
     );
-    return latestState;
   }
 
   @override
@@ -486,7 +532,7 @@ class OfficeScreen extends StatelessWidget {
     body: SafeArea(
       child: ApartmentHubScreen(
         state: state,
-        onOpenDecisions: () => _openDecision(context),
+        onOpenPendingChoice: () => _openPendingChoice(context),
         onOpenMarket: () => _openHomeComputer(context),
         onOpenRealEstate: () => _openRealEstateForSchedule(context),
         onOpenBank: () => _openBankForSchedule(context),
@@ -518,6 +564,7 @@ class OfficeScreen extends StatelessWidget {
                 state: _latestState,
                 onMarkRead: markRead,
                 onSend: send,
+                onSendGift: onSendPhoneGift,
                 aiService: phoneAiService,
               ),
             ),
@@ -537,7 +584,6 @@ class OfficeScreen extends StatelessWidget {
         onOpenEnding: () => Navigator.of(
           context,
         ).push(_gameSceneRoute<void>(CampaignEndingScreen(state: state))),
-        onClaimMission: onClaimMission,
         onTutorialComplete: onCompleteHubTutorial,
       ),
     ),
@@ -763,8 +809,10 @@ class OfficeScreen extends StatelessWidget {
                   ListTile(
                     key: const Key('advance-year-quiet-option'),
                     leading: const Icon(Icons.calendar_view_month_rounded),
-                    title: const Text('1년 저개입 진행'),
-                    subtitle: const Text('중요뉴스는 장부에 보관하고, 안건·캠페인 종료에서만 멈춥니다.'),
+                    title: const Text('다음 중요 선택까지 (최대 1년)'),
+                    subtitle: const Text(
+                      '주간 복기·주말 휴식·관계 휴식은 장부에 자동 기록하고, 선택·캠페인 종료에서 멈춥니다.',
+                    ),
                     onTap: () => Navigator.pop(
                       sheetContext,
                       const _AdvanceMenuChoice(
@@ -775,7 +823,7 @@ class OfficeScreen extends StatelessWidget {
                   ),
                 ListTile(
                   leading: const Icon(Icons.event_available_rounded),
-                  title: const Text('다음 결정까지 (최대 90일)'),
+                  title: const Text('다음 중요 뉴스·선택까지 (최대 90일)'),
                   onTap: () => Navigator.pop(
                     sheetContext,
                     const _AdvanceMenuChoice(days: 90),
@@ -804,11 +852,23 @@ class OfficeScreen extends StatelessWidget {
             stopReason != null
                 ? '$advanced일 진행 · $stopReason'
                 : next.pendingDecisions.isNotEmpty
-                ? '$advanced일 진행 후 새 안건 앞에서 멈췄습니다.'
+                ? '$advanced일 진행 후 중요한 선택 앞에서 멈췄습니다.'
                 : '$advanced일 진행했습니다.',
           ),
         ),
       );
+      if (selection.days >= 30 && context.mounted) {
+        await showModalBottomSheet<void>(
+          context: context,
+          isScrollControlled: true,
+          showDragHandle: true,
+          builder: (context) => FastForwardSummarySheet(
+            state: next,
+            advancedDays: advanced,
+            stopReason: stopReason,
+          ),
+        );
+      }
     } catch (_) {
       if (context.mounted) _showSaveFailure(context);
     }
@@ -849,17 +909,32 @@ class OfficeScreen extends StatelessWidget {
       if (!closingState.cohortInvestments.acknowledgedForDay(
         closingState.day,
       )) {
-        final completed = await navigator.push<bool>(
-          _gameSceneRoute<bool>(
-            CohortDailyResultScreen(
-              state: closingState,
-              onLend: lendToCohort,
-              onBorrow: borrowFromCohort,
-              onAcknowledge: acknowledgeCohort,
-            ),
-          ),
+        final report = closingState.cohortInvestments.reportForDay(
+          closingState.day,
         );
-        if (completed != true || !context.mounted) return;
+        final player = report?.resultFor('player');
+        final needsFullResult =
+            player?.traded == true ||
+            player?.profitLoss != 0 ||
+            report?.repaymentTotal != 0 ||
+            report?.borrowingRepaymentTotal != 0 ||
+            closingState.needsTradingRecovery;
+        if (needsFullResult) {
+          final completed = await navigator.push<bool>(
+            _gameSceneRoute<bool>(
+              CohortDailyResultScreen(
+                state: closingState,
+                onLend: lendToCohort,
+                onBorrow: borrowFromCohort,
+                onAcknowledge: acknowledgeCohort,
+              ),
+            ),
+          );
+          if (completed != true || !context.mounted) return;
+        } else {
+          final acknowledged = await acknowledgeCohort();
+          if (!acknowledged.success || !context.mounted) return;
+        }
         closingState = _latestState;
       }
     }
@@ -881,6 +956,30 @@ class OfficeScreen extends StatelessWidget {
         if (seen != true || !context.mounted) return;
         closingState = _latestState;
       }
+    }
+
+    final completeWeeklyReview = onCompleteWeeklyPortfolioReview;
+    if (completeWeeklyReview != null &&
+        weeklyPortfolioReviewDue(closingState)) {
+      final universe = await FictionalMarketUniverse.load(
+        seed: closingState.simulationSeed,
+        throughDate: closingState.currentDate,
+      );
+      if (!context.mounted) return;
+      final completed = await navigator.push<bool>(
+        _gameSceneRoute<bool>(
+          WeeklyPortfolioReviewScreen(
+            state: closingState,
+            candidates: weeklyPortfolioReviewCandidates(
+              closingState,
+              universe.asOf(closingState.currentDate),
+            ),
+            onComplete: completeWeeklyReview,
+          ),
+        ),
+      );
+      if (completed != true || !context.mounted) return;
+      closingState = _latestState;
     }
 
     final completeWeekendActivity = onCompleteWeekendActivity;
@@ -923,55 +1022,60 @@ class OfficeScreen extends StatelessWidget {
     final markPhoneRead = onMarkPhoneThreadRead;
     final sendPhone = onSendPhoneMessage;
     if (!closingState.relationships.completedEveningForDay(closingState.day)) {
-      final completed = await navigator.push<bool>(
-        _gameSceneRoute<bool>(
-          RelationshipEveningScreen(
-            state: closingState,
-            onOpenMessenger: markPhoneRead == null || sendPhone == null
-                ? null
-                : () async {
-                    await navigator.push<void>(
-                      _gameSceneRoute<void>(
-                        PhoneMessengerScreen(
-                          state: _latestState,
-                          onMarkRead: markPhoneRead,
-                          onSend: sendPhone,
-                          aiService: phoneAiService,
+      final offersRelationshipChoice =
+          closingState.currentDate.weekday == DateTime.wednesday ||
+          isWeekendOutingDay(closingState.currentDate);
+      if (offersRelationshipChoice) {
+        final completed = await navigator.push<bool>(
+          _gameSceneRoute<bool>(
+            RelationshipEveningScreen(
+              state: closingState,
+              onOpenMessenger: markPhoneRead == null || sendPhone == null
+                  ? null
+                  : () async {
+                      await navigator.push<void>(
+                        _gameSceneRoute<void>(
+                          PhoneMessengerScreen(
+                            state: _latestState,
+                            onMarkRead: markPhoneRead,
+                            onSend: sendPhone,
+                            onSendGift: onSendPhoneGift,
+                            aiService: phoneAiService,
+                          ),
                         ),
+                      );
+                      return _latestState;
+                    },
+              onComplete:
+                  onCompleteRelationshipEvening ??
+                  (girlId, activity, choiceId) async =>
+                      RelationshipActionResult(
+                        state: closingState,
+                        success: false,
+                        message: '이 화면에서는 호감도를 저장할 수 없습니다.',
                       ),
-                    );
-                    return _latestState;
-                  },
-            onComplete:
-                onCompleteRelationshipEvening ??
-                (girlId, activity, choiceId) async => RelationshipActionResult(
-                  state: closingState,
-                  success: false,
-                  message: '이 화면에서는 호감도를 저장할 수 없습니다.',
-                ),
-            onRest:
-                onRestDuringRelationshipEvening ??
-                () async => RelationshipActionResult(
-                  state: closingState,
-                  success: false,
-                  message: '이 화면에서는 호감도를 저장할 수 없습니다.',
-                ),
+              onRest:
+                  onRestDuringRelationshipEvening ??
+                  () async => RelationshipActionResult(
+                    state: closingState,
+                    success: false,
+                    message: '이 화면에서는 호감도를 저장할 수 없습니다.',
+                  ),
+            ),
           ),
-        ),
-      );
-      if (completed != true || !context.mounted) return;
+        );
+        if (completed != true || !context.mounted) return;
+      } else {
+        final rest = onRestDuringRelationshipEvening;
+        if (rest != null) {
+          final rested = await rest();
+          if (!rested.success || !context.mounted) return;
+        }
+      }
       closingState = _latestState;
     }
 
     final morningDate = closingState.currentDate.add(const Duration(days: 1));
-    final calendarCompleted = await navigator.push<bool>(
-      _gameSceneRoute<bool>(
-        LifeCalendarScreen(state: closingState, transitionTo: morningDate),
-      ),
-    );
-    if (calendarCompleted != true || !context.mounted) return;
-    closingState = _latestState;
-
     final loadingRoute = _gameSceneRoute<void>(
       NewsGeneratingScene(date: morningDate),
     );
@@ -979,6 +1083,7 @@ class OfficeScreen extends StatelessWidget {
     final stopwatch = Stopwatch()..start();
     const newsCombinator = NewsCombinator();
     late DailyMarketNewspaper newspaper;
+    late GameState advancedState;
     final closingDay = closingState.day;
     try {
       final baseNewspaper = onBuildDailyNewspaper == null
@@ -1005,7 +1110,7 @@ class OfficeScreen extends StatelessWidget {
       }
       if (!context.mounted) return;
 
-      var advancedState = await onAdvanceDay();
+      advancedState = await onAdvanceDay();
       if (advancedState.day <= closingDay) {
         throw StateError('다음 날 08:00 상태를 만들지 못했습니다.');
       }
@@ -1019,24 +1124,57 @@ class OfficeScreen extends StatelessWidget {
       if (loadingRoute.isActive) navigator.removeRoute(loadingRoute);
     }
     if (!context.mounted) return;
+    DecisionCardData? monthlyDecision;
+    for (final decision in advancedState.pendingDecisions) {
+      if (isMonthlyUnlockDecisionId(decision.id)) {
+        monthlyDecision = decision;
+        break;
+      }
+    }
+    if (monthlyDecision != null) {
+      final decision = monthlyDecision;
+      await navigator.push<void>(
+        _gameSceneRoute<void>(
+          AcademyDecisionScene(
+            state: advancedState,
+            decision: decision,
+            onSelect: (decisionContext, optionId) async {
+              await onResolveDecision(decision.id, optionId);
+              if (decisionContext.mounted) {
+                Navigator.of(decisionContext).pop();
+              }
+            },
+          ),
+        ),
+      );
+      if (!context.mounted) return;
+    }
     await navigator.push<bool>(
-      _gameSceneRoute<bool>(KoreaEconomicNewspaperScene(newspaper: newspaper)),
+      _gameSceneRoute<bool>(
+        DailyWrapUpScreen(
+          closingState: closingState,
+          morningState: advancedState,
+          newspaper: newspaper,
+        ),
+      ),
     );
   }
 
-  void _openDecision(BuildContext context) {
+  void _openPendingChoice(BuildContext context) {
+    final current = _latestState;
+    if (current.pendingDecisions.isEmpty) return;
+    final decision = current.pendingDecisions.first;
     Navigator.of(context).push<void>(
       _gameSceneRoute<void>(
-        DecisionInboxScreen(
-          state: state,
-          onResolveDecision: onResolveDecision,
-          onClaimMission:
-              onClaimMission ??
-              () async => MissionClaimResult(
-                state: state,
-                success: false,
-                message: '이 화면에서는 미션 보상을 저장할 수 없습니다.',
-              ),
+        AcademyDecisionScene(
+          state: current,
+          decision: decision,
+          onSelect: (decisionContext, optionId) async {
+            await onResolveDecision(decision.id, optionId);
+            if (decisionContext.mounted) {
+              Navigator.of(decisionContext).pop();
+            }
+          },
         ),
       ),
     );
@@ -1253,74 +1391,82 @@ class _AcademyDecisionSceneState extends State<AcademyDecisionScene> {
       if (!mounted) return;
       setState(() => _isSubmitting = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('안건 저장에 실패했어요. 다시 선택해 주세요.')),
+        const SnackBar(content: Text('선택 저장에 실패했어요. 다시 선택해 주세요.')),
       );
     }
   }
 
   @override
-  Widget build(BuildContext context) => PopScope(
-    canPop: !_isSubmitting,
-    child: Scaffold(
-      backgroundColor: const Color(0xFF22253A),
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: Image.asset(
-              'assets/images/cinematic_soft_painted/decimal/bg_decimal_trading_floor_dawn_2000_v1.png',
-              fit: BoxFit.cover,
+  Widget build(BuildContext context) {
+    final monthlyChapter = monthlyUnlockChapterForDecisionId(
+      widget.decision.id,
+    );
+    return PopScope(
+      canPop: !_isSubmitting,
+      child: Scaffold(
+        backgroundColor: const Color(0xFF22253A),
+        body: Stack(
+          children: [
+            Positioned.fill(
+              child: Image.asset(
+                'assets/images/cinematic_soft_painted/decimal/bg_decimal_trading_floor_dawn_2000_v1.png',
+                fit: BoxFit.cover,
+              ),
             ),
-          ),
-          const Positioned.fill(child: ColoredBox(color: Color(0x8A171926))),
-          SafeArea(
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 520),
-                child: Column(
-                  children: [
-                    _SceneClockStrip(
-                      location: '프로젝트 데시멀 · 데시멀 전략회의',
-                      caption: _isSubmitting
-                          ? '선택을 투자노트에 저장하고 있다.'
-                          : '데시멀 동기와 담당 운영관이 함께 검토합니다.',
-                      minute: widget.state.marketMinute,
-                      costLabel: _isSubmitting ? '저장 중' : '함께 고르기 · 30분',
-                      onBack: _isSubmitting
-                          ? null
-                          : () => Navigator.of(context).pop(),
-                    ),
-                    Expanded(
-                      child: Stack(
-                        children: [
-                          Positioned.fill(
-                            child: AbsorbPointer(
-                              absorbing: _isSubmitting,
-                              child: DecisionSheet(
-                                state: widget.state,
-                                decision: widget.decision,
-                                onSelect: _handleSelect,
+            const Positioned.fill(child: ColoredBox(color: Color(0x8A171926))),
+            SafeArea(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 520),
+                  child: Column(
+                    children: [
+                      _SceneClockStrip(
+                        location:
+                            monthlyChapter?.location ?? '프로젝트 데시멀 · 데시멀 전략회의',
+                        caption: _isSubmitting
+                            ? '선택을 투자노트에 저장하고 있다.'
+                            : monthlyChapter == null
+                            ? '데시멀 동기와 담당 운영관이 함께 검토합니다.'
+                            : '${monthlyChapter.month}월 첫날 · 관계의 온도를 숨기지 않고 함께 시작합니다.',
+                        minute: widget.state.marketMinute,
+                        costLabel: _isSubmitting ? '저장 중' : '함께 고르기 · 30분',
+                        onBack: _isSubmitting
+                            ? null
+                            : () => Navigator.of(context).pop(),
+                      ),
+                      Expanded(
+                        child: Stack(
+                          children: [
+                            Positioned.fill(
+                              child: AbsorbPointer(
+                                absorbing: _isSubmitting,
+                                child: DecisionSheet(
+                                  state: widget.state,
+                                  decision: widget.decision,
+                                  onSelect: _handleSelect,
+                                ),
                               ),
                             ),
-                          ),
-                          if (_isSubmitting)
-                            const Positioned(
-                              left: 20,
-                              right: 20,
-                              bottom: 20,
-                              child: _DecisionSavingIndicator(),
-                            ),
-                        ],
+                            if (_isSubmitting)
+                              const Positioned(
+                                left: 20,
+                                right: 20,
+                                bottom: 20,
+                                child: _DecisionSavingIndicator(),
+                              ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 class _DecisionSavingIndicator extends StatelessWidget {
@@ -1466,6 +1612,659 @@ class NewsGeneratingScene extends StatelessWidget {
   );
 }
 
+class FastForwardSummarySheet extends StatelessWidget {
+  const FastForwardSummarySheet({
+    super.key,
+    required this.state,
+    required this.advancedDays,
+    this.stopReason,
+  });
+
+  final GameState state;
+  final int advancedDays;
+  final String? stopReason;
+
+  @override
+  Widget build(BuildContext context) {
+    final review = playerProgressReviewForYear(state, state.currentDate.year);
+    final career = careerProgressReview(state);
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(
+          18,
+          0,
+          18,
+          18 + MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              '저개입 진행 기록',
+              key: Key('fast-forward-summary-title'),
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 5),
+            Text(
+              '$advancedDays일 진행 · ${state.currentDate.year}년 ${state.currentDate.month}월 ${state.currentDate.day}일 08:00',
+              style: const TextStyle(
+                color: Color(0xFF667080),
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            if (stopReason != null) ...[
+              const SizedBox(height: 10),
+              Text(
+                stopReason!,
+                style: const TextStyle(
+                  color: Color(0xFF9A4D37),
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+            const SizedBox(height: 14),
+            Text(
+              review.headline,
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '확정 투자손익 ${review.cumulativeInvestmentProfit >= 0 ? '+' : ''}${_money(review.cumulativeInvestmentProfit)}원\n'
+              '실제 거래 ${review.tradeDays}/${review.tradingDays}일 · 회사 조사 ${review.researchCount}회\n'
+              '관계 기록 ${review.relationshipMoments}회 · 주말 능동 선택 ${review.activeWeekendChoices}회',
+              style: const TextStyle(height: 1.6, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              review.nextFocus,
+              style: const TextStyle(
+                color: Color(0xFF46556D),
+                height: 1.45,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            if (advancedDays >= 365 && career.years > 1) ...[
+              const SizedBox(height: 12),
+              Text(
+                '${career.years}년 누적 · 실제 거래 ${career.tradeDays}일 · '
+                '성장 레벨 ${career.progressionLevel} · 기업 조사 ${career.researchCount}회\n'
+                '관계 기록 ${career.relationshipMoments}회 · '
+                '능동적 주말 ${career.activeWeekendChoices}회',
+                style: const TextStyle(
+                  color: Color(0xFF46556D),
+                  height: 1.45,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+            const SizedBox(height: 14),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('기록 확인'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class DailyWrapUpScreen extends StatelessWidget {
+  const DailyWrapUpScreen({
+    super.key,
+    required this.closingState,
+    required this.morningState,
+    required this.newspaper,
+  });
+
+  final GameState closingState;
+  final GameState morningState;
+  final DailyMarketNewspaper newspaper;
+
+  @override
+  Widget build(BuildContext context) {
+    final closingDate = closingState.currentDate;
+    final morningDate = morningState.currentDate;
+    final events = lifeCalendarEventsOn(
+      lifeCalendarEventsForState(closingState),
+      closingDate,
+    ).where((event) => event.title != '천천히 보내는 주말').toList();
+    final report = closingState.cohortInvestments.reportForDay(
+      closingState.day,
+    );
+    final player = report?.resultFor('player');
+    final crossedMonth =
+        closingDate.month != morningDate.month ||
+        closingDate.year != morningDate.year;
+    final crossedYear = closingDate.year != morningDate.year;
+    final review = crossedMonth
+        ? playerProgressReviewForYear(closingState, closingDate.year)
+        : null;
+    final career = crossedYear ? careerProgressReview(morningState) : null;
+    final article =
+        newspaper.combinatorialArticle?.content ?? newspaper.brief.body;
+
+    return Scaffold(
+      key: const Key('daily-wrap-up-screen'),
+      backgroundColor: const Color(0xFF18233A),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 15, 16, 10),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.nightlight_round,
+                    color: Color(0xFFFFD56B),
+                    size: 28,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          '오늘 기록 · 내일 아침',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        Text(
+                          '${closingDate.month}월 ${closingDate.day}일 20:00 → '
+                          '${morningDate.month}월 ${morningDate.day}일 08:00',
+                          style: const TextStyle(
+                            color: Color(0xFFB8C6DA),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: ListView(
+                key: const Key('daily-wrap-up-scroll'),
+                padding: const EdgeInsets.fromLTRB(14, 2, 14, 18),
+                children: [
+                  if (player != null)
+                    _DailyWrapCard(
+                      icon: Icons.show_chart_rounded,
+                      eyebrow: '오늘 투자 결과',
+                      title: player.traded
+                          ? '${player.assetName} · ${player.profitLoss >= 0 ? '+' : ''}${_money(player.profitLoss)}원'
+                          : '실제 거래 없음 · 보유 현황만 기록',
+                      body:
+                          '국가원금 대비 누적손익 ${player.cumulativeProfitLoss >= 0 ? '+' : ''}${_money(player.cumulativeProfitLoss)}원 · '
+                          '오늘 순위 ${playerRankInReport(report!)}위',
+                      accent: const Color(0xFF73C9EE),
+                    ),
+                  if (events.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    _DailyWrapCard(
+                      icon: Icons.bookmark_added_rounded,
+                      eyebrow: '오늘 남은 생활 기록 ${events.length}건',
+                      title: events.first.title,
+                      body: events.length == 1
+                          ? events.first.body
+                          : '${events.first.body}\n그 밖에 ${events.skip(1).map((event) => event.title).join(' · ')}',
+                      accent: const Color(0xFFFF9A7C),
+                    ),
+                  ],
+                  const SizedBox(height: 10),
+                  _DailyWrapCard(
+                    icon: Icons.newspaper_rounded,
+                    eyebrow:
+                        '${newspaper.date.month}월 ${newspaper.date.day}일 조간',
+                    title: newspaper.headline,
+                    body: '$article\n${newspaper.summary}',
+                    accent: const Color(0xFFFFD56B),
+                  ),
+                  if (review != null) ...[
+                    const SizedBox(height: 10),
+                    _DailyWrapCard(
+                      key: Key(
+                        crossedYear
+                            ? 'annual-progress-review'
+                            : 'monthly-progress-review',
+                      ),
+                      icon: crossedYear
+                          ? Icons.workspace_premium_rounded
+                          : Icons.calendar_month_rounded,
+                      eyebrow: crossedYear
+                          ? '${review.year}년 연말 회고'
+                          : '${closingDate.month}월 월말 점검',
+                      title: review.headline,
+                      body:
+                          '올해 투자손익 ${review.investmentProfitForYear >= 0 ? '+' : ''}${_money(review.investmentProfitForYear)}원 · '
+                          '누적 ${review.cumulativeInvestmentProfit >= 0 ? '+' : ''}${_money(review.cumulativeInvestmentProfit)}원 · '
+                          '회사 조사 ${review.researchCount}회 · 관계 기록 ${review.relationshipMoments}회 · '
+                          '주말 능동 선택 ${review.activeWeekendChoices}회\n'
+                          '현재 장부가 순자산 ${_money(review.netWorthAtCost)}원\n'
+                          '성장 레벨 ${review.progressionLevel} · 경험 ${review.progressionExperience}\n'
+                          '${review.nextFocus}',
+                      accent: const Color(0xFFB69CF0),
+                    ),
+                  ],
+                  if (career != null && career.years > 1) ...[
+                    const SizedBox(height: 10),
+                    _DailyWrapCard(
+                      key: const Key('career-progress-review'),
+                      icon: Icons.timeline_rounded,
+                      eyebrow: '${career.years}년 장기 여정',
+                      title: career.yearsWithoutTrades == 0
+                          ? '모든 해에 직접 시장 판단을 남겼습니다.'
+                          : '거래가 없었던 해 ${career.yearsWithoutTrades}년 · 다음 해 목표를 정해 보세요.',
+                      body:
+                          '실제 거래 ${career.tradeDays}일 · 기업 조사 ${career.researchCount}회 · '
+                          '관계 기록 ${career.relationshipMoments}회 · 능동적 주말 ${career.activeWeekendChoices}회\n'
+                          '성장 레벨 ${career.progressionLevel} · 현재 장부가 순자산 ${_money(career.netWorthAtCost)}원',
+                      accent: const Color(0xFF6FD5B3),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+              decoration: const BoxDecoration(
+                color: Color(0xFF10192A),
+                border: Border(top: BorderSide(color: Color(0xFF31425F))),
+              ),
+              child: FilledButton.icon(
+                key: const Key('newspaper-next-day-button'),
+                onPressed: () => Navigator.of(context).pop(true),
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFFFFD56B),
+                  foregroundColor: const Color(0xFF172238),
+                  minimumSize: const Size.fromHeight(50),
+                ),
+                icon: const Icon(Icons.wb_sunny_rounded),
+                label: const Text(
+                  '다음 날 08:00 시작',
+                  style: TextStyle(fontWeight: FontWeight.w900),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DailyWrapCard extends StatelessWidget {
+  const _DailyWrapCard({
+    super.key,
+    required this.icon,
+    required this.eyebrow,
+    required this.title,
+    required this.body,
+    required this.accent,
+  });
+
+  final IconData icon;
+  final String eyebrow;
+  final String title;
+  final String body;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.fromLTRB(14, 13, 14, 14),
+    decoration: BoxDecoration(
+      color: const Color(0xFFF8F4E9),
+      borderRadius: BorderRadius.circular(18),
+      border: Border.all(color: accent, width: 2),
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            color: accent.withValues(alpha: 0.22),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, color: const Color(0xFF263349), size: 21),
+        ),
+        const SizedBox(width: 11),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                eyebrow,
+                style: TextStyle(
+                  color: Color.lerp(accent, const Color(0xFF1D2941), 0.46),
+                  fontSize: 9,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                title,
+                style: const TextStyle(
+                  color: Color(0xFF202B3C),
+                  fontSize: 14,
+                  height: 1.3,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                body,
+                style: const TextStyle(
+                  color: Color(0xFF566071),
+                  fontSize: 10.5,
+                  height: 1.52,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class WeeklyPortfolioReviewScreen extends StatefulWidget {
+  const WeeklyPortfolioReviewScreen({
+    super.key,
+    required this.state,
+    required this.candidates,
+    required this.onComplete,
+  });
+
+  final GameState state;
+  final List<FictionalMarketAsset> candidates;
+  final Future<GameState> Function({
+    required WeeklyPortfolioReviewAction action,
+    required String assetId,
+    required String assetName,
+    required int riskLimitBps,
+  })
+  onComplete;
+
+  @override
+  State<WeeklyPortfolioReviewScreen> createState() =>
+      _WeeklyPortfolioReviewScreenState();
+}
+
+class _WeeklyPortfolioReviewScreenState
+    extends State<WeeklyPortfolioReviewScreen> {
+  FictionalMarketAsset? _selected;
+  int _riskLimitBps = 500;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _selected = widget.candidates.firstOrNull;
+    final storedRisk = widget.state.story
+        .flagInt('weeklyPortfolioRiskLimitBps', 500)
+        .clamp(100, 2000);
+    _riskLimitBps = <int>[300, 500, 800].reduce(
+      (left, right) => (left - storedRisk).abs() <= (right - storedRisk).abs()
+          ? left
+          : right,
+    );
+  }
+
+  Future<void> _complete(WeeklyPortfolioReviewAction action) async {
+    if (_saving) return;
+    final selected = _selected;
+    if (action == WeeklyPortfolioReviewAction.research && selected == null) {
+      return;
+    }
+    setState(() => _saving = true);
+    await widget.onComplete(
+      action: action,
+      assetId: selected?.id ?? '',
+      assetName: selected?.name ?? '',
+      riskLimitBps: _riskLimitBps,
+    );
+    if (mounted) Navigator.of(context).pop(true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final reports = widget.state.cohortInvestments.reports
+        .where((report) => report.day <= widget.state.day)
+        .toList(growable: false);
+    final recent = reports.length <= 5
+        ? reports
+        : reports.sublist(reports.length - 5);
+    final playerRows = recent
+        .map((report) => report.resultFor('player'))
+        .whereType<CohortDailyInvestmentResult>()
+        .toList(growable: false);
+    final weeklyPnl = playerRows.fold<int>(
+      0,
+      (sum, row) => sum + row.profitLoss,
+    );
+    final tradeDays = playerRows.where((row) => row.traded).length;
+    return Scaffold(
+      key: const Key('weekly-portfolio-review-screen'),
+      backgroundColor: const Color(0xFF132135),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.fact_check_rounded,
+                    color: Color(0xFFFFD46A),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          '이번 주 투자 복기',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        Text(
+                          '${weeklyPortfolioReviewKey(widget.state.currentDate)} 주간 · 매일이 아닌 주 1회',
+                          style: const TextStyle(
+                            color: Color(0xFFB9C8DC),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(14, 4, 14, 16),
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF5F0E5),
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _WeeklyReviewMetric(
+                            label: '최근 5거래일 손익',
+                            value:
+                                '${weeklyPnl >= 0 ? '+' : ''}${_money(weeklyPnl)}원',
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _WeeklyReviewMetric(
+                            label: '실제 거래일',
+                            value: '$tradeDays일',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  const Text(
+                    '관찰할 회사를 하나 고르기',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    '보유·관심 종목을 먼저 두고, 나머지는 매주 순환합니다. 같은 12개만 반복하지 않습니다.',
+                    style: TextStyle(
+                      color: Color(0xFFB9C8DC),
+                      fontSize: 10,
+                      height: 1.4,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 9),
+                  Wrap(
+                    spacing: 7,
+                    runSpacing: 7,
+                    children: [
+                      for (final asset in widget.candidates)
+                        ChoiceChip(
+                          key: Key('weekly-review-asset-${asset.id}'),
+                          label: Text(asset.name),
+                          selected: _selected?.id == asset.id,
+                          onSelected: _saving
+                              ? null
+                              : (_) => setState(() => _selected = asset),
+                          selectedColor: const Color(0xFFFFD46A),
+                          backgroundColor: Colors.white,
+                          labelStyle: const TextStyle(
+                            color: Color(0xFF253246),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  FilledButton.icon(
+                    key: const Key('weekly-review-research-button'),
+                    onPressed: _selected == null || _saving
+                        ? null
+                        : () => _complete(WeeklyPortfolioReviewAction.research),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFFFFD46A),
+                      foregroundColor: const Color(0xFF17253A),
+                      minimumSize: const Size.fromHeight(50),
+                    ),
+                    icon: const Icon(Icons.search_rounded),
+                    label: const Text(
+                      '이번 주 조사 대상으로 기록',
+                      style: TextStyle(fontWeight: FontWeight.w900),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  const Text(
+                    '또는 손실 확인선을 다시 적기',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SegmentedButton<int>(
+                    segments: const [
+                      ButtonSegment(value: 300, label: Text('-3%')),
+                      ButtonSegment(value: 500, label: Text('-5%')),
+                      ButtonSegment(value: 800, label: Text('-8%')),
+                    ],
+                    selected: <int>{_riskLimitBps},
+                    onSelectionChanged: _saving
+                        ? null
+                        : (selection) =>
+                              setState(() => _riskLimitBps = selection.first),
+                    style: const ButtonStyle(
+                      foregroundColor: WidgetStatePropertyAll(Colors.white),
+                    ),
+                  ),
+                  const SizedBox(height: 9),
+                  OutlinedButton.icon(
+                    key: const Key('weekly-review-risk-button'),
+                    onPressed: _saving
+                        ? null
+                        : () => _complete(WeeklyPortfolioReviewAction.riskRule),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      side: const BorderSide(color: Color(0xFF8FAAC8)),
+                      minimumSize: const Size.fromHeight(50),
+                    ),
+                    icon: const Icon(Icons.shield_outlined),
+                    label: Text(
+                      '-${(_riskLimitBps / 100).toStringAsFixed(0)}%에서 이유 다시 확인',
+                      style: const TextStyle(fontWeight: FontWeight.w900),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _WeeklyReviewMetric extends StatelessWidget {
+  const _WeeklyReviewMetric({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        label,
+        style: const TextStyle(
+          color: Color(0xFF6C7480),
+          fontSize: 9,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+      const SizedBox(height: 4),
+      Text(
+        value,
+        style: const TextStyle(
+          color: Color(0xFF202A39),
+          fontSize: 14,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    ],
+  );
+}
+
 class KoreaEconomicNewspaperScene extends StatelessWidget {
   const KoreaEconomicNewspaperScene({super.key, required this.newspaper});
   final DailyMarketNewspaper newspaper;
@@ -1522,6 +2321,11 @@ class DecisionSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final monthlyChapter = monthlyUnlockChapterForDecisionId(decision.id);
+    final monthlyTone = monthlyUnlockToneForDecisionId(decision.id);
+    final monthlyHeroine = monthlyChapter == null
+        ? null
+        : cohortGirlProfileById(monthlyChapter.heroineId);
     return DraggableScrollableSheet(
       initialChildSize: 0.96,
       minChildSize: 0.72,
@@ -1555,7 +2359,9 @@ class DecisionSheet extends StatelessWidget {
                 ),
                 const Spacer(),
                 Text(
-                  'DAY ${decision.dueDay}까지 선택',
+                  monthlyChapter == null
+                      ? 'DAY ${decision.dueDay}까지 선택'
+                      : '${monthlyChapter.year}년 ${monthlyChapter.month}월 챕터',
                   style: const TextStyle(
                     color: _coral,
                     fontSize: 11,
@@ -1575,6 +2381,14 @@ class DecisionSheet extends StatelessWidget {
                 fontWeight: FontWeight.w800,
               ),
             ),
+            if (monthlyChapter != null && monthlyHeroine != null) ...[
+              const SizedBox(height: 10),
+              _MonthlyUnlockHeroineCard(
+                chapter: monthlyChapter,
+                heroine: monthlyHeroine,
+                tone: monthlyTone,
+              ),
+            ],
             const SizedBox(height: 12),
             Text(decision.body, style: Theme.of(context).textTheme.bodyMedium),
             const SizedBox(height: 10),
@@ -1586,14 +2400,16 @@ class DecisionSheet extends StatelessWidget {
                 borderRadius: BorderRadius.circular(13),
                 border: Border.all(color: _blue, width: 1.5),
               ),
-              child: const Row(
+              child: Row(
                 children: [
-                  Icon(Icons.auto_awesome_rounded, size: 18, color: _ink),
-                  SizedBox(width: 8),
+                  const Icon(Icons.auto_awesome_rounded, size: 18, color: _ink),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      '정답은 없어요 · 선택하면 +25 XP · 미션 +1',
-                      style: TextStyle(
+                      monthlyChapter == null
+                          ? '정답은 없어요 · 선택하면 +25 XP'
+                          : '어떤 관계 상태여도 기능은 열려요 · 선택은 둘 사이의 반응만 바꿉니다.',
+                      style: const TextStyle(
                         color: _ink,
                         fontSize: 10,
                         fontWeight: FontWeight.w900,
@@ -1700,13 +2516,14 @@ class DecisionSheet extends StatelessWidget {
                 tilePadding: EdgeInsets.zero,
                 childrenPadding: const EdgeInsets.only(bottom: 6),
                 title: const Text(
-                  '동기 의견 더 보기',
+                  '같이 나눈 말 더 보기',
                   style: TextStyle(
                     color: _ink,
                     fontSize: 13,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
+                initiallyExpanded: monthlyChapter != null,
                 children: decision.advisorOpinions
                     .map(
                       (opinion) => Padding(
@@ -1728,9 +2545,11 @@ class DecisionSheet extends StatelessWidget {
                     .toList(growable: false),
               ),
             ),
-            const Text(
-              '등장 회사와 지분·거래 조건은 모두 게임 전용 가상 설정입니다. 선택 뒤 장부와 운영 결과를 함께 확인해 보세요.',
-              style: TextStyle(
+            Text(
+              monthlyChapter == null
+                  ? '등장 회사와 지분·거래 조건은 모두 게임 전용 가상 설정입니다. 선택 뒤 장부와 운영 결과를 함께 확인해 보세요.'
+                  : '이 장면은 현재 호감도뿐 아니라 최근 톡과 관계 기록을 함께 읽습니다. 갈등 중에는 억지 미소나 자동 화해가 나오지 않습니다.',
+              style: const TextStyle(
                 color: Color(0xFF8A92A2),
                 fontSize: 9,
                 height: 1.4,
@@ -1742,6 +2561,109 @@ class DecisionSheet extends StatelessWidget {
       ),
     );
   }
+}
+
+class _MonthlyUnlockHeroineCard extends StatelessWidget {
+  const _MonthlyUnlockHeroineCard({
+    required this.chapter,
+    required this.heroine,
+    required this.tone,
+  });
+
+  final MonthlyUnlockChapterDefinition chapter;
+  final CohortGirlProfile heroine;
+  final MonthlyHeroineTone tone;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    key: const Key('monthly-unlock-heroine-card'),
+    height: 132,
+    decoration: BoxDecoration(
+      color: const Color(0xFFFFF0F4),
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: const Color(0xFFE8A8BB), width: 1.5),
+    ),
+    child: Row(
+      children: [
+        SizedBox(
+          width: 106,
+          child: ClipRRect(
+            borderRadius: const BorderRadius.horizontal(
+              left: Radius.circular(14),
+            ),
+            child: heroine.portraitAsset == null
+                ? const Icon(
+                    Icons.person_rounded,
+                    size: 56,
+                    color: Color(0xFFB26C84),
+                  )
+                : Image.asset(
+                    heroine.portraitAsset!,
+                    fit: BoxFit.contain,
+                    alignment: Alignment.bottomCenter,
+                    errorBuilder: (_, _, _) => const Icon(
+                      Icons.person_rounded,
+                      size: 56,
+                      color: Color(0xFFB26C84),
+                    ),
+                  ),
+          ),
+        ),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(10, 10, 12, 10),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${chapter.month}월은 ${heroine.name}와 함께',
+                  style: const TextStyle(
+                    color: _ink,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${heroine.mbti} · ${heroine.role}',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF756477),
+                    fontSize: 10,
+                    height: 1.3,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  key: Key('monthly-unlock-tone-${tone.name}'),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(9),
+                    border: Border.all(color: const Color(0xFFD7A7B5)),
+                  ),
+                  child: Text(
+                    '지금의 거리 · ${tone.label}',
+                    style: const TextStyle(
+                      color: Color(0xFF8A4960),
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class _OfficeStatusCard extends StatelessWidget {
@@ -2049,7 +2971,7 @@ class _TodayNewsCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        pending.isEmpty ? '시간을 보내도 좋아요' : '중요 안건에서 시간이 멈췄어요',
+                        pending.isEmpty ? '시간을 보내도 좋아요' : '중요한 선택에서 시간이 멈췄어요',
                         style: const TextStyle(
                           color: _ink,
                           fontSize: 11,

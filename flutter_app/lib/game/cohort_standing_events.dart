@@ -6,11 +6,14 @@ import 'game_state.dart';
 /// 순위표는 지금까지 숫자만 보여 주고 아무것도 촉발하지 않았다. 연속 기록을 붙이면
 /// 같은 표가 면담·감사·라이벌이라는 사건으로 이어진다.
 ///
-/// 연속 기록은 저장된 `CohortInvestmentState.reports`(최근 64일)에서 파생하므로 새 저장
+/// 연속 기록은 저장된 `CohortInvestmentState.reports`에서 파생하므로 새 저장
 /// 필드나 스키마 상향이 필요 없다. 같은 저장에서 항상 같은 결과가 나온다.
 const cohortStandingLastPlaceThreshold = 3;
 const cohortStandingFirstPlaceThreshold = 3;
 const cohortStandingRivalThreshold = 5;
+const cohortStandingLastPlaceMilestones = <int>[3, 10, 30, 60, 120, 200];
+const cohortStandingFirstPlaceMilestones = <int>[3, 10, 30, 60, 120, 200];
+const cohortStandingRivalMilestones = <int>[5, 15, 30, 60, 120, 200];
 const cohortStandingEventLogFlag = 'cohortStandingEventLog';
 const cohortStandingEventLogLimit = 128;
 
@@ -151,6 +154,7 @@ class CohortStandingEvent {
     required this.title,
     required this.body,
     required this.streak,
+    required this.milestone,
     this.rivalId = '',
   });
 
@@ -161,62 +165,97 @@ class CohortStandingEvent {
 
   /// 사건을 촉발한 연속 일수.
   final int streak;
+  final int milestone;
   final String rivalId;
 
-  String get id => '${kind.name}-$streak${rivalId.isEmpty ? '' : '-$rivalId'}';
+  String get id =>
+      '${kind.name}-$milestone${rivalId.isEmpty ? '' : '-$rivalId'}';
+}
+
+int? _standingMilestone(int streak, List<int> milestones) {
+  int? reached;
+  for (final milestone in milestones) {
+    if (streak < milestone) break;
+    reached = milestone;
+  }
+  return reached;
 }
 
 /// 오늘 결과표가 촉발한 사건. 없으면 null이다.
 ///
 /// 우선순위는 연속 최하위 → 연속 1위 → 라이벌이다. 최하위 면담은 중단권 안내이므로
 /// 다른 사건보다 먼저 열린다.
-CohortStandingEvent? cohortStandingEventForState(GameState state) {
+List<CohortStandingEvent> cohortStandingEventsForState(GameState state) {
   final streak = cohortStandingStreakForState(state);
-  if (streak.isEmpty) return null;
+  if (streak.isEmpty) return const <CohortStandingEvent>[];
+  final events = <CohortStandingEvent>[];
 
-  if (streak.lastPlaceDays >= cohortStandingLastPlaceThreshold) {
-    return CohortStandingEvent(
-      kind: CohortStandingEventKind.operatorReview,
-      speaker: '한서윤 운영관',
-      title: '중단권 확인 면담',
-      body:
-          '${streak.lastPlaceDays}거래일 연속으로 맨 아래였어요. 이건 벌이 아니라 확인이에요. '
-          '계약서에 적힌 대로 언제든 그만둘 수 있고, 그만둔다고 생활 조건이 나빠지지 않습니다. '
-          '계속한다면 손실을 숨기지 않는 것만 약속해 주세요.',
-      streak: streak.lastPlaceDays,
+  final lastPlaceMilestone = _standingMilestone(
+    streak.lastPlaceDays,
+    cohortStandingLastPlaceMilestones,
+  );
+  if (lastPlaceMilestone != null) {
+    events.add(
+      CohortStandingEvent(
+        kind: CohortStandingEventKind.operatorReview,
+        speaker: '한서윤 운영관',
+        title: '중단권 확인 면담',
+        body:
+            '${streak.lastPlaceDays}거래일 연속으로 맨 아래였어요. 이건 벌이 아니라 확인이에요. '
+            '계약서에 적힌 대로 언제든 그만둘 수 있고, 그만둔다고 생활 조건이 나빠지지 않습니다. '
+            '계속한다면 손실을 숨기지 않는 것만 약속해 주세요.',
+        streak: streak.lastPlaceDays,
+        milestone: lastPlaceMilestone,
+      ),
     );
   }
 
-  if (streak.firstPlaceDays >= cohortStandingFirstPlaceThreshold) {
-    return CohortStandingEvent(
-      kind: CohortStandingEventKind.rightsAudit,
-      speaker: '조민경 권익감사관',
-      title: '기록 열람',
-      body:
-          '${streak.firstPlaceDays}거래일 연속 1위입니다. 축하하러 온 게 아니라 기록을 보러 왔습니다. '
-          '수익률이 아니라 판단 이유를 봅니다. 운이었다면 그렇게 적으면 되고, '
-          '그게 감점 사유가 되지는 않습니다.',
-      streak: streak.firstPlaceDays,
+  final firstPlaceMilestone = _standingMilestone(
+    streak.firstPlaceDays,
+    cohortStandingFirstPlaceMilestones,
+  );
+  if (firstPlaceMilestone != null) {
+    events.add(
+      CohortStandingEvent(
+        kind: CohortStandingEventKind.rightsAudit,
+        speaker: '조민경 권익감사관',
+        title: '기록 열람',
+        body:
+            '${streak.firstPlaceDays}거래일 연속 1위입니다. 축하하러 온 게 아니라 기록을 보러 왔습니다. '
+            '수익률이 아니라 판단 이유를 봅니다. 운이었다면 그렇게 적으면 되고, '
+            '그게 감점 사유가 되지는 않습니다.',
+        streak: streak.firstPlaceDays,
+        milestone: firstPlaceMilestone,
+      ),
     );
   }
 
-  if (streak.rivalDays >= cohortStandingRivalThreshold &&
-      streak.rivalId.isNotEmpty) {
-    return CohortStandingEvent(
-      kind: CohortStandingEventKind.rivalDeclared,
-      speaker: streak.rivalName,
-      title: '${streak.rivalName}의 제안',
-      body:
-          '${streak.rivalDays}거래일 연속으로 내가 앞섰네. 자랑하려는 건 아니야. '
-          '이제부터 내 종목을 먼저 공개할게. 대신 너도 이유를 적어 줘. '
-          '같은 걸 보고 다르게 판단하는지 확인하고 싶어.',
-      streak: streak.rivalDays,
-      rivalId: streak.rivalId,
+  final rivalMilestone = _standingMilestone(
+    streak.rivalDays,
+    cohortStandingRivalMilestones,
+  );
+  if (rivalMilestone != null && streak.rivalId.isNotEmpty) {
+    events.add(
+      CohortStandingEvent(
+        kind: CohortStandingEventKind.rivalDeclared,
+        speaker: streak.rivalName,
+        title: '${streak.rivalName}의 제안',
+        body:
+            '${streak.rivalDays}거래일 연속으로 내가 앞섰네. 자랑하려는 건 아니야. '
+            '이제부터 내 종목을 먼저 공개할게. 대신 너도 이유를 적어 줘. '
+            '같은 걸 보고 다르게 판단하는지 확인하고 싶어.',
+        streak: streak.rivalDays,
+        milestone: rivalMilestone,
+        rivalId: streak.rivalId,
+      ),
     );
   }
 
-  return null;
+  return List<CohortStandingEvent>.unmodifiable(events);
 }
+
+CohortStandingEvent? cohortStandingEventForState(GameState state) =>
+    cohortStandingEventsForState(state).firstOrNull;
 
 /// 같은 사건을 두 번 열지 않기 위해 처리한 사건 ID를 기록한다.
 List<String> cohortStandingEventLog(GameState state) =>
@@ -230,9 +269,10 @@ bool cohortStandingEventSeen(GameState state, CohortStandingEvent event) =>
 
 /// 아직 보지 않은 사건만 돌려준다.
 CohortStandingEvent? pendingCohortStandingEvent(GameState state) {
-  final event = cohortStandingEventForState(state);
-  if (event == null) return null;
-  return cohortStandingEventSeen(state, event) ? null : event;
+  for (final event in cohortStandingEventsForState(state)) {
+    if (!cohortStandingEventSeen(state, event)) return event;
+  }
+  return null;
 }
 
 /// 사건을 확인한 것으로 기록한다. 같은 연속 길이로는 다시 열리지 않는다.

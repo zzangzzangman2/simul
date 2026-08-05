@@ -190,12 +190,10 @@ const _lobbyMotionProfiles = <String, _LobbyMotionProfile>{
       _LobbyIdleGesture.settle,
       _LobbyIdleGesture.shy,
     ],
-    motionFrames: <String>[
-      'assets/images/production_soft_painted/kim_seoa/10_lobby_hair_tuck_f0_v2.png',
-      'assets/images/production_soft_painted/kim_seoa/10_lobby_hair_tuck_f1_v2.png',
-      'assets/images/production_soft_painted/kim_seoa/10_lobby_hair_tuck_f2_v2.png',
-      'assets/images/production_soft_painted/kim_seoa/10_lobby_hair_tuck_f3_v2.png',
-    ],
+    // The former notebook/uniform motion frames belonged to the retired
+    // identity. The approved pink twin-bun set stays on its relationship pose
+    // and uses the shared blink-only lobby motion.
+    motionFrames: <String>[],
     strength: 0.82,
     tempoMs: 3200,
     faceLine: '앗, 가까이 왔네. 기록은 흐트러뜨리지 말아 줘.',
@@ -407,10 +405,10 @@ class _LobbyBlinkGeometry {
 // the eyes instead of applying an unnatural squash to the whole face.
 const _lobbyBlinkGeometry = <String, _LobbyBlinkGeometry>{
   'kim_seoa': _LobbyBlinkGeometry(
-    leftEye: Offset(0.532, 0.130),
-    rightEye: Offset(0.600, 0.130),
-    eyeWidth: 0.044,
-    skinColor: Color(0xFFFDE9DB),
+    leftEye: Offset(0.489, 0.145),
+    rightEye: Offset(0.553, 0.138),
+    eyeWidth: 0.060,
+    skinColor: Color(0xFFFDE7DF),
   ),
   'lee_jian': _LobbyBlinkGeometry(
     leftEye: Offset(0.476, 0.131),
@@ -462,15 +460,17 @@ const _lobbyBlinkGeometry = <String, _LobbyBlinkGeometry>{
 const _lobbyBlinkGeometryByAsset = <String, _LobbyBlinkGeometry>{
   'assets/images/production_soft_painted/kim_seoa/01_neutral_notebook_v1.png':
       _LobbyBlinkGeometry(
-        leftEye: Offset(0.464, 0.128),
-        rightEye: Offset(0.527, 0.128),
-        skinColor: Color(0xFFFDE9DB),
+        leftEye: Offset(0.435, 0.142),
+        rightEye: Offset(0.522, 0.137),
+        eyeWidth: 0.062,
+        skinColor: Color(0xFFFBE3DC),
       ),
   'assets/images/production_soft_painted/kim_seoa/04_shy_appreciative_v1.png':
       _LobbyBlinkGeometry(
-        leftEye: Offset(0.463, 0.133),
-        rightEye: Offset(0.527, 0.133),
-        skinColor: Color(0xFFFDF0EA),
+        leftEye: Offset(0.491, 0.167),
+        rightEye: Offset(0.558, 0.154),
+        eyeWidth: 0.060,
+        skinColor: Color(0xFFFDE3DB),
       ),
   'assets/images/production_soft_painted/lee_jian/01_neutral_screwdriver_v2.png':
       _LobbyBlinkGeometry(
@@ -682,7 +682,7 @@ String _lobbyHeroineGreeting({
   if (unread > 0) {
     line = '톡으로 남긴 말 아직 못 봤지? 급한 건 아니니까 편할 때 확인해.';
   } else if (state.pendingDecisions.isNotEmpty) {
-    line = '새 기록이 와 있어. 먼저 확인하고 나면 오늘 할 일이 더 분명해질 거야.';
+    line = '중요한 선택이 남아 있어. 천천히 읽고 네 생각대로 정하면 돼.';
   } else if (relationshipOutingAvailableOn(state.currentDate)) {
     line = presentation.weekendLine;
   } else if (state.marketMinute < krxOpenMinute) {
@@ -710,7 +710,7 @@ class ApartmentHubScreen extends StatefulWidget {
     required this.onOpenMarket,
     required this.onOpenRealEstate,
     required this.onOpenBank,
-    required this.onOpenDecisions,
+    required this.onOpenPendingChoice,
     required this.onOpenLedger,
     required this.onOpenOrganization,
     required this.onOpenRelationships,
@@ -725,7 +725,6 @@ class ApartmentHubScreen extends StatefulWidget {
     required this.onAdvanceDay,
     required this.onAdvanceBatch,
     required this.onOpenEnding,
-    this.onClaimMission,
     this.onTutorialComplete,
   });
 
@@ -733,7 +732,7 @@ class ApartmentHubScreen extends StatefulWidget {
   final VoidCallback onOpenMarket;
   final VoidCallback onOpenRealEstate;
   final VoidCallback onOpenBank;
-  final VoidCallback onOpenDecisions;
+  final VoidCallback onOpenPendingChoice;
   final VoidCallback onOpenLedger;
   final VoidCallback onOpenOrganization;
   final VoidCallback onOpenRelationships;
@@ -748,7 +747,6 @@ class ApartmentHubScreen extends StatefulWidget {
   final VoidCallback onAdvanceDay;
   final VoidCallback onAdvanceBatch;
   final VoidCallback onOpenEnding;
-  final Future<MissionClaimResult> Function()? onClaimMission;
   final Future<void> Function()? onTutorialComplete;
 
   @override
@@ -771,28 +769,11 @@ class _ApartmentHubScreenState extends State<ApartmentHubScreen> {
     setState(() => _place = place);
   }
 
-  Future<void> _openEveningChoice() async {
-    final selection = await showModalBottomSheet<String>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      backgroundColor: const Color(0xFFFFFBF2),
-      builder: (sheetContext) => _WeekdayEveningSheet(state: widget.state),
-    );
-    if (!mounted || selection == null) return;
-    switch (selection) {
-      case 'real_estate':
-        widget.onOpenRealEstate();
-        break;
-      case 'bank':
-        widget.onOpenBank();
-        break;
-    }
-  }
+  void _openEveningChoice() => widget.onAdvanceDay();
 
   void _handleGuidanceAction() {
     if (widget.state.pendingDecisions.isNotEmpty) {
-      widget.onOpenDecisions();
+      widget.onOpenPendingChoice();
       return;
     }
     if (widget.state.currentDate.weekday >= DateTime.saturday ||
@@ -810,12 +791,6 @@ class _ApartmentHubScreenState extends State<ApartmentHubScreen> {
   @override
   Widget build(BuildContext context) {
     final details = _ApartmentPlaceDetails.forPlace(_place);
-    final legacyMissionUiDisabled = widget.state.story.flagBool(
-      'legacyMissionUiDisabled',
-    );
-    final missionProgress = legacyMissionUiDisabled
-        ? null
-        : const GameEngine().missionProgress(widget.state);
     final lobbyHeroine = _place == _ApartmentPlace.bedroom
         ? _dailyLobbyHeroine(widget.state)
         : null;
@@ -852,7 +827,6 @@ class _ApartmentHubScreenState extends State<ApartmentHubScreen> {
                 state: widget.state,
                 onOpenMarket: widget.onOpenMarket,
                 onOpenBank: widget.onOpenBank,
-                onOpenDecisions: widget.onOpenDecisions,
                 onOpenLedger: widget.onOpenLedger,
                 onOpenOrganization: widget.onOpenOrganization,
                 onOpenHomeImprovements: widget.onOpenHomeImprovements,
@@ -875,7 +849,6 @@ class _ApartmentHubScreenState extends State<ApartmentHubScreen> {
                   progress: widget.state.relationships.progressFor(
                     lobbyHeroine.id,
                   ),
-                  bottomInset: legacyMissionUiDisabled ? 0 : 68,
                   onOpenMessenger: widget.onOpenMessenger,
                   onOpenRelationships: widget.onOpenRelationships,
                 ),
@@ -901,16 +874,6 @@ class _ApartmentHubScreenState extends State<ApartmentHubScreen> {
                 onPressed: _handleGuidanceAction,
               ),
             ),
-            if (!legacyMissionUiDisabled)
-              Positioned(
-                right: 10,
-                bottom: 76,
-                child: _ApartmentMissionCard(
-                  progress: missionProgress,
-                  starBalance: widget.state.progression.starBalance,
-                  onClaim: widget.onClaimMission,
-                ),
-              ),
             Positioned(
               right: 7,
               top: 151,
@@ -951,16 +914,18 @@ class HomeComputerScreen extends StatefulWidget {
     super.key,
     required this.state,
     required this.onOpenStockMarket,
+    required this.onOpenCompanyManagement,
     required this.onOpenRealEstate,
     required this.onOpenBusiness,
-    required this.onOpenStarShop,
+    this.onOpenCasino,
   });
 
   final GameState state;
   final Future<GameState> Function(GameState state) onOpenStockMarket;
+  final Future<GameState> Function(GameState state) onOpenCompanyManagement;
   final Future<GameState> Function(GameState state) onOpenRealEstate;
   final Future<GameState> Function(GameState state) onOpenBusiness;
-  final Future<GameState> Function(GameState state) onOpenStarShop;
+  final Future<GameState> Function(GameState state)? onOpenCasino;
 
   @override
   State<HomeComputerScreen> createState() => _HomeComputerScreenState();
@@ -969,8 +934,46 @@ class HomeComputerScreen extends StatefulWidget {
 class _HomeComputerScreenState extends State<HomeComputerScreen> {
   late GameState _state = widget.state;
 
+  bool get _casinoSessionAvailable {
+    final casino = _state.personalFinance.casino;
+    final hasUnsettledRound =
+        casino.activeBlackjack != null || casino.activeCraps != null;
+    if (hasUnsettledRound) {
+      return _state.currentDate.weekday < DateTime.saturday &&
+          _state.marketMinute >= krxCloseMinute &&
+          _state.marketMinute <= marketDayEndMinute;
+    }
+    return _state.currentDate.weekday < DateTime.saturday &&
+        _state.marketMinute >= krxCloseMinute &&
+        _state.marketMinute <= marketDayEndMinute - casinoRoundMinutes &&
+        !weekdayEveningUsed(_state);
+  }
+
+  String get _casinoSessionStatus {
+    if (_state.personalFinance.casino.activeBlackjack != null) {
+      return '블랙잭 핸드 정산 필요';
+    }
+    if (_state.personalFinance.casino.activeCraps != null) {
+      return '크랩스 포인트 정산 필요';
+    }
+    if (_state.currentDate.weekday >= DateTime.saturday) {
+      return '평일 장 마감 후';
+    }
+    if (weekdayEveningUsed(_state)) return '오늘 저녁 행동 사용';
+    if (_state.marketMinute < krxCloseMinute) return '15:00 개장';
+    if (_state.marketMinute > marketDayEndMinute - casinoRoundMinutes) {
+      return '오늘 이용 종료';
+    }
+    return '● LIVE · 1판 30분';
+  }
+
   Future<void> _openStockMarket() async {
     final next = await widget.onOpenStockMarket(_state);
+    if (mounted) setState(() => _state = next);
+  }
+
+  Future<void> _openCompanyManagement() async {
+    final next = await widget.onOpenCompanyManagement(_state);
     if (mounted) setState(() => _state = next);
   }
 
@@ -984,10 +987,25 @@ class _HomeComputerScreenState extends State<HomeComputerScreen> {
     if (mounted) setState(() => _state = next);
   }
 
-  Future<void> _openStarShop() async {
-    final next = await widget.onOpenStarShop(_state);
+  Future<void> _openCasino() async {
+    final open = widget.onOpenCasino;
+    if (open == null) return;
+    final next = await open(_state);
     if (mounted) setState(() => _state = next);
   }
+
+  int get _shareholderCompanyCount => <String>{
+    ..._state.positions
+        .where((position) => position.units > 0)
+        .map((position) => position.assetId),
+    ..._state.shareholderGovernance.companies.values
+        .where((company) => company.ownershipPct > 0)
+        .map((company) => company.assetId),
+  }.length;
+
+  int get _shareholderMeetingCount => _state.shareholderGovernance.meetings
+      .where((meeting) => meeting.status != ShareholderMeetingStatus.closed)
+      .length;
 
   @override
   Widget build(BuildContext context) {
@@ -1188,7 +1206,7 @@ class _HomeComputerScreenState extends State<HomeComputerScreen> {
                                   ),
                                   const SizedBox(height: 4),
                                   const Text(
-                                    '투자 시장과 별빛 상점은 각각 별도 프로그램으로 열립니다.',
+                                    '주식거래·주주권·회사경영·부동산·상권 프로그램은 현재 상태를 공유합니다.',
                                     maxLines: 2,
                                     style: TextStyle(
                                       fontFamily: _hubDisplayFont,
@@ -1201,86 +1219,148 @@ class _HomeComputerScreenState extends State<HomeComputerScreen> {
                                   Expanded(
                                     child: LayoutBuilder(
                                       builder: (context, appConstraints) {
-                                        final tileWidth =
-                                            (appConstraints.maxWidth - 8) / 2;
-                                        final tileHeight =
-                                            (appConstraints.maxHeight - 8) / 2;
-                                        return GridView.count(
-                                          physics:
-                                              const NeverScrollableScrollPhysics(),
-                                          padding: EdgeInsets.zero,
-                                          crossAxisCount: 2,
-                                          crossAxisSpacing: 8,
-                                          mainAxisSpacing: 8,
-                                          childAspectRatio:
-                                              tileWidth / tileHeight,
+                                        return Column(
                                           children: [
-                                            _ComputerAppTile(
-                                              interactionKey: const Key(
-                                                'computer-stock-market-app',
+                                            Expanded(
+                                              child: Row(
+                                                children: [
+                                                  Expanded(
+                                                    child: _ComputerAppTile(
+                                                      interactionKey: const Key(
+                                                        'computer-stock-market-app',
+                                                      ),
+                                                      icon: Icons
+                                                          .candlestick_chart_rounded,
+                                                      iconColor: const Color(
+                                                        0xFF55C7A1,
+                                                      ),
+                                                      title: '미래 증권',
+                                                      subtitle: '주식시장',
+                                                      status: '시세 · 주문',
+                                                      onTap: _openStockMarket,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  Expanded(
+                                                    child: _ComputerAppTile(
+                                                      interactionKey: const Key(
+                                                        'computer-company-management-app',
+                                                      ),
+                                                      icon: Icons
+                                                          .account_balance_rounded,
+                                                      iconColor: const Color(
+                                                        0xFF8D72D8,
+                                                      ),
+                                                      title: '주주·회사관리',
+                                                      subtitle: '보유회사·주총일정',
+                                                      status:
+                                                          '회사 $_shareholderCompanyCount'
+                                                          ' · 일정 $_shareholderMeetingCount',
+                                                      onTap:
+                                                          _openCompanyManagement,
+                                                    ),
+                                                  ),
+                                                ],
                                               ),
-                                              icon: Icons
-                                                  .candlestick_chart_rounded,
-                                              iconColor: const Color(
-                                                0xFF55C7A1,
-                                              ),
-                                              title: '미래 증권',
-                                              subtitle: '주식시장',
-                                              status: '시세 · 주문',
-                                              onTap: _openStockMarket,
                                             ),
-                                            _ComputerAppTile(
-                                              interactionKey: const Key(
-                                                'computer-real-estate-app',
+                                            const SizedBox(height: 8),
+                                            Expanded(
+                                              child: Row(
+                                                children: [
+                                                  Expanded(
+                                                    child: _ComputerAppTile(
+                                                      interactionKey: const Key(
+                                                        'computer-real-estate-app',
+                                                      ),
+                                                      icon: Icons
+                                                          .apartment_rounded,
+                                                      iconColor: const Color(
+                                                        0xFFFFA45C,
+                                                      ),
+                                                      title: '한마음 부동산',
+                                                      subtitle:
+                                                          realEstateAccessUnlocked(
+                                                            _state,
+                                                          )
+                                                          ? '서울·경기 매물'
+                                                          : '5월 매물 이야기 필요',
+                                                      status:
+                                                          realEstateAccessUnlocked(
+                                                            _state,
+                                                          )
+                                                          ? '지도 · 계약'
+                                                          : '🔒 스토리 잠김',
+                                                      onTap:
+                                                          realEstateAccessUnlocked(
+                                                            _state,
+                                                          )
+                                                          ? _openRealEstate
+                                                          : null,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  Expanded(
+                                                    child: _ComputerAppTile(
+                                                      interactionKey: const Key(
+                                                        'computer-business-app',
+                                                      ),
+                                                      icon: Icons
+                                                          .storefront_rounded,
+                                                      iconColor: const Color(
+                                                        0xFFFF86A8,
+                                                      ),
+                                                      title: '동네상권넷',
+                                                      subtitle:
+                                                          businessMarketAccessUnlocked(
+                                                            _state,
+                                                          )
+                                                          ? businessOperationsUnlocked(
+                                                                  _state,
+                                                                )
+                                                                ? '창업 · 점포운영'
+                                                                : '상권 관찰 · 4월 운영 해금'
+                                                          : '3월 상권 이야기 필요',
+                                                      status:
+                                                          businessMarketAccessUnlocked(
+                                                            _state,
+                                                          )
+                                                          ? '점포 ${_state.businesses.activeBusinesses.length}'
+                                                                ' · 사건 ${_state.businesses.pendingEvents.length}'
+                                                          : '🔒 스토리 잠김',
+                                                      onTap:
+                                                          businessMarketAccessUnlocked(
+                                                            _state,
+                                                          )
+                                                          ? _openBusiness
+                                                          : null,
+                                                    ),
+                                                  ),
+                                                ],
                                               ),
-                                              icon: Icons.apartment_rounded,
-                                              iconColor: const Color(
-                                                0xFFFFA45C,
-                                              ),
-                                              title: '한마음 부동산',
-                                              subtitle:
-                                                  realEstateAccessUnlocked(
-                                                    _state,
-                                                  )
-                                                  ? '서울·경기 매물'
-                                                  : '서하늘 소개 필요',
-                                              status:
-                                                  realEstateAccessUnlocked(
-                                                    _state,
-                                                  )
-                                                  ? '지도 · 계약'
-                                                  : '🔒 스토리 잠김',
-                                              onTap: _openRealEstate,
                                             ),
-                                            _ComputerAppTile(
-                                              interactionKey: const Key(
-                                                'computer-business-app',
+                                            if (_state.currentDate.year >=
+                                                    2010 &&
+                                                widget.onOpenCasino !=
+                                                    null) ...[
+                                              const SizedBox(height: 8),
+                                              Expanded(
+                                                child: _ComputerAppTile(
+                                                  interactionKey: const Key(
+                                                    'computer-casino-live-app',
+                                                  ),
+                                                  icon: Icons.live_tv_rounded,
+                                                  iconColor: const Color(
+                                                    0xFFD5A64E,
+                                                  ),
+                                                  title: '카지노 LIVE',
+                                                  subtitle: '테이블 실시간 중계',
+                                                  status: _casinoSessionStatus,
+                                                  onTap: _casinoSessionAvailable
+                                                      ? _openCasino
+                                                      : null,
+                                                ),
                                               ),
-                                              icon: Icons.storefront_rounded,
-                                              iconColor: const Color(
-                                                0xFFFF86A8,
-                                              ),
-                                              title: '동네상권넷',
-                                              subtitle: '창업 · 점포운영',
-                                              status:
-                                                  '점포 ${_state.businesses.activeBusinesses.length}'
-                                                  ' · 사건 ${_state.businesses.pendingEvents.length}',
-                                              onTap: _openBusiness,
-                                            ),
-                                            _ComputerAppTile(
-                                              interactionKey: const Key(
-                                                'computer-star-shop-app',
-                                              ),
-                                              icon: Icons.auto_awesome_rounded,
-                                              iconColor: const Color(
-                                                0xFFFFD75E,
-                                              ),
-                                              title: '별빛 상점',
-                                              subtitle: '미션 스타',
-                                              status:
-                                                  '⭐ ${_state.progression.starBalance}',
-                                              onTap: _openStarShop,
-                                            ),
+                                            ],
                                           ],
                                         );
                                       },
@@ -1407,100 +1487,112 @@ class _ComputerAppTile extends StatelessWidget {
   final String title;
   final String subtitle;
   final String status;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
       final dense = constraints.maxWidth < 112 || constraints.maxHeight < 130;
       final iconSize = dense ? 34.0 : 58.0;
-      return Material(
-        color: Colors.transparent,
-        child: InkWell(
-          key: interactionKey,
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(7),
-          child: Ink(
-            decoration: BoxDecoration(
-              color: const Color(0xFFF9FAF4),
+      return SizedBox.expand(
+        child: Opacity(
+          opacity: onTap == null ? 0.62 : 1,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              key: interactionKey,
+              onTap: onTap,
               borderRadius: BorderRadius.circular(7),
-              border: Border.all(color: const Color(0xFF94A4B7), width: 1.5),
-              boxShadow: const [
-                BoxShadow(color: Colors.white, offset: Offset(-2, -2)),
-                BoxShadow(color: Color(0xFF9AA7AF), offset: Offset(2, 2)),
-              ],
-            ),
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(
-                dense ? 5 : 9,
-                dense ? 8 : 12,
-                dense ? 5 : 9,
-                dense ? 7 : 9,
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    width: iconSize,
-                    height: iconSize,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF172C4A),
-                      borderRadius: BorderRadius.circular(dense ? 10 : 12),
-                      border: Border.all(color: const Color(0xFF6E89AC)),
-                    ),
-                    child: Icon(icon, color: iconColor, size: dense ? 22 : 34),
+              child: Ink(
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF9FAF4),
+                  borderRadius: BorderRadius.circular(7),
+                  border: Border.all(
+                    color: const Color(0xFF94A4B7),
+                    width: 1.5,
                   ),
-                  SizedBox(height: dense ? 7 : 10),
-                  Text(
-                    title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontFamily: _hubDisplayFont,
-                      color: _ink,
-                      fontSize: dense ? 10 : 12,
-                      height: 1,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.25,
-                    ),
+                  boxShadow: const [
+                    BoxShadow(color: Colors.white, offset: Offset(-2, -2)),
+                    BoxShadow(color: Color(0xFF9AA7AF), offset: Offset(2, 2)),
+                  ],
+                ),
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    dense ? 5 : 9,
+                    dense ? 8 : 12,
+                    dense ? 5 : 9,
+                    dense ? 7 : 9,
                   ),
-                  SizedBox(height: dense ? 4 : 5),
-                  Text(
-                    subtitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontFamily: _hubDisplayFont,
-                      color: Color(0xFF586476),
-                      fontSize: dense ? 8 : 9,
-                      height: 1,
-                    ),
-                  ),
-                  const Spacer(),
-                  Container(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: dense ? 5 : 7,
-                      vertical: dense ? 3 : 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE5E9E4),
-                      borderRadius: BorderRadius.circular(99),
-                    ),
-                    child: Text(
-                      status,
-                      maxLines: 1,
-                      style: TextStyle(
-                        fontFamily: _hubDisplayFont,
-                        color: Color(0xFF486070),
-                        fontSize: dense ? 7.2 : 8,
-                        height: 1,
-                        fontWeight: FontWeight.w700,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: iconSize,
+                        height: iconSize,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF172C4A),
+                          borderRadius: BorderRadius.circular(dense ? 10 : 12),
+                          border: Border.all(color: const Color(0xFF6E89AC)),
+                        ),
+                        child: Icon(
+                          icon,
+                          color: iconColor,
+                          size: dense ? 22 : 34,
+                        ),
                       ),
-                    ),
+                      SizedBox(height: dense ? 7 : 10),
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontFamily: _hubDisplayFont,
+                          color: _ink,
+                          fontSize: dense ? 10 : 12,
+                          height: 1,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.25,
+                        ),
+                      ),
+                      SizedBox(height: dense ? 4 : 5),
+                      Text(
+                        subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontFamily: _hubDisplayFont,
+                          color: Color(0xFF586476),
+                          fontSize: dense ? 8 : 9,
+                          height: 1,
+                        ),
+                      ),
+                      const Spacer(),
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: dense ? 5 : 7,
+                          vertical: dense ? 3 : 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE5E9E4),
+                          borderRadius: BorderRadius.circular(99),
+                        ),
+                        child: Text(
+                          status,
+                          maxLines: 1,
+                          style: TextStyle(
+                            fontFamily: _hubDisplayFont,
+                            color: Color(0xFF486070),
+                            fontSize: dense ? 7.2 : 8,
+                            height: 1,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           ),
@@ -1558,7 +1650,7 @@ class _HubTutorialOverlay extends StatelessWidget {
                 '• 생활 라운지: 매일 바뀌는 동기와 오늘의 대화\n'
                 '• 투자실: 동기·운영관·운용 조직\n'
                 '• 작업실: PC·시장·부동산·상권 앱과 기기 정비\n'
-                '• 기록 보관실: 국가계좌 장부·안건·봉인 기록\n'
+                '• 기록 보관실: 국가계좌 장부·신문 스크랩\n'
                 '• 본관 앞: 국가계좌 창구·원내 실습',
                 style: TextStyle(
                   fontSize: 13,
@@ -1697,7 +1789,6 @@ class _LobbyHeroineStage extends StatefulWidget {
     required this.state,
     required this.profile,
     required this.progress,
-    required this.bottomInset,
     required this.onOpenMessenger,
     required this.onOpenRelationships,
   });
@@ -1705,7 +1796,6 @@ class _LobbyHeroineStage extends StatefulWidget {
   final GameState state;
   final CohortGirlProfile profile;
   final GirlRelationshipProgress progress;
-  final double bottomInset;
   final VoidCallback onOpenMessenger;
   final VoidCallback onOpenRelationships;
 
@@ -2340,7 +2430,7 @@ class _LobbyHeroineStageState extends State<_LobbyHeroineStage>
         Positioned(
           left: 10,
           right: 10,
-          bottom: 4 + widget.bottomInset,
+          bottom: 4,
           child: Container(
             key: const Key('lobby-heroine-greeting-card'),
             padding: const EdgeInsets.fromLTRB(12, 9, 6, 9),
@@ -2683,7 +2773,6 @@ class _ApartmentPlaceScene extends StatelessWidget {
     required this.state,
     required this.onOpenMarket,
     required this.onOpenBank,
-    required this.onOpenDecisions,
     required this.onOpenLedger,
     required this.onOpenOrganization,
     required this.onOpenHomeImprovements,
@@ -2694,7 +2783,6 @@ class _ApartmentPlaceScene extends StatelessWidget {
   final GameState state;
   final VoidCallback onOpenMarket;
   final VoidCallback onOpenBank;
-  final VoidCallback onOpenDecisions;
   final VoidCallback onOpenLedger;
   final VoidCallback onOpenOrganization;
   final VoidCallback onOpenHomeImprovements;
@@ -2759,22 +2847,6 @@ class _ApartmentPlaceScene extends StatelessWidget {
           ),
         ],
         if (place == _ApartmentPlace.corridor) ...[
-          _ApartmentObjectHotspot(
-            interactionKey: const Key('open-decisions-button'),
-            alignment: const Alignment(-0.58, -0.16),
-            width: 106,
-            height: 126,
-            eyebrow: '봉인 기록함 열기',
-            label: state.pendingDecisions.isEmpty
-                ? '기록 보관실'
-                : '새 기록 ${state.pendingDecisions.length}건',
-            icon: Icons.markunread_mailbox_rounded,
-            accent: state.pendingDecisions.isEmpty
-                ? const Color(0xFF9ED9EF)
-                : _yellow,
-            attention: state.pendingDecisions.isNotEmpty,
-            onTap: onOpenDecisions,
-          ),
           _ApartmentObjectHotspot(
             interactionKey: const Key('open-ledger-button'),
             alignment: const Alignment(0.60, -0.06),
@@ -3280,413 +3352,6 @@ class _ApartmentDayGuideCard extends StatelessWidget {
       ),
     );
   }
-}
-
-class _WeekdayEveningSheet extends StatelessWidget {
-  const _WeekdayEveningSheet({required this.state});
-
-  final GameState state;
-
-  @override
-  Widget build(BuildContext context) {
-    final currentTime = marketTimeLabel(state.marketMinute);
-    return SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 22),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        '장 마감 후 저녁 업무',
-                        style: TextStyle(
-                          color: _ink,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        '${_apartmentDateLabel(state.currentDate)} · 현재 $currentTime',
-                        style: const TextStyle(
-                          color: Color(0xFF65708A),
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  key: const Key('weekday-sheet-current-time'),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 11,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF243451),
-                    borderRadius: BorderRadius.circular(13),
-                  ),
-                  child: Text(
-                    currentTime,
-                    style: const TextStyle(
-                      color: Color(0xFFFFD66F),
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.all(11),
-              decoration: BoxDecoration(
-                color: const Color(0xFFEAF2FF),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFF8AA8D4)),
-              ),
-              child: const Text(
-                '오늘은 둘 중 하나만 선택할 수 있습니다. 선택한 화면에 들어가는 순간 남은 저녁을 사용하고 20:00으로 진행·저장됩니다.',
-                style: TextStyle(
-                  color: Color(0xFF40526D),
-                  fontSize: 11,
-                  height: 1.4,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
-            _WeekdayActivityTile(
-              tileKey: const Key('weekday-evening-real_estate'),
-              icon: Icons.apartment_rounded,
-              accent: const Color(0xFFB57A3D),
-              title: '부동산 시장 확인',
-              subtitle: realEstateAccessUnlocked(state)
-                  ? '$currentTime → 20:00 · 오늘 저녁 사용'
-                  : '🔒 서하늘 공인중개사 소개 이야기 필요',
-              description: realEstateAccessUnlocked(state)
-                  ? '매물·시세·보유 부동산을 검토하고 필요한 거래를 처리합니다.'
-                  : '첫 은행 상담 뒤 도착하는 소개장을 확인하면 열립니다.',
-              onTap: realEstateAccessUnlocked(state)
-                  ? () => Navigator.pop(context, 'real_estate')
-                  : null,
-            ),
-            const SizedBox(height: 8),
-            _WeekdayActivityTile(
-              tileKey: const Key('weekday-evening-bank'),
-              icon: Icons.account_balance_rounded,
-              accent: const Color(0xFF397FA8),
-              title: '은행 업무 확인',
-              subtitle: bankAccessUnlocked(state)
-                  ? '$currentTime → 20:00 · 오늘 저녁 사용'
-                  : '🔒 윤하린 은행원 소개 이야기 필요',
-              description: bankAccessUnlocked(state)
-                  ? '예금·대출·상환 조건과 현재 현금 흐름을 확인합니다.'
-                  : '주식장 첫 교육 뒤 도착하는 담당자 소개 기록을 확인하면 열립니다.',
-              onTap: bankAccessUnlocked(state)
-                  ? () => Navigator.pop(context, 'bank')
-                  : null,
-            ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _WeekdayActivityTile extends StatelessWidget {
-  const _WeekdayActivityTile({
-    required this.tileKey,
-    required this.icon,
-    required this.accent,
-    required this.title,
-    required this.subtitle,
-    required this.description,
-    required this.onTap,
-  });
-
-  final Key tileKey;
-  final IconData icon;
-  final Color accent;
-  final String title;
-  final String subtitle;
-  final String description;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) => Material(
-    color: Colors.white,
-    borderRadius: BorderRadius.circular(16),
-    child: InkWell(
-      key: tileKey,
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.all(11),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: onTap == null ? const Color(0xFFCCD1DA) : accent,
-            width: 1.5,
-          ),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: accent.withValues(alpha: onTap == null ? 0.08 : 0.16),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                icon,
-                color: onTap == null ? const Color(0xFF9AA2B1) : accent,
-                size: 21,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      color: onTap == null ? const Color(0xFF8A92A0) : _ink,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      color: onTap == null ? const Color(0xFF9AA2B1) : accent,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    description,
-                    style: const TextStyle(
-                      color: Color(0xFF65708A),
-                      fontSize: 10.5,
-                      height: 1.35,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Icon(
-              onTap == null ? Icons.check_rounded : Icons.chevron_right_rounded,
-              color: onTap == null ? const Color(0xFF9AA2B1) : accent,
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
-}
-
-class _ApartmentMissionCard extends StatefulWidget {
-  const _ApartmentMissionCard({
-    required this.progress,
-    required this.starBalance,
-    required this.onClaim,
-  });
-
-  final MissionProgressView? progress;
-  final int starBalance;
-  final Future<MissionClaimResult> Function()? onClaim;
-
-  @override
-  State<_ApartmentMissionCard> createState() => _ApartmentMissionCardState();
-}
-
-class _ApartmentMissionCardState extends State<_ApartmentMissionCard> {
-  bool _claiming = false;
-
-  Future<void> _claim() async {
-    final progress = widget.progress;
-    final onClaim = widget.onClaim;
-    if (_claiming ||
-        progress == null ||
-        !progress.complete ||
-        onClaim == null) {
-      return;
-    }
-    setState(() => _claiming = true);
-    try {
-      final result = await onClaim();
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(result.message)));
-    } finally {
-      if (mounted) setState(() => _claiming = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final progress = widget.progress;
-    final complete = progress?.complete ?? false;
-    final current = progress == null
-        ? 0
-        : progress.current.clamp(0, progress.mission.target);
-    return Semantics(
-      container: true,
-      button: complete,
-      label: progress == null
-          ? '모든 미션 완료'
-          : complete
-          ? '완료한 미션 ${progress.mission.title}, 눌러서 보상 받기'
-          : '현재 미션 ${progress.mission.title}, ${progress.current}/${progress.mission.target}',
-      child: Material(
-        key: const Key('hub-mission-card'),
-        color: Colors.transparent,
-        child: Container(
-          width: 202,
-          height: 62,
-          decoration: BoxDecoration(
-            color: const Color(0xF5FFF8E9),
-            borderRadius: BorderRadius.circular(13),
-            border: Border.all(color: const Color(0xFF243451), width: 1.5),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x4D070A12),
-                blurRadius: 8,
-                offset: Offset(0, 3),
-              ),
-            ],
-          ),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(12),
-            onTap: complete && !_claiming ? _claim : null,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(8, 7, 7, 7),
-              child: Row(
-                children: [
-                  const _ApartmentMissionEmblem(),
-                  const SizedBox(width: 7),
-                  Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Text(
-                              progress == null
-                                  ? '미션 완료'
-                                  : complete
-                                  ? '보상 받기'
-                                  : '현재 미션 $current/${progress.mission.target}',
-                              style: const TextStyle(
-                                fontFamily: _hubDisplayFont,
-                                color: Color(0xFF9B681C),
-                                fontSize: 8,
-                                height: 1,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            const Spacer(),
-                            Text(
-                              '⭐ ${widget.starBalance}',
-                              style: const TextStyle(
-                                fontFamily: _hubDisplayFont,
-                                color: Color(0xFF6B7485),
-                                fontSize: 8,
-                                height: 1,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 5),
-                        Text(
-                          progress?.mission.title ?? '모든 미션을 완료했어요!',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontFamily: _hubDisplayFont,
-                            color: _ink,
-                            fontSize: 11.5,
-                            height: 1,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: -0.25,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 7),
-                  if (complete)
-                    Container(
-                      key: const Key('hub-claim-mission-reward'),
-                      width: 30,
-                      height: 30,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF243451),
-                        borderRadius: BorderRadius.circular(9),
-                      ),
-                      alignment: Alignment.center,
-                      child: _claiming
-                          ? const SizedBox(
-                              width: 12,
-                              height: 12,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Icon(
-                              Icons.card_giftcard_rounded,
-                              size: 17,
-                              color: Colors.white,
-                            ),
-                    )
-                  else
-                    const Icon(
-                      Icons.flag_rounded,
-                      color: Color(0xFF9B681C),
-                      size: 18,
-                    ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ApartmentMissionEmblem extends StatelessWidget {
-  const _ApartmentMissionEmblem();
-
-  @override
-  Widget build(BuildContext context) => Container(
-    width: 32,
-    height: 32,
-    decoration: BoxDecoration(
-      color: const Color(0xFFFFD66F),
-      shape: BoxShape.circle,
-      border: Border.all(color: const Color(0xFF9C681B), width: 1.5),
-    ),
-    child: const Icon(Icons.star_rounded, color: Color(0xFF243451), size: 20),
-  );
 }
 
 class _ApartmentObjectHotspot extends StatelessWidget {
@@ -4373,7 +4038,7 @@ class _ApartmentPlaceDetails {
       id: 'corridor',
       title: '프로젝트 데시멀 · 기록 보관실',
       shortTitle: '기록실',
-      hint: '국가계좌 장부 · 안건 · 봉인 기록',
+      hint: '국가계좌 장부 · 신문 스크랩',
       assetPath:
           'assets/images/cinematic_soft_painted/decimal/bg_decimal_records_archive_2000_v1.png',
       icon: Icons.folder_copy_rounded,

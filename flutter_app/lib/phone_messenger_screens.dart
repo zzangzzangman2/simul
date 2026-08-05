@@ -14,6 +14,7 @@ class PhoneMessengerScreen extends StatefulWidget {
     required this.state,
     required this.onMarkRead,
     required this.onSend,
+    this.onSendGift,
     PhoneAiService? aiService,
   }) : aiService = aiService ?? PhoneAiService();
 
@@ -25,6 +26,11 @@ class PhoneMessengerScreen extends StatefulWidget {
     String text,
   )
   onSend;
+  final Future<PhoneMessengerActionResult> Function(
+    String contactId,
+    String giftId,
+  )?
+  onSendGift;
   final PhoneAiService aiService;
 
   @override
@@ -122,7 +128,12 @@ class _PhoneMessengerScreenState extends State<PhoneMessengerScreen> {
     setState(() => _opening = false);
     final latest = await Navigator.of(context).push<GameState>(
       _gameSceneRoute<GameState>(
-        PhoneChatScreen(state: _state, contact: contact, onSend: widget.onSend),
+        PhoneChatScreen(
+          state: _state,
+          contact: contact,
+          onSend: widget.onSend,
+          onSendGift: widget.onSendGift,
+        ),
       ),
     );
     if (latest != null && mounted) setState(() => _state = latest);
@@ -215,7 +226,7 @@ class _PhoneMessengerScreenState extends State<PhoneMessengerScreen> {
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 9),
               color: Colors.white,
               child: const Text(
-                '데시멀 동기 채팅 · 답장은 하루에 친구별 3번',
+                '친구별 하루 3번 · 대화 1회 30분 · 22:00 취침',
                 style: TextStyle(
                   color: Color(0xFF777777),
                   fontSize: 10,
@@ -565,6 +576,7 @@ class PhoneChatScreen extends StatefulWidget {
     required this.state,
     required this.contact,
     required this.onSend,
+    this.onSendGift,
   });
 
   final GameState state;
@@ -574,6 +586,11 @@ class PhoneChatScreen extends StatefulWidget {
     String text,
   )
   onSend;
+  final Future<PhoneMessengerActionResult> Function(
+    String contactId,
+    String giftId,
+  )?
+  onSendGift;
 
   @override
   State<PhoneChatScreen> createState() => _PhoneChatScreenState();
@@ -639,6 +656,39 @@ class _PhoneChatScreenState extends State<PhoneChatScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
   }
 
+  Future<void> _openGiftShop() async {
+    final sendGift = widget.onSendGift;
+    if (_sending || sendGift == null) return;
+    if (kBeautyGiftAlreadyGivenToday(_state)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('선물은 매장과 톡을 합쳐 하루에 한 번만 보낼 수 있어요.')),
+      );
+      return;
+    }
+    final giftId = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: const Color(0xFFFFFBF8),
+      builder: (context) =>
+          _PhoneGiftPickerSheet(state: _state, contact: widget.contact),
+    );
+    if (giftId == null || !mounted) return;
+    setState(() => _sending = true);
+    final result = await sendGift(widget.contact.id, giftId);
+    if (!mounted) return;
+    setState(() {
+      _sending = false;
+      if (result.success) _state = result.state;
+    });
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(result.message)));
+    if (result.success) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+    }
+  }
+
   String _signed(int value) => value > 0 ? '+$value' : '$value';
 
   void _closeChat() {
@@ -652,16 +702,31 @@ class _PhoneChatScreenState extends State<PhoneChatScreen> {
   @override
   Widget build(BuildContext context) {
     final messages = _state.phoneMessenger.messagesFor(widget.contact.id);
+    final messageItems = <Widget>[];
+    var previousDay = -1;
+    for (final message in messages) {
+      if (message.day != previousDay) {
+        messageItems.add(
+          _PhoneDateDivider(date: _state.dateForDay(message.day)),
+        );
+        previousDay = message.day;
+      }
+      messageItems.add(
+        _PhoneMessageBubble(message: message, contact: widget.contact),
+      );
+    }
     final relationship = cohortGirlProfileById(widget.contact.id) == null
         ? null
         : _state.relationships.progressFor(widget.contact.id);
-    final privateMemoryCount = _state.phoneMessenger
-        .memoriesFor(widget.contact.id)
-        .length;
     final used = _state.phoneMessenger
         .progressFor(widget.contact.id)
         .exchangesForDay(_state.day);
     final limitReached = used >= phoneMessengerDailySendLimit;
+    final bedtimeReached = _state.marketMinute >= phoneMessengerBedtimeMinute;
+    final exchangeWouldPassBedtime =
+        _state.marketMinute > phoneMessengerLastSendMinute;
+    final canSend =
+        !limitReached && !bedtimeReached && !exchangeWouldPassBedtime;
     return PopScope(
       canPop: _allowPop,
       onPopInvokedWithResult: (didPop, result) {
@@ -703,12 +768,10 @@ class _PhoneChatScreenState extends State<PhoneChatScreen> {
                           ),
                           Text(
                             relationship == null
-                                ? '${widget.contact.personalityLabel} · '
-                                      '1:1 기억 $privateMemoryCount'
+                                ? widget.contact.personalityLabel
                                 : '${widget.contact.personalityLabel} · '
                                       '호감 ${relationship.affection} · '
-                                      '신뢰 ${relationship.trust} · '
-                                      '1:1 기억 $privateMemoryCount',
+                                      '신뢰 ${relationship.trust}',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
@@ -720,10 +783,19 @@ class _PhoneChatScreenState extends State<PhoneChatScreen> {
                         ],
                       ),
                     ),
+                    if (cohortGirlProfileById(widget.contact.id) != null)
+                      IconButton(
+                        key: const Key('phone-gift-open-button'),
+                        tooltip: '미라온 선물하기',
+                        onPressed: widget.onSendGift == null || _sending
+                            ? null
+                            : _openGiftShop,
+                        icon: const Icon(Icons.card_giftcard_rounded, size: 22),
+                      ),
                     Padding(
                       padding: const EdgeInsets.only(right: 10),
                       child: Text(
-                        '$used / $phoneMessengerDailySendLimit',
+                        '$used/$phoneMessengerDailySendLimit · 30분',
                         style: const TextStyle(
                           color: _messengerDark,
                           fontSize: 10,
@@ -739,36 +811,8 @@ class _PhoneChatScreenState extends State<PhoneChatScreen> {
                   key: const Key('phone-chat-message-list'),
                   controller: _scrollController,
                   padding: const EdgeInsets.fromLTRB(12, 13, 12, 16),
-                  itemCount: messages.length + 1,
-                  itemBuilder: (context, index) {
-                    if (index == 0) {
-                      return Center(
-                        child: Container(
-                          margin: const EdgeInsets.only(bottom: 14),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 5,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0x55717E86),
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Text(
-                            '${_state.currentDate.month}월 ${_state.currentDate.day}일 · 데시멀 연락망',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 8,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
-                      );
-                    }
-                    return _PhoneMessageBubble(
-                      message: messages[index - 1],
-                      contact: widget.contact,
-                    );
-                  },
+                  itemCount: messageItems.length,
+                  itemBuilder: (context, index) => messageItems[index],
                 ),
               ),
               Container(
@@ -776,7 +820,7 @@ class _PhoneChatScreenState extends State<PhoneChatScreen> {
                 padding: const EdgeInsets.fromLTRB(8, 7, 8, 8),
                 child: Column(
                   children: [
-                    if (!limitReached)
+                    if (canSend)
                       SizedBox(
                         height: 31,
                         child: ListView.separated(
@@ -807,8 +851,8 @@ class _PhoneChatScreenState extends State<PhoneChatScreen> {
                           },
                         ),
                       ),
-                    if (!limitReached) const SizedBox(height: 6),
-                    if (!limitReached)
+                    if (canSend) const SizedBox(height: 6),
+                    if (canSend)
                       const Padding(
                         key: Key('phone-ai-privacy-notice'),
                         padding: EdgeInsets.only(bottom: 5),
@@ -832,7 +876,28 @@ class _PhoneChatScreenState extends State<PhoneChatScreen> {
                           ],
                         ),
                       ),
-                    if (limitReached)
+                    if (bedtimeReached || exchangeWouldPassBedtime)
+                      Container(
+                        key: const Key('phone-chat-bedtime'),
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFDFE4E7),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          bedtimeReached
+                              ? '22:00 취침 시간 · 모두 잠들어 내일 아침부터 다시 톡할 수 있어요.'
+                              : '한 번 대화하면 30분이 흘러요. 오늘은 취침 전 대화를 마칠 시간이 부족해요.',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Color(0xFF5D6870),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      )
+                    else if (limitReached)
                       Container(
                         key: const Key('phone-chat-daily-limit'),
                         width: double.infinity,
@@ -930,6 +995,7 @@ class _PhoneStatusBar extends StatelessWidget {
       children: [
         Text(
           _phoneClock(state.marketMinute),
+          key: const Key('phone-status-time'),
           style: const TextStyle(
             color: _messengerDark,
             fontSize: 10,
@@ -975,6 +1041,260 @@ class _PhoneAvatar extends StatelessWidget {
         color: Colors.white,
         fontSize: size * 0.40,
         fontWeight: FontWeight.w900,
+      ),
+    ),
+  );
+}
+
+class _PhoneGiftPickerSheet extends StatefulWidget {
+  const _PhoneGiftPickerSheet({required this.state, required this.contact});
+
+  final GameState state;
+  final PhoneContactDefinition contact;
+
+  @override
+  State<_PhoneGiftPickerSheet> createState() => _PhoneGiftPickerSheetState();
+}
+
+class _PhoneGiftPickerSheetState extends State<_PhoneGiftPickerSheet> {
+  String? _selectedId;
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = _selectedId == null ? null : weekendGiftById(_selectedId!);
+    return FractionallySizedBox(
+      heightFactor: 0.88,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 14, 10, 10),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.card_giftcard_rounded,
+                  color: Color(0xFFB6647A),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${widget.contact.name}에게 미라온 선물',
+                        style: const TextStyle(
+                          color: _ink,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      Text(
+                        '하루 1회 · 생활비 ${_money(widget.state.bankCash)}원',
+                        style: const TextStyle(
+                          color: Color(0xFF8D6B73),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close_rounded),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: GridView.builder(
+              key: const Key('phone-gift-product-grid'),
+              padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 9,
+                mainAxisSpacing: 9,
+                childAspectRatio: 0.70,
+              ),
+              itemCount: weekendGifts.length,
+              itemBuilder: (context, index) {
+                final gift = weekendGifts[index];
+                final selectedCard = gift.id == _selectedId;
+                final repeatCount = kBeautyGiftMonthlyRepeatCount(
+                  widget.state,
+                  girlId: widget.contact.id,
+                  giftId: gift.id,
+                );
+                return Material(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  child: InkWell(
+                    key: Key('phone-gift-product-${gift.id}'),
+                    onTap: () => setState(() => _selectedId = gift.id),
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: selectedCard
+                              ? const Color(0xFFB6647A)
+                              : const Color(0xFFE8D9D4),
+                          width: selectedCard ? 2.5 : 1,
+                        ),
+                      ),
+                      padding: const EdgeInsets.all(8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(11),
+                              child: Image.asset(
+                                gift.imageAsset,
+                                width: double.infinity,
+                                fit: BoxFit.cover,
+                                cacheWidth: 420,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 7),
+                          Text(
+                            gift.category,
+                            style: const TextStyle(
+                              color: Color(0xFFB6647A),
+                              fontSize: 8,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          Text(
+                            gift.title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: _ink,
+                              fontSize: 11,
+                              height: 1.15,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  '${_money(gift.cost)}원',
+                                  style: const TextStyle(
+                                    color: _ink,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ),
+                              if (repeatCount > 0)
+                                Text(
+                                  '이달 ${repeatCount + 1}회째',
+                                  style: const TextStyle(
+                                    color: Color(0xFF9A6A42),
+                                    fontSize: 7,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          if (selected != null)
+            Container(
+              margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+              padding: const EdgeInsets.all(11),
+              decoration: BoxDecoration(
+                color: selected.isFavoriteFor(widget.contact.id)
+                    ? const Color(0xFFFFE8EF)
+                    : const Color(0xFFF2F0ED),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    selected.isFavoriteFor(widget.contact.id)
+                        ? Icons.favorite_rounded
+                        : Icons.lightbulb_outline_rounded,
+                    color: selected.isFavoriteFor(widget.contact.id)
+                        ? const Color(0xFFC65172)
+                        : const Color(0xFF796E67),
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      selected.isFavoriteFor(widget.contact.id)
+                          ? '${widget.contact.name}의 취향과 특히 잘 맞을 것 같아 · ${selected.preferenceReason}'
+                          : '${widget.contact.name}의 반응은 관계와 취향에 따라 달라져요.',
+                      style: const TextStyle(
+                        color: _ink,
+                        fontSize: 10,
+                        height: 1.35,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              child: FilledButton.icon(
+                key: const Key('phone-gift-send-button'),
+                onPressed:
+                    selected == null || widget.state.bankCash < selected.cost
+                    ? null
+                    : () => Navigator.pop(context, selected.id),
+                icon: const Icon(Icons.send_rounded),
+                label: Text(
+                  selected == null
+                      ? '상품을 골라 주세요'
+                      : widget.state.bankCash < selected.cost
+                      ? '생활비가 부족해요'
+                      : '${_money(selected.cost)}원 · 선물 보내기',
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PhoneDateDivider extends StatelessWidget {
+  const _PhoneDateDivider({required this.date});
+
+  final DateTime date;
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Container(
+      key: Key('phone-date-${marketDateKey(date)}'),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: const Color(0x55717E86),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        '${date.year}년 ${date.month}월 ${date.day}일',
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 8,
+          fontWeight: FontWeight.w800,
+        ),
       ),
     ),
   );
@@ -1059,15 +1379,20 @@ class _PhoneMessageBubble extends StatelessWidget {
                             ),
                           ],
                         ),
-                        child: Text(
-                          message.text,
-                          style: const TextStyle(
-                            color: Color(0xFF252525),
-                            fontSize: 12,
-                            height: 1.35,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+                        child: message.giftId == null
+                            ? Text(
+                                message.text,
+                                style: const TextStyle(
+                                  color: Color(0xFF252525),
+                                  fontSize: 12,
+                                  height: 1.35,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              )
+                            : _PhoneGiftMessageCard(
+                                gift: weekendGiftById(message.giftId!),
+                                fallbackText: message.text,
+                              ),
                       ),
                     ),
                     if (!fromPlayer)
@@ -1085,6 +1410,71 @@ class _PhoneMessageBubble extends StatelessWidget {
                   ],
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PhoneGiftMessageCard extends StatelessWidget {
+  const _PhoneGiftMessageCard({required this.gift, required this.fallbackText});
+
+  final WeekendGiftDefinition? gift;
+  final String fallbackText;
+
+  @override
+  Widget build(BuildContext context) {
+    final product = gift;
+    if (product == null) {
+      return Text(
+        fallbackText,
+        style: const TextStyle(color: Color(0xFF252525), fontSize: 12),
+      );
+    }
+    return SizedBox(
+      width: 190,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: AspectRatio(
+              aspectRatio: 1.55,
+              child: Image.asset(
+                product.imageAsset,
+                fit: BoxFit.cover,
+                cacheWidth: 420,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'MIRAON GIFT',
+            style: TextStyle(
+              color: Color(0xFF9A5066),
+              fontSize: 8,
+              letterSpacing: 0.8,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          Text(
+            product.title,
+            style: const TextStyle(
+              color: Color(0xFF252525),
+              fontSize: 12,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 2),
+          const Text(
+            '선물이 도착했어요 · 배송지 입력 없이 바로 받기',
+            style: TextStyle(
+              color: Color(0xFF725E64),
+              fontSize: 8,
+              height: 1.3,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],

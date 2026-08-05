@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:millennium_capital/game/game_engine.dart';
 import 'package:millennium_capital/game/market_clock.dart';
+import 'package:millennium_capital/game/monthly_unlock_chapter.dart';
 import 'package:millennium_capital/game/story_state.dart';
 import 'package:millennium_capital/game/weekday_activity.dart';
 
@@ -76,7 +77,7 @@ void main() {
   });
 
   test(
-    'guidance keeps weekdays on stocks until close then offers two choices',
+    'guidance keeps weekdays on stocks until close then opens the evening flow',
     () {
       final base = engine
           .createNewGame('일정 안내 테스트', worldSeed: 'weekday-guidance')
@@ -102,7 +103,7 @@ void main() {
         gameDayGuidanceForState(
           base.copyWith(marketMinute: krxCloseMinute),
         ).title,
-        contains('부동산 또는 은행'),
+        contains('오늘 손익을 확인'),
       );
       final finished = engine.completeWeekdayActivity(
         base.copyWith(marketMinute: krxCloseMinute),
@@ -113,7 +114,7 @@ void main() {
   );
 
   test(
-    'new Decimal story unlocks bank first and realtor after a bank visit',
+    'new Decimal story unlocks bank in February and real estate research in May',
     () {
       final story = StoryState.newDecimalPlayer(
         playerName: '민재',
@@ -134,14 +135,33 @@ void main() {
 
       final afterTutorial = engine.completeInitialPracticeDay(initial);
       expect(
-        afterTutorial.pendingDecisions.single.id,
-        'facility-intro-bank-yoon-harin',
+        afterTutorial.pendingDecisions.any(
+          (decision) => decision.id.startsWith(
+            monthlyUnlockChapters.first.decisionBaseId,
+          ),
+        ),
+        isFalse,
       );
 
+      final februaryFirst = engine.advanceOneDay(
+        afterTutorial.copyWith(
+          day: 31,
+          marketMinute: marketDayEndMinute,
+          decisions: const [],
+        ),
+      );
+      final bankDecision = februaryFirst.pendingDecisions.single;
+      expect(
+        bankDecision.id,
+        startsWith(monthlyUnlockChapters.first.decisionBaseId),
+      );
       final bankIntroduced = engine.resolveDecision(
-        afterTutorial,
-        'facility-intro-bank-yoon-harin',
-        'meet_bank_clerk_deposit',
+        februaryFirst,
+        bankDecision.id,
+        monthlyUnlockOptionId(
+          monthlyUnlockChapters.first,
+          'check_dates_together',
+        ),
       );
       expect(bankAccessUnlocked(bankIntroduced), isTrue);
       expect(realEstateAccessUnlocked(bankIntroduced), isFalse);
@@ -150,24 +170,30 @@ void main() {
         contains('BANK_CLERK_YOON_HARIN_INTRODUCED'),
       );
 
-      final bankEvening = engine.completeWeekdayActivity(
-        bankIntroduced.copyWith(marketMinute: krxCloseMinute),
-        'bank',
+      var preparedForMay = bankIntroduced;
+      for (final chapter in monthlyUnlockChapters.skip(1).take(2)) {
+        preparedForMay = resolveMonthlyUnlockDecision(
+          preparedForMay,
+          monthlyUnlockDecisionId(chapter, MonthlyHeroineTone.awkward),
+          monthlyUnlockOptionId(chapter, chapter.options.first.id),
+        );
+      }
+      final mayFirst = engine.advanceOneDay(
+        preparedForMay.copyWith(day: 121, marketMinute: marketDayEndMinute),
       );
-      expect(bankEvening.success, isTrue);
-
-      final nextDay = engine.advanceOneDay(bankEvening.state);
+      final realEstateDecision = mayFirst.pendingDecisions.single;
       expect(
-        nextDay.pendingDecisions.single.id,
-        'facility-intro-realtor-seo-haneul',
+        realEstateDecision.id,
+        startsWith(monthlyUnlockChapters[3].decisionBaseId),
       );
 
       final realtorIntroduced = engine.resolveDecision(
-        nextDay,
-        'facility-intro-realtor-seo-haneul',
-        'meet_realtor_cashflow',
+        mayFirst,
+        realEstateDecision.id,
+        monthlyUnlockOptionId(monthlyUnlockChapters[3], 'align_dates'),
       );
       expect(realEstateAccessUnlocked(realtorIntroduced), isTrue);
+      expect(realEstateTransactionsUnlocked(realtorIntroduced), isFalse);
       expect(
         realtorIntroduced.story.seenStoryEventIds,
         contains('REALTOR_SEO_HANEUL_INTRODUCED'),

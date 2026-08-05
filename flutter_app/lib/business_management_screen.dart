@@ -67,6 +67,7 @@ class _BusinessManagementScreenState extends State<BusinessManagementScreen> {
   bool _busy = false;
 
   List<OwnedRealEstate> get _eligibleOwnedProperties {
+    if (!propertyBusinessLinkUnlocked(_state)) return const <OwnedRealEstate>[];
     final portfolio = _state.businesses;
     return _state.personalFinance.realEstate
         .where((property) {
@@ -175,6 +176,7 @@ class _BusinessManagementScreenState extends State<BusinessManagementScreen> {
           availableLocationIds: locationIds,
           eligibleOwnedProperties: ownedPropertiesForDistrict,
           initialLinkedRealEstateId: widget.initialLinkedRealEstateId,
+          operationsUnlocked: businessOperationsUnlocked(_state),
           onAcquire: widget.onAcquire,
         ),
       ),
@@ -736,6 +738,7 @@ class _BusinessListingReviewScreen extends StatefulWidget {
     required this.availableLocationIds,
     required this.eligibleOwnedProperties,
     required this.initialLinkedRealEstateId,
+    required this.operationsUnlocked,
     required this.onAcquire,
   });
 
@@ -744,6 +747,7 @@ class _BusinessListingReviewScreen extends StatefulWidget {
   final List<String> availableLocationIds;
   final List<OwnedRealEstate> eligibleOwnedProperties;
   final String? initialLinkedRealEstateId;
+  final bool operationsUnlocked;
   final BusinessAcquireCallback onAcquire;
 
   @override
@@ -1164,12 +1168,21 @@ class _BusinessListingReviewScreenState
                     '주식 예수금은 사업 인수에 사용할 수 없습니다.',
               ),
             ],
+            if (!widget.operationsUnlocked) ...[
+              const SizedBox(height: 8),
+              const _BusinessWarning(
+                text:
+                    '지금은 상권과 손익만 관찰할 수 있습니다. 4월 가게 운영 이야기를 마치면 실제 인수·창업이 열립니다.',
+              ),
+            ],
             const SizedBox(height: 10),
             SizedBox(
               height: 50,
               child: FilledButton.icon(
                 key: const Key('business-acquire-confirm'),
-                onPressed: _busy || !hasEnoughCash ? null : _submit,
+                onPressed: _busy || !hasEnoughCash || !widget.operationsUnlocked
+                    ? null
+                    : _submit,
                 icon: _busy
                     ? const SizedBox.square(
                         dimension: 18,
@@ -1179,6 +1192,8 @@ class _BusinessListingReviewScreenState
                 label: Text(
                   _busy
                       ? '저장 중'
+                      : !widget.operationsUnlocked
+                      ? '4월 운영 이야기 필요'
                       : hasEnoughCash
                       ? '최종 내용 확인'
                       : '초기현금 부족',

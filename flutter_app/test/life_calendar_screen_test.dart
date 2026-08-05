@@ -91,6 +91,13 @@ void main() {
 
     expect(find.byKey(const Key('life-calendar-screen')), findsOneWidget);
     expect(find.byKey(const Key('life-calendar-event-card')), findsOneWidget);
+    expect(find.byKey(const Key('life-calendar-filter-row')), findsOneWidget);
+    expect(
+      find.byKey(const Key('life-calendar-filter-keyRecords')),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const Key('life-calendar-filter-all')));
+    await tester.pumpAndSettle();
     expect(
       tester
           .widget<IconButton>(

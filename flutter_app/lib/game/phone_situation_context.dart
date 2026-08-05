@@ -1,5 +1,6 @@
 import 'game_state.dart';
 import 'market_clock.dart';
+import 'phone_messenger_state.dart';
 import 'relationship_state.dart';
 import 'weekend_activity.dart';
 import 'weekday_activity.dart';
@@ -333,6 +334,9 @@ String _phaseLabel(
   required int weekendActionsRemaining,
   required bool weekdayEveningUsed,
 }) {
+  if (state.marketMinute >= phoneMessengerBedtimeMinute) {
+    return '22:00 취침 시간';
+  }
   if (state.marketMinute >= marketDayEndMinute) return '20:00 관계 시간';
   if (isWeekend) {
     return weekendActionsRemaining > 0
@@ -342,7 +346,7 @@ String _phaseLabel(
   if (state.marketMinute < krxOpenMinute) return '장전 준비';
   if (state.marketMinute < krxContinuousEndMinute) return '주식 장중';
   if (state.marketMinute < krxCloseMinute) return '마감 동시호가';
-  return weekdayEveningUsed ? '평일 저녁 업무 완료' : '장 마감 후 평일 저녁 업무';
+  return weekdayEveningUsed ? '평일 관계 시간 완료' : '장 마감 후 자유 시간';
 }
 
 String _currentObligation(
@@ -354,6 +358,9 @@ String _currentObligation(
   if (state.pendingDecisions.isNotEmpty) {
     return '새 기록 ${state.pendingDecisions.length}건을 먼저 처리해야 함';
   }
+  if (state.marketMinute >= phoneMessengerBedtimeMinute) {
+    return '오늘 일과를 마치고 모두 취침 중';
+  }
   if (relationshipTimeUsedToday) return '오늘 관계 시간까지 이미 완료';
   if (state.marketMinute >= marketDayEndMinute) return '오늘 관계 상대와 활동을 고르기 전';
   if (isWeekend && weekendActionsRemaining > 0) {
@@ -362,7 +369,7 @@ String _currentObligation(
   if (!isWeekend && state.marketMinute < krxCloseMinute) {
     return '오늘 시장 일정이 아직 진행 중';
   }
-  if (!isWeekend) return '평일 저녁 일정을 마친 뒤 관계 시간으로 이동';
+  if (!isWeekend) return '장 마감 결과를 확인한 뒤 관계 시간으로 이동';
   return '주말 자유 일정을 마치고 관계 시간으로 이동';
 }
 

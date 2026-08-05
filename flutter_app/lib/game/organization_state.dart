@@ -534,6 +534,12 @@ class OrganizationState {
       );
     }
     final academy = OrganizationState.initial(operatingPrinciple);
+    final savedHelpers = ((json['academyHelpers'] as List?) ?? const [])
+        .whereType<Map>()
+        .map(
+          (item) => AcademyHelperStatus.fromJson(item.cast<String, dynamic>()),
+        )
+        .toList(growable: false);
     return OrganizationState(
       employees: ((json['employees'] as List?) ?? const [])
           .map(
@@ -541,9 +547,13 @@ class OrganizationState {
                 EmployeeProfile.fromJson((item as Map).cast<String, dynamic>()),
           )
           .toList(),
-      academyHelpers: academy.academyHelpers,
+      academyHelpers: savedHelpers.isEmpty
+          ? academy.academyHelpers
+          : savedHelpers,
       cultureTags: ((json['cultureTags'] as List?) ?? const []).cast<String>(),
-      helpLog: const [],
+      helpLog: ((json['helpLog'] as List?) ?? const [])
+          .whereType<String>()
+          .toList(growable: false),
     );
   }
 }

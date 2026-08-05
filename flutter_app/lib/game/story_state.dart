@@ -186,7 +186,6 @@ class StoryState {
         'fundLaunched': false,
         'externalAum': 0,
         'hubTutorialSeen': false,
-        'legacyMissionUiDisabled': true,
         'marketTutorialEligible': true,
         'marketTutorialSeen': false,
         'bankDepositTutorialSeen': false,
@@ -231,7 +230,6 @@ class StoryState {
         'facilityStoryGatesEnabled': false,
         'bankAccessUnlocked': true,
         'realEstateAccessUnlocked': true,
-        'legacyMissionUiDisabled': false,
         'migratedCompanyName': companyName,
       },
     );

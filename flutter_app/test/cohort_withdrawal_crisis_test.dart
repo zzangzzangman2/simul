@@ -301,7 +301,7 @@ void main() {
       restored.relationships.progressFor('han_sua').investmentRespect,
       greaterThan(base.relationships.progressFor('han_sua').investmentRespect),
     );
-    expect(GameState.schemaVersion, 26);
+    expect(GameState.schemaVersion, 27);
   });
 
   test('responding with no open crisis is rejected', () {

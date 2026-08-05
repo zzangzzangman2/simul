@@ -183,6 +183,8 @@ class _CohortWithdrawalCrisisScreenState
     }
     final accent = Color(profile?.accentValue ?? 0xFFEF8A62);
     final replied = _reply;
+    final remainingDays = (crisis!.deadlineDay - widget.state.day).clamp(0, 99);
+    final canDefer = widget.state.day < crisis.deadlineDay;
 
     return Scaffold(
       key: const Key('cohort-withdrawal-screen'),
@@ -233,6 +235,18 @@ class _CohortWithdrawalCrisisScreenState
                             height: 1.64,
                             fontWeight: FontWeight.w700,
                           ),
+                        ),
+                      ),
+                      const SizedBox(height: 9),
+                      Text(
+                        canDefer
+                            ? '응답 기한 · $remainingDays일 남음 · 오늘 답하지 않아도 됩니다.'
+                            : '응답 기한 · 오늘은 답을 정해야 합니다.',
+                        key: const Key('cohort-withdrawal-deadline'),
+                        style: TextStyle(
+                          color: accent,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
                         ),
                       ),
                       if (replied != null) ...[
@@ -315,6 +329,23 @@ class _CohortWithdrawalCrisisScreenState
                   onPressed: () => Navigator.of(context).pop(true),
                   child: const Text(
                     '하루를 마친다',
+                    style: TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                ),
+              ] else if (canDefer) ...[
+                const SizedBox(height: 10),
+                TextButton.icon(
+                  key: const Key('cohort-withdrawal-defer'),
+                  onPressed: _sending
+                      ? null
+                      : () => Navigator.of(context).pop(true),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size.fromHeight(48),
+                  ),
+                  icon: const Icon(Icons.schedule_rounded),
+                  label: const Text(
+                    '오늘은 듣고, 나중에 답한다',
                     style: TextStyle(fontWeight: FontWeight.w900),
                   ),
                 ),

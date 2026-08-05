@@ -7,6 +7,8 @@ const _calendarCoral = Color(0xFFFF7E73);
 const _calendarBlue = Color(0xFF6CC9ED);
 const _calendarMuted = Color(0xFF727C90);
 
+enum _LifeCalendarFilter { keyRecords, relationships, life, all }
+
 class LifeCalendarScreen extends StatefulWidget {
   const LifeCalendarScreen({super.key, required this.state, this.transitionTo});
 
@@ -23,6 +25,7 @@ class _LifeCalendarScreenState extends State<LifeCalendarScreen> {
   late DateTime _visibleMonth;
   late DateTime _selectedDate;
   late List<LifeCalendarEvent> _events;
+  _LifeCalendarFilter _filter = _LifeCalendarFilter.keyRecords;
 
   DateTime get _maximumDate => widget.transitionTo ?? widget.state.currentDate;
   DateTime get _minimumMonth =>
@@ -36,6 +39,7 @@ class _LifeCalendarScreenState extends State<LifeCalendarScreen> {
     _visibleMonth = calendarMonthStart(focus);
     _selectedDate = DateTime(focus.year, focus.month, focus.day);
     _events = lifeCalendarEventsForState(widget.state);
+    if (widget.isTransition) _filter = _LifeCalendarFilter.all;
   }
 
   bool _canShowMonth(DateTime month) =>
@@ -63,11 +67,39 @@ class _LifeCalendarScreenState extends State<LifeCalendarScreen> {
 
   void _finish() => Navigator.of(context).pop(true);
 
+  List<LifeCalendarEvent> get _filteredEvents => switch (_filter) {
+    _LifeCalendarFilter.keyRecords =>
+      _events
+          .where(
+            (event) =>
+                event.isAuthored || event.kind == LifeCalendarEventKind.market,
+          )
+          .toList(growable: false),
+    _LifeCalendarFilter.relationships =>
+      _events
+          .where(
+            (event) =>
+                event.kind == LifeCalendarEventKind.relationship ||
+                event.kind == LifeCalendarEventKind.outing,
+          )
+          .toList(growable: false),
+    _LifeCalendarFilter.life =>
+      _events
+          .where(
+            (event) =>
+                !event.isAuthored &&
+                event.kind == LifeCalendarEventKind.personal,
+          )
+          .toList(growable: false),
+    _LifeCalendarFilter.all => _events,
+  };
+
   @override
   Widget build(BuildContext context) {
     final age = decimalKoreanAge(_visibleMonth);
     final progress = decimalGrowthCalendarProgress(_visibleMonth);
-    final selectedEvents = lifeCalendarEventsOn(_events, _selectedDate);
+    final filteredEvents = _filteredEvents;
+    final selectedEvents = lifeCalendarEventsOn(filteredEvents, _selectedDate);
     final transitionTo = widget.transitionTo;
     return PopScope(
       canPop: !widget.isTransition,
@@ -108,7 +140,7 @@ class _LifeCalendarScreenState extends State<LifeCalendarScreen> {
                         selectedDate: _selectedDate,
                         maximumDate: _maximumDate,
                         transitionTo: transitionTo,
-                        events: _events,
+                        events: filteredEvents,
                         growthProgress: progress,
                         onPrevious:
                             _canShowMonth(previousCalendarMonth(_visibleMonth))
@@ -118,6 +150,40 @@ class _LifeCalendarScreenState extends State<LifeCalendarScreen> {
                             ? () => _moveMonth(1)
                             : null,
                         onSelectDate: _selectDate,
+                      ),
+                      const SizedBox(height: 10),
+                      SingleChildScrollView(
+                        key: const Key('life-calendar-filter-row'),
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            for (final entry
+                                in const <_LifeCalendarFilter, String>{
+                                  _LifeCalendarFilter.keyRecords: '핵심 기록',
+                                  _LifeCalendarFilter.relationships: '관계·외출',
+                                  _LifeCalendarFilter.life: '생활',
+                                  _LifeCalendarFilter.all: '전체',
+                                }.entries) ...[
+                              ChoiceChip(
+                                key: Key(
+                                  'life-calendar-filter-${entry.key.name}',
+                                ),
+                                label: Text(entry.value),
+                                selected: _filter == entry.key,
+                                onSelected: (_) =>
+                                    setState(() => _filter = entry.key),
+                                selectedColor: _calendarGold,
+                                backgroundColor: Colors.white,
+                                labelStyle: const TextStyle(
+                                  color: _calendarNavy,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                              const SizedBox(width: 7),
+                            ],
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 12),
                       _CalendarDayRecord(

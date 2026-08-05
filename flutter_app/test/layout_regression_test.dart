@@ -274,7 +274,6 @@ void main() {
     }
 
     expect(find.byKey(const Key('apartment-place-bedroom')), findsOneWidget);
-    expect(find.byKey(const Key('hub-mission-card')), findsOneWidget);
     expectRoomHotspots([]);
     expect(find.byKey(const Key('daily-lobby-heroine-stage')), findsOneWidget);
     expect(
@@ -302,21 +301,17 @@ void main() {
     expect(find.byKey(const Key('home-computer-screen')), findsOneWidget);
     expect(find.byType(StockMarketScreen), findsNothing);
     final stockApp = find.byKey(const Key('computer-stock-market-app'));
+    final companyApp = find.byKey(const Key('computer-company-management-app'));
     final realEstateApp = find.byKey(const Key('computer-real-estate-app'));
     final businessApp = find.byKey(const Key('computer-business-app'));
-    final starShopApp = find.byKey(const Key('computer-star-shop-app'));
     expect(stockApp.hitTestable(), findsOneWidget);
+    expect(companyApp.hitTestable(), findsOneWidget);
     expect(realEstateApp.hitTestable(), findsOneWidget);
     expect(businessApp.hitTestable(), findsOneWidget);
-    expect(starShopApp.hitTestable(), findsOneWidget);
     expect(tester.getSize(stockApp).width, greaterThanOrEqualTo(88));
+    expect(tester.getSize(companyApp), tester.getSize(stockApp));
     expect(tester.getSize(realEstateApp), tester.getSize(stockApp));
     expect(tester.getSize(businessApp), tester.getSize(stockApp));
-    expect(tester.getSize(starShopApp), tester.getSize(stockApp));
-    expect(
-      find.byKey(const Key('hub-mission-card')).hitTestable(),
-      findsNothing,
-    );
 
     await tester.tap(stockApp);
     await tester.pump(const Duration(milliseconds: 500));
@@ -324,6 +319,23 @@ void main() {
     expect(marketRoute, findsOneWidget);
     Navigator.of(tester.element(marketRoute)).pop();
     await tester.pumpAndSettle();
+    expect(find.byKey(const Key('home-computer-screen')), findsOneWidget);
+
+    await tester.tap(companyApp);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    final companyHubRoute = find.byType(
+      ShareholderCompanyHubScreen,
+      skipOffstage: false,
+    );
+    expect(companyHubRoute, findsOneWidget);
+    expect(
+      find.byKey(const Key('shareholder-company-hub-screen')),
+      findsOneWidget,
+    );
+    Navigator.of(tester.element(companyHubRoute)).pop();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
     expect(find.byKey(const Key('home-computer-screen')), findsOneWidget);
 
     await tester.tap(realEstateApp);
@@ -344,18 +356,8 @@ void main() {
     Navigator.of(tester.element(businessRoute)).pop();
     await tester.pumpAndSettle();
 
-    await tester.tap(starShopApp);
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('star-shop-screen')), findsOneWidget);
-    expect(find.byKey(const Key('star-balance')), findsOneWidget);
-    Navigator.of(
-      tester.element(find.byKey(const Key('star-shop-screen'))),
-    ).pop();
-    await tester.pumpAndSettle();
-
     await tester.tap(find.byKey(const Key('home-computer-close')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('hub-mission-card')), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('apartment-go-living-room')));
     await tester.pumpAndSettle();
@@ -367,20 +369,12 @@ void main() {
     expect(find.byKey(const Key('open-bank-button')), findsNothing);
     expect(find.byKey(const Key('open-decisions-button')), findsNothing);
     expect(find.byKey(const Key('open-work-button')), findsNothing);
-    expect(find.byKey(const Key('hub-mission-card')), findsOneWidget);
 
     final locationDock = find.byKey(const Key('apartment-location-dock'));
     final dockRect = tester.getRect(locationDock);
     expect(dockRect.left, greaterThanOrEqualTo(0));
     expect(dockRect.right, lessThanOrEqualTo(phoneSize.width));
     expect(dockRect.height, 58);
-    final missionRect = tester.getRect(
-      find.byKey(const Key('hub-mission-card')),
-    );
-    expect(missionRect.width, 202);
-    expect(missionRect.height, 62);
-    expect(missionRect.bottom, lessThan(dockRect.top));
-    expect(missionRect.overlaps(dockRect), isFalse);
     expect(find.byKey(const Key('open-market-button')), findsNothing);
     expect(find.byKey(const Key('open-ledger-button')), findsNothing);
 
@@ -388,7 +382,6 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('apartment-place-kitchen')), findsOneWidget);
     expectRoomHotspots(['open-market-button', 'open-home-improvements-button']);
-    expect(find.byKey(const Key('hub-mission-card')), findsOneWidget);
     expect(find.byKey(const Key('open-work-button')), findsNothing);
     expect(find.byKey(const Key('open-decisions-button')), findsNothing);
     expect(find.byKey(const Key('open-bank-button')), findsNothing);
@@ -396,7 +389,7 @@ void main() {
     await tester.tap(find.byKey(const Key('apartment-go-corridor')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('apartment-place-corridor')), findsOneWidget);
-    expectRoomHotspots(['open-decisions-button', 'open-ledger-button']);
+    expectRoomHotspots(['open-ledger-button']);
     expect(find.byKey(const Key('open-work-button')), findsNothing);
     expect(find.byKey(const Key('open-bank-button')), findsNothing);
     expect(find.byKey(const Key('open-organization-button')), findsNothing);
@@ -434,10 +427,6 @@ void main() {
     await tester.tap(find.byKey(const Key('open-work-button')));
     await tester.pumpAndSettle();
     expect(find.byType(SeedMoneyHubScreen), findsOneWidget);
-    expect(
-      find.byKey(const Key('hub-mission-card')).hitTestable(),
-      findsNothing,
-    );
     expect(tester.takeException(), isNull);
   });
 
@@ -487,70 +476,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('국가계좌 상태와 오늘의 신문 스크랩'), findsOneWidget);
-    expect(tester.takeException(), isNull);
-  });
-
-  testWidgets('decision scene stays locked in front until its save completes', (
-    tester,
-  ) async {
-    await usePhoneSurface(tester);
-    final state = newState();
-    final save = Completer<void>();
-    await tester.pumpWidget(
-      MaterialApp(
-        home: OfficeScreen(
-          state: state,
-          engine: engine,
-          activeSaveSlot: 1,
-          lastSavedAt: null,
-          onManualSave: () async {},
-          onReturnToTitle: () {},
-          onAdvanceDay: () async => state,
-          onSetMarketMinute: (_) async => state,
-          onSaveMarketNotebook: (_, _) async => state,
-          onResolveDecision: (_, _) => save.future,
-          onRequestAcademyHelp: (_) async => state,
-          onCompleteWork: (_) async => state,
-          onExecuteTrade: (_) async => TradeExecutionResult(
-            success: false,
-            state: state,
-            message: 'test',
-          ),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('apartment-go-living-room')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('apartment-go-kitchen')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('apartment-go-corridor')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('open-decisions-button')));
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const Key('decision-inbox-item-first-research-note')),
-    );
-    await tester.pumpAndSettle();
-
-    final option = find.byKey(const Key('decision-option-research_products'));
-    await tester.tap(option);
-    await tester.pump();
-    expect(option, findsOneWidget);
-    expect(find.byKey(const Key('decision-saving-indicator')), findsOneWidget);
-    expect(
-      find.byKey(const Key('decision-inbox-screen'), skipOffstage: false),
-      findsOneWidget,
-    );
-    await tester.binding.handlePopRoute();
-    await tester.pump();
-    expect(option, findsOneWidget);
-    expect(find.byKey(const Key('decision-saving-indicator')), findsOneWidget);
-
-    save.complete();
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('decision-inbox-screen')), findsNothing);
-    expect(option, findsNothing);
     expect(tester.takeException(), isNull);
   });
 

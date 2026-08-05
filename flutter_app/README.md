@@ -31,7 +31,7 @@ flutter build web --release --base-href /play/
 
 - `lib/main.dart`: 앱 상태·저장·신문·화면 연결
 - `lib/visual_novel_onboarding.dart`: 편집본 장면·배경·화자·포즈와 동적 종료점을 적용하는 리부트 프롤로그
-- `lib/game/game_state.dart`: 저장 스키마 v26과 관계·데시멀톡·일일 투자·대여채권·친구 차입부채·사업 자산·미지급금 합산
+- `lib/game/game_state.dart`: 저장 스키마 v27과 관계·데시멀톡·일일 투자·상장사 주주권·경영권·자회사 장부
 - `lib/game/phone_messenger_state.dart`: 데시멀 동기 9명 연락처·MBTI 답장·읽음·하루 제한 저장
 - `lib/game/phone_ai_service.dart`: 서버 Gemini 답장 호출과 안전한 로컬 조합기 폴백
 - `lib/phone_messenger_screens.dart`: 데시멀톡 채팅 목록·읽지 않음·자유 입력·좌우 말풍선 UI
@@ -55,7 +55,8 @@ flutter build web --release --base-href /play/
 - `lib/game/real_estate_rental.dart`: 공실·월세·전세·세입자 사건
 - `lib/stock_market_screen.dart`: 호가·주문·차트·배속·보고서·속보
 - `lib/business_management_screen.dart`: 동네상권넷 인수·점포·사건·월별 손익·상권판세 5탭 UI
-- `lib/rider_mini_game.dart`: 픽셀 아트 배달 일거리 조작과 점수
+- `lib/rider_mini_game.dart`: 새벽 신문배달 방향 플릭·투척 포물선·자전거 캔버스 애니메이션·성과 점수
+- `lib/game/horse_racing.dart`, `lib/horse_racing_mini_game.dart`: 데시멀 PC 국가망 경마의 8두 결정론 경주·전자 마권·확정이익 20% 국가 수수료·실시간 중계
 - `test/world_economy_test.dart`, `test/shared_economy_stock_export_test.dart`: 공통 사건 동일성·공개일·지역 매핑·주식 원천 비변경 회귀
 - `test/business_districts_test.dart`: 상권 카탈로그·국면·사건 비누설·순위·적합도·부동산 매핑·레거시 회귀
 - `test/business_simulation_test.dart`: 카탈로그·손익·사건·JSON 결정론 회귀
@@ -84,12 +85,12 @@ flutter build web --release --base-href /play/
   유지한다. 공통 유동성은 NPC 신규 매물은 각 주기의 `listedAt`, 플레이어 보유
   부동산은 `saleListedDay` 시점에 한 번 고정해 매물 체류기간과 매각 대기에
   적용한다.
-- 저장은 v26이다. 신규 사업 v3는 상권 생성기 v2, 신규 부동산은 v4를
+- 저장은 v27이다. 신규 사업 v3는 상권 생성기 v2, 신규 부동산은 v4를
   사용하며 사업 v1·v2와 부동산 v1·v2·v3 저장분의 수치 경로는 바꾸지 않는다.
 
 ## 동네 사업 규칙
 
-- 작은방 홈 PC의 `동네상권넷`은 `인수·창업 / 내 점포 / 사건함 / 월별 손익 /
+- 작업실 PC의 `동네상권넷`은 `인수·창업 / 내 점포 / 사건함 / 월별 손익 /
   상권판세` 5탭이다.
 - PC방·노래방을 포함한 18업종에 `locationId` 6개 미시 입지 유형과
   `districtId` 32개 실제 상권을 조합한다.
@@ -109,7 +110,7 @@ flutter build web --release --base-href /play/
   미지급금이며 3개월 연속 남으면 강제폐업과 잔존자산 상계로 이어진다.
 - 사건 선택지·기한·결과 예정일은 저장하고, 같은 시드·날짜·선택은 같은 결과를
   낸다. 성공은 즉시 보장하지 않고 예정일에 성공·부분 성공·실패를 공개한다.
-- 현재 저장은 v26·신규 점포는 사업 생성기 v3와 상권 생성기 v2다.
+- 현재 저장은 v27·신규 점포는 사업 생성기 v3와 상권 생성기 v2다.
   사업 생성기 v1·v2는 저장된 수치 경로를 동결하며, `districtId`가 없는 v1은
   기존 `locationId`와 중립 상권 보정을 유지해 안전하게 복원한다.
 

@@ -167,12 +167,18 @@ void main() {
 
     expect(cohortStandingEventSeen(state, event), isTrue);
     expect(pendingCohortStandingEvent(state), isNull);
-    // 연속이 더 길어지면 새 사건 ID가 되어 다시 열린다.
+    // 하루 늘어날 때마다 반복하지 않고 다음 의미 있는 이정표에서만 다시 열린다.
     final longer = _withReports(state, <CohortDailyInvestmentReport>[
       for (var day = 4; day <= 7; day += 1)
         _report(day: day, playerCumulative: -5000, filler: 100),
     ]);
-    expect(pendingCohortStandingEvent(longer), isNotNull);
+    expect(pendingCohortStandingEvent(longer), isNull);
+
+    final milestone = _withReports(state, <CohortDailyInvestmentReport>[
+      for (var day = 4; day <= 13; day += 1)
+        _report(day: day, playerCumulative: -5000, filler: 100),
+    ]);
+    expect(pendingCohortStandingEvent(milestone)?.milestone, 10);
   });
 
   test('streak is derived from the save with no new fields', () {
@@ -182,7 +188,7 @@ void main() {
     ]);
     final restored = GameState.fromJson(state.toJson());
 
-    expect(GameState.schemaVersion, 26);
+    expect(GameState.schemaVersion, 27);
     expect(
       cohortStandingStreakForState(restored).lastPlaceDays,
       cohortStandingStreakForState(state).lastPlaceDays,
@@ -191,5 +197,27 @@ void main() {
       cohortStandingEventForState(restored)?.id,
       cohortStandingEventForState(state)?.id,
     );
+  });
+
+  test('a 200-day streak produces only six meaningful milestones', () {
+    var state = base;
+    final reports = <CohortDailyInvestmentReport>[];
+    final milestones = <int>[];
+
+    for (var day = 4; day < 204; day += 1) {
+      reports.add(_report(day: day, playerCumulative: -5000, filler: 100));
+      state = _withReports(state, List.of(reports));
+      while (true) {
+        final event = pendingCohortStandingEvent(state);
+        if (event == null) break;
+        if (event.kind == CohortStandingEventKind.operatorReview) {
+          milestones.add(event.milestone);
+        }
+        state = acknowledgeCohortStandingEvent(state, event);
+      }
+    }
+
+    expect(milestones, <int>[3, 10, 30, 60, 120, 200]);
+    expect(pendingCohortStandingEvent(state), isNull);
   });
 }

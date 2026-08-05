@@ -2,16 +2,19 @@ import 'dart:math' as math;
 
 import 'banking_state.dart';
 import 'business_engine.dart';
+import 'casino_state.dart';
 import 'cohort_investment_state.dart';
 import 'game_state.dart';
 import 'home_improvement_state.dart';
+import 'horse_racing.dart';
 import 'market_clock.dart';
 import 'market_cost_rules.dart';
 import 'market_data.dart';
 import 'market_technical_levels.dart';
 import 'market_tick.dart';
 import 'order_book.dart';
-import 'mission_progression.dart';
+import 'player_progression.dart';
+import 'monthly_unlock_chapter.dart';
 import 'organization_state.dart';
 import 'real_estate_financing.dart';
 import 'real_estate_market.dart';
@@ -22,10 +25,10 @@ import 'phone_ability_hint.dart';
 import 'phone_dialogue_composer.dart';
 import 'phone_messenger_state.dart';
 import 'phone_situation_context.dart';
+import 'progress_review.dart';
 import 'relationship_state.dart';
 import 'seed_money_content.dart';
 import 'stable_hash.dart';
-import 'star_shop.dart';
 import 'story_state.dart';
 import 'weekend_activity.dart';
 import 'weekday_activity.dart';
@@ -483,6 +486,30 @@ class FinanceActionResult {
   final int cashDelta;
 }
 
+class CasinoActionResult {
+  const CasinoActionResult({
+    required this.state,
+    required this.success,
+    required this.message,
+    this.cashDelta = 0,
+    this.minutesElapsed = 0,
+  });
+
+  final GameState state;
+  final bool success;
+  final String message;
+  final int cashDelta;
+  final int minutesElapsed;
+
+  CasinoActionResult withState(GameState next) => CasinoActionResult(
+    state: next,
+    success: success,
+    message: message,
+    cashDelta: cashDelta,
+    minutesElapsed: minutesElapsed,
+  );
+}
+
 class _RentalMonthPreparation {
   const _RentalMonthPreparation({
     required this.assets,
@@ -557,46 +584,6 @@ _RealEstateDispositionPlan _realEstateDispositionPlan({
   );
 }
 
-class MissionProgressView {
-  const MissionProgressView({
-    required this.mission,
-    required this.current,
-    required this.complete,
-    required this.unlocked,
-    required this.remainingDays,
-  });
-
-  final MissionDefinition mission;
-  final int current;
-  final bool complete;
-  final bool unlocked;
-  final int? remainingDays;
-
-  double get ratio => (current / mission.target).clamp(0, 1).toDouble();
-}
-
-class MissionClaimResult {
-  const MissionClaimResult({
-    required this.state,
-    required this.success,
-    required this.message,
-    this.starReward = 0,
-    this.experienceReward = 0,
-    this.reputationReward = 0,
-    this.trustReward = 0,
-    this.unlockedSkill,
-  });
-
-  final GameState state;
-  final bool success;
-  final String message;
-  final int starReward;
-  final int experienceReward;
-  final int reputationReward;
-  final int trustReward;
-  final SkillDefinition? unlockedSkill;
-}
-
 class RelationshipActionResult {
   const RelationshipActionResult({
     required this.state,
@@ -669,6 +656,19 @@ class PhoneMessengerActionResult {
       trustDelta != 0 ||
       closenessDelta != 0 ||
       investmentRespectDelta != 0;
+
+  PhoneMessengerActionResult withState(GameState nextState) =>
+      PhoneMessengerActionResult(
+        state: nextState,
+        success: success,
+        message: message,
+        reply: reply,
+        affectionDelta: affectionDelta,
+        trustDelta: trustDelta,
+        closenessDelta: closenessDelta,
+        investmentRespectDelta: investmentRespectDelta,
+        abilityHint: abilityHint,
+      );
 }
 
 class GameEngine {
@@ -717,6 +717,185 @@ class GameEngine {
     );
   }
 
+  PhoneMessengerActionResult sendPhoneGift(
+    GameState state, {
+    required String contactId,
+    required String giftId,
+  }) {
+    final contact = phoneContactById(contactId);
+    final profile = cohortGirlProfileById(contactId);
+    final gift = weekendGiftById(giftId);
+    if (contact == null || profile == null || gift == null) {
+      return PhoneMessengerActionResult(
+        state: state,
+        success: false,
+        message: '선물과 받을 동기를 다시 확인해 주세요.',
+      );
+    }
+    if (kBeautyGiftAlreadyGivenToday(state)) {
+      return PhoneMessengerActionResult(
+        state: state,
+        success: false,
+        message: '선물은 매장과 톡을 합쳐 하루에 한 번만 보낼 수 있어요.',
+      );
+    }
+    if (state.bankCash < gift.cost) {
+      return PhoneMessengerActionResult(
+        state: state,
+        success: false,
+        message: '생활비 통장에 ${gift.cost - state.bankCash}원이 부족합니다.',
+      );
+    }
+
+    final repeatCount = kBeautyGiftMonthlyRepeatCount(
+      state,
+      girlId: profile.id,
+      giftId: gift.id,
+    );
+    final progress = state.relationships.progressFor(profile.id);
+    final requestedAffection = gift.affectionFor(
+      profile.id,
+      monthlyRepeatCount: repeatCount,
+    );
+    final requestedTrust = gift.trustFor(
+      profile.id,
+      monthlyRepeatCount: repeatCount,
+    );
+    final nextAffection = (progress.affection + requestedAffection)
+        .clamp(relationshipMinAffection, relationshipMaxAffection)
+        .toInt();
+    final nextTrust = (progress.trust + requestedTrust)
+        .clamp(relationshipDimensionMin, relationshipDimensionMax)
+        .toInt();
+    final nextCloseness =
+        (progress.closeness + (requestedAffection > 0 ? 1 : 0))
+            .clamp(relationshipDimensionMin, relationshipDimensionMax)
+            .toInt();
+    final affectionDelta = nextAffection - progress.affection;
+    final trustDelta = nextTrust - progress.trust;
+    final closenessDelta = nextCloseness - progress.closeness;
+    final replyText = kBeautyGiftPhoneReaction(
+      state,
+      gift: gift,
+      girlId: profile.id,
+      monthlyRepeatCount: repeatCount,
+    );
+    final updatedProgress = progress.copyWith(
+      affection: nextAffection,
+      trust: nextTrust,
+      closeness: nextCloseness,
+      lastInteractionDay: state.day,
+    );
+    final relationshipMemory = RelationshipMemory(
+      day: state.day,
+      girlId: profile.id,
+      activity: RelationshipActivity.gift,
+      sceneId: 'phone_gift_${gift.id}',
+      choiceId: gift.id,
+      affectionDelta: affectionDelta,
+      affectionAfter: nextAffection,
+      trustDelta: trustDelta,
+      closenessDelta: closenessDelta,
+    );
+    final relationshipMemories = <RelationshipMemory>[
+      ...state.relationships.memories,
+      relationshipMemory,
+    ];
+    final replyMinute = math.min(1439, state.marketMinute + 1);
+    final playerText = '${gift.title} 선물을 보냈어요.';
+    final playerMessage = PhoneMessage(
+      id: 'phone-gift-${state.day}-${profile.id}-${gift.id}-me',
+      contactId: profile.id,
+      senderId: phoneMessengerPlayerId,
+      text: playerText,
+      day: state.day,
+      marketMinute: state.marketMinute,
+      read: true,
+      giftId: gift.id,
+    );
+    final reply = PhoneMessage(
+      id: 'phone-gift-${state.day}-${profile.id}-${gift.id}-reply',
+      contactId: profile.id,
+      senderId: profile.id,
+      text: replyText,
+      day: state.day,
+      marketMinute: replyMinute,
+      read: true,
+    );
+    final appendedMessages = <PhoneMessage>[
+      for (final message in state.phoneMessenger.messages)
+        if (message.contactId == profile.id &&
+            !message.isFromPlayer &&
+            !message.read)
+          message.copyWith(read: true)
+        else
+          message,
+      playerMessage,
+      reply,
+    ];
+    final messages = retainPhoneMessages(appendedMessages);
+    final phoneMemory = PhoneConversationMemory(
+      id: 'phone-gift-memory-${state.day}-${profile.id}-${gift.id}',
+      contactId: profile.id,
+      day: state.day,
+      intent: 'gift',
+      investmentSituation: 'unavailable',
+      playerText: playerText,
+      replyText: replyText,
+      affectionDelta: affectionDelta,
+      trustDelta: trustDelta,
+      closenessDelta: closenessDelta,
+      importance: affectionDelta > 0 ? 3 : 2,
+      marketMinute: replyMinute,
+      situationSummary: '미라온 뷰티 톡 선물',
+    );
+    final phoneMemories = retainPhoneConversationMemories(
+      <PhoneConversationMemory>[...state.phoneMessenger.memories, phoneMemory],
+    );
+    final sourceId = 'phone-gift-${state.day}-${profile.id}-${gift.id}';
+    final next = state.copyWith(
+      cash: state.cash - gift.cost,
+      relationships: state.relationships.copyWith(
+        girls: <String, GirlRelationshipProgress>{
+          ...state.relationships.girls,
+          profile.id: updatedProgress,
+        },
+        memories: relationshipMemories.length <= relationshipMemoryHistoryLimit
+            ? relationshipMemories
+            : relationshipMemories.sublist(
+                relationshipMemories.length - relationshipMemoryHistoryLimit,
+              ),
+      ),
+      phoneMessenger: state.phoneMessenger.copyWith(
+        messages: messages,
+        memories: phoneMemories,
+      ),
+      ledger: <LedgerEntry>[
+        ...state.ledger,
+        LedgerEntry(
+          id: sourceId,
+          day: state.day,
+          amount: -gift.cost,
+          account: 'company_bank',
+          counterAccount: 'relationship_gift_expense',
+          description: '${profile.name}에게 보낸 ${gift.title}',
+          sourceId: sourceId,
+        ),
+      ],
+      processedEventIds: <String>[...state.processedEventIds, sourceId],
+    );
+    return PhoneMessengerActionResult(
+      state: next,
+      success: true,
+      message:
+          '${profile.name}에게 선물을 보냈습니다. ${kBeautyGiftRepeatLabel(repeatCount)} · 호감도 +$affectionDelta',
+      reply: reply,
+      affectionDelta: affectionDelta,
+      trustDelta: trustDelta,
+      closenessDelta: closenessDelta,
+    );
+  }
+
   PhoneMessengerActionResult sendPhoneMessage(
     GameState state, {
     required String contactId,
@@ -747,6 +926,15 @@ class GameEngine {
         message: '메시지는 $phoneMessengerMaxMessageLength자까지 보낼 수 있습니다.',
       );
     }
+    if (state.marketMinute > phoneMessengerLastSendMinute) {
+      return PhoneMessengerActionResult(
+        state: state,
+        success: false,
+        message: state.marketMinute >= phoneMessengerBedtimeMinute
+            ? '22:00가 되어 모두 잠들었습니다. 내일 아침에 다시 톡해요.'
+            : '취침 전 30분 대화를 마칠 시간이 부족합니다. 내일 다시 톡해요.',
+      );
+    }
     final progress = state.phoneMessenger.progressFor(contactId);
     final exchangesToday = progress.exchangesForDay(state.day);
     if (exchangesToday >= phoneMessengerDailySendLimit) {
@@ -758,6 +946,7 @@ class GameEngine {
     }
 
     final sequence = progress.totalExchanges + 1;
+    final replyMinute = state.marketMinute + phoneMessengerExchangeMinutes;
     final report = state.cohortInvestments.reportForDay(state.day);
     final playerRow = report?.resultFor('player');
     final contactRow = report?.resultFor(contactId);
@@ -835,12 +1024,12 @@ class GameEngine {
         ? normalizedOverride
         : null;
     final reply = PhoneMessage(
-      id: 'phone-${state.day}-${state.marketMinute}-$contactId-$sequence-reply',
+      id: 'phone-${state.day}-$replyMinute-$contactId-$sequence-reply',
       contactId: contactId,
       senderId: contactId,
       text: safeOverride ?? composed.text,
       day: state.day,
-      marketMinute: state.marketMinute,
+      marketMinute: replyMinute,
       read: true,
     );
     final appended = [
@@ -854,9 +1043,7 @@ class GameEngine {
       playerMessage,
       reply,
     ];
-    final messages = appended.length <= phoneMessengerHistoryLimit
-        ? appended
-        : appended.sublist(appended.length - phoneMessengerHistoryLimit);
+    final messages = retainPhoneMessages(appended);
     final nextProgress = <String, PhoneThreadProgress>{
       ...state.phoneMessenger.progressByContact,
       contactId: progress.recordExchange(
@@ -933,7 +1120,7 @@ class GameEngine {
       abilityHintObservation: appliedAbilityHint?.observation ?? '',
       abilityHintUsedResearchCredit:
           appliedAbilityHint?.usesResearchCredit == true,
-      marketMinute: state.marketMinute,
+      marketMinute: replyMinute,
       situationSummary: phoneSituation.situationSummary,
       scheduleDecision: phoneSituation.scheduleDecision.name,
     );
@@ -951,6 +1138,7 @@ class GameEngine {
       nextStory = state.story.copyWith(storyFlags: flags);
     }
     final next = state.copyWith(
+      marketMinute: replyMinute,
       story: nextStory,
       relationships: nextRelationships,
       phoneMessenger: state.phoneMessenger.copyWith(
@@ -1204,7 +1392,13 @@ class GameEngine {
     final closePrices = <String, double>{};
     for (final asset in universe.assets) {
       final quote = asset.quoteAtOrBefore(state.currentDate);
-      if (quote != null) closePrices[asset.id] = quote.close;
+      if (quote != null) {
+        closePrices[asset.id] = state.shareholderGovernance.adjustedPrice(
+          asset.id,
+          state.day,
+          quote.close,
+        );
+      }
     }
     final playerTotal =
         afterRepayment.brokerageCash +
@@ -1288,6 +1482,9 @@ class GameEngine {
         ? reports
         : reports.sublist(reports.length - cohortInvestmentHistoryLimit);
     final next = afterRepayment.copyWith(
+      progression: playerTradeEntries.isEmpty
+          ? afterRepayment.progression
+          : afterRepayment.progression.gainExperience(2),
       cohortInvestments: state.cohortInvestments.copyWith(
         accounts: accounts,
         reports: trimmedReports,
@@ -1623,6 +1820,10 @@ class GameEngine {
       profile: profile,
       activity: activity,
       day: state.day,
+      interactionCount: activity == RelationshipActivity.date
+          ? progress.dateCount
+          : progress.conversationCount,
+      affection: progress.affection,
     );
     RelationshipChoiceDefinition? choice;
     for (final candidate in scene.choices) {
@@ -1693,9 +1894,12 @@ class GameEngine {
         closenessDelta: closenessDelta,
       ),
     ];
-    final trimmedMemories = updatedMemories.length <= 64
+    final trimmedMemories =
+        updatedMemories.length <= relationshipMemoryHistoryLimit
         ? updatedMemories
-        : updatedMemories.sublist(updatedMemories.length - 64);
+        : updatedMemories.sublist(
+            updatedMemories.length - relationshipMemoryHistoryLimit,
+          );
     final next = state.copyWith(
       relationships: state.relationships.copyWith(
         girls: updatedGirls,
@@ -1746,6 +1950,14 @@ class GameEngine {
     GameState state,
     String activityId,
   ) {
+    final activity = weekdayActivityById(activityId);
+    if (activity == null) {
+      return WeekdayActivityResult(
+        state: state,
+        success: false,
+        message: '선택할 수 없는 저녁 업무입니다.',
+      );
+    }
     if (state.currentDate.weekday >= DateTime.saturday) {
       return WeekdayActivityResult(
         state: state,
@@ -1767,19 +1979,25 @@ class GameEngine {
         message: '15:00까지는 주식장 준비와 거래 시간입니다. 장 마감 후 이용하세요.',
       );
     }
-    if (state.marketMinute >= marketDayEndMinute) {
+    final finishingCasinoAtClose =
+        activity.id == 'casino' &&
+        state.marketMinute == marketDayEndMinute &&
+        state.personalFinance.casino.roundsForDay(state.day) > 0;
+    if (state.marketMinute >= marketDayEndMinute && !finishingCasinoAtClose) {
       return WeekdayActivityResult(
         state: state,
         success: false,
         message: '오늘 저녁 업무는 이미 끝났습니다. 다음 날로 넘어가세요.',
       );
     }
-    final activity = weekdayActivityById(activityId);
-    if (activity == null) {
+    if (activity.id == 'casino' &&
+        (state.currentDate.isBefore(DateTime(2010, 1, 1)) ||
+            state.story.ageOn(state.currentDate) < 20)) {
       return WeekdayActivityResult(
         state: state,
         success: false,
-        message: '선택할 수 없는 저녁 업무입니다.',
+        message: '카지노 LIVE는 성인이 되는 2010년부터 선택할 수 있습니다.',
+        activity: activity,
       );
     }
     if (activity.id == 'bank' && !bankAccessUnlocked(state)) {
@@ -1802,12 +2020,26 @@ class GameEngine {
       return WeekdayActivityResult(
         state: state,
         success: false,
-        message: '오늘 저녁에는 이미 부동산이나 은행 업무를 확인했습니다.',
+        message: '오늘의 저녁 행동은 이미 사용했습니다.',
+        activity: activity,
+      );
+    }
+    if (activity.id != 'casino' &&
+        state.personalFinance.casino.roundsForDay(state.day) > 0) {
+      return WeekdayActivityResult(
+        state: state,
+        success: false,
+        message: '오늘은 이미 카지노 LIVE를 선택해 저녁 시간을 사용했습니다.',
         activity: activity,
       );
     }
 
-    final startMinute = state.marketMinute;
+    final casinoRecords = state.personalFinance.casino.history
+        .where((record) => record.day == state.day)
+        .toList(growable: false);
+    final startMinute = activity.id == 'casino' && casinoRecords.isNotEmpty
+        ? casinoRecords.first.minute
+        : state.marketMinute;
     const endMinute = marketDayEndMinute;
     final log = WeekdayActivityLog(
       day: state.day,
@@ -1821,7 +2053,9 @@ class GameEngine {
       ...weekdayActivityLogsForState(state),
       log,
     ];
-    final trimmed = logs.length <= 256 ? logs : logs.sublist(logs.length - 256);
+    final trimmed = logs.length <= weekdayActivityHistoryLimit
+        ? logs
+        : logs.sublist(logs.length - weekdayActivityHistoryLimit);
     flags[weekdayActivityLogFlag] = trimmed
         .map((entry) => entry.toJson())
         .toList(growable: false);
@@ -1864,19 +2098,29 @@ class GameEngine {
 
     final job = weekendJobById(request.activityId);
     if (job != null) {
+      if (job.requiresMiniGame &&
+          (request.workScore == null || request.workMaxScore == null)) {
+        return WeekendActivityResult(
+          state: state,
+          success: false,
+          message: '신문배달 코스를 먼저 완주해야 수당을 정산할 수 있습니다.',
+        );
+      }
       final score =
+          request.workScore ??
           72 +
-          _stableHash(
-                '${state.simulationSeed}:${state.day}:weekend:${job.id}:'
-                '${weekendActivityPointsUsed(state)}',
-              ) %
-              27;
+              _stableHash(
+                    '${state.simulationSeed}:${state.day}:weekend:${job.id}:'
+                    '${weekendActivityPointsUsed(state)}',
+                  ) %
+                  27;
+      final maxScore = request.workMaxScore ?? 100;
       final worked = completeWorkSession(
         state,
         WorkSessionResult(
           activityId: job.workActivityId,
           score: score,
-          maxScore: 100,
+          maxScore: maxScore,
         ),
       );
       final earned = worked.cash - state.cash;
@@ -1898,8 +2142,8 @@ class GameEngine {
           activityId: job.id,
           title: job.title,
           body: state.needsTradingRecovery
-              ? '${job.location}에서 $earned원을 벌어 실전 증권계좌에 바로 넣었다.'
-              : '${job.location}에서 맡은 일을 마치고 $earned원을 벌었다.',
+              ? '${job.location}에서 ${job.requiresMiniGame ? '배달 정확도 ${score.clamp(0, maxScore)}점으로 ' : ''}$earned원을 벌어 실전 증권계좌에 바로 넣었다.'
+              : '${job.location}에서 ${job.requiresMiniGame ? '배달 정확도 ${score.clamp(0, maxScore)}점으로 ' : ''}맡은 일을 마치고 $earned원을 벌었다.',
           markerLabel: '알바',
           accentValue: job.accentValue,
           imageAsset: job.imageAsset,
@@ -1944,6 +2188,159 @@ class GameEngine {
       );
     }
 
+    if (request.activityId == 'horse_racing') {
+      final session = request.horseRaceResult;
+      if (session == null) {
+        return WeekendActivityResult(
+          state: state,
+          success: false,
+          message: '국가망 중계와 전자 마권 결과를 먼저 끝까지 확인해야 정산할 수 있습니다.',
+        );
+      }
+      if (horseRaceAlreadyPlayedToday(state)) {
+        return WeekendActivityResult(
+          state: state,
+          success: false,
+          message: '오늘 오후 경마 일정은 이미 마쳤습니다.',
+        );
+      }
+      if (session.stake < horseRaceMinStake ||
+          session.stake > horseRaceMaxStake) {
+        return WeekendActivityResult(
+          state: state,
+          success: false,
+          message: '전자 마권 금액은 500원부터 5,000원까지 선택할 수 있습니다.',
+        );
+      }
+      if (state.bankCash < session.stake) {
+        return WeekendActivityResult(
+          state: state,
+          success: false,
+          message: '생활비 통장에 ${session.stake - state.bankCash}원이 부족합니다.',
+        );
+      }
+      final race = buildAfternoonHorseRace(
+        simulationSeed: state.simulationSeed,
+        day: state.day,
+      );
+      if (session.raceId != race.id) {
+        return WeekendActivityResult(
+          state: state,
+          success: false,
+          message: '현재 국가망 회차와 다른 전자 마권입니다. 경주표를 다시 확인해 주세요.',
+        );
+      }
+      final primary = race.entrants
+          .where((entrant) => entrant.id == session.primaryHorseId)
+          .firstOrNull;
+      final secondary = session.secondaryHorseId == null
+          ? null
+          : race.entrants
+                .where((entrant) => entrant.id == session.secondaryHorseId)
+                .firstOrNull;
+      if (primary == null ||
+          (session.betType == HorseBetType.quinella && secondary == null)) {
+        return WeekendActivityResult(
+          state: state,
+          success: false,
+          message: '출전표에 없는 말을 선택한 전자 마권입니다.',
+        );
+      }
+      final grossPayout = calculateHorseRacePayout(
+        race: race,
+        betType: session.betType,
+        primaryHorseId: session.primaryHorseId,
+        secondaryHorseId: session.secondaryHorseId,
+        stake: session.stake,
+      );
+      if (grossPayout != session.grossPayout) {
+        return WeekendActivityResult(
+          state: state,
+          success: false,
+          message: '배당 정산값이 현재 경주 결과와 맞지 않습니다.',
+        );
+      }
+      final stateProfitFee = horseRaceStateProfitFee(
+        stake: session.stake,
+        grossPayout: grossPayout,
+        recoveryRateBps: state.story.stateRecoveryRateBps,
+      );
+      final sourceId = 'horse-race-${state.day}-${race.id}';
+      if (state.processedEventIds.contains(sourceId)) {
+        return WeekendActivityResult(
+          state: state,
+          success: false,
+          message: '이 경주의 전자 마권은 이미 정산했습니다.',
+        );
+      }
+      final netDelta = grossPayout - session.stake - stateProfitFee;
+      final ledger = <LedgerEntry>[
+        ...state.ledger,
+        LedgerEntry(
+          id: '$sourceId-stake',
+          day: state.day,
+          amount: -session.stake,
+          account: 'company_bank',
+          counterAccount: 'horse_racing_wager_expense',
+          description: '${session.betType.label} 전자 마권 · ${primary.name}',
+          sourceId: sourceId,
+        ),
+        if (grossPayout > 0)
+          LedgerEntry(
+            id: '$sourceId-payout',
+            day: state.day,
+            amount: grossPayout,
+            account: 'company_bank',
+            counterAccount: 'horse_racing_payout_income',
+            description: '국가망 전자 마권 적중 배당',
+            sourceId: sourceId,
+          ),
+        if (stateProfitFee > 0)
+          LedgerEntry(
+            id: '$sourceId-national-fee',
+            day: state.day,
+            amount: -stateProfitFee,
+            account: 'company_bank',
+            counterAccount: 'state_horse_racing_fee',
+            description: '경마 확정 이익 국가 수수료 20%',
+            sourceId: sourceId,
+          ),
+      ];
+      final settled = state.copyWith(
+        cash: state.cash + netDelta,
+        ledger: ledger,
+        processedEventIds: <String>[...state.processedEventIds, sourceId],
+      );
+      final selectionLabel = session.betType == HorseBetType.quinella
+          ? '${primary.name}·${secondary!.name}'
+          : primary.name;
+      final winner = race.entrantById(race.finishOrder.first);
+      final next = _appendWeekendActivityLog(
+        settled,
+        WeekendActivityLog(
+          day: state.day,
+          kind: WeekendActivityKind.entertainment,
+          activityId: request.activityId,
+          title: '국가망 경마 중계',
+          body:
+              '데시멀 센터 PC로 국가 전용망에 접속했다. ${race.distanceMeters}m ${session.betType.label} $selectionLabel · 우승 ${winner.name}. '
+              '전자 마권 ${session.stake}원, 배당 $grossPayout원, 확정이익 국가 수수료 $stateProfitFee원, 순변동 ${netDelta >= 0 ? '+' : ''}$netDelta원.',
+          markerLabel: '온라인 경마',
+          accentValue: 0xFF2E7D5A,
+          imageAsset: horseRaceBackgroundAsset,
+          cashDelta: netDelta,
+        ),
+      );
+      return WeekendActivityResult(
+        state: next,
+        success: true,
+        message: grossPayout > 0
+            ? '${session.betType.label} 적중 · 배당 $grossPayout원 · 국가 수수료 $stateProfitFee원 · 순이익 +$netDelta원'
+            : '${session.betType.label} 미적중 · 전자 마권 -${session.stake}원 · 국가 수수료 0원',
+        cashDelta: netDelta,
+      );
+    }
+
     if (request.activityId == 'gift') {
       final girlId = request.girlId;
       final giftId = request.giftId;
@@ -1956,11 +2353,11 @@ class GameEngine {
           message: '선물과 받을 동기를 모두 골라야 합니다.',
         );
       }
-      if (weekendGiftAlreadyGivenTo(state, profile.id)) {
+      if (kBeautyGiftAlreadyGivenToday(state)) {
         return WeekendActivityResult(
           state: state,
           success: false,
-          message: '${profile.name}에게는 오늘 이미 선물을 건넸습니다.',
+          message: '선물은 매장과 톡을 합쳐 하루에 한 번만 줄 수 있어요.',
         );
       }
       if (state.bankCash < gift.cost) {
@@ -1971,18 +2368,35 @@ class GameEngine {
         );
       }
 
+      final repeatCount = kBeautyGiftMonthlyRepeatCount(
+        state,
+        girlId: profile.id,
+        giftId: gift.id,
+      );
       final progress = state.relationships.progressFor(profile.id);
-      final requestedAffection = gift.affectionFor(profile.id);
+      final requestedAffection = gift.affectionFor(
+        profile.id,
+        monthlyRepeatCount: repeatCount,
+      );
       final nextAffection = (progress.affection + requestedAffection)
           .clamp(relationshipMinAffection, relationshipMaxAffection)
           .toInt();
       final affectionDelta = nextAffection - progress.affection;
-      final nextTrust = (progress.trust + gift.trustFor(profile.id))
-          .clamp(relationshipDimensionMin, relationshipDimensionMax)
-          .toInt();
-      final nextCloseness = (progress.closeness + 1)
-          .clamp(relationshipDimensionMin, relationshipDimensionMax)
-          .toInt();
+      final nextTrust =
+          (progress.trust +
+                  gift.trustFor(profile.id, monthlyRepeatCount: repeatCount))
+              .clamp(relationshipDimensionMin, relationshipDimensionMax)
+              .toInt();
+      final nextCloseness =
+          (progress.closeness + (requestedAffection > 0 ? 1 : 0))
+              .clamp(relationshipDimensionMin, relationshipDimensionMax)
+              .toInt();
+      final reaction = kBeautyGiftReaction(
+        state,
+        gift: gift,
+        girlId: profile.id,
+        monthlyRepeatCount: repeatCount,
+      );
       final updatedProgress = progress.copyWith(
         affection: nextAffection,
         trust: nextTrust,
@@ -2012,9 +2426,11 @@ class GameEngine {
             ...state.relationships.girls,
             profile.id: updatedProgress,
           },
-          memories: memories.length <= 64
+          memories: memories.length <= relationshipMemoryHistoryLimit
               ? memories
-              : memories.sublist(memories.length - 64),
+              : memories.sublist(
+                  memories.length - relationshipMemoryHistoryLimit,
+                ),
         ),
         ledger: <LedgerEntry>[
           ...state.ledger,
@@ -2038,10 +2454,10 @@ class GameEngine {
           activityId: gift.id,
           title: '${profile.name}에게 고른 선물',
           body:
-              '${gift.title}을 골라 건넸다. 생활비 -${gift.cost}원 · 호감도 +$affectionDelta.',
+              '${gift.title}을 골라 건넸다. ${kBeautyGiftRepeatLabel(repeatCount)} · 생활비 -${gift.cost}원 · 호감도 +$affectionDelta. $reaction',
           markerLabel: '선물',
           accentValue: profile.accentValue,
-          imageAsset: weekendGiftShopAsset,
+          imageAsset: gift.imageAsset,
           cashDelta: -gift.cost,
           girlId: profile.id,
           affectionDelta: affectionDelta,
@@ -2051,7 +2467,7 @@ class GameEngine {
         state: next,
         success: true,
         message:
-            '${profile.name}에게 ${gift.title}을 건넸습니다. · 호감도 +$affectionDelta',
+            '${profile.name}에게 ${gift.title}을 건넸습니다. ${kBeautyGiftRepeatLabel(repeatCount)} · 호감도 +$affectionDelta\n$reaction',
         cashDelta: -gift.cost,
         affectionDelta: affectionDelta,
       );
@@ -2093,7 +2509,9 @@ class GameEngine {
       ...weekendActivityLogsForState(state),
       log,
     ];
-    final trimmed = logs.length <= 256 ? logs : logs.sublist(logs.length - 256);
+    final trimmed = logs.length <= weekendActivityHistoryLimit
+        ? logs
+        : logs.sublist(logs.length - weekendActivityHistoryLimit);
     flags[weekendActivityLogFlag] = trimmed
         .map((entry) => entry.toJson())
         .toList(growable: false);
@@ -2168,13 +2586,11 @@ class GameEngine {
       banking: BankingState.initial(),
       organization: OrganizationState.initial(storyState.operatingPrinciple),
       personalFinance: PersonalFinanceState.initial(),
-      progression: MissionProgressionState.initial(day: 1, cash: initialCash),
+      progression: PlayerProgressionState.initial(),
       story: storyState,
       company: company,
       project: null,
-      decisions: storyState.flagBool('legacyMissionUiDisabled')
-          ? const []
-          : [_firstResearchNote(1)],
+      decisions: const [],
       scheduledEvents: const [],
       ledger: isStandardSeedStart
           ? [
@@ -2287,305 +2703,6 @@ class GameEngine {
     );
     migrated = prepareHiddenMarketScenario(migrated);
     return migrated;
-  }
-
-  MissionProgressView? missionProgress(GameState state) {
-    final mission = state.progression.activeMission;
-    if (mission == null) return null;
-    final unlocked = state.currentDate.year >= mission.requiredYear;
-    final raw = mission.metric == 'cash_gain'
-        ? state.cash - state.progression.missionStartCash
-        : _rawMissionMetric(state, mission.metric);
-    final current = mission.relative && mission.metric != 'cash_gain'
-        ? raw - state.progression.missionStartCounter
-        : raw;
-    final remainingDays = mission.deadlineDays == null
-        ? null
-        : (mission.deadlineDays! -
-                  (state.day - state.progression.missionStartedDay))
-              .clamp(0, mission.deadlineDays!);
-    return MissionProgressView(
-      mission: mission,
-      current: current.clamp(0, 1 << 62),
-      complete: unlocked && current >= mission.target,
-      unlocked: unlocked,
-      remainingDays: remainingDays,
-    );
-  }
-
-  MissionClaimResult claimMission(GameState state) {
-    final progress = missionProgress(state);
-    if (progress == null) {
-      return MissionClaimResult(
-        state: state,
-        success: false,
-        message: '모든 장기 미션을 완료했습니다.',
-      );
-    }
-    if (!progress.unlocked) {
-      return MissionClaimResult(
-        state: state,
-        success: false,
-        message: '${progress.mission.requiredYear}년부터 도전할 수 있습니다.',
-      );
-    }
-    if (!progress.complete) {
-      return MissionClaimResult(
-        state: state,
-        success: false,
-        message: '목표를 아직 달성하지 못했습니다.',
-      );
-    }
-
-    final beforeLevel = state.progression.level;
-    const starReward = 1;
-    final nextExperience =
-        state.progression.experience + progress.mission.experienceReward;
-    final flags = <String, dynamic>{
-      ...state.story.storyFlags,
-      'reputation': (state.story.reputation + progress.mission.reputationReward)
-          .clamp(0, 100),
-      'cohortTrust':
-          state.story.flagInt('cohortTrust', 30) + progress.mission.trustReward,
-    };
-    var rewarded = state.copyWith(
-      story: state.story.copyWith(storyFlags: flags),
-    );
-    final nextIndex = state.progression.currentMissionIndex + 1;
-    final nextMission = nextIndex < missionCatalog.length
-        ? missionCatalog[nextIndex]
-        : null;
-    final nextBaseline = nextMission == null
-        ? 0
-        : _rawMissionMetric(rewarded, nextMission.metric);
-    final claimed = <String>[
-      ...state.progression.claimedMissionIds,
-      if (!state.progression.claimedMissionIds.contains(progress.mission.id))
-        progress.mission.id,
-    ];
-    rewarded = rewarded.copyWith(
-      progression: state.progression.copyWith(
-        experience: nextExperience,
-        currentMissionIndex: nextIndex,
-        missionStartedDay: state.day,
-        missionStartCash: rewarded.cash,
-        missionStartCounter: nextBaseline,
-        claimedMissionIds: claimed,
-        starBalance: state.progression.starBalance + starReward,
-        totalStarsEarned: state.progression.totalStarsEarned + starReward,
-      ),
-    );
-    final afterLevel = rewarded.progression.level;
-    SkillDefinition? unlockedSkill;
-    if (afterLevel > beforeLevel) {
-      unlockedSkill = skillCatalog
-          .where(
-            (skill) => skill.level > beforeLevel && skill.level <= afterLevel,
-          )
-          .lastOrNull;
-    }
-    final rewardMessages = <String>[
-      '⭐ +$starReward',
-      '+${progress.mission.experienceReward} XP',
-      if (progress.mission.reputationReward > 0)
-        '평판 +${progress.mission.reputationReward}',
-      if (progress.mission.trustReward > 0)
-        '공동체 신뢰 +${progress.mission.trustReward}',
-      if (unlockedSkill != null) 'LV.$afterLevel ${unlockedSkill.name} 해금',
-    ];
-    return MissionClaimResult(
-      state: rewarded,
-      success: true,
-      message: '${progress.mission.title} 완료! ${rewardMessages.join(' · ')}',
-      starReward: starReward,
-      experienceReward: progress.mission.experienceReward,
-      reputationReward: progress.mission.reputationReward,
-      trustReward: progress.mission.trustReward,
-      unlockedSkill: unlockedSkill,
-    );
-  }
-
-  StarShopPurchaseResult purchaseStarShopItem(
-    GameState state,
-    String productId,
-  ) {
-    final product = starShopProductForId(productId);
-    if (product == null) {
-      return StarShopPurchaseResult(
-        state: state,
-        success: false,
-        message: '존재하지 않는 별빛 상점 상품입니다.',
-      );
-    }
-    final cost = starShopCost(state, product);
-    if (state.progression.starBalance < cost) {
-      return StarShopPurchaseResult(
-        state: state,
-        success: false,
-        message:
-            '스타가 부족합니다. 미션을 완료해 ⭐${cost - state.progression.starBalance}개를 더 모아 주세요.',
-      );
-    }
-
-    if (product.id == starCashExchangeId) {
-      final purchaseId =
-          'star-cash-${state.day}-${state.progression.starPurchaseIds.length + 1}';
-      final progression = state.progression.copyWith(
-        starBalance: state.progression.starBalance - cost,
-        starPurchaseIds: <String>[
-          ...state.progression.starPurchaseIds,
-          purchaseId,
-        ],
-      );
-      final next = state.copyWith(
-        cash: state.cash + 10000,
-        progression: progression,
-        ledger: <LedgerEntry>[
-          ...state.ledger,
-          LedgerEntry(
-            id: purchaseId,
-            day: state.day,
-            amount: 10000,
-            account: 'company_bank',
-            counterAccount: 'star_exchange',
-            description: '별빛 상점 회사 지원금',
-            sourceId: purchaseId,
-          ),
-        ],
-      );
-      return StarShopPurchaseResult(
-        state: next,
-        success: true,
-        message: '⭐$cost개를 사용해 회사 은행 계좌로 10,000원을 받았습니다.',
-        purchaseKey: purchaseId,
-      );
-    }
-
-    final targetDate = nextStarShopTradingDate(state.currentDate);
-    final purchaseKey = starShopInformationPurchaseKey(product.id, targetDate);
-    final savedHint = state.progression.starHints[purchaseKey];
-    if (savedHint != null ||
-        state.progression.starPurchaseIds.contains(purchaseKey)) {
-      return StarShopPurchaseResult(
-        state: state,
-        success: false,
-        message: '이 상품의 ${marketDateKey(targetDate)} 힌트는 이미 구매했습니다.',
-        hint: savedHint,
-        purchaseKey: purchaseKey,
-      );
-    }
-    final hint = buildStarShopHint(state, product, targetDate);
-    final next = state.copyWith(
-      progression: state.progression.copyWith(
-        starBalance: state.progression.starBalance - cost,
-        starPurchaseIds: <String>[
-          ...state.progression.starPurchaseIds,
-          purchaseKey,
-        ],
-        starHints: <String, String>{
-          ...state.progression.starHints,
-          purchaseKey: hint,
-        },
-      ),
-    );
-    return StarShopPurchaseResult(
-      state: next,
-      success: true,
-      message: '⭐$cost개로 ${product.title}을 구매했습니다.',
-      hint: hint,
-      purchaseKey: purchaseKey,
-    );
-  }
-
-  int _rawMissionMetric(GameState state, String metric) {
-    final counter = state.progression.counter(metric);
-    int maxWithCounter(int value) => value > counter ? value : counter;
-    return switch (metric) {
-      'work_sessions' => maxWithCounter(state.story.flagInt('workSessions', 0)),
-      'earned_seed' => state.story.seedMoneyTotal,
-      'decisions_resolved' => maxWithCounter(
-        state.decisions
-            .where((decision) => decision.status == DecisionStatus.resolved)
-            .length,
-      ),
-      'buy_orders' => maxWithCounter(
-        state.ledger
-            .where(
-              (entry) =>
-                  entry.counterAccount == 'market_security' &&
-                  entry.description.contains('매수'),
-            )
-            .length,
-      ),
-      'shares_bought' => maxWithCounter(
-        state.positions.fold<int>(
-          0,
-          (sum, position) => sum + position.units.floor(),
-        ),
-      ),
-      'unique_assets' => state.positions.length,
-      'days_advanced' => maxWithCounter(state.day - 1),
-      'sell_orders' => maxWithCounter(
-        state.ledger
-            .where(
-              (entry) =>
-                  entry.counterAccount == 'market_security' &&
-                  entry.description.contains('매도'),
-            )
-            .length,
-      ),
-      'profitable_sales' => maxWithCounter(
-        state.ledger.where((entry) => entry.realizedPnl > 0).length,
-      ),
-      'realized_profit' => maxWithCounter(
-        state.ledger.fold<int>(
-          0,
-          (sum, entry) => sum + (entry.realizedPnl > 0 ? entry.realizedPnl : 0),
-        ),
-      ),
-      'academy_help' => state.organization.researchHelpCount,
-      'cash' => state.cash,
-      'reputation' => state.story.reputation,
-      'positive_months' => counter,
-      'employees' => state.organization.employees.length,
-      'research_income' => maxWithCounter(
-        state.ledger
-            .where((entry) => entry.counterAccount == 'research_income')
-            .fold<int>(0, (sum, entry) => sum + entry.amount),
-      ),
-      'fund_launched' => state.story.fundLaunched ? 1 : 0,
-      'external_aum' => state.story.externalAum,
-      'finance_purchases' => maxWithCounter(
-        state.personalFinance.permanentPurchases.length +
-            state.personalFinance.lastPurchasePeriods.length,
-      ),
-      'properties' => state.personalFinance.realEstate.length,
-      'trade_volume' => maxWithCounter(
-        state.ledger.fold<int>(0, (sum, entry) => sum + entry.notional.abs()),
-      ),
-      'net_worth' => state.balanceSheetNetWorth(),
-      'property_income' => state.personalFinance.totalPropertyIncome,
-      'chance_plays' => state.personalFinance.chancePlayCount,
-      _ => counter,
-    };
-  }
-
-  GameState _refreshExpiredMissionWindow(GameState state) {
-    final progress = missionProgress(state);
-    if (progress == null ||
-        progress.mission.deadlineDays == null ||
-        progress.complete) {
-      return state;
-    }
-    final elapsed = state.day - state.progression.missionStartedDay;
-    if (elapsed <= progress.mission.deadlineDays!) return state;
-    return state.copyWith(
-      progression: state.progression.copyWith(
-        missionStartedDay: state.day,
-        missionStartCash: state.cash,
-        missionStartCounter: _rawMissionMetric(state, progress.mission.metric),
-      ),
-    );
   }
 
   BankLoanOffer unsecuredLoanOffer(GameState state, {required int termMonths}) {
@@ -2886,6 +3003,20 @@ class GameEngine {
     );
   }
 
+  double _playerOwnedUnits(GameState state, String assetId) => state.positions
+      .where((position) => position.assetId == assetId)
+      .fold<double>(0, (sum, position) => sum + position.units);
+
+  double _playerTenderAcquiredUnits(GameState state, String assetId) =>
+      state.shareholderGovernance.companyById(assetId)?.tenderAcquiredShares ??
+      0;
+
+  bool _exceedsMaximumQuoteQuantity(TradeOrder order) {
+    final outstanding = order.maximumPositionUnits;
+    if (outstanding == null || outstanding <= 0) return false;
+    return order.quantity > gameMaximumQuoteQuantity(outstanding) + 0.000001;
+  }
+
   bool _wouldExceedIssuedShares(
     GameState state,
     TradeOrder order, {
@@ -2894,9 +3025,7 @@ class GameEngine {
     final maximum = order.maximumPositionUnits;
     if (order.side != TradeSide.buy || maximum == null) return false;
     if (maximum <= 0) return true;
-    final owned = state.positions
-        .where((position) => position.assetId == order.assetId)
-        .fold<double>(0, (sum, position) => sum + position.units);
+    final owned = _playerOwnedUnits(state, order.assetId);
     final reserved = includePendingBuys
         ? state.pendingBuyReservedUnits(order.assetId)
         : 0.0;
@@ -2954,6 +3083,22 @@ class GameEngine {
       marketMinute: order.marketMinute,
       side: order.side,
     );
+    final maximumPositionUnits = order.maximumPositionUnits;
+    final inventoryMatches =
+        !snapshot.hasIssuedShareLedger ||
+        (snapshot.ownershipIsConserved &&
+            maximumPositionUnits != null &&
+            snapshot.sharesOutstanding == maximumPositionUnits &&
+            snapshot.playerOwnedShares ==
+                _playerOwnedUnits(
+                  state,
+                  order.assetId,
+                ).round().clamp(0, maximumPositionUnits) &&
+            snapshot.playerTenderAcquiredShares ==
+                _playerTenderAcquiredUnits(
+                  state,
+                  order.assetId,
+                ).round().clamp(0, maximumPositionUnits));
     return snapshot.sourceAssetId == order.assetId &&
         snapshot.sourceLiquidityDayKey ==
             marketLiquidityDayKey(state.currentDate) &&
@@ -2964,6 +3109,7 @@ class GameEngine {
         (sourcePrice - expectedLastTradePrice).abs() < 0.000001 &&
         snapshot.sourceMarket == order.market &&
         snapshot.sourceSimulationSeed == state.simulationSeed &&
+        inventoryMatches &&
         snapshot.liquidityPulse == order.microstructureFrame &&
         snapshot.appliedCapacityConsumptionUnits ==
             currentCapacityConsumption &&
@@ -3002,11 +3148,14 @@ class GameEngine {
     if (!order.unitPrice.isFinite || order.unitPrice <= 0) {
       return reject('유효한 현재가가 없습니다.');
     }
-    if (!_displayedOrderBookSnapshotMatchesOrder(state, order)) {
-      return reject(_staleDisplayedOrderBookMessage);
-    }
     if (_wouldExceedIssuedShares(state, order, includePendingBuys: true)) {
       return reject('보유·미체결 수량을 합쳐 발행주식 수를 넘길 수 없습니다.');
+    }
+    if (_exceedsMaximumQuoteQuantity(order)) {
+      return reject('1회 주문은 상장주식의 5%와 1억 주 중 작은 수량까지만 가능합니다.');
+    }
+    if (!_displayedOrderBookSnapshotMatchesOrder(state, order)) {
+      return reject(_staleDisplayedOrderBookMessage);
     }
     final stateDate = marketDateKey(state.currentDate);
     if (order.quoteDate != stateDate) {
@@ -3126,6 +3275,11 @@ class GameEngine {
           simulationSeed: state.simulationSeed,
           tradingDay: order.isTradingDay,
           sharesOutstanding: order.maximumPositionUnits,
+          playerOwnedUnits: _playerOwnedUnits(state, order.assetId),
+          playerTenderAcquiredUnits: _playerTenderAcquiredUnits(
+            state,
+            order.assetId,
+          ),
           isIpoFirstTradingDay: order.isIpoFirstTradingDay,
           technicalLevels: order.technicalLevels,
           liquidityPulse: order.microstructureFrame,
@@ -3276,6 +3430,84 @@ class GameEngine {
     );
   }
 
+  List<PendingTradeOrder> _pendingOrdersAfterQueueRelease(
+    Iterable<PendingTradeOrder> orders, {
+    required PendingTradeOrder source,
+    required double releasedQuantity,
+    required bool removeSource,
+  }) {
+    final released = math.max(0.0, releasedQuantity);
+    return <PendingTradeOrder>[
+      for (final order in orders)
+        if (order.id != source.id || !removeSource)
+          order.id == source.id ||
+                  released <= 0 ||
+                  order.assetId != source.assetId ||
+                  order.side != source.side ||
+                  (order.limitPrice - source.limitPrice).abs() >= 0.000001 ||
+                  order.placedSequence <= source.placedSequence
+              ? order
+              : order.copyWith(
+                  queueAheadQuantity: math.max(
+                    0.0,
+                    order.queueAheadQuantity - released,
+                  ),
+                ),
+    ];
+  }
+
+  List<PendingTradeOrder> _pendingOrdersInExchangePriority(
+    Iterable<PendingTradeOrder> source,
+  ) {
+    int withinSide(PendingTradeOrder left, PendingTradeOrder right) {
+      final priceOrder = left.side == PendingOrderSide.buy
+          ? right.limitPrice.compareTo(left.limitPrice)
+          : left.limitPrice.compareTo(right.limitPrice);
+      if (priceOrder != 0) return priceOrder;
+      final dateOrder = left.placedDate.compareTo(right.placedDate);
+      if (dateOrder != 0) return dateOrder;
+      final minuteOrder = left.placedMinute.compareTo(right.placedMinute);
+      if (minuteOrder != 0) return minuteOrder;
+      final sequenceOrder = left.placedSequence.compareTo(right.placedSequence);
+      return sequenceOrder != 0 ? sequenceOrder : left.id.compareTo(right.id);
+    }
+
+    int chronological(PendingTradeOrder left, PendingTradeOrder right) {
+      final dateOrder = left.placedDate.compareTo(right.placedDate);
+      if (dateOrder != 0) return dateOrder;
+      final minuteOrder = left.placedMinute.compareTo(right.placedMinute);
+      if (minuteOrder != 0) return minuteOrder;
+      final sequenceOrder = left.placedSequence.compareTo(right.placedSequence);
+      return sequenceOrder != 0 ? sequenceOrder : left.id.compareTo(right.id);
+    }
+
+    final buys =
+        source
+            .where((order) => order.side == PendingOrderSide.buy)
+            .toList(growable: true)
+          ..sort(withinSide);
+    final sells =
+        source
+            .where((order) => order.side == PendingOrderSide.sell)
+            .toList(growable: true)
+          ..sort(withinSide);
+    final ordered = <PendingTradeOrder>[];
+    var buyIndex = 0;
+    var sellIndex = 0;
+    while (buyIndex < buys.length || sellIndex < sells.length) {
+      if (buyIndex >= buys.length) {
+        ordered.add(sells[sellIndex++]);
+      } else if (sellIndex >= sells.length) {
+        ordered.add(buys[buyIndex++]);
+      } else if (chronological(buys[buyIndex], sells[sellIndex]) <= 0) {
+        ordered.add(buys[buyIndex++]);
+      } else {
+        ordered.add(sells[sellIndex++]);
+      }
+    }
+    return ordered;
+  }
+
   FinanceActionResult cancelPendingOrder(GameState state, String orderId) {
     final index = state.pendingOrders.indexWhere(
       (order) => order.id == orderId,
@@ -3288,7 +3520,12 @@ class GameEngine {
       );
     }
     final order = state.pendingOrders[index];
-    final pending = [...state.pendingOrders]..removeAt(index);
+    final pending = _pendingOrdersAfterQueueRelease(
+      state.pendingOrders,
+      source: order,
+      releasedQuantity: order.remainingQuantity,
+      removeSource: true,
+    );
     final sourceId = 'cancel-$orderId';
     final next = state.copyWith(
       pendingOrders: pending,
@@ -3393,6 +3630,8 @@ class GameEngine {
       simulationSeed: state.simulationSeed,
       tradingDay: isTradingDay,
       sharesOutstanding: maximumPositionUnits,
+      playerOwnedUnits: _playerOwnedUnits(state, assetId),
+      playerTenderAcquiredUnits: _playerTenderAcquiredUnits(state, assetId),
       isIpoFirstTradingDay:
           isIpoFirstTradingDay ?? representativeOrder.isIpoFirstTradingDay,
       technicalLevels: technicalLevels,
@@ -3405,23 +3644,7 @@ class GameEngine {
     if (perFillNotionalLimit <= 0) return state;
 
     var next = state;
-    final candidates = eligibleOrders.toList()
-      ..sort((left, right) {
-        if (left.side != right.side) {
-          return left.side.index.compareTo(right.side.index);
-        }
-        final priceOrder = left.side == PendingOrderSide.buy
-            ? right.limitPrice.compareTo(left.limitPrice)
-            : left.limitPrice.compareTo(right.limitPrice);
-        if (priceOrder != 0) return priceOrder;
-        final minuteOrder = left.placedMinute.compareTo(right.placedMinute);
-        if (minuteOrder != 0) return minuteOrder;
-        final sequenceOrder = left.placedSequence.compareTo(
-          right.placedSequence,
-        );
-        if (sequenceOrder != 0) return sequenceOrder;
-        return left.id.compareTo(right.id);
-      });
+    final candidates = _pendingOrdersInExchangePriority(eligibleOrders);
 
     for (final candidate in candidates) {
       final currentIndex = next.pendingOrders.indexWhere(
@@ -3522,9 +3745,12 @@ class GameEngine {
       if (fillQuantity <= 0 || fillPrice <= 0) continue;
 
       final withoutCurrent = next.copyWith(
-        pendingOrders: next.pendingOrders
-            .where((order) => order.id != current.id)
-            .toList(growable: false),
+        pendingOrders: _pendingOrdersAfterQueueRelease(
+          next.pendingOrders,
+          source: current,
+          releasedQuantity: fillQuantity,
+          removeSource: true,
+        ),
         marketMinute: marketMinute,
       );
       final fill = _executeFilledTrade(
@@ -3719,30 +3945,14 @@ class GameEngine {
       return state;
     }
     final stateDate = marketDateKey(state.currentDate);
-    final candidates =
-        state.pendingOrders
-            .where(
-              (order) =>
-                  order.assetId == assetId &&
-                  order.placedDate == stateDate &&
-                  order.placedMinute <= krxCloseMinute,
-            )
-            .toList()
-          ..sort((left, right) {
-            if (left.side != right.side) {
-              return left.side.index.compareTo(right.side.index);
-            }
-            final priceOrder = left.side == PendingOrderSide.buy
-                ? right.limitPrice.compareTo(left.limitPrice)
-                : left.limitPrice.compareTo(right.limitPrice);
-            if (priceOrder != 0) return priceOrder;
-            final sequenceOrder = left.placedSequence.compareTo(
-              right.placedSequence,
-            );
-            return sequenceOrder != 0
-                ? sequenceOrder
-                : left.id.compareTo(right.id);
-          });
+    final candidates = _pendingOrdersInExchangePriority(
+      state.pendingOrders.where(
+        (order) =>
+            order.assetId == assetId &&
+            order.placedDate == stateDate &&
+            order.placedMinute <= krxCloseMinute,
+      ),
+    );
     if (candidates.isEmpty) return state;
 
     final maximumPositionUnits = candidates
@@ -3766,6 +3976,8 @@ class GameEngine {
       simulationSeed: state.simulationSeed,
       tradingDay: true,
       sharesOutstanding: maximumPositionUnits,
+      playerOwnedUnits: _playerOwnedUnits(state, assetId),
+      playerTenderAcquiredUnits: _playerTenderAcquiredUnits(state, assetId),
       isIpoFirstTradingDay: isIpoFirstTradingDay,
       technicalLevels: technicalLevels,
     );
@@ -3901,11 +4113,14 @@ class GameEngine {
     if (!order.unitPrice.isFinite || order.unitPrice <= 0) {
       return reject('유효한 현재가가 없습니다.');
     }
-    if (!_displayedOrderBookSnapshotMatchesOrder(state, order)) {
-      return reject(_staleDisplayedOrderBookMessage);
-    }
     if (_wouldExceedIssuedShares(state, order, includePendingBuys: true)) {
       return reject('보유·미체결 수량을 합쳐 발행주식 수를 넘길 수 없습니다.');
+    }
+    if (_exceedsMaximumQuoteQuantity(order)) {
+      return reject('1회 주문은 상장주식의 5%와 1억 주 중 작은 수량까지만 가능합니다.');
+    }
+    if (!_displayedOrderBookSnapshotMatchesOrder(state, order)) {
+      return reject(_staleDisplayedOrderBookMessage);
     }
     final stateDate = marketDateKey(state.currentDate);
     if (order.quoteDate != stateDate) {
@@ -4032,6 +4247,11 @@ class GameEngine {
           simulationSeed: state.simulationSeed,
           tradingDay: tradingDay,
           sharesOutstanding: order.maximumPositionUnits,
+          playerOwnedUnits: _playerOwnedUnits(state, order.assetId),
+          playerTenderAcquiredUnits: _playerTenderAcquiredUnits(
+            state,
+            order.assetId,
+          ),
           isIpoFirstTradingDay: order.isIpoFirstTradingDay,
           technicalLevels: order.technicalLevels,
           liquidityPulse: order.microstructureFrame,
@@ -4544,7 +4764,7 @@ class GameEngine {
         ? 0
         : (score * 100 ~/ result.maxScore);
     final baseReward = switch (result.activityId) {
-      'rider' => 700 + normalized * 15,
+      'newspaper_delivery' => 900 + normalized * 16,
       'dishes' => 500 + normalized * 8,
       'stationery' => 800 + normalized * 7,
       'flea_market' => 700 + normalized * 15,
@@ -4566,7 +4786,7 @@ class GameEngine {
     if (reward <= 0) return state;
 
     final activityLabel = switch (result.activityId) {
-      'rider' => '데시멀 센터 킥보드 실기 코스',
+      'newspaper_delivery' => '강남 주택가 조간신문 배달',
       'dishes' => '식당 당번 실습',
       'stationery' => '교육자료 창고 정리',
       'flea_market' => '데시멀 교환장터',
@@ -4598,7 +4818,7 @@ class GameEngine {
 
     final next = state.copyWith(
       cash: state.cash + reward,
-      progression: state.progression.record('work_sessions'),
+      progression: state.progression.record('work_sessions').gainExperience(1),
       story: state.story.copyWith(
         accountAuthorityLevel:
             reachedSeedGoal && state.story.accountAuthorityLevel < 1
@@ -4669,16 +4889,8 @@ class GameEngine {
     // The first research card remains available after the paper-trading day,
     // but it must not trap the player on the practice date.
     final advanced = advanceOneDay(marked.copyWith(decisions: const []));
-    final decisions = <DecisionCardData>[...marked.decisions];
-    if (facilityStoryGatesEnabled(advanced) &&
-        !bankAccessUnlocked(advanced) &&
-        !decisions.any(
-          (decision) => decision.id == 'facility-intro-bank-yoon-harin',
-        )) {
-      decisions.add(_bankAccessIntroduction(advanced.day));
-    }
     return advanced.copyWith(
-      decisions: decisions,
+      decisions: <DecisionCardData>[...marked.decisions],
       story: advanced.story.copyWith(
         storyFlags: <String, dynamic>{
           ...advanced.story.storyFlags,
@@ -4908,6 +5120,13 @@ class GameEngine {
         state: state,
         success: false,
         message: '존재하지 않는 소비 항목입니다.',
+      );
+    }
+    if (option.isRealEstate && !realEstateTransactionsUnlocked(state)) {
+      return FinanceActionResult(
+        state: state,
+        success: false,
+        message: '6월 빈 점포 계약 이야기를 마친 뒤 실제 부동산을 매입할 수 있습니다.',
       );
     }
     if (state.currentDate.year < option.unlockYear) {
@@ -5451,6 +5670,13 @@ class GameEngine {
   }
 
   FinanceActionResult renovateRealEstate(GameState state, String assetId) {
+    if (!realEstateOperationsUnlocked(state)) {
+      return FinanceActionResult(
+        state: state,
+        success: false,
+        message: '7월 박하은의 부동산 운영 이야기를 마친 뒤 사용할 수 있습니다.',
+      );
+    }
     final assets = state.personalFinance.realEstate;
     final index = assets.indexWhere((asset) => asset.id == assetId);
     if (index < 0) {
@@ -5543,6 +5769,13 @@ class GameEngine {
     String assetId,
     bool active,
   ) {
+    if (!realEstateOperationsUnlocked(state)) {
+      return FinanceActionResult(
+        state: state,
+        success: false,
+        message: '7월 박하은의 부동산 운영 이야기를 마친 뒤 사용할 수 있습니다.',
+      );
+    }
     final assets = state.personalFinance.realEstate;
     final index = assets.indexWhere((asset) => asset.id == assetId);
     if (index < 0) {
@@ -5600,6 +5833,13 @@ class GameEngine {
     String assetId,
     RealEstateLeaseType leaseType,
   ) {
+    if (!realEstateOperationsUnlocked(state)) {
+      return FinanceActionResult(
+        state: state,
+        success: false,
+        message: '7월 박하은의 부동산 운영 이야기를 마친 뒤 사용할 수 있습니다.',
+      );
+    }
     final assets = state.personalFinance.realEstate;
     final index = assets.indexWhere((asset) => asset.id == assetId);
     if (index < 0) {
@@ -5802,6 +6042,13 @@ class GameEngine {
     GameState state,
     String assetId,
   ) {
+    if (!realEstateOperationsUnlocked(state)) {
+      return FinanceActionResult(
+        state: state,
+        success: false,
+        message: '7월 박하은의 부동산 운영 이야기를 마친 뒤 사용할 수 있습니다.',
+      );
+    }
     final assets = state.personalFinance.realEstate;
     final index = assets.indexWhere((asset) => asset.id == assetId);
     if (index < 0) {
@@ -5927,6 +6174,13 @@ class GameEngine {
     GameState state,
     String assetId,
   ) {
+    if (!realEstateOperationsUnlocked(state)) {
+      return FinanceActionResult(
+        state: state,
+        success: false,
+        message: '7월 박하은의 부동산 운영 이야기를 마친 뒤 사용할 수 있습니다.',
+      );
+    }
     final assets = state.personalFinance.realEstate;
     final index = assets.indexWhere((asset) => asset.id == assetId);
     if (index < 0) {
@@ -6240,6 +6494,1033 @@ class GameEngine {
     );
   }
 
+  CasinoActionResult playCasinoRound(GameState state, CasinoBet bet) {
+    if (bet.game == CasinoGameType.blackjack) {
+      return CasinoActionResult(
+        state: state,
+        success: false,
+        message: '블랙잭은 카드를 받은 뒤 히트·스탠드·더블을 직접 선택합니다.',
+      );
+    }
+    if (bet.game == CasinoGameType.craps) {
+      return startCasinoCraps(state, bet);
+    }
+    final profile = _casinoProfileForCurrentMonth(state);
+    final problem = _casinoPlayProblem(state, profile, bet.stake);
+    if (problem != null) {
+      return CasinoActionResult(state: state, success: false, message: problem);
+    }
+    if (!_casinoBetIsValid(bet)) {
+      return CasinoActionResult(
+        state: state,
+        success: false,
+        message: '이 테이블에서 받을 수 없는 베팅입니다.',
+      );
+    }
+
+    final roundId =
+        'casino-${state.day}-${profile.roundSequence}-${bet.game.name}';
+    final outcomeKey =
+        '${state.simulationSeed}:casino:${state.day}:${profile.roundSequence}:${bet.game.name}';
+    final result = switch (bet.game) {
+      CasinoGameType.baccarat => _resolveBaccaratBet(bet, outcomeKey),
+      CasinoGameType.roulette => _resolveRouletteBet(bet, outcomeKey),
+      CasinoGameType.sicBo => _resolveSicBoBet(bet, outcomeKey),
+      CasinoGameType.slots => _resolveSlotsBet(bet, outcomeKey),
+      CasinoGameType.craps => throw StateError('handled above'),
+      CasinoGameType.blackjack => throw StateError('handled above'),
+    };
+    return _recordCasinoRound(
+      state: state,
+      profile: profile,
+      roundId: roundId,
+      game: bet.game,
+      betLabel: casinoBetTitle(bet.type, selection: bet.selection),
+      stake: bet.stake,
+      payout: result.payout,
+      outcome: result.outcome,
+      detail: result.detail,
+    );
+  }
+
+  CasinoActionResult startCasinoBlackjack(GameState state, int stake) {
+    final profile = _casinoProfileForCurrentMonth(state);
+    final problem = _casinoPlayProblem(state, profile, stake);
+    if (problem != null) {
+      return CasinoActionResult(state: state, success: false, message: problem);
+    }
+    final roundId = 'casino-${state.day}-${profile.roundSequence}-blackjack';
+    final deck = casinoShuffledDeck(
+      '${state.simulationSeed}:casino:${state.day}:${profile.roundSequence}:blackjack',
+    );
+    final hand = BlackjackHandState(
+      id: roundId,
+      day: state.day,
+      minute: state.marketMinute,
+      stake: stake,
+      deck: deck,
+      playerCards: <int>[deck[0], deck[2]],
+      dealerCards: <int>[deck[1], deck[3]],
+      nextCardIndex: 4,
+      doubled: false,
+    );
+    final roundsToday = profile.lastPlayDay == state.day
+        ? profile.roundsToday + 1
+        : 1;
+    final nextProfile = profile.copyWith(
+      monthlyStake: profile.monthlyStake + stake,
+      lastPlayDay: state.day,
+      roundsToday: roundsToday,
+      roundSequence: profile.roundSequence + 1,
+      totalRounds: profile.totalRounds + 1,
+      totalStake: profile.totalStake + stake,
+      activeBlackjack: hand,
+    );
+    final nextFinance = state.personalFinance.copyWith(
+      totalSpent: state.personalFinance.totalSpent + stake,
+      chancePlayCount: state.personalFinance.chancePlayCount + 1,
+      totalChanceStake: state.personalFinance.totalChanceStake + stake,
+      casino: nextProfile,
+    );
+    final next = state.copyWith(
+      cash: state.cash - stake,
+      personalFinance: nextFinance,
+      ledger: <LedgerEntry>[
+        ...state.ledger,
+        LedgerEntry(
+          id: '$roundId-stake',
+          day: state.day,
+          amount: -stake,
+          account: 'company_bank',
+          counterAccount: 'casino_wager',
+          description: '카지노 · 블랙잭 기본 핸드',
+          sourceId: roundId,
+        ),
+      ],
+      processedEventIds: <String>[...state.processedEventIds, roundId],
+    );
+    final playerValue = blackjackHandValue(hand.playerCards).total;
+    return CasinoActionResult(
+      state: next,
+      success: true,
+      message: playerValue == 21
+          ? '블랙잭입니다. 결과 확인을 눌러 딜러 패와 정산을 확인하세요.'
+          : '카드를 받았습니다. 히트·스탠드·더블 중 하나를 선택하세요.',
+      cashDelta: -stake,
+    );
+  }
+
+  CasinoActionResult actCasinoBlackjack(
+    GameState state,
+    BlackjackAction action,
+  ) {
+    final hand = state.personalFinance.casino.activeBlackjack;
+    if (hand == null) {
+      return CasinoActionResult(
+        state: state,
+        success: false,
+        message: '진행 중인 블랙잭 핸드가 없습니다.',
+      );
+    }
+    final playerValue = blackjackHandValue(hand.playerCards).total;
+    if (playerValue >= 21 && action == BlackjackAction.hit) {
+      return CasinoActionResult(
+        state: state,
+        success: false,
+        message: '21 이상에서는 카드를 더 받을 수 없습니다. 결과를 확인하세요.',
+      );
+    }
+
+    if (action == BlackjackAction.hit) {
+      if (hand.nextCardIndex >= hand.deck.length) {
+        return CasinoActionResult(
+          state: state,
+          success: false,
+          message: '슈를 다시 준비해야 합니다. 스탠드로 정산해 주세요.',
+        );
+      }
+      final playerCards = <int>[
+        ...hand.playerCards,
+        hand.deck[hand.nextCardIndex],
+      ];
+      final updated = hand.copyWith(
+        playerCards: playerCards,
+        nextCardIndex: hand.nextCardIndex + 1,
+      );
+      if (blackjackHandValue(playerCards).total >= 21) {
+        return _settleCasinoBlackjack(state, updated);
+      }
+      final next = state.copyWith(
+        personalFinance: state.personalFinance.copyWith(
+          casino: state.personalFinance.casino.copyWith(
+            activeBlackjack: updated,
+          ),
+        ),
+      );
+      return CasinoActionResult(
+        state: next,
+        success: true,
+        message: '${casinoCardLabel(playerCards.last)} 카드를 받았습니다.',
+      );
+    }
+
+    if (action == BlackjackAction.doubleDown) {
+      if (hand.playerCards.length != 2 || hand.doubled) {
+        return CasinoActionResult(
+          state: state,
+          success: false,
+          message: '더블은 처음 두 장에서만 한 번 선택할 수 있습니다.',
+        );
+      }
+      final profile = _casinoProfileForCurrentMonth(state);
+      if (hand.stake > state.bankCash) {
+        return CasinoActionResult(
+          state: state,
+          success: false,
+          message: '더블에 필요한 추가 베팅 현금이 부족합니다.',
+        );
+      }
+      final lossLimit = casinoMonthlyLossLimitForBasis(
+        profile.monthBankrollBasis,
+      );
+      if (profile.monthlyLoss + hand.stake > lossLimit) {
+        return CasinoActionResult(
+          state: state,
+          success: false,
+          message: '이번 달 손실 중단선 때문에 더블을 선택할 수 없습니다.',
+        );
+      }
+      final playerCards = <int>[
+        ...hand.playerCards,
+        hand.deck[hand.nextCardIndex],
+      ];
+      final doubled = hand.copyWith(
+        stake: hand.stake * 2,
+        playerCards: playerCards,
+        nextCardIndex: hand.nextCardIndex + 1,
+        doubled: true,
+      );
+      final profileWithDouble = profile.copyWith(
+        monthlyStake: profile.monthlyStake + hand.stake,
+        totalStake: profile.totalStake + hand.stake,
+        activeBlackjack: doubled,
+      );
+      final charged = state.copyWith(
+        cash: state.cash - hand.stake,
+        personalFinance: state.personalFinance.copyWith(
+          totalSpent: state.personalFinance.totalSpent + hand.stake,
+          totalChanceStake: state.personalFinance.totalChanceStake + hand.stake,
+          casino: profileWithDouble,
+        ),
+        ledger: <LedgerEntry>[
+          ...state.ledger,
+          LedgerEntry(
+            id: '${hand.id}-double',
+            day: state.day,
+            amount: -hand.stake,
+            account: 'company_bank',
+            counterAccount: 'casino_wager',
+            description: '카지노 · 블랙잭 더블다운 추가 베팅',
+            sourceId: hand.id,
+          ),
+        ],
+      );
+      final settled = _settleCasinoBlackjack(charged, doubled);
+      return CasinoActionResult(
+        state: settled.state,
+        success: settled.success,
+        message: settled.message,
+        cashDelta: settled.cashDelta - hand.stake,
+        minutesElapsed: settled.minutesElapsed,
+      );
+    }
+
+    return _settleCasinoBlackjack(state, hand);
+  }
+
+  CasinoActionResult _settleCasinoBlackjack(
+    GameState state,
+    BlackjackHandState hand,
+  ) {
+    final player = blackjackHandValue(hand.playerCards);
+    var dealerCards = <int>[...hand.dealerCards];
+    var nextIndex = hand.nextCardIndex;
+    if (player.total <= 21) {
+      while (true) {
+        final dealer = blackjackHandValue(dealerCards);
+        // This table uses the common S17 rule: the dealer stands on every 17,
+        // including soft 17.
+        if (dealer.total >= 17) break;
+        if (nextIndex >= hand.deck.length) break;
+        dealerCards.add(hand.deck[nextIndex]);
+        nextIndex++;
+      }
+    }
+    final dealer = blackjackHandValue(dealerCards);
+    final playerNatural = blackjackIsNatural(hand.playerCards);
+    final dealerNatural = blackjackIsNatural(dealerCards);
+    late final int grossPayout;
+    late final String outcome;
+    if (player.total > 21) {
+      grossPayout = 0;
+      outcome = '버스트';
+    } else if (playerNatural && !dealerNatural) {
+      grossPayout = hand.stake + (hand.stake * 3 ~/ 2);
+      outcome = '블랙잭 3:2';
+    } else if (dealerNatural && !playerNatural) {
+      grossPayout = 0;
+      outcome = '딜러 블랙잭';
+    } else if (player.total == dealer.total) {
+      grossPayout = hand.stake;
+      outcome = '푸시';
+    } else if (dealer.total > 21 || player.total > dealer.total) {
+      grossPayout = hand.stake * 2;
+      outcome = '승리';
+    } else {
+      grossPayout = 0;
+      outcome = '패배';
+    }
+    final detail =
+        '플레이어 ${hand.playerCards.map(casinoCardLabel).join(' ')} (${player.total}) · '
+        '딜러 ${dealerCards.map(casinoCardLabel).join(' ')} (${dealer.total})';
+    final nationalFee = casinoNationalFee(
+      grossPayout: grossPayout,
+      stake: hand.stake,
+    );
+    final netPayout = grossPayout - nationalFee;
+    final record = CasinoRoundRecord(
+      id: hand.id,
+      day: hand.day,
+      minute: hand.minute,
+      game: CasinoGameType.blackjack,
+      betLabel: hand.doubled ? '더블다운' : '기본 핸드',
+      stake: hand.stake,
+      payout: netPayout,
+      grossPayout: grossPayout,
+      nationalFee: nationalFee,
+      outcome: outcome,
+      detail: detail,
+    );
+    final profile = state.personalFinance.casino;
+    final history = _appendCasinoHistory(profile.history, record);
+    final nextProfile = profile.copyWith(
+      monthlyPayout: profile.monthlyPayout + netPayout,
+      monthlyNationalFee: profile.monthlyNationalFee + nationalFee,
+      totalPayout: profile.totalPayout + netPayout,
+      totalNationalFee: profile.totalNationalFee + nationalFee,
+      history: history,
+      activeBlackjack: null,
+    );
+    final next = state.copyWith(
+      cash: state.cash + netPayout,
+      personalFinance: state.personalFinance.copyWith(
+        totalChancePayout: state.personalFinance.totalChancePayout + netPayout,
+        casino: nextProfile,
+      ),
+      ledger: <LedgerEntry>[
+        ...state.ledger,
+        if (grossPayout > 0)
+          LedgerEntry(
+            id: '${hand.id}-payout',
+            day: state.day,
+            amount: grossPayout,
+            account: 'company_bank',
+            counterAccount: 'casino_payout',
+            description: '카지노 · 블랙잭 $outcome 총지급',
+            sourceId: hand.id,
+          ),
+        if (nationalFee > 0)
+          LedgerEntry(
+            id: '${hand.id}-national-fee',
+            day: state.day,
+            amount: -nationalFee,
+            account: 'company_bank',
+            counterAccount: 'state_casino_fee',
+            description: '카지노 확정 이익 국가 수수료 20%',
+            sourceId: hand.id,
+          ),
+      ],
+    );
+    return CasinoActionResult(
+      state: next,
+      success: true,
+      message:
+          '$outcome · $detail · ${_casinoSettlementText(grossPayout, nationalFee)}',
+      cashDelta: netPayout,
+      minutesElapsed: casinoRoundMinutes,
+    );
+  }
+
+  CasinoActionResult startCasinoCraps(GameState state, CasinoBet bet) {
+    if (bet.game != CasinoGameType.craps ||
+        (bet.type != CasinoBetType.crapsPassLine &&
+            bet.type != CasinoBetType.crapsDontPass)) {
+      return CasinoActionResult(
+        state: state,
+        success: false,
+        message: '크랩스는 패스 라인과 돈트 패스 베팅만 받습니다.',
+      );
+    }
+    final profile = _casinoProfileForCurrentMonth(state);
+    final problem = _casinoPlayProblem(state, profile, bet.stake);
+    if (problem != null) {
+      return CasinoActionResult(state: state, success: false, message: problem);
+    }
+
+    final roundId = 'casino-${state.day}-${profile.roundSequence}-craps';
+    final firstRoll = _casinoCrapsRoll(state, roundId, 0);
+    final sum = firstRoll[0] + firstRoll[1];
+    final point = <int>{4, 5, 6, 8, 9, 10}.contains(sum) ? sum : 0;
+    final round = CrapsRoundState(
+      id: roundId,
+      day: state.day,
+      minute: state.marketMinute,
+      stake: bet.stake,
+      betType: bet.type,
+      point: point,
+      rolls: <List<int>>[firstRoll],
+      nextRollIndex: 1,
+    );
+    final roundsToday = profile.lastPlayDay == state.day
+        ? profile.roundsToday + 1
+        : 1;
+    final chargedProfile = profile.copyWith(
+      monthlyStake: profile.monthlyStake + bet.stake,
+      lastPlayDay: state.day,
+      roundsToday: roundsToday,
+      roundSequence: profile.roundSequence + 1,
+      totalRounds: profile.totalRounds + 1,
+      totalStake: profile.totalStake + bet.stake,
+      activeCraps: round,
+    );
+    final charged = state.copyWith(
+      cash: state.cash - bet.stake,
+      personalFinance: state.personalFinance.copyWith(
+        totalSpent: state.personalFinance.totalSpent + bet.stake,
+        chancePlayCount: state.personalFinance.chancePlayCount + 1,
+        totalChanceStake: state.personalFinance.totalChanceStake + bet.stake,
+        casino: chargedProfile,
+      ),
+      ledger: <LedgerEntry>[
+        ...state.ledger,
+        LedgerEntry(
+          id: '$roundId-stake',
+          day: state.day,
+          amount: -bet.stake,
+          account: 'company_bank',
+          counterAccount: 'casino_wager',
+          description: '카지노 · 크랩스 ${casinoBetTitle(bet.type)}',
+          sourceId: roundId,
+        ),
+      ],
+      processedEventIds: <String>[...state.processedEventIds, roundId],
+    );
+
+    final pass = bet.type == CasinoBetType.crapsPassLine;
+    if ((pass && (sum == 7 || sum == 11)) ||
+        (!pass && (sum == 2 || sum == 3))) {
+      final settled = _settleCasinoCraps(
+        charged,
+        round,
+        grossPayout: bet.stake * 2,
+        outcome: '컴아웃 승리',
+      );
+      return CasinoActionResult(
+        state: settled.state,
+        success: true,
+        message: settled.message,
+        cashDelta: settled.cashDelta - bet.stake,
+        minutesElapsed: settled.minutesElapsed,
+      );
+    }
+    if (!pass && sum == 12) {
+      final settled = _settleCasinoCraps(
+        charged,
+        round,
+        grossPayout: bet.stake,
+        outcome: '컴아웃 12 · 푸시',
+      );
+      return CasinoActionResult(
+        state: settled.state,
+        success: true,
+        message: settled.message,
+        cashDelta: settled.cashDelta - bet.stake,
+        minutesElapsed: settled.minutesElapsed,
+      );
+    }
+    if ((pass && (sum == 2 || sum == 3 || sum == 12)) ||
+        (!pass && (sum == 7 || sum == 11))) {
+      final settled = _settleCasinoCraps(
+        charged,
+        round,
+        grossPayout: 0,
+        outcome: '컴아웃 패배',
+      );
+      return CasinoActionResult(
+        state: settled.state,
+        success: true,
+        message: settled.message,
+        cashDelta: -bet.stake,
+        minutesElapsed: settled.minutesElapsed,
+      );
+    }
+
+    return CasinoActionResult(
+      state: charged,
+      success: true,
+      message:
+          '컴아웃 ${firstRoll[0]}+${firstRoll[1]}=$sum · 포인트 $point가 설정됐습니다. 주사위를 다시 굴리세요.',
+      cashDelta: -bet.stake,
+    );
+  }
+
+  CasinoActionResult rollCasinoCraps(GameState state) {
+    final round = state.personalFinance.casino.activeCraps;
+    if (round == null) {
+      return CasinoActionResult(
+        state: state,
+        success: false,
+        message: '진행 중인 크랩스 포인트가 없습니다.',
+      );
+    }
+    if (round.day != state.day) {
+      return CasinoActionResult(
+        state: state,
+        success: false,
+        message: '이전 날의 크랩스 라운드는 더 진행할 수 없습니다.',
+      );
+    }
+    final roll = _casinoCrapsRoll(state, round.id, round.nextRollIndex);
+    final sum = roll[0] + roll[1];
+    final updated = round.copyWith(
+      rolls: <List<int>>[...round.rolls, roll],
+      nextRollIndex: round.nextRollIndex + 1,
+    );
+    final pass = round.betType == CasinoBetType.crapsPassLine;
+    if (sum == round.point) {
+      return _settleCasinoCraps(
+        state,
+        updated,
+        grossPayout: pass ? round.stake * 2 : 0,
+        outcome: pass ? '포인트 메이크 · 승리' : '포인트 메이크 · 패배',
+      );
+    }
+    if (sum == 7) {
+      return _settleCasinoCraps(
+        state,
+        updated,
+        grossPayout: pass ? 0 : round.stake * 2,
+        outcome: pass ? '세븐 아웃 · 패배' : '세븐 아웃 · 승리',
+      );
+    }
+    final next = state.copyWith(
+      personalFinance: state.personalFinance.copyWith(
+        casino: state.personalFinance.casino.copyWith(activeCraps: updated),
+      ),
+    );
+    return CasinoActionResult(
+      state: next,
+      success: true,
+      message: '${roll[0]}+${roll[1]}=$sum · 포인트 ${round.point} 유지. 다시 굴리세요.',
+    );
+  }
+
+  List<int> _casinoCrapsRoll(GameState state, String roundId, int rollIndex) =>
+      <int>[
+        stableRandomInt(
+              '${state.simulationSeed}:$roundId:craps-v2:roll:$rollIndex:die:0',
+              6,
+            ) +
+            1,
+        stableRandomInt(
+              '${state.simulationSeed}:$roundId:craps-v2:roll:$rollIndex:die:1',
+              6,
+            ) +
+            1,
+      ];
+
+  CasinoActionResult _settleCasinoCraps(
+    GameState state,
+    CrapsRoundState round, {
+    required int grossPayout,
+    required String outcome,
+  }) {
+    final nationalFee = casinoNationalFee(
+      grossPayout: grossPayout,
+      stake: round.stake,
+    );
+    final netPayout = grossPayout - nationalFee;
+    final rolls = round.rolls
+        .map((roll) => '${roll[0]}+${roll[1]}=${roll[0] + roll[1]}')
+        .join(' → ');
+    final detail = round.point == 0
+        ? '컴아웃 $rolls'
+        : '포인트 ${round.point} · $rolls';
+    final record = CasinoRoundRecord(
+      id: round.id,
+      day: round.day,
+      minute: round.minute,
+      game: CasinoGameType.craps,
+      betLabel: casinoBetTitle(round.betType),
+      stake: round.stake,
+      payout: netPayout,
+      grossPayout: grossPayout,
+      nationalFee: nationalFee,
+      outcome: outcome,
+      detail: detail,
+    );
+    final profile = state.personalFinance.casino;
+    final nextProfile = profile.copyWith(
+      monthlyPayout: profile.monthlyPayout + netPayout,
+      monthlyNationalFee: profile.monthlyNationalFee + nationalFee,
+      totalPayout: profile.totalPayout + netPayout,
+      totalNationalFee: profile.totalNationalFee + nationalFee,
+      history: _appendCasinoHistory(profile.history, record),
+      activeCraps: null,
+    );
+    final next = state.copyWith(
+      cash: state.cash + netPayout,
+      personalFinance: state.personalFinance.copyWith(
+        totalChancePayout: state.personalFinance.totalChancePayout + netPayout,
+        casino: nextProfile,
+      ),
+      ledger: <LedgerEntry>[
+        ...state.ledger,
+        if (grossPayout > 0)
+          LedgerEntry(
+            id: '${round.id}-payout',
+            day: state.day,
+            amount: grossPayout,
+            account: 'company_bank',
+            counterAccount: 'casino_payout',
+            description: '카지노 · 크랩스 $outcome 총지급',
+            sourceId: round.id,
+          ),
+        if (nationalFee > 0)
+          LedgerEntry(
+            id: '${round.id}-national-fee',
+            day: state.day,
+            amount: -nationalFee,
+            account: 'company_bank',
+            counterAccount: 'state_casino_fee',
+            description: '카지노 확정 이익 국가 수수료 20%',
+            sourceId: round.id,
+          ),
+      ],
+    );
+    return CasinoActionResult(
+      state: next,
+      success: true,
+      message:
+          '$outcome · $detail · ${_casinoSettlementText(grossPayout, nationalFee)}',
+      cashDelta: netPayout,
+      minutesElapsed: casinoRoundMinutes,
+    );
+  }
+
+  CasinoState _casinoProfileForCurrentMonth(GameState state) => state
+      .personalFinance
+      .casino
+      .forMonth(casinoMonthKey(state.currentDate), state.bankCash);
+
+  String? _casinoPlayProblem(GameState state, CasinoState profile, int stake) {
+    final age = state.story.ageOn(state.currentDate);
+    if (state.currentDate.isBefore(DateTime(2010, 1, 1)) || age < 20) {
+      return '성인이 되는 2010년부터 이용할 수 있습니다.';
+    }
+    if (state.currentDate.weekday >= DateTime.saturday) {
+      return '카지노 LIVE는 평일 장 마감 뒤 저녁 행동으로 이용할 수 있습니다.';
+    }
+    if (state.pendingDecisions.isNotEmpty) {
+      return '새 기록의 결정을 먼저 마쳐야 전용 중계망에 접속할 수 있습니다.';
+    }
+    if (weekdayEveningUsed(state)) {
+      return '오늘의 저녁 행동은 이미 사용했습니다.';
+    }
+    if (state.marketMinute < krxCloseMinute) {
+      return '카지노 실시간 중계는 15:00 장 마감 뒤에 접속할 수 있습니다.';
+    }
+    if (state.marketMinute > marketDayEndMinute - casinoRoundMinutes) {
+      return '마지막 게임 시작은 19:30입니다. 오늘은 장부만 확인할 수 있습니다.';
+    }
+    if (profile.activeBlackjack != null) {
+      return '진행 중인 블랙잭 핸드를 먼저 마쳐야 합니다.';
+    }
+    if (profile.activeCraps != null) {
+      return '진행 중인 크랩스 포인트를 먼저 정산해야 합니다.';
+    }
+    if (profile.roundsForDay(state.day) >= casinoDailyRoundLimit) {
+      return '오늘의 테이블 이용 한도 $casinoDailyRoundLimit판을 모두 사용했습니다.';
+    }
+    final maxStake = casinoMaximumStakeForCash(state.bankCash);
+    if (stake < casinoMinimumStake ||
+        stake > maxStake ||
+        stake > state.bankCash ||
+        stake % casinoMinimumStake != 0) {
+      return '베팅은 1만원 단위이며, 현금의 1%와 10만원 중 작은 금액 이하여야 합니다.';
+    }
+    final lossLimit = casinoMonthlyLossLimitForBasis(
+      profile.monthBankrollBasis,
+    );
+    if (profile.monthlyLoss + stake > lossLimit) {
+      return '이번 달 손실 중단선 $lossLimit원에 도달해 추가 베팅이 잠겼습니다.';
+    }
+    return null;
+  }
+
+  bool _casinoBetIsValid(CasinoBet bet) {
+    final validType = switch (bet.game) {
+      CasinoGameType.baccarat => <CasinoBetType>{
+        CasinoBetType.baccaratPlayer,
+        CasinoBetType.baccaratBanker,
+        CasinoBetType.baccaratTie,
+        CasinoBetType.baccaratPlayerPair,
+        CasinoBetType.baccaratBankerPair,
+      }.contains(bet.type),
+      CasinoGameType.roulette => bet.type.name.startsWith('roulette'),
+      CasinoGameType.craps =>
+        bet.type == CasinoBetType.crapsPassLine ||
+            bet.type == CasinoBetType.crapsDontPass,
+      CasinoGameType.sicBo => bet.type.name.startsWith('sicBo'),
+      CasinoGameType.slots => bet.type == CasinoBetType.slotsSpin,
+      CasinoGameType.blackjack => bet.type == CasinoBetType.blackjackHand,
+    };
+    if (!validType) return false;
+    if (bet.type == CasinoBetType.rouletteStraight) {
+      return bet.selection != null &&
+          bet.selection! >= 0 &&
+          bet.selection! <= 36;
+    }
+    if (bet.type == CasinoBetType.sicBoSpecificTriple) {
+      return bet.selection != null &&
+          bet.selection! >= 1 &&
+          bet.selection! <= 6;
+    }
+    if (bet.type == CasinoBetType.sicBoTotal) {
+      return bet.selection != null &&
+          bet.selection! >= 4 &&
+          bet.selection! <= 17;
+    }
+    return true;
+  }
+
+  CasinoActionResult _recordCasinoRound({
+    required GameState state,
+    required CasinoState profile,
+    required String roundId,
+    required CasinoGameType game,
+    required String betLabel,
+    required int stake,
+    required int payout,
+    required String outcome,
+    required String detail,
+  }) {
+    final grossPayout = payout;
+    final nationalFee = casinoNationalFee(
+      grossPayout: grossPayout,
+      stake: stake,
+    );
+    final netPayout = grossPayout - nationalFee;
+    final record = CasinoRoundRecord(
+      id: roundId,
+      day: state.day,
+      minute: state.marketMinute,
+      game: game,
+      betLabel: betLabel,
+      stake: stake,
+      payout: netPayout,
+      grossPayout: grossPayout,
+      nationalFee: nationalFee,
+      outcome: outcome,
+      detail: detail,
+    );
+    final roundsToday = profile.lastPlayDay == state.day
+        ? profile.roundsToday + 1
+        : 1;
+    final nextProfile = profile.copyWith(
+      monthlyStake: profile.monthlyStake + stake,
+      monthlyPayout: profile.monthlyPayout + netPayout,
+      monthlyNationalFee: profile.monthlyNationalFee + nationalFee,
+      lastPlayDay: state.day,
+      roundsToday: roundsToday,
+      roundSequence: profile.roundSequence + 1,
+      totalRounds: profile.totalRounds + 1,
+      totalStake: profile.totalStake + stake,
+      totalPayout: profile.totalPayout + netPayout,
+      totalNationalFee: profile.totalNationalFee + nationalFee,
+      history: _appendCasinoHistory(profile.history, record),
+    );
+    final nextFinance = state.personalFinance.copyWith(
+      totalSpent: state.personalFinance.totalSpent + stake,
+      chancePlayCount: state.personalFinance.chancePlayCount + 1,
+      totalChanceStake: state.personalFinance.totalChanceStake + stake,
+      totalChancePayout: state.personalFinance.totalChancePayout + netPayout,
+      casino: nextProfile,
+    );
+    final next = state.copyWith(
+      cash: state.cash - stake + netPayout,
+      personalFinance: nextFinance,
+      ledger: <LedgerEntry>[
+        ...state.ledger,
+        LedgerEntry(
+          id: '$roundId-stake',
+          day: state.day,
+          amount: -stake,
+          account: 'company_bank',
+          counterAccount: 'casino_wager',
+          description: '카지노 · ${casinoGameTitle(game)} $betLabel',
+          sourceId: roundId,
+        ),
+        if (grossPayout > 0)
+          LedgerEntry(
+            id: '$roundId-payout',
+            day: state.day,
+            amount: grossPayout,
+            account: 'company_bank',
+            counterAccount: 'casino_payout',
+            description: '카지노 · ${casinoGameTitle(game)} $outcome 총지급',
+            sourceId: roundId,
+          ),
+        if (nationalFee > 0)
+          LedgerEntry(
+            id: '$roundId-national-fee',
+            day: state.day,
+            amount: -nationalFee,
+            account: 'company_bank',
+            counterAccount: 'state_casino_fee',
+            description: '카지노 확정 이익 국가 수수료 20%',
+            sourceId: roundId,
+          ),
+      ],
+      processedEventIds: <String>[...state.processedEventIds, roundId],
+    );
+    return CasinoActionResult(
+      state: next,
+      success: true,
+      message:
+          '$outcome · $detail · ${_casinoSettlementText(grossPayout, nationalFee)}',
+      cashDelta: netPayout - stake,
+      minutesElapsed: casinoRoundMinutes,
+    );
+  }
+
+  List<CasinoRoundRecord> _appendCasinoHistory(
+    List<CasinoRoundRecord> history,
+    CasinoRoundRecord record,
+  ) {
+    final next = <CasinoRoundRecord>[...history, record];
+    return next.length <= casinoHistoryLimit
+        ? next
+        : next.sublist(next.length - casinoHistoryLimit);
+  }
+
+  String _casinoSettlementText(int grossPayout, int nationalFee) =>
+      '총지급 $grossPayout원 · 국가 수수료 $nationalFee원 · '
+      '실수령 ${grossPayout - nationalFee}원';
+
+  ({int payout, String outcome, String detail}) _resolveBaccaratBet(
+    CasinoBet bet,
+    String key,
+  ) {
+    final deck = casinoShuffledDeck('$key:baccarat');
+    final player = <int>[deck[0], deck[2]];
+    final banker = <int>[deck[1], deck[3]];
+    var nextIndex = 4;
+    int value(Iterable<int> cards) => cards.fold<int>(
+      0,
+      (sum, card) =>
+          (sum + (casinoCardRank(card) >= 10 ? 0 : casinoCardRank(card))) % 10,
+    );
+    var playerTotal = value(player);
+    var bankerTotal = value(banker);
+    int? playerThirdValue;
+    if (playerTotal < 8 && bankerTotal < 8) {
+      if (playerTotal <= 5) {
+        final card = deck[nextIndex++];
+        player.add(card);
+        playerThirdValue = casinoCardRank(card) >= 10
+            ? 0
+            : casinoCardRank(card);
+        playerTotal = value(player);
+      }
+      final bankerDraws = playerThirdValue == null
+          ? bankerTotal <= 5
+          : bankerTotal <= 2 ||
+                (bankerTotal == 3 && playerThirdValue != 8) ||
+                (bankerTotal == 4 &&
+                    playerThirdValue >= 2 &&
+                    playerThirdValue <= 7) ||
+                (bankerTotal == 5 &&
+                    playerThirdValue >= 4 &&
+                    playerThirdValue <= 7) ||
+                (bankerTotal == 6 &&
+                    playerThirdValue >= 6 &&
+                    playerThirdValue <= 7);
+      if (bankerDraws) {
+        banker.add(deck[nextIndex]);
+        bankerTotal = value(banker);
+      }
+    }
+    final playerPair = casinoCardRank(player[0]) == casinoCardRank(player[1]);
+    final bankerPair = casinoCardRank(banker[0]) == casinoCardRank(banker[1]);
+    final winner = playerTotal == bankerTotal
+        ? '타이'
+        : playerTotal > bankerTotal
+        ? '플레이어'
+        : '뱅커';
+    final won = switch (bet.type) {
+      CasinoBetType.baccaratPlayer => winner == '플레이어',
+      CasinoBetType.baccaratBanker => winner == '뱅커',
+      CasinoBetType.baccaratTie => winner == '타이',
+      CasinoBetType.baccaratPlayerPair => playerPair,
+      CasinoBetType.baccaratBankerPair => bankerPair,
+      _ => false,
+    };
+    final payout = !won
+        ? 0
+        : switch (bet.type) {
+            CasinoBetType.baccaratPlayer => bet.stake * 2,
+            CasinoBetType.baccaratBanker => bet.stake + bet.stake * 95 ~/ 100,
+            CasinoBetType.baccaratTie => bet.stake * 9,
+            CasinoBetType.baccaratPlayerPair ||
+            CasinoBetType.baccaratBankerPair => bet.stake * 12,
+            _ => 0,
+          };
+    return (
+      payout: payout,
+      outcome: won ? '$winner 적중' : '$winner · 미적중',
+      detail:
+          'P ${player.map(casinoCardLabel).join(' ')} ($playerTotal) · B ${banker.map(casinoCardLabel).join(' ')} ($bankerTotal)',
+    );
+  }
+
+  ({int payout, String outcome, String detail}) _resolveRouletteBet(
+    CasinoBet bet,
+    String key,
+  ) {
+    const redNumbers = <int>{
+      1,
+      3,
+      5,
+      7,
+      9,
+      12,
+      14,
+      16,
+      18,
+      19,
+      21,
+      23,
+      25,
+      27,
+      30,
+      32,
+      34,
+      36,
+    };
+    final number = stableRandomInt('$key:roulette-v2:wheel', 37);
+    final isRed = redNumbers.contains(number);
+    final won = switch (bet.type) {
+      CasinoBetType.rouletteRed => number != 0 && isRed,
+      CasinoBetType.rouletteBlack => number != 0 && !isRed,
+      CasinoBetType.rouletteOdd => number != 0 && number.isOdd,
+      CasinoBetType.rouletteEven => number != 0 && number.isEven,
+      CasinoBetType.rouletteLow => number >= 1 && number <= 18,
+      CasinoBetType.rouletteHigh => number >= 19 && number <= 36,
+      CasinoBetType.rouletteDozen1 => number >= 1 && number <= 12,
+      CasinoBetType.rouletteDozen2 => number >= 13 && number <= 24,
+      CasinoBetType.rouletteDozen3 => number >= 25 && number <= 36,
+      CasinoBetType.rouletteColumn1 => number != 0 && (number - 1) % 3 == 0,
+      CasinoBetType.rouletteColumn2 => number != 0 && (number - 2) % 3 == 0,
+      CasinoBetType.rouletteColumn3 => number != 0 && number % 3 == 0,
+      CasinoBetType.rouletteStraight => number == bet.selection,
+      _ => false,
+    };
+    final multiplier = switch (bet.type) {
+      CasinoBetType.rouletteStraight => 36,
+      CasinoBetType.rouletteDozen1 ||
+      CasinoBetType.rouletteDozen2 ||
+      CasinoBetType.rouletteDozen3 ||
+      CasinoBetType.rouletteColumn1 ||
+      CasinoBetType.rouletteColumn2 ||
+      CasinoBetType.rouletteColumn3 => 3,
+      _ => 2,
+    };
+    final color = number == 0
+        ? '그린'
+        : isRed
+        ? '레드'
+        : '블랙';
+    return (
+      payout: won ? bet.stake * multiplier : 0,
+      outcome: won ? '$number $color 적중' : '$number $color · 미적중',
+      detail: '유럽식 싱글 제로 · 당첨 번호 $number',
+    );
+  }
+
+  ({int payout, String outcome, String detail}) _resolveSicBoBet(
+    CasinoBet bet,
+    String key,
+  ) {
+    final dice = <int>[
+      stableRandomInt('$key:sicbo-v2:die:0', 6) + 1,
+      stableRandomInt('$key:sicbo-v2:die:1', 6) + 1,
+      stableRandomInt('$key:sicbo-v2:die:2', 6) + 1,
+    ];
+    final total = dice.fold<int>(0, (sum, value) => sum + value);
+    final triple = dice[0] == dice[1] && dice[1] == dice[2];
+    final won = switch (bet.type) {
+      CasinoBetType.sicBoBig => !triple && total >= 11 && total <= 17,
+      CasinoBetType.sicBoSmall => !triple && total >= 4 && total <= 10,
+      CasinoBetType.sicBoOdd => !triple && total.isOdd,
+      CasinoBetType.sicBoEven => !triple && total.isEven,
+      CasinoBetType.sicBoAnyTriple => triple,
+      CasinoBetType.sicBoSpecificTriple => triple && dice[0] == bet.selection,
+      CasinoBetType.sicBoTotal => total == bet.selection,
+      _ => false,
+    };
+    final multiplier = switch (bet.type) {
+      CasinoBetType.sicBoAnyTriple => 26,
+      CasinoBetType.sicBoSpecificTriple => 151,
+      CasinoBetType.sicBoTotal => switch (bet.selection) {
+        4 || 17 => 51,
+        5 || 16 => 19,
+        6 || 15 => 15,
+        7 || 14 => 13,
+        8 || 13 => 9,
+        9 || 12 => 7,
+        10 || 11 => 7,
+        _ => 0,
+      },
+      _ => 2,
+    };
+    return (
+      payout: won ? bet.stake * multiplier : 0,
+      outcome: won ? '적중' : '미적중',
+      detail: '주사위 ${dice.join(' · ')} · 합계 $total${triple ? ' · 트리플' : ''}',
+    );
+  }
+
+  ({int payout, String outcome, String detail}) _resolveSlotsBet(
+    CasinoBet bet,
+    String key,
+  ) {
+    final reels = <int>[
+      stableRandomInt('$key:slots-v2:reel:0', casinoSlotSymbols.length),
+      stableRandomInt('$key:slots-v2:reel:1', casinoSlotSymbols.length),
+      stableRandomInt('$key:slots-v2:reel:2', casinoSlotSymbols.length),
+    ];
+    final multiplier = casinoSlotPayoutMultiplier(reels);
+    final detail = reels.map((value) => casinoSlotSymbols[value]).join('  |  ');
+    return (
+      payout: bet.stake * multiplier,
+      outcome: multiplier > 0 ? '$multiplier배 당첨' : '미당첨',
+      detail: '$detail · 공개 이론 지급률 97.2%',
+    );
+  }
+
+  // 구형 저장과 기록 호환을 위한 이전 월 1회 확률 오락 API. 신규 UI는 위의
+  // 테이블별 카지노 API만 사용한다.
   FinanceActionResult playAdultChanceGame(GameState state, int stake) {
     final age = state.story.ageOn(state.currentDate);
     if (state.currentDate.isBefore(DateTime(2010, 1, 1)) || age < 20) {
@@ -6338,7 +7619,7 @@ class GameEngine {
       'headline': headline,
       'eventIds': eventIds,
     });
-    if (archive.length > 90) archive.removeRange(0, archive.length - 90);
+    if (archive.length > 370) archive.removeRange(0, archive.length - 370);
     flags['newsArchive'] = archive;
     return state.copyWith(story: state.story.copyWith(storyFlags: flags));
   }
@@ -6513,27 +7794,11 @@ class GameEngine {
           .copyWith(experience: state.progression.experience + 25),
     );
 
+    if (isMonthlyUnlockDecisionId(decisionId)) {
+      return resolveMonthlyUnlockDecision(next, decisionId, optionId);
+    }
+
     switch (optionId) {
-      case 'research_products':
-      case 'research_cashflow':
-      case 'research_people':
-      case 'research_price':
-        final focus = optionId.replaceFirst('research_', '');
-        next = next.copyWith(
-          story: next.story.copyWith(
-            storyFlags: {
-              ...next.story.storyFlags,
-              'firstResearchFocus': focus,
-              'researchNoteUnlocked': true,
-              'cohortTrust': next.story.flagInt('cohortTrust', 30) + 1,
-            },
-            seenStoryEventIds: [
-              ...next.story.seenStoryEventIds,
-              if (!next.story.seenStoryEventIds.contains('FIRST_RESEARCH_NOTE'))
-                'FIRST_RESEARCH_NOTE',
-            ],
-          ),
-        );
       case 'meet_bank_clerk_deposit':
       case 'meet_bank_clerk_credit':
         next = next.copyWith(
@@ -7151,6 +8416,8 @@ class GameEngine {
     if (state.pendingDecisions.isNotEmpty || state.campaignComplete) {
       return state;
     }
+    state = _forfeitOpenCasinoBlackjack(state);
+    state = _forfeitOpenCasinoCraps(state);
     if (state.pendingOrders.isNotEmpty) {
       final missingAssetIds = state.pendingOrders
           .map((order) => order.assetId)
@@ -7168,6 +8435,10 @@ class GameEngine {
         );
       }
     }
+    if (state.currentDate.month == DateTime.december &&
+        state.currentDate.day == 31) {
+      state = archivePlayerProgressReviewForClosingYear(state);
+    }
     final replayed =
         state.pendingOrders.isNotEmpty && pendingOrderQuotePaths.isNotEmpty
         ? processPendingOrdersThroughMarketMinute(
@@ -7184,7 +8455,6 @@ class GameEngine {
       progression: state.progression.record('days_advanced'),
       organization: state.organization.recoverOneDay(),
     );
-    next = _refreshExpiredMissionWindow(next);
     next = _settleMatureBankDeposits(next);
     next = const LocalBusinessEngine().advanceOneDay(next).state;
     if (next.company.worldMode == CompanyWorldMode.fictional) {
@@ -7210,10 +8480,12 @@ class GameEngine {
     }
     next = _applyMonthlyEconomy(next);
     next = const LocalBusinessEngine().reconcilePremises(next).state;
+    // Month-opening heroine chapters take narrative priority on their exact
+    // start date; other decision cards can resume on the following day.
+    next = _applyFacilityUnlockStories(next);
     next = _applyCampaignMilestones(next);
     next = _applyControlOpportunity(next);
     next = _applyEraTechnologyDecisions(next);
-    next = _applyFacilityUnlockStories(next);
     if (next.day % 30 == 0 &&
         next.project?.status == ProjectStatus.development) {
       const burn = 10000;
@@ -7228,6 +8500,65 @@ class GameEngine {
     final payableRepayment = const LocalBusinessEngine()
         .repayDisposedBusinessPayablesForDay(processed);
     return prepareHiddenMarketScenario(payableRepayment.state);
+  }
+
+  GameState _forfeitOpenCasinoBlackjack(GameState state) {
+    final profile = state.personalFinance.casino;
+    final hand = profile.activeBlackjack;
+    if (hand == null) return state;
+    final player = blackjackHandValue(hand.playerCards).total;
+    final record = CasinoRoundRecord(
+      id: hand.id,
+      day: hand.day,
+      minute: hand.minute,
+      game: CasinoGameType.blackjack,
+      betLabel: hand.doubled ? '더블다운' : '기본 핸드',
+      stake: hand.stake,
+      payout: 0,
+      grossPayout: 0,
+      nationalFee: 0,
+      outcome: '시간 종료 · 몰수',
+      detail:
+          '플레이어 ${hand.playerCards.map(casinoCardLabel).join(' ')} ($player) · 다음 날 진행으로 핸드 종료',
+    );
+    return state.copyWith(
+      personalFinance: state.personalFinance.copyWith(
+        casino: profile.copyWith(
+          history: _appendCasinoHistory(profile.history, record),
+          activeBlackjack: null,
+        ),
+      ),
+    );
+  }
+
+  GameState _forfeitOpenCasinoCraps(GameState state) {
+    final profile = state.personalFinance.casino;
+    final round = profile.activeCraps;
+    if (round == null) return state;
+    final rolls = round.rolls
+        .map((roll) => '${roll[0]}+${roll[1]}=${roll[0] + roll[1]}')
+        .join(' → ');
+    final record = CasinoRoundRecord(
+      id: round.id,
+      day: round.day,
+      minute: round.minute,
+      game: CasinoGameType.craps,
+      betLabel: casinoBetTitle(round.betType),
+      stake: round.stake,
+      payout: 0,
+      grossPayout: 0,
+      nationalFee: 0,
+      outcome: '시간 종료 · 몰수',
+      detail: '포인트 ${round.point} · $rolls · 다음 날 진행으로 라운드 종료',
+    );
+    return state.copyWith(
+      personalFinance: state.personalFinance.copyWith(
+        casino: profile.copyWith(
+          history: _appendCasinoHistory(profile.history, record),
+          activeCraps: null,
+        ),
+      ),
+    );
   }
 
   _RentalMonthPreparation _prepareRentalMonth(
@@ -8179,6 +9510,7 @@ class GameEngine {
         tenantAuctionCount == 0 &&
         economicNet >= 0) {
       progression = progression.record('positive_months');
+      progression = progression.gainExperience(5);
     }
     return state.copyWith(
       cash: state.brokerageCash + endingCash,
@@ -8216,20 +9548,12 @@ class GameEngine {
   }
 
   GameState _applyFacilityUnlockStories(GameState state) {
-    const decisionId = 'facility-intro-realtor-seo-haneul';
-    if (!facilityStoryGatesEnabled(state) ||
-        state.pendingDecisions.isNotEmpty ||
-        !bankAccessUnlocked(state) ||
-        realEstateAccessUnlocked(state) ||
-        state.decisions.any((decision) => decision.id == decisionId) ||
-        !weekdayActivityLogsForState(
-          state,
-        ).any((log) => log.activityId == 'bank')) {
-      return state;
-    }
-    return state.copyWith(
-      decisions: [...state.decisions, _realEstateAccessIntroduction(state.day)],
-    );
+    final decision = nextMonthlyUnlockDecision(state);
+    return decision == null
+        ? state
+        : state.copyWith(
+            decisions: <DecisionCardData>[...state.decisions, decision],
+          );
   }
 
   GameState _applyEraTechnologyDecisions(GameState state) {

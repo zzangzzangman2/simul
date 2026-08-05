@@ -1,6 +1,6 @@
 # 문서 기준표
 
-최종 갱신: 2026-08-03
+최종 갱신: 2026-08-05
 
 이 저장소에는 현재 구현을 설명하는 문서만 둔다. 작업 일지, 후보 제작 보고서,
 폐기된 서사 원고는 정본과 함께 보관하지 않는다.
@@ -34,12 +34,16 @@
 | 프로젝트 데시멀 세계관·프롤로그 | `DECIMAL_WORLD.md` |
 | 플레이어·동기 연령과 장기 성장 | `PROTAGONIST_AGE_LINE.md` |
 | 월간 성장 달력·주말 행동력·알바·선물·외출·날짜 사건 | `CALENDAR_SYSTEM.md` |
+| 새벽 신문배달 플릭 조작·점수·성과 수당·렌더링 | `NEWSPAPER_DELIVERY_MINIGAME.md` |
+| 요원 PC 카지노 LIVE·테이블 규칙·시간·한도·원장 | `CASINO_SYSTEM.md` |
+| 요원 PC 국가망 경마·전자 마권·수수료·실시간 중계 | `HORSE_RACING_SYSTEM.md` |
 | 여학생 8명 성격·대사 | `characters/cohort6_girls/README.md`와 인물별 문서 |
 | 관계 시스템 | `RELATIONSHIP_SYSTEM.md` — 호감도·신뢰·친밀·투자존중·주말 외출 |
 | 데시멀 동기 일일 투자·대여 | `COHORT_DAILY_INVESTMENT.md` |
 | 데시멀톡 | `PHONE_MESSENGER_SYSTEM.md` — Gemini 3.5 Flash-Lite·로컬 폴백·성격별 대화·투자 반응·장기기억 |
 | 대사 편집기 | `DIALOGUE_EDITOR_GUIDE.md` |
 | 시장·경제 수치 | `BALANCE_NOTES.md` |
+| 상장사 주주권·주주총회·경영권·자회사·발행/유통주식 호가원장 | `SHAREHOLDER_GOVERNANCE_SYSTEM.md` |
 | 부동산 | `REAL_ESTATE_SYSTEM.md` |
 | 가상기업·사건 문법 | `CONTENT_GUIDE.md` |
 | 데이터·라이선스 | `DATA_SOURCES.md` |

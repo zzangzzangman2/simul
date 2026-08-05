@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:millennium_capital/game/game_engine.dart';
+import 'package:millennium_capital/game/game_state.dart';
 import 'package:millennium_capital/game/market_clock.dart';
 import 'package:millennium_capital/game/market_data.dart';
 import 'package:millennium_capital/game/market_liquidity_zones.dart';
@@ -138,6 +139,52 @@ void main() {
       expect(quote.isTradingDay, isTrue);
     },
   );
+
+  test('authoritative quote includes recent player fill impact', () async {
+    const engine = GameEngine();
+    final quoteDate = DateTime(2000, 1, 4);
+    final universe = await FictionalMarketUniverse.load(throughDate: quoteDate);
+    final initial = engine.createNewGame(
+      '공통 시장충격 테스트',
+      worldSeed: 'shared-player-impact',
+    );
+    final day = quoteDate.difference(initial.campaignStartDate).inDays + 1;
+    final baselineState = initial.copyWith(
+      day: day,
+      marketMinute: 10 * 60 + 11,
+    );
+    final baseline = resolveMarketTradeQuote(
+      universe,
+      baselineState,
+      'hanbit_telecom',
+    )!;
+    final buyState = baselineState.copyWith(
+      ledger: <LedgerEntry>[
+        LedgerEntry(
+          id: 'large-player-buy',
+          day: day,
+          amount: -1000000000,
+          account: 'listed_equity_investment',
+          counterAccount: 'brokerage_cash',
+          description: '시장충격 검증 매수',
+          sourceId: 'large-player-buy',
+          assetId: 'hanbit_telecom',
+          tradeSide: 'buy',
+          tradeQuantity: 1000000,
+          tradeUnitPrice: baseline.unitPrice,
+          marketMinute: 10 * 60 + 10,
+        ),
+      ],
+    );
+
+    final impacted = resolveMarketTradeQuote(
+      universe,
+      buyState,
+      'hanbit_telecom',
+    )!;
+
+    expect(impacted.unitPrice, greaterThan(baseline.unitPrice));
+  });
 
   test('14:49 to 14:50 has no hidden depth-gate jump across 20 seeds', () {
     for (var seed = 0; seed < 20; seed += 1) {

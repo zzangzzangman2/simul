@@ -22,7 +22,7 @@ void main() {
   ];
 
   const expectedAssetCounts = <String, int>{
-    'kim_seoa': 13,
+    'kim_seoa': 9,
     'lee_jian': 9,
     'choi_iseo': 13,
     'jung_arin': 13,

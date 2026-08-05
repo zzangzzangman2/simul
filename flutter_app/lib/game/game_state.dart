@@ -6,11 +6,12 @@ import 'cohort_investment_state.dart';
 import 'home_improvement_state.dart';
 import 'market_clock.dart';
 import 'market_cost_rules.dart';
-import 'mission_progression.dart';
+import 'player_progression.dart';
 import 'organization_state.dart';
 import 'personal_finance_state.dart';
 import 'phone_messenger_state.dart';
 import 'relationship_state.dart';
+import 'shareholder_governance.dart';
 import 'story_state.dart';
 
 enum CompanyWorldMode { fictional }
@@ -189,14 +190,17 @@ class GameState {
     RelationshipState? relationships,
     CohortInvestmentState? cohortInvestments,
     PhoneMessengerState? phoneMessenger,
+    ShareholderGovernanceState? shareholderGovernance,
   }) : businesses = businesses ?? const BusinessPortfolioState.initial(),
        homeImprovements =
            homeImprovements ?? const HomeImprovementState.initial(),
        relationships = relationships ?? RelationshipState.initial(),
        cohortInvestments = cohortInvestments ?? CohortInvestmentState.initial(),
-       phoneMessenger = phoneMessenger ?? PhoneMessengerState.initial();
+       phoneMessenger = phoneMessenger ?? PhoneMessengerState.initial(),
+       shareholderGovernance =
+           shareholderGovernance ?? const ShareholderGovernanceState();
 
-  static const schemaVersion = 26;
+  static const schemaVersion = 27;
   static const maxCampaignDay = 9862;
 
   final int version;
@@ -212,12 +216,13 @@ class GameState {
   final OrganizationState organization;
   final PersonalFinanceState personalFinance;
   final BusinessPortfolioState businesses;
-  final MissionProgressionState progression;
+  final PlayerProgressionState progression;
   final StoryState story;
   final HomeImprovementState homeImprovements;
   final RelationshipState relationships;
   final CohortInvestmentState cohortInvestments;
   final PhoneMessengerState phoneMessenger;
+  final ShareholderGovernanceState shareholderGovernance;
   final CompanyState company;
   final ProjectState? project;
   final List<DecisionCardData> decisions;
@@ -385,12 +390,13 @@ class GameState {
     OrganizationState? organization,
     PersonalFinanceState? personalFinance,
     BusinessPortfolioState? businesses,
-    MissionProgressionState? progression,
+    PlayerProgressionState? progression,
     StoryState? story,
     HomeImprovementState? homeImprovements,
     RelationshipState? relationships,
     CohortInvestmentState? cohortInvestments,
     PhoneMessengerState? phoneMessenger,
+    ShareholderGovernanceState? shareholderGovernance,
     CompanyState? company,
     ProjectState? project,
     bool clearProject = false,
@@ -422,6 +428,8 @@ class GameState {
       relationships: relationships ?? this.relationships,
       cohortInvestments: cohortInvestments ?? this.cohortInvestments,
       phoneMessenger: phoneMessenger ?? this.phoneMessenger,
+      shareholderGovernance:
+          shareholderGovernance ?? this.shareholderGovernance,
       company: company ?? this.company,
       project: clearProject ? null : project ?? this.project,
       decisions: decisions ?? this.decisions,
@@ -452,6 +460,7 @@ class GameState {
     'relationships': relationships.toJson(),
     'cohortInvestments': cohortInvestments.toJson(),
     'phoneMessenger': phoneMessenger.toJson(),
+    'shareholderGovernance': shareholderGovernance.toJson(),
     'company': company.toJson(),
     'project': project?.toJson(),
     'decisions': decisions.map((item) => item.toJson()).toList(),
@@ -470,8 +479,8 @@ class GameState {
       companyName: json['companyName'] as String? ?? '',
       day: ((json['day'] as num?)?.toInt() ?? 1).clamp(1, maxCampaignDay),
       marketMinute: ((json['marketMinute'] as num?)?.toInt() ?? 480).clamp(
-        480,
-        1200,
+        marketDayStartMinute,
+        phoneMessengerBedtimeMinute,
       ),
       simulationSeed: json['simulationSeed'] as String? ?? 'simul-default',
       cash: cash,
@@ -503,13 +512,8 @@ class GameState {
       businesses: BusinessPortfolioState.fromJson(
         (json['businesses'] as Map?)?.cast<String, dynamic>() ?? const {},
       ),
-      progression: MissionProgressionState.fromJson(
+      progression: PlayerProgressionState.fromJson(
         (json['progression'] as Map?)?.cast<String, dynamic>() ?? const {},
-        fallbackDay: ((json['day'] as num?)?.toInt() ?? 1).clamp(
-          1,
-          maxCampaignDay,
-        ),
-        fallbackCash: (json['cash'] as num?)?.toInt() ?? 0,
       ),
       story: StoryState.fromJson(
         (json['story'] as Map?)?.cast<String, dynamic>() ?? const {},
@@ -528,6 +532,10 @@ class GameState {
       phoneMessenger: PhoneMessengerState.fromJson(
         (json['phoneMessenger'] as Map?)?.cast<String, dynamic>() ?? const {},
       ),
+      shareholderGovernance: ShareholderGovernanceState.fromJson(
+        (json['shareholderGovernance'] as Map?)?.cast<String, dynamic>() ??
+            const {},
+      ),
       company: CompanyState.fromJson(
         (json['company'] as Map?)?.cast<String, dynamic>() ?? const {},
       ),
@@ -542,6 +550,7 @@ class GameState {
               (item as Map).cast<String, dynamic>(),
             ),
           )
+          .where((decision) => decision.category != '처음 배우기')
           .toList(),
       scheduledEvents: ((json['scheduledEvents'] as List?) ?? const [])
           .map(

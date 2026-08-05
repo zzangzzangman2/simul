@@ -917,10 +917,14 @@ class _RelationshipEveningScreenState extends State<RelationshipEveningScreen> {
     final profile = _selectedProfile;
     final activity = _activity;
     if (profile == null || activity == null) return null;
+    final progress = _state.relationships.progressFor(profile.id);
     return relationshipSceneFor(
       profile: profile,
       activity: activity,
       day: _state.day,
+      interactionCount: activity == RelationshipActivity.date
+          ? progress.dateCount
+          : progress.conversationCount,
     );
   }
 

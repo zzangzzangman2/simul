@@ -324,7 +324,7 @@ test("documents and preserves the portrait-mobile product contract", async () =>
   assert.match(rules, /390×844(?:px)?/);
   assert.match(rules, /최소 너비 360px/);
   assert.match(guide, /처음하기.*이어하기/);
-  assert.match(guide, /현재 상태 스키마는 `v26`/);
+  assert.match(guide, /현재 상태 스키마는 `v27`/);
   assert.match(guide, /최대 5슬롯/);
   assert.doesNotMatch(rules, /게임 화면보다 먼저 회사 이름/);
   assert.doesNotMatch(guide, /첫 방문 시 회사 이름 입력 화면/);
@@ -332,7 +332,7 @@ test("documents and preserves the portrait-mobile product contract", async () =>
   assert.match(css, /env\(safe-area-inset-bottom\)/);
   assert.match(css, /width: min\(100%, 430px\)/);
   assert.match(css, /\.asset-grid \{[\s\S]*?grid-template-columns: 1fr;/);
-  assert.match(state, /schemaVersion = 26/);
+  assert.match(state, /schemaVersion = 27/);
   assert.match(state, /simulationSeed/);
   assert.match(market, /daily-market-report-card/);
   assert.match(market, /purchase-market-report-button/);
@@ -423,7 +423,10 @@ test("keeps Gemini keys out of source and provides secure device setup plus loca
   assert.match(service, /relevantMemoriesFor/);
   assert.match(messenger, /더 실감 나는 대화를 켤까요/);
   assert.match(messenger, /키 없이 로컬 대화/);
-  assert.match(messenger, /1:1 기억/);
+  assert.doesNotMatch(messenger, /1:1 기억/);
+  assert.doesNotMatch(messenger, /phone-chat-search-(button|input)/);
+  assert.match(route, /과거 기억은 두 사람이 실제로 주고받은 말의 기록/);
+  assert.match(route, /상위 설정이나 현재 상태와 충돌하면 그 기억은 무시/);
   assert.match(engine, /replyOverride/);
   assert.match(abilityHint, /phoneAbilityHintDailyStrongLimit = 2/);
   assert.match(abilityHint, /buildCohortAbilityBriefing/);

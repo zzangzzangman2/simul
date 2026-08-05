@@ -522,16 +522,6 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  Future<void> goToCorridor(WidgetTester tester) async {
-    await dismissHubTutorial(tester);
-    await tester.tap(find.byKey(const Key('apartment-go-living-room')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('apartment-go-kitchen')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('apartment-go-corridor')));
-    await tester.pumpAndSettle();
-  }
-
   Future<void> openHubTimeActions(WidgetTester tester) async {
     await dismissHubTutorial(tester);
     await tester.tap(find.byKey(const Key('hub-time-actions-button')));
@@ -731,11 +721,7 @@ void main() {
         await advanceDialogue(tester, 1);
         steps += 1;
       }
-      expect(
-        operator,
-        findsOneWidget,
-        reason: '$steps번 진행해도 한서윤 장면에 닿지 못했다',
-      );
+      expect(operator, findsOneWidget, reason: '$steps번 진행해도 한서윤 장면에 닿지 못했다');
 
       expect(find.text('한서윤'), findsOneWidget);
       expect(find.text('프로젝트 데시멀 · 운영관'), findsOneWidget);
@@ -1632,67 +1618,6 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('new Decimal campaign omits the obsolete mission board', (
-    tester,
-  ) async {
-    const engine = GameEngine();
-    final story = StoryState.newDecimalPlayer(
-      playerName: '민재',
-      introChoice: 'stocks',
-      startingTrait: StoryTrait.analysis,
-      operatingPrinciple: OperatingPrinciple.reportLosses,
-    );
-    final state = engine.createNewGame('신규 데시멀', story: story);
-
-    expect(state.story.flagBool('legacyMissionUiDisabled'), isTrue);
-    expect(state.pendingDecisions, isEmpty);
-
-    await tester.pumpWidget(
-      MaterialApp(
-        home: DecisionInboxScreen(
-          state: state,
-          onResolveDecision: (_, _) async {},
-          onClaimMission: () async => engine.claimMission(state),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.text('내 방 · 안건함'), findsOneWidget);
-    expect(find.text('미션 · 안건 보드'), findsNothing);
-    expect(find.byKey(const Key('active-mission-card')), findsNothing);
-    expect(find.text('도착한 안건이 없어요'), findsOneWidget);
-
-    await tester.pumpWidget(
-      MaterialApp(
-        home: ApartmentHubScreen(
-          state: state,
-          onOpenMarket: () {},
-          onOpenRealEstate: () {},
-          onOpenBank: () {},
-          onOpenDecisions: () {},
-          onOpenLedger: () {},
-          onOpenOrganization: () {},
-          onOpenRelationships: () {},
-          onOpenMessenger: () {},
-          onOpenCalendar: () {},
-          onOpenHomeImprovements: () {},
-          onOpenWork: () {},
-          activeSaveSlot: 1,
-          lastSavedAt: null,
-          onOpenGameMenu: () {},
-          onAdvanceHour: () {},
-          onAdvanceDay: () {},
-          onAdvanceBatch: () {},
-          onOpenEnding: () {},
-        ),
-      ),
-    );
-    await tester.pump();
-    expect(find.byKey(const Key('hub-mission-card')), findsNothing);
-    expect(tester.takeException(), isNull);
-  });
-
   testWidgets('existing v1 save is restored with safe story defaults', (
     tester,
   ) async {
@@ -1720,103 +1645,6 @@ void main() {
     expect(companyHeader.data, '이어하기 연구소');
     expect(find.textContaining('1월 8일 토'), findsWidgets);
     expect(find.byKey(const Key('room-company-name')), findsOneWidget);
-  });
-
-  testWidgets('first research sheet is one-hand operable', (tester) async {
-    await tester.binding.setSurfaceSize(const Size(390, 844));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-    SharedPreferences.setMockInitialValues({
-      GamePersistence.saveKey: jsonEncode({
-        'version': 1,
-        'companyName': '모바일 연구소',
-        'day': 1,
-        'cash': 1000000,
-        'team': 1,
-      }),
-    });
-
-    await tester.pumpWidget(
-      const MillenniumCapitalApp(
-        campaignWorldPreparer: _skipCampaignWorldPreparation,
-      ),
-    );
-    await tester.pumpAndSettle();
-    await continueFirstSave(tester);
-    await goToCorridor(tester);
-    await tester.tap(find.byKey(const Key('open-decisions-button')));
-    await tester.pumpAndSettle();
-
-    expect(find.text('첫 미션: 회사 하나를 구경해 보자'), findsWidgets);
-    expect(find.byKey(const Key('decision-inbox-screen')), findsOneWidget);
-    await tester.tap(
-      find.byKey(const Key('decision-inbox-item-first-research-note')),
-    );
-    await tester.pumpAndSettle();
-    final option = find.byKey(const Key('decision-option-research_products'));
-    expect(option, findsOneWidget);
-    expect(tester.getSize(option).height, greaterThanOrEqualTo(44));
-
-    await tester.tap(option);
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('decision-inbox-screen')), findsNothing);
-    expect(find.byKey(const Key('open-decisions-button')), findsOneWidget);
-    expect(find.text('DAY 1 · 1월 1일 토'), findsOneWidget);
-    expect(
-      tester.widget<Text>(find.byKey(const Key('apartment-current-time'))).data,
-      '08:30',
-    );
-    expect(find.byKey(const Key('hub-claim-mission-reward')), findsOneWidget);
-    expect(
-      find.descendant(
-        of: find.byKey(const Key('hub-mission-card')),
-        matching: find.byType(LinearProgressIndicator),
-      ),
-      findsNothing,
-    );
-
-    await tester.tap(find.byKey(const Key('hub-mission-card')));
-    await tester.pumpAndSettle();
-
-    expect(find.byKey(const Key('decision-inbox-screen')), findsNothing);
-    expect(find.text('내 손으로 첫 돈 벌기'), findsOneWidget);
-    expect(find.byKey(const Key('hub-claim-mission-reward')), findsNothing);
-    expect(tester.takeException(), isNull);
-  });
-
-  testWidgets('mission board shows progress rewards level and skills', (
-    tester,
-  ) async {
-    await tester.binding.setSurfaceSize(const Size(390, 844));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-    const engine = GameEngine();
-    final base = engine.createNewGame('미션 연구소');
-    final state = engine.resolveDecision(
-      base,
-      'first-research-note',
-      'research_products',
-    );
-
-    await tester.pumpWidget(
-      MaterialApp(
-        home: DecisionInboxScreen(
-          state: state,
-          onResolveDecision: (_, _) async {},
-          onClaimMission: () async => engine.claimMission(state),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.text('미션 · 안건 보드'), findsOneWidget);
-    expect(find.byKey(const Key('active-mission-card')), findsOneWidget);
-    expect(find.text('첫 조사 원칙을 정하자'), findsOneWidget);
-    expect(find.text('+80 XP'), findsOneWidget);
-    expect(find.textContaining('첫 장부'), findsWidgets);
-    final claim = tester.widget<FilledButton>(
-      find.byKey(const Key('claim-mission-reward')),
-    );
-    expect(claim.onPressed, isNotNull);
-    expect(tester.takeException(), isNull);
   });
 
   testWidgets('desk drawer opens the ledger as its own scene', (tester) async {
@@ -2751,7 +2579,6 @@ void main() {
     );
     expect(find.byKey(const Key('market-investment-overview')), findsNothing);
     expect(find.byKey(const Key('market-account-summary')), findsNothing);
-    expect(find.byKey(const Key('market-mission-card')), findsNothing);
     expect(find.byKey(const Key('market-nav-home')), findsOneWidget);
     expect(find.byKey(const Key('market-nav-account')), findsOneWidget);
     await openMarketExplore(tester);
@@ -2762,7 +2589,6 @@ void main() {
     expect(find.byKey(const Key('market-phone-status-time')), findsOneWidget);
     expect(find.text('내 방 · CRT 투자 단말'), findsNothing);
     expect(find.text('모뎀 소리와 함께 2000년 시장 화면이 켜졌다.'), findsNothing);
-    expect(find.byKey(const Key('market-mission-card')), findsNothing);
     await tester.tap(find.byKey(const Key('market-sort-name')));
     await tester.pump();
     if (find.byKey(const Key('stock-row-1001')).evaluate().isEmpty) {
@@ -3593,7 +3419,6 @@ void main() {
     await tester.tap(find.byKey(const Key('market-nav-account')));
     await tester.pump();
     expect(find.byKey(const Key('market-account-summary')), findsOneWidget);
-    expect(find.byKey(const Key('market-mission-card')), findsNothing);
     expect(
       find.byKey(const Key('market-corporate-action-schedule')),
       findsOneWidget,
@@ -8132,7 +7957,7 @@ void main() {
     },
   );
   testWidgets(
-    'rider mini-game clears checkpoints and produces a scored result',
+    'newspaper mini-game clears seven deliveries and produces a scored result',
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(390, 844));
       addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -8141,6 +7966,7 @@ void main() {
           home: RiderMiniGame(
             courseDuration: Duration(milliseconds: 350),
             spawnObstacles: false,
+            autoDeliverTargets: true,
           ),
         ),
       );
@@ -8151,8 +7977,8 @@ void main() {
       await tester.pump(const Duration(milliseconds: 450));
 
       expect(find.byKey(const Key('work-result-card')), findsOneWidget);
-      expect(find.text('79점'), findsOneWidget);
-      expect(find.textContaining('배달 3/3'), findsOneWidget);
+      expect(find.text('100점'), findsOneWidget);
+      expect(find.textContaining('배달 7/7'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
@@ -8183,32 +8009,40 @@ void main() {
 
     expect(find.text('오늘 0 / 3'), findsOneWidget);
     expect(find.byKey(const Key('daily-work-limit')), findsNothing);
-    final rider = tester.widget<InkWell>(
-      find.byKey(const Key('work-activity-rider')),
+    final newspaper = tester.widget<InkWell>(
+      find.byKey(const Key('work-activity-newspaper_delivery')),
     );
-    expect(rider.onTap, isNotNull);
-    rider.onTap!();
+    expect(newspaper.onTap, isNotNull);
+    newspaper.onTap!();
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
     expect(find.byType(RiderMiniGame), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
-  test('rider clear score determines the paid reward', () {
+  test('newspaper delivery score determines the paid reward', () {
     const engine = GameEngine();
     final base = engine.createNewGame('라이더 보상 테스트');
     final low = engine.completeWorkSession(
       base,
-      const WorkSessionResult(activityId: 'rider', score: 60, maxScore: 100),
+      const WorkSessionResult(
+        activityId: 'newspaper_delivery',
+        score: 60,
+        maxScore: 100,
+      ),
     );
     final high = engine.completeWorkSession(
       base,
-      const WorkSessionResult(activityId: 'rider', score: 100, maxScore: 100),
+      const WorkSessionResult(
+        activityId: 'newspaper_delivery',
+        score: 100,
+        maxScore: 100,
+      ),
     );
 
     expect(low.cash, greaterThan(base.cash));
     expect(high.cash, greaterThan(low.cash));
-    expect(high.story.storyFlags['lastWorkActivity'], 'rider');
+    expect(high.story.storyFlags['lastWorkActivity'], 'newspaper_delivery');
   });
 
   testWidgets('hour and day advance controls stay distinct when unlocked', (
@@ -8356,8 +8190,8 @@ void main() {
         expect(dayFinder, findsOneWidget);
         final hourButton = tester.widget<ListTile>(hourFinder);
         final dayButton = tester.widget<ListTile>(dayFinder);
-        expect(hourButton.onTap, isNull);
-        expect(dayButton.onTap, isNull);
+        expect(hourButton.onTap, isNotNull);
+        expect(dayButton.onTap, isNotNull);
         expect(tester.getSize(hourFinder).height, greaterThanOrEqualTo(48));
         expect(tester.getSize(dayFinder).height, greaterThanOrEqualTo(48));
         expect(tester.takeException(), isNull);

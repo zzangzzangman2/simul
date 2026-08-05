@@ -10,7 +10,6 @@ ART = ROOT / "flutter_app" / "assets" / "images" / "production_soft_painted"
 SOURCES = ART / "lobby_motion_sources"
 
 MOTIONS = {
-    "kim_seoa": ("kim_seoa_hair_tuck_sheet_v1.png", "hair_tuck", "grid"),
     "choi_iseo": ("choi_iseo_thread_tidy_sheet_v1.png", "thread_tidy", "grid"),
     "jung_arin": ("jung_arin_tie_reset_sheet_v1.png", "tie_reset", "grid"),
     "park_haeun": ("park_haeun_welcome_sheet_v1.png", "welcome", "grid"),

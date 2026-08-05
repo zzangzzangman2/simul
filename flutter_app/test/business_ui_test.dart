@@ -66,7 +66,7 @@ void main() {
 
   for (final size in <Size>[const Size(390, 844), const Size(360, 800)]) {
     testWidgets(
-      '${size.width.toInt()}px home PC exposes a 2x2 business app and opens management',
+      '${size.width.toInt()}px home PC exposes four current apps and opens management',
       (tester) async {
         await usePhoneSurface(tester, size);
         final state = newState();
@@ -77,6 +77,7 @@ void main() {
               builder: (context) => HomeComputerScreen(
                 state: state,
                 onOpenStockMarket: (current) async => current,
+                onOpenCompanyManagement: (current) async => current,
                 onOpenRealEstate: (current) async => current,
                 onOpenBusiness: (current) async {
                   await Navigator.of(context).push<void>(
@@ -86,7 +87,6 @@ void main() {
                   );
                   return current;
                 },
-                onOpenStarShop: (current) async => current,
               ),
             ),
           ),
@@ -94,15 +94,12 @@ void main() {
         await tester.pumpAndSettle();
 
         final stockApp = find.byKey(const Key('computer-stock-market-app'));
+        final companyApp = find.byKey(
+          const Key('computer-company-management-app'),
+        );
         final realEstateApp = find.byKey(const Key('computer-real-estate-app'));
         final businessApp = find.byKey(const Key('computer-business-app'));
-        final starShopApp = find.byKey(const Key('computer-star-shop-app'));
-        final apps = <Finder>[
-          stockApp,
-          realEstateApp,
-          businessApp,
-          starShopApp,
-        ];
+        final apps = <Finder>[stockApp, companyApp, realEstateApp, businessApp];
 
         for (final app in apps) {
           expect(app, findsOneWidget);
@@ -114,18 +111,17 @@ void main() {
           expect(rect.bottom, lessThanOrEqualTo(size.height));
         }
         expect(tester.getSize(realEstateApp), tester.getSize(stockApp));
+        expect(tester.getSize(companyApp), tester.getSize(stockApp));
         expect(tester.getSize(businessApp), tester.getSize(stockApp));
-        expect(tester.getSize(starShopApp), tester.getSize(stockApp));
 
         final stockCenter = tester.getCenter(stockApp);
+        final companyCenter = tester.getCenter(companyApp);
         final realEstateCenter = tester.getCenter(realEstateApp);
         final businessCenter = tester.getCenter(businessApp);
-        final starShopCenter = tester.getCenter(starShopApp);
-        expect(stockCenter.dy, closeTo(realEstateCenter.dy, 0.5));
-        expect(businessCenter.dy, closeTo(starShopCenter.dy, 0.5));
-        expect(businessCenter.dy, greaterThan(stockCenter.dy));
-        expect(stockCenter.dx, lessThan(realEstateCenter.dx));
-        expect(businessCenter.dx, lessThan(starShopCenter.dx));
+        expect(stockCenter.dy, closeTo(companyCenter.dy, 0.5));
+        expect(realEstateCenter.dy, closeTo(businessCenter.dy, 0.5));
+        expect(realEstateCenter.dy, greaterThan(stockCenter.dy));
+        expect(stockCenter.dx, lessThan(companyCenter.dx));
         expect(tester.takeException(), isNull);
 
         await tester.tap(businessApp);
@@ -204,9 +200,9 @@ void main() {
   ) async {
     await usePhoneSurface(tester, const Size(390, 844));
     final initial = newState();
+    GameState? companyInput;
     GameState? realEstateInput;
     GameState? businessInput;
-    GameState? starShopInput;
 
     await tester.pumpWidget(
       MaterialApp(
@@ -214,6 +210,10 @@ void main() {
           state: initial,
           onOpenStockMarket: (current) async =>
               current.copyWith(cash: current.cash + 101),
+          onOpenCompanyManagement: (current) async {
+            companyInput = current;
+            return current.copyWith(cash: current.cash + 151);
+          },
           onOpenRealEstate: (current) async {
             realEstateInput = current;
             return current.copyWith(cash: current.cash + 202);
@@ -222,10 +222,6 @@ void main() {
             businessInput = current;
             return current.copyWith(cash: current.cash + 303);
           },
-          onOpenStarShop: (current) async {
-            starShopInput = current;
-            return current;
-          },
         ),
       ),
     );
@@ -233,16 +229,15 @@ void main() {
 
     await tester.tap(find.byKey(const Key('computer-stock-market-app')));
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('computer-company-management-app')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('computer-real-estate-app')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('computer-business-app')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('computer-star-shop-app')));
-    await tester.pumpAndSettle();
-
-    expect(realEstateInput?.cash, initial.cash + 101);
-    expect(businessInput?.cash, initial.cash + 303);
-    expect(starShopInput?.cash, initial.cash + 606);
+    expect(companyInput?.cash, initial.cash + 101);
+    expect(realEstateInput?.cash, initial.cash + 252);
+    expect(businessInput?.cash, initial.cash + 454);
     expect(tester.takeException(), isNull);
   });
 

@@ -1,7 +1,15 @@
 const phoneMessengerPlayerId = 'player';
 const phoneMessengerDailySendLimit = 3;
 const phoneMessengerMaxMessageLength = 80;
-const phoneMessengerHistoryLimit = 256;
+const phoneMessengerExchangeMinutes = 30;
+const phoneMessengerBedtimeMinute = 22 * 60;
+const phoneMessengerLastSendMinute =
+    phoneMessengerBedtimeMinute - phoneMessengerExchangeMinutes;
+// Three daily exchanges create six visible bubbles. Keep a full leap-year tail
+// per contact so a player who uses the maximum allowance never loses that
+// year's on-screen conversation history.
+const phoneMessengerPerContactHistoryLimit = 2300;
+const phoneMessengerHistoryLimit = 20700;
 const phoneConversationMemoryPerContactLimit = 512;
 const phoneConversationMemoryLimit = 4608;
 const phoneConversationRecallLimit = 8;
@@ -171,6 +179,7 @@ class PhoneMessage {
     required this.day,
     required this.marketMinute,
     required this.read,
+    this.giftId,
   });
 
   final String id;
@@ -180,6 +189,7 @@ class PhoneMessage {
   final int day;
   final int marketMinute;
   final bool read;
+  final String? giftId;
 
   bool get isFromPlayer => senderId == phoneMessengerPlayerId;
 
@@ -191,6 +201,7 @@ class PhoneMessage {
     day: day,
     marketMinute: marketMinute,
     read: read ?? this.read,
+    giftId: giftId,
   );
 
   Map<String, dynamic> toJson() => {
@@ -201,6 +212,7 @@ class PhoneMessage {
     'day': day,
     'marketMinute': marketMinute,
     'read': read,
+    if (giftId != null) 'giftId': giftId,
   };
 
   factory PhoneMessage.fromJson(Map<String, dynamic> json) => PhoneMessage(
@@ -214,6 +226,7 @@ class PhoneMessage {
       1439,
     ),
     read: json['read'] == true,
+    giftId: json['giftId'] as String?,
   );
 }
 
@@ -452,10 +465,11 @@ class PhoneMessengerState {
 
   /// Selects a bounded private memory prompt for one direct-message thread.
   ///
-  /// Adapted from the hybrid archive strategy in `Downloads/ai`: the latest
-  /// arc is always available, older memories compete by query relevance and
-  /// importance, and the first exchange survives as a continuity fallback.
-  /// No memory owned by another contact can enter the result.
+  /// The latest arc is always available, older memories compete by current
+  /// topic relevance and importance, and the first exchange survives as a
+  /// continuity fallback. These are private dialogue recollections, never
+  /// authoritative world facts. No memory owned by another contact can enter
+  /// the result.
   List<PhoneConversationMemory> relevantMemoriesFor(
     String contactId, {
     required String queryText,
@@ -567,11 +581,7 @@ class PhoneMessengerState {
         .toList(growable: false);
     final messages = parsedMessages.isEmpty
         ? PhoneMessengerState.initial().messages
-        : parsedMessages.length <= phoneMessengerHistoryLimit
-        ? parsedMessages
-        : parsedMessages.sublist(
-            parsedMessages.length - phoneMessengerHistoryLimit,
-          );
+        : retainPhoneMessages(parsedMessages);
 
     final rawProgress = (json['progressByContact'] as Map?) ?? const {};
     final progress = <String, PhoneThreadProgress>{};
@@ -721,4 +731,28 @@ List<PhoneConversationMemory> retainPhoneConversationMemories(
     kept.addAll(scoped.where((memory) => ids.contains(memory.id)));
   }
   return List<PhoneConversationMemory>.unmodifiable(kept);
+}
+
+/// Keeps a phone-like visible history per contact so one busy conversation
+/// cannot erase every other thread. Global order remains unchanged.
+List<PhoneMessage> retainPhoneMessages(List<PhoneMessage> source) {
+  final keptIds = <String>{};
+  for (final contact in phoneMessengerContacts) {
+    var count = 0;
+    for (final message in source.reversed) {
+      if (message.contactId != contact.id) continue;
+      if (count >= phoneMessengerPerContactHistoryLimit) break;
+      keptIds.add(message.id);
+      count += 1;
+    }
+  }
+  final kept = source
+      .where((message) => keptIds.contains(message.id))
+      .toList(growable: false);
+  if (kept.length <= phoneMessengerHistoryLimit) {
+    return List<PhoneMessage>.unmodifiable(kept);
+  }
+  return List<PhoneMessage>.unmodifiable(
+    kept.sublist(kept.length - phoneMessengerHistoryLimit),
+  );
 }

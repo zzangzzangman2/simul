@@ -287,6 +287,9 @@ async function syncBuild() {
 try {
   const flutterCommand = await resolveFlutterCommand();
   console.log(`Using Flutter: ${flutterCommand}`);
+  // 이전 릴리스에서 찍은 build id가 Flutter의 증분 빌드에 남으면 아래 검증이
+  // 새 템플릿의 자리표시자로 오인하지 못한다. 생성물만 비우고 항상 깨끗이 빌드한다.
+  await rm(buildOutput, { recursive: true, force: true });
   await run(
     flutterCommand,
     ["build", "web", "--release", "--base-href", "/play/"],

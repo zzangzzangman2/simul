@@ -94,14 +94,15 @@ class _OrderBookPanel extends StatelessWidget {
     );
 
     final snapshot = this.snapshot;
-    final playerAskQuantity = snapshot.asks.fold<double>(
-      0,
-      (sum, level) => sum + _playerQuantity(level),
-    );
-    final playerBidQuantity = snapshot.bids.fold<double>(
-      0,
-      (sum, level) => sum + _playerQuantity(level),
-    );
+    final playerOrders = state.pendingOrders
+        .where((order) => order.assetId == definition.id)
+        .toList(growable: false);
+    final playerAskQuantity = playerOrders
+        .where((order) => order.side == PendingOrderSide.sell)
+        .fold<double>(0, (sum, order) => sum + order.remainingQuantity);
+    final playerBidQuantity = playerOrders
+        .where((order) => order.side == PendingOrderSide.buy)
+        .fold<double>(0, (sum, order) => sum + order.remainingQuantity);
     final displayedAskQuantity =
         snapshot.totalAskQuantity + playerAskQuantity.ceil();
     final displayedBidQuantity =
@@ -295,6 +296,7 @@ class _OrderBookPanel extends StatelessWidget {
             state: state,
             minute: minute,
             snapshot: snapshot,
+            playerOrders: playerOrders,
             tradeTape: tradeTape,
           ),
           Container(
@@ -384,6 +386,7 @@ class _OrderBookPanel extends StatelessWidget {
             tapeCursor: tapeCursor,
             playbackSpeed: playbackSpeed,
             snapshot: snapshot,
+            playerOrders: playerOrders,
             currentPrice: currentDisplayPrice,
             previousClose: quote.previousClose,
             availableHeight:
@@ -412,7 +415,7 @@ class _OrderBookPanel extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    '매도잔량 ${_money(displayedAskQuantity)}주',
+                    '공개 매도잔량 ${_money(displayedAskQuantity)}주',
                     style: const TextStyle(
                       color: _marketAccent,
                       fontSize: 12,
@@ -422,7 +425,7 @@ class _OrderBookPanel extends StatelessWidget {
                 ),
                 Expanded(
                   child: Text(
-                    '매수잔량 ${_money(displayedBidQuantity)}주',
+                    '공개 매수잔량 ${_money(displayedBidQuantity)}주',
                     textAlign: TextAlign.right,
                     style: const TextStyle(
                       color: Color(0xFFF04452),
@@ -486,6 +489,7 @@ class _OrderBookMarketSummary extends StatelessWidget {
     required this.state,
     required this.minute,
     required this.snapshot,
+    required this.playerOrders,
     required this.tradeTape,
   });
 
@@ -496,6 +500,7 @@ class _OrderBookMarketSummary extends StatelessWidget {
   final GameState state;
   final int minute;
   final GameOrderBookSnapshot snapshot;
+  final List<PendingTradeOrder> playerOrders;
   final List<_OrderBookTapePrint> tradeTape;
 
   @override
@@ -513,8 +518,18 @@ class _OrderBookMarketSummary extends StatelessWidget {
         (fullDayVolume * gameTurnoverProgressAtMinute(minute)).round();
     final executionStrength = _tradeTapeExecutionStrength(tradeTape);
     final depthRatio = snapshot.tradeStrength;
-    final bestAsk = snapshot.asks.firstOrNull?.price;
-    final bestBid = snapshot.bids.firstOrNull?.price;
+    final presentationLevels = orderBookPresentationLevelsWithPlayerOrders(
+      marketLevels: _symmetricVisibleOrderBookLevels(snapshot),
+      playerOrders: playerOrders,
+    );
+    final bestAsk = presentationLevels
+        .where((level) => level.side == GameOrderBookSide.ask)
+        .lastOrNull
+        ?.price;
+    final bestBid = presentationLevels
+        .where((level) => level.side == GameOrderBookSide.bid)
+        .firstOrNull
+        ?.price;
     final spread = bestAsk == null || bestBid == null
         ? 0
         : math.max(0, (bestAsk - bestBid).round());
@@ -1030,6 +1045,7 @@ class _OrderBookPriceLadder extends StatefulWidget {
     required this.currentPrice,
     required this.previousClose,
     required this.availableHeight,
+    required this.playerOrders,
     required this.playerQuantityForLevel,
     required this.playerOrderLabelForLevel,
     required this.averageCostPrice,
@@ -1050,6 +1066,7 @@ class _OrderBookPriceLadder extends StatefulWidget {
   final double currentPrice;
   final double previousClose;
   final double availableHeight;
+  final List<PendingTradeOrder> playerOrders;
   final double Function(GameOrderBookLevel level) playerQuantityForLevel;
   final String? Function(GameOrderBookLevel level) playerOrderLabelForLevel;
   final double? averageCostPrice;
@@ -1185,7 +1202,10 @@ class _OrderBookPriceLadderState extends State<_OrderBookPriceLadder>
   Widget build(BuildContext context) {
     final activeSweepStep = _activeOrderBookSweepStep;
     final snapshot = _orderBookSweepPresentationSnapshot(widget.snapshot);
-    final candidateLevels = _orderBookSweepPresentationLevels(widget.snapshot);
+    final candidateLevels = orderBookPresentationLevelsWithPlayerOrders(
+      marketLevels: _orderBookSweepPresentationLevels(widget.snapshot),
+      playerOrders: widget.playerOrders,
+    );
     if (candidateLevels.isNotEmpty) {
       _lastNonEmptyLevels = List<GameOrderBookLevel>.unmodifiable(
         candidateLevels,
@@ -1341,11 +1361,7 @@ class _OrderBookPriceLadderState extends State<_OrderBookPriceLadder>
                                 : bidIndexByPrice[level.price]) ??
                             0;
                         final isBestAsk =
-                            isAsk &&
-                            _matchesPrice(
-                              level,
-                              widget.snapshot.asks.firstOrNull?.price,
-                            );
+                            isAsk && _matchesPrice(level, bestAskLevel?.price);
                         Widget row = _OrderBookLevelRow(
                           key: Key(
                             'order-book-${isAsk ? 'ask' : 'bid'}-$levelIndex',
@@ -2174,6 +2190,12 @@ class _OrderSheetState extends State<_OrderSheet> {
       simulationSeed: widget.state.simulationSeed,
       tradingDay: quote.isTradingDay,
       sharesOutstanding: _maximumPositionUnits,
+      playerOwnedUnits: _position?.units ?? 0,
+      playerTenderAcquiredUnits:
+          widget.state.shareholderGovernance
+              .companyById(widget.definition.id)
+              ?.tenderAcquiredShares ??
+          0,
       isIpoFirstTradingDay: widget.definition.asset.isIpoFirstTradingDay(
         widget.state.currentDate,
       ),

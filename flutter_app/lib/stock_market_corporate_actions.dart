@@ -13,6 +13,7 @@ class _CorporateActionScheduleCard extends StatelessWidget {
     required this.subscribeRights,
     required this.savingPreference,
     required this.preferenceEnabled,
+    required this.rightsChoiceUnlocked,
     required this.onPreferenceChanged,
   });
 
@@ -20,6 +21,7 @@ class _CorporateActionScheduleCard extends StatelessWidget {
   final bool subscribeRights;
   final bool savingPreference;
   final bool preferenceEnabled;
+  final bool rightsChoiceUnlocked;
   final ValueChanged<bool> onPreferenceChanged;
 
   @override
@@ -96,9 +98,11 @@ class _CorporateActionScheduleCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 7),
-              const Text(
-                '청약대금이 부족하면 해당 권리는 자동매도됩니다.',
-                style: TextStyle(
+              Text(
+                rightsChoiceUnlocked
+                    ? '청약대금이 부족하면 해당 권리는 자동매도됩니다.'
+                    : '9월 오지우와 권리 조건을 살펴본 뒤 처리 방식을 직접 고를 수 있어요. 그전에는 자동매도합니다.',
+                style: const TextStyle(
                   color: _marketMuted,
                   fontSize: 9,
                   fontWeight: FontWeight.w600,

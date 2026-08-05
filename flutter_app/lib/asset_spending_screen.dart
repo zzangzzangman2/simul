@@ -773,20 +773,24 @@ class _AssetSpendingScreenState extends State<AssetSpendingScreen> {
 
   Future<void> _openListingDetail(GeneratedRealEstateListing listing) async {
     _showRealtorMood(_RealtorMood.explain);
+    final transactionLock = !realEstateTransactionsUnlocked(_state)
+        ? '6월 계약 이야기 후 해금'
+        : _listingLockReason(listing);
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (routeContext) => _RealEstateDetailScreen(
           listing: listing,
           state: _state,
           ownedHousingCount: _state.personalFinance.ownedHousingCount,
-          lockReason: _listingLockReason(listing),
+          lockReason: transactionLock,
           initialNote: _realEstateNotes[listing.optionId] ?? '',
           onNoteSaved: (note) async {
             if (!mounted) return;
             setState(() => _realEstateNotes[listing.optionId] = note);
           },
-          onPurchase: (ltv) =>
-              _purchaseListing(listing, selectedLtvPercent: ltv),
+          onPurchase: realEstateTransactionsUnlocked(_state)
+              ? (ltv) => _purchaseListing(listing, selectedLtvPercent: ltv)
+              : null,
         ),
       ),
     );
@@ -825,7 +829,9 @@ class _AssetSpendingScreenState extends State<AssetSpendingScreen> {
           onCancelSale: widget.onCancelSaleListing == null
               ? null
               : () => _cancelSaleListing(owned),
-          onManageLease: widget.onConfigureLease == null
+          onManageLease:
+              widget.onConfigureLease == null ||
+                  !realEstateOperationsUnlocked(_state)
               ? null
               : () => _manageLease(owned),
           onPrepayMortgage: widget.onPrepayMortgage == null
@@ -838,31 +844,30 @@ class _AssetSpendingScreenState extends State<AssetSpendingScreen> {
                   variableRate: variableRate,
                   termMonths: termMonths,
                 ),
-          onRenovate: widget.onRenovateRealEstate == null
+          onRenovate:
+              widget.onRenovateRealEstate == null ||
+                  !realEstateOperationsUnlocked(_state)
               ? null
               : () => _renovateRealEstate(owned),
-          onSetInsurance: widget.onSetRealEstateInsurance == null
+          onSetInsurance:
+              widget.onSetRealEstateInsurance == null ||
+                  !realEstateOperationsUnlocked(_state)
               ? null
               : (active) => _setRealEstateInsurance(owned, active),
-          onRenewMonthlyLease: widget.onRenewMonthlyLease == null
+          onRenewMonthlyLease:
+              widget.onRenewMonthlyLease == null ||
+                  !realEstateOperationsUnlocked(_state)
               ? null
               : () => _renewMonthlyLease(owned),
           onTerminateMonthlyLeaseEarly:
-              widget.onTerminateMonthlyLeaseEarly == null
+              widget.onTerminateMonthlyLeaseEarly == null ||
+                  !realEstateOperationsUnlocked(_state)
               ? null
               : () => _terminateMonthlyLeaseEarly(owned),
         ),
       ),
     );
   }
-
-  Future<void> _playChance(int stake) => _run(
-    () => widget.onPlayChanceGame(stake),
-    title: '성인 확률 오락',
-    body:
-        '게임머니 ${_money(stake)}원을 사용합니다. 지급률은 60%: 0원, 30%: 1.5배, 10%: 3배이며 평균 지급률은 75%입니다. 월 1회이고 실제 결제나 현금 보상은 없습니다.',
-    confirmLabel: '확률 확인 후 참여',
-  );
 
   @override
   Widget build(BuildContext context) {
@@ -1035,7 +1040,8 @@ class _AssetSpendingScreenState extends State<AssetSpendingScreen> {
                             busy: _busy,
                             onSell: () => _sell(asset),
                             leaseManagementAvailable:
-                                widget.onConfigureLease != null,
+                                widget.onConfigureLease != null &&
+                                realEstateOperationsUnlocked(_state),
                             onManageLease: () => _manageLease(asset),
                             onOpenDetail: () => _openOwnedDetail(asset),
                           ),
@@ -1043,11 +1049,7 @@ class _AssetSpendingScreenState extends State<AssetSpendingScreen> {
                       ),
                     if (!widget.realEstateOnly) ...[
                       const SizedBox(height: 10),
-                      _AdultChanceCard(
-                        state: _state,
-                        busy: _busy,
-                        onPlay: _playChance,
-                      ),
+                      _AdultChanceCard(state: _state),
                     ],
                   ],
                 ),
@@ -2687,6 +2689,14 @@ class _RealEstateDetailScreenState extends State<_RealEstateDetailScreen> {
             _DetailMetricData('누적 수리비', '${_money(owned.totalRepairCosts)}원'),
           ],
         ),
+        if (!realEstateOperationsUnlocked(widget.state)) ...[
+          const SizedBox(height: 10),
+          const _UnavailableActionCard(
+            title: '운영 기능은 7월에 열립니다',
+            body: '박하은과 임차인·수리·보험 장부를 정리하는 월초 이야기를 마치면 사용할 수 있습니다.',
+            actionKey: Key('real-estate-operations-locked'),
+          ),
+        ],
         const SizedBox(height: 10),
         _RealEstateDetailSection(
           title: '매각 제안',
@@ -4870,29 +4880,14 @@ class _OwnedPropertyCard extends StatelessWidget {
 }
 
 class _AdultChanceCard extends StatelessWidget {
-  const _AdultChanceCard({
-    required this.state,
-    required this.busy,
-    required this.onPlay,
-  });
+  const _AdultChanceCard({required this.state});
   final GameState state;
-  final bool busy;
-  final ValueChanged<int> onPlay;
 
   @override
   Widget build(BuildContext context) {
-    final month =
-        '${state.currentDate.year}-${state.currentDate.month.toString().padLeft(2, '0')}';
     final age = state.story.ageOn(state.currentDate);
     final unlocked = state.currentDate.year >= 2010 && age >= 20;
-    final alreadyPlayed = state.personalFinance.lastChanceMonth == month;
-    final onePercent = state.cash ~/ 100;
-    final maxStake = onePercent < 100000 ? onePercent : 100000;
-    final stakes = [
-      10000,
-      50000,
-      100000,
-    ].where((stake) => stake <= maxStake).toList(growable: false);
+    final casino = state.personalFinance.casino;
     return Container(
       key: const Key('adult-chance-card'),
       padding: const EdgeInsets.all(15),
@@ -4904,7 +4899,7 @@ class _AdultChanceCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            '성인 확률 오락 · 선택 콘텐츠',
+            '카지노 이용 기록',
             style: TextStyle(
               color: Colors.white,
               fontSize: 16,
@@ -4913,7 +4908,7 @@ class _AdultChanceCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           const Text(
-            '60% 지급 없음 · 30% 1.5배 · 10% 3배 · 평균 지급률 75%\n월 1회, 현금의 최대 1%, 상한 10만원. 실제 돈·광고·결제 없음.',
+            '바카라·블랙잭·유럽식 룰렛·다이사이·3릴은 작업실 PC의 전용 실시간 중계 앱에서 15:00 이후 이용합니다. 실제 돈·광고·결제 없음.',
             style: TextStyle(
               color: Color(0xFFD8D3E6),
               fontSize: 11,
@@ -4929,42 +4924,17 @@ class _AdultChanceCard extends StatelessWidget {
                 fontWeight: FontWeight.w900,
               ),
             )
-          else if (alreadyPlayed)
-            const Text(
-              '이번 달 이용 완료',
-              style: TextStyle(
-                color: Color(0xFFFFD27A),
-                fontWeight: FontWeight.w900,
-              ),
-            )
-          else if (stakes.isEmpty)
-            const Text(
-              '현금 100만원 이상일 때 1만원부터 참여할 수 있습니다.',
-              style: TextStyle(
-                color: Color(0xFFFFD27A),
-                fontWeight: FontWeight.w900,
-              ),
-            )
           else
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: stakes
-                  .map(
-                    (stake) => SizedBox(
-                      height: 44,
-                      child: FilledButton.tonal(
-                        key: Key('adult-chance-$stake'),
-                        onPressed: busy ? null : () => onPlay(stake),
-                        child: Text('${_money(stake)}원'),
-                      ),
-                    ),
-                  )
-                  .toList(growable: false),
+            Text(
+              '누적 ${casino.totalRounds}판 · 순손익 ${casino.lifetimeNet >= 0 ? '+' : '-'}${_money(casino.lifetimeNet.abs())}원 · 국가 수수료 ${_money(casino.totalNationalFee)}원',
+              style: const TextStyle(
+                color: Color(0xFFFFD27A),
+                fontWeight: FontWeight.w900,
+              ),
             ),
           const SizedBox(height: 8),
           Text(
-            '누적 참가 ${_money(state.personalFinance.totalChanceStake)}원 · 지급 ${_money(state.personalFinance.totalChancePayout)}원',
+            '원장은 판별 베팅·총지급금·확정 이익 20% 국가 수수료·실수령과 결과를 각각 기록합니다.',
             style: const TextStyle(color: Color(0xFFAFA8C1), fontSize: 10),
           ),
         ],

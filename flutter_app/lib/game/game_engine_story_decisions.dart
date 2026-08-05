@@ -1,5 +1,8 @@
 part of 'game_engine.dart';
 
+// Kept so pre-monthly development saves containing the old decision ids still
+// resolve through GameEngine.resolveDecision without losing their choice data.
+// ignore: unused_element
 DecisionCardData _bankAccessIntroduction(int day) => DecisionCardData(
   id: 'facility-intro-bank-yoon-harin',
   category: '시설 해금 이야기',
@@ -11,7 +14,7 @@ DecisionCardData _bankAccessIntroduction(int day) => DecisionCardData(
   createdDay: day,
   dueDay: day + 7,
   requestedFunds: 0,
-  benefit: '윤하린 은행원 소개 · 새천년은행 저녁 업무 해금',
+  benefit: '윤하린 은행원 소개 · 새천년은행 실제 금융 거래 해금',
   risk: '예금과 대출은 현금흐름과 상환 조건을 직접 확인해야 합니다.',
   advisorOpinions: const [
     '한서윤: 증권 계좌와 생활 통장을 먼저 분리해 두세요.',
@@ -31,6 +34,7 @@ DecisionCardData _bankAccessIntroduction(int day) => DecisionCardData(
   ],
 );
 
+// ignore: unused_element
 DecisionCardData _realEstateAccessIntroduction(int day) => DecisionCardData(
   id: 'facility-intro-realtor-seo-haneul',
   category: '시설 해금 이야기',
@@ -42,7 +46,7 @@ DecisionCardData _realEstateAccessIntroduction(int day) => DecisionCardData(
   createdDay: day,
   dueDay: day + 7,
   requestedFunds: 0,
-  benefit: '서하늘 공인중개사 소개 · 한마음부동산 저녁 업무 해금',
+  benefit: '서하늘 공인중개사 소개 · 한마음부동산 실제 자산 거래 해금',
   risk: '매입가뿐 아니라 취득비·대출·공실·보유세를 함께 봐야 합니다.',
   advisorOpinions: const [
     '윤하린: 대출 가능액보다 매달 감당할 현금흐름을 먼저 보세요.',
@@ -58,47 +62,6 @@ DecisionCardData _realEstateAccessIntroduction(int day) => DecisionCardData(
       id: 'meet_realtor_cashflow',
       label: '서하늘에게 임대 현금흐름부터 배운다',
       description: '공실·보증금·월 순현금을 기준으로 첫 매물을 살펴봅니다.',
-    ),
-  ],
-);
-
-DecisionCardData _firstResearchNote(int day) => DecisionCardData(
-  id: 'first-research-note',
-  category: '처음 배우기',
-  title: '첫 미션: 회사 하나를 구경해 보자',
-  proposer: '한서윤 운영관',
-  body:
-      '아직 돈을 쓰지 않아도 괜찮아. 눈에 익은 회사 하나를 고르고, 무엇을 파는지부터 같이 살펴보자. 아래 네 가지 중 가장 쉬워 보이는 방법을 하나 고르면 돼.',
-  createdDay: day,
-  dueDay: day + 30,
-  requestedFunds: 0,
-  benefit: '회사 보는 첫 방법을 배우고 +25 XP 받기',
-  risk: '한 가지만 보고 바로 사면 실수할 수 있음',
-  advisorOpinions: const [
-    '김학준: 회사가 지켜야 할 규정과 빚부터 확인하자.',
-    '한수아: 사람들이 왜 이 물건을 사는지 직접 물어보자.',
-    '김서아: 매수 이유와 생각이 바뀔 조건을 같은 장에 적자.',
-  ],
-  options: const [
-    DecisionOptionData(
-      id: 'research_products',
-      label: '써 본 제품부터 보기',
-      description: '생활실에서 써 본 물건을 떠올려 회사와 연결해 봅니다.',
-    ),
-    DecisionOptionData(
-      id: 'research_cashflow',
-      label: '회사가 돈 버는 법 보기',
-      description: '누가 이 회사에 왜 돈을 내는지 한 줄로 적습니다.',
-    ),
-    DecisionOptionData(
-      id: 'research_people',
-      label: '회사를 운영하는 사람 보기',
-      description: '대표와 직원이 어떤 목표로 일하는지 살펴봅니다.',
-    ),
-    DecisionOptionData(
-      id: 'research_price',
-      label: '가격부터 본다',
-      description: '주가가 싼지 비싼지 다른 회사와 천천히 비교합니다.',
     ),
   ],
 );
