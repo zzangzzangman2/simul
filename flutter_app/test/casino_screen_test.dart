@@ -61,6 +61,59 @@ void _expectCasualDealerLine(WidgetTester tester) {
 void main() {
   const engine = GameEngine();
 
+  testWidgets('home PC registers a casino visit after the stock close', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final day =
+        DateTime(2010, 1, 4).difference(DateTime(2000, 1, 1)).inDays + 1;
+    final state = engine
+        .createNewGame(
+          '카지노 PC 연결 테스트',
+          initialCash: 1000000,
+          worldSeed: 'casino-home-computer',
+        )
+        .copyWith(day: day, marketMinute: krxCloseMinute, decisions: const []);
+    var casinoOpenCount = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HomeComputerScreen(
+          state: state,
+          onOpenStockMarket: (current) async => current,
+          onOpenCompanyManagement: (current) async => current,
+          onOpenRealEstate: (current) async => current,
+          onOpenBusiness: (current) async => current,
+          onOpenCasino: (current) async {
+            casinoOpenCount += 1;
+            return current;
+          },
+          onOpenHorseRace: (current) async => current,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final app = find.byKey(const Key('computer-casino-live-app'));
+    expect(app, findsOneWidget);
+    expect(find.text('입장 가능 · 1판 30분'), findsOneWidget);
+    await tester.tap(app);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('after-market-casino-gateway')),
+      findsOneWidget,
+    );
+    expect(find.textContaining('원격 게임이 아니라'), findsOneWidget);
+    expect(casinoOpenCount, 0);
+    await tester.tap(find.byKey(const Key('after-market-casino-confirm')));
+    await tester.pumpAndSettle();
+    expect(casinoOpenCount, 1);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('casino welcome advances from the character during typing', (
     tester,
   ) async {

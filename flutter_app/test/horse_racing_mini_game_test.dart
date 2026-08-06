@@ -210,10 +210,72 @@ void main() {
 
     final app = find.byKey(const Key('computer-horse-racing-app'));
     expect(app, findsOneWidget);
+    expect(
+      find.byKey(const Key('after-market-leisure-banner')),
+      findsOneWidget,
+    );
+    expect(find.textContaining('장 마감 완료'), findsOneWidget);
     expect(find.text('베팅 0/1회'), findsOneWidget);
     await tester.tap(app);
     await tester.pumpAndSettle();
+    expect(find.byKey(const Key('after-market-horse-gateway')), findsOneWidget);
+    expect(find.textContaining('원격 패독'), findsOneWidget);
+    expect(horseRaceOpenCount, 0);
+    await tester.tap(find.byKey(const Key('after-market-horse-confirm')));
+    await tester.pumpAndSettle();
     expect(horseRaceOpenCount, 1);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('after-market leisure apps stay locked before the stock close', (
+    tester,
+  ) async {
+    await setPhoneSurface(tester);
+    const engine = GameEngine();
+    final base = engine.createNewGame(
+      '마감 전 PC 잠금 테스트',
+      worldSeed: 'after-market-pc-lock',
+    );
+    var day = base.day;
+    while (base.dateForDay(day).isBefore(DateTime(2010, 1, 1)) ||
+        base.dateForDay(day).weekday >= DateTime.saturday) {
+      day += 1;
+    }
+    final state = base.copyWith(
+      day: day,
+      cash: base.cash + 5000,
+      marketMinute: krxCloseMinute - 1,
+      decisions: const [],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HomeComputerScreen(
+          state: state,
+          onOpenStockMarket: (current) async => current,
+          onOpenCompanyManagement: (current) async => current,
+          onOpenRealEstate: (current) async => current,
+          onOpenBusiness: (current) async => current,
+          onOpenCasino: (current) async => current,
+          onOpenHorseRace: (current) async => current,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('주식장 마감 15:00 뒤 열림'), findsOneWidget);
+    expect(
+      tester
+          .widget<InkWell>(find.byKey(const Key('computer-horse-racing-app')))
+          .onTap,
+      isNull,
+    );
+    expect(
+      tester
+          .widget<InkWell>(find.byKey(const Key('computer-casino-live-app')))
+          .onTap,
+      isNull,
+    );
     expect(tester.takeException(), isNull);
   });
 

@@ -934,7 +934,54 @@ class HomeComputerScreen extends StatefulWidget {
 class _HomeComputerScreenState extends State<HomeComputerScreen> {
   late GameState _state = widget.state;
 
+  bool get _adultLeisureUnlocked =>
+      !_state.currentDate.isBefore(DateTime(2010, 1, 1)) &&
+      _state.story.ageOn(_state.currentDate) >= 20;
+
+  bool get _afterMarketLeisureOpen {
+    final casino = _state.personalFinance.casino;
+    final hasUnsettledCasino =
+        casino.activeBlackjack != null || casino.activeCraps != null;
+    if (hasUnsettledCasino) {
+      return _adultLeisureUnlocked &&
+          _state.currentDate.weekday < DateTime.saturday &&
+          _state.marketMinute >= krxCloseMinute &&
+          _state.marketMinute <= marketDayEndMinute;
+    }
+    return _adultLeisureUnlocked &&
+        _state.currentDate.weekday < DateTime.saturday &&
+        _state.marketMinute >= krxCloseMinute &&
+        _state.marketMinute < marketDayEndMinute &&
+        !weekdayEveningUsed(_state);
+  }
+
+  String get _afterMarketLeisureStatus {
+    if (!_adultLeisureUnlocked) return '성인 시점에 개방 · 만 20세 이상';
+    if (_state.currentDate.weekday >= DateTime.saturday) {
+      return '휴장일 · 다음 평일 장 마감 뒤 이용';
+    }
+    final casino = _state.personalFinance.casino;
+    if (casino.activeBlackjack != null || casino.activeCraps != null) {
+      return '카지노 진행 중 · 현장 세션 정산 필요';
+    }
+    if (_state.personalFinance.casino.roundsForDay(_state.day) > 0) {
+      return '오늘 선택 완료 · 데시멀 카지노';
+    }
+    if (horseRaceDailyLimitReached(_state)) {
+      return '오늘 선택 완료 · 국가망 경마';
+    }
+    if (weekdayEveningUsed(_state)) return '오늘 저녁 일정 완료';
+    if (_state.marketMinute < krxCloseMinute) {
+      return '주식장 마감 ${marketTimeLabel(krxCloseMinute)} 뒤 열림';
+    }
+    if (_state.marketMinute >= marketDayEndMinute) {
+      return '오늘 접속 종료 · 다음 거래일 이용';
+    }
+    return '장 마감 완료 · 경마 또는 카지노 중 하나 선택';
+  }
+
   bool get _casinoSessionAvailable {
+    if (widget.onOpenCasino == null || !_adultLeisureUnlocked) return false;
     final casino = _state.personalFinance.casino;
     final hasUnsettledRound =
         casino.activeBlackjack != null || casino.activeCraps != null;
@@ -956,9 +1003,11 @@ class _HomeComputerScreenState extends State<HomeComputerScreen> {
     if (_state.personalFinance.casino.activeCraps != null) {
       return '크랩스 포인트 정산 필요';
     }
+    if (!_adultLeisureUnlocked) return '만 20세부터 출입 등록';
     if (_state.currentDate.weekday >= DateTime.saturday) {
       return '평일 장 마감 후';
     }
+    if (horseRaceDailyLimitReached(_state)) return '오늘 경마 선택';
     if (weekdayEveningUsed(_state)) return '오늘 저녁 행동 사용';
     if (_state.marketMinute < krxCloseMinute) return '15:00 개장';
     if (_state.marketMinute > marketDayEndMinute - casinoRoundMinutes) {
@@ -969,8 +1018,7 @@ class _HomeComputerScreenState extends State<HomeComputerScreen> {
 
   bool get _horseRaceSessionAvailable =>
       widget.onOpenHorseRace != null &&
-      !_state.currentDate.isBefore(DateTime(2010, 1, 1)) &&
-      _state.story.ageOn(_state.currentDate) >= 20 &&
+      _adultLeisureUnlocked &&
       _state.currentDate.weekday < DateTime.saturday &&
       _state.marketMinute >= krxCloseMinute &&
       _state.marketMinute < marketDayEndMinute &&
@@ -980,6 +1028,7 @@ class _HomeComputerScreenState extends State<HomeComputerScreen> {
       _state.bankCash >= horseRaceMinStake;
 
   String get _horseRaceSessionStatus {
+    if (!_adultLeisureUnlocked) return '만 20세부터 국가망 접속';
     if (_state.currentDate.weekday >= DateTime.saturday) return '평일 장 마감 후';
     if (_state.personalFinance.casino.roundsForDay(_state.day) > 0) {
       return '오늘 카지노 선택';
@@ -1017,6 +1066,36 @@ class _HomeComputerScreenState extends State<HomeComputerScreen> {
   Future<void> _openCasino() async {
     final open = widget.onOpenCasino;
     if (open == null) return;
+    final casino = _state.personalFinance.casino;
+    final resuming =
+        casino.activeBlackjack != null || casino.activeCraps != null;
+    if (!resuming) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          key: const Key('after-market-casino-gateway'),
+          title: const Text('카지노 현장 방문 등록'),
+          content: const Text(
+            '공용 PC에서 성인 출입증과 셔틀 좌석을 등록합니다. 등록 뒤에는 원격 게임이 아니라 데시멀 카지노 현장으로 이동해 이안 딜러의 테이블을 이용합니다.\n\n'
+            '평일 장 마감 뒤 15:00~19:30 · 1판 30분 · 국가망 경마와 같은 날 중복 이용 불가',
+          ),
+          actions: [
+            TextButton(
+              key: const Key('after-market-casino-cancel'),
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('취소'),
+            ),
+            FilledButton.icon(
+              key: const Key('after-market-casino-confirm'),
+              onPressed: () => Navigator.pop(dialogContext, true),
+              icon: const Icon(Icons.directions_bus_rounded),
+              label: const Text('출입증 발급 · 현장 이동'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+    }
     final next = await open(_state);
     if (mounted) setState(() => _state = next);
   }
@@ -1024,6 +1103,31 @@ class _HomeComputerScreenState extends State<HomeComputerScreen> {
   Future<void> _openHorseRace() async {
     final open = widget.onOpenHorseRace;
     if (open == null) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        key: const Key('after-market-horse-gateway'),
+        title: const Text('국가망 경마 접속'),
+        content: const Text(
+          '공용 PC의 국가망에서 원격 패독과 8두 출전표를 확인하고 전자 마권을 전송합니다. 경주가 시작되면 실시간 중계를 본 뒤 정산 즉시 20:00으로 이동합니다.\n\n'
+          '평일 장 마감 뒤 1일 1회 · 데시멀 카지노와 같은 날 중복 이용 불가',
+        ),
+        actions: [
+          TextButton(
+            key: const Key('after-market-horse-cancel'),
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('취소'),
+          ),
+          FilledButton.icon(
+            key: const Key('after-market-horse-confirm'),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            icon: const Icon(Icons.satellite_alt_rounded),
+            label: const Text('국가망 접속'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
     final next = await open(_state);
     if (mounted) setState(() => _state = next);
   }
@@ -1239,10 +1343,12 @@ class _HomeComputerScreenState extends State<HomeComputerScreen> {
                                     ),
                                   ),
                                   const SizedBox(height: 4),
-                                  const Text(
-                                    '주식거래·주주권·회사경영·부동산·상권 프로그램은 현재 상태를 공유합니다.',
+                                  Text(
+                                    _adultLeisureUnlocked
+                                        ? '자산 프로그램과 장 마감 후 경마·카지노 연결은 같은 게임 시간과 자금을 공유합니다.'
+                                        : '주식거래·주주권·회사경영·부동산·상권 프로그램은 현재 상태를 공유합니다.',
                                     maxLines: 2,
-                                    style: TextStyle(
+                                    style: const TextStyle(
                                       fontFamily: _hubDisplayFont,
                                       color: Color(0xFF697486),
                                       fontSize: 9.5,
@@ -1378,6 +1484,12 @@ class _HomeComputerScreenState extends State<HomeComputerScreen> {
                                                     widget.onOpenHorseRace !=
                                                         null)) ...[
                                               const SizedBox(height: 8),
+                                              _AfterMarketLeisureBanner(
+                                                open: _afterMarketLeisureOpen,
+                                                status:
+                                                    _afterMarketLeisureStatus,
+                                              ),
+                                              const SizedBox(height: 8),
                                               Expanded(
                                                 child: Row(
                                                   children: [
@@ -1396,7 +1508,7 @@ class _HomeComputerScreenState extends State<HomeComputerScreen> {
                                                               ),
                                                           title: '데시멀 카지노',
                                                           subtitle:
-                                                              '현장 입장 · 테이블 이용',
+                                                              'PC 등록 → 현장 테이블',
                                                           status:
                                                               _casinoSessionStatus,
                                                           onTap:
@@ -1426,7 +1538,7 @@ class _HomeComputerScreenState extends State<HomeComputerScreen> {
                                                               ),
                                                           title: '국가망 경마',
                                                           subtitle:
-                                                              '15:10 경주 중계',
+                                                              'PC 원격 · 전자 마권',
                                                           status:
                                                               _horseRaceSessionStatus,
                                                           onTap:
@@ -1546,6 +1658,62 @@ class _HomeComputerScreenState extends State<HomeComputerScreen> {
       ),
     );
   }
+}
+
+class _AfterMarketLeisureBanner extends StatelessWidget {
+  const _AfterMarketLeisureBanner({required this.open, required this.status});
+
+  final bool open;
+  final String status;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    key: const Key('after-market-leisure-banner'),
+    constraints: const BoxConstraints(minHeight: 30),
+    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+    decoration: BoxDecoration(
+      color: open ? const Color(0xFFE3F3E8) : const Color(0xFFE8EDF4),
+      border: Border.all(
+        color: open ? const Color(0xFF6E9E7C) : const Color(0xFF8795A8),
+      ),
+      borderRadius: BorderRadius.circular(6),
+    ),
+    child: Row(
+      children: [
+        Icon(
+          open ? Icons.lock_open_rounded : Icons.schedule_rounded,
+          size: 15,
+          color: open ? const Color(0xFF2E7150) : const Color(0xFF536276),
+        ),
+        const SizedBox(width: 6),
+        const Text(
+          '장 마감 후 레저',
+          style: TextStyle(
+            fontFamily: _hubDisplayFont,
+            color: Color(0xFF27394F),
+            fontSize: 9,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(width: 7),
+        Expanded(
+          child: Text(
+            status,
+            key: const Key('after-market-leisure-status'),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.right,
+            style: TextStyle(
+              fontFamily: _hubDisplayFont,
+              color: open ? const Color(0xFF2E7150) : const Color(0xFF5E6B7C),
+              fontSize: 8.5,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class _ComputerAppTile extends StatelessWidget {
