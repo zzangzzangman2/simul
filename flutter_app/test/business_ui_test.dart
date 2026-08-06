@@ -12,13 +12,15 @@ void main() {
   const gameEngine = GameEngine();
   const businessEngine = LocalBusinessEngine();
 
-  GameState newState() => gameEngine
-      .createNewGame(
-        '동네사업 UI 테스트 회사',
-        initialCash: 1000000000,
-        worldSeed: 'business-ui-test-world',
-      )
-      .copyWith(brokerageCash: 0);
+  GameState newState() => gameEngine.markNationalNetworkBriefingSeen(
+    gameEngine
+        .createNewGame(
+          '동네사업 UI 테스트 회사',
+          initialCash: 1000000000,
+          worldSeed: 'business-ui-test-world',
+        )
+        .copyWith(brokerageCash: 0),
+  );
 
   FinanceActionResult unavailable(GameState state) => FinanceActionResult(
     state: state,

@@ -4885,8 +4885,7 @@ class _AdultChanceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final age = state.story.ageOn(state.currentDate);
-    final unlocked = state.currentDate.year >= 2010 && age >= 20;
+    final unlocked = state.story.nationalNetworkBriefingSeen;
     final casino = state.personalFinance.casino;
     return Container(
       key: const Key('adult-chance-card'),
@@ -4899,7 +4898,7 @@ class _AdultChanceCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            '카지노 이용 기록',
+            '국가망 카지노 기록',
             style: TextStyle(
               color: Colors.white,
               fontSize: 16,
@@ -4908,7 +4907,7 @@ class _AdultChanceCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           const Text(
-            '바카라·블랙잭·유럽식 룰렛·다이사이·3릴은 컴퓨터실 PC의 전용 실시간 중계 앱에서 15:00 이후 이용합니다. 실제 돈·광고·결제 없음.',
+            '바카라·블랙잭·유럽식 룰렛·크랩스·다이사이·3릴은 2000년부터 PC 국가 전용망에서 15:00 이후 접속합니다. 현장 이동·외부 결제 없음.',
             style: TextStyle(
               color: Color(0xFFD8D3E6),
               fontSize: 11,
@@ -4918,7 +4917,7 @@ class _AdultChanceCard extends StatelessWidget {
           const SizedBox(height: 10),
           if (!unlocked)
             const Text(
-              '2010년 성인 시점에 해금됩니다.',
+              '한서윤 운영관의 국가망 사전 안내 후 해금됩니다.',
               style: TextStyle(
                 color: Color(0xFFFFD27A),
                 fontWeight: FontWeight.w900,
@@ -4934,7 +4933,7 @@ class _AdultChanceCard extends StatelessWidget {
             ),
           const SizedBox(height: 8),
           Text(
-            '원장은 판별 베팅·총지급금·확정 이익 20% 국가 수수료·실수령과 결과를 각각 기록합니다.',
+            '원장은 국가계좌 칩 전송·판별 베팅·총지급금·확정 이익 20% 국가 환수·실수령을 각각 기록합니다.',
             style: const TextStyle(color: Color(0xFFAFA8C1), fontSize: 10),
           ),
         ],
@@ -5003,7 +5002,7 @@ class _AssetSpendingEntry extends StatelessWidget {
                     style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
                   ),
                   Text(
-                    '부동산 ${state.personalFinance.realEstate.length}건 · 교육·공동체·사회공헌·성인 오락',
+                    '부동산 ${state.personalFinance.realEstate.length}건 · 교육·공동체·사회공헌·국가망 확률시장',
                     style: const TextStyle(fontSize: 9, height: 1.35),
                   ),
                 ],

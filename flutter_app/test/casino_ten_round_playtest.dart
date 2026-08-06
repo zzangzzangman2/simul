@@ -9,15 +9,10 @@ const _engine = GameEngine();
 const _stake = 10000;
 
 GameState _session(String seed) {
-  final day = DateTime(2010, 1, 4).difference(DateTime(2000, 1, 1)).inDays + 1;
+  final day = DateTime(2000, 1, 3).difference(DateTime(2000, 1, 1)).inDays + 1;
   final state = _engine
       .createNewGame('카지노 10판 실전 테스트', initialCash: 10000000, worldSeed: seed)
-      .copyWith(
-        day: day,
-        marketMinute: krxCloseMinute,
-        brokerageCash: 0,
-        decisions: const [],
-      );
+      .copyWith(day: day, marketMinute: krxCloseMinute, decisions: const []);
   return _engine.exchangeCasinoChips(state, 1000000).state;
 }
 

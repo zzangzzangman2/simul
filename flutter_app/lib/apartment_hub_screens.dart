@@ -915,6 +915,7 @@ class HomeComputerScreen extends StatefulWidget {
     required this.onOpenCompanyManagement,
     required this.onOpenRealEstate,
     required this.onOpenBusiness,
+    this.onCompleteNationalNetworkBriefing,
     this.onOpenCasino,
     this.onOpenHorseRace,
   });
@@ -924,6 +925,7 @@ class HomeComputerScreen extends StatefulWidget {
   final Future<GameState> Function(GameState state) onOpenCompanyManagement;
   final Future<GameState> Function(GameState state) onOpenRealEstate;
   final Future<GameState> Function(GameState state) onOpenBusiness;
+  final Future<GameState> Function()? onCompleteNationalNetworkBriefing;
   final Future<GameState> Function(GameState state)? onOpenCasino;
   final Future<GameState> Function(GameState state)? onOpenHorseRace;
 
@@ -933,22 +935,75 @@ class HomeComputerScreen extends StatefulWidget {
 
 class _HomeComputerScreenState extends State<HomeComputerScreen> {
   late GameState _state = widget.state;
+  bool _nationalNetworkBriefingScheduled = false;
+  bool _nationalNetworkBriefingShowing = false;
 
-  bool get _adultLeisureUnlocked =>
-      !_state.currentDate.isBefore(DateTime(2010, 1, 1)) &&
-      _state.story.ageOn(_state.currentDate) >= 20;
+  bool get _nationalNetworkBriefingEligible => _state.story.marketTutorialSeen;
+
+  bool get _nationalNetworkUnlocked => _state.story.nationalNetworkBriefingSeen;
+
+  @override
+  void initState() {
+    super.initState();
+    _scheduleNationalNetworkBriefing();
+  }
+
+  void _scheduleNationalNetworkBriefing() {
+    if (_nationalNetworkBriefingScheduled ||
+        _nationalNetworkBriefingShowing ||
+        !_nationalNetworkBriefingEligible ||
+        _nationalNetworkUnlocked) {
+      return;
+    }
+    _nationalNetworkBriefingScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _nationalNetworkBriefingScheduled = false;
+      if (mounted) _showNationalNetworkBriefing();
+    });
+  }
+
+  Future<void> _showNationalNetworkBriefing() async {
+    if (_nationalNetworkBriefingShowing ||
+        !_nationalNetworkBriefingEligible ||
+        _nationalNetworkUnlocked) {
+      return;
+    }
+    _nationalNetworkBriefingShowing = true;
+    final completed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const _NationalNetworkBriefingDialog(),
+    );
+    if (!mounted) return;
+    if (completed == true) {
+      final save = widget.onCompleteNationalNetworkBriefing;
+      final next = save == null
+          ? _state.copyWith(
+              story: _state.story.copyWith(
+                storyFlags: <String, dynamic>{
+                  ..._state.story.storyFlags,
+                  'nationalNetworkBriefingSeen': true,
+                  'nationalNetworkBriefingCompletedDay': _state.day,
+                },
+              ),
+            )
+          : await save();
+      if (mounted) setState(() => _state = next);
+    }
+    _nationalNetworkBriefingShowing = false;
+  }
 
   bool get _afterMarketLeisureOpen {
     final casino = _state.personalFinance.casino;
     final hasUnsettledCasino =
         casino.activeBlackjack != null || casino.activeCraps != null;
     if (hasUnsettledCasino) {
-      return _adultLeisureUnlocked &&
+      return _nationalNetworkUnlocked &&
           _state.currentDate.weekday < DateTime.saturday &&
           _state.marketMinute >= krxCloseMinute &&
           _state.marketMinute <= marketDayEndMinute;
     }
-    return _adultLeisureUnlocked &&
+    return _nationalNetworkUnlocked &&
         _state.currentDate.weekday < DateTime.saturday &&
         _state.marketMinute >= krxCloseMinute &&
         _state.marketMinute < marketDayEndMinute &&
@@ -956,13 +1011,16 @@ class _HomeComputerScreenState extends State<HomeComputerScreen> {
   }
 
   String get _afterMarketLeisureStatus {
-    if (!_adultLeisureUnlocked) return '성인 시점에 개방 · 만 20세 이상';
+    if (!_nationalNetworkBriefingEligible) {
+      return '국가계좌 주식 실습을 먼저 마치세요';
+    }
+    if (!_nationalNetworkUnlocked) return '한서윤 운영관 사전 안내 대기';
     if (_state.currentDate.weekday >= DateTime.saturday) {
       return '휴장일 · 다음 평일 장 마감 뒤 이용';
     }
     final casino = _state.personalFinance.casino;
     if (casino.activeBlackjack != null || casino.activeCraps != null) {
-      return '카지노 진행 중 · 현장 세션 정산 필요';
+      return '카지노 진행 중 · 온라인 세션 정산 필요';
     }
     if (_state.personalFinance.casino.roundsForDay(_state.day) > 0) {
       return '오늘 선택 완료 · 데시멀 카지노';
@@ -981,7 +1039,7 @@ class _HomeComputerScreenState extends State<HomeComputerScreen> {
   }
 
   bool get _casinoSessionAvailable {
-    if (widget.onOpenCasino == null || !_adultLeisureUnlocked) return false;
+    if (widget.onOpenCasino == null || !_nationalNetworkUnlocked) return false;
     final casino = _state.personalFinance.casino;
     final hasUnsettledRound =
         casino.activeBlackjack != null || casino.activeCraps != null;
@@ -1003,7 +1061,7 @@ class _HomeComputerScreenState extends State<HomeComputerScreen> {
     if (_state.personalFinance.casino.activeCraps != null) {
       return '크랩스 포인트 정산 필요';
     }
-    if (!_adultLeisureUnlocked) return '만 20세부터 출입 등록';
+    if (!_nationalNetworkUnlocked) return '운영관 안내 후 접속';
     if (_state.currentDate.weekday >= DateTime.saturday) {
       return '평일 장 마감 후';
     }
@@ -1013,22 +1071,23 @@ class _HomeComputerScreenState extends State<HomeComputerScreen> {
     if (_state.marketMinute > marketDayEndMinute - casinoRoundMinutes) {
       return '오늘 이용 종료';
     }
-    return '입장 가능 · 1판 30분';
+    return '접속 가능 · 1판 30분';
   }
 
   bool get _horseRaceSessionAvailable =>
       widget.onOpenHorseRace != null &&
-      _adultLeisureUnlocked &&
+      _nationalNetworkUnlocked &&
       _state.currentDate.weekday < DateTime.saturday &&
       _state.marketMinute >= krxCloseMinute &&
       _state.marketMinute < marketDayEndMinute &&
       !weekdayEveningUsed(_state) &&
       _state.personalFinance.casino.roundsForDay(_state.day) == 0 &&
       !horseRaceDailyLimitReached(_state) &&
-      _state.bankCash >= horseRaceMinStake;
+      horseRaceMaximumStakeForCash(_state.availableBrokerageCash) >=
+          horseRaceMinStake;
 
   String get _horseRaceSessionStatus {
-    if (!_adultLeisureUnlocked) return '만 20세부터 국가망 접속';
+    if (!_nationalNetworkUnlocked) return '운영관 안내 후 접속';
     if (_state.currentDate.weekday >= DateTime.saturday) return '평일 장 마감 후';
     if (_state.personalFinance.casino.roundsForDay(_state.day) > 0) {
       return '오늘 카지노 선택';
@@ -1039,13 +1098,19 @@ class _HomeComputerScreenState extends State<HomeComputerScreen> {
     if (weekdayEveningUsed(_state)) return '오늘 저녁 행동 사용';
     if (_state.marketMinute < krxCloseMinute) return '15:00 개장';
     if (_state.marketMinute >= marketDayEndMinute) return '오늘 이용 종료';
-    if (_state.bankCash < horseRaceMinStake) return '생활비 잔액 부족';
+    if (horseRaceMaximumStakeForCash(_state.availableBrokerageCash) <
+        horseRaceMinStake) {
+      return '국가계좌 주문 가능금 부족';
+    }
     return '베팅 ${horseRaceBetsToday(_state)}/$horseRaceDailyBetLimit회';
   }
 
   Future<void> _openStockMarket() async {
     final next = await widget.onOpenStockMarket(_state);
-    if (mounted) setState(() => _state = next);
+    if (mounted) {
+      setState(() => _state = next);
+      _scheduleNationalNetworkBriefing();
+    }
   }
 
   Future<void> _openCompanyManagement() async {
@@ -1074,10 +1139,10 @@ class _HomeComputerScreenState extends State<HomeComputerScreen> {
         context: context,
         builder: (dialogContext) => AlertDialog(
           key: const Key('after-market-casino-gateway'),
-          title: const Text('카지노 현장 방문 등록'),
+          title: const Text('데시멀 카지노 국가망 접속'),
           content: const Text(
-            '공용 PC에서 성인 출입증과 셔틀 좌석을 등록합니다. 등록 뒤에는 원격 게임이 아니라 데시멀 카지노 현장으로 이동해 이안 딜러의 테이블을 이용합니다.\n\n'
-            '평일 장 마감 뒤 15:00~19:30 · 1판 30분 · 국가망 경마와 같은 날 중복 이용 불가',
+            '데시멀 PC에서 이안 딜러가 운영하는 국가 전용망 테이블에 접속합니다. 현장 이동과 외부 결제는 없고, 국가계좌 주문 가능금만 칩으로 바꿔 사용합니다.\n\n'
+            '평일 장 마감 뒤 15:00~19:30 · 1판 30분 · 500원 단위 · 국가망 경마와 같은 날 중복 이용 불가',
           ),
           actions: [
             TextButton(
@@ -1088,8 +1153,8 @@ class _HomeComputerScreenState extends State<HomeComputerScreen> {
             FilledButton.icon(
               key: const Key('after-market-casino-confirm'),
               onPressed: () => Navigator.pop(dialogContext, true),
-              icon: const Icon(Icons.directions_bus_rounded),
-              label: const Text('출입증 발급 · 현장 이동'),
+              icon: const Icon(Icons.lock_open_rounded),
+              label: const Text('국가망 테이블 접속'),
             ),
           ],
         ),
@@ -1109,8 +1174,8 @@ class _HomeComputerScreenState extends State<HomeComputerScreen> {
         key: const Key('after-market-horse-gateway'),
         title: const Text('국가망 경마 접속'),
         content: const Text(
-          '공용 PC의 국가망에서 원격 패독과 8두 출전표를 확인하고 전자 마권을 전송합니다. 경주가 시작되면 실시간 중계를 본 뒤 정산 즉시 20:00으로 이동합니다.\n\n'
-          '평일 장 마감 뒤 1일 1회 · 데시멀 카지노와 같은 날 중복 이용 불가',
+          '공용 PC의 국가망에서 원격 패독과 8두 출전표를 확인하고, 국가계좌 주문 가능금의 2%·5%·10%·30% 중 하나로 전자 마권을 전송합니다. 최소 500원이며 정산 즉시 20:00으로 이동합니다.\n\n'
+          '평일 장 마감 뒤 1일 1회 · 확정 이익 20% 국가 환수 · 카지노와 같은 날 중복 이용 불가',
         ),
         actions: [
           TextButton(
@@ -1344,8 +1409,8 @@ class _HomeComputerScreenState extends State<HomeComputerScreen> {
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    _adultLeisureUnlocked
-                                        ? '자산 프로그램과 장 마감 후 경마·카지노 연결은 같은 게임 시간과 자금을 공유합니다.'
+                                    _nationalNetworkUnlocked
+                                        ? '자산 프로그램과 국가망 확률시장은 같은 게임 시간과 국가계좌를 공유합니다.'
                                         : '주식거래·주주권·회사경영·부동산·상권 프로그램은 현재 상태를 공유합니다.',
                                     maxLines: 2,
                                     style: const TextStyle(
@@ -1478,11 +1543,9 @@ class _HomeComputerScreenState extends State<HomeComputerScreen> {
                                                 ],
                                               ),
                                             ),
-                                            if (_state.currentDate.year >=
-                                                    2010 &&
-                                                (widget.onOpenCasino != null ||
-                                                    widget.onOpenHorseRace !=
-                                                        null)) ...[
+                                            if (widget.onOpenCasino != null ||
+                                                widget.onOpenHorseRace !=
+                                                    null) ...[
                                               const SizedBox(height: 8),
                                               _AfterMarketLeisureBanner(
                                                 open: _afterMarketLeisureOpen,
@@ -1508,7 +1571,7 @@ class _HomeComputerScreenState extends State<HomeComputerScreen> {
                                                               ),
                                                           title: '데시멀 카지노',
                                                           subtitle:
-                                                              'PC 등록 → 현장 테이블',
+                                                              'PC 온라인 · 국가계좌 칩',
                                                           status:
                                                               _casinoSessionStatus,
                                                           onTap:
@@ -1660,6 +1723,288 @@ class _HomeComputerScreenState extends State<HomeComputerScreen> {
   }
 }
 
+class _NationalNetworkBriefingBeat {
+  const _NationalNetworkBriefingBeat({required this.title, required this.body});
+
+  final String title;
+  final String body;
+}
+
+const _nationalNetworkBriefingBeats = <_NationalNetworkBriefingBeat>[
+  _NationalNetworkBriefingBeat(
+    title: '국가계좌에 붙는 두 개의 온라인 시장',
+    body:
+        '한서윤 운영관: “주식 실습을 마친 후부터 PC에 국가망 경마와 데시멀 카지노가 열립니다. 둘 다 현장에 가는 서비스가 아니라, 프로젝트 내부 PC에서만 접속하는 확률시장입니다.”',
+  ),
+  _NationalNetworkBriefingBeat(
+    title: '국가망 경마 · 주문 가능금의 2~30%',
+    body:
+        '한서윤 운영관: “단승·연승·복승 중 하나를 고르고 국가계좌 주문 가능금의 2%·5%·10%·30% 중 하나를 전자 마권으로 삽니다. 최소는 500원, 상한은 계좌의 30%이고 하루 한 번만 가능합니다.”',
+  ),
+  _NationalNetworkBriefingBeat(
+    title: '데시멀 카지노 · 보유 칩의 2~30%',
+    body:
+        '한서윤 운영관: “국가계좌 돈을 온라인 칩으로 먼저 바꾸고, 이안 딜러가 진행하는 여섯 테이블 중 하나를 고릅니다. 실제 베팅은 보유 칩의 2%·5%·10%·30%를 500원 단위로 내린 금액 중 하나입니다. 최소 베팅은 500원이고, 한 판은 30분입니다.”',
+  ),
+  _NationalNetworkBriefingBeat(
+    title: '이기면 20% 국가 환수 · 지면 수수료 0원',
+    body:
+        '한서윤 운영관: “원금이 아닌 확정 이익에서만 20%를 국가가 환수합니다. 나머지 80%는 다시 국가계좌로 돌아옵니다. 손실이나 본전에는 환수가 없지만, 잃은 돈도 국가계좌에서 실제로 빠집니다. 경마와 카지노는 같은 날 하나만 고르세요.”',
+  ),
+];
+
+class _NationalNetworkBriefingDialog extends StatefulWidget {
+  const _NationalNetworkBriefingDialog();
+
+  @override
+  State<_NationalNetworkBriefingDialog> createState() =>
+      _NationalNetworkBriefingDialogState();
+}
+
+class _NationalNetworkBriefingDialogState
+    extends State<_NationalNetworkBriefingDialog> {
+  int _page = 0;
+
+  bool get _showUnlock => _page >= _nationalNetworkBriefingBeats.length;
+
+  void _advance() {
+    if (_showUnlock) {
+      Navigator.of(context).pop(true);
+      return;
+    }
+    GameAudio.instance.playSfx(GameSfx.select);
+    setState(() => _page += 1);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final screen = MediaQuery.sizeOf(context);
+    return Dialog(
+      key: const Key('national-network-briefing-dialog'),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 20),
+      backgroundColor: Colors.transparent,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 460,
+          maxHeight: math.min(680, screen.height - 40),
+        ),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: const Color(0xFFF4F0E5),
+            border: Border.all(color: const Color(0xFF263854), width: 2),
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x66000000),
+                blurRadius: 20,
+                offset: Offset(0, 10),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Column(
+              children: [
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                  color: const Color(0xFF1B2B45),
+                  child: Text(
+                    _showUnlock
+                        ? '국가망 접속 승인'
+                        : '한서윤 운영관 · 사전 안내 ${_page + 1}/${_nationalNetworkBriefingBeats.length}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontFamily: _hubDisplayFont,
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 260),
+                    child: _showUnlock
+                        ? const _NationalNetworkUnlockEffect()
+                        : _NationalNetworkTeacherPage(
+                            key: ValueKey(_page),
+                            beat: _nationalNetworkBriefingBeats[_page],
+                          ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 8, 14, 14),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      key: Key(
+                        _showUnlock
+                            ? 'national-network-briefing-complete'
+                            : 'national-network-briefing-next',
+                      ),
+                      onPressed: _advance,
+                      icon: Icon(
+                        _showUnlock
+                            ? Icons.power_settings_new_rounded
+                            : Icons.navigate_next_rounded,
+                      ),
+                      label: Text(
+                        _showUnlock
+                            ? 'PC 국가망 열기'
+                            : _page == _nationalNetworkBriefingBeats.length - 1
+                            ? '안내 확인 · 잠금해제'
+                            : '다음 설명',
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NationalNetworkTeacherPage extends StatelessWidget {
+  const _NationalNetworkTeacherPage({super.key, required this.beat});
+
+  final _NationalNetworkBriefingBeat beat;
+
+  @override
+  Widget build(BuildContext context) => SingleChildScrollView(
+    padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SizedBox(
+          height: 210,
+          child: Image.asset(
+            'assets/images/주식선생님/22_포즈1_주인공그림체_공통슬롯_투명.png',
+            fit: BoxFit.contain,
+            alignment: Alignment.bottomCenter,
+            errorBuilder: (_, _, _) => const Icon(
+              Icons.school_rounded,
+              size: 96,
+              color: Color(0xFF526A8E),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          beat.title,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontFamily: _hubDisplayFont,
+            color: Color(0xFF1C2F4A),
+            fontSize: 16,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(13),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border.all(color: const Color(0xFF9AA9BA)),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            beat.body,
+            style: const TextStyle(
+              fontFamily: _hubDisplayFont,
+              color: Color(0xFF26364C),
+              fontSize: 12,
+              height: 1.55,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _NationalNetworkUnlockEffect extends StatelessWidget {
+  const _NationalNetworkUnlockEffect();
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: TweenAnimationBuilder<double>(
+      key: const Key('national-network-unlock-effect'),
+      tween: Tween(begin: 0.72, end: 1),
+      duration: const Duration(milliseconds: 620),
+      curve: Curves.elasticOut,
+      builder: (context, scale, child) =>
+          Transform.scale(scale: scale, child: child),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 112,
+              height: 112,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFF193B5E),
+                border: Border.all(color: const Color(0xFFFFCF66), width: 4),
+                boxShadow: const [
+                  BoxShadow(color: Color(0x88FFD15D), blurRadius: 28),
+                ],
+              ),
+              child: const Icon(
+                Icons.lock_open_rounded,
+                size: 58,
+                color: Color(0xFFFFD66F),
+              ),
+            ),
+            const SizedBox(height: 22),
+            const Text(
+              '잠금해제',
+              style: TextStyle(
+                fontFamily: _hubDisplayFont,
+                color: Color(0xFFB37A13),
+                fontSize: 14,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 3,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              '국가망 확률시장',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: _hubDisplayFont,
+                color: Color(0xFF1D304B),
+                fontSize: 24,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              '국가망 경마 · 데시멀 온라인 카지노\n국가계좌 전용 · 확정 이익 20% 국가 환수',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: _hubDisplayFont,
+                color: Color(0xFF5D6878),
+                fontSize: 12,
+                height: 1.55,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
 class _AfterMarketLeisureBanner extends StatelessWidget {
   const _AfterMarketLeisureBanner({required this.open, required this.status});
 
@@ -1687,7 +2032,7 @@ class _AfterMarketLeisureBanner extends StatelessWidget {
         ),
         const SizedBox(width: 6),
         const Text(
-          '장 마감 후 레저',
+          '국가망 확률시장',
           style: TextStyle(
             fontFamily: _hubDisplayFont,
             color: Color(0xFF27394F),

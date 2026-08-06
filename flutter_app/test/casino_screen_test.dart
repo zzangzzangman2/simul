@@ -33,14 +33,14 @@ Future<void> _advanceCasinoWelcome(
   expect(
     find.text(
       hasChips
-          ? '보유 칩으로 테이블에 가거나, 현금을 칩으로 더 바꿀 수 있어.'
-          : '지금은 칩이 하나도 없어. 먼저 현금을 칩으로 바꿔야 테이블에 들어갈 수 있어.',
+          ? '보유 칩으로 온라인 테이블에 가거나, 국가계좌 돈을 칩으로 더 바꿀 수 있어.'
+          : '지금은 칩이 하나도 없어. 먼저 국가계좌 돈을 칩으로 바꿔야 테이블에 들어갈 수 있어.',
     ),
     findsOneWidget,
   );
   expect(find.byKey(const Key('casino-entry-continue')), findsOneWidget);
   expect(find.byKey(const Key('casino-entry-exchange')), findsOneWidget);
-  expect(find.text(hasChips ? '테이블로 가기' : '칩 교환 후 입장'), findsOneWidget);
+  expect(find.text(hasChips ? '온라인 테이블' : '칩 교환 후 접속'), findsOneWidget);
   final tableButton = tester.widget<FilledButton>(
     find.byKey(const Key('casino-entry-continue')),
   );
@@ -69,12 +69,16 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     final day =
-        DateTime(2010, 1, 4).difference(DateTime(2000, 1, 1)).inDays + 1;
+        DateTime(2000, 1, 3).difference(DateTime(2000, 1, 1)).inDays + 1;
     final state = engine
-        .createNewGame(
-          '카지노 PC 연결 테스트',
-          initialCash: 1000000,
-          worldSeed: 'casino-home-computer',
+        .markNationalNetworkBriefingSeen(
+          engine.markMarketTutorialSeen(
+            engine.createNewGame(
+              '카지노 PC 연결 테스트',
+              initialCash: 1000000,
+              worldSeed: 'casino-home-computer',
+            ),
+          ),
         )
         .copyWith(day: day, marketMinute: krxCloseMinute, decisions: const []);
     var casinoOpenCount = 0;
@@ -99,14 +103,14 @@ void main() {
 
     final app = find.byKey(const Key('computer-casino-live-app'));
     expect(app, findsOneWidget);
-    expect(find.text('입장 가능 · 1판 30분'), findsOneWidget);
+    expect(find.text('접속 가능 · 1판 30분'), findsOneWidget);
     await tester.tap(app);
     await tester.pumpAndSettle();
     expect(
       find.byKey(const Key('after-market-casino-gateway')),
       findsOneWidget,
     );
-    expect(find.textContaining('원격 게임이 아니라'), findsOneWidget);
+    expect(find.textContaining('현장 이동과 외부 결제는 없고'), findsOneWidget);
     expect(casinoOpenCount, 0);
     await tester.tap(find.byKey(const Key('after-market-casino-confirm')));
     await tester.pumpAndSettle();
@@ -129,7 +133,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.text('지금은 칩이 하나도 없어. 먼저 현금을 칩으로 바꿔야 테이블에 들어갈 수 있어.'),
+      find.text('지금은 칩이 하나도 없어. 먼저 국가계좌 돈을 칩으로 바꿔야 테이블에 들어갈 수 있어.'),
       findsOneWidget,
     );
     expect(find.byKey(const Key('casino-entry-exchange')), findsOneWidget);
@@ -144,19 +148,16 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     final day =
-        DateTime(2010, 1, 4).difference(DateTime(2000, 1, 1)).inDays + 1;
+        DateTime(2000, 1, 3).difference(DateTime(2000, 1, 1)).inDays + 1;
     var state = engine
-        .createNewGame(
-          '카지노 화면 테스트',
-          initialCash: 10000000,
-          worldSeed: 'casino-screen-test',
+        .markNationalNetworkBriefingSeen(
+          engine.createNewGame(
+            '카지노 화면 테스트',
+            initialCash: 10000000,
+            worldSeed: 'casino-screen-test',
+          ),
         )
-        .copyWith(
-          day: day,
-          marketMinute: krxCloseMinute,
-          brokerageCash: 0,
-          decisions: const [],
-        );
+        .copyWith(day: day, marketMinute: krxCloseMinute, decisions: const []);
 
     Future<CasinoActionResult> persist(CasinoActionResult result) async {
       if (result.success) {
@@ -235,8 +236,19 @@ void main() {
       find.byKey(const Key('casino-game-money-status')),
     );
     expect(gameMoneyStatus.data, contains('15:00'));
-    expect(gameMoneyStatus.data, contains('현금 9,900,000원'));
+    expect(gameMoneyStatus.data, contains('국가계좌 9,900,000원'));
     expect(gameMoneyStatus.data, contains('칩 100,000원'));
+    expect(find.byKey(const Key('casino-stake-2000')), findsOneWidget);
+    expect(find.byKey(const Key('casino-stake-5000')), findsOneWidget);
+    expect(find.byKey(const Key('casino-stake-10000')), findsOneWidget);
+    expect(find.byKey(const Key('casino-stake-30000')), findsOneWidget);
+    expect(find.text('2%'), findsOneWidget);
+    expect(find.text('5%'), findsOneWidget);
+    expect(find.text('10%'), findsOneWidget);
+    expect(find.text('30%'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('casino-stake-30000')));
+    await tester.pump();
+    expect(find.text('PLACE BET · 30,000원'), findsOneWidget);
     expect(find.byKey(const Key('casino-play-round')), findsOneWidget);
     expect(find.byKey(const Key('casino-live-table-stage')), findsOneWidget);
     expect(
@@ -318,7 +330,7 @@ void main() {
       find.byKey(const Key('casino-go-offline')),
     );
     expect(find.text('다른 게임 하러가기'), findsOneWidget);
-    expect(find.text('퇴장'), findsOneWidget);
+    expect(find.text('접속 종료'), findsOneWidget);
     expect(otherGamesRect.top, closeTo(offlineRect.top, 1));
     expect(otherGamesRect.width, closeTo(offlineRect.width, 1));
     expect(find.text('최근 게임 원장'), findsOneWidget);
@@ -333,19 +345,14 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     final day =
-        DateTime(2010, 1, 4).difference(DateTime(2000, 1, 1)).inDays + 1;
+        DateTime(2000, 1, 3).difference(DateTime(2000, 1, 1)).inDays + 1;
     var state = engine
         .createNewGame(
           '블랙잭 화면 테스트',
           initialCash: 10000000,
           worldSeed: 'blackjack-screen-test',
         )
-        .copyWith(
-          day: day,
-          marketMinute: krxCloseMinute,
-          brokerageCash: 0,
-          decisions: const [],
-        );
+        .copyWith(day: day, marketMinute: krxCloseMinute, decisions: const []);
     state = engine.exchangeCasinoChips(state, 100000).state;
 
     Future<CasinoActionResult> apply(CasinoActionResult result) async {
@@ -622,11 +629,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('casino-test-screen')), findsOneWidget);
-    expect(find.text('데시멀 카지노 · TEST'), findsOneWidget);
-    expect(find.text('15:00 · 현금 1,000,000원 · 칩 0원'), findsOneWidget);
+    expect(find.text('데시멀 온라인 카지노 · TEST'), findsOneWidget);
+    expect(find.text('15:00 · 국가계좌 1,000,000원 · 칩 0원'), findsOneWidget);
     expect(find.byKey(const Key('casino-game-baccarat')), findsNothing);
     await _advanceCasinoWelcome(tester, hasChips: false);
-    expect(find.text('칩 교환 후 입장'), findsOneWidget);
+    expect(find.text('칩 교환 후 접속'), findsOneWidget);
     expect(find.text('칩 교환'), findsOneWidget);
 
     await tester.ensureVisible(find.byKey(const Key('casino-entry-exchange')));
@@ -671,7 +678,7 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
       final day =
-          DateTime(2010, 1, 4).difference(DateTime(2000, 1, 1)).inDays + 1;
+          DateTime(2000, 1, 3).difference(DateTime(2000, 1, 1)).inDays + 1;
       var state = engine
           .createNewGame(
             '카지노 테스트',
@@ -681,7 +688,6 @@ void main() {
           .copyWith(
             day: day,
             marketMinute: krxCloseMinute,
-            brokerageCash: 0,
             decisions: const [],
           );
       state = engine.exchangeCasinoChips(state, 10000).state;
@@ -708,7 +714,19 @@ void main() {
             onExchangeChips: (amount) =>
                 apply(engine.exchangeCasinoChips(state, amount)),
             onCashOutChips: () => apply(engine.cashOutCasinoChips(state)),
-            onPlayRound: (bet) => apply(engine.playCasinoRound(state, bet)),
+            onPlayRound: (bet) => apply(
+              CasinoActionResult(
+                state: state.copyWith(
+                  personalFinance: state.personalFinance.copyWith(
+                    casino: state.personalFinance.casino.copyWith(
+                      chipBalance: 0,
+                    ),
+                  ),
+                ),
+                success: true,
+                message: '테스트용 칩 소진',
+              ),
+            ),
             onStartBlackjack: (stake) =>
                 apply(engine.startCasinoBlackjack(state, stake)),
             onBlackjackAction: (action) =>
@@ -734,7 +752,7 @@ void main() {
       );
       expect(emptyLever.onTap, isNotNull);
       expect(find.text('칩 충전'), findsOneWidget);
-      expect(find.text('칩이 떨어졌어. 게임 버튼을 눌러 칩을 충전해 줘.'), findsOneWidget);
+      expect(find.text('베팅 가능한 칩이 부족해. 칩 교환소에서 더 충전해 줘.'), findsOneWidget);
 
       await tester.tap(find.byKey(const Key('casino-slot-pull')));
       await tester.pumpAndSettle();
@@ -752,9 +770,9 @@ void main() {
       final dialogue = tester.getRect(noChipDialogue);
       await tester.tapAt(Offset(dialogue.right - 8, dialogue.bottom - 8));
       await tester.pumpAndSettle();
-      expect(find.text('더 할 거면 칩 사러 가자. 오늘은 여기까지면 퇴장하면 돼.'), findsOneWidget);
+      expect(find.text('더 할 거면 칩 사러 가자. 오늘은 여기까지면 접속을 끝내면 돼.'), findsOneWidget);
       expect(find.text('칩 사러 가기'), findsOneWidget);
-      expect(find.text('퇴장하기'), findsOneWidget);
+      expect(find.text('접속 종료'), findsWidgets);
 
       await tester.tap(find.byKey(const Key('casino-no-chips-offline')));
       await tester.pumpAndSettle();
@@ -774,7 +792,7 @@ void main() {
       await tester.tap(find.byKey(const Key('casino-no-chips-exchange')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('casino-exchange-confirm')), findsOneWidget);
-      expect(find.textContaining('현금 990,000원 · 보유 칩 0원'), findsOneWidget);
+      expect(find.textContaining('국가계좌 990,000원 · 보유 칩 0원'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
@@ -787,19 +805,16 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     final day =
-        DateTime(2010, 1, 4).difference(DateTime(2000, 1, 1)).inDays + 1;
+        DateTime(2000, 1, 3).difference(DateTime(2000, 1, 1)).inDays + 1;
     var state = engine
-        .createNewGame(
-          '카지노 칩 보관 화면 테스트',
-          initialCash: 1000000,
-          worldSeed: 'casino-keep-chip-screen',
+        .markNationalNetworkBriefingSeen(
+          engine.createNewGame(
+            '카지노 칩 보관 화면 테스트',
+            initialCash: 1000000,
+            worldSeed: 'casino-keep-chip-screen',
+          ),
         )
-        .copyWith(
-          day: day,
-          marketMinute: krxCloseMinute,
-          brokerageCash: 0,
-          decisions: const [],
-        );
+        .copyWith(day: day, marketMinute: krxCloseMinute, decisions: const []);
     state = engine.exchangeCasinoChips(state, 100000).state;
     final offlineMinute = state.marketMinute;
     var wentOffline = false;
@@ -831,7 +846,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('casino-exit-sheet')), findsOneWidget);
     expect(find.text('현재 보유 칩 100,000원'), findsOneWidget);
-    expect(find.textContaining('현금 100,000원으로 환전'), findsOneWidget);
+    expect(find.textContaining('국가계좌 100,000원으로 환전'), findsOneWidget);
     expect(find.text('칩 보관하고 나가기'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('casino-exit-cancel')));

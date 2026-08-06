@@ -3509,26 +3509,35 @@ void main() {
   });
 
   test(
-    'chance entertainment is adult-only, capped, deterministic, and monthly',
+    'legacy chance API uses the 2000 national account, cap, fee, and month lock',
     () {
-      final january1 =
-          DateTime(2010, 1, 1).difference(DateTime(2000, 1, 1)).inDays + 1;
-      final adult = engine
-          .createNewGame('확률 오락 테스트', initialCash: 10000000)
-          .copyWith(day: january1, brokerageCash: 0, decisions: const []);
-      final beforeAdult = adult.copyWith(day: january1 - 366);
+      final base = engine
+          .createNewGame('확률시장 호환 테스트', initialCash: 10000000)
+          .copyWith(decisions: const []);
+      final national = engine.markNationalNetworkBriefingSeen(base);
 
-      final locked = engine.playAdultChanceGame(beforeAdult, 10000);
-      final excessive = engine.playAdultChanceGame(adult, 100001);
-      final first = engine.playAdultChanceGame(adult, 100000);
+      final locked = engine.playAdultChanceGame(base, 100000);
+      final excessive = engine.playAdultChanceGame(national, 100500);
+      final first = engine.playAdultChanceGame(national, 100000);
       final repeated = engine.playAdultChanceGame(first.state, 100000);
-      final deterministic = engine.playAdultChanceGame(adult, 100000);
+      final deterministic = engine.playAdultChanceGame(national, 100000);
 
       expect(locked.success, isFalse);
       expect(excessive.success, isFalse);
       expect(first.success, isTrue);
       expect(first.state.personalFinance.totalChanceStake, 100000);
       expect(first.state.personalFinance.chancePlayCount, 1);
+      expect(first.state.bankCash, 0);
+      expect(
+        first.state.brokerageCash,
+        national.brokerageCash + first.cashDelta,
+      );
+      expect(
+        first.state.ledger
+            .where((entry) => entry.sourceId.startsWith('adult-chance-'))
+            .every((entry) => entry.account == 'brokerage_cash'),
+        isTrue,
+      );
       expect(repeated.success, isFalse);
       expect(repeated.state.toJson(), first.state.toJson());
       expect(deterministic.state.toJson(), first.state.toJson());

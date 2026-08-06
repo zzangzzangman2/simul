@@ -85,6 +85,8 @@ class StoryState {
   bool get tutorialSeen => flagBool('hubTutorialSeen');
   bool get marketTutorialEligible => flagBool('marketTutorialEligible');
   bool get marketTutorialSeen => flagBool('marketTutorialSeen');
+  bool get nationalNetworkBriefingSeen =>
+      flagBool('nationalNetworkBriefingSeen');
   bool get bankDepositTutorialSeen => flagBool('bankDepositTutorialSeen');
   bool get realEstateTutorialSeen => flagBool('realEstateTutorialSeen');
   List<Map<String, dynamic>> get newsArchive {
@@ -188,6 +190,7 @@ class StoryState {
         'hubTutorialSeen': false,
         'marketTutorialEligible': true,
         'marketTutorialSeen': false,
+        'nationalNetworkBriefingSeen': false,
         'bankDepositTutorialSeen': false,
         'realEstateTutorialSeen': false,
         'liveTradingStarted': false,

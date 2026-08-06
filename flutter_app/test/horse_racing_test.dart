@@ -13,8 +13,7 @@ void main() {
   GameState weekdayState(String seed) {
     final base = engine.createNewGame('경마 테스트', worldSeed: seed);
     var day = base.day;
-    while (base.dateForDay(day).isBefore(DateTime(2010, 1, 1)) ||
-        base.dateForDay(day).weekday >= DateTime.saturday) {
+    while (base.dateForDay(day).weekday >= DateTime.saturday) {
       day += 1;
     }
     return base.copyWith(
@@ -330,6 +329,17 @@ void main() {
     expect(outsiderWins, greaterThan(0));
   });
 
+  test('stake presets scale from 2 to 30 percent of available cash', () {
+    expect(horseRaceStakeForCashPercent(50000, 2), 1000);
+    expect(horseRaceStakeForCashPercent(50000, 5), 2500);
+    expect(horseRaceStakeForCashPercent(50000, 10), 5000);
+    expect(horseRaceStakeForCashPercent(50000, 30), 15000);
+    expect(horseRaceMaximumStakeForCash(50000), 15000);
+    expect(isValidHorseRaceStake(15000, 50000), isTrue);
+    expect(isValidHorseRaceStake(15500, 50000), isFalse);
+    expect(isValidHorseRaceStake(1250, 50000), isFalse);
+  });
+
   test('win, place, and quinella payouts follow the official finish', () {
     final race = buildAfternoonHorseRace(simulationSeed: 'payout', day: 8);
     final winner = race.finishOrder[0];
@@ -415,6 +425,11 @@ void main() {
       expect(settled.success, isTrue);
       expect(settled.cashDelta, payout - 1000 - stateFee);
       expect(settled.state.cash, state.cash + payout - 1000 - stateFee);
+      expect(
+        settled.state.brokerageCash,
+        state.brokerageCash + payout - 1000 - stateFee,
+      );
+      expect(settled.state.bankCash, state.bankCash);
       expect(settled.state.marketMinute, marketDayEndMinute);
       expect(horseRaceBetsToday(settled.state), horseRaceDailyBetLimit);
       expect(horseRaceDailyLimitReached(settled.state), isTrue);
@@ -425,6 +440,12 @@ void main() {
       expect(
         settled.state.ledger.where((entry) => entry.id.contains('horse-race')),
         hasLength(3),
+      );
+      expect(
+        settled.state.ledger
+            .where((entry) => entry.id.contains('horse-race'))
+            .every((entry) => entry.account == 'brokerage_cash'),
+        isTrue,
       );
       expect(
         settled.state.ledger
@@ -459,6 +480,36 @@ void main() {
       ),
     );
     expect(result.success, isFalse);
+    expect(result.state.cash, state.cash);
+  });
+
+  test('engine rejects a ticket above 30 percent of available cash', () {
+    final base = weekdayState('oversized-horse-race');
+    final state = base.copyWith(cash: 50000, brokerageCash: 50000);
+    final race = buildAfternoonHorseRace(
+      simulationSeed: state.simulationSeed,
+      day: state.day,
+    );
+    const stake = 15500;
+    final result = engine.completeHorseRace(
+      state,
+      HorseRaceSessionResult(
+        raceId: race.id,
+        betType: HorseBetType.win,
+        primaryHorseId: race.finishOrder.first,
+        stake: stake,
+        grossPayout: calculateHorseRacePayout(
+          race: race,
+          betType: HorseBetType.win,
+          primaryHorseId: race.finishOrder.first,
+          stake: stake,
+        ),
+        finishOrder: race.finishOrder,
+      ),
+    );
+
+    expect(result.success, isFalse);
+    expect(result.message, contains('30%'));
     expect(result.state.cash, state.cash);
   });
 

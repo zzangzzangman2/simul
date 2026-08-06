@@ -168,7 +168,36 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('adult weekday home PC exposes the one-bet horse racing app', (
+  testWidgets('stake buttons use 2, 5, 10, and 30 percent of available cash', (
+    tester,
+  ) async {
+    await setPhoneSurface(tester);
+    final race = buildAfternoonHorseRace(
+      simulationSeed: 'horse-widget-stake-percent',
+      day: 8,
+    );
+    await tester.pumpWidget(
+      MaterialApp(home: HorseRacingMiniGame(race: race, availableCash: 50000)),
+    );
+    await tester.pump();
+    await openHorseRaceBettingCard(tester);
+
+    expect(find.byKey(const Key('horse-stake-1000')), findsOneWidget);
+    expect(find.byKey(const Key('horse-stake-2500')), findsOneWidget);
+    expect(find.byKey(const Key('horse-stake-5000')), findsOneWidget);
+    expect(find.byKey(const Key('horse-stake-15000')), findsOneWidget);
+    expect(find.text('2%'), findsOneWidget);
+    expect(find.text('5%'), findsOneWidget);
+    expect(find.text('10%'), findsOneWidget);
+    expect(find.text('30%'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('horse-stake-15000')));
+    await tester.pump();
+    expect(find.text('15,000원 베팅하고 경주 보기'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('2000 national-account PC exposes the one-bet horse racing app', (
     tester,
   ) async {
     await setPhoneSurface(tester);
@@ -178,16 +207,17 @@ void main() {
       worldSeed: 'horse-home-computer',
     );
     var day = base.day;
-    while (base.dateForDay(day).isBefore(DateTime(2010, 1, 1)) ||
-        base.dateForDay(day).weekday >= DateTime.saturday) {
+    while (base.dateForDay(day).weekday >= DateTime.saturday) {
       day += 1;
     }
-    final state = base.copyWith(
-      day: day,
-      cash: base.cash + 5000,
-      marketMinute: krxCloseMinute,
-      decisions: const [],
-    );
+    final state = engine
+        .markNationalNetworkBriefingSeen(engine.markMarketTutorialSeen(base))
+        .copyWith(
+          day: day,
+          cash: base.cash + 5000,
+          marketMinute: krxCloseMinute,
+          decisions: const [],
+        );
     var horseRaceOpenCount = 0;
 
     await tester.pumpWidget(
@@ -237,16 +267,17 @@ void main() {
       worldSeed: 'after-market-pc-lock',
     );
     var day = base.day;
-    while (base.dateForDay(day).isBefore(DateTime(2010, 1, 1)) ||
-        base.dateForDay(day).weekday >= DateTime.saturday) {
+    while (base.dateForDay(day).weekday >= DateTime.saturday) {
       day += 1;
     }
-    final state = base.copyWith(
-      day: day,
-      cash: base.cash + 5000,
-      marketMinute: krxCloseMinute - 1,
-      decisions: const [],
-    );
+    final state = engine
+        .markNationalNetworkBriefingSeen(engine.markMarketTutorialSeen(base))
+        .copyWith(
+          day: day,
+          cash: base.cash + 5000,
+          marketMinute: krxCloseMinute - 1,
+          decisions: const [],
+        );
 
     await tester.pumpWidget(
       MaterialApp(
@@ -278,6 +309,91 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'teacher explains costs and state recovery before unlock effect',
+    (tester) async {
+      await setPhoneSurface(tester);
+      const engine = GameEngine();
+      final base = engine.createNewGame(
+        '국가망 사전 안내 테스트',
+        worldSeed: 'national-network-briefing',
+      );
+      var day = base.day;
+      while (base.dateForDay(day).weekday >= DateTime.saturday) {
+        day += 1;
+      }
+      var saved = engine
+          .markMarketTutorialSeen(base)
+          .copyWith(
+            day: day,
+            marketMinute: krxCloseMinute,
+            decisions: const [],
+          );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: HomeComputerScreen(
+            state: saved,
+            onOpenStockMarket: (current) async => current,
+            onOpenCompanyManagement: (current) async => current,
+            onOpenRealEstate: (current) async => current,
+            onOpenBusiness: (current) async => current,
+            onCompleteNationalNetworkBriefing: () async {
+              saved = engine.markNationalNetworkBriefingSeen(saved);
+              return saved;
+            },
+            onOpenCasino: (current) async => current,
+            onOpenHorseRace: (current) async => current,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('national-network-briefing-dialog')),
+        findsOneWidget,
+      );
+      expect(find.textContaining('현장에 가는 서비스가 아니라'), findsOneWidget);
+      expect(
+        find.byKey(const Key('national-network-unlock-effect')),
+        findsNothing,
+      );
+
+      for (var page = 0; page < 4; page++) {
+        if (page == 1) {
+          expect(find.textContaining('최소는 500원'), findsOneWidget);
+        }
+        if (page == 2) {
+          expect(find.textContaining('한 판은 30분'), findsOneWidget);
+        }
+        if (page == 3) {
+          expect(find.textContaining('확정 이익에서만 20%'), findsOneWidget);
+        }
+        await tester.tap(
+          find.byKey(const Key('national-network-briefing-next')),
+        );
+        await tester.pumpAndSettle();
+      }
+
+      expect(
+        find.byKey(const Key('national-network-unlock-effect')),
+        findsOneWidget,
+      );
+      expect(saved.story.nationalNetworkBriefingSeen, isFalse);
+      await tester.tap(
+        find.byKey(const Key('national-network-briefing-complete')),
+      );
+      await tester.pumpAndSettle();
+      expect(saved.story.nationalNetworkBriefingSeen, isTrue);
+      expect(
+        find.byKey(const Key('national-network-briefing-dialog')),
+        findsNothing,
+      );
+      expect(find.text('접속 가능 · 1판 30분'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('eight animated horses run and produce an official result', (
     tester,

@@ -129,7 +129,7 @@ class _HorseRacingMiniGameState extends State<HorseRacingMiniGame>
   late String _primaryHorseId = widget.race.entrants.first.id;
   String? _secondaryHorseId;
   bool _pickingQuinellaSecond = false;
-  int _stake = horseRaceMinStake;
+  late int _stake;
   int _raceAudioCue = 0;
 
   HorseRaceEntrant get _primary => widget.race.entrantById(_primaryHorseId);
@@ -139,9 +139,7 @@ class _HorseRacingMiniGameState extends State<HorseRacingMiniGame>
       : widget.race.entrantById(_secondaryHorseId!);
 
   bool get _canStart =>
-      widget.availableCash >= horseRaceMinStake &&
-      _stake >= horseRaceMinStake &&
-      _stake <= math.min(horseRaceMaxStake, widget.availableCash) &&
+      isValidHorseRaceStake(_stake, widget.availableCash) &&
       (_betType != HorseBetType.quinella ||
           (_secondaryHorseId != null && _secondaryHorseId != _primaryHorseId));
 
@@ -197,6 +195,12 @@ class _HorseRacingMiniGameState extends State<HorseRacingMiniGame>
   @override
   void initState() {
     super.initState();
+    _stake = horseRaceStakePercents
+        .map(
+          (percent) =>
+              horseRaceStakeForCashPercent(widget.availableCash, percent),
+        )
+        .firstWhere((stake) => stake >= horseRaceMinStake, orElse: () => 0);
     _raceController =
         AnimationController(vsync: this, duration: widget.raceDuration)
           ..addListener(_handleRaceAudioProgress)
@@ -652,12 +656,15 @@ class _HorseRacingMiniGameState extends State<HorseRacingMiniGame>
   }
 
   Widget _buildBettingScreen() {
-    final stakeOptions = <int>{
-      horseRaceMinStake,
-      1000,
-      2000,
-      math.min(horseRaceMaxStake, widget.availableCash),
-    }.where((value) => value >= horseRaceMinStake).toList()..sort();
+    final stakeOptions = horseRaceStakePercents
+        .map(
+          (percent) => MapEntry(
+            percent,
+            horseRaceStakeForCashPercent(widget.availableCash, percent),
+          ),
+        )
+        .where((option) => option.value >= horseRaceMinStake)
+        .toList(growable: false);
     return Scaffold(
       key: const Key('horse-race-betting-screen'),
       backgroundColor: const Color(0xFFF4F1F7),
@@ -714,7 +721,7 @@ class _HorseRacingMiniGameState extends State<HorseRacingMiniGame>
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     const Text(
-                      '₩',
+                      '국가 ₩',
                       style: TextStyle(
                         color: Color(0xFFFFD36F),
                         fontSize: 11,
@@ -1062,10 +1069,14 @@ class _HorseRacingMiniGameState extends State<HorseRacingMiniGame>
                   for (var index = 0; index < stakeOptions.length; index++) ...[
                     Expanded(
                       child: _StakeCoinButton(
-                        value: stakeOptions[index],
-                        selected: _stake == stakeOptions[index],
-                        enabled: stakeOptions[index] <= widget.availableCash,
-                        onTap: () => _setStake(stakeOptions[index]),
+                        percent: stakeOptions[index].key,
+                        value: stakeOptions[index].value,
+                        selected: _stake == stakeOptions[index].value,
+                        enabled: isValidHorseRaceStake(
+                          stakeOptions[index].value,
+                          widget.availableCash,
+                        ),
+                        onTap: () => _setStake(stakeOptions[index].value),
                       ),
                     ),
                     if (index != stakeOptions.length - 1)
@@ -1478,12 +1489,14 @@ class _RaceHubEmblem extends StatelessWidget {
 
 class _StakeCoinButton extends StatelessWidget {
   const _StakeCoinButton({
+    required this.percent,
     required this.value,
     required this.selected,
     required this.enabled,
     required this.onTap,
   });
 
+  final int percent;
   final int value;
   final bool selected;
   final bool enabled;
@@ -1500,7 +1513,7 @@ class _StakeCoinButton extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
-          height: 36,
+          height: 43,
           decoration: BoxDecoration(
             color: selected ? const Color(0xFFE95778) : const Color(0xFFF2EFF4),
             borderRadius: BorderRadius.circular(8),
@@ -1510,15 +1523,27 @@ class _StakeCoinButton extends StatelessWidget {
                   : const Color(0xFFD9D4DE),
             ),
           ),
-          child: Row(
+          child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(
-                value >= 1000 ? '${value ~/ 1000}천' : '$value',
+                '$percent%',
                 style: TextStyle(
                   color: selected ? Colors.white : const Color(0xFF40384D),
-                  fontSize: 11,
+                  fontSize: 10,
                   fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 1),
+              Text(
+                '${_money(value)}원',
+                maxLines: 1,
+                style: TextStyle(
+                  color: selected
+                      ? const Color(0xFFFFE8EE)
+                      : const Color(0xFF777080),
+                  fontSize: 8,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
             ],

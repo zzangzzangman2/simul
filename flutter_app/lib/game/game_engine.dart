@@ -1990,16 +1990,6 @@ class GameEngine {
         message: '오늘 저녁 업무는 이미 끝났습니다. 다음 날로 넘어가세요.',
       );
     }
-    if ((activity.id == 'casino' || activity.id == 'horse_racing') &&
-        (state.currentDate.isBefore(DateTime(2010, 1, 1)) ||
-            state.story.ageOn(state.currentDate) < 20)) {
-      return WeekdayActivityResult(
-        state: state,
-        success: false,
-        message: '카지노와 경마는 성인이 되는 2010년부터 선택할 수 있습니다.',
-        activity: activity,
-      );
-    }
     if (activity.id == 'bank' && !bankAccessUnlocked(state)) {
       return WeekdayActivityResult(
         state: state,
@@ -2086,10 +2076,6 @@ class GameEngine {
     if (state.currentDate.weekday >= DateTime.saturday) {
       return failure('경마는 월요일부터 금요일까지 장 마감 뒤에만 이용할 수 있습니다.');
     }
-    if (state.currentDate.isBefore(DateTime(2010, 1, 1)) ||
-        state.story.ageOn(state.currentDate) < 20) {
-      return failure('경마는 성인이 되는 2010년부터 이용할 수 있습니다.');
-    }
     if (state.pendingDecisions.isNotEmpty) {
       return failure('새 기록의 결정을 먼저 마쳐야 경마 중계를 볼 수 있습니다.');
     }
@@ -2108,12 +2094,13 @@ class GameEngine {
     if (weekdayEveningUsed(state)) {
       return failure('오늘의 저녁 행동은 이미 사용했습니다.');
     }
-    if (session.stake < horseRaceMinStake ||
-        session.stake > horseRaceMaxStake) {
-      return failure('전자 마권 금액은 500원부터 5,000원까지 선택할 수 있습니다.');
+    if (!isValidHorseRaceStake(session.stake, state.availableBrokerageCash)) {
+      return failure('전자 마권은 국가계좌 주문 가능금의 30% 이내에서 500원 단위로 선택할 수 있습니다.');
     }
-    if (state.bankCash < session.stake) {
-      return failure('생활비 통장에 ${session.stake - state.bankCash}원이 부족합니다.');
+    if (state.availableBrokerageCash < session.stake) {
+      return failure(
+        '국가계좌 주문 가능금이 ${session.stake - state.availableBrokerageCash}원 부족합니다.',
+      );
     }
 
     final race = buildAfternoonHorseRace(
@@ -2162,13 +2149,14 @@ class GameEngine {
         : primary.name;
     final settled = state.copyWith(
       cash: state.cash + netDelta,
+      brokerageCash: state.brokerageCash + netDelta,
       ledger: <LedgerEntry>[
         ...state.ledger,
         LedgerEntry(
           id: '$sourceId-stake',
           day: state.day,
           amount: -session.stake,
-          account: 'company_bank',
+          account: 'brokerage_cash',
           counterAccount: 'horse_racing_wager_expense',
           description: '${session.betType.label} 전자 마권 · $selectionLabel',
           sourceId: sourceId,
@@ -2178,7 +2166,7 @@ class GameEngine {
             id: '$sourceId-payout',
             day: state.day,
             amount: grossPayout,
-            account: 'company_bank',
+            account: 'brokerage_cash',
             counterAccount: 'horse_racing_payout_income',
             description: '경마 전자 마권 적중 배당',
             sourceId: sourceId,
@@ -2188,7 +2176,7 @@ class GameEngine {
             id: '$sourceId-national-fee',
             day: state.day,
             amount: -stateProfitFee,
-            account: 'company_bank',
+            account: 'brokerage_cash',
             counterAccount: 'state_horse_racing_fee',
             description: '경마 확정 이익 국가 수수료 20%',
             sourceId: sourceId,
@@ -4845,6 +4833,23 @@ class GameEngine {
     ),
   );
 
+  GameState markNationalNetworkBriefingSeen(GameState state) => state.copyWith(
+    story: state.story.copyWith(
+      storyFlags: {
+        ...state.story.storyFlags,
+        'nationalNetworkBriefingSeen': true,
+        'nationalNetworkBriefingCompletedDay': state.day,
+      },
+      seenStoryEventIds: <String>[
+        ...state.story.seenStoryEventIds,
+        if (!state.story.seenStoryEventIds.contains(
+          'DECIMAL_NATIONAL_PROBABILITY_NETWORK_UNLOCKED',
+        ))
+          'DECIMAL_NATIONAL_PROBABILITY_NETWORK_UNLOCKED',
+      ],
+    ),
+  );
+
   GameState markBankDepositTutorialSeen(GameState state) => state.copyWith(
     story: state.story.copyWith(
       storyFlags: {
@@ -6479,14 +6484,6 @@ class GameEngine {
 
   CasinoActionResult exchangeCasinoChips(GameState state, int amount) {
     final profile = _casinoProfileForCurrentMonth(state);
-    final age = state.story.ageOn(state.currentDate);
-    if (state.currentDate.isBefore(DateTime(2010, 1, 1)) || age < 20) {
-      return CasinoActionResult(
-        state: state,
-        success: false,
-        message: '카지노는 2010년부터 성인만 이용할 수 있습니다.',
-      );
-    }
     if (profile.activeBlackjack != null || profile.activeCraps != null) {
       return CasinoActionResult(
         state: state,
@@ -6495,12 +6492,12 @@ class GameEngine {
       );
     }
     if (amount < casinoMinimumStake ||
-        amount > state.bankCash ||
+        amount > state.availableBrokerageCash ||
         amount % casinoMinimumStake != 0) {
       return CasinoActionResult(
         state: state,
         success: false,
-        message: '칩은 1만원 단위로 은행 현금 잔액 안에서 교환할 수 있습니다.',
+        message: '칩은 500원 단위로 국가계좌 주문 가능금 안에서 교환할 수 있습니다.',
       );
     }
     final exchangeId =
@@ -6510,6 +6507,7 @@ class GameEngine {
     );
     final next = state.copyWith(
       cash: state.cash - amount,
+      brokerageCash: state.brokerageCash - amount,
       personalFinance: state.personalFinance.copyWith(casino: nextProfile),
       ledger: <LedgerEntry>[
         ...state.ledger,
@@ -6517,9 +6515,9 @@ class GameEngine {
           id: exchangeId,
           day: state.day,
           amount: -amount,
-          account: 'company_bank',
+          account: 'brokerage_cash',
           counterAccount: 'casino_chips',
-          description: '카지노 현금 → 테이블 칩 교환',
+          description: '국가계좌 주문 가능금 → 온라인 카지노 칩',
           sourceId: exchangeId,
         ),
       ],
@@ -6554,6 +6552,7 @@ class GameEngine {
         'casino-chip-cashout-${state.day}-${profile.roundSequence}-${state.ledger.length}';
     final next = state.copyWith(
       cash: state.cash + amount,
+      brokerageCash: state.brokerageCash + amount,
       personalFinance: state.personalFinance.copyWith(
         casino: profile.copyWith(chipBalance: 0),
       ),
@@ -6563,9 +6562,9 @@ class GameEngine {
           id: cashOutId,
           day: state.day,
           amount: amount,
-          account: 'company_bank',
+          account: 'brokerage_cash',
           counterAccount: 'casino_chips',
-          description: '카지노 테이블 칩 → 현금 환전',
+          description: '온라인 카지노 칩 → 국가계좌 주문 가능금',
           sourceId: cashOutId,
         ),
       ],
@@ -6574,7 +6573,7 @@ class GameEngine {
     return CasinoActionResult(
       state: next,
       success: true,
-      message: '남은 칩 $amount원을 현금으로 환전했습니다.',
+      message: '남은 칩 $amount원을 국가계좌 주문 가능금으로 환전했습니다.',
       cashDelta: amount,
     );
   }
@@ -6762,7 +6761,7 @@ class GameEngine {
         return CasinoActionResult(
           state: state,
           success: false,
-          message: '더블에 필요한 추가 베팅 현금이 부족합니다.',
+          message: '더블에 필요한 추가 칩이 부족합니다.',
         );
       }
       final lossLimit = casinoMonthlyLossLimitForBasis(
@@ -7206,25 +7205,21 @@ class GameEngine {
   CasinoState _casinoProfileForCurrentMonth(GameState state) =>
       state.personalFinance.casino.forMonth(
         casinoMonthKey(state.currentDate),
-        state.bankCash + state.personalFinance.casino.chipBalance,
+        state.availableBrokerageCash + state.personalFinance.casino.chipBalance,
       );
 
   String? _casinoPlayProblem(GameState state, CasinoState profile, int stake) {
-    final age = state.story.ageOn(state.currentDate);
-    if (state.currentDate.isBefore(DateTime(2010, 1, 1)) || age < 20) {
-      return '성인이 되는 2010년부터 이용할 수 있습니다.';
-    }
     if (state.currentDate.weekday >= DateTime.saturday) {
       return '카지노는 평일 장 마감 뒤 저녁 행동으로 이용할 수 있습니다.';
     }
     if (state.pendingDecisions.isNotEmpty) {
-      return '새 기록의 결정을 먼저 마쳐야 카지노에 입장할 수 있습니다.';
+      return '새 기록의 결정을 먼저 마쳐야 온라인 카지노에 접속할 수 있습니다.';
     }
     if (weekdayEveningUsed(state)) {
       return '오늘의 저녁 행동은 이미 사용했습니다.';
     }
     if (state.marketMinute < krxCloseMinute) {
-      return '카지노는 15:00 장 마감 뒤에 입장할 수 있습니다.';
+      return '카지노는 15:00 장 마감 뒤에 온라인으로 접속할 수 있습니다.';
     }
     if (state.marketMinute > marketDayEndMinute - casinoRoundMinutes) {
       return '마지막 게임 시작은 19:30입니다. 오늘은 장부만 확인할 수 있습니다.';
@@ -7238,13 +7233,8 @@ class GameEngine {
     if (profile.roundsForDay(state.day) >= casinoDailyRoundLimit) {
       return '오늘의 테이블 이용 한도 $casinoDailyRoundLimit판을 모두 사용했습니다.';
     }
-    final bankroll = state.bankCash + profile.chipBalance;
-    final maxStake = casinoMaximumStakeForCash(bankroll);
-    if (stake < casinoMinimumStake ||
-        stake > maxStake ||
-        stake > profile.chipBalance ||
-        stake % casinoMinimumStake != 0) {
-      return '베팅은 1만원 단위이며, 현금의 1%와 10만원 중 작은 금액 이하여야 합니다.';
+    if (!isValidCasinoChipStake(stake, profile.chipBalance)) {
+      return '베팅은 보유 칩의 30% 이내에서 500원 단위로 선택해야 합니다.';
     }
     final lossLimit = casinoMonthlyLossLimitForBasis(
       profile.monthBankrollBasis,
@@ -7609,12 +7599,11 @@ class GameEngine {
   // 구형 저장과 기록 호환을 위한 이전 월 1회 확률 오락 API. 신규 UI는 위의
   // 테이블별 카지노 API만 사용한다.
   FinanceActionResult playAdultChanceGame(GameState state, int stake) {
-    final age = state.story.ageOn(state.currentDate);
-    if (state.currentDate.isBefore(DateTime(2010, 1, 1)) || age < 20) {
+    if (!state.story.nationalNetworkBriefingSeen) {
       return FinanceActionResult(
         state: state,
         success: false,
-        message: '성인이 되는 2010년부터만 이용할 수 있습니다.',
+        message: '한서윤 운영관의 국가망 사전 안내를 먼저 완료해야 합니다.',
       );
     }
     final month =
@@ -7626,13 +7615,18 @@ class GameEngine {
         message: '책임 있는 이용을 위해 월 1회로 제한됩니다.',
       );
     }
-    final onePercent = state.bankCash ~/ 100;
-    final maxStake = onePercent < 100000 ? onePercent : 100000;
-    if (stake < 10000 || stake > maxStake || stake > state.bankCash) {
+    final legacyOnePercent = state.availableBrokerageCash ~/ 100;
+    final maxStake =
+        (math.min(legacyOnePercent, 100000) ~/ casinoMinimumStake) *
+        casinoMinimumStake;
+    if (stake < casinoMinimumStake ||
+        stake > maxStake ||
+        stake > state.availableBrokerageCash ||
+        stake % casinoMinimumStake != 0) {
       return FinanceActionResult(
         state: state,
         success: false,
-        message: '참가금은 1만원 이상, 현금의 1%와 10만원 중 작은 금액 이하여야 합니다.',
+        message: '참가금은 500원 단위이며, 국가계좌 주문 가능금의 1%와 10만원 중 작은 금액 이하여야 합니다.',
       );
     }
     final roll =
@@ -7642,15 +7636,18 @@ class GameEngine {
         : roll < 90
         ? (stake * 1.5).round()
         : stake * 3;
+    final nationalFee = casinoNationalFee(grossPayout: payout, stake: stake);
+    final netPayout = payout - nationalFee;
+    final netDelta = netPayout - stake;
     final sourceId = 'adult-chance-$month';
     final entries = <LedgerEntry>[
       LedgerEntry(
         id: '$sourceId-stake',
         day: state.day,
         amount: -stake,
-        account: 'company_bank',
+        account: 'brokerage_cash',
         counterAccount: 'chance_entertainment',
-        description: '성인 확률 오락 참가금',
+        description: '국가망 확률시장 참가금',
         sourceId: sourceId,
       ),
       if (payout > 0)
@@ -7658,9 +7655,19 @@ class GameEngine {
           id: '$sourceId-payout',
           day: state.day,
           amount: payout,
-          account: 'company_bank',
+          account: 'brokerage_cash',
           counterAccount: 'chance_payout',
-          description: '성인 확률 오락 지급금',
+          description: '국가망 확률시장 총지급금',
+          sourceId: sourceId,
+        ),
+      if (nationalFee > 0)
+        LedgerEntry(
+          id: '$sourceId-national-fee',
+          day: state.day,
+          amount: -nationalFee,
+          account: 'brokerage_cash',
+          counterAccount: 'state_casino_fee',
+          description: '국가망 확정 이익 국가 환수 20%',
           sourceId: sourceId,
         ),
     ];
@@ -7669,10 +7676,11 @@ class GameEngine {
       lastChanceMonth: month,
       chancePlayCount: state.personalFinance.chancePlayCount + 1,
       totalChanceStake: state.personalFinance.totalChanceStake + stake,
-      totalChancePayout: state.personalFinance.totalChancePayout + payout,
+      totalChancePayout: state.personalFinance.totalChancePayout + netPayout,
     );
     final next = state.copyWith(
-      cash: state.cash - stake + payout,
+      cash: state.cash + netDelta,
+      brokerageCash: state.brokerageCash + netDelta,
       personalFinance: nextFinance,
       ledger: [...state.ledger, ...entries],
       processedEventIds: [...state.processedEventIds, sourceId],
@@ -7680,13 +7688,13 @@ class GameEngine {
     final message = payout == 0
         ? '이번에는 지급금이 없습니다. 다음 달까지 이용이 잠깁니다.'
         : payout >= stake * 3
-        ? '10% 결과에 당첨되어 $payout원을 받았습니다.'
-        : '30% 결과에 당첨되어 $payout원을 받았습니다.';
+        ? '10% 결과 적중 · 총지급 $payout원 · 국가 환수 $nationalFee원 · 실수령 $netPayout원'
+        : '30% 결과 적중 · 총지급 $payout원 · 국가 환수 $nationalFee원 · 실수령 $netPayout원';
     return FinanceActionResult(
       state: next,
       success: true,
       message: message,
-      cashDelta: payout - stake,
+      cashDelta: netDelta,
     );
   }
 

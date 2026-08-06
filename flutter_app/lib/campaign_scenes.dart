@@ -68,6 +68,7 @@ class OfficeScreen extends StatelessWidget {
     this.onPurchaseMarketReport,
     this.onCompleteHubTutorial,
     this.onCompleteMarketTutorial,
+    this.onCompleteNationalNetworkBriefing,
     this.onCompleteBankDepositTutorial,
     this.onCompleteRealEstateTutorial,
     this.onArchiveNews,
@@ -205,6 +206,7 @@ class OfficeScreen extends StatelessWidget {
   final Future<FinanceActionResult> Function()? onPurchaseMarketReport;
   final Future<void> Function()? onCompleteHubTutorial;
   final Future<GameState> Function()? onCompleteMarketTutorial;
+  final Future<GameState> Function()? onCompleteNationalNetworkBriefing;
   final Future<GameState> Function()? onCompleteBankDepositTutorial;
   final Future<GameState> Function()? onCompleteRealEstateTutorial;
   final Future<void> Function(String headline, List<String> eventIds)?
@@ -372,7 +374,7 @@ class OfficeScreen extends StatelessWidget {
             simulationSeed: currentState.simulationSeed,
             day: currentState.day,
           ),
-          availableCash: currentState.bankCash,
+          availableCash: currentState.availableBrokerageCash,
           stateRecoveryRateBps: currentState.story.stateRecoveryRateBps,
           onPowerOff: () {
             navigator.pop();
@@ -562,6 +564,7 @@ class OfficeScreen extends StatelessWidget {
           },
           onOpenBusiness: (currentState) =>
               _openBusinessMarket(context, currentState: currentState),
+          onCompleteNationalNetworkBriefing: onCompleteNationalNetworkBriefing,
           onOpenCasino: (currentState) async {
             await _openCasino(context);
             return _latestState;

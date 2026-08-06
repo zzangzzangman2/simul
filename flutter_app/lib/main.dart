@@ -240,9 +240,8 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
         worldSeed: 'casino-live-test-v1',
       );
       _state = testState.copyWith(
-        day: DateTime(2010, 1, 4).difference(DateTime(2000, 1, 1)).inDays + 1,
+        day: DateTime(2000, 1, 3).difference(DateTime(2000, 1, 1)).inDays + 1,
         marketMinute: krxCloseMinute,
-        brokerageCash: 0,
         decisions: const [],
       );
       _view = _AppView.game;
@@ -1582,6 +1581,13 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     return next;
   }
 
+  Future<GameState> _completeNationalNetworkBriefing() async {
+    final next = _engine.markNationalNetworkBriefingSeen(_state!);
+    await _persistence.save(next);
+    if (mounted) setState(() => _state = next);
+    return next;
+  }
+
   Future<GameState> _completeBankDepositTutorial() async {
     final next = _engine.markBankDepositTutorialSeen(_state!);
     await _persistence.save(next);
@@ -1932,10 +1938,11 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     final current = _state!;
     final currentMonthCasino = current.personalFinance.casino.forMonth(
       casinoMonthKey(current.currentDate),
-      current.bankCash,
+      current.availableBrokerageCash,
     );
     final engineState = current.copyWith(
-      cash: math.max(current.bankCash, casinoMaximumStake * 100),
+      cash: math.max(current.cash, casinoTestBankroll * 10),
+      brokerageCash: math.max(current.brokerageCash, casinoTestBankroll * 10),
       personalFinance: current.personalFinance.copyWith(
         casino: currentMonthCasino.copyWith(
           monthBankrollBasis: casinoTestBankroll * 50,
@@ -1945,9 +1952,11 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     );
     final raw = action(engineState);
     if (!raw.success) return raw.withState(current);
-    final cashDelta = raw.state.bankCash - engineState.bankCash;
+    final brokerageCashDelta =
+        raw.state.brokerageCash - engineState.brokerageCash;
     var next = raw.state.copyWith(
-      cash: math.max(0, current.bankCash + cashDelta),
+      cash: math.max(0, current.cash + brokerageCashDelta),
+      brokerageCash: math.max(0, current.brokerageCash + brokerageCashDelta),
     );
     if (raw.minutesElapsed > 0) {
       next = next.copyWith(
@@ -2220,6 +2229,8 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
                     onPurchaseMarketReport: _purchaseDailyMarketReport,
                     onCompleteHubTutorial: _completeHubTutorial,
                     onCompleteMarketTutorial: _completeMarketTutorial,
+                    onCompleteNationalNetworkBriefing:
+                        _completeNationalNetworkBriefing,
                     onCompleteBankDepositTutorial: _completeBankDepositTutorial,
                     onCompleteRealEstateTutorial: _completeRealEstateTutorial,
                     onArchiveNews: _archiveNews,

@@ -1,8 +1,9 @@
 import 'stable_hash.dart';
 
-const casinoUnlockDate = '2010-01-01';
-const casinoMinimumStake = 10000;
-const casinoMaximumStake = 100000;
+const casinoUnlockDate = '2000-01-03';
+const casinoMinimumStake = 500;
+const casinoStakePercents = <int>[2, 5, 10, 30];
+const casinoMaximumStakePercent = 30;
 const casinoTestBankroll = 1000000;
 const casinoRoundMinutes = 30;
 const casinoDailyRoundLimit = 10;
@@ -515,13 +516,23 @@ class CasinoState {
   }
 }
 
-int casinoMaximumStakeForCash(int bankCash) {
-  final onePercent = bankCash ~/ 100;
-  final capped = onePercent < casinoMaximumStake
-      ? onePercent
-      : casinoMaximumStake;
-  return (capped ~/ casinoMinimumStake) * casinoMinimumStake;
+int casinoMaximumStakeForChips(int chipBalance) {
+  if (chipBalance <= 0) return 0;
+  final proportional = chipBalance * casinoMaximumStakePercent ~/ 100;
+  return (proportional ~/ casinoMinimumStake) * casinoMinimumStake;
 }
+
+int casinoStakeForChipPercent(int chipBalance, int percent) {
+  if (!casinoStakePercents.contains(percent)) return 0;
+  final proportional = chipBalance * percent ~/ 100;
+  final rounded = (proportional ~/ casinoMinimumStake) * casinoMinimumStake;
+  return rounded >= casinoMinimumStake ? rounded : 0;
+}
+
+bool isValidCasinoChipStake(int stake, int chipBalance) =>
+    stake >= casinoMinimumStake &&
+    stake % casinoMinimumStake == 0 &&
+    stake <= casinoMaximumStakeForChips(chipBalance);
 
 int casinoMonthlyLossLimitForBasis(int bankrollBasis) {
   final twoPercent = bankrollBasis ~/ 50;

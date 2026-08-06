@@ -47,9 +47,29 @@ const horseRaceGallopAssets = <String>[
 ];
 
 const horseRaceMinStake = 500;
-const horseRaceMaxStake = 5000;
+const horseRaceStakeUnit = 500;
+const horseRaceStakePercents = <int>[2, 5, 10, 30];
+const horseRaceMaximumStakePercent = 30;
 const horseRaceDailyBetLimit = 1;
 const horseRaceDefaultStateRecoveryRateBps = 2000;
+
+int horseRaceMaximumStakeForCash(int availableCash) {
+  if (availableCash <= 0) return 0;
+  final proportional = availableCash * horseRaceMaximumStakePercent ~/ 100;
+  return proportional ~/ horseRaceStakeUnit * horseRaceStakeUnit;
+}
+
+int horseRaceStakeForCashPercent(int availableCash, int percent) {
+  if (!horseRaceStakePercents.contains(percent)) return 0;
+  final proportional = availableCash * percent ~/ 100;
+  final rounded = proportional ~/ horseRaceStakeUnit * horseRaceStakeUnit;
+  return rounded >= horseRaceMinStake ? rounded : 0;
+}
+
+bool isValidHorseRaceStake(int stake, int availableCash) =>
+    stake >= horseRaceMinStake &&
+    stake % horseRaceStakeUnit == 0 &&
+    stake <= horseRaceMaximumStakeForCash(availableCash);
 
 int horseRaceBetsForDay(GameState state, int day) => state.ledger
     .where(
@@ -969,7 +989,7 @@ int calculateHorseRacePayout({
   required int stake,
   String? secondaryHorseId,
 }) {
-  if (stake < horseRaceMinStake || stake > horseRaceMaxStake) return 0;
+  if (stake < horseRaceMinStake || stake % horseRaceStakeUnit != 0) return 0;
   if (!race.entrants.any((entrant) => entrant.id == primaryHorseId)) return 0;
   final position = race.finishPosition(primaryHorseId);
   final primary = race.entrantById(primaryHorseId);

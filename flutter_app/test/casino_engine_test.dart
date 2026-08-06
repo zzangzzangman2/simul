@@ -5,19 +5,14 @@ import 'package:millennium_capital/game/game_state.dart';
 import 'package:millennium_capital/game/market_clock.dart';
 import 'package:millennium_capital/game/weekday_activity.dart';
 
-GameState _adultCasinoState(
+GameState _nationalCasinoState(
   GameEngine engine, {
   String seed = 'casino-engine-test',
 }) {
-  final day = DateTime(2010, 1, 4).difference(DateTime(2000, 1, 1)).inDays + 1;
+  final day = DateTime(2000, 1, 3).difference(DateTime(2000, 1, 1)).inDays + 1;
   final state = engine
       .createNewGame('카지노 엔진 테스트', initialCash: 10000000, worldSeed: seed)
-      .copyWith(
-        day: day,
-        marketMinute: krxCloseMinute,
-        brokerageCash: 0,
-        decisions: const [],
-      );
+      .copyWith(day: day, marketMinute: krxCloseMinute, decisions: const []);
   return engine.exchangeCasinoChips(state, 1000000).state;
 }
 
@@ -30,25 +25,32 @@ void main() {
     expect(casinoNationalFee(grossPayout: 0, stake: 10000), 0);
   });
 
+  test('casino stake presets use 2 to 30 percent of owned chips', () {
+    expect(casinoStakeForChipPercent(100000, 2), 2000);
+    expect(casinoStakeForChipPercent(100000, 5), 5000);
+    expect(casinoStakeForChipPercent(100000, 10), 10000);
+    expect(casinoStakeForChipPercent(100000, 30), 30000);
+    expect(casinoMaximumStakeForChips(100000), 30000);
+    expect(isValidCasinoChipStake(30000, 100000), isTrue);
+    expect(isValidCasinoChipStake(30500, 100000), isFalse);
+    expect(isValidCasinoChipStake(1250, 100000), isFalse);
+  });
+
   test('cash is exchanged into persistent casino chips and cashed out', () {
     final day =
-        DateTime(2010, 1, 4).difference(DateTime(2000, 1, 1)).inDays + 1;
+        DateTime(2000, 1, 3).difference(DateTime(2000, 1, 1)).inDays + 1;
     final state = engine
         .createNewGame(
           '카지노 칩 테스트',
           initialCash: 1000000,
           worldSeed: 'casino-chip-wallet',
         )
-        .copyWith(
-          day: day,
-          marketMinute: krxCloseMinute,
-          brokerageCash: 0,
-          decisions: const [],
-        );
+        .copyWith(day: day, marketMinute: krxCloseMinute, decisions: const []);
 
     final exchanged = engine.exchangeCasinoChips(state, 100000);
     expect(exchanged.success, isTrue);
-    expect(exchanged.state.bankCash, 900000);
+    expect(exchanged.state.availableBrokerageCash, 900000);
+    expect(exchanged.state.bankCash, 0);
     expect(exchanged.state.personalFinance.casino.chipBalance, 100000);
     expect(
       GameState.fromJson(
@@ -63,7 +65,8 @@ void main() {
 
     final cashedOut = engine.cashOutCasinoChips(exchanged.state);
     expect(cashedOut.success, isTrue);
-    expect(cashedOut.state.bankCash, 1000000);
+    expect(cashedOut.state.availableBrokerageCash, 1000000);
+    expect(cashedOut.state.bankCash, 0);
     expect(cashedOut.state.personalFinance.casino.chipBalance, 0);
     expect(cashedOut.state.ledger.last.counterAccount, 'casino_chips');
   });
@@ -85,34 +88,31 @@ void main() {
     expect(casinoSlotsTheoreticalRtp * 100, closeTo(97.22, 0.01));
   });
 
-  test(
-    'casino is adult-only, afternoon-only, and records a deterministic round',
-    () {
-      final adult = _adultCasinoState(engine);
-      final early = adult.copyWith(marketMinute: krxCloseMinute - 1);
-      const bet = CasinoBet(
-        game: CasinoGameType.baccarat,
-        type: CasinoBetType.baccaratPlayer,
-        stake: 10000,
-      );
+  test('casino is online from 2000, afternoon-only, and deterministic', () {
+    final online = _nationalCasinoState(engine);
+    final early = online.copyWith(marketMinute: krxCloseMinute - 1);
+    const bet = CasinoBet(
+      game: CasinoGameType.baccarat,
+      type: CasinoBetType.baccaratPlayer,
+      stake: 10000,
+    );
 
-      final locked = engine.playCasinoRound(early, bet);
-      final first = engine.playCasinoRound(adult, bet);
-      final replay = engine.playCasinoRound(adult, bet);
+    final locked = engine.playCasinoRound(early, bet);
+    final first = engine.playCasinoRound(online, bet);
+    final replay = engine.playCasinoRound(online, bet);
 
-      expect(locked.success, isFalse);
-      expect(locked.message, contains('15:00'));
-      expect(first.success, isTrue);
-      expect(first.minutesElapsed, casinoRoundMinutes);
-      expect(first.state.personalFinance.casino.totalRounds, 1);
-      expect(first.state.personalFinance.casino.history, hasLength(1));
-      expect(first.state.ledger.last.sourceId, contains('casino-'));
-      expect(replay.state.toJson(), first.state.toJson());
-    },
-  );
+    expect(locked.success, isFalse);
+    expect(locked.message, contains('15:00'));
+    expect(first.success, isTrue);
+    expect(first.minutesElapsed, casinoRoundMinutes);
+    expect(first.state.personalFinance.casino.totalRounds, 1);
+    expect(first.state.personalFinance.casino.history, hasLength(1));
+    expect(first.state.ledger.last.sourceId, contains('casino-'));
+    expect(replay.state.toJson(), first.state.toJson());
+  });
 
   test('casino is one weekday evening action with 30-minute rounds', () {
-    final monday = _adultCasinoState(engine, seed: 'casino-evening-action');
+    final monday = _nationalCasinoState(engine, seed: 'casino-evening-action');
     const spin = CasinoBet(
       game: CasinoGameType.slots,
       type: CasinoBetType.slotsSpin,
@@ -171,7 +171,7 @@ void main() {
   });
 
   test('casino outcome does not reroll when the bet side changes', () {
-    final state = _adultCasinoState(engine, seed: 'bet-independent-outcome');
+    final state = _nationalCasinoState(engine, seed: 'bet-independent-outcome');
     final player = engine.playCasinoRound(
       state,
       const CasinoBet(
@@ -197,13 +197,32 @@ void main() {
     );
   });
 
+  test('engine rejects a wager above 30 percent of owned chips', () {
+    final state = _nationalCasinoState(engine, seed: 'casino-chip-cap');
+    final result = engine.playCasinoRound(
+      state,
+      const CasinoBet(
+        game: CasinoGameType.roulette,
+        type: CasinoBetType.rouletteRed,
+        stake: 300500,
+      ),
+    );
+
+    expect(result.success, isFalse);
+    expect(result.message, contains('보유 칩의 30%'));
+    expect(
+      result.state.personalFinance.casino.chipBalance,
+      state.personalFinance.casino.chipBalance,
+    );
+  });
+
   test(
     'winning round separates gross payout, national fee, and net receipt',
     () {
       CasinoActionResult? winning;
       GameState? winningBefore;
       for (var index = 0; index < 200; index++) {
-        final before = _adultCasinoState(engine, seed: 'casino-fee-$index');
+        final before = _nationalCasinoState(engine, seed: 'casino-fee-$index');
         final result = engine.playCasinoRound(
           before,
           const CasinoBet(
@@ -261,7 +280,7 @@ void main() {
   );
 
   test('daily round limit and monthly loss stop are enforced', () {
-    var state = _adultCasinoState(engine, seed: 'casino-limits');
+    var state = _nationalCasinoState(engine, seed: 'casino-limits');
     for (var index = 0; index < casinoDailyRoundLimit; index++) {
       final result = engine.playCasinoRound(
         state,
@@ -285,9 +304,10 @@ void main() {
     expect(dailyLocked.success, isFalse);
     expect(dailyLocked.message, contains('10판'));
 
-    final fresh = _adultCasinoState(engine, seed: 'casino-loss-stop');
+    final fresh = _nationalCasinoState(engine, seed: 'casino-loss-stop');
     final monthKey = casinoMonthKey(fresh.currentDate);
-    final basis = fresh.bankCash + fresh.personalFinance.casino.chipBalance;
+    final basis =
+        fresh.availableBrokerageCash + fresh.personalFinance.casino.chipBalance;
     final limit = casinoMonthlyLossLimitForBasis(basis);
     final stopped = fresh.copyWith(
       personalFinance: fresh.personalFinance.copyWith(
@@ -314,7 +334,7 @@ void main() {
   test(
     'blackjack persists the hand, settles S17, and survives JSON round-trip',
     () {
-      final state = _adultCasinoState(engine, seed: 'blackjack-persist');
+      final state = _nationalCasinoState(engine, seed: 'blackjack-persist');
       final deal = engine.startCasinoBlackjack(state, 10000);
 
       expect(deal.success, isTrue);
@@ -349,7 +369,7 @@ void main() {
     () {
       CasinoActionResult? pointStart;
       for (var index = 0; index < 200; index++) {
-        final state = _adultCasinoState(engine, seed: 'craps-point-$index');
+        final state = _nationalCasinoState(engine, seed: 'craps-point-$index');
         final result = engine.playCasinoRound(
           state,
           const CasinoBet(
@@ -424,7 +444,10 @@ void main() {
     CasinoActionResult? push;
     GameState? before;
     for (var index = 0; index < 500; index++) {
-      final state = _adultCasinoState(engine, seed: 'craps-bar-twelve-$index');
+      final state = _nationalCasinoState(
+        engine,
+        seed: 'craps-bar-twelve-$index',
+      );
       final result = engine.playCasinoRound(
         state,
         const CasinoBet(
@@ -454,7 +477,7 @@ void main() {
   });
 
   test('unfinished blackjack is forfeited when the day advances', () {
-    final state = _adultCasinoState(engine, seed: 'blackjack-day-boundary');
+    final state = _nationalCasinoState(engine, seed: 'blackjack-day-boundary');
     final deal = engine.startCasinoBlackjack(state, 10000);
     final closing = deal.state.copyWith(marketMinute: marketDayEndMinute);
 
@@ -468,7 +491,7 @@ void main() {
   test('unfinished craps point is forfeited when the day advances', () {
     CasinoActionResult? pointStart;
     for (var index = 0; index < 200; index++) {
-      final state = _adultCasinoState(engine, seed: 'craps-forfeit-$index');
+      final state = _nationalCasinoState(engine, seed: 'craps-forfeit-$index');
       final result = engine.playCasinoRound(
         state,
         const CasinoBet(
