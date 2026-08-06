@@ -36,7 +36,7 @@ flutter build web --release --base-href /play/
 ## 핵심 구조
 
 - `lib/main.dart`: 앱 상태·저장·신문·화면 연결
-- `lib/visual_novel_onboarding.dart`: 편집본 장면·배경·화자·포즈와 동적 종료점을 적용하는 리부트 프롤로그
+- `lib/visual_novel_onboarding.dart`: 편집본 장면·배경·화자·포즈와 동적 종료점, 4구간 시작 선택·막간 자동저장을 적용하는 리부트 프롤로그
 - `lib/game/game_state.dart`: 저장 스키마 v27과 관계·데시멀톡·일일 투자·상장사 주주권·경영권·자회사 장부
 - `lib/game/phone_messenger_state.dart`: 데시멀 동기 9명 연락처·MBTI 답장·읽음·하루 제한 저장
 - `lib/game/phone_ai_service.dart`: 서버 Gemini 답장 호출과 안전한 로컬 조합기 폴백
