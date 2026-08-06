@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart' show compute, visibleForTesting;
 
 import 'market_clock.dart';
+import 'shareholder_governance.dart';
 import 'stable_hash.dart';
 
 part 'fictional_market.dart';

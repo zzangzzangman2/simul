@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:millennium_capital/game/market_clock.dart';
 import 'package:millennium_capital/game/market_data.dart';
 import 'package:millennium_capital/game/market_tick.dart';
+import 'package:millennium_capital/game/shareholder_governance.dart';
 
 void main() {
   test('market universe reuses the same cached load', () async {
@@ -453,6 +454,181 @@ void main() {
             }),
         ),
       );
+    },
+  );
+
+  test(
+    'player governance disclosures join the market calendar without leaking outcomes',
+    () {
+      final asset = FictionalMarketAsset(
+        id: 'player_company',
+        symbol: '1999',
+        name: '플레이어전자',
+        market: fictionalMainMarket,
+        country: 'KR',
+        sector: '전자',
+        colorHex: '#0E7C66',
+        currency: 'KRW',
+        initialSharesOutstanding: 1000000,
+        prices: const {'1999-12-30': 10000, '2000-01-20': 11000},
+        corporateActions: const [],
+        financials: const [],
+      );
+      final governance = ShareholderGovernanceState.fromJson(<String, dynamic>{
+        'companies': <String, dynamic>{
+          asset.id: <String, dynamic>{
+            'assetId': asset.id,
+            'symbol': asset.symbol,
+            'name': asset.name,
+            'market': asset.market,
+            'sharesOutstanding': 1000000,
+            'ownedShares': 700000,
+            'playerIsCeo': true,
+            'managementDecisions': <Map<String, dynamic>>[
+              <String, dynamic>{
+                'id': 'completed-ceo-plan',
+                'agendaId': 'ceo:automation:2000-01',
+                'optionId': 'automation',
+                'title': 'CEO 월간 집행',
+                'optionLabel': '자동화·원가혁신',
+                'summary': '생산 자동화 투자를 집행합니다.',
+                'decisionDay': 5,
+                'completionDay': 10,
+                'immediatePriceImpactBps': 80,
+                'status': 'succeeded',
+                'outcome': '원가 절감 목표를 달성했습니다.',
+                'realizedPriceImpactBps': 350,
+              },
+              <String, dynamic>{
+                'id': 'executing-ceo-plan',
+                'agendaId': 'ceo:globalExpansion:2000-01',
+                'optionId': 'globalExpansion',
+                'title': 'CEO 월간 집행',
+                'optionLabel': '해외시장 진출',
+                'summary': '해외 판매망 투자를 시작합니다.',
+                'decisionDay': 18,
+                'completionDay': 40,
+                'immediatePriceImpactBps': 120,
+                'status': 'executing',
+                'outcome': '아직 공개되면 안 되는 미래 성과',
+              },
+            ],
+          },
+        },
+        'meetings': <Map<String, dynamic>>[
+          <String, dynamic>{
+            'id': 'agm-player-company-2000',
+            'assetId': asset.id,
+            'year': 2000,
+            'heldDay': 80,
+            'deadlineDay': 75,
+            'extraordinary': false,
+            'status': 'scheduled',
+            'attended': false,
+            'agendas': <Map<String, dynamic>>[
+              <String, dynamic>{
+                'id': 'player-proposal',
+                'type': 'strategy',
+                'title': '플레이어 성장전략 제안',
+                'description': '신사업 투자안을 표결합니다.',
+                'baseSupportPct': 55,
+                'requiredApprovalPct': 50,
+                'proposedByPlayer': true,
+              },
+            ],
+          },
+        ],
+        'corporateActions': <Map<String, dynamic>>[
+          <String, dynamic>{
+            'id': 'player-merger',
+            'type': 'merger',
+            'leadAssetId': asset.id,
+            'leadName': asset.name,
+            'partnerAssetId': 'partner_company',
+            'partnerName': '파트너산업',
+            'strategy': '흡수합병',
+            'announcedDay': 19,
+            'completionDay': 100,
+            'cashCost': 100000000,
+            'successChancePct': 72,
+            'immediatePriceImpactBps': 260,
+            'successPriceImpactBps': 900,
+            'failurePriceImpactBps': -1100,
+            'status': 'executing',
+            'outcome': '아직 공개되면 안 되는 합병 결과',
+          },
+        ],
+      });
+      final asOfDate = DateTime(2000, 1, 20);
+      DateTime dateForDay(int day) =>
+          DateTime(2000, 1, 1).add(Duration(days: day - 1));
+
+      final events = buildCorporateDisclosureCalendar(
+        asset: asset,
+        simulationSeed: 'player-governance-calendar',
+        asOfDate: asOfDate,
+        governance: governance,
+        governanceDateForDay: dateForDay,
+        pastDays: 120,
+        futureDays: 365,
+      );
+      final playerEvents = events
+          .where((event) => event.playerGenerated)
+          .toList(growable: false);
+
+      expect(
+        playerEvents.map((event) => event.id),
+        containsAll(<String>[
+          'player-decision-${asset.id}-completed-ceo-plan',
+          'player-decision-result-${asset.id}-completed-ceo-plan',
+          'player-decision-${asset.id}-executing-ceo-plan',
+          'player-decision-result-${asset.id}-executing-ceo-plan',
+          'governance-meeting-agm-player-company-2000',
+          'player-corporate-announcement-player-merger-${asset.id}',
+          'player-corporate-result-player-merger-${asset.id}',
+        ]),
+      );
+      expect(
+        events
+            .where(
+              (event) =>
+                  event.type == CorporateDisclosureType.annualGeneralMeeting,
+            )
+            .where((event) => event.date.year == 2000),
+        hasLength(1),
+        reason: '실제 주주총회가 있으면 합성 정기주총을 중복 표시하면 안 됩니다.',
+      );
+      final completedResult = events.singleWhere(
+        (event) =>
+            event.id == 'player-decision-result-${asset.id}-completed-ceo-plan',
+      );
+      expect(completedResult.summary, contains('원가 절감 목표'));
+      expect(completedResult.summary, contains('다음 거래일 시장평가 +3.5%'));
+      expect(completedResult.priceImpactBps, 350);
+
+      final futureDecisionResult = events.singleWhere(
+        (event) =>
+            event.id == 'player-decision-result-${asset.id}-executing-ceo-plan',
+      );
+      final futureMergerResult = events.singleWhere(
+        (event) =>
+            event.id == 'player-corporate-result-player-merger-${asset.id}',
+      );
+      expect(futureDecisionResult.status, CorporateDisclosureStatus.announced);
+      expect(futureDecisionResult.summary, isNot(contains('미래 성과')));
+      expect(futureMergerResult.summary, isNot(contains('합병 결과')));
+
+      final restored = ShareholderGovernanceState.fromJson(governance.toJson());
+      final restoredIds = buildCorporateDisclosureCalendar(
+        asset: asset,
+        simulationSeed: 'player-governance-calendar',
+        asOfDate: asOfDate,
+        governance: restored,
+        governanceDateForDay: dateForDay,
+        pastDays: 120,
+        futureDays: 365,
+      ).where((event) => event.playerGenerated).map((event) => event.id);
+      expect(restoredIds, orderedEquals(playerEvents.map((event) => event.id)));
     },
   );
 

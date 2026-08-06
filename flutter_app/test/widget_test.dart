@@ -13,6 +13,7 @@ import 'package:millennium_capital/game/market_data.dart';
 import 'package:millennium_capital/game/market_quote.dart';
 import 'package:millennium_capital/game/order_book.dart';
 import 'package:millennium_capital/game/market_tick.dart';
+import 'package:millennium_capital/game/shareholder_governance.dart';
 import 'package:millennium_capital/game/story_state.dart';
 import 'package:millennium_capital/game/seed_money_content.dart';
 import 'package:millennium_capital/main.dart';
@@ -2680,7 +2681,39 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final state = const GameEngine()
         .createNewGame('별빛 투자', initialCash: 1000000)
-        .copyWith(day: 4, marketMinute: krxOpenMinute);
+        .copyWith(
+          day: 4,
+          marketMinute: krxOpenMinute,
+          shareholderGovernance: ShareholderGovernanceState.fromJson(
+            <String, dynamic>{
+              'companies': <String, dynamic>{
+                'hanbit_telecom': <String, dynamic>{
+                  'assetId': 'hanbit_telecom',
+                  'symbol': '1001',
+                  'name': '한빛통신',
+                  'market': 'KSE',
+                  'sharesOutstanding': 1000000,
+                  'ownedShares': 700000,
+                  'playerIsCeo': true,
+                  'managementDecisions': <Map<String, dynamic>>[
+                    <String, dynamic>{
+                      'id': 'widget-player-ceo-announcement',
+                      'agendaId': 'market-event:widget-ceo',
+                      'optionId': 'announced',
+                      'title': '대표이사 CEO 선임',
+                      'optionLabel': '공시',
+                      'summary': '플레이어의 직접 책임경영 선언이 공시됐습니다.',
+                      'decisionDay': 4,
+                      'completionDay': 4,
+                      'status': 'succeeded',
+                      'realizedPriceImpactBps': 120,
+                    },
+                  ],
+                },
+              },
+            },
+          ),
+        );
     const engine = GameEngine();
     final persistence = GamePersistence();
     var current = state;
@@ -2854,6 +2887,7 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('기업 공시·주요 일정'), findsOneWidget);
+    expect(find.text('내 결정'), findsOneWidget);
     await tester.scrollUntilVisible(
       find.byKey(const Key('open-market-research-note')),
       220,

@@ -9,6 +9,7 @@ enum CorporateDisclosureType {
   guidance,
   correction,
   annualGeneralMeeting,
+  extraordinaryGeneralMeeting,
   dividend,
   rightsRecord,
   exRights,
@@ -50,6 +51,8 @@ class CorporateDisclosureEvent {
     required this.status,
     this.minute = 16 * 60,
     this.material = false,
+    this.playerGenerated = false,
+    this.priceImpactBps = 0,
   });
 
   final String id;
@@ -61,6 +64,8 @@ class CorporateDisclosureEvent {
   final String summary;
   final CorporateDisclosureStatus status;
   final bool material;
+  final bool playerGenerated;
+  final int priceImpactBps;
 
   String get dateKey => marketDateKey(date);
 
@@ -154,6 +159,8 @@ List<CorporateDisclosureEvent> buildCorporateDisclosureCalendar({
   required FictionalMarketAsset asset,
   required String simulationSeed,
   required DateTime asOfDate,
+  ShareholderGovernanceState? governance,
+  DateTime Function(int day)? governanceDateForDay,
   int pastDays = 180,
   int futureDays = 365,
 }) {
@@ -263,23 +270,34 @@ List<CorporateDisclosureEvent> buildCorporateDisclosureCalendar({
             material: snapshot?.auditOpinion != '적정',
           ),
         );
-        final meetingDate = _corporateThirdFriday(year + 1, 3);
-        add(
-          CorporateDisclosureEvent(
-            id: 'agm-${asset.id}-$year',
-            assetId: asset.id,
-            type: CorporateDisclosureType.annualGeneralMeeting,
-            date: meetingDate,
-            minute: 10 * 60,
-            title: '정기주주총회',
-            summary: '재무제표 승인·이사/감사 선임·보수한도·배당·주주제안을 표결합니다.',
-            status: _corporateDisclosureStatus(
-              eventDate: meetingDate,
-              announcedOn: _corporateAddTradingDays(meetingDate, -15),
-              asOfDate: today,
+        final meetingYear = year + 1;
+        final hasGovernanceMeeting =
+            governance?.meetings.any(
+              (meeting) =>
+                  meeting.assetId == asset.id &&
+                  meeting.year == meetingYear &&
+                  !meeting.extraordinary,
+            ) ??
+            false;
+        if (!hasGovernanceMeeting) {
+          final meetingDate = _corporateThirdFriday(meetingYear, 3);
+          add(
+            CorporateDisclosureEvent(
+              id: 'agm-${asset.id}-$year',
+              assetId: asset.id,
+              type: CorporateDisclosureType.annualGeneralMeeting,
+              date: meetingDate,
+              minute: 10 * 60,
+              title: '정기주주총회',
+              summary: '재무제표 승인·이사/감사 선임·보수한도·배당·주주제안을 표결합니다.',
+              status: _corporateDisclosureStatus(
+                eventDate: meetingDate,
+                announcedOn: _corporateAddTradingDays(meetingDate, -15),
+                asOfDate: today,
+              ),
             ),
-          ),
-        );
+          );
+        }
       }
     }
   }
@@ -548,6 +566,16 @@ List<CorporateDisclosureEvent> buildCorporateDisclosureCalendar({
     );
   }
 
+  if (governance != null && governanceDateForDay != null) {
+    _appendPlayerGovernanceDisclosures(
+      add: add,
+      asset: asset,
+      governance: governance,
+      dateForDay: governanceDateForDay,
+      asOfDate: today,
+    );
+  }
+
   events.sort((left, right) {
     final dateOrder = left.date.compareTo(right.date);
     if (dateOrder != 0) return dateOrder;
@@ -556,6 +584,246 @@ List<CorporateDisclosureEvent> buildCorporateDisclosureCalendar({
     return left.id.compareTo(right.id);
   });
   return List<CorporateDisclosureEvent>.unmodifiable(events);
+}
+
+void _appendPlayerGovernanceDisclosures({
+  required void Function(CorporateDisclosureEvent event) add,
+  required FictionalMarketAsset asset,
+  required ShareholderGovernanceState governance,
+  required DateTime Function(int day) dateForDay,
+  required DateTime asOfDate,
+}) {
+  final company = governance.companyById(asset.id);
+  if (company != null) {
+    for (final decision in company.managementDecisions) {
+      // 기업재편은 아래의 구조화된 기록에서 발표와 결과를 한 쌍으로 만든다.
+      // 같은 사건을 managementDecisions에서도 다시 넣으면 공시가 중복된다.
+      if (decision.agendaId.startsWith('market-event:corporate-')) continue;
+
+      final announcedOn = dateForDay(decision.decisionDay);
+      final completedOn = dateForDay(decision.completionDay);
+      final immediateImpact = decision.immediatePriceImpactBps != 0
+          ? decision.immediatePriceImpactBps
+          : decision.completionDay == decision.decisionDay
+          ? decision.realizedPriceImpactBps
+          : 0;
+      final decisionType = _playerDecisionDisclosureType(decision);
+      add(
+        CorporateDisclosureEvent(
+          id: 'player-decision-${asset.id}-${decision.id}',
+          assetId: asset.id,
+          type: decisionType,
+          date: announcedOn,
+          minute: 15 * 60 + 35,
+          title: '${decision.title} · ${decision.optionLabel}',
+          summary: _withPriceImpact(
+            decision.summary,
+            immediateImpact,
+            nextTradingDay: true,
+          ),
+          status: CorporateDisclosureStatus.completed,
+          material: immediateImpact.abs() >= 50,
+          playerGenerated: true,
+          priceImpactBps: immediateImpact,
+        ),
+      );
+
+      if (decision.completionDay <= decision.decisionDay) continue;
+      final resultIsPublic =
+          !decision.isExecuting && !completedOn.isAfter(asOfDate);
+      final resultImpact = resultIsPublic ? decision.realizedPriceImpactBps : 0;
+      add(
+        CorporateDisclosureEvent(
+          id: 'player-decision-result-${asset.id}-${decision.id}',
+          assetId: asset.id,
+          type: decisionType,
+          date: completedOn,
+          minute: 16 * 60,
+          title:
+              '${decision.title} · 성과 ${resultIsPublic ? decision.status.label : '확정 예정'}',
+          summary: resultIsPublic
+              ? _withPriceImpact(
+                  decision.outcome.isEmpty
+                      ? '집행 결과가 확정됐습니다.'
+                      : decision.outcome,
+                  resultImpact,
+                  nextTradingDay: true,
+                )
+              : '집행 성과와 추가 시장평가는 이 날짜에 확정되며 결과는 미리 공개되지 않습니다.',
+          status: _corporateDisclosureStatus(
+            eventDate: completedOn,
+            announcedOn: announcedOn,
+            asOfDate: asOfDate,
+          ),
+          material: true,
+          playerGenerated: true,
+          priceImpactBps: resultImpact,
+        ),
+      );
+    }
+  }
+
+  for (final meeting in governance.meetingsFor(asset.id)) {
+    final heldOn = dateForDay(meeting.heldDay);
+    final deadlineOn = dateForDay(meeting.deadlineDay);
+    final agendaTitles = meeting.agendas
+        .map((agenda) => agenda.title)
+        .where((title) => title.trim().isNotEmpty)
+        .take(3)
+        .join(' · ');
+    final decided = meeting.agendas.where((agenda) => agenda.passed != null);
+    final passedCount = decided.where((agenda) => agenda.passed == true).length;
+    final meetingClosed = meeting.status == ShareholderMeetingStatus.closed;
+    final playerDriven =
+        meeting.extraordinary ||
+        meeting.agendas.any((agenda) => agenda.proposedByPlayer);
+    add(
+      CorporateDisclosureEvent(
+        id: 'governance-meeting-${meeting.id}',
+        assetId: asset.id,
+        type: meeting.extraordinary
+            ? CorporateDisclosureType.extraordinaryGeneralMeeting
+            : CorporateDisclosureType.annualGeneralMeeting,
+        date: heldOn,
+        minute: 10 * 60,
+        title: meeting.extraordinary ? '임시주주총회' : '정기주주총회',
+        summary: meetingClosed
+            ? '${decided.length}개 안건 중 $passedCount개 가결${meeting.attended ? ' · 플레이어 참석·의결 완료' : ''}'
+            : '${agendaTitles.isEmpty ? '상정 안건 공시 예정' : agendaTitles} · 의결 마감 ${marketDateKey(deadlineOn)}',
+        status: _corporateDisclosureStatus(
+          eventDate: heldOn,
+          announcedOn: deadlineOn,
+          asOfDate: asOfDate,
+        ),
+        material: meeting.agendas.any(
+          (agenda) =>
+              agenda.type == ShareholderAgendaType.merger ||
+              agenda.type == ShareholderAgendaType.capitalIncrease ||
+              agenda.type == ShareholderAgendaType.assetSale,
+        ),
+        playerGenerated: playerDriven,
+      ),
+    );
+  }
+
+  for (final action in governance.corporateActionsFor(asset.id)) {
+    final announcedOn = dateForDay(action.announcedDay);
+    final completedOn = dateForDay(action.completionDay);
+    final isLead = action.leadAssetId == asset.id;
+    final counterparty = isLead ? action.partnerName : action.leadName;
+    final immediateImpact = isLead
+        ? action.immediatePriceImpactBps
+        : (action.immediatePriceImpactBps * 0.7).round();
+    final relation = counterparty.isEmpty ? '' : ' · 상대 $counterparty';
+    final disclosureType = _playerCorporateActionDisclosureType(action.type);
+    add(
+      CorporateDisclosureEvent(
+        id: 'player-corporate-announcement-${action.id}-${asset.id}',
+        assetId: asset.id,
+        type: disclosureType,
+        date: announcedOn,
+        minute: 15 * 60 + 35,
+        title: '${action.type.label} 추진 공시',
+        summary: _withPriceImpact(
+          '${action.strategy}$relation · 주주 승인과 실행 절차를 시작합니다.',
+          immediateImpact,
+          nextTradingDay: true,
+        ),
+        status: CorporateDisclosureStatus.completed,
+        material: true,
+        playerGenerated: true,
+        priceImpactBps: immediateImpact,
+      ),
+    );
+
+    final resultIsPublic =
+        !action.isExecuting && !completedOn.isAfter(asOfDate);
+    final resultImpact = resultIsPublic
+        ? _playerCorporateActionResultImpact(action, isLead: isLead)
+        : 0;
+    add(
+      CorporateDisclosureEvent(
+        id: 'player-corporate-result-${action.id}-${asset.id}',
+        assetId: asset.id,
+        type: disclosureType,
+        date: completedOn,
+        minute: 16 * 60,
+        title:
+            '${action.type.label} ${resultIsPublic ? action.status.label : '결과 확정 예정'}',
+        summary: resultIsPublic
+            ? _withPriceImpact(
+                action.outcome.isEmpty ? '기업재편 결과가 확정됐습니다.' : action.outcome,
+                resultImpact,
+                nextTradingDay: true,
+              )
+            : '통합·재편 성과와 추가 시장평가는 이 날짜에 확정되며 결과는 미리 공개되지 않습니다.',
+        status: _corporateDisclosureStatus(
+          eventDate: completedOn,
+          announcedOn: announcedOn,
+          asOfDate: asOfDate,
+        ),
+        material: true,
+        playerGenerated: true,
+        priceImpactBps: resultImpact,
+      ),
+    );
+  }
+}
+
+CorporateDisclosureType _playerDecisionDisclosureType(
+  ListedManagementDecisionRecord decision,
+) {
+  if (decision.title.contains('CEO') || decision.agendaId.startsWith('ceo:')) {
+    return switch (decision.optionId) {
+      'talentAndCulture' => CorporateDisclosureType.executiveChange,
+      'shareholderReturn' => CorporateDisclosureType.dividend,
+      'researchAndDevelopment' ||
+      'automation' ||
+      'globalExpansion' => CorporateDisclosureType.capexDecision,
+      _ => CorporateDisclosureType.boardMeeting,
+    };
+  }
+  if (decision.title.contains('주주총회') ||
+      decision.title.contains('주주서한') ||
+      decision.title.contains('서면질의')) {
+    return CorporateDisclosureType.minorityShareholderAction;
+  }
+  return CorporateDisclosureType.boardMeeting;
+}
+
+CorporateDisclosureType _playerCorporateActionDisclosureType(
+  ListedCorporateActionType type,
+) => switch (type) {
+  ListedCorporateActionType.merger => CorporateDisclosureType.merger,
+  ListedCorporateActionType.jointVenture =>
+    CorporateDisclosureType.capexDecision,
+  ListedCorporateActionType.spinOff => CorporateDisclosureType.spinoff,
+  ListedCorporateActionType.assetSale => CorporateDisclosureType.restructuring,
+};
+
+int _playerCorporateActionResultImpact(
+  ListedCorporateActionRecord action, {
+  required bool isLead,
+}) {
+  final leadImpact = switch (action.status) {
+    ListedCorporateActionStatus.succeeded => action.successPriceImpactBps,
+    ListedCorporateActionStatus.mixed =>
+      (action.successPriceImpactBps * 0.25).round(),
+    ListedCorporateActionStatus.failed => action.failurePriceImpactBps,
+    ListedCorporateActionStatus.executing => 0,
+  };
+  return isLead ? leadImpact : (leadImpact * 0.7).round();
+}
+
+String _withPriceImpact(
+  String summary,
+  int impactBps, {
+  required bool nextTradingDay,
+}) {
+  if (impactBps == 0) return summary;
+  final impact = impactBps / 100;
+  final timing = nextTradingDay ? '다음 거래일 시장평가' : '시장평가';
+  return '$summary · $timing ${impact >= 0 ? '+' : ''}${impact.toStringAsFixed(1)}%';
 }
 
 extension on double {

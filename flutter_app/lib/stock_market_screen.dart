@@ -5460,6 +5460,8 @@ class _StockDetailScreenState extends State<_StockDetailScreen>
                     asset: definition.asset,
                     simulationSeed: state.simulationSeed,
                     asOfDate: state.currentDate,
+                    governance: state.shareholderGovernance,
+                    governanceDateForDay: state.dateForDay,
                     pastDays: 120,
                     futureDays: 365,
                   );
@@ -7339,7 +7341,8 @@ class _CorporateDisclosureRow extends StatelessWidget {
     return Semantics(
       key: ValueKey<String>('corporate-disclosure-${event.id}'),
       label:
-          '${event.date.year}년 ${event.date.month}월 ${event.date.day}일 ${event.title}, ${event.statusLabel}',
+          '${event.date.year}년 ${event.date.month}월 ${event.date.day}일 ${event.title}, ${event.statusLabel}'
+          '${event.playerGenerated ? ', 내가 내린 결정' : ''}',
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -7373,6 +7376,27 @@ class _CorporateDisclosureRow extends StatelessWidget {
                         ),
                       ),
                     ),
+                    if (event.playerGenerated) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0E7C66).withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: const Text(
+                          '내 결정',
+                          style: TextStyle(
+                            color: Color(0xFF0E7C66),
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ],
                     const SizedBox(width: 6),
                     Container(
                       padding: const EdgeInsets.symmetric(
