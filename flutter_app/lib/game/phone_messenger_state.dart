@@ -21,7 +21,6 @@ class PhoneContactDefinition {
     required this.name,
     required this.personalityLabel,
     required this.accentValue,
-    required this.openingMessage,
     required this.stockReply,
     required this.classReply,
     required this.casualReply,
@@ -34,7 +33,6 @@ class PhoneContactDefinition {
   final String name;
   final String personalityLabel;
   final int accentValue;
-  final String openingMessage;
   final String stockReply;
   final String classReply;
   final String casualReply;
@@ -49,7 +47,6 @@ const phoneMessengerContacts = <PhoneContactDefinition>[
     name: '김학준',
     personalityLabel: '규칙·계산형',
     accentValue: 0xFF5D7FA3,
-    openingMessage: '야, 장 끝나면 손익표 서로 확인하자. 계산 틀리면 바로 말해.',
     stockReply: '수익률만 보지 말고 수수료까지 넣어. 숫자 하나 빠지면 결론도 바뀌잖아.',
     classReply: '나는 순서 다시 적는 중. 헷갈린 데 있으면 같이 맞춰 보자.',
     casualReply: '지금 장부 정리 중. 다 하면 탁구 한 판은 가능.',
@@ -62,7 +59,6 @@ const phoneMessengerContacts = <PhoneContactDefinition>[
     name: '김서아',
     personalityLabel: 'ISFJ · 약속과 기록',
     accentValue: 0xFFF38B96,
-    openingMessage: '단톡 공지 놓친 거 있으면 말해 줘. 내가 오늘 날짜로 적어 둘게.',
     stockReply: '오늘 오른 것보다 전에 한 약속을 계속 지킨 회사인지 먼저 보고 있어.',
     classReply: '아까 운영관이 말한 순서 적어 뒀어. 필요한 부분만 사진처럼 다시 써 줄까?',
     casualReply: '공용 컵 채워 두고 있었어. 너 밥은 먹었어?',
@@ -75,7 +71,6 @@ const phoneMessengerContacts = <PhoneContactDefinition>[
     name: '이지안',
     personalityLabel: 'ISTP · 원인과 실험',
     accentValue: 0xFF77BCE8,
-    openingMessage: '컴퓨터 또 멈추면 전원부터 누르지 말고 불러. 원인 지워져.',
     stockReply: '광고 말고 실제 제품부터 봐. 작동이 별로면 숫자도 오래 못 버텨.',
     classReply: '설명만 보면 더 헷갈려. 화면 켜고 한 번 직접 해 보면 돼.',
     casualReply: '드라이버 찾는 중. 아까 여기 뒀는데 누가 옮겼나.',
@@ -88,7 +83,6 @@ const phoneMessengerContacts = <PhoneContactDefinition>[
     name: '최이서',
     personalityLabel: 'ISFP · 감각과 경계',
     accentValue: 0xFFB58CE8,
-    openingMessage: '네 이름표 색 골라 놨어. 마음에 안 들면 그냥 말해. 다시 하면 돼.',
     stockReply: '사람들이 한 번 사고 끝인지, 계속 쓰고 싶은지가 더 궁금해.',
     classReply: '화면 색이 너무 세서 오래 보면 눈 아파. 내용은 직접 해 보니까 알겠어.',
     casualReply: '실 정리하고 있어. 조용해서 지금은 좀 좋다.',
@@ -101,7 +95,6 @@ const phoneMessengerContacts = <PhoneContactDefinition>[
     name: '정아린',
     personalityLabel: 'ESTJ · 실행과 마감',
     accentValue: 0xFFFF9466,
-    openingMessage: '내일 준비물 오늘 아홉 시 전에 확인해. 아침에 찾으면 무조건 늦어.',
     stockReply: '계획 말고 실적부터. 이번 분기 약속한 납기 지켰는지 확인했어?',
     classReply: '헷갈린 부분 세 개만 적어. 여덟 시 반에 같이 끝내자.',
     casualReply: '내일 시간표 짜는 중. 놀 거면 몇 시까지인지 먼저 정해.',
@@ -114,7 +107,6 @@ const phoneMessengerContacts = <PhoneContactDefinition>[
     name: '박하은',
     personalityLabel: 'ENFJ · 배려와 합의',
     accentValue: 0xFFFF7F9B,
-    openingMessage: '오늘 조용했던 사람들 괜찮은지 궁금해. 너도 힘든 거 있으면 말해 줘.',
     stockReply: '대표 말도 보지만 직원들이 실제로 오래 남는 회사인지 같이 보고 싶어.',
     classReply: '모르는 거 말해도 괜찮아. 우리 중에 같은 데서 막힌 사람 분명 있을걸?',
     casualReply: '다들 저녁 먹었는지 보고 있었어. 근데 나도 이제 좀 쉬려고.',
@@ -127,7 +119,6 @@ const phoneMessengerContacts = <PhoneContactDefinition>[
     name: '한수아',
     personalityLabel: 'ENFP · 가능성과 사람',
     accentValue: 0xFFFF6F91,
-    openingMessage: '야, 오늘 다들 표정 봤어? 종가 뜨자마자 한꺼번에 굳은 거 웃기면서도 좀 긴장됐어!',
     stockReply: '지금 느낌이 좋은 건 맞는데 다시 사는 사람이 진짜 늘었는지도 보자. 나 또 신났나 봐.',
     classReply: '잠깐, 나도 거기서 막혔어! 둘이 틀리면 덜 쪽팔리니까 같이 다시 해 보자.',
     casualReply: '나 간식 뭐 먹을지 다섯 개째 고민 중. 이게 오늘 제일 어려운 선택이야.',
@@ -140,7 +131,6 @@ const phoneMessengerContacts = <PhoneContactDefinition>[
     name: '오지우',
     personalityLabel: 'ENTP · 가설과 반례',
     accentValue: 0xFF45B7A7,
-    openingMessage: '지우 방송국 개국. 첫 속보: 우리 반 손익표 공개 직전 긴장감 최고조.',
     stockReply: '속보 정정. 싼 종목이 아니라 다들 피하는 이유를 우리가 모르는 걸 수도 있습니다.',
     classReply: '가정해 보자. 설명이 어려운 게 아니라 예시가 이상했던 거면? 다른 걸로 시험해 보자.',
     casualReply: '라디오 주파수 잡는 중. 지금은 잡음 80, 음악 20. 그래도 제법 괜찮아.',
@@ -153,7 +143,6 @@ const phoneMessengerContacts = <PhoneContactDefinition>[
     name: '윤채아',
     personalityLabel: 'INTJ · 구조와 장기 전략',
     accentValue: 0xFF727FBE,
-    openingMessage: '오늘 결과표는 버리지 마. 하루보다 한 달 흐름을 보는 게 나아.',
     stockReply: '오늘 가격만 보면 안 돼. 왜 이 가격이 됐고 그 이유가 끝났는지부터 봐.',
     classReply: '나는 전제부터 다시 적는 중이야. 중간 하나를 빼면 결론이 전부 달라져.',
     casualReply: '영수증 날짜별로 정리 중. 끝나면 잠깐은 이야기할 수 있어.',
@@ -410,18 +399,7 @@ class PhoneMessengerState {
   });
 
   factory PhoneMessengerState.initial() => PhoneMessengerState(
-    messages: [
-      for (var index = 0; index < phoneMessengerContacts.length; index++)
-        PhoneMessage(
-          id: 'phone-opening-${phoneMessengerContacts[index].id}',
-          contactId: phoneMessengerContacts[index].id,
-          senderId: phoneMessengerContacts[index].id,
-          text: phoneMessengerContacts[index].openingMessage,
-          day: 1,
-          marketMinute: 480 + index,
-          read: false,
-        ),
-    ],
+    messages: const <PhoneMessage>[],
     progressByContact: {
       for (final contact in phoneMessengerContacts)
         contact.id: PhoneThreadProgress(contactId: contact.id),
@@ -572,6 +550,7 @@ class PhoneMessengerState {
         .where(
           (message) =>
               message.id.isNotEmpty &&
+              !message.id.startsWith('phone-opening-') &&
               message.text.isNotEmpty &&
               message.text.length <= phoneMessengerMaxMessageLength * 3 &&
               validIds.contains(message.contactId) &&
@@ -579,9 +558,7 @@ class PhoneMessengerState {
                   message.senderId == message.contactId),
         )
         .toList(growable: false);
-    final messages = parsedMessages.isEmpty
-        ? PhoneMessengerState.initial().messages
-        : retainPhoneMessages(parsedMessages);
+    final messages = retainPhoneMessages(parsedMessages);
 
     final rawProgress = (json['progressByContact'] as Map?) ?? const {};
     final progress = <String, PhoneThreadProgress>{};

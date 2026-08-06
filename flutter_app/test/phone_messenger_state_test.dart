@@ -6,13 +6,13 @@ import 'package:millennium_capital/game/phone_messenger_state.dart';
 void main() {
   const engine = GameEngine();
 
-  test('new and migrated saves have nine distinct phone contacts in v27', () {
+  test('new and migrated saves start with nine empty phone contacts', () {
     final state = engine.createNewGame('미래톡 테스트', worldSeed: 'phone-initial');
 
     expect(GameState.schemaVersion, 27);
     expect(phoneMessengerContacts.length, 9);
-    expect(state.phoneMessenger.messages.length, 9);
-    expect(state.phoneMessenger.totalUnread, 9);
+    expect(state.phoneMessenger.messages, isEmpty);
+    expect(state.phoneMessenger.totalUnread, 0);
     expect(
       phoneMessengerContacts.map((contact) => contact.personalityLabel).toSet(),
       hasLength(9),
@@ -23,16 +23,49 @@ void main() {
       ..['version'] = 23;
     final migrated = GameState.fromJson(legacyJson);
     expect(migrated.phoneMessenger.progressByContact, hasLength(9));
-    expect(migrated.phoneMessenger.totalUnread, 9);
+    expect(migrated.phoneMessenger.messages, isEmpty);
+    expect(migrated.phoneMessenger.totalUnread, 0);
+
+    final seededJson = state.toJson();
+    final phoneJson = (seededJson['phoneMessenger'] as Map<String, dynamic>);
+    phoneJson['messages'] = [
+      const PhoneMessage(
+        id: 'phone-opening-kim_seoa',
+        contactId: 'kim_seoa',
+        senderId: 'kim_seoa',
+        text: '구버전 인공 첫 메시지',
+        day: 1,
+        marketMinute: 480,
+        read: false,
+      ).toJson(),
+    ];
+    final cleaned = GameState.fromJson(seededJson);
+    expect(cleaned.phoneMessenger.messages, isEmpty);
+    expect(cleaned.phoneMessenger.totalUnread, 0);
   });
 
-  test('reading one thread clears only that contact unread messages', () {
-    final state = engine.createNewGame('읽음 테스트', worldSeed: 'phone-read');
+  test('reading one thread clears a real unread message', () {
+    var state = engine.createNewGame('읽음 테스트', worldSeed: 'phone-read');
+    state = state.copyWith(
+      phoneMessenger: state.phoneMessenger.copyWith(
+        messages: const [
+          PhoneMessage(
+            id: 'phone-proactive-4-kim_seoa',
+            contactId: 'kim_seoa',
+            senderId: 'kim_seoa',
+            text: '오늘 기록 같이 볼래?',
+            day: 4,
+            marketMinute: 480,
+            read: false,
+          ),
+        ],
+      ),
+    );
     final result = engine.markPhoneThreadRead(state, contactId: 'kim_seoa');
 
     expect(result.success, isTrue);
     expect(result.state.phoneMessenger.unreadFor('kim_seoa'), 0);
-    expect(result.state.phoneMessenger.totalUnread, 8);
+    expect(result.state.phoneMessenger.totalUnread, 0);
   });
 
   test('the same stock message receives nine personality-specific replies', () {

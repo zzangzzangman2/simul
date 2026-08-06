@@ -172,10 +172,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('phone-messenger-screen')), findsOneWidget);
-    expect(
-      find.byKey(const Key('phone-messenger-total-unread')),
-      findsOneWidget,
-    );
+    expect(find.byKey(const Key('phone-messenger-total-unread')), findsNothing);
     for (final id in <String>[
       'kim_hakjun',
       'kim_seoa',
@@ -189,16 +186,18 @@ void main() {
     ]) {
       expect(find.byKey(Key('phone-contact-$id')), findsOneWidget);
     }
+    expect(find.text('첫 메시지를 보내보세요'), findsNWidgets(9));
 
     await tester.tap(find.byKey(const Key('phone-contact-han_sua')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('phone-chat-han_sua')), findsOneWidget);
-    expect(find.textContaining('한꺼번에 굳은'), findsOneWidget);
+    expect(find.byKey(const Key('phone-chat-empty-state')), findsOneWidget);
+    expect(find.text('첫 메시지를 보내보세요'), findsOneWidget);
     expect(
       tester.widget<Text>(find.byKey(const Key('phone-status-time'))).data,
       '08:00',
     );
-    expect(find.byKey(const Key('phone-date-2000-01-01')), findsOneWidget);
+    expect(find.byKey(const Key('phone-date-2000-01-01')), findsNothing);
 
     expect(find.byKey(const Key('phone-chat-search-button')), findsNothing);
     expect(find.byKey(const Key('phone-chat-search-input')), findsNothing);
@@ -210,6 +209,8 @@ void main() {
     await tester.tap(find.byKey(const Key('phone-chat-send-button')));
     await tester.pumpAndSettle();
 
+    expect(find.byKey(const Key('phone-chat-empty-state')), findsNothing);
+    expect(find.byKey(const Key('phone-date-2000-01-01')), findsOneWidget);
     expect(find.text('나도 오늘 수업 헷갈려'), findsOneWidget);
     expect(find.textContaining('둘이 틀리면'), findsOneWidget);
     expect(state.phoneMessenger.progressFor('han_sua').totalExchanges, 1);

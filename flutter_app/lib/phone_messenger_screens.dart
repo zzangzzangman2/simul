@@ -298,7 +298,7 @@ class _PhoneMessengerScreenState extends State<PhoneMessengerScreen> {
                                   children: [
                                     Expanded(
                                       child: Text(
-                                        message?.text ?? '아직 대화가 없습니다.',
+                                        message?.text ?? '첫 메시지를 보내보세요',
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                         style: const TextStyle(
@@ -810,12 +810,43 @@ class _PhoneChatScreenState extends State<PhoneChatScreen> {
                 ),
               ),
               Expanded(
-                child: ListView.builder(
-                  key: const Key('phone-chat-message-list'),
-                  controller: _scrollController,
-                  padding: const EdgeInsets.fromLTRB(12, 13, 12, 16),
-                  itemCount: messageItems.length,
-                  itemBuilder: (context, index) => messageItems[index],
+                child: Stack(
+                  children: [
+                    ListView.builder(
+                      key: const Key('phone-chat-message-list'),
+                      controller: _scrollController,
+                      padding: const EdgeInsets.fromLTRB(12, 13, 12, 16),
+                      itemCount: messageItems.length,
+                      itemBuilder: (context, index) => messageItems[index],
+                    ),
+                    if (messages.isEmpty)
+                      const Positioned.fill(
+                        child: IgnorePointer(
+                          child: Center(
+                            child: Column(
+                              key: Key('phone-chat-empty-state'),
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.send_rounded,
+                                  size: 27,
+                                  color: Color(0xFF9CB4C0),
+                                ),
+                                SizedBox(height: 9),
+                                Text(
+                                  '첫 메시지를 보내보세요',
+                                  style: TextStyle(
+                                    color: Color(0xFF647983),
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
               Container(
