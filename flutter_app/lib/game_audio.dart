@@ -78,7 +78,7 @@ extension on GameAudioScene {
       0.25,
     ),
     GameAudioScene.hub => const _GameAudioSceneConfig(
-      'audio/bgm/hub_verdure.ogg',
+      'audio/bgm/hub_gentle_brew.ogg',
       0.25,
     ),
     GameAudioScene.finance => const _GameAudioSceneConfig(

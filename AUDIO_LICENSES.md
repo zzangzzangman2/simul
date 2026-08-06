@@ -16,7 +16,8 @@
 | `story_hesitation.ogg` | Hesitation | <https://peritune.com/blog/2022/02/26/hesitation/> | 국정원·긴장 장면 |
 | `story_piano_sad.ogg` | Piano Sad2 (Strings) | <https://peritune.com/blog/2018/09/06/piano_sad2/> | 좌절·회상 장면 |
 | `finance_sakuya.ogg` | Sakuya | <https://peritune.com/blog/2015/11/21/sakuya/> | 은행·자산·경영 |
-| `hub_verdure.ogg` | Verdure3 | <https://peritune.com/blog/2016/12/12/verdure3/> | 아파트·일상 허브 |
+| `hub_gentle_brew.ogg` | Gentle Brew (official loop) | <https://peritune.com/blog/2025/01/22/gentle_brew/> | 로비·일상 허브 |
+| `hub_verdure.ogg` | Verdure3 | <https://peritune.com/blog/2016/12/12/verdure3/> | 프롤로그 아파트·일상 장면 |
 | `relationship_raindrop.ogg` | RainDrop | <https://peritune.com/blog/2022/07/11/raindrop/> | 메신저·관계 이벤트 |
 | `market_portside_cafe.ogg` | Portside Café (official loop) | <https://peritune.com/blog/2026/03/13/portside-cafe/> | 주식·PC·시장 |
 | `action_strategy.ogg` | Strategy5 | <https://peritune.com/blog/2017/12/30/strategy5/> | 신문 배달·액션 |

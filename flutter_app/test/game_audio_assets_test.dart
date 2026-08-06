@@ -15,6 +15,7 @@ void main() {
       'assets/audio/bgm/story_piano_sad.ogg',
       'assets/audio/bgm/finance_sakuya.ogg',
       'assets/audio/bgm/hub_verdure.ogg',
+      'assets/audio/bgm/hub_gentle_brew.ogg',
       'assets/audio/bgm/relationship_raindrop.ogg',
       'assets/audio/bgm/market_portside_cafe.ogg',
       'assets/audio/bgm/action_strategy.ogg',

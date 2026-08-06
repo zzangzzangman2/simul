@@ -41858,7 +41858,7 @@ r.$flags=1
 q=r
 return q.length===0?s:s+" \xb7 "+B.d.b6(q," \xb7 ")},
 bYt(a){var s
-switch(a.a){case 0:s=B.cfw
+switch(a.a){case 0:s=B.cfv
 break
 case 1:s=B.cfy
 break
@@ -41866,7 +41866,7 @@ case 2:s=B.cfu
 break
 case 3:s=B.cfq
 break
-case 4:s=B.cfv
+case 4:s=B.cfw
 break
 case 5:s=B.cfx
 break
@@ -170900,8 +170900,8 @@ B.cfr=new A.ld("audio/bgm/action_strategy.ogg",0.27)
 B.cfs=new A.ld("audio/bgm/horse_racing_prairie4.ogg",0.24)
 B.cft=new A.ld("audio/bgm/market_portside_cafe.ogg",0.24)
 B.cfu=new A.ld("audio/bgm/story_hesitation.ogg",0.25)
-B.cfv=new A.ld("audio/bgm/hub_verdure.ogg",0.25)
-B.cfw=new A.ld(null,0)
+B.cfv=new A.ld(null,0)
+B.cfw=new A.ld("audio/bgm/hub_gentle_brew.ogg",0.25)
 B.cfx=new A.ld("audio/bgm/finance_sakuya.ogg",0.23)
 B.cfy=new A.ld("audio/bgm/title_gentle_theme.ogg",0.28)
 B.cfz=new A.le(B.U6,null)

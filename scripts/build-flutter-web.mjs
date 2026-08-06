@@ -132,6 +132,7 @@ async function validateBuild() {
   }
   for (const name of [
     "assets/assets/audio/bgm/title_gentle_theme.ogg",
+    "assets/assets/audio/bgm/hub_gentle_brew.ogg",
     "assets/assets/audio/bgm/market_portside_cafe.ogg",
     "assets/assets/audio/bgm/horse_racing_prairie4.ogg",
     "assets/assets/audio/bgm/casino_taisho.ogg",
