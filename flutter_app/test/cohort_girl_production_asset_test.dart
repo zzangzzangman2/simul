@@ -69,8 +69,20 @@ void main() {
 
         var foregroundPixels = 0;
         var brightNeutralPixels = 0;
+        var partialAlphaPixels = 0;
+        var greenEdgePixels = 0;
         for (var offset = 0; offset < rgba.length; offset += 4) {
-          if (rgba[offset + 3] < 128) {
+          final alpha = rgba[offset + 3];
+          if (alpha > 0 && alpha < 255) {
+            partialAlphaPixels += 1;
+            final red = rgba[offset];
+            final green = rgba[offset + 1];
+            final blue = rgba[offset + 2];
+            if (green > red + 18 && green > blue + 18) {
+              greenEdgePixels += 1;
+            }
+          }
+          if (alpha < 128) {
             continue;
           }
           foregroundPixels += 1;
@@ -100,6 +112,18 @@ void main() {
           lessThan(brightNeutralLimit),
           reason: '${file.path} contains a white/checker matte field',
         );
+        if (file.path.contains('kim_hakjun')) {
+          expect(
+            partialAlphaPixels,
+            greaterThan(1000),
+            reason: '${file.path} must keep a soft antialiased silhouette',
+          );
+          expect(
+            greenEdgePixels,
+            0,
+            reason: '${file.path} contains chroma-key spill on its alpha edge',
+          );
+        }
 
         image.dispose();
         codec.dispose();

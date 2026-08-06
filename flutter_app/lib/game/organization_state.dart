@@ -386,6 +386,13 @@ class AcademyHelperStatus {
       );
 }
 
+String academyHelperDialogue(String helperId) => switch (helperId) {
+  'hakjun' => '“공시 날짜랑 숫자부터 맞춰 보자. 틀린 한 줄이 있으면 그 종목은 일단 멈춰.”',
+  'sua' => '“잠깐, 사람들이 왜 다시 사는지부터 보자. 반짝 인기면 숫자도 금방 꺼져.”',
+  'seoyoon' => '“보유 종목부터 보겠습니다. 매수 이유와 틀렸을 때의 조건을 한 줄씩 남겨요.”',
+  _ => '“같이 확인해 볼게요. 확인한 사실과 아직 모르는 부분부터 나눠 봐요.”',
+};
+
 class OrganizationState {
   const OrganizationState({
     required this.employees,
@@ -441,9 +448,9 @@ class OrganizationState {
         id: 'hakjun',
         name: '김학준',
         relation: '데시멀 동기',
-        role: '규정과 공시 교차검토',
-        specialty: '규정 · 위험 · 기록',
-        effect: '규정집과 공시를 대조해 빠뜨린 위험 조건을 찾아냅니다.',
+        role: '공시·손실 위험 점검',
+        specialty: '숫자 불일치 · 악재 · 주문 조건',
+        effect: '무료 조사권 1회 · 적용 거래일의 악재·손실 위험 신호 4건 우선',
         asset:
             'assets/images/production_soft_painted/kim_hakjun/01_neutral_crosscheck_uniform_v4.png',
         fatigue: 8,
@@ -454,9 +461,9 @@ class OrganizationState {
         id: 'sua',
         name: '한수아',
         relation: '데시멀 동기',
-        role: '고객과 생활 반응 조사',
-        specialty: '사람 · 소비 · 인터뷰',
-        effect: '숫자 뒤에 있는 고객 표정과 실제 사용 반응을 확인합니다.',
+        role: '고객 반응·재구매 점검',
+        specialty: '소비 · 유통 · 콘텐츠 · 생활 반응',
+        effect: '무료 조사권 1회 · 적용 거래일의 고객 수요 신호 4건 우선',
         asset:
             'assets/images/production_soft_painted/han_sua/02_warm_smile_wave_v3.png',
         fatigue: 5,
@@ -467,9 +474,9 @@ class OrganizationState {
         id: 'seoyoon',
         name: '한서윤',
         relation: '데시멀 담당 운영관',
-        role: '투자노트 점검',
-        specialty: '기업분석 · 손실복기 · 준법',
-        effect: '매수 이유와 매도 조건이 실제 기록으로 남았는지 점검합니다.',
+        role: '보유종목·투자노트 점검',
+        specialty: '보유종목 · 관심종목 · 공개 시각',
+        effect: '무료 조사권 1회 · 적용 거래일의 보유·관심종목 신호 4건 우선',
         asset: 'assets/images/주식선생님/26_포즈5_주인공그림체_공통슬롯_투명.png',
         fatigue: 4,
         helpCount: 0,
@@ -497,7 +504,10 @@ class OrganizationState {
           .map((item) => item.id == helperId ? item.requestHelp(day) : item)
           .toList(growable: false),
       cultureTags: cultureTags,
-      helpLog: [...helpLog, 'DAY $day · ${helper.name} · ${helper.effect}'],
+      helpLog: [
+        ...helpLog,
+        'DAY $day · ${helper.name} 교차검토 · ${helper.effect}',
+      ],
     );
   }
 
@@ -540,6 +550,27 @@ class OrganizationState {
           (item) => AcademyHelperStatus.fromJson(item.cast<String, dynamic>()),
         )
         .toList(growable: false);
+    final savedHelpersById = <String, AcademyHelperStatus>{
+      for (final helper in savedHelpers) helper.id: helper,
+    };
+    final normalizedHelpers = academy.academyHelpers
+        .map((canonical) {
+          final saved = savedHelpersById[canonical.id];
+          if (saved == null) return canonical;
+          return AcademyHelperStatus(
+            id: canonical.id,
+            name: canonical.name,
+            relation: canonical.relation,
+            role: canonical.role,
+            specialty: canonical.specialty,
+            effect: canonical.effect,
+            asset: canonical.asset,
+            fatigue: saved.fatigue,
+            helpCount: saved.helpCount,
+            lastHelpDay: saved.lastHelpDay,
+          );
+        })
+        .toList(growable: false);
     return OrganizationState(
       employees: ((json['employees'] as List?) ?? const [])
           .map(
@@ -547,9 +578,7 @@ class OrganizationState {
                 EmployeeProfile.fromJson((item as Map).cast<String, dynamic>()),
           )
           .toList(),
-      academyHelpers: savedHelpers.isEmpty
-          ? academy.academyHelpers
-          : savedHelpers,
+      academyHelpers: normalizedHelpers,
       cultureTags: ((json['cultureTags'] as List?) ?? const []).cast<String>(),
       helpLog: ((json['helpLog'] as List?) ?? const [])
           .whereType<String>()

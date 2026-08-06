@@ -239,11 +239,8 @@ class GameState {
   int get bankCash => math.max(0, cash - brokerageCash);
 
   double get pendingOrderFeeMultiplier {
-    final helperDiscount =
-        story.storyFlags['activeResearchHelper'] == 'hakjun' &&
-        story.flagInt('activeResearchHelperDay', -1) == day;
     final skillDiscount = progression.hasSkill('fee_sense') ? 0.9 : 1.0;
-    return (helperDiscount ? 0.9 : 1.0) * skillDiscount;
+    return skillDiscount;
   }
 
   int get pendingBuyReservedCash {

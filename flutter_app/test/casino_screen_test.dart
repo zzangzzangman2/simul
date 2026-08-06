@@ -14,7 +14,7 @@ Future<void> _advanceCasinoWelcome(
 }) async {
   expect(find.byKey(const Key('story-dialogue-panel')), findsOneWidget);
   expect(find.text('이안'), findsOneWidget);
-  expect(find.text('오빠, 오늘도 왔네.'), findsOneWidget);
+  expect(find.text('오빠, 왔네.'), findsOneWidget);
   expect(find.textContaining('20세'), findsNothing);
   expect(find.byKey(const Key('casino-entry-continue')), findsNothing);
   final dialogueRect = tester.getRect(

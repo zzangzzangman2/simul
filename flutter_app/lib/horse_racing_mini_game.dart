@@ -149,6 +149,7 @@ class _HorseRacingMiniGameState extends State<HorseRacingMiniGame>
   late String _primaryHorseId = widget.race.entrants.first.id;
   String? _secondaryHorseId;
   bool _pickingQuinellaSecond = false;
+  bool _betSlipTouched = false;
   late int _stake;
   int _raceAudioCue = 0;
   final Set<String> _playedRaceSurges = <String>{};
@@ -167,6 +168,7 @@ class _HorseRacingMiniGameState extends State<HorseRacingMiniGame>
       : widget.race.entrantById(_secondaryHorseId!);
 
   bool get _canStart =>
+      _betSlipTouched &&
       isValidHorseRaceStake(_stake, widget.availableCash) &&
       (_betType != HorseBetType.quinella ||
           (_secondaryHorseId != null && _secondaryHorseId != _primaryHorseId));
@@ -321,6 +323,7 @@ class _HorseRacingMiniGameState extends State<HorseRacingMiniGame>
   void _changeBetType(HorseBetType type) {
     GameAudio.instance.playSfx(GameSfx.toggle);
     setState(() {
+      _betSlipTouched = true;
       _betType = type;
       if (type == HorseBetType.quinella) {
         _secondaryHorseId = null;
@@ -335,6 +338,7 @@ class _HorseRacingMiniGameState extends State<HorseRacingMiniGame>
   void _selectEntrant(String id) {
     GameAudio.instance.playSfx(GameSfx.select);
     setState(() {
+      _betSlipTouched = true;
       if (_betType != HorseBetType.quinella) {
         _primaryHorseId = id;
         return;
@@ -367,7 +371,10 @@ class _HorseRacingMiniGameState extends State<HorseRacingMiniGame>
 
   void _setStake(int stake) {
     GameAudio.instance.playSfx(GameSfx.coins, volumeScale: 0.7);
-    setState(() => _stake = stake);
+    setState(() {
+      _betSlipTouched = true;
+      _stake = stake;
+    });
   }
 
   void _goOffline() {
@@ -1210,7 +1217,9 @@ class _HorseRacingMiniGameState extends State<HorseRacingMiniGame>
                   ),
                   icon: const Icon(Icons.flag_rounded, size: 20),
                   label: Text(
-                    '${_money(_stake)}원 베팅하고 경주 보기',
+                    _betSlipTouched
+                        ? '${_money(_stake)}원 베팅하고 경주 보기'
+                        : '말·베팅액을 한 번 선택해 주세요',
                     style: const TextStyle(
                       fontSize: 14.5,
                       fontWeight: FontWeight.w900,

@@ -29,6 +29,9 @@ class _OrganizationScreenState extends State<OrganizationScreen> {
 
   Future<void> _requestHelp(AcademyHelperStatus helper) async {
     if (_busyHelperId != null || !helper.canHelpOn(_state.day)) return;
+    final creditsBefore = _state.story.flagInt(
+      weekendMarketResearchCreditsFlag,
+    );
     setState(() => _busyHelperId = helper.id);
     late GameState next;
     try {
@@ -44,10 +47,23 @@ class _OrganizationScreenState extends State<OrganizationScreen> {
       _state = next;
       _busyHelperId = null;
     });
+    final creditsAfter = next.story.flagInt(weekendMarketResearchCreditsFlag);
+    final effectiveDay = next.story.flagInt(
+      'activeResearchHelperDay',
+      next.day,
+    );
+    final timing = effectiveDay == next.day ? '오늘 거래일' : '다음 유효 거래일';
+    final creditText = creditsAfter > creditsBefore
+        ? '무료 조사권 1회 추가'
+        : '조사권 3회 보유 중';
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
-        SnackBar(content: Text('${helper.name}의 조언을 오늘 조사노트에 추가했어요.')),
+        SnackBar(
+          content: Text(
+            '${helper.name}: ${academyHelperDialogue(helper.id)}\n$creditText · $timing 보고서에 교차검토 적용',
+          ),
+        ),
       );
   }
 
@@ -126,7 +142,7 @@ class _OrganizationScreenState extends State<OrganizationScreen> {
                   location: '프로젝트 데시멀 · 데시멀 전략회의',
                   caption: '동기와 담당 운영관에게 교차검토를 부탁한다.',
                   minute: _state.marketMinute,
-                  costLabel: '도움 요청 +30분',
+                  costLabel: '교차검토 +30분',
                   dark: false,
                 ),
                 Expanded(
@@ -143,7 +159,7 @@ class _OrganizationScreenState extends State<OrganizationScreen> {
 
                       const SizedBox(height: 22),
                       const Text(
-                        '지금 함께하는 사람들',
+                        '오늘 교차검토 담당',
                         style: TextStyle(
                           color: _ink,
                           fontSize: 20,
@@ -153,7 +169,7 @@ class _OrganizationScreenState extends State<OrganizationScreen> {
                       ),
                       const SizedBox(height: 5),
                       const Text(
-                        '동기와 교사는 직원이 아닙니다. 하루에 한 번만 교차검토를 부탁할 수 있고, 반복하면 피로가 쌓여요.',
+                        '동기와 운영관은 직원이 아닙니다. 하루 한 명에게 30분을 써 교차검토를 맡기면 무료 조사권 1회와 다음 유효 거래일의 전용 보고서 필터가 생깁니다.',
                         style: TextStyle(
                           color: Color(0xFF747B88),
                           fontSize: 11,
@@ -183,7 +199,7 @@ class _OrganizationScreenState extends State<OrganizationScreen> {
                       if (organization.helpLog.isNotEmpty) ...[
                         const SizedBox(height: 22),
                         const Text(
-                          '최근 도움 기록',
+                          '최근 교차검토 기록',
                           style: TextStyle(
                             color: _ink,
                             fontSize: 16,
@@ -253,7 +269,7 @@ class _OrganizationHeader extends StatelessWidget {
         ),
         const Expanded(
           child: Text(
-            '사람들',
+            '데시멀 운용조직',
             style: TextStyle(
               color: _ink,
               fontSize: 20,
@@ -332,13 +348,13 @@ class _OrganizationSummary extends StatelessWidget {
                 value: '${organization.academyFatigue}%',
               ),
               _OrganizationMetric(
-                label: '도움 기록',
+                label: '교차검토',
                 value: '${organization.researchHelpCount}회',
               ),
               _OrganizationMetric(
-                label: '평판 / 월급',
+                label: '무료 조사권',
                 value:
-                    '${state.story.reputation} / ${_money(organization.monthlyPayroll)}',
+                    '${state.story.flagInt(weekendMarketResearchCreditsFlag)}회',
               ),
             ],
           ),
@@ -640,7 +656,7 @@ class _AcademyAssignmentBoard extends StatelessWidget {
               const SizedBox(width: 7),
               const Expanded(
                 child: Text(
-                  '오늘 조사팀 배치',
+                  '오늘 교차검토 선택',
                   style: TextStyle(
                     color: _ink,
                     fontSize: 15,
@@ -655,7 +671,7 @@ class _AcademyAssignmentBoard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Text(
-                  '조언자 1명',
+                  '하루 1명',
                   style: TextStyle(
                     color: Color(0xFF8E6C25),
                     fontSize: 9,
@@ -667,7 +683,7 @@ class _AcademyAssignmentBoard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Container(
-            height: 190,
+            height: 214,
             decoration: BoxDecoration(
               gradient: const LinearGradient(
                 colors: [Color(0xFFFFF2D8), Color(0xFFF0E6D9)],
@@ -681,7 +697,7 @@ class _AcademyAssignmentBoard extends StatelessWidget {
               children: [
                 SizedBox(
                   width: 138,
-                  height: 190,
+                  height: 214,
                   child: Image.asset(
                     selected.asset,
                     key: ValueKey('assignment-portrait-${selected.id}'),
@@ -724,20 +740,43 @@ class _AcademyAssignmentBoard extends StatelessWidget {
                             fontWeight: FontWeight.w800,
                           ),
                         ),
-                        const SizedBox(height: 7),
+                        const SizedBox(height: 6),
                         Expanded(
                           child: Text(
-                            selected.effect,
+                            academyHelperDialogue(selected.id),
                             maxLines: 3,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                              color: Color(0xFF737985),
-                              fontSize: 9,
+                              color: Color(0xFF3E4654),
+                              fontSize: 10,
                               height: 1.4,
-                              fontWeight: FontWeight.w600,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                         ),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 7,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xD9FFFFFF),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            '실제 적용 · ${selected.effect}',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Color(0xFF536A96),
+                              fontSize: 8.5,
+                              height: 1.3,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
                         Row(
                           children: [
                             Text(
@@ -783,12 +822,12 @@ class _AcademyAssignmentBoard extends StatelessWidget {
               icon: const Icon(Icons.edit_note_rounded, size: 18),
               label: Text(
                 busy
-                    ? '기록 중…'
+                    ? '교차검토 준비 중…'
                     : selected.lastHelpDay == day
-                    ? '오늘 도움 완료'
+                    ? '오늘 교차검토 완료'
                     : selected.fatigue >= 80
                     ? '오늘은 쉬어야 해요'
-                    : '${selected.name}에게 조사 도움 부탁하기',
+                    : '조사권 받고 ${selected.name}에게 교차검토 맡기기',
               ),
               style: FilledButton.styleFrom(
                 backgroundColor: const Color(0xFF536A96),
@@ -805,7 +844,7 @@ class _AcademyAssignmentBoard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           const Text(
-            '아래 카드에서 조언자를 선택하세요',
+            '아래에서 교차검토 담당을 선택하세요',
             style: TextStyle(
               color: Color(0xFF878C95),
               fontSize: 9,

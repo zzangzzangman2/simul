@@ -4,6 +4,24 @@ enum _AppView { title, continueGame, onboarding, game }
 
 enum _GameMenuAction { save, title }
 
+// The title artwork was composed on the same 390 x 844 portrait canvas used by
+// the game's mobile baseline. Foldable inner displays are much wider in
+// portrait, so covering the whole viewport crops the top and bottom and makes
+// the hero appear to collide with the title and menu. Keep the authored scene
+// in this aspect ratio and let only the dimmed background absorb extra space.
+const _titleCompositionAspectRatio = 426 / 923;
+
+Size _titleCompositionSize(Size viewport) {
+  if (viewport.isEmpty) return Size.zero;
+  if (viewport.aspectRatio > _titleCompositionAspectRatio) {
+    return Size(
+      viewport.height * _titleCompositionAspectRatio,
+      viewport.height,
+    );
+  }
+  return Size(viewport.width, viewport.width / _titleCompositionAspectRatio);
+}
+
 class _GameTitleScreen extends StatelessWidget {
   const _GameTitleScreen({
     required this.occupiedSlots,
@@ -27,64 +45,71 @@ class _GameTitleScreen extends StatelessWidget {
           child: LayoutBuilder(
             builder: (context, constraints) {
               final compact = constraints.maxHeight < 740;
-              return Padding(
-                padding: EdgeInsets.fromLTRB(
-                  20,
-                  compact ? 14 : 22,
-                  20,
-                  compact ? 14 : 20,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    SizedBox(height: compact ? 8 : 14),
-                    Text(
-                      '10대부터 건물주',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: const Color(0xFFFFF4C6),
-                        fontFamily: 'Maplestory',
-                        fontSize: compact ? 31 : 37,
-                        height: 1,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: -2,
-                        shadows: const [
-                          Shadow(
-                            color: Color(0xFFE6463E),
-                            offset: Offset(0, 3),
+              final composition = _titleCompositionSize(constraints.biggest);
+              return Center(
+                child: SizedBox(
+                  key: const Key('title-menu-safe-stage'),
+                  width: composition.width,
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      20,
+                      compact ? 14 : 22,
+                      20,
+                      compact ? 14 : 20,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        SizedBox(height: compact ? 8 : 14),
+                        Text(
+                          '10대부터 건물주',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: const Color(0xFFFFF4C6),
+                            fontFamily: 'Maplestory',
+                            fontSize: compact ? 31 : 37,
+                            height: 1,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -2,
+                            shadows: const [
+                              Shadow(
+                                color: Color(0xFFE6463E),
+                                offset: Offset(0, 3),
+                              ),
+                              Shadow(color: Color(0xAAFFCF4D), blurRadius: 18),
+                            ],
                           ),
-                          Shadow(color: Color(0xAAFFCF4D), blurRadius: 18),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          '국가원금 5만원으로 시작하는 데시멀 동기 운용자의 기록',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Color(0xFFD4E8E3),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const Spacer(),
+                        _TitleActionButton(
+                          key: const Key('new-game-button'),
+                          icon: Icons.auto_awesome_rounded,
+                          label: '처음하기',
+                          filled: true,
+                          onPressed: onNewGame,
+                        ),
+                        const SizedBox(height: 9),
+                        _TitleActionButton(
+                          key: const Key('continue-game-button'),
+                          icon: Icons.folder_open_rounded,
+                          label: '이어하기',
+                          filled: false,
+                          onPressed: onContinue,
+                        ),
+                        SizedBox(height: compact ? 4 : 8),
+                      ],
                     ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      '국가원금 5만원으로 시작하는 데시멀 동기 운용자의 기록',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Color(0xFFD4E8E3),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const Spacer(),
-                    _TitleActionButton(
-                      key: const Key('new-game-button'),
-                      icon: Icons.auto_awesome_rounded,
-                      label: '처음하기',
-                      filled: true,
-                      onPressed: onNewGame,
-                    ),
-                    const SizedBox(height: 9),
-                    _TitleActionButton(
-                      key: const Key('continue-game-button'),
-                      icon: Icons.folder_open_rounded,
-                      label: '이어하기',
-                      filled: false,
-                      onPressed: onContinue,
-                    ),
-                    SizedBox(height: compact ? 4 : 8),
-                  ],
+                  ),
                 ),
               );
             },
@@ -134,59 +159,92 @@ class _AnimatedTitleHeroState extends State<_AnimatedTitleHero>
     builder: (context, _) {
       final breath = math.sin(_motion.value * math.pi * 2);
       final breeze = math.sin(_motion.value * math.pi * 4);
-      return Stack(
-        fit: StackFit.expand,
-        children: [
-          Transform.scale(
-            scale: 1.012 + breath * 0.004,
-            alignment: Alignment.center,
-            child: Transform.translate(
-              offset: Offset(0, breath * 1.8),
-              child: Semantics(
-                key: const Key('title-cartoon-hero'),
-                image: true,
-                label: '10대부터 건물주, 액자 밖으로 손을 내미는 10대 투자자',
-                child: Image.asset(
-                  _asset,
-                  fit: BoxFit.cover,
-                  alignment: Alignment.center,
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          final composition = _titleCompositionSize(constraints.biggest);
+          return ClipRect(
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                ImageFiltered(
+                  imageFilter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                  child: Transform.scale(
+                    scale: 1.12,
+                    child: Image.asset(
+                      _asset,
+                      fit: BoxFit.cover,
+                      alignment: Alignment.center,
+                      color: const Color(0xFF173947).withValues(alpha: 0.72),
+                      colorBlendMode: BlendMode.srcATop,
+                      filterQuality: FilterQuality.low,
+                    ),
+                  ),
                 ),
-              ),
+                Center(
+                  child: SizedBox(
+                    key: const Key('title-art-safe-stage'),
+                    width: composition.width,
+                    height: composition.height,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Transform.scale(
+                          scale: 1.012 + breath * 0.004,
+                          alignment: Alignment.center,
+                          child: Transform.translate(
+                            offset: Offset(0, breath * 1.8),
+                            child: Semantics(
+                              key: const Key('title-cartoon-hero'),
+                              image: true,
+                              label: '10대부터 건물주, 액자 밖으로 손을 내미는 10대 투자자',
+                              child: Image.asset(
+                                _asset,
+                                fit: BoxFit.cover,
+                                alignment: Alignment.center,
+                              ),
+                            ),
+                          ),
+                        ),
+                        Transform.rotate(
+                          angle: breeze * 0.005,
+                          alignment: const Alignment(-0.72, 0.18),
+                          child: ClipPath(
+                            clipper: _HeroHandClipper(),
+                            child: Image.asset(_asset, fit: BoxFit.cover),
+                          ),
+                        ),
+                        Transform.rotate(
+                          angle: breeze * -0.004,
+                          alignment: const Alignment(0, -0.05),
+                          child: ClipPath(
+                            clipper: _HeroBeretClipper(),
+                            child: Image.asset(_asset, fit: BoxFit.cover),
+                          ),
+                        ),
+                        CustomPaint(painter: _HeroMotionPainter(_motion.value)),
+                      ],
+                    ),
+                  ),
+                ),
+                const DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Color(0xB8061923),
+                        Color(0x05061923),
+                        Color(0x10061923),
+                        Color(0xD9061923),
+                      ],
+                      stops: [0, 0.22, 0.62, 1],
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ),
-          Transform.rotate(
-            angle: breeze * 0.005,
-            alignment: const Alignment(-0.72, 0.18),
-            child: ClipPath(
-              clipper: _HeroHandClipper(),
-              child: Image.asset(_asset, fit: BoxFit.cover),
-            ),
-          ),
-          Transform.rotate(
-            angle: breeze * -0.004,
-            alignment: const Alignment(0, -0.05),
-            child: ClipPath(
-              clipper: _HeroBeretClipper(),
-              child: Image.asset(_asset, fit: BoxFit.cover),
-            ),
-          ),
-          CustomPaint(painter: _HeroMotionPainter(_motion.value)),
-          const DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Color(0xB8061923),
-                  Color(0x05061923),
-                  Color(0x10061923),
-                  Color(0xD9061923),
-                ],
-                stops: [0, 0.22, 0.62, 1],
-              ),
-            ),
-          ),
-        ],
+          );
+        },
       );
     },
   );

@@ -1160,9 +1160,9 @@ class _MarketPhoneStatusBar extends StatelessWidget {
 
 enum _MarketPlaybackSpeed {
   paused(minutesPerSecond: 0, orderBookAnimationRate: 0, label: '정지'),
-  normal(minutesPerSecond: 5, orderBookAnimationRate: 1, label: '5분'),
-  triple(minutesPerSecond: 15, orderBookAnimationRate: 3, label: '15분'),
-  tenfold(minutesPerSecond: 50, orderBookAnimationRate: 10, label: '50분');
+  normal(minutesPerSecond: 1, orderBookAnimationRate: 1, label: '1분'),
+  triple(minutesPerSecond: 3, orderBookAnimationRate: 3, label: '3분'),
+  tenfold(minutesPerSecond: 10, orderBookAnimationRate: 10, label: '10분');
 
   const _MarketPlaybackSpeed({
     required this.minutesPerSecond,
@@ -1371,9 +1371,9 @@ class _MarketPlaybackBar extends StatelessWidget {
 
   String _tooltipFor(_MarketPlaybackSpeed value) => switch (value) {
     _MarketPlaybackSpeed.paused => '시장 시간 일시정지',
-    _MarketPlaybackSpeed.normal => '현실 1초에 게임 5분',
-    _MarketPlaybackSpeed.triple => '현실 1초에 게임 15분',
-    _MarketPlaybackSpeed.tenfold => '현실 1초에 게임 50분',
+    _MarketPlaybackSpeed.normal => '현실 1초에 게임 1분',
+    _MarketPlaybackSpeed.triple => '현실 1초에 게임 3분',
+    _MarketPlaybackSpeed.tenfold => '현실 1초에 게임 10분',
   };
 
   @override

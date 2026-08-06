@@ -52,6 +52,7 @@ import 'game/phone_ability_hint.dart';
 import 'game/phone_ai_service.dart';
 import 'game/phone_dialogue_composer.dart';
 import 'game/phone_messenger_state.dart';
+import 'game/phone_proactive_message.dart';
 import 'game/progress_review.dart';
 import 'game/real_estate_market.dart';
 import 'game/relationship_state.dart';
@@ -401,6 +402,8 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
           'prologueAcademyStockAppOpen': false,
           'prologuePlayerName': '',
           'prologueCompanyName': '',
+          'prologueStartRouteChosen': false,
+          'prologueIntermissionEpisode': 0,
         },
       ),
     );
@@ -583,6 +586,8 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     bool academyStockAppOpen,
     String playerName,
     String companyName,
+    bool startRouteChosen,
+    int intermissionEpisode,
   ) {
     final slot = _newGameSlot;
     final draft = _newGameDraftState;
@@ -598,6 +603,8 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
           'prologueAcademyStockAppOpen': academyStockAppOpen,
           'prologuePlayerName': playerName,
           'prologueCompanyName': companyName,
+          'prologueStartRouteChosen': startRouteChosen,
+          'prologueIntermissionEpisode': intermissionEpisode,
         },
       ),
     );
@@ -757,6 +764,12 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     final current = _state;
     if (current == null) return;
     final resolved = _engine.resolveDecision(current, decisionId, optionId);
+    final wasResolved = resolved.decisions.any(
+      (decision) =>
+          decision.id == decisionId &&
+          decision.status == DecisionStatus.resolved,
+    );
+    if (!wasResolved) return;
     final next = await _processStateThroughMarketMinute(
       resolved,
       advanceGameTime(current.marketMinute, decisionActionMinutes),
@@ -1078,6 +1091,27 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
 
   Future<GameState> _advanceDay() => _advanceDays(1);
 
+  Future<GameState> _receiveScheduledProactivePhoneMessage(
+    GameState state,
+  ) async {
+    final candidate = selectPhoneProactiveCandidate(state);
+    if (candidate == null) return state;
+    final generated = await _phoneAiService.createProactiveMessage(
+      state: state,
+      contactId: candidate.contactId,
+      reason: candidate.reason,
+    );
+    if (generated == null) return state;
+    final received = _engine.receivePhoneProactiveMessage(
+      state,
+      contactId: candidate.contactId,
+      text: generated.text,
+    );
+    if (!received.success) return state;
+    GameAudio.instance.playSfx(GameSfx.notification, volumeScale: 0.85);
+    return received.state;
+  }
+
   Future<GameState> _advanceDays(int requestedDays) async {
     final current = _state!;
     final initialFlags = Map<String, dynamic>.from(current.story.storyFlags)
@@ -1231,6 +1265,11 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
             },
           ),
         );
+      }
+      final isArrivalCheckpoint =
+          requestedDays == 1 || i == requestedDays - 1 || shouldStop;
+      if (isArrivalCheckpoint) {
+        next = await _receiveScheduledProactivePhoneMessage(next);
       }
       final shouldCheckpoint =
           requestedDays == 1 ||
@@ -1834,6 +1873,13 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     final maximumPositionUnits = asset?.sharesOutstandingAtOrBefore(
       current.currentDate,
     );
+    final displayedUnitPrice = order.displayedSnapshot?.sourceLastTradePrice;
+    final unitPriceMatchesSource =
+        displayedUnitPrice != null &&
+            displayedUnitPrice.isFinite &&
+            displayedUnitPrice > 0
+        ? (order.unitPrice - displayedUnitPrice).abs() < 0.000001
+        : quote != null && (order.unitPrice - quote.unitPrice).abs() < 0.000001;
     if (quote == null ||
         asset == null ||
         order.symbol != asset.code ||
@@ -1842,7 +1888,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
         order.currency != asset.currency ||
         order.quoteDate != quote.quoteDate ||
         order.marketMinute != quote.marketMinute ||
-        order.unitPrice != quote.unitPrice ||
+        !unitPriceMatchesSource ||
         order.isTradingDay != quote.isTradingDay ||
         order.maximumPositionUnits != maximumPositionUnits ||
         order.isIpoFirstTradingDay !=
@@ -2157,6 +2203,16 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
                                 .storyFlags['prologueCompanyName']
                             as String? ??
                         '',
+                    initialStartRouteChosen:
+                        _newGameDraftState?.story.flagBool(
+                          'prologueStartRouteChosen',
+                        ) ??
+                        false,
+                    initialIntermissionEpisode:
+                        _newGameDraftState?.story.flagInt(
+                          'prologueIntermissionEpisode',
+                        ) ??
+                        0,
                     allowRuntimeDialoguePreview: widget.dialoguePreviewMode,
                     dialogueOverrideJson: widget.dialogueOverrideJson,
                   ),

@@ -12,6 +12,10 @@ const _storyDialogueBottomInset = 44.0;
 const _storyCharacterHeightFactor = 0.9;
 const _storyCharacterAspectRatio = 2 / 3;
 const _storyCharacterSceneScale = 1.55;
+// The NIS/government portraits place adult faces slightly higher inside the
+// same 1024 x 1536 canvas than the cohort portraits. 1.50 aligns their face
+// centers with the 1.55 cohort stage without pushing hair behind the HUD.
+const _nisCharacterSceneScale = 1.50;
 const _storySceneControlsTopInset = 94.0;
 const _storyDialoguePanelMinHeight = 154.0;
 const _maximumWheelBackSteps = 12;
@@ -54,6 +58,8 @@ typedef PrologueCheckpointSaver =
       bool academyStockAppOpen,
       String playerName,
       String companyName,
+      bool startRouteChosen,
+      int intermissionEpisode,
     );
 
 class _PrologueSkipStep {
@@ -68,7 +74,28 @@ class _PrologueSkipStep {
   final int targetBeat;
 }
 
-double _storyCharacterScaleForAsset(String _) => _storyCharacterSceneScale;
+class _PrologueEpisode {
+  const _PrologueEpisode({
+    required this.number,
+    required this.title,
+    required this.period,
+    required this.summary,
+    required this.startBeat,
+  });
+
+  final int number;
+  final String title;
+  final String period;
+  final String summary;
+  final int startBeat;
+
+  String get label => number == 4 ? 'DAY 1' : '$number부';
+}
+
+double _storyCharacterScaleForAsset(String asset) =>
+    asset.contains('/decimal_nis_1999/characters/')
+    ? _nisCharacterSceneScale
+    : _storyCharacterSceneScale;
 
 void _playStoryFeedback({bool strong = false}) {
   if (strong) {
@@ -382,6 +409,8 @@ class VisualNovelOnboardingScreen extends StatefulWidget {
     this.initialAcademyStockAppOpen = false,
     this.initialPlayerName = '',
     this.initialCompanyName = '',
+    this.initialStartRouteChosen = false,
+    this.initialIntermissionEpisode = 0,
     this.allowRuntimeDialoguePreview = false,
     this.dialogueOverrideJson,
   });
@@ -394,6 +423,8 @@ class VisualNovelOnboardingScreen extends StatefulWidget {
   final bool initialAcademyStockAppOpen;
   final String initialPlayerName;
   final String initialCompanyName;
+  final bool initialStartRouteChosen;
+  final int initialIntermissionEpisode;
   final bool allowRuntimeDialoguePreview;
   final String? dialogueOverrideJson;
 
@@ -420,6 +451,9 @@ class _VisualNovelOnboardingScreenState
   String? _creationError;
   late bool _academyPcPoweredOn;
   late bool _academyStockAppOpen;
+  late bool _startRouteChosen;
+  bool _showEpisodePicker = false;
+  int? _pendingEpisodeIndex;
   DateTime? _lastWheelBackAt;
   double _mobileSwipeDistance = 0;
   int _mobileSwipeBackSteps = 0;
@@ -442,6 +476,12 @@ class _VisualNovelOnboardingScreenState
     _playerController.text = widget.initialPlayerName.trim();
     _playerNameConfirmed = _playerController.text.isNotEmpty;
     _companyController.text = widget.initialCompanyName;
+    _startRouteChosen = widget.initialStartRouteChosen || _beat > 0;
+    _showEpisodePicker = _playerNameConfirmed && !_startRouteChosen;
+    final savedIntermission = widget.initialIntermissionEpisode - 1;
+    if (savedIntermission >= 0 && savedIntermission < 4) {
+      _pendingEpisodeIndex = savedIntermission;
+    }
     _dialogueLoadFuture = _loadDialogueOverrides();
     unawaited(_dialogueLoadFuture);
   }
@@ -783,6 +823,59 @@ class _VisualNovelOnboardingScreenState
       if (_backgroundForBeat(beat).contains(token)) return beat;
     }
     return math.min(fallbackBeat, _dialogueEndBeat);
+  }
+
+  List<_PrologueEpisode> get _prologueEpisodes {
+    final desireBeat = _firstBeatWithBackground('bg_decimal_desire_test_', 99);
+    final loungeBeat = _firstBeatWithBackground(
+      'bg_decimal_living_lounge_',
+      149,
+    );
+    final tradingBeat = _firstBeatWithBackground(
+      'bg_decimal_trading_floor_',
+      269,
+    );
+    return <_PrologueEpisode>[
+      const _PrologueEpisode(
+        number: 1,
+        title: '1999년 국가 실험',
+        period: '재가동 · 실패 기록 · 행렬 시험 · 불공정 게임',
+        summary:
+            '봉인됐던 프로젝트 데시멀이 다시 움직이고, 과거 실패 기록과 두 차례 선발 시험을 통해 참가자의 판단 기준을 검증한다.',
+        startBeat: 0,
+      ),
+      _PrologueEpisode(
+        number: 2,
+        title: '데시멀 입소',
+        period: '욕망 검증 · 강남 아지트 도착',
+        summary: '마지막 욕망 검증을 통과한 참가자들이 강남 아지트에 도착하고, 국가계좌와 공동생활의 규칙을 처음 마주한다.',
+        startBeat: desireBeat,
+      ),
+      _PrologueEpisode(
+        number: 3,
+        title: '첫날 밤',
+        period: '최종 열 명 · 공동생활 · 첫 갈등',
+        summary:
+            '최종 열 명이 서로를 소개하고 첫날 공동생활을 시작한다. 옥상과 생활공간에서 관계의 첫 방향과 갈등이 드러난다.',
+        startBeat: loungeBeat,
+      ),
+      _PrologueEpisode(
+        number: 4,
+        title: '2000년 1월 3일 · 첫 주문',
+        period: 'DAY 1 · 50,000원 국가계좌 · 주식실습',
+        summary:
+            '새해 첫 거래일, 50,000원 국가원금이 지급된다. 트레이딩 플로어 브리핑을 거쳐 자기 이름의 장부와 첫 주문을 시작한다.',
+        startBeat: tradingBeat,
+      ),
+    ];
+  }
+
+  int? _episodeIndexStartingAt(int beat) {
+    final episodes = _prologueEpisodes;
+    for (var index = 1; index < episodes.length; index += 1) {
+      if (episodes[index].startBeat == beat) return index;
+    }
+    return null;
   }
 
   _PrologueSkipStep _prologueSkipStepForBeat(int beat) {
@@ -1144,8 +1237,15 @@ class _VisualNovelOnboardingScreenState
     final explicitTarget = _beatForSceneId(targetSceneId);
     final configuredTarget = _beatForSceneId(current?.nextSceneId ?? '');
     final candidate = explicitTarget ?? configuredTarget ?? currentBeat + 1;
+    final nextBeat = _nextVisibleBeat(candidate);
+    final nextEpisodeIndex = _episodeIndexStartingAt(nextBeat);
     setState(() {
-      if (_beat == currentBeat) _beat = _nextVisibleBeat(candidate);
+      if (_beat == currentBeat) {
+        _beat = nextBeat;
+        if (nextEpisodeIndex != null) {
+          _pendingEpisodeIndex = nextEpisodeIndex;
+        }
+      }
     });
     unawaited(_syncStoryAudio());
     unawaited(_saveCheckpoint());
@@ -1165,6 +1265,8 @@ class _VisualNovelOnboardingScreenState
         _academyStockAppOpen,
         _playerController.text,
         _companyController.text,
+        _startRouteChosen,
+        (_pendingEpisodeIndex ?? -1) + 1,
       ) ??
       Future<void>.value();
 
@@ -1186,6 +1288,7 @@ class _VisualNovelOnboardingScreenState
     setState(() {
       _playerController.text = playerName;
       _playerNameConfirmed = true;
+      _showEpisodePicker = !_startRouteChosen;
       _creationError = null;
     });
     unawaited(_syncStoryAudio());
@@ -1195,6 +1298,93 @@ class _VisualNovelOnboardingScreenState
   void _exitOnboarding() {
     unawaited(_saveCheckpoint());
     widget.onExit?.call();
+  }
+
+  void _startEpisode(int index) {
+    final episodes = _prologueEpisodes;
+    if (index < 0 || index >= episodes.length) return;
+    FocusManager.instance.primaryFocus?.unfocus();
+    _playStoryFeedback(strong: true);
+    setState(() {
+      _startRouteChosen = true;
+      _showEpisodePicker = false;
+      _pendingEpisodeIndex = null;
+      _beatNavigationHistory.clear();
+      _beat = episodes[index].startBeat;
+    });
+    unawaited(_syncStoryAudio());
+    unawaited(_saveCheckpoint());
+  }
+
+  void _continueEpisode() {
+    if (_pendingEpisodeIndex == null) return;
+    _playStoryFeedback(strong: true);
+    setState(() => _pendingEpisodeIndex = null);
+    unawaited(_syncStoryAudio());
+    unawaited(_saveCheckpoint());
+  }
+
+  Future<void> _showEpisodeSummary({
+    required String title,
+    required String body,
+    required String actionLabel,
+    required VoidCallback onConfirmed,
+    Key? dialogKey,
+  }) async {
+    _playStoryFeedback();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        key: dialogKey,
+        title: Text(title),
+        content: SingleChildScrollView(child: Text(body)),
+        actions: [
+          TextButton(
+            key: const Key('prologue-summary-cancel'),
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('돌아가기'),
+          ),
+          FilledButton(
+            key: const Key('prologue-summary-confirm'),
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(actionLabel),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || confirmed != true) return;
+    onConfirmed();
+  }
+
+  Future<void> _showFullSummaryAndStartDayOne() async {
+    final episodes = _prologueEpisodes;
+    final body = episodes
+        .map(
+          (episode) =>
+              '${episode.label} · ${episode.title}\n${episode.summary}',
+        )
+        .join('\n\n');
+    await _showEpisodeSummary(
+      title: '프롤로그 전체 요약',
+      body: body,
+      actionLabel: 'DAY 1 시작',
+      dialogKey: const Key('prologue-full-summary-dialog'),
+      onConfirmed: () => _startEpisode(episodes.length - 1),
+    );
+  }
+
+  Future<void> _summarizeAndSkipEpisode(int episodeIndex) async {
+    final episodes = _prologueEpisodes;
+    if (episodeIndex < 0 || episodeIndex >= episodes.length - 1) return;
+    final episode = episodes[episodeIndex];
+    final nextEpisode = episodes[episodeIndex + 1];
+    await _showEpisodeSummary(
+      title: '${episode.label} · ${episode.title} 요약',
+      body: episode.summary,
+      actionLabel: '${nextEpisode.label}로',
+      dialogKey: const Key('prologue-episode-summary-dialog'),
+      onConfirmed: () => _startEpisode(episodeIndex + 1),
+    );
   }
 
   Future<void> _showBacklog() async {
@@ -1430,15 +1620,27 @@ class _VisualNovelOnboardingScreenState
         key: const Key('story-mobile-swipe-back-area'),
         behavior: HitTestBehavior.translucent,
         onHorizontalDragStart:
-            _playerNameConfirmed && !_isCreating && _beat < _dialogueEndBeat
+            _playerNameConfirmed &&
+                !_showEpisodePicker &&
+                _pendingEpisodeIndex == null &&
+                !_isCreating &&
+                _beat < _dialogueEndBeat
             ? _handleMobileSwipeStart
             : null,
         onHorizontalDragUpdate:
-            _playerNameConfirmed && !_isCreating && _beat < _dialogueEndBeat
+            _playerNameConfirmed &&
+                !_showEpisodePicker &&
+                _pendingEpisodeIndex == null &&
+                !_isCreating &&
+                _beat < _dialogueEndBeat
             ? _handleMobileSwipeUpdate
             : null,
         onHorizontalDragEnd:
-            _playerNameConfirmed && !_isCreating && _beat < _dialogueEndBeat
+            _playerNameConfirmed &&
+                !_showEpisodePicker &&
+                _pendingEpisodeIndex == null &&
+                !_isCreating &&
+                _beat < _dialogueEndBeat
             ? _handleMobileSwipeEnd
             : null,
         onHorizontalDragCancel: _handleMobileSwipeCancel,
@@ -1566,7 +1768,11 @@ class _VisualNovelOnboardingScreenState
                     child: GestureDetector(
                       key: const Key('story-stage-advance-area'),
                       behavior: HitTestBehavior.translucent,
-                      onTap: _isCreating || !_playerNameConfirmed
+                      onTap:
+                          _isCreating ||
+                              !_playerNameConfirmed ||
+                              _showEpisodePicker ||
+                              _pendingEpisodeIndex != null
                           ? null
                           : () =>
                                 _activeNovelDialogueState?._handleExternalTap(),
@@ -1585,7 +1791,9 @@ class _VisualNovelOnboardingScreenState
                     ),
                   ),
 
-                  if (_playerNameConfirmed)
+                  if (_playerNameConfirmed &&
+                      !_showEpisodePicker &&
+                      _pendingEpisodeIndex == null)
                     SafeArea(
                       child: Align(
                         alignment: Alignment.topRight,
@@ -1706,6 +1914,11 @@ class _VisualNovelOnboardingScreenState
         onConfirm: _confirmPlayerName,
       );
     }
+    if (_showEpisodePicker) return _buildEpisodePicker(context);
+    final pendingEpisodeIndex = _pendingEpisodeIndex;
+    if (pendingEpisodeIndex != null) {
+      return _buildEpisodeIntermission(context, pendingEpisodeIndex);
+    }
     if (_beat >= _dialogueEndBeat) return _orientationComplete();
     if (_isOrientationRosterScene) return _orientationRoster();
     return _NovelDialogue(
@@ -1727,6 +1940,277 @@ class _VisualNovelOnboardingScreenState
             onTap: () => _selectChoice(choice),
           ),
       ],
+    );
+  }
+
+  Widget _buildEpisodePicker(BuildContext context) {
+    final episodes = _prologueEpisodes;
+    return Container(
+      key: const Key('prologue-episode-picker'),
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * 0.72,
+      ),
+      padding: const EdgeInsets.fromLTRB(16, 15, 16, 14),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xF5283144), Color(0xF5111724)],
+        ),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0x99FFD46A), width: 1.2),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x99000000),
+            blurRadius: 24,
+            offset: Offset(0, 10),
+          ),
+        ],
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '어디서 시작할까요?',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 5),
+            const Text(
+              '프롤로그는 4개 구간으로 자동 저장됩니다. 처음 보는 경우 1부부터 권장합니다.',
+              style: TextStyle(
+                color: Color(0xFFD5DCE8),
+                fontSize: 10.5,
+                height: 1.35,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 11),
+            for (var index = 0; index < episodes.length; index += 1) ...[
+              _episodeStartButton(episodes[index], index),
+              if (index != episodes.length - 1) const SizedBox(height: 7),
+            ],
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                key: const Key('prologue-summary-to-day1'),
+                onPressed: () => unawaited(_showFullSummaryAndStartDayOne()),
+                style: FilledButton.styleFrom(
+                  foregroundColor: const Color(0xFF182033),
+                  backgroundColor: _yellow,
+                  minimumSize: const Size.fromHeight(44),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(11),
+                  ),
+                ),
+                icon: const Icon(Icons.summarize_rounded, size: 19),
+                label: const Text(
+                  '전체 요약 후 DAY 1부터 시작',
+                  style: TextStyle(fontWeight: FontWeight.w900),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _episodeStartButton(_PrologueEpisode episode, int index) => SizedBox(
+    width: double.infinity,
+    child: OutlinedButton(
+      key: Key('prologue-start-episode-${index + 1}'),
+      onPressed: () => _startEpisode(index),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: Colors.white,
+        side: BorderSide(
+          color: index == 0 ? const Color(0xFFFFD46A) : const Color(0x667F93AE),
+        ),
+        backgroundColor: index == 0
+            ? const Color(0x263C73A8)
+            : const Color(0x161B2535),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(11)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 45,
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            decoration: BoxDecoration(
+              color: index == 0
+                  ? const Color(0xFFFFD46A)
+                  : const Color(0xFF3B475C),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              episode.label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: index == 0 ? const Color(0xFF182033) : Colors.white,
+                fontSize: 10.5,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  episode.title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  episode.period,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFFBFC9D8),
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Icon(Icons.chevron_right_rounded, size: 20),
+        ],
+      ),
+    ),
+  );
+
+  Widget _buildEpisodeIntermission(BuildContext context, int episodeIndex) {
+    final episodes = _prologueEpisodes;
+    final safeEpisodeIndex = episodeIndex.clamp(0, episodes.length - 1);
+    final episode = episodes[safeEpisodeIndex];
+    final hasNextEpisode = episodeIndex < episodes.length - 1;
+    final nextEpisode = hasNextEpisode ? episodes[episodeIndex + 1] : null;
+    return Container(
+      key: const Key('prologue-episode-intermission'),
+      padding: const EdgeInsets.fromLTRB(18, 17, 18, 16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xF5313B50), Color(0xF5131A29)],
+        ),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xCCFFD46A), width: 1.3),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x99000000),
+            blurRadius: 24,
+            offset: Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '${episode.label} 시작',
+            key: const Key('prologue-intermission-label'),
+            style: const TextStyle(
+              color: _yellow,
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1.1,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            episode.title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            episode.summary,
+            style: const TextStyle(
+              color: Color(0xFFD8E0EB),
+              fontSize: 11,
+              height: 1.4,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 13),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              key: const Key('prologue-episode-continue'),
+              onPressed: _continueEpisode,
+              style: FilledButton.styleFrom(
+                foregroundColor: const Color(0xFF182033),
+                backgroundColor: _yellow,
+                minimumSize: const Size.fromHeight(45),
+              ),
+              icon: const Icon(Icons.play_arrow_rounded),
+              label: Text(
+                '${episode.label} 바로 시작',
+                style: const TextStyle(fontWeight: FontWeight.w900),
+              ),
+            ),
+          ),
+          const SizedBox(height: 7),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  key: const Key('prologue-episode-save-exit'),
+                  onPressed: _exitOnboarding,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    side: const BorderSide(color: Color(0x667F93AE)),
+                    minimumSize: const Size.fromHeight(43),
+                  ),
+                  icon: const Icon(Icons.save_outlined, size: 18),
+                  label: const Text(
+                    '저장하고 나가기',
+                    style: TextStyle(fontSize: 10.5),
+                  ),
+                ),
+              ),
+              if (nextEpisode != null) ...[
+                const SizedBox(width: 7),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    key: const Key('prologue-episode-summary-skip'),
+                    onPressed: () =>
+                        unawaited(_summarizeAndSkipEpisode(episodeIndex)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: _yellow,
+                      side: const BorderSide(color: Color(0x99FFD46A)),
+                      minimumSize: const Size.fromHeight(43),
+                    ),
+                    icon: const Icon(Icons.fast_forward_rounded, size: 18),
+                    label: Text(
+                      '요약 후 ${nextEpisode.label}',
+                      style: const TextStyle(fontSize: 10.5),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
     );
   }
 

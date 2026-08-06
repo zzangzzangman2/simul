@@ -414,6 +414,13 @@ void main() {
       await tester.tap(find.byKey(const Key('prologue-player-name-confirm')));
       await tester.pumpAndSettle();
     }
+    if (find
+        .byKey(const Key('prologue-episode-picker'))
+        .evaluate()
+        .isNotEmpty) {
+      await tester.tap(find.byKey(const Key('prologue-start-episode-1')));
+      await tester.pumpAndSettle();
+    }
   }
 
   Future<void> skipCurrentPrologueSection(WidgetTester tester) async {
@@ -868,10 +875,7 @@ void main() {
     final characterScale = tester.widget<Transform>(
       find.byKey(const Key('story-character-scale')),
     );
-    expect(
-      characterScale.transform.getMaxScaleOnAxis(),
-      greaterThanOrEqualTo(1.55),
-    );
+    expect(characterScale.transform.getMaxScaleOnAxis(), closeTo(1.50, 0.001));
     expect(
       tester.getRect(find.byKey(const Key('story-character-image'))).bottom,
       greaterThan(
@@ -1552,6 +1556,161 @@ void main() {
     );
   });
 
+  testWidgets('prologue offers four resumable starts and a full summary', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      const MillenniumCapitalApp(
+        campaignWorldPreparer: _skipCampaignWorldPreparation,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('new-game-button')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('prologue-player-name-input')),
+      '구간선택자',
+    );
+    await tester.tap(find.byKey(const Key('prologue-player-name-confirm')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('prologue-episode-picker')), findsOneWidget);
+    expect(find.byKey(const Key('prologue-start-episode-1')), findsOneWidget);
+    expect(find.byKey(const Key('prologue-start-episode-2')), findsOneWidget);
+    expect(find.byKey(const Key('prologue-start-episode-3')), findsOneWidget);
+    expect(find.byKey(const Key('prologue-start-episode-4')), findsOneWidget);
+    expect(find.text('1999년 국가 실험'), findsOneWidget);
+    expect(find.text('데시멀 입소'), findsOneWidget);
+    expect(find.text('첫날 밤'), findsOneWidget);
+    expect(find.text('2000년 1월 3일 · 첫 주문'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('prologue-summary-to-day1')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('prologue-full-summary-dialog')),
+      findsOneWidget,
+    );
+    expect(find.textContaining('50,000원 국가원금'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('prologue-summary-cancel')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('prologue-start-episode-4')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('prologue-episode-picker')), findsNothing);
+    expect(
+      (tester
+                  .widget<Image>(
+                    find.byKey(const Key('story-background-image')),
+                  )
+                  .image
+              as AssetImage)
+          .assetName,
+      'assets/images/cinematic_soft_painted/decimal/bg_decimal_trading_floor_dawn_2000_v1.png',
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('episode boundary autosaves and resumes at the intermission', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    final preferences = await SharedPreferences.getInstance();
+    final persistence = GamePersistence(preferences: preferences);
+    const archive =
+        'assets/images/cinematic_soft_painted/decimal_nis_1999/backgrounds/bg_nis_decimal_archive_predawn_1999_v1.png';
+    const desire =
+        'assets/images/cinematic_soft_painted/decimal/bg_decimal_desire_test_1999_v1.png';
+    const lounge =
+        'assets/images/cinematic_soft_painted/decimal/bg_decimal_living_lounge_1999_v1.png';
+    const trading =
+        'assets/images/cinematic_soft_painted/decimal/bg_decimal_trading_floor_dawn_2000_v1.png';
+    final backgrounds = <String>[
+      archive,
+      archive,
+      desire,
+      desire,
+      lounge,
+      lounge,
+      trading,
+      trading,
+    ];
+    final dialogueOverrideJson = jsonEncode({
+      'contentVersion': 5,
+      'appearanceVersion': 20,
+      'scenes': [
+        for (var index = 0; index < backgrounds.length; index += 1)
+          {
+            'id': 'episode-test-${index + 1}',
+            'order': index + 1,
+            'chapter': '4부 테스트',
+            'date': '1999.12.${30 + (index ~/ 4)}',
+            'location': '구간 테스트실',
+            'speaker': '운영관',
+            'line': '구간 테스트 장면 ${index + 1}',
+            'background': backgrounds[index],
+            'character': '',
+          },
+      ],
+    });
+
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      MillenniumCapitalApp(
+        persistence: persistence,
+        campaignWorldPreparer: _skipCampaignWorldPreparation,
+        dialogueOverrideJson: dialogueOverrideJson,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await startNewGame(tester);
+    await advanceDialogue(tester, 2);
+
+    expect(
+      find.byKey(const Key('prologue-episode-intermission')),
+      findsOneWidget,
+    );
+    expect(find.text('2부 시작'), findsOneWidget);
+    expect(find.text('데시멀 입소'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('prologue-episode-save-exit')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('game-title-screen')), findsOneWidget);
+
+    var slots = await persistence.listSlots();
+    expect(slots.first.state!.story.flagInt('prologueBeat'), 2);
+    expect(slots.first.state!.story.flagInt('prologueIntermissionEpisode'), 2);
+
+    await tester.tap(find.byKey(const Key('continue-game-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('load-save-slot-1')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('prologue-episode-intermission')),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const Key('prologue-episode-summary-skip')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('prologue-episode-summary-dialog')),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const Key('prologue-summary-confirm')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('prologue-episode-intermission')),
+      findsNothing,
+    );
+    expect(find.text('구간 테스트 장면 5'), findsOneWidget);
+    slots = await persistence.listSlots();
+    expect(slots.first.state!.story.flagInt('prologueBeat'), 4);
+    expect(slots.first.state!.story.flagInt('prologueIntermissionEpisode'), 0);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'orientation checkpoint resumes without opening the stock tutorial',
     (tester) async {
@@ -1653,7 +1812,13 @@ void main() {
   testWidgets('bright cartoon title fits supported mobile viewports', (
     tester,
   ) async {
-    const sizes = [Size(360, 800), Size(390, 844), Size(419, 860)];
+    const sizes = [
+      Size(360, 800),
+      Size(390, 844),
+      Size(419, 860),
+      Size(624, 986),
+      Size(768, 1024),
+    ];
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
     for (final size in sizes) {
@@ -1667,6 +1832,20 @@ void main() {
 
       expect(find.text('10대부터 건물주'), findsOneWidget);
       expect(find.byKey(const Key('title-cartoon-hero')), findsOneWidget);
+      final artStage = tester.getRect(
+        find.byKey(const Key('title-art-safe-stage')),
+      );
+      final menuStage = tester.getRect(
+        find.byKey(const Key('title-menu-safe-stage')),
+      );
+      expect(artStage.size.aspectRatio, closeTo(426 / 923, 0.001));
+      expect(artStage.left, greaterThanOrEqualTo(0));
+      expect(artStage.right, lessThanOrEqualTo(size.width));
+      expect(artStage.top, greaterThanOrEqualTo(0));
+      expect(artStage.bottom, lessThanOrEqualTo(size.height));
+      expect(menuStage.width, closeTo(artStage.width, 0.01));
+      expect(menuStage.left, closeTo(artStage.left, 0.01));
+      expect(menuStage.right, closeTo(artStage.right, 0.01));
       expect(
         find.byKey(const Key('new-game-button')).hitTestable(),
         findsOneWidget,
@@ -1678,6 +1857,14 @@ void main() {
       expect(
         tester.getBottomRight(find.byKey(const Key('continue-game-button'))).dy,
         lessThanOrEqualTo(size.height),
+      );
+      expect(
+        tester.getTopLeft(find.byKey(const Key('new-game-button'))).dx,
+        greaterThanOrEqualTo(menuStage.left),
+      );
+      expect(
+        tester.getBottomRight(find.byKey(const Key('continue-game-button'))).dx,
+        lessThanOrEqualTo(menuStage.right),
       );
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
@@ -2477,6 +2664,7 @@ void main() {
       await tester.pump();
       expect(find.byKey(const Key('order-result')), findsOneWidget);
       expect(find.textContaining('지정가 1주 전량 체결'), findsOneWidget);
+      expect(find.text('1주를 살 현금이 부족합니다.'), findsNothing);
       expect(tester.takeException(), isNull);
       expect(current.cash, actualCashBefore);
       expect(current.brokerageCash, actualBrokerageBefore);
@@ -2558,6 +2746,7 @@ void main() {
       await tester.pump();
       expect(find.byKey(const Key('order-result')), findsOneWidget);
       expect(find.textContaining('매도 완료'), findsOneWidget);
+      expect(find.text('보유 수량이 없습니다.'), findsNothing);
       expect(tester.takeException(), isNull);
 
       await tester.ensureVisible(
@@ -4032,7 +4221,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
     expect(tester.widget<Text>(clock.first).data, contains('09:00'));
     await tester.pump(const Duration(milliseconds: 500));
-    expect(tester.widget<Text>(clock.first).data, contains('09:05'));
+    expect(tester.widget<Text>(clock.first).data, contains('09:01'));
 
     await openMarketExplore(tester);
     await tester.tap(find.byKey(const Key('stock-row-1001')));
@@ -4056,7 +4245,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('market speed controls pause and advance 15 and 50 minutes', (
+  testWidgets('market speed controls pause and advance 3 and 10 minutes', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
@@ -4088,7 +4277,7 @@ void main() {
     await tester.tap(find.byKey(const Key('market-speed-3x')));
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
-    expect(displayedMinute(), pausedAt + 15);
+    expect(displayedMinute(), pausedAt + 3);
 
     await tester.tap(find.byKey(const Key('market-speed-pause')));
     await tester.pump();
@@ -4099,7 +4288,7 @@ void main() {
     await tester.tap(find.byKey(const Key('market-speed-10x')));
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
-    expect(displayedMinute(), pausedAgainAt + 50);
+    expect(displayedMinute(), pausedAgainAt + 10);
 
     await openMarketExplore(tester);
     await tester.tap(find.byKey(const Key('stock-row-1001')));
@@ -4114,7 +4303,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('five-minute playback settles exactly on the official close', (
+  testWidgets('one-minute playback settles exactly on the official close', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
@@ -4122,7 +4311,7 @@ void main() {
 
     final state = const GameEngine()
         .createNewGame('종가 도달 회귀', initialCash: 1000000)
-        .copyWith(day: 4, marketMinute: krxCloseMinute - 5);
+        .copyWith(day: 4, marketMinute: krxCloseMinute - 1);
     final universe = testMarketUniverse(
       tradingDate: state.currentDate,
       closeOverride: 6800,
@@ -4168,7 +4357,7 @@ void main() {
     expect(
       rowTexts,
       contains('6,800원'),
-      reason: '5분 배치의 마지막 틱은 일봉에 저장된 목표 종가와 일치해야 합니다. 표시값: $rowTexts',
+      reason: '1분 배치의 마지막 틱은 일봉에 저장된 목표 종가와 일치해야 합니다. 표시값: $rowTexts',
     );
     expect(tester.takeException(), isNull);
   });
@@ -8469,6 +8658,70 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('decision costs use bank cash rather than brokerage cash', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final state = const GameEngine()
+        .createNewGame('결정 통장 분리 테스트', initialCash: 50000)
+        .copyWith(brokerageCash: 50000);
+    const decision = DecisionCardData(
+      id: 'cash-source-regression',
+      category: '회귀 테스트',
+      title: '어느 계좌에서 결제할까?',
+      proposer: '운영관',
+      body: '증권 예수금과 생활·회사 통장을 구분한다.',
+      createdDay: 1,
+      dueDay: 14,
+      requestedFunds: 10000,
+      benefit: '정확한 결제 판정',
+      risk: '잘못된 선택 허용',
+      advisorOpinions: <String>['실제 결제 계좌를 확인한다.'],
+      options: <DecisionOptionData>[
+        DecisionOptionData(
+          id: 'paid',
+          label: '유료 선택',
+          description: '통장에서 10,000원을 사용한다.',
+          cashCost: 10000,
+        ),
+        DecisionOptionData(
+          id: 'free',
+          label: '무료 선택',
+          description: '돈을 사용하지 않는다.',
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Stack(
+            children: <Widget>[
+              DecisionSheet(state: state, decision: decision, onSelect: (_) {}),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      tester
+          .widget<ElevatedButton>(find.byKey(const Key('decision-option-paid')))
+          .onPressed,
+      isNull,
+    );
+    expect(
+      tester
+          .widget<ElevatedButton>(find.byKey(const Key('decision-option-free')))
+          .onPressed,
+      isNotNull,
+    );
+    expect(find.textContaining('생활·회사 통장 부족'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'organization uses upper-body portrait and cards for assignment',
     (tester) async {
@@ -8521,7 +8774,8 @@ void main() {
       await tester.ensureVisible(helpButton);
       await tester.tap(helpButton);
       await tester.pumpAndSettle();
-      expect(find.text('오늘 도움 완료'), findsOneWidget);
+      expect(find.text('오늘 교차검토 완료'), findsOneWidget);
+      expect(find.textContaining('무료 조사권 1회'), findsWidgets);
       expect(tester.takeException(), isNull);
     },
   );

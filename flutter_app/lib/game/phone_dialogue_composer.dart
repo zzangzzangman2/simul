@@ -152,15 +152,7 @@ PhonePlayerIntent classifyPhoneIntent(String rawText) {
   if (hasAny(const ['벌었', '수익났', '플러스', '익절', '대박'])) {
     return PhonePlayerIntent.gainShare;
   }
-  if (hasAny(const [
-    '추천',
-    '힌트',
-    '뭘사',
-    '뭐사',
-    '매수할까',
-    '매도할까',
-    '조언',
-  ])) {
+  if (hasAny(const ['추천', '힌트', '뭘사', '뭐사', '매수할까', '매도할까', '조언'])) {
     return PhonePlayerIntent.investmentAdvice;
   }
   if (hasAny(const ['왜올랐', '왜내렸', '복기', '분석', '손익', '투자', '주식', '종목'])) {
@@ -218,6 +210,8 @@ PhoneComposedReply composePhoneReply(
   final components = <String>[];
   if (intent == PhonePlayerIntent.boundary) {
     components.add(context.contact.boundaryReply);
+  } else if (context.situation?.hasRealityConflict == true) {
+    components.add(context.situation!.localRealityReply(context.contact.id));
   } else if (repeated) {
     components.add(voice.repetitionLine);
   } else {
@@ -251,9 +245,7 @@ PhoneComposedReply composePhoneReply(
       }
     } else if (intent == PhonePlayerIntent.planning &&
         context.situation?.invitationDetected == true) {
-      components.add(
-        context.situation!.localPlanningReply(context.contact.id),
-      );
+      components.add(context.situation!.localPlanningReply(context.contact.id));
     } else if (_isSocialIntent(intent)) {
       final investmentEmotion =
           intent == PhonePlayerIntent.emotionalSupport &&
@@ -301,6 +293,11 @@ PhoneComposedReply composePhoneReply(
     trustDelta = -1;
     closenessDelta = 0;
     investmentRespectDelta = -1;
+  } else if (context.situation?.hasRealityConflict == true) {
+    affectionDelta = 0;
+    trustDelta = 0;
+    closenessDelta = 0;
+    investmentRespectDelta = 0;
   }
 
   return PhoneComposedReply(

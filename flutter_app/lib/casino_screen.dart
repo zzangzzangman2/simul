@@ -1403,7 +1403,7 @@ class _CasinoScreenState extends State<CasinoScreen> {
       key: ValueKey<int>(_welcomeDialogueStep),
       speaker: '이안',
       line: isGreeting
-          ? '오빠, 오늘도 왔네.'
+          ? '오빠, 왔네.'
           : hasTableChips
           ? '보유 칩으로 온라인 테이블에 가거나, 국가계좌 돈을 칩으로 더 바꿀 수 있어.'
           : '지금은 칩이 하나도 없어. 먼저 국가계좌 돈을 칩으로 바꿔야 테이블에 들어갈 수 있어.',

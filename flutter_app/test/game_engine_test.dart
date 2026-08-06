@@ -10,6 +10,7 @@ import 'package:millennium_capital/game/order_book.dart';
 import 'package:millennium_capital/game/real_estate_rental.dart';
 import 'package:millennium_capital/game/seed_money_content.dart';
 import 'package:millennium_capital/game/story_state.dart';
+import 'package:millennium_capital/game/weekend_activity.dart';
 
 void main() {
   const engine = GameEngine();
@@ -22,14 +23,14 @@ void main() {
     );
   }
 
-  int dayWithFutureMarketSignal(String seed) {
+  int dayWithFutureMarketSignal(String seed, {int minimumSignals = 1}) {
     for (var day = 3; day <= 370; day += 1) {
       final date = DateTime(2000, 1, 1).add(Duration(days: day - 1));
       if (isMarketTradingDay(date) &&
-          fictionalMarketEventsForDate(
-            seed,
-            date,
-          ).any((event) => event.revealMinute > marketDayStartMinute)) {
+          fictionalMarketEventsForDate(seed, date)
+                  .where((event) => event.revealMinute > marketDayStartMinute)
+                  .length >=
+              minimumSignals) {
         return day;
       }
     }
@@ -305,12 +306,16 @@ void main() {
   test('academy helper fatigue, daily limit, and recovery are persisted', () {
     var state = engine.createNewGame('제6기 연구소');
     final helperBefore = state.organization.academyHelpers.first;
+    final reputationBefore = state.story.reputation;
 
     state = engine.requestAcademyHelp(state, 'hakjun');
     final afterHelp = state.organization.academyHelpers.first;
     expect(afterHelp.fatigue, helperBefore.fatigue + 12);
     expect(afterHelp.helpCount, 1);
     expect(state.organization.helpLog, hasLength(1));
+    expect(state.story.flagInt(weekendMarketResearchCreditsFlag), 1);
+    expect(state.story.flagInt('activeResearchHelperDay'), 3);
+    expect(state.story.reputation, reputationBefore);
 
     final restored = GameState.fromJson(state.toJson());
     expect(
@@ -325,6 +330,72 @@ void main() {
     state = engine.advanceOneDay(state);
     final afterRest = state.organization.academyHelpers.first;
     expect(afterRest.fatigue, afterHelp.fatigue - 3);
+  });
+
+  test('academy help gives a free four-signal report with a real lens', () {
+    const seed = 'academy-help-report-world';
+    final reportDay = dayWithFutureMarketSignal(seed, minimumSignals: 4);
+    final base = engine
+        .createNewGame('교차검토 보고서', initialCash: 5000, worldSeed: seed)
+        .copyWith(
+          day: reportDay,
+          brokerageCash: 0,
+          marketMinute: marketDayStartMinute,
+        );
+
+    final helped = engine.requestAcademyHelp(base, 'sua');
+    final purchased = engine.purchaseDailyMarketReport(helped);
+    final reports =
+        purchased.state.story.storyFlags['dailyMarketReports'] as Map;
+    final items = reports[marketDateKey(base.currentDate)] as List;
+
+    expect(helped.story.flagInt('activeResearchHelperDay'), reportDay);
+    expect(helped.story.flagInt(weekendMarketResearchCreditsFlag), 1);
+    expect(purchased.success, isTrue);
+    expect(purchased.state.cash, base.cash);
+    expect(items, hasLength(4));
+    expect(purchased.message, contains('한수아'));
+    expect(purchased.state.story.flagInt(weekendMarketResearchCreditsFlag), 0);
+  });
+
+  test('saved helper presentation is normalized without losing progress', () {
+    final state = engine.requestAcademyHelp(
+      engine.createNewGame('구형 도움 문구'),
+      'hakjun',
+    );
+    final json = state.toJson();
+    final organization = (json['organization'] as Map).cast<String, dynamic>();
+    final helpers = organization['academyHelpers'] as List;
+    final oldHakjun = (helpers.first as Map).cast<String, dynamic>();
+    oldHakjun['role'] = '막연한 도움';
+    oldHakjun['effect'] = '조사에 도움을 줍니다.';
+
+    final restored = GameState.fromJson(json);
+    final hakjun = restored.organization.academyHelpers.first;
+
+    expect(hakjun.role, '공시·손실 위험 점검');
+    expect(hakjun.effect, contains('무료 조사권 1회'));
+    expect(hakjun.fatigue, state.organization.academyHelpers.first.fatigue);
+    expect(hakjun.helpCount, 1);
+  });
+
+  test('legacy unused helper bonus becomes one real research credit', () {
+    final base = engine.createNewGame('구형 도움 효과');
+    final json = base.toJson();
+    final story = (json['story'] as Map).cast<String, dynamic>();
+    final flags = (story['storyFlags'] as Map).cast<String, dynamic>();
+    flags
+      ..['activeResearchHelper'] = 'sua'
+      ..['activeResearchHelperDay'] = base.day
+      ..['researchBonusPct'] = 12
+      ..remove('academyResearchSignalCount')
+      ..remove(weekendMarketResearchCreditsFlag);
+
+    final restored = GameState.fromJson(json);
+
+    expect(restored.story.flagInt('academyResearchSignalCount'), 4);
+    expect(restored.story.flagInt(weekendMarketResearchCreditsFlag), 1);
+    expect(restored.story.storyFlags, isNot(contains('researchBonusPct')));
   });
   test(
     'work sessions earn period-scale cash, write ledger, and stop at three per day',

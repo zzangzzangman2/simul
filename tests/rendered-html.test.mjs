@@ -387,7 +387,7 @@ test("uses the deterministic local news combinator without a remote API", async 
 });
 
 test("keeps Gemini keys out of source and provides secure device setup plus local fallback", async () => {
-  const [route, service, messenger, engine, abilityHint, situation, envExample] = await Promise.all([
+  const [route, service, messenger, engine, abilityHint, situation, proactive, envExample] = await Promise.all([
     readFile(new URL("../app/api/gemini/chat/route.ts", import.meta.url), "utf8"),
     readFile(
       new URL("../flutter_app/lib/game/phone_ai_service.dart", import.meta.url),
@@ -404,6 +404,10 @@ test("keeps Gemini keys out of source and provides secure device setup plus loca
     ),
     readFile(
       new URL("../flutter_app/lib/game/phone_situation_context.dart", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../flutter_app/lib/game/phone_proactive_message.dart", import.meta.url),
       "utf8",
     ),
     readFile(new URL("../.env.example", import.meta.url), "utf8"),
@@ -426,12 +430,21 @@ test("keeps Gemini keys out of source and provides secure device setup plus loca
   assert.match(route, /replyViolatesAbilityHintPolicy/);
   assert.match(route, /현재 게임 시간과 일정 강제 규칙/);
   assert.match(route, /replyViolatesSituationPolicy/);
+  assert.match(route, /function assessReality/);
+  assert.match(route, /replyAcknowledgesReality/);
+  assert.match(route, /MAX_POLICY_GENERATION_ATTEMPTS = 3/);
+  assert.match(route, /policyRepairPrompt/);
+  assert.match(route, /messageMode === "proactive"/);
+  assert.match(route, /playerLocation/);
+  assert.match(route, /2000년이고 그런 미래 서비스는 아직 없어/);
   assert.match(route, /오늘은 평일이라 당일 외출·데이트를 수락하면 안 된다/);
   assert.match(route, /정확한 종목 추천, 매수·매도 명령, 목표가/);
   assert.match(service, /\/api\/gemini\/chat/);
   assert.match(service, /FlutterSecureStorage/);
   assert.match(service, /project_decimal_gemini_api_key_v1/);
   assert.match(service, /relevantMemoriesFor/);
+  assert.match(service, /createProactiveMessage/);
+  assert.match(service, /policy conflict sent back for regeneration/);
   assert.match(messenger, /더 실감 나는 대화를 켤까요/);
   assert.match(messenger, /키 없이 로컬 대화/);
   assert.doesNotMatch(messenger, /1:1 기억/);
@@ -444,11 +457,18 @@ test("keeps Gemini keys out of source and provides secure device setup plus loca
   assert.match(abilityHint, /usesResearchCredit/);
   assert.match(situation, /PhoneScheduleDecision\.todayWeekdayBlocked/);
   assert.match(situation, /phoneAiReplyViolatesSituationPolicy/);
+  assert.match(situation, /PhoneRealityConflict\.timeOfDay/);
+  assert.match(situation, /atMinute/);
+  assert.match(situation, /chatCannotExecute/);
+  assert.match(proactive, /phoneProactiveAffectionThreshold = 40/);
+  assert.match(proactive, /phoneProactiveMinimumGapDays = 3/);
+  assert.match(proactive, /phoneProactiveMaximumGapDays = 4/);
+  assert.match(proactive, /stableRandomInt/);
   assert.match(envExample, /^GEMINI_API_KEY=$/m);
   assert.doesNotMatch(`${route}${service}${envExample}`, /AIza[0-9A-Za-z_-]{20,}/);
 });
 
-test("fills the mobile viewport and provides an exact desktop phone preview", async () => {
+test("keeps one 390x844 stage on mobile and desktop", async () => {
   const [flutterTemplate, flutterBootstrap, fontManifest, visualNovel] = await Promise.all([
     readFile(new URL("../flutter_app/web/index.html", import.meta.url), "utf8"),
     readFile(new URL("../flutter_app/web/flutter_bootstrap.js", import.meta.url), "utf8"),
@@ -465,6 +485,9 @@ test("fills the mobile viewport and provides an exact desktop phone preview", as
   assert.match(flutterTemplate, /width:\s*390px/);
   assert.match(flutterTemplate, /height:\s*844px/);
   assert.match(flutterTemplate, /--desktop-preview-scale/);
+  assert.match(flutterTemplate, /--app-stage-scale/);
+  assert.match(flutterTemplate, /navigator\.maxTouchPoints/);
+  assert.match(flutterTemplate, /desktopPreviewQuery\?\.matches === true && !hasTouchInput/);
   assert.match(
     flutterTemplate,
     /@media \(hover: hover\) and \(pointer: fine\) and \(min-width: 700px\)/,
@@ -506,7 +529,9 @@ test("fills the mobile viewport and provides an exact desktop phone preview", as
   const host = { style: {} };
   const body = { scrollTop: 24 };
   const root = {
+    clientWidth: 390,
     clientHeight: 800,
+    classList: { toggle() {} },
     style: {
       setProperty(name, value) {
         cssProperties.set(name, value);
@@ -514,6 +539,7 @@ test("fills the mobile viewport and provides an exact desktop phone preview", as
     },
   };
   const viewport = {
+    width: 390,
     height: 860,
     addEventListener(type, listener) {
       viewportListeners.set(type, listener);
@@ -528,6 +554,7 @@ test("fills the mobile viewport and provides an exact desktop phone preview", as
   const fakeWindow = {
     innerWidth: 390,
     innerHeight: 1024,
+    navigator: { maxTouchPoints: 0 },
     visualViewport: viewport,
     scrollX: 0,
     scrollY: 24,
@@ -559,32 +586,38 @@ test("fills the mobile viewport and provides an exact desktop phone preview", as
   };
 
   vm.runInNewContext(script, { document, window: fakeWindow });
-  assert.equal(cssProperties.get("--app-height"), "860px");
+  assert.equal(cssProperties.get("--viewport-height"), "860px");
+  assert.equal(cssProperties.get("--app-height"), "844px");
+  assert.equal(cssProperties.get("--app-stage-scale"), "1.0000");
   assert.equal(
     desktopPreviewQuery,
     "(hover: hover) and (pointer: fine) and (min-width: 700px)",
   );
-  assert.equal(host.style.height, "860px");
+  assert.equal(host.style.width, "390px");
+  assert.equal(host.style.height, "844px");
 
   fakeWindow.innerHeight = 940;
   viewport.height = 940;
   viewportListeners.get("resize")();
-  assert.equal(cssProperties.get("--app-height"), "940px");
-  assert.equal(host.style.height, "940px");
+  assert.equal(cssProperties.get("--viewport-height"), "940px");
+  assert.equal(cssProperties.get("--app-height"), "844px");
+  assert.equal(host.style.height, "844px");
 
   document.activeElement = { tagName: "INPUT", isContentEditable: false };
   fakeWindow.innerHeight = 480;
   viewport.height = 480;
   viewportListeners.get("resize")();
-  assert.equal(cssProperties.get("--app-height"), "940px");
-  assert.equal(host.style.height, "940px");
+  assert.equal(cssProperties.get("--viewport-height"), "940px");
+  assert.equal(cssProperties.get("--app-height"), "844px");
+  assert.equal(host.style.height, "844px");
 
   document.activeElement = null;
   fakeWindow.innerHeight = 860;
   viewport.height = 860;
   viewportListeners.get("resize")();
-  assert.equal(cssProperties.get("--app-height"), "860px");
-  assert.equal(host.style.height, "860px");
+  assert.equal(cssProperties.get("--viewport-height"), "860px");
+  assert.equal(cssProperties.get("--app-height"), "844px");
+  assert.equal(host.style.height, "844px");
 
   fakeWindow.scrollY = 160;
   body.scrollTop = 160;
@@ -595,23 +628,29 @@ test("fills the mobile viewport and provides an exact desktop phone preview", as
   desktopPreviewMedia.matches = true;
   fakeWindow.innerWidth = 640;
   fakeWindow.innerHeight = 1000;
+  viewport.width = 640;
+  viewport.height = 1000;
   mediaListeners.get("change")();
   assert.equal(cssProperties.get("--app-height"), "844px");
   assert.equal(cssProperties.get("--desktop-preview-scale"), "1.0000");
   assert.equal(host.style.height, "844px");
 
   fakeWindow.innerWidth = 380;
+  viewport.width = 380;
   windowListeners.get("resize")();
   assert.equal(cssProperties.get("--desktop-preview-scale"), "0.8488");
   assert.equal(host.style.height, "844px");
 
   fakeWindow.innerWidth = 1440;
   fakeWindow.innerHeight = 700;
+  viewport.width = 1440;
+  viewport.height = 700;
   windowListeners.get("resize")();
   assert.equal(cssProperties.get("--desktop-preview-scale"), "0.7731");
   assert.equal(host.style.height, "844px");
 
   fakeWindow.innerHeight = 400;
+  viewport.height = 400;
   windowListeners.get("resize")();
   assert.equal(cssProperties.get("--desktop-preview-scale"), "0.4259");
   assert.ok(
@@ -622,11 +661,72 @@ test("fills the mobile viewport and provides an exact desktop phone preview", as
   desktopPreviewMedia.matches = false;
   fakeWindow.innerWidth = 390;
   fakeWindow.innerHeight = 600;
+  viewport.width = 390;
   viewport.height = 600;
   mediaListeners.get("change")();
-  assert.equal(cssProperties.get("--desktop-preview-scale"), "1");
-  assert.equal(cssProperties.get("--app-height"), "600px");
-  assert.equal(host.style.height, "600px");
+  assert.equal(cssProperties.get("--viewport-height"), "600px");
+  assert.equal(cssProperties.get("--app-height"), "844px");
+  assert.equal(cssProperties.get("--app-stage-scale"), "0.7109");
+  assert.equal(cssProperties.get("--desktop-preview-scale"), "0.7109");
+  assert.equal(host.style.height, "844px");
+
+  const touchCssProperties = new Map();
+  let touchClassified = false;
+  const touchHost = { style: {} };
+  const touchBody = { scrollTop: 0 };
+  const touchRoot = {
+    clientWidth: 624,
+    clientHeight: 986,
+    classList: {
+      toggle(name, active) {
+        touchClassified = name === "touch-device" && active;
+      },
+    },
+    style: {
+      setProperty(name, value) {
+        touchCssProperties.set(name, value);
+      },
+    },
+  };
+  const touchViewport = {
+    width: 624,
+    height: 986,
+    addEventListener() {},
+  };
+  const touchWindow = {
+    innerWidth: 624,
+    innerHeight: 986,
+    navigator: { maxTouchPoints: 10 },
+    visualViewport: touchViewport,
+    matchMedia() {
+      return { matches: true, addEventListener() {} };
+    },
+    addEventListener() {},
+    requestAnimationFrame(callback) {
+      callback();
+    },
+    setTimeout(callback) {
+      callback();
+    },
+    scrollTo() {},
+  };
+  const touchDocument = {
+    documentElement: touchRoot,
+    body: touchBody,
+    activeElement: null,
+    getElementById(id) {
+      return id === "flutter_host" ? touchHost : null;
+    },
+  };
+  vm.runInNewContext(script, {
+    document: touchDocument,
+    window: touchWindow,
+  });
+  assert.equal(touchClassified, true);
+  assert.equal(touchCssProperties.get("--app-stage-scale"), "1.1682");
+  assert.equal(touchCssProperties.get("--desktop-preview-scale"), "1.1682");
+  assert.equal(touchHost.style.width, "390px");
+  assert.equal(touchHost.style.height, "844px");
 });
 
 test("offers a disposable stock-only test entry", async () => {

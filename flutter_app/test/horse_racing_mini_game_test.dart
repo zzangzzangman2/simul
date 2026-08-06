@@ -165,6 +165,14 @@ void main() {
     expect(find.byKey(const Key('horse-bet-place')), findsOneWidget);
     expect(find.byKey(const Key('horse-bet-quinella')), findsOneWidget);
     expect(find.byKey(const Key('horse-race-start')), findsOneWidget);
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(const Key('horse-race-start')))
+          .onPressed,
+      isNull,
+      reason: '소개 화면 연속 탭만으로 기본 마권이 접수되면 안 된다.',
+    );
+    expect(find.text('말·베팅액을 한 번 선택해 주세요'), findsOneWidget);
     expect(find.textContaining('적중 가정 국가 수수료'), findsOneWidget);
     expect(find.text('출전마 8두'), findsOneWidget);
     final selectedSpriteRect = tester.getRect(
@@ -520,6 +528,8 @@ void main() {
     );
     await tester.pump();
     await openHorseRaceBettingCard(tester);
+    await tester.tap(find.byKey(const Key('horse-stake-500')));
+    await tester.pump();
     await tester.tap(find.byKey(const Key('horse-race-start')));
     await tester.pump();
     expect(
@@ -944,6 +954,8 @@ void main() {
     );
     await tester.pump();
     await openHorseRaceBettingCard(tester);
+    await tester.tap(find.byKey(const Key('horse-stake-500')));
+    await tester.pump();
     await tester.tap(find.byKey(const Key('horse-race-start')));
     await tester.pump();
     await finishTellerTyping(tester);
@@ -995,6 +1007,8 @@ void main() {
     );
     await tester.pump();
     await openHorseRaceBettingCard(tester);
+    await tester.tap(find.byKey(const Key('horse-stake-500')));
+    await tester.pump();
     await tester.tap(find.byKey(const Key('horse-race-start')));
     await tester.pump();
     await finishTellerTyping(tester);

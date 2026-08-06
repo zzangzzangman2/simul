@@ -3039,7 +3039,7 @@ class DecisionSheet extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             ...decision.options.map((option) {
-              final locked = option.cashCost > state.cash;
+              final locked = option.cashCost > state.bankCash;
               return Padding(
                 padding: const EdgeInsets.only(bottom: 9),
                 child: SizedBox(
@@ -3078,7 +3078,7 @@ class DecisionSheet extends StatelessWidget {
                               const SizedBox(height: 3),
                               Text(
                                 locked
-                                    ? '현금 부족 · ${_money(option.cashCost)}원 필요'
+                                    ? '생활·회사 통장 부족 · ${_money(option.cashCost)}원 필요'
                                     : option.description,
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,

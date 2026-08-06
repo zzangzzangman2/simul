@@ -62,11 +62,8 @@ class GamePendingOrderQuotePath {
 }
 
 double gameTradingFeeMultiplier(GameState state) {
-  final helperDiscount =
-      state.story.storyFlags['activeResearchHelper'] == 'hakjun' &&
-      state.story.flagInt('activeResearchHelperDay', -1) == state.day;
   final skillDiscount = state.progression.hasSkill('fee_sense') ? 0.9 : 1.0;
-  return (helperDiscount ? 0.9 : 1.0) * skillDiscount;
+  return skillDiscount;
 }
 
 int gameTradingFeeForState(GameState state, int notional) {
@@ -731,6 +728,54 @@ class GameEngine {
     );
   }
 
+  PhoneMessengerActionResult receivePhoneProactiveMessage(
+    GameState state, {
+    required String contactId,
+    required String text,
+  }) {
+    final contact = phoneContactById(contactId);
+    final profile = cohortGirlProfileById(contactId);
+    final content = _normalizedPhoneReply(text);
+    if (contact == null || profile == null || content == null) {
+      return PhoneMessengerActionResult(
+        state: state,
+        success: false,
+        message: '선톡을 보낼 상대와 내용을 확인해 주세요.',
+      );
+    }
+    if (state.phoneMessenger.messages.any(
+      (message) =>
+          message.day == state.day && message.id.startsWith('phone-proactive-'),
+    )) {
+      return PhoneMessengerActionResult(
+        state: state,
+        success: false,
+        message: '오늘은 이미 먼저 연락한 동기가 있습니다.',
+      );
+    }
+    final message = PhoneMessage(
+      id: 'phone-proactive-${state.day}-$contactId',
+      contactId: contactId,
+      senderId: contactId,
+      text: content,
+      day: state.day,
+      marketMinute: state.marketMinute,
+      read: false,
+    );
+    final messages = retainPhoneMessages([
+      ...state.phoneMessenger.messages,
+      message,
+    ]);
+    return PhoneMessengerActionResult(
+      state: state.copyWith(
+        phoneMessenger: state.phoneMessenger.copyWith(messages: messages),
+      ),
+      success: true,
+      message: '${profile.name}에게서 새 메시지가 왔습니다.',
+      reply: message,
+    );
+  }
+
   PhoneMessengerActionResult sendPhoneGift(
     GameState state, {
     required String contactId,
@@ -980,6 +1025,7 @@ class GameEngine {
       state,
       contactId: contactId,
       playerText: content,
+      atMinute: replyMinute,
     );
     final guardedAbilityHint = enforcePhoneAbilityHintForSend(
       state,
@@ -5288,25 +5334,33 @@ class GameEngine {
       state.day,
     );
     if (identical(organization, state.organization)) return state;
+    final currentReports =
+        (state.story.storyFlags['dailyMarketReports'] as Map?) ?? const {};
+    final currentReportAlreadyWritten = currentReports.containsKey(
+      marketDateKey(state.currentDate),
+    );
+    var effectiveDay = state.day;
+    if (!isMarketTradingDay(state.currentDate) ||
+        state.marketMinute >= krxCloseMinute ||
+        currentReportAlreadyWritten) {
+      var cursor = state.currentDate.add(const Duration(days: 1));
+      effectiveDay += 1;
+      while (!isMarketTradingDay(cursor)) {
+        cursor = cursor.add(const Duration(days: 1));
+        effectiveDay += 1;
+      }
+    }
+    final researchCredits =
+        (state.story.storyFlags[weekendMarketResearchCreditsFlag] as num?)
+            ?.toInt() ??
+        0;
     final flags = <String, dynamic>{
       ...state.story.storyFlags,
       'activeResearchHelper': helperId,
-      'activeResearchHelperDay': state.day,
-      'researchBonusPct': helperId == 'hakjun'
-          ? 15
-          : helperId == 'sua'
-          ? 12
-          : 10,
-      'reputation': (state.story.reputation + 1).clamp(0, 100),
-      'cohortTrust': state.story.flagInt('cohortTrust', 30) + 1,
+      'activeResearchHelperDay': effectiveDay,
+      'academyResearchSignalCount': 4,
+      weekendMarketResearchCreditsFlag: (researchCredits + 1).clamp(0, 3),
     };
-    if (helperId == 'hakjun') {
-      flags['hakjunAffinity'] = state.story.flagInt('hakjunAffinity', 30) + 2;
-    } else if (helperId == 'sua') {
-      flags['suaAffinity'] = state.story.flagInt('suaAffinity', 30) + 2;
-    } else {
-      flags['teacherTrust'] = state.story.flagInt('teacherTrust', 30) + 2;
-    }
     return state.copyWith(
       organization: organization,
       story: state.story.copyWith(storyFlags: flags),
@@ -8497,16 +8551,55 @@ class GameEngine {
       ...((flags['marketFavoriteAssetIds'] as List?) ?? const [])
           .whereType<String>(),
     };
+    final activeHelperId =
+        state.story.flagInt('activeResearchHelperDay', -1) == state.day
+        ? state.story.storyFlags['activeResearchHelper'] as String?
+        : null;
+    const consumerSectors = <String>{
+      '유통',
+      '미디어',
+      '식품',
+      '게임',
+      '생활소비재',
+      '인터넷',
+      '교육',
+      '전자·가전',
+      '화장품',
+      '엔터테인먼트',
+      '레저',
+      '가구',
+      '호텔·여행',
+      '소비자금융',
+    };
     final events =
         fictionalMarketEventsForDate(
             state.simulationSeed,
             state.currentDate,
           ).where((event) => event.revealMinute > state.marketMinute).toList()
           ..sort((left, right) {
+            final helperOrder = switch (activeHelperId) {
+              'hakjun' => (left.impactPct < 0 ? 0 : 1).compareTo(
+                right.impactPct < 0 ? 0 : 1,
+              ),
+              'sua' =>
+                (consumerSectors.contains(left.sector) ? 0 : 1).compareTo(
+                  consumerSectors.contains(right.sector) ? 0 : 1,
+                ),
+              'seoyoon' =>
+                (preferredAssetIds.contains(left.companyId) ? 0 : 1).compareTo(
+                  preferredAssetIds.contains(right.companyId) ? 0 : 1,
+                ),
+              _ => 0,
+            };
+            if (helperOrder != 0) return helperOrder;
             final leftPreferred = preferredAssetIds.contains(left.companyId);
             final rightPreferred = preferredAssetIds.contains(right.companyId);
             if (leftPreferred != rightPreferred) {
               return leftPreferred ? -1 : 1;
+            }
+            if (activeHelperId == 'seoyoon') {
+              final timeOrder = left.revealMinute.compareTo(right.revealMinute);
+              if (timeOrder != 0) return timeOrder;
             }
             final impactOrder = right.impactPct.abs().compareTo(
               left.impactPct.abs(),
@@ -8522,8 +8615,11 @@ class GameEngine {
         message: '현재 시각 이후에 조사할 미공개 시장 신호가 없습니다.',
       );
     }
+    final signalCount = activeHelperId == null
+        ? 3
+        : state.story.flagInt('academyResearchSignalCount', 4).clamp(3, 4);
     final signals = events
-        .take(3)
+        .take(signalCount)
         .map(
           (event) => <String, dynamic>{
             'companyName': event.companyName,
@@ -8559,8 +8655,10 @@ class GameEngine {
     return FinanceActionResult(
       state: next,
       success: true,
-      message: researchCredits > 0
-          ? '주말에 준비한 조사권으로 보고서를 받았습니다. 결과와 방향은 보장하지 않습니다.'
+      message: activeHelperId != null
+          ? '${state.organization.academyHelpers.where((helper) => helper.id == activeHelperId).firstOrNull?.name ?? '데시멀 동료'}의 교차검토를 반영한 보고서입니다. 신호는 늘 맞는다는 보장이 없습니다.'
+          : researchCredits > 0
+          ? '준비해 둔 조사권으로 보고서를 받았습니다. 결과와 방향은 보장하지 않습니다.'
           : '현장 징후를 정리한 보고서를 받았습니다. 결과와 방향은 보장하지 않습니다.',
       cashDelta: -effectivePrice,
     );

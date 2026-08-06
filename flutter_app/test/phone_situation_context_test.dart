@@ -167,4 +167,90 @@ void main() {
       );
     },
   );
+
+  test('reply-time clock corrects a false time and keeps advancing', () {
+    final base = engine
+        .createNewGame('연속 시각 인식 테스트', worldSeed: 'phone-live-clock')
+        .copyWith(day: 3, marketMinute: 20 * 60);
+
+    final first = engine.sendPhoneMessage(
+      base,
+      contactId: 'jung_arin',
+      text: '좋은 아침, 아침이네',
+      replyOverride: '맞아, 좋은 아침이야.',
+    );
+    expect(first.success, isTrue);
+    expect(first.reply?.marketMinute, 20 * 60 + 30);
+    expect(first.reply?.text, contains('20:30'));
+    expect(first.reply?.text, isNot('맞아, 좋은 아침이야.'));
+    expect(first.affectionDelta, 0);
+    expect(first.trustDelta, 0);
+
+    final second = engine.sendPhoneMessage(
+      first.state,
+      contactId: 'jung_arin',
+      text: '지금은 20시잖아',
+    );
+    expect(second.success, isTrue);
+    expect(second.reply?.marketMinute, 21 * 60);
+    expect(second.reply?.text, contains('21:00'));
+  });
+
+  test('current location and closed market claims are grounded', () {
+    final base = engine
+        .createNewGame('장소 인식 테스트', worldSeed: 'phone-location')
+        .copyWith(day: 3, marketMinute: 20 * 60);
+
+    final location = buildPhoneSituationContext(
+      base,
+      contactId: 'lee_jian',
+      playerText: '너 지금 학교야?',
+      atMinute: 20 * 60 + 30,
+    );
+    expect(location.realityConflict, PhoneRealityConflict.location);
+    expect(location.playerLocation, contains('생활동'));
+    expect(location.contactLocation, contains('숙소'));
+    expect(location.localRealityReply('lee_jian'), contains('생활동'));
+
+    final market = buildPhoneSituationContext(
+      base,
+      contactId: 'yoon_chaea',
+      playerText: '지금 장 열렸지? 바로 매수하자.',
+      atMinute: 20 * 60 + 30,
+    );
+    expect(market.marketOpenNow, isFalse);
+    expect(market.realityConflict, PhoneRealityConflict.marketPhase);
+    expect(market.localRealityReply('yoon_chaea'), contains('열려 있지 않아'));
+  });
+
+  test('broader reality rules reject impossible world assumptions', () {
+    final state = engine
+        .createNewGame('현실성 규칙 테스트', worldSeed: 'phone-grounding')
+        .copyWith(day: 3, marketMinute: 20 * 60);
+
+    PhoneRealityConflict conflictFor(String text) => buildPhoneSituationContext(
+      state,
+      contactId: 'kim_seoa',
+      playerText: text,
+      atMinute: 20 * 60 + 30,
+    ).realityConflict;
+
+    expect(
+      conflictFor('지금 당장 제주 공항으로 가자'),
+      PhoneRealityConflict.impossibleTravel,
+    );
+    expect(
+      conflictFor('유튜브 같이 보자'),
+      PhoneRealityConflict.anachronisticTechnology,
+    );
+    expect(
+      conflictFor('오늘 소주 마시러 가자'),
+      PhoneRealityConflict.ageRestrictedActivity,
+    );
+    expect(conflictFor('내 방으로 지금 와'), PhoneRealityConflict.chatCannotExecute);
+    expect(
+      conflictFor('우리 오늘 데이트했잖아'),
+      PhoneRealityConflict.unverifiedSharedEvent,
+    );
+  });
 }

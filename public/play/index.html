@@ -13,7 +13,7 @@
   <meta name="twitter:title" content="10대부터 건물주 — 프로젝트 데시멀 투자 생활 게임">
   <meta name="twitter:description" content="2000년 서울, 프로젝트 데시멀의 열 명이 국가원금 5만원으로 생존과 투자를 배워 가는 모바일 세로형 생활·투자 시뮬레이션">
   <meta name="theme-color" content="#061F2A">
-  <meta name="decimal-build-id" content="ada21f57337d">
+  <meta name="decimal-build-id" content="ad6f182eeddb">
   <meta name="mobile-web-app-capable" content="yes">
   <!-- iOS는 아직 레거시 이름만 읽는다. 이 둘이 없으면 홈 화면에서 열어도 사파리 주소창이 남는다. -->
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -23,9 +23,18 @@
   <link rel="icon" type="image/png" href="favicon.png">
   <title>10대부터 건물주</title>
   <link rel="manifest" href="manifest.json">
+  <script id="device-input-classifier">
+    (() => {
+      const hasTouchInput =
+        (navigator.maxTouchPoints ?? 0) > 0 || 'ontouchstart' in window;
+      document.documentElement.classList.toggle('touch-device', hasTouchInput);
+    })();
+  </script>
   <style>
     :root {
-      --app-height: 100dvh;
+      --viewport-height: 100dvh;
+      --app-height: 844px;
+      --app-stage-scale: 1;
       --desktop-preview-scale: 1;
     }
 
@@ -35,11 +44,12 @@
       top: 0;
       left: 0;
       width: 100%;
-      height: var(--app-height);
+      height: var(--viewport-height);
       margin: 0;
       overflow: hidden;
       overscroll-behavior: none;
-      background: #061F2A;
+      background:
+        radial-gradient(circle at 50% 18%, #214a59 0, #0b2632 38%, #031016 100%);
     }
 
     body {
@@ -49,12 +59,15 @@
 
     #flutter_host {
       position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: var(--app-height);
+      top: 50%;
+      left: 50%;
+      width: 390px;
+      height: 844px;
       overflow: hidden;
       background: #061F2A;
+      transform: translate(-50%, -50%) scale(var(--app-stage-scale));
+      transform-origin: center;
+      box-shadow: 0 20px 70px rgba(0, 0, 0, 0.42);
     }
 
     flutter-view {
@@ -66,17 +79,15 @@
     }
 
     @media (hover: hover) and (pointer: fine) and (min-width: 700px) {
-      html,
-      body {
+      html:not(.touch-device),
+      html:not(.touch-device) body {
         width: 100%;
         height: 100%;
         background:
           radial-gradient(circle at 50% 15%, #193b49 0, #07151d 42%, #02080c 100%);
       }
 
-      #flutter_host {
-        top: 50%;
-        left: 50%;
+      html:not(.touch-device) #flutter_host {
         width: 390px;
         height: 844px;
         border: 10px solid #0b1115;
@@ -158,13 +169,26 @@
       const host = document.getElementById('flutter_host');
       const viewport = window.visualViewport;
       const keyboardThreshold = 120;
-      const desktopPreviewHeight = 844;
+      const mobileStageWidth = 390;
+      const mobileStageHeight = 844;
       const desktopPreviewOuterWidth = 410;
       const desktopPreviewOuterHeight = 864;
       const desktopPreviewQuery = window.matchMedia?.(
         '(hover: hover) and (pointer: fine) and (min-width: 700px)',
       );
-      const isDesktopPreview = () => desktopPreviewQuery?.matches === true;
+      const hasTouchInput =
+        (window.navigator?.maxTouchPoints ?? 0) > 0 ||
+        'ontouchstart' in window;
+      root.classList?.toggle?.('touch-device', hasTouchInput);
+      const isDesktopPreview = () =>
+        desktopPreviewQuery?.matches === true && !hasTouchInput;
+      const visibleViewportWidth = () => {
+        const visualWidth = viewport?.width;
+        if (Number.isFinite(visualWidth) && visualWidth > 0) {
+          return visualWidth;
+        }
+        return window.innerWidth || root.clientWidth;
+      };
       const visibleViewportHeight = () => {
         const visualHeight = viewport?.height;
         if (Number.isFinite(visualHeight) && visualHeight > 0) {
@@ -186,38 +210,36 @@
       let layoutHeight = visibleViewportHeight();
 
       const applyLayout = () => {
-        if (isDesktopPreview()) {
-          const availableWidth = Math.max(1, window.innerWidth - 32);
-          const availableHeight = Math.max(1, window.innerHeight - 32);
-          const scale = Math.min(
-            1,
-            availableWidth / desktopPreviewOuterWidth,
-            availableHeight / desktopPreviewOuterHeight,
-          );
-          root.style.setProperty(
-            '--desktop-preview-scale',
-            scale.toFixed(4),
-          );
-          root.style.setProperty(
-            '--app-height',
-            `${desktopPreviewHeight}px`,
-          );
-          host.style.height = `${desktopPreviewHeight}px`;
-        } else {
-          root.style.setProperty('--desktop-preview-scale', '1');
-          root.style.setProperty('--app-height', `${Math.round(layoutHeight)}px`);
-          host.style.height = `${Math.round(layoutHeight)}px`;
-        }
+        const desktop = isDesktopPreview();
+        const horizontalMargin = desktop ? 32 : 0;
+        const verticalMargin = desktop ? 32 : 0;
+        const stageWidth = desktop
+          ? desktopPreviewOuterWidth
+          : mobileStageWidth;
+        const stageHeight = desktop
+          ? desktopPreviewOuterHeight
+          : mobileStageHeight;
+        const availableWidth = Math.max(
+          1,
+          visibleViewportWidth() - horizontalMargin,
+        );
+        const availableHeight = Math.max(1, layoutHeight - verticalMargin);
+        const uncappedScale = Math.min(
+          availableWidth / stageWidth,
+          availableHeight / stageHeight,
+        );
+        const scale = desktop ? Math.min(1, uncappedScale) : uncappedScale;
+        root.style.setProperty('--viewport-height', `${Math.round(layoutHeight)}px`);
+        root.style.setProperty('--app-height', `${mobileStageHeight}px`);
+        root.style.setProperty('--app-stage-scale', scale.toFixed(4));
+        root.style.setProperty('--desktop-preview-scale', scale.toFixed(4));
+        host.style.width = `${mobileStageWidth}px`;
+        host.style.height = `${mobileStageHeight}px`;
         window.scrollTo(0, 0);
         document.body.scrollTop = 0;
       };
 
       const refreshLayout = () => {
-        if (isDesktopPreview()) {
-          layoutHeight = desktopPreviewHeight;
-          window.requestAnimationFrame(applyLayout);
-          return;
-        }
         const visibleHeight = visibleViewportHeight();
         const keyboardVisible =
           isEditingText() && layoutHeight - visibleHeight > keyboardThreshold;
@@ -428,7 +450,7 @@
       const timeout = new Promise((resolve) => window.setTimeout(resolve, 4000));
 
       const activateCurrentWorker = window.navigator.serviceWorker
-        .register('pwa_service_worker.js?v=ada21f57337d', {
+        .register('pwa_service_worker.js?v=ad6f182eeddb', {
           scope: './',
           updateViaCache: 'none',
         })
@@ -497,7 +519,7 @@
     (() => {
       const loadFlutter = () => {
         const script = document.createElement('script');
-        script.src = 'flutter_bootstrap.js?v=ada21f57337d';
+        script.src = 'flutter_bootstrap.js?v=ad6f182eeddb';
         script.async = true;
         document.body.appendChild(script);
       };

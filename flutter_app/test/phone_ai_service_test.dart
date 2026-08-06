@@ -84,7 +84,12 @@ void main() {
     expect(requestBody['investment'], isA<Map>());
     expect(requestBody['situation'], isA<Map>());
     final situation = (requestBody['situation'] as Map).cast<String, dynamic>();
-    expect(situation['marketMinute'], state.marketMinute);
+    expect(
+      situation['marketMinute'],
+      state.marketMinute + phoneMessengerExchangeMinutes,
+    );
+    expect(situation['playerLocation'], isA<String>());
+    expect(situation['contactLocation'], isA<String>());
     expect(situation['relationshipTimeUsedToday'], isFalse);
     expect(requestBody['recentMessages'], isA<List>());
     expect(requestBody['memories'], isA<List>());
@@ -121,51 +126,117 @@ void main() {
   });
 
   test(
-    'rejects a remote reply that accepts an impossible weekday date',
+    'creates a Gemini-only proactive message with relationship context',
     () async {
       final base = engine.createNewGame(
-        'AI 일정 검증 테스트',
-        worldSeed: 'phone-ai-schedule-guard',
+        'AI 선톡 테스트',
+        worldSeed: 'phone-ai-proactive',
       );
       final state = base.copyWith(
-        day: 3,
-        marketMinute: 20 * 60,
+        day: 5,
         relationships: base.relationships.copyWith(
           girls: {
             ...base.relationships.girls,
             'kim_seoa': base.relationships
                 .progressFor('kim_seoa')
-                .copyWith(affection: 35),
+                .copyWith(affection: 52, trust: 31, closeness: 28),
           },
         ),
       );
+      late Map<String, dynamic> requestBody;
       final service = PhoneAiService(
         endpoint: endpoint,
-        client: MockClient(
-          (_) async => http.Response.bytes(
+        client: MockClient((request) async {
+          requestBody = jsonDecode(request.body) as Map<String, dynamic>;
+          return http.Response.bytes(
             utf8.encode(
               jsonEncode({
                 'ok': true,
-                'reply': '좋아, 오늘 지금 바로 만나자.',
+                'reply': '좋은 아침. 어제 네가 말한 건 좀 괜찮아졌어?',
                 'model': 'gemini-3.5-flash-lite',
+                'fallbackUsed': false,
               }),
             ),
             200,
             headers: const {'content-type': 'application/json; charset=utf-8'},
-          ),
-        ),
+          );
+        }),
       );
 
-      final reply = await service.createReply(
+      final proactive = await service.createProactiveMessage(
         state: state,
         contactId: 'kim_seoa',
-        playerText: '오늘 일 끝났으니 데이트 나갈까?',
-        localDraft: '오늘은 평일이라 못 나가. 이번 주말은 어때?',
+        reason: '마지막 대화 후 나흘이 지나 아침 안부를 먼저 전할 때가 됨',
       );
 
-      expect(reply, isNull);
+      expect(proactive, isNotNull);
+      expect(proactive!.text, contains('좋은 아침'));
+      expect(requestBody['messageMode'], 'proactive');
+      expect(requestBody['playerMessage'], isEmpty);
+      expect(requestBody['proactiveReason'], contains('나흘'));
+      expect((requestBody['relationship'] as Map)['affection'], 52);
+      expect(
+        (requestBody['situation'] as Map)['marketMinute'],
+        state.marketMinute,
+      );
     },
   );
+
+  test('asks Gemini to regenerate an impossible weekday date reply', () async {
+    final base = engine.createNewGame(
+      'AI 일정 검증 테스트',
+      worldSeed: 'phone-ai-schedule-guard',
+    );
+    final state = base.copyWith(
+      day: 3,
+      marketMinute: 20 * 60,
+      relationships: base.relationships.copyWith(
+        girls: {
+          ...base.relationships.girls,
+          'kim_seoa': base.relationships
+              .progressFor('kim_seoa')
+              .copyWith(affection: 35),
+        },
+      ),
+    );
+    var requests = 0;
+    late Map<String, dynamic> repairBody;
+    final service = PhoneAiService(
+      endpoint: endpoint,
+      client: MockClient((request) async {
+        requests += 1;
+        final requestBody = jsonDecode(request.body) as Map<String, dynamic>;
+        if (requests == 2) repairBody = requestBody;
+        return http.Response.bytes(
+          utf8.encode(
+            jsonEncode({
+              'ok': true,
+              'reply': requests == 1
+                  ? '좋아, 오늘 지금 바로 만나자.'
+                  : '오늘은 평일이라 지금 나갈 수 없어. 이번 주말에 다시 정하자.',
+              'model': 'gemini-3.5-flash-lite',
+              'regenerated': requests > 1,
+            }),
+          ),
+          200,
+          headers: const {'content-type': 'application/json; charset=utf-8'},
+        );
+      }),
+    );
+
+    final reply = await service.createReply(
+      state: state,
+      contactId: 'kim_seoa',
+      playerText: '오늘 일 끝났으니 데이트 나갈까?',
+      localDraft: '오늘은 평일이라 못 나가. 이번 주말은 어때?',
+    );
+
+    expect(requests, 2);
+    expect(repairBody['replyRepair'], isA<Map>());
+    expect(reply, isNotNull);
+    expect(reply!.text, contains('평일'));
+    expect(reply.text, contains('주말'));
+  });
 
   test(
     'sends the exact ability-hint envelope and rejects direct AI orders',
@@ -176,15 +247,17 @@ void main() {
       );
       late Map<String, dynamic> requestBody;
       var directReply = false;
+      var directAttempt = 0;
       final service = PhoneAiService(
         endpoint: endpoint,
         client: MockClient((request) async {
           requestBody = jsonDecode(request.body) as Map<String, dynamic>;
+          if (directReply) directAttempt += 1;
           return http.Response.bytes(
             utf8.encode(
               jsonEncode({
                 'ok': true,
-                'reply': directReply
+                'reply': directReply && directAttempt == 1
                     ? '지금 당장 매수해. 무조건 오를 거야.'
                     : '어제 이름이 자주 나온 건 맞아. 실제 수요인지는 더 확인해 보자.',
                 'model': 'gemini-3.5-flash-lite',
@@ -225,14 +298,17 @@ void main() {
       expect(sentHint['sourceThroughDate'], '2000-01-02');
 
       directReply = true;
-      final rejected = await service.createReply(
+      final regenerated = await service.createReply(
         state: state,
         contactId: 'han_sua',
         playerText: '수요 힌트 하나 줘',
         localDraft: hint.localReply,
         abilityHint: hint,
       );
-      expect(rejected, isNull);
+      expect(directAttempt, 2);
+      expect(requestBody['replyRepair'], isA<Map>());
+      expect(regenerated, isNotNull);
+      expect(regenerated!.text, contains('더 확인'));
     },
   );
 

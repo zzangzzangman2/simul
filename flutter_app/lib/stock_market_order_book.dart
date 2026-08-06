@@ -3017,7 +3017,8 @@ class _OrderSheetState extends State<_OrderSheet> {
                   ],
                 ),
               ),
-              if (!_authorityReady || !_tradable || maxQuantity <= 0) ...[
+              if (_result?.success != true &&
+                  (!_authorityReady || !_tradable || maxQuantity <= 0)) ...[
                 const SizedBox(height: 10),
                 Text(
                   !_tradable

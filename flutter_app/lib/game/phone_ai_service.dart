@@ -248,6 +248,136 @@ class PhoneAiService {
 
   Future<void> clearPersonalApiKey() => _credentialStore.deleteApiKey();
 
+  Future<PhoneAiReply?> createProactiveMessage({
+    required GameState state,
+    required String contactId,
+    required String reason,
+  }) async {
+    final endpoint = _endpoint;
+    final contact = phoneContactById(contactId);
+    final relationship = cohortGirlProfileById(contactId) == null
+        ? null
+        : state.relationships.progressFor(contactId);
+    if (endpoint == null || contact == null || relationship == null) {
+      return null;
+    }
+
+    final reports = state.cohortInvestments.reports;
+    final report = reports.isEmpty ? null : reports.last;
+    final playerRow = report?.resultFor('player');
+    final contactRow = report?.resultFor(contactId);
+    int rankFor(String investorId) {
+      final rows = report?.rankedRows ?? const <CohortDailyInvestmentResult>[];
+      for (var index = 0; index < rows.length; index++) {
+        if (rows[index].investorId == investorId) return index + 1;
+      }
+      return 0;
+    }
+
+    final messages = state.phoneMessenger.messagesFor(contactId);
+    final recentMessages = messages.length <= 10
+        ? messages
+        : messages.sublist(messages.length - 10);
+    final recentMemories = state.phoneMessenger.relevantMemoriesFor(
+      contactId,
+      queryText: reason,
+      currentDay: state.day,
+    );
+    final situation = buildPhoneSituationContext(
+      state,
+      contactId: contactId,
+      playerText: '',
+      atMinute: state.marketMinute,
+    );
+    final body = <String, dynamic>{
+      'messageMode': 'proactive',
+      'contactId': contactId,
+      'playerMessage': '',
+      'playerIntent': 'casual',
+      'proactiveReason': reason,
+      'localDraft': '',
+      'date': marketDateKey(state.currentDate),
+      'situation': situation.toRequestJson(),
+      'relationship': <String, dynamic>{
+        'stage': relationship.stage.name,
+        'affection': relationship.affection,
+        'trust': relationship.trust,
+        'closeness': relationship.closeness,
+        'investmentRespect': relationship.investmentRespect,
+      },
+      'investment': <String, dynamic>{
+        'marketClosed': !isMarketTradingDay(state.currentDate),
+        'playerDailyProfitLoss': playerRow?.profitLoss ?? 0,
+        'playerCumulativeProfitLoss':
+            state.cohortInvestments.playerCumulativeProfitLoss,
+        'contactDailyProfitLoss': contactRow?.profitLoss ?? 0,
+        'playerRank': rankFor('player'),
+        'contactRank': rankFor(contactId),
+      },
+      'recentMessages': <Map<String, dynamic>>[
+        for (final message in recentMessages)
+          <String, dynamic>{
+            'from': message.isFromPlayer ? 'player' : contactId,
+            'text': message.text,
+          },
+      ],
+      'memories': <Map<String, dynamic>>[
+        for (final memory in recentMemories)
+          <String, dynamic>{
+            'day': memory.day,
+            'player': memory.playerText,
+            'reply': memory.replyText,
+            'intent': memory.intent,
+            'importance': memory.importance,
+            'privacyScope': memory.privacyScope,
+            'ownerContactId': memory.contactId,
+            'marketMinute': memory.marketMinute,
+            'situationSummary': memory.situationSummary,
+            'scheduleDecision': memory.scheduleDecision,
+          },
+      ],
+      'abilityHint': <String, dynamic>{},
+    };
+
+    try {
+      final personalApiKey = await _credentialStore.readApiKey();
+      final headers = <String, String>{
+        'content-type': 'application/json',
+        'accept': 'application/json',
+      };
+      if (personalApiKey != null) {
+        headers[_phoneAiPersonalKeyHeader] = personalApiKey;
+      }
+      final response = await _client
+          .post(endpoint, headers: headers, body: jsonEncode(body))
+          .timeout(const Duration(seconds: 45));
+      if (response.statusCode < 200 || response.statusCode >= 300) return null;
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map || decoded['ok'] != true) return null;
+      final reply = (decoded['reply'] as String? ?? '')
+          .replaceAll(RegExp(r'[\x00-\x1F\x7F]'), ' ')
+          .replaceAll(RegExp(r'\s+'), ' ')
+          .trim();
+      if (reply.isEmpty || reply.length > 160) return null;
+      return PhoneAiReply(
+        text: reply,
+        model: decoded['model'] as String? ?? 'gemini-3.5-flash-lite',
+        fallbackUsed: false,
+      );
+    } on TimeoutException {
+      if (kDebugMode) debugPrint('Phone AI proactive message timed out');
+      return null;
+    } on FormatException {
+      if (kDebugMode) {
+        debugPrint('Phone AI proactive message returned invalid JSON');
+      }
+      return null;
+    } catch (error) {
+      if (kDebugMode) debugPrint('Phone AI proactive message failed: $error');
+      return null;
+    }
+  }
+
   Future<PhoneAiReply?> createReply({
     required GameState state,
     required String contactId,
@@ -288,6 +418,7 @@ class PhoneAiService {
       state,
       contactId: contactId,
       playerText: playerText,
+      atMinute: state.marketMinute + phoneMessengerExchangeMinutes,
     );
 
     final body = <String, dynamic>{
@@ -363,62 +494,77 @@ class PhoneAiService {
       if (personalApiKey != null) {
         headers[_phoneAiPersonalKeyHeader] = personalApiKey;
       }
-      final response = await _client
-          .post(endpoint, headers: headers, body: jsonEncode(body))
-          .timeout(const Duration(seconds: 45));
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        var serverMessage = '';
-        try {
-          final errorBody = jsonDecode(response.body);
-          if (errorBody is Map) {
-            serverMessage = (errorBody['message'] as String? ?? '').trim();
+      for (var policyAttempt = 0; policyAttempt < 2; policyAttempt += 1) {
+        final response = await _client
+            .post(endpoint, headers: headers, body: jsonEncode(body))
+            .timeout(const Duration(seconds: 45));
+        if (response.statusCode < 200 || response.statusCode >= 300) {
+          var serverMessage = '';
+          try {
+            final errorBody = jsonDecode(response.body);
+            if (errorBody is Map) {
+              serverMessage = (errorBody['message'] as String? ?? '').trim();
+            }
+          } on FormatException {
+            // The local reply remains available when the error body is not JSON.
           }
-        } on FormatException {
-          // The local reply remains available when the error body is not JSON.
+          if (kDebugMode) {
+            debugPrint(
+              'Phone AI fallback: HTTP ${response.statusCode}'
+              '${serverMessage.isEmpty ? '' : ' · $serverMessage'}',
+            );
+          }
+          return null;
         }
-        if (kDebugMode) {
-          debugPrint(
-            'Phone AI fallback: HTTP ${response.statusCode}'
-            '${serverMessage.isEmpty ? '' : ' · $serverMessage'}',
-          );
+        final decoded = jsonDecode(response.body);
+        if (decoded is! Map) return null;
+        final reply = (decoded['reply'] as String? ?? '')
+            .replaceAll(RegExp(r'[\x00-\x1F\x7F]'), ' ')
+            .trim();
+        if (decoded['ok'] != true || reply.isEmpty || reply.length > 160) {
+          return null;
         }
-        return null;
-      }
-      final decoded = jsonDecode(response.body);
-      if (decoded is! Map) return null;
-      final reply = (decoded['reply'] as String? ?? '')
-          .replaceAll(RegExp(r'[\x00-\x1F\x7F]'), ' ')
-          .trim();
-      if (decoded['ok'] != true || reply.isEmpty || reply.length > 160) {
-        return null;
-      }
-      if (phoneAiReplyViolatesAbilityHintPolicy(
-        reply,
-        hint: abilityHint,
-        enforceInvestmentAdvice:
-            classifyPhoneIntent(playerText) ==
-            PhonePlayerIntent.investmentAdvice,
-      )) {
-        if (kDebugMode) {
-          debugPrint(
-            'Phone AI fallback: direct investment instruction rejected',
-          );
+        final violatesAbilityPolicy = phoneAiReplyViolatesAbilityHintPolicy(
+          reply,
+          hint: abilityHint,
+          enforceInvestmentAdvice:
+              classifyPhoneIntent(playerText) ==
+              PhonePlayerIntent.investmentAdvice,
+        );
+        final violatesSituationPolicy = phoneAiReplyViolatesSituationPolicy(
+          reply,
+          situation: situation,
+        );
+        if (violatesAbilityPolicy || violatesSituationPolicy) {
+          if (policyAttempt == 0) {
+            body['replyRepair'] = <String, dynamic>{
+              'rejectedReply': reply,
+              'reason': violatesSituationPolicy
+                  ? '현재 게임 시각·요일·장소·일정 또는 현실성 규칙과 충돌'
+                  : '허용 범위를 넘은 직접 투자 지시 또는 결과 보장',
+              'requiredCorrection': situation.realityCorrection,
+            };
+            if (kDebugMode) {
+              debugPrint(
+                'Phone AI: policy conflict sent back for regeneration',
+              );
+            }
+            continue;
+          }
+          if (kDebugMode) {
+            debugPrint(
+              'Phone AI fallback: regenerated reply still violated policy',
+            );
+          }
+          return null;
         }
-        return null;
+        return PhoneAiReply(
+          text: reply,
+          model: decoded['model'] as String? ?? 'gemini-3.5-flash-lite',
+          fallbackUsed: decoded['fallbackUsed'] == true,
+        );
       }
-      if (phoneAiReplyViolatesSituationPolicy(reply, situation: situation)) {
-        if (kDebugMode) {
-          debugPrint(
-            'Phone AI fallback: impossible schedule acceptance rejected',
-          );
-        }
-        return null;
-      }
-      return PhoneAiReply(
-        text: reply,
-        model: decoded['model'] as String? ?? 'gemini-3.5-flash-lite',
-        fallbackUsed: decoded['fallbackUsed'] == true,
-      );
+      return null;
     } on TimeoutException {
       if (kDebugMode) debugPrint('Phone AI fallback: request timed out');
       return null;

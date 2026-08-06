@@ -357,6 +357,20 @@ class StoryState {
         ..remove('activeResearchHelperDay')
         ..remove('researchBonusPct');
     }
+    if (<String>{
+          'hakjun',
+          'sua',
+          'seoyoon',
+        }.contains(migrated['activeResearchHelper']) &&
+        migrated['researchBonusPct'] is num &&
+        !migrated.containsKey('academyResearchSignalCount')) {
+      final credits =
+          (migrated['weekendMarketResearchCredits'] as num?)?.toInt() ?? 0;
+      migrated
+        ..['academyResearchSignalCount'] = 4
+        ..['weekendMarketResearchCredits'] = (credits + 1).clamp(0, 3)
+        ..remove('researchBonusPct');
+    }
     return migrated;
   }
 
