@@ -2747,6 +2747,7 @@ FictionalMarketUniverse buildFictionalMarketUniverse(
     for (final definition in definitions) definition.id: <String, double>{},
   };
   final current = <String, double>{};
+  final lastDailyReturns = <String, double>{};
   final start = DateTime(1999, 12, 30);
   final campaignEnd = DateTime(fictionalCampaignEndYear, 12, 31);
   final requestedEnd = throughDate ?? campaignEnd;
@@ -2935,8 +2936,42 @@ FictionalMarketUniverse buildFictionalMarketUniverse(
         final valuationPull = (valuationGap * 0.0045)
             .clamp(-0.006, 0.006)
             .toDouble();
+        final priorDailyReturn = lastDailyReturns[company.id] ?? 0.0;
+        final reliefDraw =
+            (_fictionalFastSigned(
+                  companyDailyNoiseSeeds[company.id]!,
+                  dayOrdinal * 4099 + 0x5a17,
+                ) +
+                1) /
+            2;
+        final reliefMagnitudeDraw =
+            (_fictionalFastSigned(
+                  companyDailyNoiseSeeds[company.id]!,
+                  dayOrdinal * 6151 + 0x31d9,
+                ) +
+                1) /
+            2;
+        // A violent move often exhausts the crowded side and produces a
+        // partial relief rally (or profit-taking drop) on the next quiet day.
+        // Suppress it when fresh material news arrives so a new disclosure is
+        // never mechanically overruled by yesterday's tape.
+        final exhaustionReversal =
+            eventImpact.abs() < 0.01 &&
+                priorDailyReturn.abs() >= 0.075 &&
+                reliefDraw < 0.58
+            ? -priorDailyReturn.sign *
+                  (priorDailyReturn.abs() *
+                          (0.38 + reliefMagnitudeDraw * 0.34))
+                      .clamp(0.025, 0.095)
+                      .toDouble()
+            : 0.0;
         final nonEventReturn =
-            macro + corpusMarketReturn + sector + companyNoise + valuationPull;
+            macro +
+            corpusMarketReturn +
+            sector +
+            companyNoise +
+            valuationPull +
+            exhaustionReversal;
         final ipoDiscoveryReturn = usesModernIpoRange
             ? _fictionalModernIpoDiscoveryReturn(seed, company)
             : 0.0;
@@ -2976,6 +3011,7 @@ FictionalMarketUniverse buildFictionalMarketUniverse(
         );
         current[company.id] = rounded;
         prices[company.id]![dateKey] = rounded;
+        lastDailyReturns[company.id] = rounded / previous - 1;
       }
     }
     date = date.add(const Duration(days: 1));

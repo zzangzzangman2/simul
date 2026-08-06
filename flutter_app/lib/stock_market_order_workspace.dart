@@ -878,6 +878,15 @@ mixin _OrderBookSweepPlayback<T extends StatefulWidget> on State<T> {
         : scaled;
   }
 
+  Duration get _orderBookSweepBorderMotionDuration {
+    final scaled = _scaledOrderBookSweepDuration(
+      const Duration(milliseconds: 72),
+    );
+    return scaled < const Duration(milliseconds: 36)
+        ? const Duration(milliseconds: 36)
+        : scaled;
+  }
+
   void _initializeOrderBookSweepPlaybackSpeed(
     _MarketPlaybackSpeed playbackSpeed,
     GameOrderBookSnapshot initialSnapshot,
@@ -1530,6 +1539,31 @@ class _CompactOrderBookRailState extends State<_CompactOrderBookRail>
             .firstOrNull
             ?.price ??
         snapshot.bids.firstOrNull?.price;
+    if (activeSweepStep == null && outlinePrice != null) {
+      final bestAsk = levels
+          .where((level) => level.side == GameOrderBookSide.ask)
+          .lastOrNull;
+      final bestBid = levels
+          .where((level) => level.side == GameOrderBookSide.bid)
+          .firstOrNull;
+      final outlineIsCentral = <GameOrderBookLevel?>[bestAsk, bestBid].any(
+        (level) =>
+            level != null &&
+            _matches(level.price, outlinePrice) &&
+            (outlineSide == null || level.side == outlineSide),
+      );
+      if (!outlineIsCentral) {
+        final centralLevel = outlineSide == GameOrderBookSide.ask
+            ? bestAsk
+            : outlineSide == GameOrderBookSide.bid
+            ? bestBid
+            : bestBid ?? bestAsk;
+        if (centralLevel != null) {
+          outlinePrice = centralLevel.price;
+          outlineSide = centralLevel.side;
+        }
+      }
+    }
     final activeSweepLevel = arrivedSweepStep == null
         ? null
         : levels
@@ -1713,11 +1747,36 @@ class _CompactOrderBookRailState extends State<_CompactOrderBookRail>
                       if (outlineIndex >= 0)
                         AnimatedPositioned(
                           key: const Key(
-                            'inline-order-book-current-price-border',
+                            'inline-order-book-current-price-border-trail',
                           ),
                           duration: activeSweepStep == null
                               ? _orderBookMotionDuration
-                              : Duration.zero,
+                              : _orderBookSweepBorderMotionDuration,
+                          curve: Curves.easeOutCubic,
+                          top: outlineIndex * rowHeight,
+                          left: 0,
+                          right: constraints.maxWidth * 5 / 11,
+                          height: rowHeight,
+                          child: IgnorePointer(
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: activeSweepStep == null
+                                      ? const Color(0x00F04452)
+                                      : const Color(0x55F04452),
+                                  width: 2.7,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      if (outlineIndex >= 0)
+                        AnimatedPositioned(
+                          key: const Key(
+                            'inline-order-book-current-price-border',
+                          ),
+                          // 전체 호가와 똑같이 현재가 공개 프레임에 즉시 점프한다.
+                          duration: Duration.zero,
                           curve: Curves.easeOutCubic,
                           top: outlineIndex * rowHeight,
                           left: 0,

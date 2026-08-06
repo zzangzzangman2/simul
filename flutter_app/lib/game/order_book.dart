@@ -718,6 +718,51 @@ class GameOrderBookSnapshot {
       playerOwnedShares + nonPlayerTradableShares + nonPlayerLockedShares ==
           sharesOutstanding;
 
+  /// Whether every visible quote is backed by the finite ownership/cash
+  /// ledger that produced this snapshot.
+  ///
+  /// In particular, external asks can never represent shares already owned by
+  /// the player. If the player owns 51%, the entire visible external sell book
+  /// is therefore capped by the remaining 49% (and usually by the smaller
+  /// estimated free float). Player sell orders are reserved separately by the
+  /// engine, so external asks plus all valid player sells cannot exceed the
+  /// issued share count.
+  bool get visibleInventoryIsConserved {
+    if (!hasIssuedShareLedger) return true;
+    final displayedAskQuantity = asks.fold<int>(
+      0,
+      (sum, level) => sum + level.quantity,
+    );
+    final displayedBidQuantity = bids.fold<int>(
+      0,
+      (sum, level) => sum + level.quantity,
+    );
+    final maximumAggregateLevelQuantity = math.min(
+      sharesOutstanding,
+      math.max(maximumQuoteQuantity, maximumQuoteQuantity * 4),
+    );
+    return ownershipIsConserved &&
+        playerOwnedShares >= 0 &&
+        nonPlayerTradableShares >= 0 &&
+        nonPlayerLockedShares >= 0 &&
+        visibleAskSupplyLimit >= 0 &&
+        visibleAskSupplyLimit <= nonPlayerTradableShares &&
+        visibleBidDemandLimit >= 0 &&
+        asks.every(
+          (level) =>
+              level.quantity >= 0 &&
+              level.quantity <= maximumAggregateLevelQuantity,
+        ) &&
+        bids.every(
+          (level) =>
+              level.quantity >= 0 &&
+              level.quantity <= maximumAggregateLevelQuantity,
+        ) &&
+        displayedAskQuantity <= visibleAskSupplyLimit &&
+        displayedAskQuantity + playerOwnedShares <= sharesOutstanding &&
+        displayedBidQuantity <= visibleBidDemandLimit;
+  }
+
   /// Standing liquidity already visited during this asset's current session.
   ///
   /// The visible rows are only a window onto the book. Keeping their latest
@@ -1605,29 +1650,45 @@ GameOrderBookTradePulse? gameOrderBookTradePulse({
   var side = dominantSide;
   if (liquidityPulse > 0) {
     // A minute candle gives the dominant aggressor, not every individual
-    // trade. Directional moves retain that bias, while flat prints are paired
-    // into one buy and one sell in a seeded order so a sideways tape cannot
-    // remain red or blue for minutes at a time.
+    // trade. Directional moves retain that bias, while a flat candle can still
+    // contain a persistent buy/sell run that is being absorbed at the touch.
+    // This is deliberately driven by the same clustered order flow that adds
+    // and cancels standing depth below; a mechanical buy/sell alternation is
+    // not a real limit-order market.
     final directional = (currentPrice - previousPrice).abs() > 0.000001;
+    final persistentFlow = _gameOrderBookPersistentOrderFlow(
+      seededAssetId: seededAssetId,
+      day: day,
+      minute: minute,
+      liquidityPulse: liquidityPulse,
+    );
     if (!directional) {
-      final pulses = math.max(1, pulsesPerMarketMinute);
       final localSlot = pulsesPerMarketMinute > 0
           ? gameOrderBookPulseSlotForFrame(
               marketMinute: minute,
               liquidityPulse: liquidityPulse,
             )
           : liquidityPulse;
-      final sequence = minute * pulses + localSlot;
-      final askFirst = _orderBookMixedHash(
+      final buyAggressorProbability = (0.50 + persistentFlow * 0.28)
+          .clamp(0.20, 0.80)
+          .toDouble();
+      final sideDraw = _orderBookUnit(
         seededAssetId,
         day,
-        (sequence ~/ 2) * 104729 + 7919,
-      ).isEven;
-      side = sequence.isEven == askFirst
+        minute * 104729 + localSlot * 15485863 + 7919,
+      );
+      side = sideDraw < buyAggressorProbability
           ? GameOrderBookSide.ask
           : GameOrderBookSide.bid;
     } else {
-      final dominantProbability = 0.65 + moveIntensity * 0.20;
+      final dominantFlowSign = dominantSide == GameOrderBookSide.ask
+          ? 1.0
+          : -1.0;
+      final flowAlignment = persistentFlow * dominantFlowSign;
+      final dominantProbability =
+          (0.64 + moveIntensity * 0.20 + flowAlignment * 0.08)
+              .clamp(0.54, 0.92)
+              .toDouble();
       final sideDraw =
           (_orderBookMixedHash(
                 seededAssetId,
@@ -1764,6 +1825,27 @@ List<GameOrderBookLevel> _gameOrderBookLevelsWithinBudget({
         );
       })(),
   ]);
+}
+
+List<GameOrderBookLevel> _gameOrderBookLevelsWithinSnapshotBudget({
+  required GameOrderBookSnapshot snapshot,
+  required List<GameOrderBookLevel> levels,
+  required GameOrderBookSide side,
+}) {
+  if (!snapshot.hasIssuedShareLedger) {
+    return List<GameOrderBookLevel>.unmodifiable(levels);
+  }
+  final maximumAggregateLevelQuantity = math.min(
+    snapshot.sharesOutstanding,
+    math.max(snapshot.maximumQuoteQuantity, snapshot.maximumQuoteQuantity * 4),
+  );
+  return _gameOrderBookLevelsWithinBudget(
+    levels: levels,
+    totalBudget: side == GameOrderBookSide.ask
+        ? snapshot.visibleAskSupplyLimit
+        : snapshot.visibleBidDemandLimit,
+    maximumAggregateLevelQuantity: maximumAggregateLevelQuantity,
+  );
 }
 
 int _gameOrderBookStructuralRecoveryCeiling(
@@ -1932,46 +2014,36 @@ GameOrderBookSnapshot gameOrderBookSnapshotAfterSyntheticTrade({
         ? math.min(target.structuralVacuumMultiplier, 0.65)
         : null,
   );
-  final promotedTouch = _gameOrderBookPromotedTouchArrival(
-    snapshot: snapshot,
-    target: updatedTarget,
-    remainingQuantity: remainingQuantity,
-    actualQuantity: actualQuantity,
-  );
-
-  final asks = pulse.levelSide == GameOrderBookSide.ask
+  // A fully matched quote is not converted into a resting order on the other
+  // side. KRX matching removes the exhausted order; a bid/ask at the same
+  // absolute price may appear later only when a new order actually arrives.
+  var asks = pulse.levelSide == GameOrderBookSide.ask
       ? <GameOrderBookLevel>[
           for (var index = 0; index < snapshot.asks.length; index += 1)
-            if (index != targetIndex || promotedTouch == null)
-              index == targetIndex ? updatedTarget : snapshot.asks[index],
+            index == targetIndex ? updatedTarget : snapshot.asks[index],
         ]
-      : promotedTouch == null
-      ? snapshot.asks
-      : <GameOrderBookLevel>[
-          promotedTouch,
-          ...snapshot.asks.where(
-            (level) => (level.price - promotedTouch.price).abs() >= 0.000001,
-          ),
-        ];
-  final bids = pulse.levelSide == GameOrderBookSide.bid
+      : snapshot.asks;
+  var bids = pulse.levelSide == GameOrderBookSide.bid
       ? <GameOrderBookLevel>[
           for (var index = 0; index < snapshot.bids.length; index += 1)
-            if (index != targetIndex || promotedTouch == null)
-              index == targetIndex ? updatedTarget : snapshot.bids[index],
+            index == targetIndex ? updatedTarget : snapshot.bids[index],
         ]
-      : promotedTouch == null
-      ? snapshot.bids
-      : <GameOrderBookLevel>[
-          promotedTouch,
-          ...snapshot.bids.where(
-            (level) => (level.price - promotedTouch.price).abs() >= 0.000001,
-          ),
-        ];
+      : snapshot.bids;
+  asks = _gameOrderBookLevelsWithinSnapshotBudget(
+    snapshot: snapshot,
+    levels: asks,
+    side: GameOrderBookSide.ask,
+  );
+  bids = _gameOrderBookLevelsWithinSnapshotBudget(
+    snapshot: snapshot,
+    levels: bids,
+    side: GameOrderBookSide.bid,
+  );
   final totalAsk = asks.fold<int>(0, (sum, level) => sum + level.quantity);
   final totalBid = bids.fold<int>(0, (sum, level) => sum + level.quantity);
   final rememberedLevels = <double, GameOrderBookLevel>{
     ...snapshot.rememberedLevels,
-    updatedTarget.price: promotedTouch ?? updatedTarget,
+    updatedTarget.price: updatedTarget,
   };
   final syntheticTrade = GameOrderBookSyntheticTrade(
     marketMinute: marketMinute,
@@ -1999,10 +2071,9 @@ GameOrderBookSnapshot gameOrderBookSnapshotAfterSyntheticTrade({
         sequence: entry.key,
       ),
   ];
-  final boundaryBidPrice = promotedTouch == null
-      ? snapshot.boundaryBidPrice
-      : bids.where((level) => level.quantity > 0).firstOrNull?.price ??
-            snapshot.boundaryBidPrice;
+  final boundaryBidPrice =
+      bids.where((level) => level.quantity > 0).firstOrNull?.price ??
+      snapshot.boundaryBidPrice;
 
   return GameOrderBookSnapshot(
     asks: List<GameOrderBookLevel>.unmodifiable(asks),
@@ -2068,153 +2139,6 @@ GameOrderBookSnapshot gameOrderBookSnapshotAfterSyntheticTrade({
     externalBidCash: snapshot.externalBidCash,
     visibleAskSupplyLimit: snapshot.visibleAskSupplyLimit,
     visibleBidDemandLimit: snapshot.visibleBidDemandLimit,
-  );
-}
-
-GameOrderBookLevel? _gameOrderBookPromotedTouchArrival({
-  required GameOrderBookSnapshot snapshot,
-  required GameOrderBookLevel target,
-  required int remainingQuantity,
-  required int actualQuantity,
-}) {
-  if (actualQuantity <= 0 || remainingQuantity > 0) {
-    return null;
-  }
-  final sameSideLevels = target.side == GameOrderBookSide.ask
-      ? snapshot.asks
-      : snapshot.bids;
-  final sameSideTouch = sameSideLevels
-      .where((level) => level.quantity > 0)
-      .firstOrNull;
-  if (sameSideTouch == null ||
-      (sameSideTouch.price - target.price).abs() >= 0.000001) {
-    return null;
-  }
-  return _gameOrderBookOppositeQueueAfterTouchConsumption(
-    snapshot: snapshot,
-    target: target,
-  );
-}
-
-GameOrderBookLevel? _gameOrderBookOppositeQueueAfterTouchConsumption({
-  required GameOrderBookSnapshot snapshot,
-  required GameOrderBookLevel target,
-}) {
-  if (snapshot.fullDayTurnoverEok <
-      gameOrderBookSeverelySparseFullDayTurnoverEok) {
-    return null;
-  }
-  final oppositeLevels = target.side == GameOrderBookSide.ask
-      ? snapshot.bids
-      : snapshot.asks;
-  final oppositeTouch = oppositeLevels
-      .where((level) => level.quantity > 0)
-      .firstOrNull;
-  if (oppositeTouch == null) return null;
-  final targetIsBeyondOppositeTouch = target.side == GameOrderBookSide.ask
-      ? target.price > oppositeTouch.price
-      : target.price < oppositeTouch.price;
-  if (!targetIsBeyondOppositeTouch) {
-    return null;
-  }
-
-  // The consumed wall stays gone. A full ask print moves that absolute price
-  // to a fresh bid; a full bid print moves it to a fresh ask. This advances the
-  // spread boundary without converting or resurrecting the old standing wall.
-  // Do not require the old spread to have been exactly one tick: this reducer
-  // must also repair a legacy/sparse snapshot whose hidden zero rows left a
-  // wide visible gap (for example 32,150 bid / 32,500 ask).
-  // The new ordinary queue must be usable depth, never the visible 1-share
-  // artifact produced by the former minimum fallback.
-  final originalTarget =
-      (target.side == GameOrderBookSide.ask ? snapshot.asks : snapshot.bids)
-          .where((level) => (level.price - target.price).abs() < 0.000001)
-          .firstOrNull;
-  final structuralQueueBreached =
-      target.isStructuralBreached ||
-      (originalTarget?.isStructuralWall ?? false);
-  final recoveryBaseline = math.max(
-    target.queueRecoveryTargetQuantity,
-    math.max(target.quantity, originalTarget?.quantity ?? 0),
-  );
-  final structuralRecoveryCeiling = structuralQueueBreached
-      ? _gameOrderBookStructuralRecoveryCeiling(
-          originalTarget ?? target,
-          baselineQuantity: recoveryBaseline,
-        )
-      : recoveryBaseline;
-  final seededAssetId =
-      '${snapshot.sourceSimulationSeed ?? ''}:'
-      '${snapshot.sourceAssetId ?? 'order-book'}';
-  final day = snapshot.sourceLiquidityDayKey ?? 0;
-  final priceSalt =
-      target.price.round() * 97 +
-      (target.side == GameOrderBookSide.ask ? 1907 : 3529);
-  final targetVariation =
-      0.84 + _orderBookUnit(seededAssetId, day, priceSalt) * 0.32;
-  final initialShare =
-      0.16 + _orderBookUnit(seededAssetId, day, priceSalt + 811) * 0.12;
-  final ordinaryReference = structuralQueueBreached
-      ? math.max(
-          structuralRecoveryCeiling,
-          math.max(
-            (oppositeTouch.quantity * 0.35).round(),
-            (snapshot.executionCapacity * 0.18).round(),
-          ),
-        )
-      : math.max(
-          recoveryBaseline,
-          math.max(
-            (oppositeTouch.quantity * 0.55).round(),
-            (snapshot.executionCapacity * 0.35).round(),
-          ),
-        );
-  final unboundedRecoveryTarget = math.max(
-    gameOrderBookMinimumDisplayedQuantity * 2,
-    (math.max(1, ordinaryReference) * targetVariation).round(),
-  );
-  final recoveryTarget = structuralQueueBreached
-      ? math.max(
-          gameOrderBookMinimumDisplayedQuantity * 2,
-          math.min(structuralRecoveryCeiling, unboundedRecoveryTarget),
-        )
-      : unboundedRecoveryTarget;
-  var practicalQuantity = math.max(
-    gameOrderBookMinimumDisplayedQuantity,
-    math.max(
-      (recoveryTarget * initialShare).round(),
-      (math.max(1, snapshot.executionCapacity) * 0.05).round(),
-    ),
-  );
-  practicalQuantity = math.min(practicalQuantity, recoveryTarget);
-  if (practicalQuantity >= recoveryTarget &&
-      recoveryTarget > gameOrderBookMinimumDisplayedQuantity) {
-    practicalQuantity = math.max(
-      gameOrderBookMinimumDisplayedQuantity,
-      recoveryTarget - 1,
-    );
-  }
-  return GameOrderBookLevel(
-    side: target.side == GameOrderBookSide.ask
-        ? GameOrderBookSide.bid
-        : GameOrderBookSide.ask,
-    price: target.price,
-    quantity: practicalQuantity,
-    isWall: false,
-    structuralKind: target.structuralKind,
-    structuralStrength: 1,
-    structuralHoldTicks: 0,
-    isStructuralWall: false,
-    isStructuralBreached: structuralQueueBreached,
-    structuralVacuumMultiplier: structuralQueueBreached
-        ? math.min(target.structuralVacuumMultiplier, 0.65)
-        : target.structuralVacuumMultiplier,
-    isPsychological: target.isPsychological,
-    technicalPeriods: target.technicalPeriods,
-    wasLiquidityPulseTouched: true,
-    queueRecoveryTargetQuantity: recoveryTarget > practicalQuantity
-        ? recoveryTarget
-        : 0,
   );
 }
 
@@ -2519,17 +2443,11 @@ GameOrderBookSnapshot gameOrderBookSnapshotAfterConsumption({
       : latestConsumedSide == GameOrderBookSide.bid && hasNewBidConsumption
       ? GameOrderBookSide.bid
       : null;
-  final promotionTarget = selectedConsumedSide == GameOrderBookSide.ask
+  final exhaustionTarget = selectedConsumedSide == GameOrderBookSide.ask
       ? exhaustedAsks.lastOrNull
       : selectedConsumedSide == GameOrderBookSide.bid
       ? exhaustedBids.lastOrNull
       : null;
-  final promotedTouch = promotionTarget == null
-      ? null
-      : _gameOrderBookOppositeQueueAfterTouchConsumption(
-          snapshot: snapshot,
-          target: promotionTarget,
-        );
 
   var asks = netAskLevels
       .where(
@@ -2541,27 +2459,16 @@ GameOrderBookSnapshot gameOrderBookSnapshotAfterConsumption({
         (level) => level.quantity > 0 || keepsActiveSyntheticTombstone(level),
       )
       .toList(growable: false);
-  if (promotedTouch != null && promotedTouch.side == GameOrderBookSide.bid) {
-    asks = asks
-        .where((level) => (level.price - promotedTouch.price).abs() >= 0.000001)
-        .toList(growable: false);
-    bids = <GameOrderBookLevel>[
-      promotedTouch,
-      ...bids.where(
-        (level) => (level.price - promotedTouch.price).abs() >= 0.000001,
-      ),
-    ];
-  } else if (promotedTouch != null) {
-    bids = bids
-        .where((level) => (level.price - promotedTouch.price).abs() >= 0.000001)
-        .toList(growable: false);
-    asks = <GameOrderBookLevel>[
-      promotedTouch,
-      ...asks.where(
-        (level) => (level.price - promotedTouch.price).abs() >= 0.000001,
-      ),
-    ];
-  }
+  asks = _gameOrderBookLevelsWithinSnapshotBudget(
+    snapshot: snapshot,
+    levels: asks,
+    side: GameOrderBookSide.ask,
+  );
+  bids = _gameOrderBookLevelsWithinSnapshotBudget(
+    snapshot: snapshot,
+    levels: bids,
+    side: GameOrderBookSide.bid,
+  );
   final rememberedLevels = <double, GameOrderBookLevel>{
     for (final entry in snapshot.rememberedLevels.entries)
       entry.key: entry.value.side == GameOrderBookSide.ask
@@ -2576,9 +2483,6 @@ GameOrderBookSnapshot gameOrderBookSnapshotAfterConsumption({
               snapshot.appliedBidConsumptionByPrice,
             ),
   };
-  if (promotedTouch != null) {
-    rememberedLevels[promotedTouch.price] = promotedTouch;
-  }
   final totalAsk = asks.fold<int>(0, (sum, level) => sum + level.quantity);
   final totalBid = bids.fold<int>(0, (sum, level) => sum + level.quantity);
   final appliedAskConsumptionByPrice = mergedWatermark(
@@ -2589,15 +2493,9 @@ GameOrderBookSnapshot gameOrderBookSnapshotAfterConsumption({
     snapshot.appliedBidConsumptionByPrice,
     consumedBidByPrice,
   );
-  final boundaryBidPrice = promotedTouch?.side == GameOrderBookSide.bid
-      ? promotedTouch!.price
-      : promotedTouch?.side == GameOrderBookSide.ask
-      ? bids.where((level) => level.quantity > 0).firstOrNull?.price ??
-            snapshot.boundaryBidPrice
-      : snapshot.boundaryBidPrice == null
-      ? null
-      : bids.where((level) => level.quantity > 0).firstOrNull?.price ??
-            snapshot.boundaryBidPrice;
+  final boundaryBidPrice =
+      bids.where((level) => level.quantity > 0).firstOrNull?.price ??
+      snapshot.boundaryBidPrice;
   final hasValidLatestConsumedPrice =
       latestConsumedPrice != null &&
       latestConsumedPrice.isFinite &&
@@ -2605,7 +2503,7 @@ GameOrderBookSnapshot gameOrderBookSnapshotAfterConsumption({
   final sourceLastTradePrice =
       selectedConsumedSide != null && hasValidLatestConsumedPrice
       ? latestConsumedPrice
-      : promotionTarget?.price ?? snapshot.sourceLastTradePrice;
+      : exhaustionTarget?.price ?? snapshot.sourceLastTradePrice;
   return GameOrderBookSnapshot(
     asks: List<GameOrderBookLevel>.unmodifiable(asks),
     bids: List<GameOrderBookLevel>.unmodifiable(bids),
@@ -3064,19 +2962,27 @@ GameOrderBookSnapshot buildGameOrderBookSnapshot({
           )
         : 0;
     if (fill.side != level.side) {
-      final promoted = _gameOrderBookOppositeQueueAfterTouchConsumption(
-        snapshot: previousSnapshot!,
-        target: previousLevel,
-      );
-      if (promoted != null && promoted.side == level.side) {
-        return promoted;
-      }
       if (!structuralQueueBreached) return carried;
-      final breachedQuantity = math.min(carried.quantity, recoveryCeiling);
+      final initialArrivalCeiling = math.min(
+        recoveryCeiling,
+        math.max(
+          gameOrderBookMinimumDisplayedQuantity,
+          (recoveryCeiling * 0.24).round(),
+        ),
+      );
+      final breachedQuantity = math.min(
+        carried.quantity,
+        initialArrivalCeiling,
+      );
       return _gameOrderBookLevelWithQuantity(
         carried,
         breachedQuantity,
-        queueRecoveryTargetQuantity: 0,
+        // This is a newly generated quote in a later builder frame, not the
+        // exhausted standing order changing sides. It may recover gradually,
+        // but the breached structural wall itself never resurrects.
+        queueRecoveryTargetQuantity: breachedQuantity < recoveryCeiling
+            ? recoveryCeiling
+            : 0,
         isWall: false,
         isStructuralWall: false,
         isStructuralBreached: true,
@@ -3522,7 +3428,64 @@ _GameOrderBookQueueArrivalProfile _gameOrderBookQueueArrivalProfile({
   );
 }
 
-({GameOrderBookSide side, double price, double targetMultiplier})?
+/// Persistent signed order flow shared by prints and standing-quote changes.
+///
+/// Positive values mean buy pressure: more ask-side executions, bid arrivals,
+/// and ask cancellations. Negative values mirror those events. The slower
+/// components create locally persistent regimes while the pulse component
+/// prevents every update inside a regime from moving the same row.
+double _gameOrderBookPersistentOrderFlow({
+  required String seededAssetId,
+  required int day,
+  required int minute,
+  required int liquidityPulse,
+}) {
+  final safePulse = math.max(0, liquidityPulse);
+  final pulseHash = _orderBookMixedHash(
+    seededAssetId,
+    day,
+    safePulse * 12289 + 17431,
+  );
+  final institutionalFlow =
+      _smoothOrderBookUnit(
+            seededAssetId,
+            day,
+            minute,
+            15443,
+            windowMinutes: 3,
+          ) *
+          2 -
+      1;
+  final pensionFlow =
+      _smoothOrderBookUnit(
+            seededAssetId,
+            day,
+            minute,
+            15461,
+            windowMinutes: 9,
+          ) *
+          2 -
+      1;
+  final microFlow =
+      _orderBookUnit(
+            seededAssetId,
+            day,
+            safePulse * 24593 + pulseHash + 19301,
+          ) *
+          2 -
+      1;
+  return (institutionalFlow * 0.55 + pensionFlow * 0.25 + microFlow * 0.20)
+      .clamp(-1.0, 1.0)
+      .toDouble();
+}
+
+({
+  GameOrderBookSide side,
+  double price,
+  double targetMultiplier,
+  double adjustmentFraction,
+  bool cancelsCompletely,
+})?
 _gameOrderBookWallBreath({
   required GameOrderBookSnapshot previousSnapshot,
   required String seededAssetId,
@@ -3559,43 +3522,12 @@ _gameOrderBookWallBreath({
           .toList(growable: false);
   if (healthyLevels.isEmpty) return null;
 
-  final pulseHash = _orderBookMixedHash(
-    seededAssetId,
-    day,
-    liquidityPulse * 12289 + 17431,
+  final netFlow = _gameOrderBookPersistentOrderFlow(
+    seededAssetId: seededAssetId,
+    day: day,
+    minute: minute,
+    liquidityPulse: liquidityPulse,
   );
-  final institutionalFlow =
-      _smoothOrderBookUnit(
-            seededAssetId,
-            day,
-            minute,
-            15443,
-            windowMinutes: 3,
-          ) *
-          2 -
-      1;
-  final pensionFlow =
-      _smoothOrderBookUnit(
-            seededAssetId,
-            day,
-            minute,
-            15461,
-            windowMinutes: 9,
-          ) *
-          2 -
-      1;
-  final microFlow =
-      _orderBookUnit(
-            seededAssetId,
-            day,
-            liquidityPulse * 24593 + pulseHash + 19301,
-          ) *
-          2 -
-      1;
-  final netFlow =
-      (institutionalFlow * 0.55 + pensionFlow * 0.25 + microFlow * 0.20)
-          .clamp(-1.0, 1.0)
-          .toDouble();
   final selectionDraw = _orderBookUnit(
     seededAssetId,
     day,
@@ -3647,11 +3579,42 @@ _gameOrderBookWallBreath({
             0.5
       : selectsPressureSide;
   final flowMagnitude = 0.45 + netFlow.abs() * 0.55;
-  final amplitude = fastMarket ? 0.020 : 0.012;
+  final ordinaryAmplitude = fastMarket ? 0.020 : 0.012;
+  // A real wall is not a permanent painted number. Most packets only breathe
+  // by a few percent, but occasionally a participant cancels a meaningful
+  // portion or replenishes the queue. The snapshot-wide inventory budget below
+  // still caps every addition, so a shock can never create unissued shares.
+  final wallEventDraw = _orderBookUnit(
+    seededAssetId,
+    day,
+    liquidityPulse * 35831 + 20011,
+  );
+  final hasLargeWallEvent =
+      selected.isWall && wallEventDraw < (fastMarket ? 0.18 : 0.08);
+  final wallEventMagnitudeDraw = _orderBookUnit(
+    seededAssetId,
+    day,
+    liquidityPulse * 37813 + 20029,
+  );
+  final cancelsCompletely =
+      selected.isWall &&
+      _orderBookUnit(seededAssetId, day, liquidityPulse * 40009 + 20047) <
+          (fastMarket ? 0.015 : 0.004);
+  final amplitude = cancelsCompletely
+      ? 1.0
+      : !hasLargeWallEvent
+      ? ordinaryAmplitude
+      : addsLiquidity
+      ? 0.08 + wallEventMagnitudeDraw * 0.22
+      : 0.18 + wallEventMagnitudeDraw * 0.67;
   return (
     side: selected.side,
     price: selected.price,
-    targetMultiplier: 1 + (addsLiquidity ? 1 : -1) * flowMagnitude * amplitude,
+    targetMultiplier: cancelsCompletely
+        ? 0.0
+        : 1 + (addsLiquidity ? 1 : -1) * flowMagnitude * amplitude,
+    adjustmentFraction: amplitude,
+    cancelsCompletely: cancelsCompletely,
   );
 }
 
@@ -3739,7 +3702,13 @@ class _GameOrderBookCarryContext {
   final bool noNewAdaptivePulse;
   final GameOrderBookSyntheticTrade? latestSyntheticTrade;
   final int currentLiquidityPulse;
-  final ({GameOrderBookSide side, double price, double targetMultiplier})?
+  final ({
+    GameOrderBookSide side,
+    double price,
+    double targetMultiplier,
+    double adjustmentFraction,
+    bool cancelsCompletely,
+  })?
   wallBreath;
   final _GameOrderBookQueueArrivalProfile queueArrivalProfile;
   final double effectiveLimit;
@@ -3865,6 +3834,8 @@ class _GameOrderBookCarryContext {
         activeWallBreath != null &&
         activeWallBreath.side == level.side &&
         (activeWallBreath.price - level.price).abs() < 0.000001;
+    final cancelsWallCompletely =
+        isBreathingWall && activeWallBreath.cancelsCompletely;
     final isProtectedWall = isLiveWall || isBreathingWall;
     if (previous.quantity <= 0) {
       if (level.quantity <= 0) {
@@ -3968,13 +3939,18 @@ class _GameOrderBookCarryContext {
     // the minute, near-touch rows move more visibly while outer rows stay calm.
     final proximity = gameOrderBookQueueArrivalProximity(ticksFromTouch);
     final rawBreathingTarget = isBreathingWall
-        ? math.max(
-            gameOrderBookMinimumDisplayedQuantity,
-            (previous.quantity * activeWallBreath.targetMultiplier).round(),
-          )
+        ? cancelsWallCompletely
+              ? 0
+              : math.max(
+                  gameOrderBookMinimumDisplayedQuantity,
+                  (previous.quantity * activeWallBreath.targetMultiplier)
+                      .round(),
+                )
         : level.quantity;
     final targetQuantity =
-        isBreathingWall && rawBreathingTarget == previous.quantity
+        isBreathingWall &&
+            !cancelsWallCompletely &&
+            rawBreathingTarget == previous.quantity
         ? math.max(
             gameOrderBookMinimumDisplayedQuantity,
             previous.quantity +
@@ -3982,10 +3958,13 @@ class _GameOrderBookCarryContext {
           )
         : rawBreathingTarget;
     final adjustment = isBreathingWall
-        ? math.max(
-            1,
-            (previous.quantity * (fastMarket ? 0.020 : 0.012)).round(),
-          )
+        ? cancelsWallCompletely
+              ? previous.quantity
+              : math.max(
+                  1,
+                  (previous.quantity * activeWallBreath.adjustmentFraction)
+                      .round(),
+                )
         : isLiveWall && effectiveLimit > 0
         ? math.max(
             1,
@@ -3999,7 +3978,7 @@ class _GameOrderBookCarryContext {
         : (previous.quantity * effectiveLimit * proximity).floor();
     var quantity = targetQuantity
         .clamp(
-          math.max(1, previous.quantity - adjustment),
+          math.max(0, previous.quantity - adjustment),
           previous.quantity + adjustment,
         )
         .toInt();
@@ -4007,6 +3986,15 @@ class _GameOrderBookCarryContext {
     // immediately. Live walls instead move inside the small cap above so a
     // single quote pulse cannot make the wall look fully redrawn.
     if (!isProtectedWall) quantity = math.min(quantity, targetQuantity);
+    if (cancelsWallCompletely) {
+      return (
+        quantity: 0,
+        queueRecoveryTargetQuantity: math.max(
+          gameOrderBookMinimumDisplayedQuantity,
+          (previous.quantity * 0.35).round(),
+        ),
+      );
+    }
     if (isRecoveringOrdinaryQueue && !isBreathingWall) {
       var arrival = queueArrivalProfile.replenishmentFor(
         level,
@@ -4118,12 +4106,19 @@ class _GameOrderBookCarryContext {
     final displayedQuantity = carried.quantity <= 0
         ? 0
         : math.max(gameOrderBookMinimumDisplayedQuantity, carried.quantity);
+    final activeWallBreath = wallBreath;
+    final cancelledWallThisPulse =
+        activeWallBreath != null &&
+        activeWallBreath.cancelsCompletely &&
+        activeWallBreath.side == level.side &&
+        (activeWallBreath.price - level.price).abs() < 0.000001;
     return GameOrderBookLevel(
       side: level.side,
       price: level.price,
       quantity: displayedQuantity,
       isWall:
-          carriesRecoveringOrdinaryQueue ||
+          cancelledWallThisPulse ||
+              carriesRecoveringOrdinaryQueue ||
               carriedStructuralBreach ||
               carriedStructuralVacuum < 0.999999
           ? false
@@ -4134,7 +4129,9 @@ class _GameOrderBookCarryContext {
       structuralStrength: level.structuralStrength,
       structuralHoldTicks: level.structuralHoldTicks,
       isStructuralWall:
-          carriesRecoveringOrdinaryQueue || carriedStructuralBreach
+          cancelledWallThisPulse ||
+              carriesRecoveringOrdinaryQueue ||
+              carriedStructuralBreach
           ? false
           : level.isStructuralWall,
       isStructuralBreached: carriedStructuralBreach,

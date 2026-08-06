@@ -47,6 +47,7 @@ import 'game/real_estate_financing.dart';
 import 'game/real_estate_rental.dart';
 import 'game/real_estate_world.dart';
 import 'game/personal_finance_state.dart';
+import 'game/player_progression.dart';
 import 'game/phone_ability_hint.dart';
 import 'game/phone_ai_service.dart';
 import 'game/phone_dialogue_composer.dart';
@@ -934,6 +935,15 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
     return result;
   }
 
+  Future<CohortRollCallActionResult> _settleCohortDailyRollCall() async {
+    final current = _state!;
+    final result = _engine.settleCohortDailyRollCall(current);
+    if (!result.success || identical(result.state, current)) return result;
+    await _persistence.save(result.state);
+    if (mounted) setState(() => _state = result.state);
+    return result;
+  }
+
   Future<void> _acknowledgeCohortStandingEvent(
     CohortStandingEvent event,
   ) async {
@@ -1068,10 +1078,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
 
   Future<GameState> _advanceDay() => _advanceDays(1);
 
-  Future<GameState> _advanceDays(
-    int requestedDays, {
-    bool stopOnImportantNews = true,
-  }) async {
+  Future<GameState> _advanceDays(int requestedDays) async {
     final current = _state!;
     final initialFlags = Map<String, dynamic>.from(current.story.storyFlags)
       ..remove('fastForwardStopReason');
@@ -1098,31 +1105,29 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
           headline: brief.title,
           eventIds: events.map((event) => event.id).toList(growable: false),
         );
-        if (stopOnImportantNews) {
-          final trackedAssets = <String>{
-            ...before.positions.map((position) => position.assetId),
-            ...((before.story.storyFlags['marketFavoriteAssetIds'] as List?) ??
-                    const [])
-                .whereType<String>(),
-          };
-          final important = events
-              .where(
-                (event) =>
-                    event.companyId == fictionalWholeMarketCompanyId ||
-                    trackedAssets.contains(event.companyId),
-              )
-              .where(
-                (event) =>
-                    event.tone == NewsTone.shock ||
-                    event.tone == NewsTone.milestone ||
-                    event.impactPct.abs() >= 0.08 ||
-                    event.eyebrow.contains('상장폐지'),
-              );
-          if (important.isNotEmpty) {
-            stopAfterClosing = true;
-            stopReason =
-                '${marketDateKey(before.currentDate)} 보유·관심 종목 중요 뉴스가 공개되어 멈췄습니다.';
-          }
+        final trackedAssets = <String>{
+          ...before.positions.map((position) => position.assetId),
+          ...((before.story.storyFlags['marketFavoriteAssetIds'] as List?) ??
+                  const [])
+              .whereType<String>(),
+        };
+        final important = events
+            .where(
+              (event) =>
+                  event.companyId == fictionalWholeMarketCompanyId ||
+                  trackedAssets.contains(event.companyId),
+            )
+            .where(
+              (event) =>
+                  event.tone == NewsTone.shock ||
+                  event.tone == NewsTone.milestone ||
+                  event.impactPct.abs() >= 0.08 ||
+                  event.eyebrow.contains('상장폐지'),
+            );
+        if (important.isNotEmpty) {
+          stopAfterClosing = true;
+          stopReason =
+              '${marketDateKey(before.currentDate)} 보유·관심 종목 중요 뉴스가 공개되어 멈췄습니다.';
         }
       }
       final beforeUniverse = universeWindow.asOf(before.currentDate);
@@ -2167,8 +2172,6 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
                     onReturnToTitle: _returnToTitle,
                     onAdvanceDay: _advanceDay,
                     onAdvanceDays: _advanceDays,
-                    onAdvanceDaysQuiet: (days) =>
-                        _advanceDays(days, stopOnImportantNews: false),
                     onSetMarketMinute: _setMarketMinute,
                     onSaveMarketNotebook: _saveMarketNotebook,
                     onSetMarketRightsIssuePreference:
@@ -2187,6 +2190,7 @@ class _MillenniumCapitalAppState extends State<MillenniumCapitalApp> {
                     onBorrowFromCohortInvestor: _borrowFromCohortInvestor,
                     onAcknowledgeCohortInvestmentReport:
                         _acknowledgeCohortInvestmentReport,
+                    onSettleCohortDailyRollCall: _settleCohortDailyRollCall,
                     onAcknowledgeCohortStandingEvent:
                         _acknowledgeCohortStandingEvent,
                     onRespondToCohortWithdrawal: _respondToCohortWithdrawal,
@@ -2472,13 +2476,9 @@ class NewGameSetup {
 }
 
 class _AdvanceMenuChoice {
-  const _AdvanceMenuChoice({
-    required this.days,
-    this.stopOnImportantNews = true,
-  });
+  const _AdvanceMenuChoice({required this.days});
 
   final int days;
-  final bool stopOnImportantNews;
 }
 
 class _Sticker extends StatelessWidget {

@@ -344,6 +344,7 @@ class GameState {
   int balanceSheetGrossAssets({Map<String, double>? prices}) =>
       cash +
       story.selfRelianceReserve +
+      personalFinance.casino.chipBalance +
       businesses.totalBookValue +
       company.investmentBookValue +
       banking.termDepositAssetValueAt(day) +

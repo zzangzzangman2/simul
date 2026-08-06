@@ -74,6 +74,27 @@ void main() {
         findsOneWidget,
       );
     }
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('cohort-result-row-player')),
+      220,
+      scrollable: find.descendant(
+        of: find.byKey(const Key('cohort-daily-result-list')),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    await tester.tap(find.byKey(const Key('cohort-result-row-player')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('cohort-investor-detail-player')),
+      findsOneWidget,
+    );
+    expect(find.text('총자산 · 자금 위치'), findsOneWidget);
+    expect(find.text('현재 나이'), findsOneWidget);
+    await tester.tap(
+      find.byKey(const Key('cohort-investor-detail-close-player')),
+    );
+    await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
   });
 

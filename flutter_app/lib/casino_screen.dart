@@ -4,8 +4,41 @@ const _casinoGold = Color(0xFFD8AE62);
 const _casinoWine = Color(0xFF6A192B);
 const _casinoGreen = Color(0xFF0D4938);
 const _casinoInk = Color(0xFF170F0D);
+const _casinoCompactRailAsset =
+    'assets/images/casino/betting_rail_compact_v1.png';
+const _casinoChipDenominations = <int>[
+  1,
+  20,
+  100,
+  500,
+  1000,
+  5000,
+  10000,
+  50000,
+];
+const _casinoStakeDenominations = <int>[500, 1000, 5000, 10000];
 const _casinoGameDialogueHeight = 112.0;
 const _casinoGameDialogueBottomInset = 0.0;
+
+String _casinoChipLabel(int denomination) =>
+    denomination >= 1000 ? '${denomination ~/ 1000}K' : '$denomination';
+
+Color _casinoChipColor(int denomination) => switch (denomination) {
+  1 => const Color(0xFFB9ACA0),
+  20 => const Color(0xFF6E4B89),
+  100 => const Color(0xFFE5DCC8),
+  500 => const Color(0xFF2869A3),
+  1000 => const Color(0xFF9A2940),
+  5000 => const Color(0xFF187054),
+  10000 => const Color(0xFF242329),
+  50000 => const Color(0xFFD5A744),
+  _ => const Color(0xFF56463E),
+};
+
+Color _casinoChipForeground(int denomination) => switch (denomination) {
+  1 || 100 || 50000 => const Color(0xFF2A211D),
+  _ => Colors.white,
+};
 
 enum _CasinoEntryPhase { welcome, exchange, handover, lobby }
 
@@ -57,6 +90,9 @@ class _CasinoScreenState extends State<CasinoScreen> {
   _CasinoTableMotion _tableMotion = _CasinoTableMotion.idle;
   int _tableMotionToken = 0;
   String? _dealerReaction;
+  VoidCallback? _refreshBetPicker;
+  late List<int> _visualChipCounts;
+  final Set<CasinoBetType> _favoriteBets = <CasinoBetType>{};
 
   CasinoState get _casino => _state.personalFinance.casino;
 
@@ -71,6 +107,7 @@ class _CasinoScreenState extends State<CasinoScreen> {
   @override
   void initState() {
     super.initState();
+    _visualChipCounts = _makeChipInventory(_availableChips);
     final activeBlackjack = _casino.activeBlackjack != null;
     final activeCraps = _casino.activeCraps != null;
     _entryPhase = activeBlackjack || activeCraps
@@ -81,9 +118,7 @@ class _CasinoScreenState extends State<CasinoScreen> {
     } else if (activeCraps) {
       _selectedGame = CasinoGameType.craps;
     }
-    final exchangeable =
-        (_state.availableBrokerageCash ~/ casinoMinimumStake) *
-        casinoMinimumStake;
+    final exchangeable = _maximumExchangeAmount;
     _exchangeAmount = math.min(100000, exchangeable);
     if (_exchangeAmount < casinoMinimumStake && exchangeable > 0) {
       _exchangeAmount = exchangeable;
@@ -119,15 +154,144 @@ class _CasinoScreenState extends State<CasinoScreen> {
   int get _lossLimit => widget.testMode
       ? casinoTestBankroll
       : casinoMonthlyLossLimitForBasis(_monthBasis);
-  int get _maxStake => casinoMaximumStakeForChips(_availableChips);
+  int get _remainingMonthlyLossAllowance =>
+      math.max(0, _lossLimit - _casino.monthlyLoss);
+  int get _playableStakeBasis => casinoPlayableStakeBasis(
+    chipBalance: _availableChips,
+    remainingMonthlyLossAllowance: _remainingMonthlyLossAllowance,
+  );
+  int get _maxStake => casinoMaximumStakeForChips(_playableStakeBasis);
 
   bool _stakeIsPlayable(int stake) =>
-      isValidCasinoChipStake(stake, _availableChips) &&
+      isValidCasinoPlayableStake(
+        stake: stake,
+        chipBalance: _availableChips,
+        remainingMonthlyLossAllowance: _remainingMonthlyLossAllowance,
+      ) &&
       _casino.monthlyLoss + stake <= _lossLimit;
 
   int _firstPlayableStake() => casinoStakePercents
-      .map((percent) => casinoStakeForChipPercent(_availableChips, percent))
+      .map(
+        (percent) => casinoPlayableStakeForPercent(
+          chipBalance: _availableChips,
+          remainingMonthlyLossAllowance: _remainingMonthlyLossAllowance,
+          percent: percent,
+        ),
+      )
       .firstWhere(_stakeIsPlayable, orElse: () => 0);
+
+  List<int> _makeChipInventory(int balance) {
+    final counts = List<int>.filled(_casinoChipDenominations.length, 0);
+    var remaining = math.max(0, balance);
+
+    void seed(int denomination, int targetCount) {
+      final index = _casinoChipDenominations.indexOf(denomination);
+      final count = math.min(targetCount, remaining ~/ denomination);
+      counts[index] += count;
+      remaining -= count * denomination;
+    }
+
+    // The cashier deliberately supplies usable low-value stacks first. This
+    // is the actual visual inventory, not a decorative random pile.
+    seed(500, 4);
+    seed(1000, 8);
+    seed(5000, 4);
+    seed(10000, 3);
+
+    for (var index = _casinoChipDenominations.length - 1; index >= 0; index--) {
+      final denomination = _casinoChipDenominations[index];
+      if (denomination == 50000 && balance < 250000) continue;
+      final count = remaining ~/ denomination;
+      counts[index] += count;
+      remaining -= count * denomination;
+    }
+    assert(remaining == 0);
+    assert(_chipInventoryValue(counts) == math.max(0, balance));
+    return counts;
+  }
+
+  int _chipInventoryValue(List<int> counts) {
+    var total = 0;
+    for (var index = 0; index < counts.length; index++) {
+      total += counts[index] * _casinoChipDenominations[index];
+    }
+    return total;
+  }
+
+  int _stakeDenomination(int stake, int tierIndex) {
+    var desired = _casinoStakeDenominations[tierIndex.clamp(0, 3)];
+    while (desired > casinoMinimumStake &&
+        (desired > stake || stake % desired != 0)) {
+      final currentIndex = _casinoStakeDenominations.indexOf(desired);
+      desired = _casinoStakeDenominations[currentIndex - 1];
+    }
+    return stake % desired == 0 ? desired : casinoMinimumStake;
+  }
+
+  int _preferredStakeDenomination(int stake) {
+    for (var index = 0; index < casinoStakePercents.length; index++) {
+      final option = casinoPlayableStakeForPercent(
+        chipBalance: _availableChips,
+        remainingMonthlyLossAllowance: _remainingMonthlyLossAllowance,
+        percent: casinoStakePercents[index],
+      );
+      if (option == stake) return _stakeDenomination(stake, index);
+    }
+    return casinoMinimumStake;
+  }
+
+  void _syncVisualChipInventory(
+    int before,
+    int after, {
+    bool freshExchange = false,
+  }) {
+    if (freshExchange || after <= 0) {
+      _visualChipCounts = _makeChipInventory(after);
+      assert(_chipInventoryValue(_visualChipCounts) == math.max(0, after));
+      return;
+    }
+    final delta = after - before;
+    if (delta == 0) {
+      assert(_chipInventoryValue(_visualChipCounts) == after);
+      return;
+    }
+    final preferred = _preferredStakeDenomination(_stake);
+    final preferredIndex = _casinoChipDenominations.indexOf(preferred);
+
+    if (delta > 0) {
+      var remaining = delta;
+      final preferredCount = remaining ~/ preferred;
+      _visualChipCounts[preferredIndex] += preferredCount;
+      remaining -= preferredCount * preferred;
+      for (
+        var index = _casinoChipDenominations.length - 1;
+        index >= 0;
+        index--
+      ) {
+        final denomination = _casinoChipDenominations[index];
+        final count = remaining ~/ denomination;
+        _visualChipCounts[index] += count;
+        remaining -= count * denomination;
+      }
+      assert(remaining == 0);
+      assert(_chipInventoryValue(_visualChipCounts) == after);
+      return;
+    }
+
+    final valueToRemove = -delta;
+    if (valueToRemove % preferred == 0) {
+      final countToRemove = valueToRemove ~/ preferred;
+      if (_visualChipCounts[preferredIndex] >= countToRemove) {
+        _visualChipCounts[preferredIndex] -= countToRemove;
+        assert(_chipInventoryValue(_visualChipCounts) == after);
+        return;
+      }
+    }
+    // A cashier-style denomination exchange is required when the exact losing
+    // stack is not available. The recomposed piles still sum to the balance.
+    _visualChipCounts = _makeChipInventory(after);
+    assert(_chipInventoryValue(_visualChipCounts) == after);
+  }
 
   bool get _nationalNetworkUnlocked =>
       widget.testMode || _state.story.nationalNetworkBriefingSeen;
@@ -199,9 +363,11 @@ class _CasinoScreenState extends State<CasinoScreen> {
   bool get _canExchangeChips =>
       _canEnterChipDesk && _maximumExchangeAmount >= casinoMinimumStake;
 
-  int get _maximumExchangeAmount =>
-      (_state.availableBrokerageCash ~/ casinoMinimumStake) *
-      casinoMinimumStake;
+  int get _maximumExchangeAmount => casinoMaximumSafeChipExchange(
+    availableCash: _state.availableBrokerageCash,
+    chipBalance: _availableChips,
+    remainingMonthlyLossAllowance: _remainingMonthlyLossAllowance,
+  );
 
   void _openChipDesk() {
     if (!_canExchangeChips) {
@@ -386,6 +552,7 @@ class _CasinoScreenState extends State<CasinoScreen> {
 
   Future<void> _confirmChipExchange() async {
     if (_busy || _exchangeAmount < casinoMinimumStake) return;
+    final chipsBefore = _availableChips;
     setState(() {
       _busy = true;
     });
@@ -394,6 +561,11 @@ class _CasinoScreenState extends State<CasinoScreen> {
       if (!mounted) return;
       setState(() {
         if (result.success) {
+          _syncVisualChipInventory(
+            chipsBefore,
+            result.state.personalFinance.casino.chipBalance,
+            freshExchange: true,
+          );
           _state = result.state;
           _stake = _firstPlayableStake();
           _entryPhase = _CasinoEntryPhase.handover;
@@ -447,13 +619,21 @@ class _CasinoScreenState extends State<CasinoScreen> {
         _busy = true;
       });
       try {
+        final chipsBefore = _availableChips;
         final result = await widget.onCashOutChips();
         if (!mounted) return;
         if (!result.success) {
           GameAudio.instance.playSfx(GameSfx.error);
           return;
         }
-        _state = result.state;
+        setState(() {
+          _syncVisualChipInventory(
+            chipsBefore,
+            result.state.personalFinance.casino.chipBalance,
+            freshExchange: true,
+          );
+          _state = result.state;
+        });
       } finally {
         if (mounted) setState(() => _busy = false);
       }
@@ -505,7 +685,7 @@ class _CasinoScreenState extends State<CasinoScreen> {
                 ),
                 const SizedBox(height: 5),
                 Text(
-                  '현재 보유 칩 ${_money(_casino.chipBalance)}원',
+                  '현재 보유 칩 잔액 ${_money(_casino.chipBalance)}',
                   style: const TextStyle(
                     color: _casinoGold,
                     fontSize: 15,
@@ -598,6 +778,7 @@ class _CasinoScreenState extends State<CasinoScreen> {
   }) async {
     if (_busy) return;
     final historyLengthBefore = _casino.history.length;
+    final chipsBefore = _availableChips;
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
     final startingBlackjack =
         motion == _CasinoTableMotion.deal &&
@@ -645,6 +826,10 @@ class _CasinoScreenState extends State<CasinoScreen> {
       }
       setState(() {
         if (result.success) {
+          _syncVisualChipInventory(
+            chipsBefore,
+            result.state.personalFinance.casino.chipBalance,
+          );
           _state = result.state;
           final history = _casino.history;
           _dealerReaction = history.length > historyLengthBefore
@@ -868,7 +1053,13 @@ class _CasinoScreenState extends State<CasinoScreen> {
   );
 
   String _dealerLiveDialogue(CasinoGameType game) {
-    if (!_busy) return _dealerReaction ?? _dealerTableDialogue(game);
+    if (!_busy) {
+      if (_dealerReaction != null) return _dealerReaction!;
+      if (game == CasinoGameType.blackjack && _casino.activeBlackjack != null) {
+        return _blackjackLiveAdvice(_casino.activeBlackjack!);
+      }
+      return _dealerTableDialogue(game);
+    }
     return switch (_tableMotion) {
       _CasinoTableMotion.deal => '카드를 나눠 줄게. 잠깐만 기다려.',
       _CasinoTableMotion.reveal => '마지막 패 확인하고 있어. 곧 결과 나와.',
@@ -878,6 +1069,48 @@ class _CasinoScreenState extends State<CasinoScreen> {
       _CasinoTableMotion.reels => '릴이 돌아가고 있어. 같은 심벌이 모이는지 보자.',
       _CasinoTableMotion.idle => _dealerReaction ?? _dealerTableDialogue(game),
     };
+  }
+
+  String _blackjackLiveAdvice(BlackjackHandState hand) {
+    final value = blackjackHandValue(hand.activePlayerCards);
+    final total = value.total;
+    final dealerUp = blackjackHandValue(<int>[hand.dealerCards.first]).total;
+    if (total > 21) return '합계 $total, 버스트야. 결과 확인을 눌러 정산해 줘.';
+    if (total == 21) return '합계 21이야. 결과 확인을 눌러 딜러 패와 비교해 보자.';
+    if (!hand.isSplit &&
+        dealerUp == 11 &&
+        hand.playerCards.length == 2 &&
+        hand.insuranceStake == 0 &&
+        hand.stake >= casinoMinimumStake * 2) {
+      return '딜러 오픈카드는 에이스야. 보험을 선택할 수 있지만 기본 전략에서는 보통 권하지 않아.';
+    }
+
+    late final String advice;
+    if (value.soft) {
+      advice = total >= 19
+          ? '스탠드'
+          : total == 18 && dealerUp >= 9
+          ? '히트'
+          : total >= 16 && dealerUp >= 3 && dealerUp <= 6
+          ? '더블'
+          : '히트';
+    } else if (total >= 17) {
+      advice = '스탠드';
+    } else if (total <= 8) {
+      advice = '히트';
+    } else if (total == 9) {
+      advice = dealerUp >= 3 && dealerUp <= 6 ? '더블' : '히트';
+    } else if (total == 10) {
+      advice = dealerUp <= 9 ? '더블' : '히트';
+    } else if (total == 11) {
+      advice = dealerUp == 11 ? '히트' : '더블';
+    } else if (total == 12) {
+      advice = dealerUp >= 4 && dealerUp <= 6 ? '스탠드' : '히트';
+    } else {
+      advice = dealerUp >= 2 && dealerUp <= 6 ? '스탠드' : '히트';
+    }
+    final softLabel = value.soft ? '소프트 ' : '';
+    return '내 패는 $softLabel$total, 딜러 오픈카드는 $dealerUp이야. 기본 전략 추천은 $advice.';
   }
 
   String _dealerReactionForResult(
@@ -1052,17 +1285,17 @@ class _CasinoScreenState extends State<CasinoScreen> {
 
   String _chipSettlementDialogue(CasinoRoundRecord record) {
     if (record.net > 0) {
-      return '칩 ${_money(record.net)}원을 더 얻었어. 베팅 칩까지 합쳐 ${_money(record.payout)}원을 돌려줄게.';
+      return '${_money(record.net)}칩을 더 얻었어. 베팅 칩까지 합쳐 ${_money(record.payout)}칩을 돌려줄게.';
     }
     if (record.net < 0) {
-      return '이번 판에는 칩 ${_money(-record.net)}원을 가져갔어.';
+      return '이번 판에는 ${_money(-record.net)}칩을 가져갔어.';
     }
-    return '베팅한 칩 ${_money(record.stake)}원은 그대로 돌려줄게.';
+    return '베팅한 ${_money(record.stake)}칩은 그대로 돌려줄게.';
   }
 
   String _dealerTableDialogue(CasinoGameType game) => switch (game) {
     CasinoGameType.baccarat => '플레이어와 뱅커 중 한쪽에 칩을 놓아 줘. 타이와 페어도 선택할 수 있어.',
-    CasinoGameType.blackjack => '카드를 두 장 줄게. 히트, 스탠드, 더블 중에서 천천히 골라 줘.',
+    CasinoGameType.blackjack => '카드를 두 장 줄게. 현재 합과 딜러 오픈카드에 맞춰 기본 전략도 알려줄게.',
     CasinoGameType.roulette => '원하는 숫자나 구역에 칩을 놓아 줘. 선택이 끝나면 휠 돌릴게.',
     CasinoGameType.craps => '패스와 돈트 패스 중 하나를 골라 줘. 포인트가 정해지면 계속 이어져.',
     CasinoGameType.sicBo => '세 주사위의 합과 조합을 고르는 게임이야. 배당판을 보고 칩을 놓아 줘.',
@@ -1127,7 +1360,7 @@ class _CasinoScreenState extends State<CasinoScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '$clock · 국가계좌 ${_money(_state.availableBrokerageCash)}원 · 칩 ${_money(_casino.chipBalance)}원',
+                  '$clock · 국가계좌 ${_money(_state.availableBrokerageCash)}원 · 칩 ${_money(_casino.chipBalance)}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
@@ -1248,6 +1481,7 @@ class _CasinoScreenState extends State<CasinoScreen> {
 
   Widget _buildChipExchange() {
     final maximum = _maximumExchangeAmount;
+    final compactHeight = MediaQuery.sizeOf(context).height <= 820;
     final presets =
         <int>{casinoMinimumStake, 5000, 10000, 50000, 100000, maximum}
             .where(
@@ -1257,7 +1491,7 @@ class _CasinoScreenState extends State<CasinoScreen> {
           ..sort();
     return Column(
       children: [
-        const SizedBox(height: 330),
+        SizedBox(height: compactHeight ? 205 : 330),
         _CasinoPanel(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1273,10 +1507,13 @@ class _CasinoScreenState extends State<CasinoScreen> {
                 ),
               ),
               const SizedBox(height: 9),
-              _buildDealerDialogue('오빠, 바꿀 금액 말해 줘. 국가계좌에서 500원 단위로 전송할게.'),
+              _buildDealerDialogue(
+                '오빠, 바꿀 금액 말해 줘. 국가계좌에서 500원 단위로 전송할게. 월 손실 정지선 안에서 실제로 베팅 가능한 칩만 받을 수 있어.',
+              ),
               const SizedBox(height: 9),
               Text(
-                '국가계좌 ${_money(_state.availableBrokerageCash)}원 · 보유 칩 ${_money(_casino.chipBalance)}원\n'
+                '국가계좌 ${_money(_state.availableBrokerageCash)}원 · 보유 칩 ${_money(_casino.chipBalance)}\n'
+                '이번에 최대 ${_money(maximum)}원 교환 가능 · 이번 달 남은 손실 허용액 ${_money(_remainingMonthlyLossAllowance)}원\n'
                 '교환한 칩만 온라인 테이블에서 사용해. 접속을 끝낼 때 국가계좌 환전 또는 칩 보관을 직접 고를 수 있어.',
                 style: const TextStyle(
                   color: Color(0xFFD8CDC3),
@@ -1402,7 +1639,7 @@ class _CasinoScreenState extends State<CasinoScreen> {
             const _CasinoSectionLabel('YOUR CHIPS ARE READY'),
             const SizedBox(height: 7),
             _buildDealerDialogue(
-              '오빠, 여기 칩 ${_money(_casino.chipBalance)}원이야. 수량 확인해 줘. 나갈 때 환전하거나 다음에 쓰도록 보관할 수 있어.',
+              '오빠, 여기 칩 잔액 ${_money(_casino.chipBalance)}이야. 액면가와 수량 확인해 줘. 나갈 때 환전하거나 다음에 쓰도록 보관할 수 있어.',
             ),
             const SizedBox(height: 7),
             const Text(
@@ -1498,7 +1735,7 @@ class _CasinoScreenState extends State<CasinoScreen> {
                         ),
                         const SizedBox(height: 7),
                         Text(
-                          '칩 ${_money(_casino.chipBalance)}원',
+                          '칩 ${_money(_casino.chipBalance)}',
                           style: const TextStyle(
                             color: Color(0xFFFFD98C),
                             fontSize: 9,
@@ -1622,7 +1859,7 @@ class _CasinoScreenState extends State<CasinoScreen> {
       ),
       CasinoGameType.blackjack => (
         Icons.filter_2_rounded,
-        'S17 · 블랙잭 3:2 · 히트·스탠드·더블',
+        'S17 · 3:2 · 히트·스탠드·더블·스플릿·보험',
         'assets/images/casino/tile_casino_blackjack_v1.webp',
       ),
       CasinoGameType.roulette => (
@@ -1642,7 +1879,7 @@ class _CasinoScreenState extends State<CasinoScreen> {
       ),
       CasinoGameType.slots => (
         Icons.view_column_rounded,
-        '3릴 · 공개 이론 지급률 97.2%',
+        '3릴 · 세전 97.2% · 수수료 후 79.7%',
         'assets/images/casino/tile_casino_slots_v1.webp',
       ),
     };
@@ -1823,24 +2060,15 @@ class _CasinoScreenState extends State<CasinoScreen> {
                 else
                   _buildPlayButton(game),
               ],
-              const SizedBox(height: 4),
-              Text(
-                _gameRuleLine(game),
-                style: const TextStyle(
-                  color: Color(0xFFD6C9BE),
-                  fontSize: 10,
-                  height: 1.45,
-                ),
-              ),
               const SizedBox(height: 8),
               if (game == CasinoGameType.blackjack) ...[
                 _buildBlackjackTable(),
               ] else if (game == CasinoGameType.slots) ...[
                 _buildStakeSelector(),
                 const SizedBox(height: 8),
-                _buildSlotsPaytable(),
+                _buildCompactSlotsPaytable(),
               ] else ...[
-                _buildBetOptions(game),
+                _buildCompactBetRail(game),
                 if (game != CasinoGameType.craps ||
                     _casino.activeCraps == null) ...[
                   const SizedBox(height: 8),
@@ -1897,7 +2125,7 @@ class _CasinoScreenState extends State<CasinoScreen> {
           const SizedBox(width: 5),
           Expanded(
             child: Text(
-              '$clock · 국가계좌 ${_money(_state.availableBrokerageCash)}원 · 칩 ${_money(_casino.chipBalance)}원',
+              '$clock · 국가계좌 ${_money(_state.availableBrokerageCash)}원 · 칩 ${_money(_casino.chipBalance)}',
               key: const Key('casino-game-money-status'),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -1933,10 +2161,11 @@ class _CasinoScreenState extends State<CasinoScreen> {
       motion: _tableMotion,
       motionToken: _tableMotionToken,
       stake: game == CasinoGameType.blackjack && _casino.activeBlackjack != null
-          ? _casino.activeBlackjack!.stake
+          ? _casino.activeBlackjack!.activePlayerStake
           : game == CasinoGameType.craps && _casino.activeCraps != null
           ? _casino.activeCraps!.stake
           : _stake,
+      chipDenomination: _preferredStakeDenomination(_stake),
       betLabel: game == CasinoGameType.blackjack
           ? '기본 핸드'
           : game == CasinoGameType.craps && _casino.activeCraps != null
@@ -1965,6 +2194,521 @@ class _CasinoScreenState extends State<CasinoScreen> {
         ),
       ],
     );
+  }
+
+  List<CasinoBetType> _quickBetsFor(CasinoGameType game) {
+    final bets = switch (game) {
+      CasinoGameType.baccarat => const [
+        CasinoBetType.baccaratPlayer,
+        CasinoBetType.baccaratTie,
+        CasinoBetType.baccaratBanker,
+        CasinoBetType.baccaratPlayerPair,
+        CasinoBetType.baccaratBankerPair,
+      ],
+      CasinoGameType.roulette => const [
+        CasinoBetType.rouletteRed,
+        CasinoBetType.rouletteBlack,
+        CasinoBetType.rouletteOdd,
+        CasinoBetType.rouletteEven,
+        CasinoBetType.rouletteLow,
+        CasinoBetType.rouletteHigh,
+      ],
+      CasinoGameType.craps => const [
+        CasinoBetType.crapsPassLine,
+        CasinoBetType.crapsDontPass,
+        CasinoBetType.crapsField,
+      ],
+      CasinoGameType.sicBo => const [
+        CasinoBetType.sicBoBig,
+        CasinoBetType.sicBoSmall,
+        CasinoBetType.sicBoOdd,
+        CasinoBetType.sicBoEven,
+      ],
+      CasinoGameType.blackjack || CasinoGameType.slots => const [],
+    };
+    return <CasinoBetType>[
+      ...bets.where(_favoriteBets.contains),
+      ...bets.where((bet) => !_favoriteBets.contains(bet)),
+    ];
+  }
+
+  bool _hasExtendedBetPicker(CasinoGameType game) => switch (game) {
+    CasinoGameType.baccarat ||
+    CasinoGameType.roulette ||
+    CasinoGameType.craps ||
+    CasinoGameType.sicBo => true,
+    _ => false,
+  };
+
+  bool _betSelectionLocked(CasinoGameType game) =>
+      _busy || (game == CasinoGameType.craps && _casino.activeCraps != null);
+
+  String _betPayoutLabel(CasinoBetType type) => switch (type) {
+    CasinoBetType.baccaratPlayer => '2.00×',
+    CasinoBetType.baccaratBanker => '1.95×',
+    CasinoBetType.baccaratTie => '9×',
+    CasinoBetType.baccaratPlayerPair ||
+    CasinoBetType.baccaratBankerPair => '12×',
+    CasinoBetType.blackjackHand => '3:2',
+    CasinoBetType.rouletteRed ||
+    CasinoBetType.rouletteBlack ||
+    CasinoBetType.rouletteOdd ||
+    CasinoBetType.rouletteEven ||
+    CasinoBetType.rouletteLow ||
+    CasinoBetType.rouletteHigh => '2×',
+    CasinoBetType.rouletteDozen1 ||
+    CasinoBetType.rouletteDozen2 ||
+    CasinoBetType.rouletteDozen3 ||
+    CasinoBetType.rouletteColumn1 ||
+    CasinoBetType.rouletteColumn2 ||
+    CasinoBetType.rouletteColumn3 => '3×',
+    CasinoBetType.rouletteStraight => '36×',
+    CasinoBetType.crapsPassLine || CasinoBetType.crapsDontPass => '2×',
+    CasinoBetType.crapsField => '2× · 2/12는 3×',
+    CasinoBetType.crapsAnySeven => '5×',
+    CasinoBetType.crapsAnyCraps => '8×',
+    CasinoBetType.sicBoBig ||
+    CasinoBetType.sicBoSmall ||
+    CasinoBetType.sicBoOdd ||
+    CasinoBetType.sicBoEven => '2×',
+    CasinoBetType.sicBoAnyTriple => '26×',
+    CasinoBetType.sicBoSpecificTriple => '151×',
+    CasinoBetType.sicBoTotal => '${_sicBoTotalMultiplier(_selection)}×',
+    CasinoBetType.slotsSpin => '최고 95×',
+  };
+
+  String _afterFeeDisclosure(CasinoGameType game) => switch (game) {
+    CasinoGameType.roulette => '1:1 베팅 RTP · 세전 97.3% · 수수료 후 87.6%',
+    CasinoGameType.slots => '전체 RTP · 세전 97.2% · 수수료 후 실수령 79.7%',
+    _ => '승리 이익의 20%를 국가 수수료로 차감해',
+  };
+
+  Color _betAccent(CasinoBetType type) => switch (type) {
+    CasinoBetType.baccaratPlayer => const Color(0xFF275D8A),
+    CasinoBetType.baccaratTie => const Color(0xFF24634E),
+    CasinoBetType.baccaratBanker => const Color(0xFF7A2638),
+    CasinoBetType.baccaratPlayerPair => const Color(0xFF234B70),
+    CasinoBetType.baccaratBankerPair => const Color(0xFF642235),
+    CasinoBetType.rouletteRed => const Color(0xFF8A2438),
+    CasinoBetType.rouletteBlack => const Color(0xFF242326),
+    CasinoBetType.rouletteOdd ||
+    CasinoBetType.rouletteEven => const Color(0xFF5B3A2A),
+    CasinoBetType.rouletteLow ||
+    CasinoBetType.rouletteHigh => const Color(0xFF1E5543),
+    CasinoBetType.crapsPassLine => const Color(0xFF7A2638),
+    CasinoBetType.crapsDontPass => const Color(0xFF1D5947),
+    CasinoBetType.crapsField => const Color(0xFF6A4A24),
+    CasinoBetType.crapsAnySeven => const Color(0xFF8A2438),
+    CasinoBetType.crapsAnyCraps => const Color(0xFF4E3974),
+    CasinoBetType.sicBoBig ||
+    CasinoBetType.sicBoSmall => const Color(0xFF7A2638),
+    CasinoBetType.sicBoOdd ||
+    CasinoBetType.sicBoEven => const Color(0xFF1D5947),
+    _ => const Color(0xFF5B3B26),
+  };
+
+  IconData _betIcon(CasinoBetType type) => switch (type) {
+    CasinoBetType.baccaratPlayer => Icons.person_rounded,
+    CasinoBetType.baccaratBanker => Icons.account_balance_rounded,
+    CasinoBetType.baccaratTie => Icons.balance_rounded,
+    CasinoBetType.baccaratPlayerPair ||
+    CasinoBetType.baccaratBankerPair => Icons.style_rounded,
+    CasinoBetType.rouletteRed ||
+    CasinoBetType.rouletteBlack => Icons.circle_rounded,
+    CasinoBetType.rouletteOdd ||
+    CasinoBetType.rouletteEven => Icons.filter_1_rounded,
+    CasinoBetType.rouletteLow => Icons.south_rounded,
+    CasinoBetType.rouletteHigh => Icons.north_rounded,
+    CasinoBetType.crapsPassLine ||
+    CasinoBetType.crapsDontPass => Icons.casino_rounded,
+    CasinoBetType.crapsField => Icons.grid_on_rounded,
+    CasinoBetType.crapsAnySeven => Icons.looks_one_rounded,
+    CasinoBetType.crapsAnyCraps => Icons.warning_amber_rounded,
+    CasinoBetType.sicBoBig => Icons.expand_less_rounded,
+    CasinoBetType.sicBoSmall => Icons.expand_more_rounded,
+    CasinoBetType.sicBoOdd || CasinoBetType.sicBoEven => Icons.casino_rounded,
+    _ => Icons.local_activity_rounded,
+  };
+
+  Widget _compactRailSurface({required Widget child}) => Container(
+    width: double.infinity,
+    decoration: BoxDecoration(
+      color: const Color(0xFF1B1312),
+      image: DecorationImage(
+        image: const AssetImage(_casinoCompactRailAsset),
+        fit: BoxFit.cover,
+        alignment: Alignment.center,
+        colorFilter: ColorFilter.mode(
+          Colors.black.withValues(alpha: 0.34),
+          BlendMode.darken,
+        ),
+      ),
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: _casinoGold.withValues(alpha: 0.48)),
+      boxShadow: const [
+        BoxShadow(
+          color: Color(0x55000000),
+          blurRadius: 10,
+          offset: Offset(0, 5),
+        ),
+      ],
+    ),
+    child: child,
+  );
+
+  Widget _buildCompactBetRail(CasinoGameType game) {
+    final quickBets = _quickBetsFor(game);
+    final selectedTitle = casinoBetTitle(_selectedBet, selection: _selection);
+    final locked = _betSelectionLocked(game);
+    return _compactRailSurface(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 6, 8, 7),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(
+                  Icons.local_activity_rounded,
+                  size: 13,
+                  color: _casinoGold,
+                ),
+                const SizedBox(width: 5),
+                Expanded(
+                  child: Text(
+                    '$selectedTitle · ${_betPayoutLabel(_selectedBet)}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  width: 44,
+                  height: 44,
+                  child: IconButton(
+                    key: Key('casino-favorite-${_selectedBet.name}'),
+                    tooltip: _favoriteBets.contains(_selectedBet)
+                        ? '세션 즐겨찾기 해제'
+                        : '세션 즐겨찾기 추가',
+                    onPressed: locked
+                        ? null
+                        : () => setState(() {
+                            if (!_favoriteBets.add(_selectedBet)) {
+                              _favoriteBets.remove(_selectedBet);
+                            }
+                          }),
+                    padding: EdgeInsets.zero,
+                    icon: Icon(
+                      _favoriteBets.contains(_selectedBet)
+                          ? Icons.star_rounded
+                          : Icons.star_border_rounded,
+                      color: _casinoGold,
+                      size: 20,
+                    ),
+                  ),
+                ),
+                if (_hasExtendedBetPicker(game))
+                  SizedBox(
+                    height: 44,
+                    child: TextButton.icon(
+                      key: Key('casino-open-bet-picker-${game.name}'),
+                      onPressed: locked ? null : () => _showBetPicker(game),
+                      style: TextButton.styleFrom(
+                        foregroundColor: const Color(0xFFFFD993),
+                        padding: const EdgeInsets.symmetric(horizontal: 7),
+                        minimumSize: const Size(44, 44),
+                      ),
+                      icon: const Icon(Icons.grid_view_rounded, size: 12),
+                      label: const Text(
+                        '전체 베팅',
+                        style: TextStyle(
+                          fontSize: 8.5,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 5),
+            SizedBox(
+              height: 48,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: quickBets.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 5),
+                itemBuilder: (context, index) {
+                  final type = quickBets[index];
+                  final label = casinoBetTitle(type);
+                  final selected = _selectedBet == type;
+                  final width = label.length >= 6
+                      ? 94.0
+                      : label.length >= 4
+                      ? 80.0
+                      : 65.0;
+                  return Semantics(
+                    button: true,
+                    selected: selected,
+                    label: '$label 베팅, ${_betPayoutLabel(type)} 지급',
+                    child: Material(
+                      key: Key('casino-quick-bet-${type.name}'),
+                      color: Colors.transparent,
+                      borderRadius: BorderRadius.circular(10),
+                      child: Ink(
+                        width: width,
+                        decoration: BoxDecoration(
+                          color: selected
+                              ? Color.lerp(_betAccent(type), _casinoGold, 0.14)
+                              : _betAccent(type).withValues(alpha: 0.78),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: selected
+                                ? const Color(0xFFFFD993)
+                                : Colors.white24,
+                            width: selected ? 1.4 : 0.7,
+                          ),
+                        ),
+                        child: InkWell(
+                          onTap: locked ? null : () => _chooseBet(type),
+                          borderRadius: BorderRadius.circular(10),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 7),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  _betIcon(type),
+                                  size: 12,
+                                  color: Colors.white,
+                                ),
+                                const SizedBox(width: 4),
+                                Flexible(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        label,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 8.8,
+                                          fontWeight: FontWeight.w900,
+                                        ),
+                                      ),
+                                      Text(
+                                        _betPayoutLabel(type),
+                                        style: const TextStyle(
+                                          color: Color(0xFFFFD993),
+                                          fontSize: 7.3,
+                                          fontWeight: FontWeight.w900,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              _afterFeeDisclosure(game),
+              key: Key('casino-after-fee-${game.name}'),
+              style: const TextStyle(
+                color: Color(0xFFE3CDAE),
+                fontSize: 8.5,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCompactSlotsPaytable() => Semantics(
+    button: true,
+    label: '슬롯 배당표 열기',
+    child: Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        key: const Key('casino-open-slots-paytable'),
+        onTap: _busy ? null : () => _showBetPicker(CasinoGameType.slots),
+        borderRadius: BorderRadius.circular(14),
+        child: _compactRailSurface(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            child: Row(
+              children: [
+                for (var index = 0; index < 4; index++) ...[
+                  if (index > 0) const SizedBox(width: 3),
+                  ExcludeSemantics(
+                    child: _CasinoSlotSymbol(
+                      reelIndex: index,
+                      symbolIndex: 5 - index,
+                      dimension: 24,
+                    ),
+                  ),
+                ],
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '최고 95× · 1라인 배당',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      Text(
+                        '세전 97.2% · 수수료 후 실수령 79.7%',
+                        style: TextStyle(color: Color(0xFFC9B9AF), fontSize: 8),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right_rounded, color: _casinoGold),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+
+  Future<void> _showBetPicker(CasinoGameType game) async {
+    if (_betSelectionLocked(game)) return;
+    var sheetOpen = true;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.72),
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, setSheetState) {
+          _refreshBetPicker = () {
+            if (sheetOpen) setSheetState(() {});
+          };
+          return Container(
+            height: MediaQuery.sizeOf(sheetContext).height * 0.78,
+            decoration: const BoxDecoration(
+              color: Color(0xFF160F0E),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              border: Border(top: BorderSide(color: _casinoGold, width: 1.2)),
+            ),
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 9, 8, 7),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 3,
+                        height: 25,
+                        decoration: BoxDecoration(
+                          color: _casinoGold,
+                          borderRadius: BorderRadius.circular(99),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              game == CasinoGameType.slots
+                                  ? 'PAY TABLE'
+                                  : 'BET SELECT',
+                              style: const TextStyle(
+                                color: _casinoGold,
+                                fontSize: 7,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 1.3,
+                              ),
+                            ),
+                            Text(
+                              game == CasinoGameType.slots
+                                  ? '슬롯 배당표'
+                                  : '${casinoGameTitle(game)} · ${casinoBetTitle(_selectedBet, selection: _selection)}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: '닫기',
+                        onPressed: () => Navigator.of(sheetContext).pop(),
+                        icon: const Icon(
+                          Icons.close_rounded,
+                          color: Colors.white70,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(12, 3, 12, 14),
+                    child: _buildBetOptions(game),
+                  ),
+                ),
+                if (game != CasinoGameType.slots)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: 46,
+                      child: FilledButton(
+                        key: const Key('casino-confirm-bet-picker'),
+                        onPressed: () => Navigator.of(sheetContext).pop(),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: _casinoWine,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        child: Text(
+                          '${casinoBetTitle(_selectedBet, selection: _selection)} · ${_betPayoutLabel(_selectedBet)} 선택',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.w900),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+    sheetOpen = false;
+    _refreshBetPicker = null;
   }
 
   Widget _buildBetOptions(CasinoGameType game) => switch (game) {
@@ -2017,6 +2761,40 @@ class _CasinoScreenState extends State<CasinoScreen> {
                         english: "DON'T PASS",
                         payout: '2.00×',
                         tint: const Color(0xFF263D38),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 7),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildBetZone(
+                        CasinoBetType.crapsField,
+                        label: '필드',
+                        english: 'FIELD',
+                        payout: '2× · 2/12 3×',
+                        tint: const Color(0xFF6A4A24),
+                      ),
+                    ),
+                    const SizedBox(width: 5),
+                    Expanded(
+                      child: _buildBetZone(
+                        CasinoBetType.crapsAnySeven,
+                        label: '애니 세븐',
+                        english: 'ANY 7',
+                        payout: '5×',
+                        tint: const Color(0xFF8A2438),
+                      ),
+                    ),
+                    const SizedBox(width: 5),
+                    Expanded(
+                      child: _buildBetZone(
+                        CasinoBetType.crapsAnyCraps,
+                        label: '애니 크랩스',
+                        english: '2 · 3 · 12',
+                        payout: '8×',
+                        tint: const Color(0xFF4E3974),
                       ),
                     ),
                   ],
@@ -2135,7 +2913,7 @@ class _CasinoScreenState extends State<CasinoScreen> {
                         ),
                         const SizedBox(height: 3),
                         Text(
-                          '예치금 ${_money(round.stake)}원 · 1:1',
+                          '예치 ${_money(round.stake)}칩 · 1:1',
                           style: const TextStyle(
                             color: Color(0xFFE8D19D),
                             fontSize: 10,
@@ -2213,6 +2991,14 @@ class _CasinoScreenState extends State<CasinoScreen> {
         _selection = 0;
       }
     });
+    _refreshBetPicker?.call();
+  }
+
+  void _chooseSelection(int value) {
+    if (_busy) return;
+    unawaited(HapticFeedback.selectionClick());
+    setState(() => _selection = value);
+    _refreshBetPicker?.call();
   }
 
   Widget _buildBaccaratBoard() => Column(
@@ -2594,7 +3380,7 @@ class _CasinoScreenState extends State<CasinoScreen> {
             ),
           ),
           child: InkWell(
-            onTap: _busy ? null : () => setState(() => _selection = value),
+            onTap: _busy ? null : () => _chooseSelection(value),
             borderRadius: BorderRadius.circular(5),
             child: Center(
               child: Text(
@@ -2620,7 +3406,7 @@ class _CasinoScreenState extends State<CasinoScreen> {
       ),
       child: Column(
         children: [
-          SizedBox(height: 34, width: double.infinity, child: number(0)),
+          SizedBox(height: 48, width: double.infinity, child: number(0)),
           const SizedBox(height: 4),
           GridView.builder(
             shrinkWrap: true,
@@ -2628,7 +3414,7 @@ class _CasinoScreenState extends State<CasinoScreen> {
             itemCount: 36,
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 6,
-              childAspectRatio: 1.35,
+              childAspectRatio: 1,
               crossAxisSpacing: 4,
               mainAxisSpacing: 4,
             ),
@@ -2755,10 +3541,10 @@ class _CasinoScreenState extends State<CasinoScreen> {
                   : const Color(0xFF2D2521),
               borderRadius: BorderRadius.circular(9),
               child: InkWell(
-                onTap: _busy ? null : () => setState(() => _selection = value),
+                onTap: _busy ? null : () => _chooseSelection(value),
                 borderRadius: BorderRadius.circular(9),
                 child: SizedBox(
-                  height: 43,
+                  height: 48,
                   child: Center(
                     child: Text(
                       _diceFace(value),
@@ -2784,8 +3570,8 @@ class _CasinoScreenState extends State<CasinoScreen> {
     physics: const NeverScrollableScrollPhysics(),
     itemCount: 14,
     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-      crossAxisCount: 7,
-      childAspectRatio: 0.78,
+      crossAxisCount: 6,
+      childAspectRatio: 1,
       crossAxisSpacing: 4,
       mainAxisSpacing: 4,
     ),
@@ -2804,7 +3590,7 @@ class _CasinoScreenState extends State<CasinoScreen> {
             side: BorderSide(color: selected ? _casinoGold : Colors.white24),
           ),
           child: InkWell(
-            onTap: _busy ? null : () => setState(() => _selection = value),
+            onTap: _busy ? null : () => _chooseSelection(value),
             borderRadius: BorderRadius.circular(7),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -2992,6 +3778,9 @@ class _CasinoScreenState extends State<CasinoScreen> {
       CasinoGameType.craps => const <CasinoBetType>[
         CasinoBetType.crapsPassLine,
         CasinoBetType.crapsDontPass,
+        CasinoBetType.crapsField,
+        CasinoBetType.crapsAnySeven,
+        CasinoBetType.crapsAnyCraps,
       ],
       CasinoGameType.sicBo => const <CasinoBetType>[
         CasinoBetType.sicBoBig,
@@ -3071,15 +3860,16 @@ class _CasinoScreenState extends State<CasinoScreen> {
     children: values
         .map(
           (value) => SizedBox(
-            width: 39,
-            height: 38,
+            key: Key('casino-number-$value'),
+            width: 48,
+            height: 48,
             child: OutlinedButton(
-              key: Key('casino-number-$value'),
-              onPressed: _busy
-                  ? null
-                  : () => setState(() => _selection = value),
+              onPressed: _busy ? null : () => _chooseSelection(value),
               style: OutlinedButton.styleFrom(
                 padding: EdgeInsets.zero,
+                minimumSize: const Size(48, 48),
+                fixedSize: const Size(48, 48),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 backgroundColor: _selection == value
                     ? _casinoWine
                     : const Color(0xFF241C19),
@@ -3098,15 +3888,22 @@ class _CasinoScreenState extends State<CasinoScreen> {
   );
 
   Widget _buildStakeSelector() {
-    final stakes = casinoStakePercents
-        .map(
-          (percent) => MapEntry(
-            percent,
-            casinoStakeForChipPercent(_availableChips, percent),
+    final stakes = [
+      for (var index = 0; index < casinoStakePercents.length; index++)
+        (
+          tier: index,
+          percent: casinoStakePercents[index],
+          value: casinoPlayableStakeForPercent(
+            chipBalance: _availableChips,
+            remainingMonthlyLossAllowance: _remainingMonthlyLossAllowance,
+            percent: casinoStakePercents[index],
           ),
-        )
-        .where((option) => option.value >= casinoMinimumStake)
-        .toList(growable: false);
+        ),
+    ].where((option) => option.value >= casinoMinimumStake).toList();
+    final physicalChipCount = _visualChipCounts.fold<int>(
+      0,
+      (total, count) => total + count,
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -3114,7 +3911,7 @@ class _CasinoScreenState extends State<CasinoScreen> {
           children: [
             const Expanded(child: _CasinoSectionLabel('CHIP RACK · 칩 선택')),
             Text(
-              '보유 칩 기준 최대 ${_money(_maxStake)}원',
+              '보유 ${_money(_availableChips)}칩 · $physicalChipCount개',
               style: const TextStyle(color: Color(0xFFAFA198), fontSize: 9),
             ),
           ],
@@ -3126,122 +3923,170 @@ class _CasinoScreenState extends State<CasinoScreen> {
             style: TextStyle(color: Color(0xFFF0B47C), fontSize: 11),
           )
         else
-          Wrap(
-            spacing: 6,
-            runSpacing: 7,
-            children: stakes
-                .map((option) {
-                  final percent = option.key;
-                  final value = option.value;
-                  final selected = _stake == value;
-                  final enabled = !_busy && _stakeIsPlayable(value);
-                  final chipColor = value >= 100000
-                      ? const Color(0xFF202022)
-                      : value >= 50000
-                      ? const Color(0xFF8C2032)
-                      : value >= 20000
-                      ? const Color(0xFF245B91)
-                      : const Color(0xFFE6DDCA);
-                  final foreground = value >= 20000
-                      ? Colors.white
-                      : const Color(0xFF31251F);
-                  return Semantics(
-                    button: true,
-                    selected: selected,
-                    enabled: enabled,
-                    label: '보유 칩의 $percent%, ${_money(value)}원',
-                    child: Opacity(
-                      opacity: enabled ? 1 : 0.38,
-                      child: SizedBox(
-                        width: 66,
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Material(
-                              key: Key('casino-stake-$value'),
-                              color: Colors.transparent,
-                              shape: const CircleBorder(),
-                              child: InkWell(
-                                customBorder: const CircleBorder(),
-                                onTap: enabled
-                                    ? () {
-                                        unawaited(
-                                          HapticFeedback.selectionClick(),
-                                        );
-                                        setState(() => _stake = value);
-                                      }
-                                    : null,
-                                child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 150),
-                                  width: 50,
-                                  height: 50,
-                                  padding: const EdgeInsets.all(3),
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: selected
-                                        ? _casinoGold
-                                        : const Color(0xFF241C19),
-                                    border: Border.all(
-                                      color: selected
-                                          ? const Color(0xFFFFDEA0)
-                                          : Colors.white24,
-                                      width: selected ? 2 : 1,
-                                    ),
-                                    boxShadow: selected
-                                        ? const [
-                                            BoxShadow(
-                                              color: Color(0x55D8AE62),
-                                              blurRadius: 12,
-                                              spreadRadius: 1,
-                                            ),
-                                          ]
-                                        : null,
-                                  ),
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: chipColor,
-                                      border: Border.all(
-                                        color: foreground.withValues(
-                                          alpha: 0.75,
-                                        ),
-                                        width: 1.5,
-                                      ),
-                                    ),
-                                    alignment: Alignment.center,
-                                    child: Text(
-                                      '$percent%',
-                                      style: TextStyle(
-                                        color: foreground,
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w900,
-                                      ),
-                                    ),
-                                  ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    for (var index = 0; index < stakes.length; index++) ...[
+                      if (index > 0) const SizedBox(width: 2),
+                      Expanded(
+                        child: _buildStakeChip(
+                          tier: stakes[index].tier,
+                          percent: stakes[index].percent,
+                          value: stakes[index].value,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 5),
+              _CasinoChipVault(
+                balance: _availableChips,
+                counts: _visualChipCounts,
+              ),
+            ],
+          ),
+      ],
+    );
+  }
+
+  Widget _buildStakeChip({
+    required int tier,
+    required int percent,
+    required int value,
+  }) {
+    final denomination = _stakeDenomination(value, tier);
+    final chipCount = value ~/ denomination;
+    final selected = _stake == value;
+    final enabled = !_busy && _stakeIsPlayable(value);
+    final chipColor = _casinoChipColor(denomination);
+    final foreground = _casinoChipForeground(denomination);
+    return Semantics(
+      button: true,
+      selected: selected,
+      enabled: enabled,
+      label:
+          '보유 칩의 $percent%, ${_casinoChipLabel(denomination)}칩 $chipCount개, 총 ${_money(value)}칩',
+      child: Opacity(
+        opacity: enabled ? 1 : 0.38,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Material(
+              key: Key('casino-stake-$value'),
+              color: Colors.transparent,
+              shape: const CircleBorder(),
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: enabled
+                    ? () {
+                        unawaited(HapticFeedback.selectionClick());
+                        setState(() => _stake = value);
+                      }
+                    : null,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      width: 48,
+                      height: 48,
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: selected ? _casinoGold : const Color(0xFF241C19),
+                        border: Border.all(
+                          color: selected
+                              ? const Color(0xFFFFDEA0)
+                              : Colors.white24,
+                          width: selected ? 2 : 1,
+                        ),
+                        boxShadow: selected
+                            ? const [
+                                BoxShadow(
+                                  color: Color(0x66D8AE62),
+                                  blurRadius: 11,
+                                  spreadRadius: 1,
                                 ),
-                              ),
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              '${_money(value)}원',
-                              maxLines: 1,
-                              style: TextStyle(
-                                color: selected
-                                    ? const Color(0xFFFFD98C)
-                                    : const Color(0xFFD1C4BA),
-                                fontSize: 8.5,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ],
+                              ]
+                            : null,
+                      ),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: RadialGradient(
+                            colors: [
+                              Color.lerp(chipColor, Colors.white, 0.2)!,
+                              chipColor,
+                              Color.lerp(chipColor, Colors.black, 0.24)!,
+                            ],
+                            stops: const [0, 0.62, 1],
+                          ),
+                          border: Border.all(
+                            color: foreground.withValues(alpha: 0.72),
+                            width: 1.2,
+                          ),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          '$percent%',
+                          style: TextStyle(
+                            color: foreground,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
                       ),
                     ),
-                  );
-                })
-                .toList(growable: false),
-          ),
-      ],
+                    Positioned(
+                      right: -3,
+                      top: -3,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 3.5,
+                          vertical: 1.5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: selected
+                              ? const Color(0xFFFFD98C)
+                              : const Color(0xFF3B2B25),
+                          borderRadius: BorderRadius.circular(99),
+                          border: Border.all(color: const Color(0xFF7D6344)),
+                        ),
+                        child: Text(
+                          '${_casinoChipLabel(denomination)}×$chipCount',
+                          style: TextStyle(
+                            color: selected
+                                ? const Color(0xFF24150D)
+                                : const Color(0xFFEADAC8),
+                            fontSize: 6.2,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              '${_money(value)}칩',
+              maxLines: 1,
+              style: TextStyle(
+                color: selected
+                    ? const Color(0xFFFFD98C)
+                    : const Color(0xFFD1C4BA),
+                fontSize: 8.5,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -3255,8 +4100,11 @@ class _CasinoScreenState extends State<CasinoScreen> {
     }
     final enabled = !_busy && (continuingCraps || _canStartRound);
     final opensChipPrompt = !_busy && !continuingCraps && _isOutOfChips;
+    final repeatBet = !continuingCraps && _isRepeatSelection(game);
     final action = continuingCraps
         ? 'ROLL DICE · POINT ${crapsRound.point}'
+        : repeatBet
+        ? 'REBET'
         : game == CasinoGameType.slots
         ? 'SPIN'
         : game == CasinoGameType.craps
@@ -3325,7 +4173,7 @@ class _CasinoScreenState extends State<CasinoScreen> {
                       continuingCraps
                           ? action
                           : _canStartRound
-                          ? '$action · ${_money(_stake)}원'
+                          ? '$action · ${_money(_stake)}칩'
                           : _shortLockReason(),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -3369,7 +4217,7 @@ class _CasinoScreenState extends State<CasinoScreen> {
               game == CasinoGameType.slots ? Icons.casino : Icons.play_arrow,
             ),
       label: Text(
-        _canStartRound ? '${_money(_stake)}원 베팅 · 1판 시작' : _shortLockReason(),
+        _canStartRound ? '${_money(_stake)}칩 베팅 · 1판 시작' : _shortLockReason(),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: const TextStyle(fontWeight: FontWeight.w900),
@@ -3383,33 +4231,44 @@ class _CasinoScreenState extends State<CasinoScreen> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _CasinoBoardHeader(
-            eyebrow: 'BLACKJACK · DEALER STANDS S17',
-            title: '칩을 놓고 첫 패를 받으세요',
-            note: '블랙잭 3:2 · 일반 승리 1:1 · 동점은 원금 반환',
-          ),
-          const SizedBox(height: 7),
-          const Row(
-            children: [
-              Expanded(
-                child: _BlackjackRuleTile(value: '21', label: '목표 합계'),
+          _compactRailSurface(
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 11, vertical: 9),
+              child: Row(
+                children: [
+                  Icon(Icons.style_rounded, size: 18, color: _casinoGold),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '21 목표 · 3:2 · S17 · 스플릿·보험',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    '카드 받기',
+                    style: TextStyle(
+                      color: Color(0xFFFFD993),
+                      fontSize: 8,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
               ),
-              SizedBox(width: 5),
-              Expanded(
-                child: _BlackjackRuleTile(value: '3:2', label: '블랙잭'),
-              ),
-              SizedBox(width: 5),
-              Expanded(
-                child: _BlackjackRuleTile(value: 'S17', label: '딜러 규칙'),
-              ),
-            ],
+            ),
           ),
           const SizedBox(height: 8),
           _buildStakeSelector(),
         ],
       );
     }
-    final playerValue = blackjackHandValue(hand.playerCards).total;
+    final activeCards = hand.activePlayerCards;
+    final playerValue = blackjackHandValue(activeCards).total;
     final dealerUpValue = blackjackHandValue(<int>[
       hand.dealerCards.first,
     ]).total;
@@ -3418,10 +4277,13 @@ class _CasinoScreenState extends State<CasinoScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _CasinoBoardHeader(
-          eyebrow: 'LIVE HAND · ${_money(hand.stake)}원',
+          eyebrow:
+              'LIVE HAND · ${_money(hand.totalMainStake)}칩${hand.insuranceStake > 0 ? ' · 보험 ${_money(hand.insuranceStake)}칩' : ''}',
           title: mustSettle ? '판정을 기다립니다' : '히트 또는 스탠드를 선택하세요',
-          note: hand.doubled
+          note: hand.activePlayerDoubled
               ? '더블다운 적용 · 추가 카드를 받은 뒤 자동 스탠드'
+              : hand.isSplit
+              ? '스플릿 핸드 ${hand.activeSplitHand + 1}/2 진행 중'
               : '더블다운은 첫 두 장에서만 선택할 수 있습니다.',
         ),
         const SizedBox(height: 11),
@@ -3444,7 +4306,7 @@ class _CasinoScreenState extends State<CasinoScreen> {
           children: [
             const Expanded(child: _CasinoSectionLabel('플레이어')),
             Text(
-              '합계 $playerValue${hand.doubled ? ' · 더블' : ''}',
+              '${hand.isSplit ? '핸드 ${hand.activeSplitHand + 1} · ' : ''}합계 $playerValue${hand.activePlayerDoubled ? ' · 더블' : ''}',
               style: TextStyle(
                 color: playerValue > 21 ? const Color(0xFFFF8B85) : _casinoGold,
                 fontSize: 11,
@@ -3457,10 +4319,17 @@ class _CasinoScreenState extends State<CasinoScreen> {
         Wrap(
           spacing: 7,
           runSpacing: 7,
-          children: hand.playerCards
+          children: activeCards
               .map((card) => _CasinoPlayingCard(card: card))
               .toList(growable: false),
         ),
+        if (hand.isSplit) ...[
+          const SizedBox(height: 7),
+          Text(
+            '다른 핸드 합계 ${blackjackHandValue(hand.splitHands[hand.activeSplitHand == 0 ? 1 : 0]).total}',
+            style: const TextStyle(color: Color(0xFFBDAFA5), fontSize: 9),
+          ),
+        ],
       ],
     );
   }
@@ -3493,7 +4362,9 @@ class _CasinoScreenState extends State<CasinoScreen> {
           ),
           icon: const Icon(Icons.style_rounded),
           label: Text(
-            _canStartRound ? '${_money(_stake)}원 · 카드 받기' : _shortLockReason(),
+            _canStartRound
+                ? '${_money(_stake)}칩 · ${_isRepeatSelection(CasinoGameType.blackjack) ? '같은 금액 다시 받기' : '카드 받기'}'
+                : _shortLockReason(),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(fontWeight: FontWeight.w900),
@@ -3501,7 +4372,22 @@ class _CasinoScreenState extends State<CasinoScreen> {
         ),
       );
     }
-    final mustSettle = blackjackHandValue(hand.playerCards).total >= 21;
+    final activeCards = hand.activePlayerCards;
+    final mustSettle = blackjackHandValue(activeCards).total >= 21;
+    final dealerUp = blackjackHandValue(<int>[hand.dealerCards.first]).total;
+    final canInsure =
+        !hand.isSplit &&
+        dealerUp == 11 &&
+        hand.playerCards.length == 2 &&
+        hand.insuranceStake == 0 &&
+        hand.stake >= casinoMinimumStake * 2 &&
+        hand.stake ~/ 2 <= _availableChips;
+    final canSplit =
+        !hand.isSplit &&
+        hand.playerCards.length == 2 &&
+        math.min(casinoCardRank(hand.playerCards[0]), 10) ==
+            math.min(casinoCardRank(hand.playerCards[1]), 10) &&
+        hand.stake <= _availableChips;
     return Row(
       children: [
         Expanded(
@@ -3517,6 +4403,36 @@ class _CasinoScreenState extends State<CasinoScreen> {
           ),
         ),
         const SizedBox(width: 7),
+        if (canInsure) ...[
+          Expanded(
+            child: _CasinoActionButton(
+              key: const Key('casino-blackjack-insurance'),
+              label: '보험',
+              onPressed: _busy
+                  ? null
+                  : () => _apply(
+                      widget.onBlackjackAction(BlackjackAction.insurance),
+                      motion: _CasinoTableMotion.reveal,
+                    ),
+            ),
+          ),
+          const SizedBox(width: 7),
+        ],
+        if (canSplit) ...[
+          Expanded(
+            child: _CasinoActionButton(
+              key: const Key('casino-blackjack-split'),
+              label: '스플릿',
+              onPressed: _busy
+                  ? null
+                  : () => _apply(
+                      widget.onBlackjackAction(BlackjackAction.split),
+                      motion: _CasinoTableMotion.deal,
+                    ),
+            ),
+          ),
+          const SizedBox(width: 7),
+        ],
         Expanded(
           child: _CasinoActionButton(
             key: const Key('casino-blackjack-stand'),
@@ -3537,9 +4453,9 @@ class _CasinoScreenState extends State<CasinoScreen> {
             label: '더블',
             onPressed:
                 _busy ||
-                    hand.playerCards.length != 2 ||
-                    hand.doubled ||
-                    hand.stake > _availableChips
+                    activeCards.length != 2 ||
+                    hand.activePlayerDoubled ||
+                    hand.activePlayerStake > _availableChips
                 ? null
                 : () => _apply(
                     widget.onBlackjackAction(BlackjackAction.doubleDown),
@@ -3638,7 +4554,7 @@ class _CasinoScreenState extends State<CasinoScreen> {
           children: [
             const Expanded(child: _CasinoSectionLabel('이번 달 손실 중단선')),
             Text(
-              '${_money(used)} / ${_money(_lossLimit)}원',
+              '${_money(used)} / ${_money(_lossLimit)}칩',
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 10,
@@ -3661,8 +4577,8 @@ class _CasinoScreenState extends State<CasinoScreen> {
         ),
         const SizedBox(height: 5),
         Text(
-          '칩 ${_money(_availableChips)}원 · 국가계좌 ${_money(_state.availableBrokerageCash)}원 · 오늘 ${_casino.roundsForDay(_state.day)}/$casinoDailyRoundLimit판\n'
-          '누적 ${_casino.totalRounds}판 · 순손익 ${_signedMoney(_casino.lifetimeNet)}원 · 수수료 ${_money(_casino.totalNationalFee)}원',
+          '칩 ${_money(_availableChips)} · 국가계좌 ${_money(_state.availableBrokerageCash)}원 · 오늘 ${_casino.roundsForDay(_state.day)}/$casinoDailyRoundLimit판\n'
+          '누적 ${_casino.totalRounds}판 · 순손익 ${_signedMoney(_casino.lifetimeNet)}칩 · 수수료 ${_money(_casino.totalNationalFee)}칩',
           style: const TextStyle(
             color: Color(0xFFB5A79D),
             fontSize: 9,
@@ -3680,10 +4596,17 @@ class _CasinoScreenState extends State<CasinoScreen> {
   }
 
   Widget _buildHistory({CasinoGameType? game}) {
-    final records = _casino.history.reversed
+    final allRecords = _casino.history
         .where((record) => game == null || record.game == game)
-        .take(3)
         .toList(growable: false);
+    final records = allRecords.reversed.take(3).toList(growable: false);
+    final wins = allRecords.where((record) => record.net > 0).length;
+    final pushes = allRecords.where((record) => record.net == 0).length;
+    final losses = allRecords.length - wins - pushes;
+    final net = allRecords.fold<int>(0, (sum, record) => sum + record.net);
+    final hitRate = allRecords.isEmpty
+        ? 0
+        : (wins * 100 / allRecords.length).round();
     return _CasinoPanel(
       padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
       child: Column(
@@ -3703,6 +4626,29 @@ class _CasinoScreenState extends State<CasinoScreen> {
             ],
           ),
           const SizedBox(height: 8),
+          if (allRecords.isNotEmpty) ...[
+            Container(
+              key: Key('casino-history-summary-${game?.name ?? 'all'}'),
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
+              decoration: BoxDecoration(
+                color: const Color(0xFF112D27),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: _casinoGold.withValues(alpha: 0.35)),
+              ),
+              child: Text(
+                '${allRecords.length}판 · $wins승 $pushes푸시 $losses패 · 승률 $hitRate% · 순손익 ${_signedMoney(net)}칩',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Color(0xFFFFD993),
+                  fontSize: 9,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
           if (records.isEmpty)
             const Text(
               '아직 정산된 게임이 없습니다.',
@@ -3717,6 +4663,15 @@ class _CasinoScreenState extends State<CasinoScreen> {
         ],
       ),
     );
+  }
+
+  bool _isRepeatSelection(CasinoGameType game) {
+    final latest = _latestRecordFor(game);
+    if (latest == null) return false;
+    final currentLabel = game == CasinoGameType.blackjack
+        ? casinoBetTitle(CasinoBetType.blackjackHand)
+        : casinoBetTitle(_selectedBet, selection: _selection);
+    return latest.betLabel == currentLabel;
   }
 
   String _shortLockReason() {
@@ -3740,16 +4695,6 @@ class _CasinoScreenState extends State<CasinoScreen> {
     if (_casino.monthlyLoss + _stake > _lossLimit) return '월 손실 중단선';
     return '현재 이용 불가';
   }
-
-  String _gameRuleLine(CasinoGameType game) => switch (game) {
-    CasinoGameType.baccarat =>
-      '표준 3장 규칙 · 플레이어 1:1 · 뱅커 0.95:1 · 타이 8:1 · 페어 11:1',
-    CasinoGameType.blackjack => '싱글 핸드 · 딜러 S17 · 블랙잭 3:2 · 더블 가능 · 스플릿·보험 없음',
-    CasinoGameType.roulette => '유럽식 싱글 제로 · 단순찬스 1:1 · 더즌·열 2:1 · 스트레이트 35:1',
-    CasinoGameType.craps => '컴아웃 7·11 / 2·3·12 · 포인트 4·5·6·8·9·10 · 패스·돈트 패스',
-    CasinoGameType.sicBo => '주사위 3개 · 대·소·홀짝은 트리플 제외 · 트리플과 합계별 공개 배당',
-    CasinoGameType.slots => '동일 확률 6심벌 3릴 · 트리플·체리 2개 지급 · 이론 지급률 97.2%',
-  };
 
   String _signedMoney(int value) =>
       '${value >= 0 ? '+' : '-'}${_money(value.abs())}';
@@ -3799,7 +4744,7 @@ class _CasinoScreenState extends State<CasinoScreen> {
               '• 바카라·블랙잭·룰렛·크랩스·다이사이·3릴을 자유롭게 바꿀 수 있으며, 정산된 한 판마다 30분을 사용해 하루 최대 10판입니다. 10판을 채울 필요는 없으며 1판 후에도 나갈 수 있습니다.\n'
               '• 접속을 끝내면 현재 시각을 유지한 채 PC 메인으로 돌아갑니다.\n'
               '• 테이블에서는 국가계좌 주문 가능금을 미리 교환한 칩만 사용합니다. 종료할 때 국가계좌 환전 또는 칩 보관을 선택하며, 보관한 칩은 다음 접속에도 유지됩니다.\n'
-              '• 실제 베팅은 현금이 아니라 보유 칩에서만 빠지며, 보유 칩의 2%·5%·10%·30% 중 하나를 500원 단위로 내려 선택합니다.\n'
+              '• 실제 베팅은 현금이 아니라 보유 칩에서만 빠지며, 보유 칩의 2%·5%·10%·30% 중 하나를 500칩 단위로 내려 선택합니다.\n'
               '• 월 손실 중단선은 월 첫 접속 국가계좌+칩의 2%, 최소 5만원·최대 100만원입니다.\n'
               '• 확정 이익의 20%를 국가 수수료로 냅니다. 반환 원금과 푸시에는 부과하지 않으며 총지급·수수료·실수령을 원장에 따로 기록합니다.\n'
               '• 게임 결과는 월드시드·날짜·판 번호로 고정되며 베팅 종류나 금액으로 다시 뽑히지 않습니다.\n'
@@ -3826,15 +4771,15 @@ class _CasinoScreenState extends State<CasinoScreen> {
               '바카라\n'
               '플레이어와 뱅커 중 9에 가까운 쪽이 승리합니다. 자동 3장 규칙을 적용하며 뱅커 승리 배당은 0.95:1, 타이는 8:1입니다.\n\n'
               '블랙잭\n'
-              '21을 넘기지 않고 딜러보다 높은 합을 만듭니다. 딜러는 17에 스탠드하며 내추럴 블랙잭은 3:2입니다. 히트·스탠드·더블을 직접 선택합니다.\n\n'
+              '21을 넘기지 않고 딜러보다 높은 합을 만듭니다. 딜러는 17에 스탠드하며 내추럴 블랙잭은 3:2입니다. 같은 값의 첫 두 장은 스플릿할 수 있고 각 핸드에서 히트·스탠드·더블을 직접 선택합니다. 딜러 오픈카드가 에이스면 원금의 절반으로 2:1 보험을 선택할 수 있습니다.\n\n'
               '유럽식 룰렛\n'
               '0이 하나인 휠을 사용합니다. 레드·블랙과 홀·짝은 1:1, 더즌·열은 2:1, 번호 하나는 35:1입니다.\n\n'
               '크랩스\n'
-              '컴아웃에서 패스 라인은 7·11 승리, 2·3·12 패배이고 돈트 패스는 2·3 승리, 7·11 패배, 12 푸시입니다. 4·5·6·8·9·10은 포인트가 되며, 패스는 포인트가 7보다 먼저 나오면 승리하고 돈트 패스는 그 반대입니다. 현재는 두 라인 베팅만 지원합니다. 포인트 중간 롤은 추가 시간을 쓰지 않고 계약 정산 시 한 판 30분을 반영합니다.\n\n'
+              '컴아웃에서 패스 라인은 7·11 승리, 2·3·12 패배이고 돈트 패스는 2·3 승리, 7·11 패배, 12 푸시입니다. 4·5·6·8·9·10은 포인트가 됩니다. 한 번에 정산되는 필드·애니 세븐·애니 크랩스 프로포지션도 지원합니다. 포인트 중간 롤은 추가 시간을 쓰지 않고 계약 정산 시 한 판 30분을 반영합니다.\n\n'
               '다이사이\n'
               '주사위 3개의 합과 조합에 베팅합니다. 대·소·홀·짝은 트리플이 나오면 적중하지 않습니다.\n\n'
               '클래식 3릴\n'
-              '3개 릴의 심벌을 맞추며, 같은 심벌 3개와 체리 2개에 배당이 있습니다. 공개 이론 지급률은 97.2%입니다.',
+              '3개 릴의 심벌을 맞추며, 같은 심벌 3개와 체리 2개에 배당이 있습니다. 공개 세전 이론 지급률은 97.2%, 국가 수수료 적용 후 실수령 이론 지급률은 79.7%입니다.',
               style: TextStyle(
                 color: Color(0xFFE0D4CB),
                 fontSize: 11,
@@ -3907,7 +4852,7 @@ class _CasinoSlotLever extends StatelessWidget {
     button: true,
     enabled: enabled || onLockedTap != null,
     label: enabled
-        ? '슬롯 레버 당기기 · ${_money(stake)}원'
+        ? '슬롯 레버 당기기 · ${_money(stake)}칩'
         : onLockedTap != null
         ? '칩이 떨어졌어 · 칩 충전 선택 열기'
         : '슬롯 레버 잠김 · $lockReason',
@@ -3997,6 +4942,213 @@ class _CasinoSlotLever extends StatelessWidget {
       ),
     ),
   );
+}
+
+class _CasinoChipVault extends StatelessWidget {
+  const _CasinoChipVault({required this.balance, required this.counts});
+
+  final int balance;
+  final List<int> counts;
+
+  @override
+  Widget build(BuildContext context) {
+    final activeIndexes = [
+      for (var index = 0; index < counts.length; index++)
+        if (counts[index] > 0) index,
+    ];
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 320),
+      width: 112,
+      height: 63,
+      padding: const EdgeInsets.fromLTRB(4, 3, 4, 3),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFF183A30), Color(0xFF0D211D)],
+        ),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: _casinoGold.withValues(alpha: 0.5)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x66000000),
+            blurRadius: 8,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 360),
+        switchInCurve: Curves.easeOutBack,
+        switchOutCurve: Curves.easeIn,
+        child: balance <= 0 || activeIndexes.isEmpty
+            ? const Center(
+                key: ValueKey('casino-chip-vault-empty'),
+                child: Text(
+                  'EMPTY',
+                  style: TextStyle(
+                    color: Color(0xFF887B72),
+                    fontSize: 8,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.1,
+                  ),
+                ),
+              )
+            : Column(
+                key: const ValueKey('casino-chip-vault-active'),
+                children: [
+                  const Text(
+                    'MY CHIP STACKS',
+                    style: TextStyle(
+                      color: Color(0xFFCBB47E),
+                      fontSize: 5.5,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.65,
+                    ),
+                  ),
+                  const SizedBox(height: 1),
+                  Expanded(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        for (final index in activeIndexes)
+                          Expanded(
+                            child: _CasinoChipPile(
+                              denomination: _casinoChipDenominations[index],
+                              count: counts[index],
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+      ),
+    );
+  }
+}
+
+class _CasinoChipPile extends StatelessWidget {
+  const _CasinoChipPile({required this.denomination, required this.count});
+
+  final int denomination;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    key: Key('casino-chip-pile-$denomination-$count'),
+    container: true,
+    label: '${_casinoChipLabel(denomination)}칩 $count개',
+    child: Column(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 220),
+          transitionBuilder: (child, animation) => ScaleTransition(
+            scale: CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutBack,
+            ),
+            child: FadeTransition(opacity: animation, child: child),
+          ),
+          child: Text(
+            '×$count',
+            key: ValueKey('$denomination-$count'),
+            style: const TextStyle(
+              color: Color(0xFFF6E8CA),
+              fontSize: 5.7,
+              fontWeight: FontWeight.w900,
+              height: 1,
+            ),
+          ),
+        ),
+        Expanded(
+          child: TweenAnimationBuilder<double>(
+            tween: Tween<double>(end: count.toDouble()),
+            duration: const Duration(milliseconds: 520),
+            curve: Curves.easeOutCubic,
+            builder: (context, animatedCount, _) => CustomPaint(
+              key: Key('casino-chip-stack-$denomination'),
+              size: Size.infinite,
+              painter: _CasinoChipStackPainter(
+                count: animatedCount.round(),
+                color: _casinoChipColor(denomination),
+              ),
+            ),
+          ),
+        ),
+        Text(
+          _casinoChipLabel(denomination),
+          style: const TextStyle(
+            color: Color(0xFFB7AAA0),
+            fontSize: 5.4,
+            fontWeight: FontWeight.w800,
+            height: 1,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _CasinoChipStackPainter extends CustomPainter {
+  const _CasinoChipStackPainter({required this.count, required this.color});
+
+  final int count;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (count <= 0 || size.isEmpty) return;
+    final chipWidth = math.min(15.0, size.width - 1);
+    const chipHeight = 4.8;
+    final availableLift = math.max(0.0, size.height - chipHeight - 1);
+    final step = count <= 1 ? 0.0 : math.min(2.5, availableLift / (count - 1));
+    final left = (size.width - chipWidth) / 2;
+    final dark = Color.lerp(color, Colors.black, 0.38)!;
+    final light = Color.lerp(color, Colors.white, 0.32)!;
+    final rim = Color.lerp(color, _casinoGold, 0.28)!;
+
+    for (var index = 0; index < count; index++) {
+      final top = size.height - chipHeight - index * step;
+      final rect = Rect.fromLTWH(left, top, chipWidth, chipHeight);
+      final radius = Radius.circular(chipHeight / 2);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(rect.shift(const Offset(0, 0.7)), radius),
+        Paint()..color = const Color(0x66000000),
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(rect, radius),
+        Paint()
+          ..shader = LinearGradient(
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+            colors: [dark, color, light, color, dark],
+          ).createShader(rect),
+      );
+      canvas.drawLine(
+        Offset(left + 2.5, top + 1.1),
+        Offset(left + chipWidth - 2.5, top + 1.1),
+        Paint()
+          ..color = rim.withValues(alpha: 0.82)
+          ..strokeWidth = 0.55,
+      );
+    }
+
+    final top = size.height - chipHeight - (count - 1) * step;
+    final topRect = Rect.fromLTWH(left + 2.2, top + 0.7, chipWidth - 4.4, 2.2);
+    canvas.drawOval(
+      topRect,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 0.55
+        ..color = _casinoGold.withValues(alpha: 0.78),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _CasinoChipStackPainter oldDelegate) =>
+      count != oldDelegate.count || color != oldDelegate.color;
 }
 
 class _CasinoPanel extends StatelessWidget {
@@ -4117,40 +5269,6 @@ class _CasinoSectionLabel extends StatelessWidget {
   );
 }
 
-class _BlackjackRuleTile extends StatelessWidget {
-  const _BlackjackRuleTile({required this.value, required this.label});
-
-  final String value;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    height: 42,
-    decoration: BoxDecoration(
-      color: const Color(0xFF153D32),
-      borderRadius: BorderRadius.circular(10),
-      border: Border.all(color: const Color(0xFF4D7364)),
-    ),
-    child: Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Text(
-          value,
-          style: const TextStyle(
-            color: _casinoGold,
-            fontSize: 12,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-        Text(
-          label,
-          style: const TextStyle(color: Color(0xFFC9BDB4), fontSize: 7),
-        ),
-      ],
-    ),
-  );
-}
-
 class _CasinoPlayingCard extends StatelessWidget {
   const _CasinoPlayingCard({this.card, this.hidden = false});
   final int? card;
@@ -4182,6 +5300,8 @@ class _CasinoActionButton extends StatelessWidget {
       '히트' => 'HIT',
       '더블' => 'DOUBLE',
       '스탠드' => 'STAND',
+      '보험' => 'INSURE',
+      '스플릿' => 'SPLIT',
       _ => 'SETTLE',
     };
     final actionIndex = switch (label) {
@@ -4349,7 +5469,7 @@ class _CasinoHistoryRow extends StatelessWidget {
               ),
               const SizedBox(height: 3),
               Text(
-                '${record.outcome} · 베팅 ${_money(record.stake)}원',
+                '${record.outcome} · 베팅 ${_money(record.stake)}칩',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(color: Color(0xFFB9ACA3), fontSize: 9),
@@ -4357,7 +5477,7 @@ class _CasinoHistoryRow extends StatelessWidget {
               if (record.grossPayout > 0) ...[
                 const SizedBox(height: 2),
                 Text(
-                  '총지급 ${_money(record.grossPayout)}원 · 국가 수수료 ${_money(record.nationalFee)}원 · 실수령 ${_money(record.payout)}원',
+                  '총지급 ${_money(record.grossPayout)}칩 · 국가 수수료 ${_money(record.nationalFee)}칩 · 실수령 ${_money(record.payout)}칩',
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(

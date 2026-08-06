@@ -96,10 +96,229 @@ void main() {
         book.totalAskQuantity,
         lessThanOrEqualTo(book.visibleAskSupplyLimit),
       );
+      expect(book.visibleInventoryIsConserved, isTrue);
       for (final level in <GameOrderBookLevel>[...book.asks, ...book.bids]) {
         expect(level.quantity, lessThanOrEqualTo(outstanding));
       }
     }
+  });
+
+  test(
+    '51 percent owner remains protected when an exhausted bid disappears',
+    () {
+      final asks = <GameOrderBookLevel>[
+        const GameOrderBookLevel(
+          side: GameOrderBookSide.ask,
+          price: 10100,
+          quantity: 200000,
+          isWall: true,
+        ),
+        const GameOrderBookLevel(
+          side: GameOrderBookSide.ask,
+          price: 10200,
+          quantity: 200000,
+          isWall: true,
+        ),
+        const GameOrderBookLevel(
+          side: GameOrderBookSide.ask,
+          price: 10300,
+          quantity: 90000,
+          isWall: true,
+        ),
+      ];
+      final bids = <GameOrderBookLevel>[
+        const GameOrderBookLevel(
+          side: GameOrderBookSide.bid,
+          price: 9900,
+          quantity: 10000,
+          isWall: false,
+        ),
+      ];
+      final ledger = GameOrderBookSnapshot(
+        asks: asks,
+        bids: bids,
+        turnoverEok: 100,
+        fullDayTurnoverEok: 100,
+        boundaryBidPrice: 9900,
+        executionCapacity: 100000,
+        totalAskQuantity: 490000,
+        totalBidQuantity: 10000,
+        tradeStrength: 100,
+        liquidityPulse: gameOrderBookLiquidityPulseFrame(
+          marketMinute: 600,
+          slotIndex: 1,
+        ),
+        adaptiveLiquidityPulses: true,
+        sourceAssetId: 'majority-transition-stock',
+        sourceLiquidityDayKey: 1,
+        sourceDateKey: '2000-01-03',
+        sourceMarketMinute: 600,
+        sourceLastTradePrice: 10000,
+        sourceMarket: 'KSE',
+        sourceSimulationSeed: 'majority-transition-world',
+        sharesOutstanding: outstanding,
+        estimatedFreeFloatShares: outstanding,
+        playerOwnedShares: 510000,
+        nonPlayerTradableShares: 490000,
+        maximumQuoteQuantity: 50000,
+        externalBidCash: 500000000,
+        visibleAskSupplyLimit: 490000,
+        visibleBidDemandLimit: 50000,
+      );
+
+      final playerFillTransition = gameOrderBookSnapshotAfterConsumption(
+        snapshot: ledger,
+        consumedBidByPrice: <double, double>{9900: 10000},
+        consumedCapacityUnits: 10000,
+        latestConsumedSide: GameOrderBookSide.bid,
+        latestConsumedPrice: 9900,
+      );
+      final generatedTradeTransition = gameOrderBookSnapshotAfterSyntheticTrade(
+        snapshot: ledger,
+        pulse: const GameOrderBookTradePulse(
+          levelSide: GameOrderBookSide.bid,
+          levelIndex: 0,
+          quantity: 10000,
+          crossedTicks: 1,
+        ),
+        absolutePrice: 9900,
+        availableSnapshot: ledger,
+        perMinuteBudgetUnits: 10000,
+      );
+
+      for (final transitioned in <GameOrderBookSnapshot>[
+        playerFillTransition,
+        generatedTradeTransition,
+      ]) {
+        expect(transitioned.asks.first.price, 10100);
+        expect(
+          transitioned.asks.any((level) => level.price == 9900),
+          isFalse,
+          reason: '소진된 9,900원 매수 주문을 매도 주문으로 자동 변환하면 안 됩니다.',
+        );
+        expect(
+          transitioned.bids
+              .where((level) => level.price == 9900)
+              .every((level) => level.quantity == 0),
+          isTrue,
+        );
+        expect(transitioned.totalAskQuantity, lessThanOrEqualTo(490000));
+        expect(
+          transitioned.totalAskQuantity + transitioned.playerOwnedShares,
+          lessThanOrEqualTo(outstanding),
+        );
+        expect(
+          transitioned.asks.every((level) => level.quantity <= 200000),
+          isTrue,
+        );
+        expect(transitioned.visibleInventoryIsConserved, isTrue);
+      }
+    },
+  );
+
+  test('large wall cancellations and replenishment stay inventory funded', () {
+    const wallOutstanding = 500000000;
+    const wallPlayerOwned = wallOutstanding * 0.51;
+    GameOrderBookLevel? levelAt(
+      GameOrderBookSnapshot book,
+      GameOrderBookSide side,
+      double price,
+    ) {
+      for (final level in <GameOrderBookLevel>[...book.asks, ...book.bids]) {
+        if (level.side == side && (level.price - price).abs() < 0.000001) {
+          return level;
+        }
+      }
+      final remembered = book.rememberedLevels[price];
+      return remembered?.side == side ? remembered : null;
+    }
+
+    var largeCancellations = 0;
+    var largeReplenishments = 0;
+    for (var sample = 0; sample < 60; sample += 1) {
+      final day = 6015 + sample;
+      var current = buildGameOrderBookSnapshot(
+        assetId: 'busy-independent-wall-flow',
+        day: day,
+        minute: 600,
+        currentPrice: 10000,
+        previousTradePrice: 10000,
+        previousClose: 9800,
+        date: DateTime(2016, 6, 20).add(Duration(days: sample)),
+        market: 'KSE',
+        simulationSeed: 'busy-independent-wall-world',
+        sharesOutstanding: wallOutstanding,
+        playerOwnedUnits: wallPlayerOwned,
+        liquidityPulse: gameOrderBookLiquidityPulseFrame(
+          marketMinute: 600,
+          slotIndex: 0,
+        ),
+        adaptiveLiquidityPulses: true,
+      );
+      expect(current.visibleInventoryIsConserved, isTrue);
+
+      for (
+        var slot = 1;
+        slot <= gameOrderBookMaximumPulsesPerMarketMinute;
+        slot += 1
+      ) {
+        final next = buildGameOrderBookSnapshot(
+          assetId: 'busy-independent-wall-flow',
+          day: day,
+          minute: 600,
+          currentPrice: 10000,
+          previousTradePrice: 10000,
+          previousClose: 9800,
+          date: DateTime(2016, 6, 20).add(Duration(days: sample)),
+          market: 'KSE',
+          simulationSeed: 'busy-independent-wall-world',
+          sharesOutstanding: wallOutstanding,
+          playerOwnedUnits: wallPlayerOwned,
+          previousSnapshot: current,
+          previousSnapshotMinute: 600,
+          liquidityPulse: gameOrderBookLiquidityPulseFrame(
+            marketMinute: 600,
+            slotIndex: slot,
+          ),
+          adaptiveLiquidityPulses: true,
+        );
+        expect(next.visibleInventoryIsConserved, isTrue);
+        expect(
+          next.totalAskQuantity + next.playerOwnedShares,
+          lessThanOrEqualTo(wallOutstanding),
+        );
+
+        final side = next.lastBreathingWallSide;
+        final price = side == GameOrderBookSide.ask
+            ? next.breathingAskWallPrice
+            : next.breathingBidWallPrice;
+        if (side != null && price != null) {
+          final before = levelAt(current, side, price);
+          final after = levelAt(next, side, price);
+          if (before != null &&
+              after != null &&
+              before.isWall &&
+              after.isWall &&
+              before.quantity > 0) {
+            final ratio = (after.quantity - before.quantity) / before.quantity;
+            if (ratio <= -0.06) largeCancellations += 1;
+            if (ratio >= 0.03) largeReplenishments += 1;
+          }
+        }
+        current = next;
+      }
+    }
+
+    expect(
+      largeCancellations,
+      greaterThan(0),
+      reason: 'observed replenishments: $largeReplenishments',
+    );
+    expect(
+      largeReplenishments,
+      greaterThan(0),
+      reason: 'observed cancellations: $largeCancellations',
+    );
   });
 
   test(

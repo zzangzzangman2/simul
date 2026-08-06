@@ -35,6 +35,39 @@ const horseGallopPintoAsset =
 const horseGallopMahoganyAsset =
     'assets/images/horse_racing/horse_gallop_mahogany_cobalt_v2.png';
 
+const horseGallopChestnutBlazeAsset =
+    'assets/images/horse_racing/horse_gallop_chestnut_blaze_crimson_v3.png';
+const horseGallopChestnutStarAsset =
+    'assets/images/horse_racing/horse_gallop_chestnut_star_tealgold_v3.png';
+const horseGallopDarkBayBlazeAsset =
+    'assets/images/horse_racing/horse_gallop_darkbay_blaze_cobalt_v3.png';
+const horseGallopDarkBayRavenAsset =
+    'assets/images/horse_racing/horse_gallop_darkbay_raven_burgundy_v3.png';
+const horseGallopGrayDappleAsset =
+    'assets/images/horse_racing/horse_gallop_gray_dapple_purple_v3.png';
+const horseGallopGrayFleabittenAsset =
+    'assets/images/horse_racing/horse_gallop_gray_fleabitten_amber_v3.png';
+const horseGallopWhiteSilverAsset =
+    'assets/images/horse_racing/horse_gallop_white_silver_navy_v3.png';
+const horseGallopWhiteCreamAsset =
+    'assets/images/horse_racing/horse_gallop_white_cream_burgundy_v3.png';
+const horseGallopBlackStarAsset =
+    'assets/images/horse_racing/horse_gallop_black_star_emerald_v3.png';
+const horseGallopBlackBlazeAsset =
+    'assets/images/horse_racing/horse_gallop_black_blaze_royalgold_v3.png';
+const horseGallopPalominoGoldAsset =
+    'assets/images/horse_racing/horse_gallop_palomino_gold_violet_v3.png';
+const horseGallopPalominoChampagneAsset =
+    'assets/images/horse_racing/horse_gallop_palomino_champagne_turquoise_v3.png';
+const horseGallopPintoTobianoAsset =
+    'assets/images/horse_racing/horse_gallop_pinto_tobiano_coral_v3.png';
+const horseGallopPintoOveroAsset =
+    'assets/images/horse_racing/horse_gallop_pinto_overo_forest_v3.png';
+const horseGallopMahoganyBloodBayAsset =
+    'assets/images/horse_racing/horse_gallop_mahogany_bloodbay_cobalt_v3.png';
+const horseGallopMahoganyCopperAsset =
+    'assets/images/horse_racing/horse_gallop_mahogany_copper_mustard_v3.png';
+
 const horseRaceGallopAssets = <String>[
   horseGallopChestnutAsset,
   horseGallopDarkBayAsset,
@@ -46,22 +79,98 @@ const horseRaceGallopAssets = <String>[
   horseGallopMahoganyAsset,
 ];
 
+const horseRaceGallopAssetFamilies = <List<String>>[
+  <String>[
+    horseGallopChestnutAsset,
+    horseGallopChestnutBlazeAsset,
+    horseGallopChestnutStarAsset,
+  ],
+  <String>[
+    horseGallopDarkBayAsset,
+    horseGallopDarkBayBlazeAsset,
+    horseGallopDarkBayRavenAsset,
+  ],
+  <String>[
+    horseGallopGrayAsset,
+    horseGallopGrayDappleAsset,
+    horseGallopGrayFleabittenAsset,
+  ],
+  <String>[
+    horseGallopWhiteAsset,
+    horseGallopWhiteSilverAsset,
+    horseGallopWhiteCreamAsset,
+  ],
+  <String>[
+    horseGallopBlackAsset,
+    horseGallopBlackStarAsset,
+    horseGallopBlackBlazeAsset,
+  ],
+  <String>[
+    horseGallopPalominoAsset,
+    horseGallopPalominoGoldAsset,
+    horseGallopPalominoChampagneAsset,
+  ],
+  <String>[
+    horseGallopPintoAsset,
+    horseGallopPintoTobianoAsset,
+    horseGallopPintoOveroAsset,
+  ],
+  <String>[
+    horseGallopMahoganyAsset,
+    horseGallopMahoganyBloodBayAsset,
+    horseGallopMahoganyCopperAsset,
+  ],
+];
+
+const horseRaceAllGallopAssets = <String>[
+  horseGallopChestnutAsset,
+  horseGallopChestnutBlazeAsset,
+  horseGallopChestnutStarAsset,
+  horseGallopDarkBayAsset,
+  horseGallopDarkBayBlazeAsset,
+  horseGallopDarkBayRavenAsset,
+  horseGallopGrayAsset,
+  horseGallopGrayDappleAsset,
+  horseGallopGrayFleabittenAsset,
+  horseGallopWhiteAsset,
+  horseGallopWhiteSilverAsset,
+  horseGallopWhiteCreamAsset,
+  horseGallopBlackAsset,
+  horseGallopBlackStarAsset,
+  horseGallopBlackBlazeAsset,
+  horseGallopPalominoAsset,
+  horseGallopPalominoGoldAsset,
+  horseGallopPalominoChampagneAsset,
+  horseGallopPintoAsset,
+  horseGallopPintoTobianoAsset,
+  horseGallopPintoOveroAsset,
+  horseGallopMahoganyAsset,
+  horseGallopMahoganyBloodBayAsset,
+  horseGallopMahoganyCopperAsset,
+];
+
 const horseRaceMinStake = 500;
 const horseRaceStakeUnit = 500;
 const horseRaceStakePercents = <int>[2, 5, 10, 30];
 const horseRaceMaximumStakePercent = 30;
+const horseRaceLeisureStakeBasisCap = 50000000;
 const horseRaceDailyBetLimit = 1;
 const horseRaceDefaultStateRecoveryRateBps = 2000;
 
+int horseRaceStakeBasisForCash(int availableCash) =>
+    math.min(math.max(0, availableCash), horseRaceLeisureStakeBasisCap);
+
 int horseRaceMaximumStakeForCash(int availableCash) {
-  if (availableCash <= 0) return 0;
-  final proportional = availableCash * horseRaceMaximumStakePercent ~/ 100;
+  final stakeBasis = horseRaceStakeBasisForCash(availableCash);
+  if (stakeBasis <= 0) return 0;
+  final proportional = stakeBasis * horseRaceMaximumStakePercent ~/ 100;
   return proportional ~/ horseRaceStakeUnit * horseRaceStakeUnit;
 }
 
 int horseRaceStakeForCashPercent(int availableCash, int percent) {
   if (!horseRaceStakePercents.contains(percent)) return 0;
-  final proportional = availableCash * percent ~/ 100;
+  final proportional =
+      horseRaceStakeBasisForCash(availableCash) * percent ~/ 100;
   final rounded = proportional ~/ horseRaceStakeUnit * horseRaceStakeUnit;
   return rounded >= horseRaceMinStake ? rounded : 0;
 }
@@ -140,9 +249,14 @@ class HorseRaceEntrant {
     required this.id,
     required this.gate,
     required this.name,
+    required this.origin,
+    required this.sex,
+    required this.age,
     required this.jockey,
+    required this.trainer,
+    required this.assignedWeight,
     required this.runningStyle,
-    required this.recentForm,
+    required this.recentPerformances,
     required this.bodyWeight,
     required this.weightChange,
     required this.accentValue,
@@ -162,9 +276,14 @@ class HorseRaceEntrant {
   final String id;
   final int gate;
   final String name;
+  final String origin;
+  final String sex;
+  final int age;
   final String jockey;
+  final String trainer;
+  final double assignedWeight;
   final String runningStyle;
-  final String recentForm;
+  final List<HorseRecentPerformance> recentPerformances;
   final int bodyWeight;
   final int weightChange;
   final int accentValue;
@@ -179,6 +298,39 @@ class HorseRaceEntrant {
   final double winOdds;
   final double placeOdds;
   final double finalScore;
+
+  List<int> get recentFinishes => List<int>.unmodifiable(
+    recentPerformances.map((performance) => performance.position),
+  );
+  String get recentForm => recentFinishes.take(3).join('-');
+  int get recentWinCount => recentFinishes.where((rank) => rank == 1).length;
+  int get recentTopTwoCount => recentFinishes.where((rank) => rank <= 2).length;
+  int get recentTopThreeCount =>
+      recentFinishes.where((rank) => rank <= 3).length;
+}
+
+class HorseRecentPerformance {
+  const HorseRecentPerformance({
+    required this.date,
+    required this.distanceMeters,
+    required this.position,
+    required this.fieldSize,
+    required this.jockey,
+    required this.assignedWeight,
+    required this.recordSeconds,
+    required this.bodyWeight,
+    required this.rating,
+  });
+
+  final DateTime date;
+  final int distanceMeters;
+  final int position;
+  final int fieldSize;
+  final String jockey;
+  final double assignedWeight;
+  final double recordSeconds;
+  final int bodyWeight;
+  final int rating;
 }
 
 class HorseRaceCard {
@@ -298,7 +450,7 @@ class _HorseRaceDraft {
   final double finalScore;
 }
 
-const _horseTemplates = <_HorseTemplate>[
+const _anchorHorseTemplates = <_HorseTemplate>[
   _HorseTemplate(
     id: 'dawn_dash',
     name: '새벽질주',
@@ -589,6 +741,144 @@ const _horseTemplates = <_HorseTemplate>[
   ),
 ];
 
+const _horseRosterPrefixes = <String>[
+  '라온',
+  '천지',
+  '해피',
+  '원더풀',
+  '글로벌',
+  '드림',
+  '로열',
+  '스타',
+  '블루',
+  '골드',
+  '실버',
+  '파워',
+  '스카이',
+  '히어로',
+  '퀸',
+  '킹',
+  '챔프',
+  '빅토리',
+  '다이아',
+  '미라클',
+  '판타스틱',
+  '브라이트',
+  '슈퍼',
+  '에이스',
+  '태양',
+  '한강',
+  '백두',
+  '청룡',
+];
+
+const _horseRosterSuffixes = <String>[
+  '러시',
+  '스톰',
+  '웨이브',
+  '글로리',
+  '오닉스',
+  '메테오',
+  '체크',
+  '블레이즈',
+];
+
+const _horseRosterJockeys = <String>[
+  '김태성',
+  '이수호',
+  '박건우',
+  '최민재',
+  '정우람',
+  '오성민',
+  '윤지환',
+  '한도윤',
+  '서지민',
+  '민재호',
+  '강준혁',
+  '배도현',
+  '문예찬',
+  '노승우',
+  '임도하',
+  '송하준',
+];
+
+const _horseRosterAccentValues = <int>[
+  0xFFF5F5F5,
+  0xFF20232A,
+  0xFFE54848,
+  0xFF2E68D4,
+  0xFFF2C94C,
+  0xFF4CAD68,
+  0xFFF18A42,
+  0xFFF185AD,
+];
+
+final List<_HorseTemplate> _horseTemplates = _buildHorseTemplateRoster();
+
+int _horseVisualFamilyIndex(String spriteAsset) => horseRaceGallopAssetFamilies
+    .indexWhere((family) => family.contains(spriteAsset));
+
+List<_HorseTemplate> _buildHorseTemplateRoster() {
+  final roster = <_HorseTemplate>[..._anchorHorseTemplates];
+  for (
+    var familyIndex = 0;
+    familyIndex < horseRaceGallopAssetFamilies.length;
+    familyIndex++
+  ) {
+    final family = horseRaceGallopAssetFamilies[familyIndex];
+    var generatedIndex = 0;
+    while (roster
+            .where(
+              (template) =>
+                  _horseVisualFamilyIndex(template.spriteAsset) == familyIndex,
+            )
+            .length <
+        28) {
+      final prefix =
+          _horseRosterPrefixes[generatedIndex % _horseRosterPrefixes.length];
+      final name = '$prefix${_horseRosterSuffixes[familyIndex]}';
+      final id =
+          'roster_${familyIndex.toString().padLeft(2, '0')}_${generatedIndex.toString().padLeft(2, '0')}';
+      final seed = horseRaceStableSeed('$id:$name');
+      final speed = 74 + seed % 26;
+      final acceleration = 74 + (seed ~/ 7) % 26;
+      final stamina = 74 + (seed ~/ 13) % 26;
+      final finishingKick = 74 + (seed ~/ 19) % 26;
+      final consistency = 70 + (seed ~/ 23) % 30;
+      final recentFirst = 1 + (seed ~/ 29) % 8;
+      final recentSecond = 1 + (seed ~/ 31) % 9;
+      final recentThird = 1 + (seed ~/ 37) % 10;
+      roster.add(
+        _HorseTemplate(
+          id: id,
+          name: name,
+          jockey:
+              _horseRosterJockeys[(seed ~/ 41) % _horseRosterJockeys.length],
+          runningStyle: const <String>[
+            '선행',
+            '선입',
+            '추입',
+            '지구력',
+            '자유',
+          ][(seed ~/ 43) % 5],
+          recentForm: '$recentFirst-$recentSecond-$recentThird',
+          bodyWeight: 458 + (seed ~/ 47) % 45,
+          weightChange: -4 + (seed ~/ 53) % 9,
+          accentValue: _horseRosterAccentValues[familyIndex],
+          spriteAsset: family[generatedIndex % family.length],
+          speed: speed,
+          acceleration: acceleration,
+          stamina: stamina,
+          finishingKick: finishingKick,
+          consistency: consistency,
+        ),
+      );
+      generatedIndex += 1;
+    }
+  }
+  return List<_HorseTemplate>.unmodifiable(roster);
+}
+
 int horseRaceStableSeed(String value) {
   var hash = 0x811C9DC5;
   for (final codeUnit in value.codeUnits) {
@@ -599,6 +889,164 @@ int horseRaceStableSeed(String value) {
 }
 
 const _horseRacePaceBreaks = <double>[0, 0.12, 0.30, 0.52, 0.70, 0.86, 1];
+
+/// The pace segment where this runner makes its strongest deterministic move.
+///
+/// Keeping this public lets the broadcast presentation fire its sound and
+/// visual cue on the exact frame where the underlying pace profile changes.
+int horseRaceBroadcastBurstSegment({
+  required HorseRaceCard race,
+  required HorseRaceEntrant entrant,
+}) {
+  final profileSeed = horseRaceStableSeed(
+    '${race.seed}:${entrant.id}:straight-pace',
+  );
+  return switch (entrant.runningStyle) {
+    '선행' => profileSeed.isEven ? 0 : 1,
+    '선입' => 2 + profileSeed % 2,
+    '추입' => 4 + profileSeed % 2,
+    '지구력' => 3 + profileSeed % 2,
+    _ => 1 + profileSeed % 4,
+  };
+}
+
+/// Normalized official-race time when the runner's strongest move begins.
+double horseRaceBroadcastSurgeAt({
+  required HorseRaceCard race,
+  required HorseRaceEntrant entrant,
+}) {
+  final segment = horseRaceBroadcastBurstSegment(race: race, entrant: entrant);
+  return (_horseRacePaceBreaks[segment] *
+          horseRaceBroadcastFinishAt(race: race, entrant: entrant))
+      .clamp(0.0, 0.94);
+}
+
+String horseRaceBroadcastSurgeLabel(HorseRaceEntrant entrant) =>
+    horseRaceSignatureSkill(entrant).name;
+
+class HorseRaceSignatureSkill {
+  const HorseRaceSignatureSkill({
+    required this.name,
+    required this.effectLabel,
+    required this.triggerLabel,
+    required this.phaseLabel,
+    required this.paceBoost,
+  });
+
+  final String name;
+  final String effectLabel;
+  final String triggerLabel;
+  final String phaseLabel;
+  final double paceBoost;
+
+  String get strengthGrade => paceBoost >= 0.32
+      ? 'S'
+      : paceBoost >= 0.29
+      ? 'A'
+      : paceBoost >= 0.26
+      ? 'B'
+      : 'C';
+}
+
+const _horseRaceSkillPrefixes = <String>[
+  '새벽',
+  '자홍',
+  '청명',
+  '백야',
+  '금빛',
+  '은하',
+  '유리',
+  '여명',
+  '낙뢰',
+  '질풍',
+  '열화',
+  '설원',
+  '월광',
+  '폭풍',
+  '흑운',
+  '찬란',
+];
+
+const _horseRaceSkillCores = <String>[
+  '점화',
+  '선봉',
+  '궤적',
+  '맥동',
+  '돌파',
+  '역전',
+  '유성',
+  '비상',
+  '폭주',
+  '숨결',
+  '파동',
+  '서약',
+  '환영',
+  '왕관',
+];
+
+/// One stable, roster-wide unique signature skill per horse.
+///
+/// The 16 x 14 name table maps exactly to the 224-horse stable without
+/// borrowing names or copy from another game. The condition follows the
+/// horse's running style, while its relevant ability changes the real pace
+/// boost used by the broadcast simulation.
+HorseRaceSignatureSkill horseRaceSignatureSkill(HorseRaceEntrant entrant) {
+  final rosterIndex = _horseTemplates.indexWhere(
+    (template) => template.id == entrant.id,
+  );
+  final identityIndex = rosterIndex < 0
+      ? horseRaceStableSeed('${entrant.id}:signature-skill') %
+            (_horseRaceSkillPrefixes.length * _horseRaceSkillCores.length)
+      : rosterIndex;
+  final prefix =
+      _horseRaceSkillPrefixes[identityIndex % _horseRaceSkillPrefixes.length];
+  final core =
+      _horseRaceSkillCores[(identityIndex ~/ _horseRaceSkillPrefixes.length) %
+          _horseRaceSkillCores.length];
+  final relevantAbility = switch (entrant.runningStyle) {
+    '선행' => entrant.acceleration,
+    '선입' => ((entrant.speed + entrant.acceleration) / 2).round(),
+    '추입' => entrant.finishingKick,
+    '지구력' => entrant.stamina,
+    _ => ((entrant.speed + entrant.consistency) / 2).round(),
+  };
+  final identityVariation =
+      horseRaceStableSeed('${entrant.id}:signature-power') % 5 * 0.005;
+  final paceBoost =
+      (0.22 +
+              (relevantAbility - 74).clamp(0, 25) / 25 * 0.11 +
+              identityVariation)
+          .clamp(0.22, 0.35)
+          .toDouble();
+  final effectLabel = switch (entrant.runningStyle) {
+    '선행' => '초반 선두권에서 가속·속도 상승',
+    '선입' => '중반 추월 구간에서 가속 상승',
+    '추입' => '막판 직선에서 최고속도 상승',
+    '지구력' => '중후반 지구력을 살려 속도 유지',
+    _ => '직선 빈 공간에서 속도·가속 상승',
+  };
+  final triggerLabel = switch (entrant.runningStyle) {
+    '선행' => '출발 후 선두권에 진입하면 발동',
+    '선입' => '중반에 앞말을 추월할 때 발동',
+    '추입' => '남은 300m에서 후방 추격 시 발동',
+    '지구력' => '중후반 페이스를 유지하면 발동',
+    _ => '직선에서 앞 공간이 열리면 발동',
+  };
+  final phaseLabel = switch (entrant.runningStyle) {
+    '선행' => '초반',
+    '선입' => '중반',
+    '추입' => '막판',
+    '지구력' => '중후반',
+    _ => '전개 대응',
+  };
+  return HorseRaceSignatureSkill(
+    name: '$prefix의 $core',
+    effectLabel: effectLabel,
+    triggerLabel: triggerLabel,
+    phaseLabel: phaseLabel,
+    paceBoost: paceBoost,
+  );
+}
 
 /// Returns the runner's deterministic position in the straight-only broadcast.
 ///
@@ -631,13 +1079,10 @@ double horseRaceBroadcastProgress({
   final profileSeed = horseRaceStableSeed(
     '${race.seed}:${entrant.id}:straight-pace',
   );
-  final burstSegment = switch (entrant.runningStyle) {
-    '선행' => profileSeed.isEven ? 0 : 1,
-    '선입' => 2 + profileSeed % 2,
-    '추입' => 4 + profileSeed % 2,
-    '지구력' => 3 + profileSeed % 2,
-    _ => 1 + profileSeed % 4,
-  };
+  final burstSegment = horseRaceBroadcastBurstSegment(
+    race: race,
+    entrant: entrant,
+  );
 
   for (var segment = 0; segment < speeds.length; segment++) {
     final segmentSeed = horseRaceStableSeed('$profileSeed:$segment');
@@ -655,7 +1100,7 @@ double horseRaceBroadcastProgress({
       _ => kickFit * 0.14 + staminaFit * 0.04,
     };
     final burst = segment == burstSegment
-        ? 0.28
+        ? horseRaceSignatureSkill(entrant).paceBoost
         : (segment - burstSegment).abs() == 1
         ? 0.08
         : 0.0;
@@ -665,20 +1110,84 @@ double horseRaceBroadcastProgress({
     );
   }
 
-  var totalDistance = 0.0;
-  var coveredDistance = 0.0;
+  // Do not let a wide official margin turn into a horse treading in place a
+  // few pixels before the stripe. Keep the recorded finish time, but reserve
+  // enough distance for a clearly readable final approach. The runner stays
+  // farther behind until the last segment and then crosses at a continuous,
+  // visible speed instead of waiting beside the finish line.
+  final finalSegmentDuration =
+      _horseRacePaceBreaks.last -
+      _horseRacePaceBreaks[_horseRacePaceBreaks.length - 2];
+  var precedingDistance = 0.0;
+  for (var segment = 0; segment < speeds.length - 1; segment++) {
+    precedingDistance +=
+        (_horseRacePaceBreaks[segment + 1] - _horseRacePaceBreaks[segment]) *
+        speeds[segment];
+  }
+  // Once the broadcast camera settles on the finish stripe, a normalized
+  // speed near 1.0 reads as a crawl on a phone-sized track. Reserve much more
+  // of the distance for the last 14% so trailing runners are already spread
+  // out before the line, then make every horse gallop through it at speed.
+  const minimumFinalNormalizedSpeed = 3.0;
+  final minimumFinalSegmentSpeed =
+      minimumFinalNormalizedSpeed *
+      precedingDistance /
+      (1 - minimumFinalNormalizedSpeed * finalSegmentDuration);
+  speeds[speeds.length - 1] = math.max(speeds.last, minimumFinalSegmentSpeed);
+
+  final cumulativeDistance = <double>[0.0];
   for (var segment = 0; segment < speeds.length; segment++) {
     final start = _horseRacePaceBreaks[segment];
     final end = _horseRacePaceBreaks[segment + 1];
     final segmentDistance = (end - start) * speeds[segment];
-    totalDistance += segmentDistance;
-    final coveredTime = (math.min(raceTime, end) - start).clamp(
-      0.0,
-      end - start,
-    );
-    coveredDistance += coveredTime * speeds[segment];
+    cumulativeDistance.add(cumulativeDistance.last + segmentDistance);
   }
-  return (coveredDistance / totalDistance).clamp(0.0, 1.0);
+
+  // Join the pace sections with a monotone cubic curve. The old piecewise
+  // linear distance curve changed velocity on a single frame at every section
+  // boundary, which could read as a tiny hitch even though the horse never
+  // actually stopped. Harmonic tangents preserve every section distance and
+  // the official finish time while keeping both position and velocity smooth.
+  final tangents = List<double>.filled(speeds.length + 1, 0);
+  tangents.first = speeds.first;
+  tangents.last = speeds.last;
+  for (var knot = 1; knot < speeds.length; knot++) {
+    final previousWidth =
+        _horseRacePaceBreaks[knot] - _horseRacePaceBreaks[knot - 1];
+    final nextWidth =
+        _horseRacePaceBreaks[knot + 1] - _horseRacePaceBreaks[knot];
+    final previousSlope = speeds[knot - 1];
+    final nextSlope = speeds[knot];
+    final previousWeight = 2 * nextWidth + previousWidth;
+    final nextWeight = nextWidth + 2 * previousWidth;
+    tangents[knot] =
+        (previousWeight + nextWeight) /
+        (previousWeight / previousSlope + nextWeight / nextSlope);
+  }
+
+  var activeSegment = speeds.length - 1;
+  for (var segment = 0; segment < speeds.length; segment++) {
+    if (raceTime <= _horseRacePaceBreaks[segment + 1]) {
+      activeSegment = segment;
+      break;
+    }
+  }
+  final start = _horseRacePaceBreaks[activeSegment];
+  final end = _horseRacePaceBreaks[activeSegment + 1];
+  final width = end - start;
+  final unit = ((raceTime - start) / width).clamp(0.0, 1.0);
+  final unitSquared = unit * unit;
+  final unitCubed = unitSquared * unit;
+  final startBasis = 2 * unitCubed - 3 * unitSquared + 1;
+  final startTangentBasis = unitCubed - 2 * unitSquared + unit;
+  final endBasis = -2 * unitCubed + 3 * unitSquared;
+  final endTangentBasis = unitCubed - unitSquared;
+  final coveredDistance =
+      startBasis * cumulativeDistance[activeSegment] +
+      startTangentBasis * width * tangents[activeSegment] +
+      endBasis * cumulativeDistance[activeSegment + 1] +
+      endTangentBasis * width * tangents[activeSegment + 1];
+  return (coveredDistance / cumulativeDistance.last).clamp(0.0, 1.0);
 }
 
 /// Deterministic official elapsed time used by the racecourse result board.
@@ -805,28 +1314,251 @@ double _horseRaceGaussian(math.Random random) {
   return math.sqrt(-2 * math.log(first)) * math.cos(2 * math.pi * second);
 }
 
+// Eight-horse thoroughbred markets generally see the public favourite win
+// roughly one race in three. Keeping the market and result on the same
+// temperature makes the displayed odds honest instead of letting the
+// top-rated horse win far more often than its shown probability.
+const double _horseRaceMarketTemperature = 3.7;
+
+double _horseRaceGumbel(math.Random random) {
+  final uniform = random.nextDouble().clamp(0.000000001, 0.999999999);
+  return -math.log(-math.log(uniform));
+}
+
 double _roundOdds(double value) => double.parse(value.toStringAsFixed(1));
 
 int _assessedHorseAbility(int base, math.Random random) =>
     math.max(70, math.min(99, base + random.nextInt(5) - 2));
 
-HorseRaceCard buildAfternoonHorseRace({
+const _horseRaceTrainerNames = <String>[
+  '박준호',
+  '이경민',
+  '최용건',
+  '서인석',
+  '정호익',
+  '김동균',
+  '전승규',
+  '강환민',
+];
+
+List<HorseRecentPerformance> _baselineHorseRecentPerformances(
+  _HorseTemplate template,
+) {
+  final latest = template.recentForm
+      .split('-')
+      .map(int.parse)
+      .toList(growable: true);
+  final random = math.Random(
+    horseRaceStableSeed('${template.id}:official-recent-ten'),
+  );
+  final baseAbility = horseRaceCompositeScore(
+    speed: template.speed,
+    acceleration: template.acceleration,
+    stamina: template.stamina,
+    finishingKick: template.finishingKick,
+    consistency: template.consistency,
+  );
+  while (latest.length < 10) {
+    final fieldSize = 8 + random.nextInt(5);
+    final expectedRank =
+        1 + ((100 - baseAbility) / 25).clamp(0.0, 1.0) * (fieldSize - 1);
+    final volatility = 0.9 + (100 - template.consistency) * 0.055;
+    final rank = (expectedRank + _horseRaceGaussian(random) * volatility)
+        .round()
+        .clamp(1, fieldSize);
+    latest.add(rank);
+  }
+  final performances = <HorseRecentPerformance>[];
+  final campaignStartDate = DateTime(2000, 1, 1);
+  var daysAgo = 0;
+  const distances = <int>[1000, 1200, 1300, 1400, 1600, 1800];
+  for (var index = 0; index < latest.length; index++) {
+    daysAgo += 15 + random.nextInt(27);
+    final position = latest[index];
+    final fieldSize = math.max(position, 8 + random.nextInt(7));
+    final distance = distances[random.nextInt(distances.length)];
+    final baseSeconds = distance * 0.0605;
+    final recordSeconds = baseSeconds + position * 0.19 + random.nextDouble();
+    performances.add(
+      HorseRecentPerformance(
+        date: campaignStartDate.subtract(Duration(days: daysAgo)),
+        distanceMeters: distance,
+        position: position,
+        fieldSize: fieldSize,
+        jockey: index < 6
+            ? template.jockey
+            : _horseRosterJockeys[random.nextInt(_horseRosterJockeys.length)],
+        assignedWeight: 51.0 + random.nextInt(15) * 0.5,
+        recordSeconds: recordSeconds,
+        bodyWeight: template.bodyWeight + random.nextInt(13) - 6,
+        rating: (baseAbility + random.nextInt(7) - 3).round().clamp(70, 99),
+      ),
+    );
+  }
+  return List<HorseRecentPerformance>.unmodifiable(performances);
+}
+
+List<_HorseTemplate> _scheduledHorseTemplates({
   required String simulationSeed,
   required int day,
 }) {
+  final selectedTemplates = <_HorseTemplate>[];
+  for (
+    var familyIndex = 0;
+    familyIndex < horseRaceGallopAssetFamilies.length;
+    familyIndex++
+  ) {
+    final candidates = _horseTemplates
+        .where(
+          (template) =>
+              _horseVisualFamilyIndex(template.spriteAsset) == familyIndex,
+        )
+        .toList(growable: false);
+    final zeroBasedDay = math.max(0, day - 1);
+    final fortnightBlock = zeroBasedDay ~/ 14;
+    final rosterHalf = fortnightBlock.isEven ? 0 : 14;
+    final cycle = fortnightBlock ~/ 2;
+    final scheduled = candidates.sublist(rosterHalf, rosterHalf + 14).toList();
+    scheduled.shuffle(
+      math.Random(
+        horseRaceStableSeed(
+          '$simulationSeed:${horseRaceGallopAssets[familyIndex]}:cycle:$cycle',
+        ),
+      ),
+    );
+    selectedTemplates.add(scheduled[zeroBasedDay % 14]);
+  }
+  return selectedTemplates;
+}
+
+Map<String, List<HorseRecentPerformance>> _horseRecentPerformancesForField({
+  required List<_HorseTemplate> selectedTemplates,
+  required String simulationSeed,
+  required int raceDay,
+}) {
+  final selectedIds = selectedTemplates.map((template) => template.id).toSet();
+  final histories = <String, List<HorseRecentPerformance>>{
+    for (final template in selectedTemplates)
+      template.id: <HorseRecentPerformance>[],
+  };
+
+  // Every world race is deterministic and exists whether the player opened the
+  // broadcast or not. Scanning backwards reconstructs exactly the same official
+  // results after saving, loading, or fast-forwarding without bloating saves.
+  for (var previousDay = raceDay - 1; previousDay >= 1; previousDay--) {
+    if (histories.values.every((history) => history.length >= 10)) break;
+    final historicalRace = _officialHorseRaceSnapshot(
+      simulationSeed: simulationSeed,
+      day: previousDay,
+    );
+    for (final entrant in historicalRace.entrants) {
+      if (!selectedIds.contains(entrant.id)) continue;
+      final history = histories[entrant.id]!;
+      if (history.length >= 10) continue;
+      history.add(
+        HorseRecentPerformance(
+          date: DateTime(2000, 1, 1).add(Duration(days: previousDay - 1)),
+          distanceMeters: historicalRace.distanceMeters,
+          position: historicalRace.finishPosition(entrant.id),
+          fieldSize: historicalRace.entrants.length,
+          jockey: entrant.jockey,
+          assignedWeight: entrant.assignedWeight,
+          recordSeconds: horseRaceFinishTimeSeconds(
+            race: historicalRace,
+            entrant: entrant,
+          ),
+          bodyWeight: entrant.bodyWeight,
+          rating: entrant.compositeScore.round().clamp(70, 99),
+        ),
+      );
+    }
+  }
+
+  for (final template in selectedTemplates) {
+    final history = histories[template.id]!;
+    history.addAll(_baselineHorseRecentPerformances(template));
+    if (history.length > 10) {
+      history.removeRange(10, history.length);
+    }
+  }
+  return histories;
+}
+
+const _horseRaceSnapshotCacheLimit = 512;
+final Map<String, HorseRaceCard> _horseRaceSnapshotCache =
+    <String, HorseRaceCard>{};
+
+HorseRaceCard _officialHorseRaceSnapshot({
+  required String simulationSeed,
+  required int day,
+}) {
+  final key = '$simulationSeed:$day';
+  final cached = _horseRaceSnapshotCache.remove(key);
+  if (cached != null) {
+    _horseRaceSnapshotCache[key] = cached;
+    return cached;
+  }
+  final snapshot = _buildAfternoonHorseRace(
+    simulationSeed: simulationSeed,
+    day: day,
+    includeRecentPerformances: false,
+  );
+  while (_horseRaceSnapshotCache.length >= _horseRaceSnapshotCacheLimit) {
+    _horseRaceSnapshotCache.remove(_horseRaceSnapshotCache.keys.first);
+  }
+  _horseRaceSnapshotCache[key] = snapshot;
+  return snapshot;
+}
+
+String _horseOrigin(_HorseTemplate template) {
+  final seed = horseRaceStableSeed('${template.id}:origin');
+  return seed % 5 == 0 ? '미국' : '한국';
+}
+
+String _horseSex(_HorseTemplate template) {
+  final seed = horseRaceStableSeed('${template.id}:sex');
+  return const <String>['수', '암', '거'][seed % 3];
+}
+
+int _horseAge(_HorseTemplate template) =>
+    3 + horseRaceStableSeed('${template.id}:age') % 4;
+
+String _horseTrainer(_HorseTemplate template) =>
+    _horseRaceTrainerNames[horseRaceStableSeed('${template.id}:trainer') %
+        _horseRaceTrainerNames.length];
+
+double _horseAssignedWeight(double compositeScore) =>
+    ((52.0 + (compositeScore - 82) * 0.28).clamp(51.0, 58.0) * 2).round() / 2;
+
+HorseRaceCard buildAfternoonHorseRace({
+  required String simulationSeed,
+  required int day,
+}) => _buildAfternoonHorseRace(
+  simulationSeed: simulationSeed,
+  day: day,
+  includeRecentPerformances: true,
+);
+
+HorseRaceCard _buildAfternoonHorseRace({
+  required String simulationSeed,
+  required int day,
+  required bool includeRecentPerformances,
+}) {
   final seed = horseRaceStableSeed('$simulationSeed:$day:seoul-turf-1510');
   final random = math.Random(seed);
-  final selectedTemplates = <_HorseTemplate>[];
-  for (final spriteAsset in horseRaceGallopAssets) {
-    final candidates = _horseTemplates
-        .where((template) => template.spriteAsset == spriteAsset)
-        .toList(growable: false);
-    final rotationSeed = horseRaceStableSeed(
-      '$simulationSeed:$spriteAsset:roster',
-    );
-    selectedTemplates.add(candidates[(rotationSeed + day) % candidates.length]);
-  }
+  final selectedTemplates = _scheduledHorseTemplates(
+    simulationSeed: simulationSeed,
+    day: day,
+  );
   selectedTemplates.shuffle(random);
+
+  final recentPerformancesById = includeRecentPerformances
+      ? _horseRecentPerformancesForField(
+          selectedTemplates: selectedTemplates,
+          simulationSeed: simulationSeed,
+          raceDay: day,
+        )
+      : const <String, List<HorseRecentPerformance>>{};
 
   final drafts = <_HorseRaceDraft>[];
   for (final template in selectedTemplates) {
@@ -847,19 +1579,11 @@ HorseRaceCard buildAfternoonHorseRace({
       finishingKick: finishingKick,
       consistency: consistency,
     );
-    final condition = (random.nextDouble() - 0.5) * 4.0;
-    final paceFit = switch (template.runningStyle) {
-      '선행' => (random.nextDouble() - 0.5) * 2.2,
-      '추입' => (random.nextDouble() - 0.5) * 2.8,
-      '지구력' => (random.nextDouble() - 0.5) * 1.8,
-      _ => (random.nextDouble() - 0.5) * 2.4,
-    };
-    final volatility = 1.15 + (100 - consistency) * 0.10;
+    // Gumbel-max sampling gives each runner the same actual winning chance as
+    // the probability used by the tote board, while still allowing any runner
+    // to win and producing a deterministic result for a saved race day.
     final finalScore =
-        compositeScore +
-        condition +
-        paceFit +
-        _horseRaceGaussian(random) * volatility;
+        compositeScore / _horseRaceMarketTemperature + _horseRaceGumbel(random);
     drafts.add(
       _HorseRaceDraft(
         template: template,
@@ -882,7 +1606,7 @@ HorseRaceCard buildAfternoonHorseRace({
   final marketWeights = <String, double>{
     for (final draft in drafts)
       draft.template.id: math.exp(
-        (draft.compositeScore - strongestScore) / 3.2,
+        (draft.compositeScore - strongestScore) / _horseRaceMarketTemperature,
       ),
   };
   final marketWeightTotal = marketWeights.values.reduce((a, b) => a + b);
@@ -930,9 +1654,16 @@ HorseRaceCard buildAfternoonHorseRace({
         id: template.id,
         gate: index + 1,
         name: template.name,
+        origin: _horseOrigin(template),
+        sex: _horseSex(template),
+        age: _horseAge(template),
         jockey: template.jockey,
+        trainer: _horseTrainer(template),
+        assignedWeight: _horseAssignedWeight(draft.compositeScore),
         runningStyle: template.runningStyle,
-        recentForm: template.recentForm,
+        recentPerformances:
+            recentPerformancesById[template.id] ??
+            const <HorseRecentPerformance>[],
         bodyWeight: draft.bodyWeight,
         weightChange: draft.weightChange,
         accentValue: template.accentValue,

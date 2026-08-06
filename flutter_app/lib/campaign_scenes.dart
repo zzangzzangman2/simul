@@ -13,7 +13,6 @@ class OfficeScreen extends StatelessWidget {
     required this.onReturnToTitle,
     required this.onAdvanceDay,
     this.onAdvanceDays,
-    this.onAdvanceDaysQuiet,
     required this.onSetMarketMinute,
     required this.onSaveMarketNotebook,
     this.onSetMarketRightsIssuePreference,
@@ -28,6 +27,7 @@ class OfficeScreen extends StatelessWidget {
     this.onLendToCohortInvestor,
     this.onBorrowFromCohortInvestor,
     this.onAcknowledgeCohortInvestmentReport,
+    this.onSettleCohortDailyRollCall,
     this.onAcknowledgeCohortStandingEvent,
     this.onRespondToCohortWithdrawal,
     this.onMarkPhoneThreadRead,
@@ -90,7 +90,6 @@ class OfficeScreen extends StatelessWidget {
   final VoidCallback onReturnToTitle;
   final Future<GameState> Function() onAdvanceDay;
   final Future<GameState> Function(int days)? onAdvanceDays;
-  final Future<GameState> Function(int days)? onAdvanceDaysQuiet;
   final Future<GameState> Function(int) onSetMarketMinute;
   final Future<GameState> Function(Set<String>, Map<String, String>)
   onSaveMarketNotebook;
@@ -131,6 +130,8 @@ class OfficeScreen extends StatelessWidget {
   onBorrowFromCohortInvestor;
   final Future<CohortInvestmentActionResult> Function()?
   onAcknowledgeCohortInvestmentReport;
+  final Future<CohortRollCallActionResult> Function()?
+  onSettleCohortDailyRollCall;
 
   /// 수익률 순위표가 촉발한 사건을 확인 처리한다.
   final Future<void> Function(CohortStandingEvent)?
@@ -364,7 +365,10 @@ class OfficeScreen extends StatelessWidget {
     );
   }
 
-  Future<void> _openHorseRace(BuildContext context) async {
+  Future<void> _openHorseRace(
+    BuildContext context, {
+    bool closeParentOnPowerOff = true,
+  }) async {
     final currentState = _latestState;
     final navigator = Navigator.of(context);
     final session = await Navigator.of(context).push<HorseRaceSessionResult>(
@@ -378,7 +382,7 @@ class OfficeScreen extends StatelessWidget {
           stateRecoveryRateBps: currentState.story.stateRecoveryRateBps,
           onPowerOff: () {
             navigator.pop();
-            if (navigator.canPop()) navigator.pop();
+            if (closeParentOnPowerOff && navigator.canPop()) navigator.pop();
           },
         ),
       ),
@@ -412,6 +416,58 @@ class OfficeScreen extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Future<WeekdayActivityResult> _runWeekdayAfternoonChoice(
+    BuildContext context,
+    String activityId,
+  ) async {
+    final activity = weekdayActivityById(activityId);
+    final complete = onCompleteWeekdayActivity;
+    WeekdayActivityResult failure(String message) => WeekdayActivityResult(
+      state: _latestState,
+      success: false,
+      message: message,
+      activity: activity,
+    );
+    if (activity == null) return failure('선택할 수 없는 오후 일정입니다.');
+    if (complete == null) return failure('오후 일정을 저장할 수 없습니다.');
+    if (!weekdayActivityUnlocked(_latestState, activityId)) {
+      return failure(weekdayActivityLockReason(_latestState, activityId));
+    }
+
+    switch (activityId) {
+      case 'casino':
+        await _openCasino(context);
+        break;
+      case 'horse_racing':
+        await _openHorseRace(context, closeParentOnPowerOff: false);
+        break;
+      case 'bank':
+        await _openBank(context, _latestState);
+        break;
+      case 'real_estate':
+        await _openRealEstateMarket(context, _latestState);
+        break;
+    }
+    if (!context.mounted) return failure('오후 일정 화면을 닫았습니다.');
+
+    final latest = _latestState;
+    final existing = weekdayActivityLogsForDay(latest, latest.day).firstOrNull;
+    if (existing != null) {
+      return WeekdayActivityResult(
+        state: latest,
+        success: true,
+        message: '${existing.title} 오후 일정이 완료됐습니다.',
+        activity: activity,
+        startMinute: existing.startMinute,
+        endMinute: existing.endMinute,
+      );
+    }
+    if (activityId == 'horse_racing') {
+      return failure('전자 마권 정산을 마쳐야 경마 오후 일정이 완료됩니다.');
+    }
+    return complete(activityId);
   }
 
   bool _weekdayFacilityAvailable(BuildContext context, String activityId) {
@@ -808,7 +864,8 @@ class OfficeScreen extends StatelessWidget {
   }
 
   Future<void> _showAdvanceMenu(BuildContext context) async {
-    if (onAdvanceDays == null) return;
+    final advanceDays = onAdvanceDays;
+    if (advanceDays == null) return;
     final selection = await showModalBottomSheet<_AdvanceMenuChoice>(
       context: context,
       showDragHandle: true,
@@ -857,22 +914,6 @@ class OfficeScreen extends StatelessWidget {
                     const _AdvanceMenuChoice(days: 30),
                   ),
                 ),
-                if (onAdvanceDaysQuiet != null)
-                  ListTile(
-                    key: const Key('advance-year-quiet-option'),
-                    leading: const Icon(Icons.calendar_view_month_rounded),
-                    title: const Text('다음 중요 선택까지 (최대 1년)'),
-                    subtitle: const Text(
-                      '주간 복기·주말 휴식·관계 휴식은 장부에 자동 기록하고, 선택·캠페인 종료에서 멈춥니다.',
-                    ),
-                    onTap: () => Navigator.pop(
-                      sheetContext,
-                      const _AdvanceMenuChoice(
-                        days: 365,
-                        stopOnImportantNews: false,
-                      ),
-                    ),
-                  ),
                 ListTile(
                   leading: const Icon(Icons.event_available_rounded),
                   title: const Text('다음 중요 뉴스·선택까지 (최대 90일)'),
@@ -889,11 +930,7 @@ class OfficeScreen extends StatelessWidget {
     );
     if (selection == null || !context.mounted) return;
     try {
-      final advance = selection.stopOnImportantNews
-          ? onAdvanceDays
-          : onAdvanceDaysQuiet;
-      if (advance == null) return;
-      final next = await advance(selection.days);
+      final next = await advanceDays(selection.days);
       if (!context.mounted) return;
       final advanced = next.day - state.day;
       final stopReason =
@@ -946,67 +983,13 @@ class OfficeScreen extends StatelessWidget {
     final lendToCohort = onLendToCohortInvestor;
     final borrowFromCohort = onBorrowFromCohortInvestor;
     final acknowledgeCohort = onAcknowledgeCohortInvestmentReport;
-    if (isMarketTradingDay(closingState.currentDate) &&
-        settleCohort != null &&
-        lendToCohort != null &&
-        borrowFromCohort != null &&
-        acknowledgeCohort != null) {
+    if (isMarketTradingDay(closingState.currentDate) && settleCohort != null) {
       if (!closingState.cohortInvestments.settledForDay(closingState.day)) {
         final settlement = await settleCohort();
         if (!settlement.success) {
           throw StateError(settlement.message);
         }
         closingState = settlement.state;
-      }
-      if (!closingState.cohortInvestments.acknowledgedForDay(
-        closingState.day,
-      )) {
-        final report = closingState.cohortInvestments.reportForDay(
-          closingState.day,
-        );
-        final player = report?.resultFor('player');
-        final needsFullResult =
-            player?.traded == true ||
-            player?.profitLoss != 0 ||
-            report?.repaymentTotal != 0 ||
-            report?.borrowingRepaymentTotal != 0 ||
-            closingState.needsTradingRecovery;
-        if (needsFullResult) {
-          final completed = await navigator.push<bool>(
-            _gameSceneRoute<bool>(
-              CohortDailyResultScreen(
-                state: closingState,
-                onLend: lendToCohort,
-                onBorrow: borrowFromCohort,
-                onAcknowledge: acknowledgeCohort,
-              ),
-            ),
-          );
-          if (completed != true || !context.mounted) return;
-        } else {
-          final acknowledged = await acknowledgeCohort();
-          if (!acknowledged.success || !context.mounted) return;
-        }
-        closingState = _latestState;
-      }
-    }
-
-    // 결과표가 촉발한 사건을 바로 잇는다. 연속 최하위 면담은 중단권 안내이므로
-    // 다른 일정보다 먼저 나온다.
-    final acknowledgeStanding = onAcknowledgeCohortStandingEvent;
-    if (acknowledgeStanding != null) {
-      final standing = pendingCohortStandingEvent(closingState);
-      if (standing != null) {
-        final seen = await navigator.push<bool>(
-          _gameSceneRoute<bool>(
-            CohortStandingEventScreen(
-              event: standing,
-              onAcknowledge: () => acknowledgeStanding(standing),
-            ),
-          ),
-        );
-        if (seen != true || !context.mounted) return;
-        closingState = _latestState;
       }
     }
 
@@ -1027,6 +1010,31 @@ class OfficeScreen extends StatelessWidget {
               universe.asOf(closingState.currentDate),
             ),
             onComplete: completeWeeklyReview,
+          ),
+        ),
+      );
+      if (completed != true || !context.mounted) return;
+      closingState = _latestState;
+    }
+
+    final completeAfternoonActivity = onCompleteWeekdayActivity;
+    if (completeAfternoonActivity != null &&
+        closingState.currentDate.weekday < DateTime.saturday &&
+        !weekdayEveningUsed(closingState) &&
+        closingState.personalFinance.casino.roundsForDay(closingState.day) >
+            0) {
+      final completedCasino = await completeAfternoonActivity('casino');
+      if (!completedCasino.success || !context.mounted) return;
+      closingState = completedCasino.state;
+    }
+    if (completeAfternoonActivity != null &&
+        weekdayAfternoonScheduleRequired(closingState)) {
+      final completed = await navigator.push<bool>(
+        _gameSceneRoute<bool>(
+          WeekdayAfternoonScheduleScreen(
+            state: closingState,
+            onSelect: (activityId) =>
+                _runWeekdayAfternoonChoice(context, activityId),
           ),
         ),
       );
@@ -1055,7 +1063,88 @@ class OfficeScreen extends StatelessWidget {
     }
     if (!context.mounted) return;
 
-    // 20:00 관계 시간 전에 그 애가 먼저 말을 꺼낸다.
+    // Roll call is the 20:00 group event. Personal messages and relationship
+    // time deliberately follow it, leaving the familiar 20:00-22:00 wind-down.
+    final settleRollCall = onSettleCohortDailyRollCall;
+    if (settleRollCall != null) {
+      if (closingState.cohortInvestments.rollCallReportForDay(
+            closingState.day,
+          ) ==
+          null) {
+        final settlement = await settleRollCall();
+        if (!settlement.success || !context.mounted) return;
+        closingState = settlement.state;
+      }
+      final report = closingState.cohortInvestments.rollCallReportForDay(
+        closingState.day,
+      );
+      if (report != null) {
+        final completed = await navigator.push<bool>(
+          _gameSceneRoute<bool>(
+            CohortDailyRollCallScreen(
+              state: closingState,
+              report: report,
+              onOpenCohortFinance:
+                  lendToCohort == null ||
+                      borrowFromCohort == null ||
+                      acknowledgeCohort == null ||
+                      closingState.cohortInvestments.reportForDay(
+                            closingState.day,
+                          ) ==
+                          null
+                  ? null
+                  : () async {
+                      await navigator.push<bool>(
+                        _gameSceneRoute<bool>(
+                          CohortDailyResultScreen(
+                            state: closingState,
+                            onLend: lendToCohort,
+                            onBorrow: borrowFromCohort,
+                            onAcknowledge: acknowledgeCohort,
+                            loanOnly: true,
+                          ),
+                        ),
+                      );
+                    },
+            ),
+          ),
+        );
+        if (completed != true || !context.mounted) return;
+        closingState = _latestState;
+      }
+    }
+
+    // Keep the internal stock report open during roll call so the optional
+    // loan/recovery book can still transact. It is acknowledged only after
+    // the group announcement closes, whether or not that book was opened.
+    if (acknowledgeCohort != null &&
+        closingState.cohortInvestments.reportForDay(closingState.day) != null &&
+        !closingState.cohortInvestments.acknowledgedForDay(closingState.day)) {
+      final acknowledged = await acknowledgeCohort();
+      if (!acknowledged.success || !context.mounted) return;
+      closingState = _latestState;
+    }
+
+    // Streak interviews and withdrawal conversations are consequences of the
+    // announced result, so they now follow the 20:00 group roll call instead
+    // of interrupting the start of the afternoon schedule.
+    final acknowledgeStanding = onAcknowledgeCohortStandingEvent;
+    if (acknowledgeStanding != null) {
+      final standing = pendingCohortStandingEvent(closingState);
+      if (standing != null) {
+        final seen = await navigator.push<bool>(
+          _gameSceneRoute<bool>(
+            CohortStandingEventScreen(
+              event: standing,
+              onAcknowledge: () => acknowledgeStanding(standing),
+            ),
+          ),
+        );
+        if (seen != true || !context.mounted) return;
+        closingState = _latestState;
+      }
+    }
+
     final respondWithdrawal = onRespondToCohortWithdrawal;
     if (respondWithdrawal != null &&
         activeCohortWithdrawalCrisis(closingState) != null) {
@@ -1118,6 +1207,30 @@ class OfficeScreen extends StatelessWidget {
         );
         if (completed != true || !context.mounted) return;
       } else {
+        if (markPhoneRead != null && sendPhone != null) {
+          final completed = await navigator.push<bool>(
+            _gameSceneRoute<bool>(
+              PostRollCallPhoneTimeScreen(
+                state: closingState,
+                onOpenMessenger: () async {
+                  await navigator.push<void>(
+                    _gameSceneRoute<void>(
+                      PhoneMessengerScreen(
+                        state: _latestState,
+                        onMarkRead: markPhoneRead,
+                        onSend: sendPhone,
+                        onSendGift: onSendPhoneGift,
+                        aiService: phoneAiService,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          );
+          if (completed != true || !context.mounted) return;
+          closingState = _latestState;
+        }
         final rest = onRestDuringRelationshipEvening;
         if (rest != null) {
           final rested = await rest();
@@ -1662,6 +1775,430 @@ class NewsGeneratingScene extends StatelessWidget {
       ),
     ),
   );
+}
+
+class WeekdayAfternoonScheduleScreen extends StatefulWidget {
+  const WeekdayAfternoonScheduleScreen({
+    super.key,
+    required this.state,
+    required this.onSelect,
+  });
+
+  final GameState state;
+  final Future<WeekdayActivityResult> Function(String activityId) onSelect;
+
+  @override
+  State<WeekdayAfternoonScheduleScreen> createState() =>
+      _WeekdayAfternoonScheduleScreenState();
+}
+
+class _WeekdayAfternoonScheduleScreenState
+    extends State<WeekdayAfternoonScheduleScreen> {
+  String? _busyActivityId;
+
+  Future<void> _select(WeekdayActivityDefinition activity) async {
+    if (_busyActivityId != null ||
+        !weekdayActivityUnlocked(widget.state, activity.id)) {
+      return;
+    }
+    setState(() => _busyActivityId = activity.id);
+    final result = await widget.onSelect(activity.id);
+    if (!mounted) return;
+    if (result.success) {
+      Navigator.pop(context, true);
+      return;
+    }
+    setState(() => _busyActivityId = null);
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(result.message)));
+  }
+
+  IconData _iconFor(String activityId) => switch (activityId) {
+    'casino' => Icons.casino_rounded,
+    'horse_racing' => Icons.emoji_events_rounded,
+    'bank' => Icons.savings_rounded,
+    'real_estate' => Icons.apartment_rounded,
+    _ => Icons.schedule_rounded,
+  };
+
+  Color _colorFor(String activityId) => switch (activityId) {
+    'casino' => const Color(0xFF9D4865),
+    'horse_racing' => const Color(0xFF2E7D68),
+    'bank' => const Color(0xFF386FB0),
+    'real_estate' => const Color(0xFFB06B32),
+    _ => const Color(0xFF657087),
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final availableCount = unlockedWeekdayActivities(widget.state).length;
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
+        key: const Key('weekday-afternoon-schedule-screen'),
+        backgroundColor: const Color(0xFFF4ECDD),
+        body: SafeArea(
+          child: ListView(
+            key: const Key('weekday-afternoon-schedule-scroll'),
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 24),
+            children: [
+              Container(
+                padding: const EdgeInsets.fromLTRB(17, 16, 17, 15),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF172744),
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(
+                    color: const Color(0xFFE4C36E),
+                    width: 1.5,
+                  ),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x33000000),
+                      blurRadius: 13,
+                      offset: Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '15:00 · 장 마감 후',
+                      style: TextStyle(
+                        color: Color(0xFFE4C36E),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.6,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    const Text(
+                      '오후 일정을 선택하세요',
+                      key: Key('weekday-afternoon-choice-message'),
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontFamily: _hubDisplayFont,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 7),
+                    const Text(
+                      '해금된 일정 중 하나를 이용할 수 있습니다. 쉬고 싶은 날에는 아무 시설도 이용하지 않고 바로 점호로 넘어가세요.',
+                      style: TextStyle(
+                        color: Color(0xFFD7DFEC),
+                        fontSize: 10,
+                        height: 1.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      key: const Key('weekday-afternoon-available-count'),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF24395E),
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                      child: Text(
+                        '현재 $availableCount개 선택 가능 · 최대 4개',
+                        style: const TextStyle(
+                          color: Color(0xFFF2D782),
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 13),
+              for (final activity in weekdayActivities) ...[
+                Builder(
+                  builder: (context) {
+                    final unlocked = weekdayActivityUnlocked(
+                      widget.state,
+                      activity.id,
+                    );
+                    final busy = _busyActivityId == activity.id;
+                    final accent = _colorFor(activity.id);
+                    return AnimatedOpacity(
+                      duration: const Duration(milliseconds: 160),
+                      opacity: unlocked ? 1 : 0.58,
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          key: Key('weekday-afternoon-choice-${activity.id}'),
+                          onTap: unlocked && _busyActivityId == null
+                              ? () => _select(activity)
+                              : null,
+                          borderRadius: BorderRadius.circular(18),
+                          child: Ink(
+                            padding: const EdgeInsets.all(13),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(
+                                color: unlocked
+                                    ? accent
+                                    : const Color(0xFFB1B5BC),
+                                width: unlocked ? 1.7 : 1,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 46,
+                                  height: 46,
+                                  decoration: BoxDecoration(
+                                    color: accent.withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                  child: Icon(
+                                    unlocked
+                                        ? _iconFor(activity.id)
+                                        : Icons.lock_rounded,
+                                    color: accent,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        activity.title,
+                                        style: const TextStyle(
+                                          color: Color(0xFF263451),
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w900,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 3),
+                                      Text(
+                                        unlocked
+                                            ? activity.description
+                                            : weekdayActivityLockReason(
+                                                widget.state,
+                                                activity.id,
+                                              ),
+                                        style: TextStyle(
+                                          color: unlocked
+                                              ? const Color(0xFF667087)
+                                              : const Color(0xFF8B8F97),
+                                          fontSize: 9,
+                                          height: 1.35,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                if (busy)
+                                  SizedBox(
+                                    width: 22,
+                                    height: 22,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2.3,
+                                      color: accent,
+                                    ),
+                                  )
+                                else
+                                  Icon(
+                                    unlocked
+                                        ? Icons.arrow_forward_ios_rounded
+                                        : Icons.lock_outline_rounded,
+                                    size: 17,
+                                    color: unlocked
+                                        ? accent
+                                        : const Color(0xFF9CA2AB),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 9),
+              ],
+              const SizedBox(height: 5),
+              OutlinedButton.icon(
+                key: const Key('weekday-afternoon-skip-button'),
+                onPressed: _busyActivityId == null
+                    ? () => _select(weekdayAfternoonSkipActivity)
+                    : null,
+                icon: _busyActivityId == weekdayAfternoonSkipActivityId
+                    ? const SizedBox(
+                        width: 17,
+                        height: 17,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.nights_stay_rounded),
+                label: const Text('오늘은 그냥 넘어가기'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF4E5E76),
+                  side: const BorderSide(color: Color(0xFF8E9AAF)),
+                  padding: const EdgeInsets.symmetric(vertical: 13),
+                  textStyle: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+              ),
+              const SizedBox(height: 7),
+              const Text(
+                '오후 활동은 선택 사항입니다. 넘어가도 손해나 벌점은 없습니다.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Color(0xFF68748A),
+                  fontSize: 9,
+                  height: 1.4,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class PostRollCallPhoneTimeScreen extends StatelessWidget {
+  const PostRollCallPhoneTimeScreen({
+    super.key,
+    required this.state,
+    required this.onOpenMessenger,
+  });
+
+  final GameState state;
+  final Future<void> Function() onOpenMessenger;
+
+  @override
+  Widget build(BuildContext context) {
+    final readOnly = state.marketMinute >= phoneMessengerBedtimeMinute;
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
+        key: const Key('post-roll-call-phone-time-screen'),
+        backgroundColor: const Color(0xFF14223B),
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8F3E8),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(
+                      color: const Color(0xFFE6C46E),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 62,
+                        height: 62,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFFFE467),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.chat_bubble_rounded,
+                          color: Color(0xFF3A321F),
+                          size: 31,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        '점호 이후 · 자유 톡 시간',
+                        style: TextStyle(
+                          color: Color(0xFF263451),
+                          fontFamily: _hubDisplayFont,
+                          fontSize: 21,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 7),
+                      Text(
+                        readOnly
+                            ? '지금은 ${marketTimeLabel(state.marketMinute)}예요. 22:00부터는 모두 취침해 지난 대화만 읽을 수 있습니다.'
+                            : '20:00 점호가 끝났어요. 마지막 대화 시작은 21:30까지이고, 한 번 대화하면 30분이 흘러 22:00에 모두 취침합니다.',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Color(0xFF667087),
+                          fontSize: 10.5,
+                          height: 1.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 9),
+                      const Text(
+                        '데시멀톡은 관계 선택을 소비하지 않아요. 오늘 이야기할 말이 없다면 바로 마무리해도 됩니다.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Color(0xFF8A6A31),
+                          fontSize: 9,
+                          height: 1.4,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+                FilledButton.icon(
+                  key: const Key('post-roll-call-open-phone-button'),
+                  onPressed: onOpenMessenger,
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(52),
+                    backgroundColor: const Color(0xFFFFE467),
+                    foregroundColor: const Color(0xFF3A321F),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  icon: const Icon(Icons.phone_android_rounded),
+                  label: Text(
+                    readOnly ? '데시멀톡 읽기' : '데시멀톡 열기',
+                    style: const TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton(
+                  key: const Key('post-roll-call-phone-finish-button'),
+                  onPressed: () => Navigator.pop(context, true),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(48),
+                    foregroundColor: Colors.white,
+                    side: const BorderSide(color: Color(0xFF90A0BE)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  child: const Text(
+                    '오늘은 마무리',
+                    style: TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                ),
+                const Spacer(),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class FastForwardSummarySheet extends StatelessWidget {

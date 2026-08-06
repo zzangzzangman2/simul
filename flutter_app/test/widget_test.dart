@@ -586,6 +586,87 @@ void main() {
     expect(snapshot.bids.map((level) => level.price), <double>[13350, 13300]);
   });
 
+  test('a filled 24500 wall stays visible without becoming a fake bid', () {
+    const snapshot = GameOrderBookSnapshot(
+      asks: <GameOrderBookLevel>[
+        GameOrderBookLevel(
+          side: GameOrderBookSide.ask,
+          price: 24500,
+          quantity: 100,
+          isWall: true,
+        ),
+        GameOrderBookLevel(
+          side: GameOrderBookSide.ask,
+          price: 24550,
+          quantity: 180,
+          isWall: false,
+        ),
+      ],
+      bids: <GameOrderBookLevel>[
+        GameOrderBookLevel(
+          side: GameOrderBookSide.bid,
+          price: 24450,
+          quantity: 140,
+          isWall: false,
+        ),
+        GameOrderBookLevel(
+          side: GameOrderBookSide.bid,
+          price: 24400,
+          quantity: 160,
+          isWall: false,
+        ),
+      ],
+      turnoverEok: 10,
+      fullDayTurnoverEok: 100,
+      boundaryBidPrice: 24450,
+      executionCapacity: 1000,
+      totalAskQuantity: 280,
+      totalBidQuantity: 300,
+      tradeStrength: 100,
+      liquidityPulse: 4,
+      sourceAssetId: 'filled-24500-wall',
+      sourceLiquidityDayKey: 6015,
+      sourceMarketMinute: 600,
+      sourceLastTradePrice: 24450,
+      sourceMarket: '코스닥',
+      sourceSimulationSeed: 'filled-wall-world',
+    );
+    final traded = gameOrderBookSnapshotAfterSyntheticTrade(
+      snapshot: snapshot,
+      pulse: const GameOrderBookTradePulse(
+        levelSide: GameOrderBookSide.ask,
+        levelIndex: 0,
+        quantity: 100,
+        crossedTicks: 1,
+      ),
+      absolutePrice: 24500,
+      previousSnapshot: snapshot,
+      availableSnapshot: snapshot,
+      perMinuteBudgetUnits: 1000,
+    );
+
+    expect(traded.rememberedLevels[24500]!.side, GameOrderBookSide.ask);
+    expect(traded.rememberedLevels[24500]!.quantity, 0);
+    expect(traded.bids.any((level) => level.price == 24500), isFalse);
+
+    final executable = gameOrderBookSnapshotAfterConsumption(
+      snapshot: traded,
+      retainSyntheticTombstone: false,
+    );
+    expect(executable.asks.any((level) => level.price == 24500), isFalse);
+    expect(executable.bids.any((level) => level.price == 24500), isFalse);
+
+    final presentation = stockOrderBookPresentationLevels(
+      executable,
+      sideRowCount: 3,
+    );
+    final displayed24500 = presentation
+        .where((level) => level.price == 24500)
+        .single;
+    expect(displayed24500.side, GameOrderBookSide.bid);
+    expect(displayed24500.quantity, 0);
+  });
+
   void expectSymmetricInlineOrderBook(WidgetTester tester) {
     final askRows = find.byKey(const ValueKey('inline-order-book-ask-row'));
     final bidRows = find.byKey(const ValueKey('inline-order-book-bid-row'));
@@ -642,7 +723,11 @@ void main() {
         );
       }
     } else if (borderWidget is AnimatedPositioned) {
-      expect(borderWidget.duration, const Duration(milliseconds: 144));
+      expect(
+        borderWidget.duration,
+        Duration.zero,
+        reason: '대기 중에도 현재가 외곽선은 새 가격행으로 즉시 점프해야 한다.',
+      );
       expect(
         borderTop,
         anyOf(bestAskSlot.top, bestBidSlot.top),
@@ -5606,7 +5691,7 @@ void main() {
     );
   });
 
-  test('order-book hides cancellation deltas but keeps actual flow labels', () {
+  test('order-book hides cancellation deltas but keeps real flow labels', () {
     expect(orderBookQuantityDeltaLabel(-125, isTrade: false), isEmpty);
     expect(orderBookQuantityDeltaLabel(-125, isTrade: true), '-125');
     expect(orderBookQuantityDeltaLabel(125, isTrade: false), '+125');
@@ -6097,6 +6182,20 @@ void main() {
     expect(sweepDepthTween!.begin, inInclusiveRange(0.0, 1.0));
     expect(sweepDepthTween.end, inInclusiveRange(0.0, 1.0));
     expect(sweepDepthTween.begin!, greaterThanOrEqualTo(sweepDepthTween.end!));
+    expect(
+      tester.widget<AnimatedPositioned>(currentPriceBorder).duration,
+      Duration.zero,
+      reason: '본 체결 테두리는 체결 문구와 같은 가격행에 즉시 고정되어야 합니다.',
+    );
+    expect(
+      tester
+          .widget<AnimatedPositioned>(
+            find.byKey(const Key('order-book-current-price-border-trail')),
+          )
+          .duration,
+      const Duration(milliseconds: 72),
+      reason: '반투명 체결 잔상은 이전 가격행에서 다음 가격행으로 짧게 이동해야 합니다.',
+    );
 
     final sweepRect = tester.getRect(
       find.byKey(const Key('order-book-sweep-step')),
@@ -6466,9 +6565,9 @@ void main() {
         isTrue,
         reason: '운영 호가창은 소진된 숫자 0 행을 노출하면 안 됩니다.',
       );
-      // Match the original trade side. A fully consumed ask may legally create
-      // a fresh bid at the same absolute price; that opposite queue is not a
-      // replenished ask and must not be compared with the pre-trade ask.
+      // Match the original trade side. A fully consumed order disappears from
+      // executable depth; any later opposite-side row at the same price must
+      // come from a separate quote-arrival frame.
       final displayedAfter = trade.isVisible ? trade.displayedQuantity : null;
       if (displayedAfter != null) {
         expect(
@@ -6552,6 +6651,11 @@ void main() {
       );
       expect(compactBorder, findsOneWidget);
       expect(tester.widget<Widget>(compactBorder), isA<AnimatedPositioned>());
+      expect(
+        tester.widget<AnimatedPositioned>(compactBorder).duration,
+        Duration.zero,
+        reason: '주문 화면의 축소 호가도 현재가 외곽선이 즉시 새 가격행에 붙어야 합니다.',
+      );
 
       List<Finder> inlineRows() {
         final asks = find.byKey(const ValueKey('inline-order-book-ask-row'));
@@ -7243,7 +7347,11 @@ void main() {
             'arrival과 drain 모두 같은 AnimatedPositioned runtime type을 유지해야 합니다.',
       );
       final animatedBorder = border as AnimatedPositioned;
-      expect(animatedBorder.duration, const Duration(milliseconds: 144));
+      expect(
+        animatedBorder.duration,
+        Duration.zero,
+        reason: '영웅문식 현재가 외곽선은 평상시 틱에서도 행 사이를 미끄러지면 안 됩니다.',
+      );
       return animatedBorder.top;
     }
 

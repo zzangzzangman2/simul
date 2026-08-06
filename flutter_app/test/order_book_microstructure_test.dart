@@ -1027,7 +1027,7 @@ void main() {
   );
 
   test(
-    'sub-minute trade border keeps directional bias but crosses both sides',
+    'sub-minute trade border keeps directional bias and flat flow clusters',
     () {
       final risingPulses = [
         for (var pulse = 1; pulse <= 400; pulse++)
@@ -1046,19 +1046,9 @@ void main() {
       final buyAggressorRatio =
           risingPulses.where((pulse) => pulse.isBuyAggressor).length /
           risingPulses.length;
-      expect(buyAggressorRatio, inInclusiveRange(0.60, 0.85));
+      expect(buyAggressorRatio, inInclusiveRange(0.55, 0.92));
       expect(risingPulses.any((pulse) => !pulse.isBuyAggressor), isTrue);
 
-      final flatBaseline = gameOrderBookTradePulse(
-        assetId: assetId,
-        day: day,
-        minute: minute,
-        previousPrice: 10000,
-        currentPrice: 10000,
-        executionCapacity: 5000,
-        market: 'main',
-        simulationSeed: simulationSeed,
-      )!;
       final flatPulses = [
         for (var pulse = 1; pulse <= 400; pulse++)
           gameOrderBookTradePulse(
@@ -1073,15 +1063,26 @@ void main() {
             liquidityPulse: pulse,
           )!,
       ];
-      final balancedRatio =
-          flatPulses
-              .where((pulse) => pulse.levelSide == flatBaseline.levelSide)
-              .length /
+      final flatBuyRatio =
+          flatPulses.where((pulse) => pulse.isBuyAggressor).length /
           flatPulses.length;
-      expect(balancedRatio, inInclusiveRange(0.45, 0.55));
+      var longestRun = 1;
+      var currentRun = 1;
+      for (var index = 1; index < flatPulses.length; index += 1) {
+        if (flatPulses[index].levelSide == flatPulses[index - 1].levelSide) {
+          currentRun += 1;
+          longestRun = math.max(longestRun, currentRun);
+        } else {
+          currentRun = 1;
+        }
+      }
+      expect(flatBuyRatio, inInclusiveRange(0.20, 0.80));
+      expect(flatPulses.any((pulse) => pulse.isBuyAggressor), isTrue);
+      expect(flatPulses.any((pulse) => !pulse.isBuyAggressor), isTrue);
       expect(
-        flatPulses.any((pulse) => pulse.levelSide != flatBaseline.levelSide),
-        isTrue,
+        longestRun,
+        greaterThanOrEqualTo(4),
+        reason: '횡보장도 흡수되는 매수·매도 체결 군집이 있어야 하며 기계적으로 교대하면 안 된다.',
       );
 
       final repeated = gameOrderBookTradePulse(
@@ -1450,11 +1451,11 @@ void main() {
       previousSnapshot: applied,
     );
     final movedLevel = moved.rememberedLevels[target.price]!;
-    expect(movedLevel.side, GameOrderBookSide.bid);
+    expect(movedLevel.side, GameOrderBookSide.ask);
     expect(
       movedLevel.quantity,
-      isNot(remaining),
-      reason: '남은 매도 잔량을 같은 가격의 새 매수 큐로 넘기면 안 됩니다.',
+      remaining,
+      reason: '화면 밖 기억 행도 남은 매도 잔량의 방향을 매수로 바꾸면 안 됩니다.',
     );
     expect(moved.lastSyntheticTrade, same(applied.lastSyntheticTrade));
     expect(moved.syntheticTradeBudgetUsed, applied.syntheticTradeBudgetUsed);

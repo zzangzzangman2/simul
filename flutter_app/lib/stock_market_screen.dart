@@ -299,7 +299,11 @@ List<GameOrderBookLevel> orderBookSweepPresentationLevels({
 }
 
 String orderBookQuantityDeltaLabel(int delta, {required bool isTrade}) {
-  if (delta < 0 && !isTrade) return '';
+  // HeroMoon updates a cancelled quote's remaining depth in place. Only an
+  // actual execution gets a signed drain label and a matching tape print;
+  // painting a separate negative cancellation number makes the quote look
+  // like a trade that never happened.
+  if (delta == 0 || (!isTrade && delta < 0)) return '';
   return '${delta > 0 ? '+' : ''}${_money(delta)}';
 }
 
@@ -544,10 +548,10 @@ List<GameOrderBookLevel> stockOrderBookPresentationLevels(
 /// Selects the idle red current-price outline row at the central touch.
 ///
 /// Active sweep playback bypasses this fallback and targets the exact execution
-/// row. This helper is used only while no execution is being presented. When a
-/// fully consumed level immediately becomes the opposite-side touch at the same
-/// absolute price, that exact row still wins so the idle outline cannot appear
-/// one tick ahead of the header and trade tape.
+/// row. This helper is used only while no execution is being presented. A
+/// consumed price can remain as a zero-depth presentation row while the real
+/// executable book waits for a new order, so the outline stays on the current
+/// central touch instead of jumping to a non-executable historical price.
 GameOrderBookLevel? stockOrderBookCentralOutlineLevel({
   required List<GameOrderBookLevel> levels,
   required double? referencePrice,

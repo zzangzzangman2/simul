@@ -6,7 +6,13 @@ import 'package:millennium_capital/game/game_state.dart';
 import 'package:millennium_capital/game/market_clock.dart';
 
 const _engine = GameEngine();
-const _stake = 10000;
+// Bet fixtures describe only game/type/selection. The live wager is always
+// recalculated from the current balance so the audit obeys the 2% preset and
+// can complete all ten rounds without bypassing the monthly loss stop.
+const _stake = 0;
+
+int _stakeFor(GameState state) =>
+    casinoStakeForChipPercent(state.personalFinance.casino.chipBalance, 2);
 
 GameState _session(String seed) {
   final day = DateTime(2000, 1, 3).difference(DateTime(2000, 1, 1)).inDays + 1;
@@ -58,14 +64,14 @@ void _verifyAndPrint(String label, GameState before, GameState after) {
   final losses = records.where((record) => record.net < 0).length;
   debugPrint(
     '[$label] 10판 · 승 $wins / 본전 $pushes / 패 $losses · '
-    '손익 $totalNet원 · 국가 수수료 $totalFee원 · 종료 20:00',
+    '손익 $totalNet칩 · 국가 수수료 $totalFee칩 · 종료 20:00',
   );
   for (var index = 0; index < records.length; index++) {
     final record = records[index];
     debugPrint(
       '  ${index + 1}. ${record.betLabel} · ${record.outcome} · '
-      '${record.detail} · 베팅 ${record.stake}원 · 손익 ${record.net}원 · '
-      '수수료 ${record.nationalFee}원',
+      '${record.detail} · 베팅 ${record.stake}칩 · 손익 ${record.net}칩 · '
+      '수수료 ${record.nationalFee}칩',
     );
   }
 }
@@ -74,7 +80,15 @@ GameState _playFixedBets(String seed, List<CasinoBet> bets) {
   var state = _session(seed);
   final before = state;
   for (final bet in bets) {
-    final result = _engine.playCasinoRound(state, bet);
+    final result = _engine.playCasinoRound(
+      state,
+      CasinoBet(
+        game: bet.game,
+        type: bet.type,
+        stake: _stakeFor(state),
+        selection: bet.selection,
+      ),
+    );
     state = _advanceAfterRound(state, result);
   }
   _verifyAndPrint(casinoGameTitle(bets.first.game), before, state);
@@ -231,19 +245,24 @@ void main() {
     );
   });
 
-  test('크랩스 패스·돈트 패스 계약을 10판 플레이한다', () {
+  test('크랩스 라인·단판 프로포지션을 10판 플레이한다', () {
     var state = _session('ten-round-craps');
     final before = state;
+    const betTypes = <CasinoBetType>[
+      CasinoBetType.crapsPassLine,
+      CasinoBetType.crapsDontPass,
+      CasinoBetType.crapsField,
+      CasinoBetType.crapsAnySeven,
+      CasinoBetType.crapsAnyCraps,
+    ];
     for (var round = 0; round < 10; round++) {
       var beforeAction = state;
       var result = _engine.playCasinoRound(
         state,
         CasinoBet(
           game: CasinoGameType.craps,
-          type: round.isEven
-              ? CasinoBetType.crapsPassLine
-              : CasinoBetType.crapsDontPass,
-          stake: _stake,
+          type: betTypes[round % betTypes.length],
+          stake: _stakeFor(state),
         ),
       );
       expect(result.success, isTrue, reason: result.message);
@@ -268,7 +287,7 @@ void main() {
     var state = _session('ten-round-blackjack');
     final before = state;
     for (var round = 0; round < 10; round++) {
-      final deal = _engine.startCasinoBlackjack(state, _stake);
+      final deal = _engine.startCasinoBlackjack(state, _stakeFor(state));
       expect(
         deal.success,
         isTrue,

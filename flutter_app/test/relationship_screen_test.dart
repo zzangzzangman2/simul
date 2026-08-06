@@ -27,6 +27,15 @@ void main() {
     expect(cohortCharacterProfileById('han_seoyoon')?.mbti, 'INFJ');
     expect(cohortCharacterProfileById('kim_hakjun')?.age, 14);
     expect(cohortCharacterProfileById('han_seoyoon')?.age, 23);
+    expect(cohortCharacterProfileById('kim_seoa')?.birthdayLabel, '1987.02.12');
+    expect(
+      cohortCharacterProfileById('kim_seoa')?.ageLabelAt(DateTime(2001, 1, 1)),
+      '15살',
+    );
+    expect(
+      cohortCharacterProfileById('han_seoyoon')?.birthdayLabel,
+      '1978.04.09',
+    );
   });
 
   testWidgets('character directory opens a card and portrait detail', (
@@ -71,11 +80,33 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('초상화를 눌러 상세 프로필 보기'), findsOneWidget);
+    expect(find.text('현재 나이'), findsOneWidget);
+    expect(find.text('생일'), findsOneWidget);
+    expect(find.text('현재 호감도'), findsOneWidget);
+    expect(find.text('고유 능력'), findsOneWidget);
+    expect(find.text('1987.02.12'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('relationship-affection-kim_seoa')),
+      220,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(
       find.byKey(const Key('relationship-affection-kim_seoa')),
       findsOneWidget,
     );
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('cohort-investor-assets-kim_seoa')),
+      220,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(
+      find.byKey(const Key('cohort-investor-assets-kim_seoa')),
+      findsOneWidget,
+    );
 
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, 1400));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('character-card-portrait-kim_seoa')));
     await tester.pumpAndSettle();
 
@@ -86,6 +117,7 @@ void main() {
     expect(find.text('성격'), findsOneWidget);
     expect(find.text('좋아하는 것'), findsOneWidget);
     expect(find.text('14살'), findsOneWidget);
+    expect(find.text('1987.02.12'), findsOneWidget);
     expect(find.text('ISFJ'), findsWidgets);
 
     await tester.scrollUntilVisible(
@@ -132,6 +164,16 @@ void main() {
     );
     expect(find.text('INFJ'), findsWidgets);
     expect(find.text('23세'), findsWidgets);
+    expect(find.text('1978.04.09'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('운영관은 10인 투자 순위 참가자가 아니어서 개인 자산을 공개하지 않습니다.'),
+      220,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(
+      find.text('운영관은 10인 투자 순위 참가자가 아니어서 개인 자산을 공개하지 않습니다.'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('ten character cards fit the 360 by 800 mobile minimum', (

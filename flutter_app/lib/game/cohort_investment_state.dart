@@ -9,6 +9,10 @@ const cohortNpcEmergencyReserve = 10000;
 // Keep a complete leap-year trading tail so the year-end archive never loses
 // the first sessions of a 261/262-session year before it is summarized.
 const cohortInvestmentHistoryLimit = 270;
+// Daily roll call includes weekends, so keep a little more than a full year.
+// The current month's total can always be reconstructed without growing saves
+// for the entire ten-year campaign.
+const cohortRollCallHistoryLimit = 400;
 
 enum CohortLoanDirection { playerLends, playerBorrows }
 
@@ -327,6 +331,135 @@ class CohortDailyInvestmentReport {
   );
 }
 
+/// One person's whole-day result announced at the 20:00 roll call.
+///
+/// Stock is kept separate from casino/horse-racing profit, while deposits,
+/// property, businesses, work and loan interest are grouped into other funds.
+/// The afternoon activity also records a deliberate skip. Principal transfers
+/// are not profit.
+class CohortDailyRollCallRow {
+  const CohortDailyRollCallRow({
+    required this.investorId,
+    required this.name,
+    required this.stockProfitLoss,
+    required this.leisureProfitLoss,
+    required this.otherProfitLoss,
+    required this.leisureActivity,
+    required this.isPlayer,
+    this.afternoonStake = 0,
+    this.afternoonGrossPayout = 0,
+    this.afternoonStateRecovery = 0,
+  });
+
+  final String investorId;
+  final String name;
+  final int stockProfitLoss;
+  final int leisureProfitLoss;
+  final int otherProfitLoss;
+
+  /// `카지노`, `경마`, `예금·은행`, `부동산`, `그냥 넘어감`, `미참여` or
+  /// `자금 부족`. A row never contains two activities because everybody gets
+  /// the same single afternoon slot.
+  final String leisureActivity;
+  final bool isPlayer;
+  final int afternoonStake;
+  final int afternoonGrossPayout;
+  final int afternoonStateRecovery;
+
+  int get dailyProfitLoss =>
+      (stockProfitLoss + leisureProfitLoss + otherProfitLoss).clamp(
+        -cohortInvestmentMaxMoney,
+        cohortInvestmentMaxMoney,
+      );
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+    'investorId': investorId,
+    'name': name,
+    'stockProfitLoss': stockProfitLoss,
+    'leisureProfitLoss': leisureProfitLoss,
+    'otherProfitLoss': otherProfitLoss,
+    'leisureActivity': leisureActivity,
+    'isPlayer': isPlayer,
+    'afternoonStake': afternoonStake,
+    'afternoonGrossPayout': afternoonGrossPayout,
+    'afternoonStateRecovery': afternoonStateRecovery,
+  };
+
+  factory CohortDailyRollCallRow.fromJson(Map<String, dynamic> json) =>
+      CohortDailyRollCallRow(
+        investorId: json['investorId'] as String? ?? '',
+        name: json['name'] as String? ?? '',
+        stockProfitLoss: ((json['stockProfitLoss'] as num?)?.toInt() ?? 0)
+            .clamp(-cohortInvestmentMaxMoney, cohortInvestmentMaxMoney),
+        leisureProfitLoss: ((json['leisureProfitLoss'] as num?)?.toInt() ?? 0)
+            .clamp(-cohortInvestmentMaxMoney, cohortInvestmentMaxMoney),
+        otherProfitLoss: ((json['otherProfitLoss'] as num?)?.toInt() ?? 0)
+            .clamp(-cohortInvestmentMaxMoney, cohortInvestmentMaxMoney),
+        leisureActivity: json['leisureActivity'] as String? ?? '미참여',
+        isPlayer: json['isPlayer'] == true,
+        afternoonStake: ((json['afternoonStake'] as num?)?.toInt() ?? 0).clamp(
+          0,
+          cohortInvestmentMaxMoney,
+        ),
+        afternoonGrossPayout:
+            ((json['afternoonGrossPayout'] as num?)?.toInt() ?? 0).clamp(
+              0,
+              cohortInvestmentMaxMoney,
+            ),
+        afternoonStateRecovery:
+            ((json['afternoonStateRecovery'] as num?)?.toInt() ?? 0).clamp(
+              0,
+              cohortInvestmentMaxMoney,
+            ),
+      );
+}
+
+class CohortDailyRollCallReport {
+  const CohortDailyRollCallReport({required this.day, required this.rows});
+
+  final int day;
+  final List<CohortDailyRollCallRow> rows;
+
+  /// The evening announcement is deliberately a daily-money ranking. Monthly
+  /// profit is shown beside it as context, but does not rewrite today's order.
+  List<CohortDailyRollCallRow> get rankedRows {
+    final sorted = <CohortDailyRollCallRow>[...rows]
+      ..sort((left, right) {
+        final dailyOrder = right.dailyProfitLoss.compareTo(
+          left.dailyProfitLoss,
+        );
+        if (dailyOrder != 0) return dailyOrder;
+        return left.investorId.compareTo(right.investorId);
+      });
+    return List<CohortDailyRollCallRow>.unmodifiable(sorted);
+  }
+
+  CohortDailyRollCallRow? resultFor(String investorId) {
+    for (final row in rows) {
+      if (row.investorId == investorId) return row;
+    }
+    return null;
+  }
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+    'day': day,
+    'rows': rows.map((row) => row.toJson()).toList(growable: false),
+  };
+
+  factory CohortDailyRollCallReport.fromJson(Map<String, dynamic> json) =>
+      CohortDailyRollCallReport(
+        day: ((json['day'] as num?)?.toInt() ?? 1).clamp(1, 0x7fffffff),
+        rows: ((json['rows'] as List?) ?? const <dynamic>[])
+            .whereType<Map>()
+            .map(
+              (row) =>
+                  CohortDailyRollCallRow.fromJson(row.cast<String, dynamic>()),
+            )
+            .where((row) => row.investorId.isNotEmpty)
+            .toList(growable: false),
+      );
+}
+
 class CohortLoan {
   const CohortLoan({
     required this.id,
@@ -428,6 +561,7 @@ class CohortInvestmentState {
     required this.lastSettledDay,
     required this.lastAcknowledgedDay,
     required this.lastLoanDay,
+    this.rollCallReports = const <CohortDailyRollCallReport>[],
     this.previousPlayerCloseTotal,
     this.playerCumulativeProfitLoss = 0,
   });
@@ -445,6 +579,7 @@ class CohortInvestmentState {
     lastSettledDay: -1,
     lastAcknowledgedDay: -1,
     lastLoanDay: -1,
+    rollCallReports: const <CohortDailyRollCallReport>[],
   );
 
   final Map<String, CohortInvestorAccount> accounts;
@@ -453,6 +588,7 @@ class CohortInvestmentState {
   final int lastSettledDay;
   final int lastAcknowledgedDay;
   final int lastLoanDay;
+  final List<CohortDailyRollCallReport> rollCallReports;
   final int? previousPlayerCloseTotal;
   final int playerCumulativeProfitLoss;
 
@@ -469,6 +605,13 @@ class CohortInvestmentState {
 
   CohortDailyInvestmentReport? reportForDay(int day) {
     for (final report in reports.reversed) {
+      if (report.day == day) return report;
+    }
+    return null;
+  }
+
+  CohortDailyRollCallReport? rollCallReportForDay(int day) {
+    for (final report in rollCallReports.reversed) {
       if (report.day == day) return report;
     }
     return null;
@@ -500,6 +643,7 @@ class CohortInvestmentState {
     int? lastSettledDay,
     int? lastAcknowledgedDay,
     int? lastLoanDay,
+    List<CohortDailyRollCallReport>? rollCallReports,
     int? previousPlayerCloseTotal,
     int? playerCumulativeProfitLoss,
   }) => CohortInvestmentState(
@@ -509,6 +653,7 @@ class CohortInvestmentState {
     lastSettledDay: lastSettledDay ?? this.lastSettledDay,
     lastAcknowledgedDay: lastAcknowledgedDay ?? this.lastAcknowledgedDay,
     lastLoanDay: lastLoanDay ?? this.lastLoanDay,
+    rollCallReports: rollCallReports ?? this.rollCallReports,
     previousPlayerCloseTotal:
         previousPlayerCloseTotal ?? this.previousPlayerCloseTotal,
     playerCumulativeProfitLoss:
@@ -524,6 +669,9 @@ class CohortInvestmentState {
     'lastSettledDay': lastSettledDay,
     'lastAcknowledgedDay': lastAcknowledgedDay,
     'lastLoanDay': lastLoanDay,
+    'rollCallReports': rollCallReports
+        .map((report) => report.toJson())
+        .toList(growable: false),
     if (previousPlayerCloseTotal != null)
       'previousPlayerCloseTotal': previousPlayerCloseTotal,
     'playerCumulativeProfitLoss': playerCumulativeProfitLoss,
@@ -574,6 +722,22 @@ class CohortInvestmentState {
               loan.principal > 0,
         )
         .toList(growable: false);
+    final rollCallReports =
+        ((json['rollCallReports'] as List?) ?? const <dynamic>[])
+            .whereType<Map>()
+            .map(
+              (report) => CohortDailyRollCallReport.fromJson(
+                report.cast<String, dynamic>(),
+              ),
+            )
+            .where((report) => report.rows.length == 10)
+            .toList(growable: false);
+    final trimmedRollCallReports =
+        rollCallReports.length <= cohortRollCallHistoryLimit
+        ? rollCallReports
+        : rollCallReports.sublist(
+            rollCallReports.length - cohortRollCallHistoryLimit,
+          );
     final previousPlayerCloseTotal = (json['previousPlayerCloseTotal'] as num?)
         ?.toInt();
     final migratedPlayerCumulativeProfitLoss = trimmedReports.fold<int>(
@@ -587,6 +751,9 @@ class CohortInvestmentState {
       lastSettledDay: (json['lastSettledDay'] as num?)?.toInt() ?? -1,
       lastAcknowledgedDay: (json['lastAcknowledgedDay'] as num?)?.toInt() ?? -1,
       lastLoanDay: (json['lastLoanDay'] as num?)?.toInt() ?? -1,
+      rollCallReports: List<CohortDailyRollCallReport>.unmodifiable(
+        trimmedRollCallReports,
+      ),
       previousPlayerCloseTotal: previousPlayerCloseTotal?.clamp(
         0,
         cohortInvestmentMaxMoney,

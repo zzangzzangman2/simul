@@ -110,6 +110,13 @@ void main() {
       state.cohortInvestments.reports.length,
       lessThanOrEqualTo(cohortInvestmentHistoryLimit),
     );
+    expect(state.cohortInvestments.rollCallReports, hasLength(365));
+    expect(
+      state.cohortInvestments.rollCallReports.every(
+        (report) => report.rows.length == 10,
+      ),
+      isTrue,
+    );
     expect(
       weeklyPortfolioReviewArchive(state).length,
       inInclusiveRange(52, 53),
@@ -130,6 +137,10 @@ void main() {
     expect(
       restored.cohortInvestments.reports.length,
       state.cohortInvestments.reports.length,
+    );
+    expect(
+      restored.cohortInvestments.rollCallReports.length,
+      state.cohortInvestments.rollCallReports.length,
     );
     expect(
       weeklyPortfolioReviewArchive(restored).length,

@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'stable_hash.dart';
 
 const casinoUnlockDate = '2000-01-03';
@@ -12,6 +14,11 @@ const casinoSlotSymbols = <String>['체리', '레몬', '스타', 'BAR', '벨', '
 const casinoSlotTripleMultipliers = <int>[5, 8, 12, 18, 27, 95];
 const casinoSlotTwoCherryMultiplier = 3;
 const casinoSlotsTheoreticalRtp = 210 / 216;
+// Every winning profit is charged the 20% national fee. This is the return the
+// player actually receives with the public slot paytable above.
+const casinoSlotsAfterFeeRtp = 172.2 / 216;
+const casinoRouletteEvenMoneyTheoreticalRtp = 36 / 37;
+const casinoRouletteEvenMoneyAfterFeeRtp = 32.4 / 37;
 
 enum CasinoGameType { baccarat, blackjack, roulette, craps, sicBo, slots }
 
@@ -37,6 +44,9 @@ enum CasinoBetType {
   rouletteStraight,
   crapsPassLine,
   crapsDontPass,
+  crapsField,
+  crapsAnySeven,
+  crapsAnyCraps,
   sicBoBig,
   sicBoSmall,
   sicBoOdd,
@@ -47,7 +57,7 @@ enum CasinoBetType {
   slotsSpin,
 }
 
-enum BlackjackAction { hit, stand, doubleDown }
+enum BlackjackAction { hit, stand, doubleDown, insurance, split }
 
 String casinoGameTitle(CasinoGameType game) => switch (game) {
   CasinoGameType.baccarat => '바카라',
@@ -80,6 +90,9 @@ String casinoBetTitle(CasinoBetType type, {int? selection}) => switch (type) {
   CasinoBetType.rouletteStraight => '스트레이트 ${selection ?? 0}',
   CasinoBetType.crapsPassLine => '패스 라인',
   CasinoBetType.crapsDontPass => '돈트 패스',
+  CasinoBetType.crapsField => '필드',
+  CasinoBetType.crapsAnySeven => '애니 세븐',
+  CasinoBetType.crapsAnyCraps => '애니 크랩스',
   CasinoBetType.sicBoBig => '대',
   CasinoBetType.sicBoSmall => '소',
   CasinoBetType.sicBoOdd => '홀',
@@ -191,6 +204,11 @@ class BlackjackHandState {
     required this.dealerCards,
     required this.nextCardIndex,
     required this.doubled,
+    this.insuranceStake = 0,
+    this.splitHands = const <List<int>>[],
+    this.splitStakes = const <int>[],
+    this.splitDoubled = const <bool>[],
+    this.activeSplitHand = 0,
   });
 
   final String id;
@@ -202,6 +220,22 @@ class BlackjackHandState {
   final List<int> dealerCards;
   final int nextCardIndex;
   final bool doubled;
+  final int insuranceStake;
+  final List<List<int>> splitHands;
+  final List<int> splitStakes;
+  final List<bool> splitDoubled;
+  final int activeSplitHand;
+
+  bool get isSplit => splitHands.length == 2 && splitStakes.length == 2;
+  List<int> get activePlayerCards =>
+      isSplit ? splitHands[activeSplitHand.clamp(0, 1)] : playerCards;
+  int get activePlayerStake =>
+      isSplit ? splitStakes[activeSplitHand.clamp(0, 1)] : stake;
+  bool get activePlayerDoubled => isSplit
+      ? splitDoubled.length == 2 && splitDoubled[activeSplitHand.clamp(0, 1)]
+      : doubled;
+  int get totalMainStake =>
+      isSplit ? splitStakes.fold<int>(0, (sum, value) => sum + value) : stake;
 
   BlackjackHandState copyWith({
     int? stake,
@@ -209,6 +243,11 @@ class BlackjackHandState {
     List<int>? dealerCards,
     int? nextCardIndex,
     bool? doubled,
+    int? insuranceStake,
+    List<List<int>>? splitHands,
+    List<int>? splitStakes,
+    List<bool>? splitDoubled,
+    int? activeSplitHand,
   }) => BlackjackHandState(
     id: id,
     day: day,
@@ -219,6 +258,11 @@ class BlackjackHandState {
     dealerCards: dealerCards ?? this.dealerCards,
     nextCardIndex: nextCardIndex ?? this.nextCardIndex,
     doubled: doubled ?? this.doubled,
+    insuranceStake: insuranceStake ?? this.insuranceStake,
+    splitHands: splitHands ?? this.splitHands,
+    splitStakes: splitStakes ?? this.splitStakes,
+    splitDoubled: splitDoubled ?? this.splitDoubled,
+    activeSplitHand: activeSplitHand ?? this.activeSplitHand,
   );
 
   Map<String, dynamic> toJson() => <String, dynamic>{
@@ -231,6 +275,11 @@ class BlackjackHandState {
     'dealerCards': dealerCards,
     'nextCardIndex': nextCardIndex,
     'doubled': doubled,
+    'insuranceStake': insuranceStake,
+    'splitHands': splitHands,
+    'splitStakes': splitStakes,
+    'splitDoubled': splitDoubled,
+    'activeSplitHand': activeSplitHand,
   };
 
   factory BlackjackHandState.fromJson(Map<String, dynamic> json) =>
@@ -256,6 +305,31 @@ class BlackjackHandState {
             .toList(growable: false),
         nextCardIndex: (json['nextCardIndex'] as num?)?.toInt() ?? 4,
         doubled: json['doubled'] == true,
+        insuranceStake: (json['insuranceStake'] as num?)?.toInt() ?? 0,
+        splitHands: ((json['splitHands'] as List?) ?? const <dynamic>[])
+            .whereType<List>()
+            .map(
+              (cards) => cards
+                  .whereType<num>()
+                  .map((value) => value.toInt())
+                  .where((value) => value >= 0 && value < 52)
+                  .toList(growable: false),
+            )
+            .where((cards) => cards.isNotEmpty)
+            .take(2)
+            .toList(growable: false),
+        splitStakes: ((json['splitStakes'] as List?) ?? const <dynamic>[])
+            .whereType<num>()
+            .map((value) => value.toInt())
+            .where((value) => value >= casinoMinimumStake)
+            .take(2)
+            .toList(growable: false),
+        splitDoubled: ((json['splitDoubled'] as List?) ?? const <dynamic>[])
+            .whereType<bool>()
+            .take(2)
+            .toList(growable: false),
+        activeSplitHand: ((json['activeSplitHand'] as num?)?.toInt() ?? 0)
+            .clamp(0, 1),
       );
 }
 
@@ -531,13 +605,83 @@ int casinoStakeForChipPercent(int chipBalance, int percent) {
 
 bool isValidCasinoChipStake(int stake, int chipBalance) =>
     stake >= casinoMinimumStake &&
-    stake % casinoMinimumStake == 0 &&
-    stake <= casinoMaximumStakeForChips(chipBalance);
+    casinoStakePercents.any(
+      (percent) => casinoStakeForChipPercent(chipBalance, percent) == stake,
+    );
+
+int? casinoStakePercentForAmount(int stake, int chipBalance) {
+  for (final percent in casinoStakePercents) {
+    if (casinoStakeForChipPercent(chipBalance, percent) == stake) {
+      return percent;
+    }
+  }
+  return null;
+}
 
 int casinoMonthlyLossLimitForBasis(int bankrollBasis) {
   final twoPercent = bankrollBasis ~/ 50;
   final bounded = twoPercent.clamp(50000, 1000000);
   return (bounded ~/ casinoMinimumStake) * casinoMinimumStake;
+}
+
+/// Largest chip balance that still leaves the 2% preset playable within the
+/// remaining monthly loss allowance.
+///
+/// Without this guard a large national-account transfer can make the smallest
+/// legal stake larger than the monthly stop, locking every table before the
+/// first round. Existing oversized balances can always be cashed out.
+int casinoMaximumPlayableChipBalance(int remainingMonthlyLossAllowance) {
+  if (remainingMonthlyLossAllowance < casinoMinimumStake) return 0;
+  final minimumPercent = casinoStakePercents.first;
+  final proportionalLimit =
+      remainingMonthlyLossAllowance * 100 ~/ minimumPercent;
+  return (proportionalLimit ~/ casinoMinimumStake) * casinoMinimumStake;
+}
+
+int casinoPlayableStakeBasis({
+  required int chipBalance,
+  required int remainingMonthlyLossAllowance,
+}) => math.min(
+  math.max(0, chipBalance),
+  casinoMaximumPlayableChipBalance(remainingMonthlyLossAllowance),
+);
+
+int casinoPlayableStakeForPercent({
+  required int chipBalance,
+  required int remainingMonthlyLossAllowance,
+  required int percent,
+}) => casinoStakeForChipPercent(
+  casinoPlayableStakeBasis(
+    chipBalance: chipBalance,
+    remainingMonthlyLossAllowance: remainingMonthlyLossAllowance,
+  ),
+  percent,
+);
+
+bool isValidCasinoPlayableStake({
+  required int stake,
+  required int chipBalance,
+  required int remainingMonthlyLossAllowance,
+}) => isValidCasinoChipStake(
+  stake,
+  casinoPlayableStakeBasis(
+    chipBalance: chipBalance,
+    remainingMonthlyLossAllowance: remainingMonthlyLossAllowance,
+  ),
+);
+
+int casinoMaximumSafeChipExchange({
+  required int availableCash,
+  required int chipBalance,
+  required int remainingMonthlyLossAllowance,
+}) {
+  if (availableCash < casinoMinimumStake) return 0;
+  final maximumChipBalance = casinoMaximumPlayableChipBalance(
+    remainingMonthlyLossAllowance,
+  );
+  final headroom = math.max(0, maximumChipBalance - chipBalance);
+  final maximum = math.min(availableCash, headroom);
+  return (maximum ~/ casinoMinimumStake) * casinoMinimumStake;
 }
 
 int casinoNationalFee({required int grossPayout, required int stake}) {

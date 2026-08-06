@@ -309,6 +309,25 @@ class GameAudio {
     unawaited(_playSfx(player, config, volumeScale));
   }
 
+  /// Three-layer race surge cue assembled from the project's existing sounds:
+  /// air cut, hoof impact, then a short activation chime.
+  void playRaceSurgeSfx({bool decisive = false}) {
+    if (!_unlocked) return;
+    playSfx(GameSfx.messageSend, volumeScale: decisive ? 1.0 : 0.78);
+    unawaited(
+      Future<void>.delayed(const Duration(milliseconds: 34), () {
+        playSfx(GameSfx.impactSoft, volumeScale: decisive ? 0.95 : 0.68);
+      }),
+    );
+    if (decisive) {
+      unawaited(
+        Future<void>.delayed(const Duration(milliseconds: 82), () {
+          playSfx(GameSfx.notification, volumeScale: 0.72);
+        }),
+      );
+    }
+  }
+
   void startLoop(GameLoopSfx effect) {
     _requestedLoops.add(effect);
     if (_unlocked) unawaited(_playLoop(effect));

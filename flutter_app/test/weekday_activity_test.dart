@@ -200,4 +200,69 @@ void main() {
       );
     },
   );
+
+  test('afternoon choices grow from two to four as facilities unlock', () {
+    final story = StoryState.newDecimalPlayer(
+      playerName: '오후 일정 테스트',
+      introChoice: 'stocks',
+      startingTrait: StoryTrait.analysis,
+      operatingPrinciple: OperatingPrinciple.reportLosses,
+    );
+    final base = engine
+        .createNewGame(
+          '오후 일정 해금 테스트',
+          story: story,
+          worldSeed: 'weekday-afternoon-unlocks',
+        )
+        .copyWith(day: 3, marketMinute: krxCloseMinute, decisions: const []);
+    expect(unlockedWeekdayActivities(base), isEmpty);
+    expect(weekdayAfternoonScheduleRequired(base), isFalse);
+
+    final network = base.copyWith(
+      story: base.story.copyWith(
+        storyFlags: <String, dynamic>{
+          ...base.story.storyFlags,
+          'nationalNetworkBriefingSeen': true,
+        },
+      ),
+    );
+    expect(
+      unlockedWeekdayActivities(network).map((activity) => activity.id),
+      orderedEquals(<String>['casino', 'horse_racing']),
+    );
+    expect(weekdayAfternoonScheduleRequired(network), isTrue);
+
+    final bank = network.copyWith(
+      story: network.story.copyWith(
+        storyFlags: <String, dynamic>{
+          ...network.story.storyFlags,
+          bankAccessUnlockedFlag: true,
+        },
+      ),
+    );
+    expect(unlockedWeekdayActivities(bank), hasLength(3));
+
+    final allFour = bank.copyWith(
+      story: bank.story.copyWith(
+        storyFlags: <String, dynamic>{
+          ...bank.story.storyFlags,
+          realEstateAccessUnlockedFlag: true,
+        },
+      ),
+    );
+    expect(unlockedWeekdayActivities(allFour), hasLength(4));
+    final completed = engine.completeWeekdayActivity(
+      allFour,
+      weekdayAfternoonSkipActivityId,
+    );
+    expect(completed.success, isTrue);
+    expect(weekdayAfternoonScheduleRequired(completed.state), isFalse);
+    expect(
+      weekdayActivityLogsForDay(
+        completed.state,
+        completed.state.day,
+      ).single.activityId,
+      weekdayAfternoonSkipActivityId,
+    );
+  });
 }

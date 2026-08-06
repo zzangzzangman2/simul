@@ -4,12 +4,12 @@ enum _CasinoTableMotion { idle, deal, reveal, wheel, crapsDice, dice, reels }
 
 Duration _casinoTableMotionDuration(_CasinoTableMotion motion) =>
     switch (motion) {
-      _CasinoTableMotion.deal => const Duration(milliseconds: 2200),
-      _CasinoTableMotion.reveal => const Duration(milliseconds: 1350),
-      _CasinoTableMotion.wheel => const Duration(milliseconds: 2100),
-      _CasinoTableMotion.crapsDice => const Duration(milliseconds: 1750),
-      _CasinoTableMotion.dice => const Duration(milliseconds: 1500),
-      _CasinoTableMotion.reels => const Duration(milliseconds: 1900),
+      _CasinoTableMotion.deal => const Duration(milliseconds: 1500),
+      _CasinoTableMotion.reveal => const Duration(milliseconds: 950),
+      _CasinoTableMotion.wheel => const Duration(milliseconds: 1650),
+      _CasinoTableMotion.crapsDice => const Duration(milliseconds: 1300),
+      _CasinoTableMotion.dice => const Duration(milliseconds: 1100),
+      _CasinoTableMotion.reels => const Duration(milliseconds: 1450),
       _CasinoTableMotion.idle => Duration.zero,
     };
 
@@ -29,6 +29,7 @@ class _CasinoLiveTableStage extends StatefulWidget {
     required this.motion,
     required this.motionToken,
     required this.stake,
+    required this.chipDenomination,
     required this.betLabel,
     required this.blackjackHand,
     required this.crapsRound,
@@ -40,6 +41,7 @@ class _CasinoLiveTableStage extends StatefulWidget {
   final _CasinoTableMotion motion;
   final int motionToken;
   final int stake;
+  final int chipDenomination;
   final String betLabel;
   final BlackjackHandState? blackjackHand;
   final CrapsRoundState? crapsRound;
@@ -141,6 +143,7 @@ class _CasinoLiveTableStageState extends State<_CasinoLiveTableStage>
                     child: Center(
                       child: _CasinoChipStack(
                         stake: widget.stake,
+                        denomination: widget.chipDenomination,
                         label: widget.betLabel,
                         progress: _motion.value,
                         active: _movesBettingChips,
@@ -353,7 +356,9 @@ class _CasinoLiveTableStageState extends State<_CasinoLiveTableStage>
     if (widget.game == CasinoGameType.blackjack && hand != null) {
       return (
         dealer: <String?>[casinoCardLabel(hand.dealerCards.first), null],
-        player: hand.playerCards.map(casinoCardLabel).toList(growable: false),
+        player: hand.activePlayerCards
+            .map(casinoCardLabel)
+            .toList(growable: false),
       );
     }
     final detail = widget.latest?.detail ?? '';
@@ -400,7 +405,7 @@ class _CasinoLiveTableStageState extends State<_CasinoLiveTableStage>
 
   Offset _dealTarget(Size size, int index, bool dealerTarget) {
     final seatCardIndex = _isSinglePlayerDraw
-        ? widget.blackjackHand!.playerCards.length
+        ? widget.blackjackHand!.activePlayerCards.length
         : index ~/ 2;
     return dealerTarget
         ? Offset(size.width - 120 + seatCardIndex * 31, 75)
@@ -914,11 +919,13 @@ class _CasinoCardBackPainter extends CustomPainter {
 class _CasinoChipStack extends StatelessWidget {
   const _CasinoChipStack({
     required this.stake,
+    required this.denomination,
     required this.label,
     required this.progress,
     required this.active,
   });
   final int stake;
+  final int denomination;
   final String label;
   final double progress;
   final bool active;
@@ -928,71 +935,60 @@ class _CasinoChipStack extends StatelessWidget {
     final move = active
         ? Curves.easeOutBack.transform(progress.clamp(0.0, 1.0))
         : 1.0;
-    final chipColor = stake >= 100000
-        ? const Color(0xFF202020)
-        : stake >= 50000
-        ? const Color(0xFF9A2438)
-        : stake >= 20000
-        ? const Color(0xFF285E9E)
-        : const Color(0xFFE8E1D1);
+    final exactDenomination = stake % denomination == 0 ? denomination : 1;
+    final chipCount = stake ~/ exactDenomination;
+    final chipColor = _casinoChipColor(exactDenomination);
     return Transform.translate(
       key: const Key('casino-chip-stack'),
       offset: Offset(0, (1 - move) * 64),
       child: Opacity(
         opacity: active ? progress.clamp(0.0, 1.0) : 1,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(
-              width: 39,
-              height: 28,
-              child: Stack(
-                children: [
-                  for (var index = 0; index < 4; index++)
-                    Positioned(
-                      left: 4.0,
-                      bottom: index * 3.5,
-                      child: Container(
-                        width: 31,
-                        height: 12,
-                        decoration: BoxDecoration(
-                          color: chipColor,
-                          borderRadius: BorderRadius.circular(99),
-                          border: Border.all(color: _casinoGold, width: 1),
-                          boxShadow: const [
-                            BoxShadow(
-                              color: Color(0x55000000),
-                              blurRadius: 3,
-                              offset: Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                      ),
+        child: Semantics(
+          key: Key('casino-table-chip-stack-$exactDenomination-$chipCount'),
+          label:
+              '$label 베팅, ${_casinoChipLabel(exactDenomination)}칩 $chipCount개, 총 ${_money(stake)}칩',
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 39,
+                height: 28,
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween<double>(end: chipCount.toDouble()),
+                  duration: const Duration(milliseconds: 420),
+                  curve: Curves.easeOutCubic,
+                  builder: (context, animatedCount, _) => CustomPaint(
+                    painter: _CasinoChipStackPainter(
+                      count: animatedCount.round(),
+                      color: chipColor,
                     ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 5),
-            Container(
-              constraints: const BoxConstraints(maxWidth: 118),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-              decoration: BoxDecoration(
-                color: const Color(0xB814100E),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: _casinoGold.withValues(alpha: 0.45)),
-              ),
-              child: Text(
-                '$label · ${_money(stake)}원',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 8,
-                  fontWeight: FontWeight.w900,
+                  ),
                 ),
               ),
-            ),
-          ],
+              const SizedBox(width: 5),
+              Container(
+                constraints: const BoxConstraints(maxWidth: 130),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                decoration: BoxDecoration(
+                  color: const Color(0xB814100E),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: _casinoGold.withValues(alpha: 0.45),
+                  ),
+                ),
+                child: Text(
+                  '$label · ${_casinoChipLabel(exactDenomination)} ×$chipCount',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 8,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

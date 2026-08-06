@@ -269,7 +269,14 @@ Future<void> main() async {
           marketDateKey(state.currentDate),
         );
         if (price != null && price > 0) {
-          final quantity = gameMaxBuyQuantity(state, price);
+          final affordableQuantity = gameMaxBuyQuantity(state, price);
+          // The campaign audit models a player who limits any single momentum
+          // position to 25% of currently affordable size. It still buys and
+          // sells through the real engine every month, without making the
+          // survival check depend on an unrealistic all-in concentration bet.
+          final quantity = affordableQuantity <= 0
+              ? 0
+              : math.max(1, (affordableQuantity * 0.25).floor());
           if (quantity > 0) {
             final result = _engine.executeTrade(
               state,

@@ -1315,10 +1315,34 @@ class _OrderBookPriceLadderState extends State<_OrderBookPriceLadder>
               ),
             if (currentRowIndex >= 0)
               AnimatedPositioned(
-                key: const Key('order-book-current-price-border'),
+                key: const Key('order-book-current-price-border-trail'),
                 duration: activeSweepStep == null
                     ? _orderBookMotionDuration
-                    : Duration.zero,
+                    : _orderBookSweepBorderMotionDuration,
+                curve: Curves.easeOutCubic,
+                top: currentRowIndex * rowHeight,
+                left: 132,
+                right: 132,
+                height: rowHeight,
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: activeSweepStep == null
+                            ? const Color(0x00F04452)
+                            : const Color(0x55F04452),
+                        width: 3,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            if (currentRowIndex >= 0)
+              AnimatedPositioned(
+                key: const Key('order-book-current-price-border'),
+                // 영웅문 현재가 외곽선은 가격행 사이를 미끄러지지 않고
+                // 시세가 공개된 프레임에 새 가격행으로 즉시 붙는다.
+                duration: Duration.zero,
                 curve: Curves.easeOutCubic,
                 top: currentRowIndex * rowHeight,
                 left: 132,

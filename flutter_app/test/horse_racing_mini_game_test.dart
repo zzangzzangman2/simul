@@ -38,6 +38,30 @@ void main() {
     await tester.pump();
   }
 
+  Future<void> startLiveRaceFromHandover(
+    WidgetTester tester,
+    HorseRaceCard race,
+  ) async {
+    await tester.tap(find.byKey(const Key('horse-race-teller-watch-race')));
+    await tester.pump();
+    expect(
+      find.byKey(const Key('horse-race-broadcast-lineup')),
+      findsOneWidget,
+    );
+    expect(find.text('최근 5전'), findsOneWidget);
+    expect(find.text('단승'), findsOneWidget);
+    for (final entrant in race.entrants) {
+      expect(
+        find.byKey(Key('horse-race-broadcast-runner-${entrant.id}')),
+        findsOneWidget,
+      );
+    }
+    await tester.tap(find.byKey(const Key('horse-race-broadcast-start-now')));
+    await tester.pump();
+    expect(find.byKey(const Key('horse-race-broadcast-lineup')), findsNothing);
+    expect(find.byKey(const Key('horse-race-live-track')), findsOneWidget);
+  }
+
   testWidgets(
     'teller dialogue uses the story style and advances from the image',
     (tester) async {
@@ -142,9 +166,63 @@ void main() {
     expect(find.byKey(const Key('horse-bet-quinella')), findsOneWidget);
     expect(find.byKey(const Key('horse-race-start')), findsOneWidget);
     expect(find.textContaining('적중 가정 국가 수수료'), findsOneWidget);
+    expect(find.text('출전마 8두'), findsOneWidget);
+    final selectedSpriteRect = tester.getRect(
+      find.byKey(const Key('horse-selected-sprite')),
+    );
+    final selectedOddsRect = tester.getRect(
+      find.byKey(const Key('horse-selected-win-odds')),
+    );
+    expect(
+      selectedOddsRect.bottom,
+      lessThanOrEqualTo(selectedSpriteRect.top),
+      reason: 'The win-odds badge must not cover the selected horse art.',
+    );
     for (final entrant in race.entrants) {
       expect(find.byKey(Key('horse-entry-${entrant.id}')), findsOneWidget);
+      expect(find.byKey(Key('horse-detail-${entrant.id}')), findsOneWidget);
     }
+
+    final firstDetails = find.byKey(
+      Key('horse-detail-${race.entrants.first.id}'),
+    );
+    tester.widget<InkWell>(firstDetails).onTap!();
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(Key('horse-detail-sheet-${race.entrants.first.id}')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(Key('horse-signature-skill-${race.entrants.first.id}')),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(horseRaceSignatureSkill(race.entrants.first).name),
+      findsOneWidget,
+    );
+    final firstSkill = horseRaceSignatureSkill(race.entrants.first);
+    expect(find.text('효과 · ${firstSkill.effectLabel}'), findsOneWidget);
+    expect(find.text('조건 · ${firstSkill.triggerLabel}'), findsOneWidget);
+    expect(
+      find.text('발동 구간 ${firstSkill.phaseLabel}  ·  지속 약 2초  ·  실제 전개 반영'),
+      findsOneWidget,
+    );
+    expect(find.text('최근 10회 상세 전적'), findsOneWidget);
+    expect(
+      find.byKey(Key('horse-performance-${race.entrants.first.id}-0')),
+      findsOneWidget,
+    );
+    final lastPerformance = find.byKey(
+      Key('horse-performance-${race.entrants.first.id}-9'),
+    );
+    await tester.scrollUntilVisible(
+      lastPerformance,
+      260,
+      scrollable: find.byType(Scrollable).last,
+    );
+    expect(lastPerformance, findsOneWidget);
+    Navigator.of(tester.element(lastPerformance)).pop();
+    await tester.pumpAndSettle();
 
     await tester.ensureVisible(find.byKey(const Key('horse-bet-quinella')));
     await tester.tap(find.byKey(const Key('horse-bet-quinella')));
@@ -194,6 +272,33 @@ void main() {
     await tester.tap(find.byKey(const Key('horse-stake-15000')));
     await tester.pump();
     expect(find.text('15,000원 베팅하고 경주 보기'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('high-value cash shows and applies the leisure stake cap', (
+    tester,
+  ) async {
+    await setPhoneSurface(tester);
+    final race = buildAfternoonHorseRace(
+      simulationSeed: 'horse-widget-high-value-cap',
+      day: 8,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HorseRacingMiniGame(race: race, availableCash: 100000000000),
+      ),
+    );
+    await tester.pump();
+    await openHorseRaceBettingCard(tester);
+
+    expect(
+      find.byKey(const Key('horse-race-leisure-stake-cap')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('horse-stake-1000000')), findsOneWidget);
+    expect(find.byKey(const Key('horse-stake-2500000')), findsOneWidget);
+    expect(find.byKey(const Key('horse-stake-5000000')), findsOneWidget);
+    expect(find.byKey(const Key('horse-stake-15000000')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -429,8 +534,7 @@ void main() {
       findsOneWidget,
     );
     await finishTellerTyping(tester);
-    await tester.tap(find.byKey(const Key('horse-race-teller-watch-race')));
-    await tester.pump(const Duration(milliseconds: 145));
+    await startLiveRaceFromHandover(tester, race);
 
     expect(find.byKey(const Key('horse-race-running-screen')), findsOneWidget);
     expect(find.byKey(const Key('horse-race-live-track')), findsOneWidget);
@@ -543,7 +647,7 @@ void main() {
           ..sort();
     expect(
       lateRunnerRights.last - lateRunnerRights.first,
-      greaterThan(trackRect.width * 0.20),
+      greaterThan(trackRect.width * 0.14),
     );
 
     await tester.pump(const Duration(milliseconds: 170));
@@ -648,7 +752,319 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('ImageGen race background and eight gallop sheets are bundled', (
+  testWidgets('a real pace surge triggers the race activation presentation', (
+    tester,
+  ) async {
+    await setPhoneSurface(tester);
+    final race = buildAfternoonHorseRace(
+      simulationSeed: 'horse-widget-surge',
+      day: 12,
+    );
+    const raceDuration = Duration(milliseconds: 1600);
+    final selected =
+        ([...race.entrants]..sort(
+              (left, right) =>
+                  horseRaceBroadcastSurgeAt(
+                    race: race,
+                    entrant: left,
+                  ).compareTo(
+                    horseRaceBroadcastSurgeAt(race: race, entrant: right),
+                  ),
+            ))
+            .first;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HorseRacingMiniGame(
+          race: race,
+          availableCash: 5000,
+          previewMode: true,
+          raceDuration: raceDuration,
+        ),
+      ),
+    );
+    await tester.pump();
+    await openHorseRaceBettingCard(tester);
+    final selectedEntry = find.byKey(Key('horse-entry-${selected.id}'));
+    tester
+        .widget<InkWell>(
+          find
+              .descendant(of: selectedEntry, matching: find.byType(InkWell))
+              .first,
+        )
+        .onTap!();
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('horse-race-start')));
+    await tester.pump();
+    await finishTellerTyping(tester);
+    await tester.tap(find.byKey(const Key('horse-race-teller-confirm-ticket')));
+    await tester.pump();
+    await finishTellerTyping(tester);
+    await startLiveRaceFromHandover(tester, race);
+
+    final surgeAt =
+        horseRaceBroadcastSurgeAt(race: race, entrant: selected) * 0.84;
+    await tester.pump(
+      Duration(
+        milliseconds: (raceDuration.inMilliseconds * surgeAt).round() + 18,
+      ),
+    );
+
+    expect(find.byKey(Key('horse-race-surge-${selected.id}')), findsOneWidget);
+    expect(
+      find.byKey(Key('horse-race-skill-tag-${selected.id}')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('horse-race-surge-frame')), findsNothing);
+    expect(find.byKey(const Key('horse-race-surge-banner')), findsNothing);
+    expect(find.text(horseRaceSignatureSkill(selected).name), findsOneWidget);
+    final selectedRunnerRect = tester.getRect(
+      find.byKey(Key('horse-live-${selected.id}')),
+    );
+    final selectedSkillRect = tester.getRect(
+      find.byKey(Key('horse-race-skill-tag-${selected.id}')),
+    );
+    expect(
+      selectedSkillRect.overlaps(selectedRunnerRect),
+      isFalse,
+      reason: 'The signature tag must sit beside, not cover, its horse.',
+    );
+    for (final taggedEntrant in race.entrants) {
+      final tagFinder = find.byKey(
+        Key('horse-race-skill-tag-${taggedEntrant.id}'),
+      );
+      if (tagFinder.evaluate().isEmpty) continue;
+      final tagRect = tester.getRect(tagFinder);
+      for (final runner in race.entrants) {
+        expect(
+          tagRect.overlaps(
+            tester.getRect(find.byKey(Key('horse-live-${runner.id}'))),
+          ),
+          isFalse,
+          reason: '${taggedEntrant.name} skill tag must not cover any runner.',
+        );
+      }
+    }
+
+    final trackRect = tester.getRect(
+      find.byKey(const Key('horse-race-live-track')),
+    );
+    var previousCenters = <String, double>{
+      for (final entrant in race.entrants)
+        entrant.id: tester
+            .getRect(find.byKey(Key('horse-live-${entrant.id}')))
+            .center
+            .dx,
+    };
+    var elapsedMs = (raceDuration.inMilliseconds * surgeAt).round() + 18;
+    while (elapsedMs < raceDuration.inMilliseconds * 0.84) {
+      const frameMs = 20;
+      await tester.pump(const Duration(milliseconds: frameMs));
+      elapsedMs += frameMs;
+      final currentCenters = <String, double>{
+        for (final entrant in race.entrants)
+          entrant.id: tester
+              .getRect(find.byKey(Key('horse-live-${entrant.id}')))
+              .center
+              .dx,
+      };
+      for (final entrant in race.entrants) {
+        expect(
+          (currentCenters[entrant.id]! - previousCenters[entrant.id]!).abs(),
+          lessThan(trackRect.width * 0.16),
+          reason: '${entrant.name} must move continuously through a surge.',
+        );
+      }
+      final visibleCount = currentCenters.values
+          .where(
+            (centerX) =>
+                centerX >= trackRect.left - 60 &&
+                centerX <= trackRect.right + 60,
+          )
+          .length;
+      expect(
+        visibleCount,
+        greaterThanOrEqualTo(4),
+        reason: 'A surge must never push the whole field off-screen.',
+      );
+      previousCenters = currentCenters;
+    }
+    expect(tester.takeException(), isNull);
+  });
+
+  test('gallop poses keep one pixel scale and one ground line', () {
+    const canvasSize = Size(82, 48);
+    const canonicalSourceSize = Size(384, 282);
+    const poses = <Size>[
+      Size(361, 282),
+      Size(384, 282),
+      Size(347, 281),
+      Size(384, 262),
+    ];
+
+    double? stableScale;
+    for (final pose in poses) {
+      final destination = horseRaceStableFrameDestination(
+        canvasSize: canvasSize,
+        sourceSize: pose,
+        canonicalSourceSize: canonicalSourceSize,
+      );
+      final scale = destination.width / pose.width;
+      stableScale ??= scale;
+      expect(scale, closeTo(stableScale, 0.000001));
+      expect(destination.height / pose.height, closeTo(stableScale, 0.000001));
+      expect(destination.bottom, canvasSize.height);
+    }
+    expect(horseRaceFrameCrossfadeProgress(2.58), closeTo(0, 0.000001));
+    expect(horseRaceFrameCrossfadeProgress(2.79), closeTo(0.5, 0.000001));
+    expect(horseRaceFrameCrossfadeProgress(2.999), greaterThan(0.999));
+  });
+
+  testWidgets('gate four advances on every live frame without a lane hitch', (
+    tester,
+  ) async {
+    await setPhoneSurface(tester);
+    final race = buildAfternoonHorseRace(
+      simulationSeed: 'horse-widget-gate-four-continuity',
+      day: 18,
+    );
+    final gateFour = race.entrants.singleWhere((entrant) => entrant.gate == 4);
+    // Match the production broadcast duration. A 1.6-second synthetic race
+    // multiplies the gait frequency by ten and measures jumps the live game
+    // can never render.
+    const raceDuration = Duration(seconds: 16);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HorseRacingMiniGame(
+          race: race,
+          availableCash: 5000,
+          previewMode: true,
+          raceDuration: raceDuration,
+        ),
+      ),
+    );
+    await tester.pump();
+    await openHorseRaceBettingCard(tester);
+    await tester.tap(find.byKey(const Key('horse-race-start')));
+    await tester.pump();
+    await finishTellerTyping(tester);
+    await tester.tap(find.byKey(const Key('horse-race-teller-confirm-ticket')));
+    await tester.pump();
+    await finishTellerTyping(tester);
+    await startLiveRaceFromHandover(tester, race);
+    await tester.pump(const Duration(milliseconds: 64));
+
+    final gateFourFinder = find.byKey(Key('horse-live-${gateFour.id}'));
+    var previous = tester.getRect(gateFourFinder);
+    for (var frame = 0; frame < 76; frame++) {
+      await tester.pump(const Duration(milliseconds: 16));
+      final current = tester.getRect(gateFourFinder);
+      expect(
+        current.center.dx,
+        greaterThan(previous.center.dx + 0.01),
+        reason: 'Gate four must advance on every sampled animation frame.',
+      );
+      expect(
+        (current.center.dy - previous.center.dy).abs(),
+        lessThan(4.5),
+        reason: 'Gate four must not jump vertically between gait poses.',
+      );
+      expect(current.width, closeTo(previous.width, 0.01));
+      expect(current.height, closeTo(previous.height, 0.01));
+      previous = current;
+    }
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('every runner stays in its lane and exits after the finish', (
+    tester,
+  ) async {
+    await setPhoneSurface(tester);
+    final race = buildAfternoonHorseRace(
+      simulationSeed: 'horse-widget-run-out',
+      day: 15,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HorseRacingMiniGame(
+          race: race,
+          availableCash: 5000,
+          previewMode: true,
+          raceDuration: const Duration(milliseconds: 1000),
+        ),
+      ),
+    );
+    await tester.pump();
+    await openHorseRaceBettingCard(tester);
+    await tester.tap(find.byKey(const Key('horse-race-start')));
+    await tester.pump();
+    await finishTellerTyping(tester);
+    await tester.tap(find.byKey(const Key('horse-race-teller-confirm-ticket')));
+    await tester.pump();
+    await finishTellerTyping(tester);
+    await startLiveRaceFromHandover(tester, race);
+    await tester.pump(const Duration(milliseconds: 120));
+
+    final laneCenters = <String, double>{
+      for (final entrant in race.entrants)
+        entrant.id: tester
+            .getRect(find.byKey(Key('horse-live-${entrant.id}')))
+            .center
+            .dy,
+    };
+    final trackRect = tester.getRect(
+      find.byKey(const Key('horse-race-live-track')),
+    );
+    await tester.pump(const Duration(milliseconds: 600));
+    var previousCenters = <String, double>{
+      for (final entrant in race.entrants)
+        entrant.id: tester
+            .getRect(find.byKey(Key('horse-live-${entrant.id}')))
+            .center
+            .dx,
+    };
+    for (var frame = 0; frame < 6; frame++) {
+      await tester.pump(const Duration(milliseconds: 25));
+      final currentCenters = <String, double>{
+        for (final entrant in race.entrants)
+          entrant.id: tester
+              .getRect(find.byKey(Key('horse-live-${entrant.id}')))
+              .center
+              .dx,
+      };
+      for (final entrant in race.entrants) {
+        expect(
+          currentCenters[entrant.id]!,
+          greaterThan(previousCenters[entrant.id]! + 0.5),
+          reason:
+              '${entrant.name} must advance on every sampled finish-approach frame.',
+        );
+      }
+      previousCenters = currentCenters;
+    }
+    await tester.pump(const Duration(milliseconds: 125));
+    expect(find.byKey(const Key('horse-race-running-screen')), findsOneWidget);
+    for (final entrant in race.entrants) {
+      final runnerRect = tester.getRect(
+        find.byKey(Key('horse-live-${entrant.id}')),
+      );
+      expect(
+        runnerRect.left,
+        greaterThan(trackRect.right),
+        reason:
+            '${entrant.name} must gallop fully off-screen after its finish.',
+      );
+      expect(
+        runnerRect.center.dy,
+        closeTo(laneCenters[entrant.id]!, 5.0),
+        reason: '${entrant.name} must keep the same lane through the run-out.',
+      );
+    }
+    await tester.pump(const Duration(milliseconds: 10));
+    expect(find.byKey(const Key('horse-race-result-screen')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('ImageGen race background and 24 gallop sheets are bundled', (
     tester,
   ) async {
     const assets = [
@@ -660,14 +1076,7 @@ void main() {
       horseRaceTellerAcceptAsset,
       horseRaceTellerHandoverAsset,
       horseRaceStraightTrackAsset,
-      horseGallopChestnutAsset,
-      horseGallopDarkBayAsset,
-      horseGallopGrayAsset,
-      horseGallopWhiteAsset,
-      horseGallopBlackAsset,
-      horseGallopPalominoAsset,
-      horseGallopPintoAsset,
-      horseGallopMahoganyAsset,
+      ...horseRaceAllGallopAssets,
     ];
     for (final asset in assets) {
       final bytes = await rootBundle.load(asset);

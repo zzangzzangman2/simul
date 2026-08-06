@@ -42,6 +42,29 @@ void main() {
       first.entrants.map((horse) => horse.spriteAsset).toSet(),
       hasLength(8),
     );
+    for (final entrant in first.entrants) {
+      expect(entrant.recentFinishes, hasLength(10));
+      expect(entrant.recentPerformances, hasLength(10));
+      expect(
+        entrant.recentFinishes.every((rank) => rank >= 1 && rank <= 12),
+        isTrue,
+      );
+      expect(entrant.recentWinCount, inInclusiveRange(0, 10));
+      expect(entrant.recentTopThreeCount, inInclusiveRange(0, 10));
+      expect(entrant.origin, anyOf('한국', '미국'));
+      expect(entrant.sex, anyOf('수', '암', '거'));
+      expect(entrant.age, inInclusiveRange(3, 6));
+      expect(entrant.assignedWeight, inInclusiveRange(51.0, 58.0));
+      expect(entrant.trainer, isNotEmpty);
+      for (var index = 1; index < entrant.recentPerformances.length; index++) {
+        expect(
+          entrant.recentPerformances[index - 1].date.isAfter(
+            entrant.recentPerformances[index].date,
+          ),
+          isTrue,
+        );
+      }
+    }
 
     final records = first.finishOrder
         .map(first.entrantById)
@@ -185,6 +208,108 @@ void main() {
     expect(leaders, contains(previewRace.finishOrder.first));
   });
 
+  test('broadcast surge cues match each runner pace profile', () {
+    final race = buildAfternoonHorseRace(
+      simulationSeed: 'broadcast-surge-cues',
+      day: 11,
+    );
+    final rebuilt = buildAfternoonHorseRace(
+      simulationSeed: 'broadcast-surge-cues',
+      day: 11,
+    );
+
+    for (final entrant in race.entrants) {
+      final segment = horseRaceBroadcastBurstSegment(
+        race: race,
+        entrant: entrant,
+      );
+      final allowedSegments = switch (entrant.runningStyle) {
+        '선행' => <int>{0, 1},
+        '선입' => <int>{2, 3},
+        '추입' => <int>{4, 5},
+        '지구력' => <int>{3, 4},
+        _ => <int>{1, 2, 3, 4},
+      };
+      expect(allowedSegments, contains(segment));
+      final surgeAt = horseRaceBroadcastSurgeAt(race: race, entrant: entrant);
+      expect(surgeAt, inInclusiveRange(0.0, 0.94));
+      expect(horseRaceBroadcastSurgeLabel(entrant), isNotEmpty);
+      final skill = horseRaceSignatureSkill(entrant);
+      expect(skill.effectLabel, isNotEmpty);
+      expect(skill.paceBoost, inInclusiveRange(0.22, 0.35));
+
+      final rebuiltEntrant = rebuilt.entrantById(entrant.id);
+      expect(
+        horseRaceBroadcastSurgeAt(race: rebuilt, entrant: rebuiltEntrant),
+        surgeAt,
+      );
+      expect(horseRaceSignatureSkill(rebuiltEntrant).name, skill.name);
+      expect(
+        horseRaceSignatureSkill(rebuiltEntrant).paceBoost,
+        skill.paceBoost,
+      );
+    }
+  });
+
+  test('every runner keeps visible speed on the final approach', () {
+    for (var day = 1; day <= 40; day++) {
+      final race = buildAfternoonHorseRace(
+        simulationSeed: 'final-approach-speed',
+        day: day,
+      );
+      double progress(HorseRaceEntrant entrant, double time) =>
+          horseRaceBroadcastProgress(
+            race: race,
+            entrant: entrant,
+            time: math.max(0, time),
+          );
+      for (final entrant in race.entrants) {
+        final finishAt = horseRaceBroadcastFinishAt(
+          race: race,
+          entrant: entrant,
+        );
+        final before = progress(entrant, finishAt - 0.08);
+        expect(
+          1 - before,
+          greaterThan(0.24),
+          reason:
+              '${entrant.name} must still have a real galloping distance one second before its finish.',
+        );
+        expect(
+          progress(entrant, finishAt - 0.02) -
+              progress(entrant, finishAt - 0.04),
+          greaterThan(0.06),
+          reason:
+              '${entrant.name} must accelerate through the line instead of crawling into its assigned place.',
+        );
+      }
+
+      final winner = race.entrantById(race.finishOrder.first);
+      final previewTime =
+          horseRaceBroadcastFinishAt(race: race, entrant: winner) - 0.08;
+      final previewProgress = race.entrants
+          .map((entrant) => progress(entrant, previewTime))
+          .toList(growable: false);
+      expect(
+        previewProgress.reduce(math.max) - previewProgress.reduce(math.min),
+        greaterThan(0.10),
+        reason:
+            'The field must already be visibly spread before the winner reaches the stripe.',
+      );
+      final bestBottomHalfProgress = race.finishOrder
+          .skip(4)
+          .map(race.entrantById)
+          .map((entrant) => progress(entrant, previewTime))
+          .reduce(math.max);
+      expect(
+        progress(winner, previewTime) - bestBottomHalfProgress,
+        greaterThan(0.06),
+        reason:
+            'Lower-ranked runners must lose ground before the line, not brake beside it.',
+      );
+    }
+  });
+
   test('official margins include close photos and visibly spread fields', () {
     var narrowestGap = double.infinity;
     var widestGap = 0.0;
@@ -249,6 +374,89 @@ void main() {
     },
   );
 
+  test('the stable roster rests every horse for at least two weeks', () {
+    final cards = <HorseRaceCard>[
+      for (var day = 1; day <= 56; day++)
+        buildAfternoonHorseRace(simulationSeed: 'rested-roster', day: day),
+    ];
+    final lastStartByHorse = <String, int>{};
+    var returningHorseCount = 0;
+    for (var index = 0; index < cards.length; index++) {
+      final day = index + 1;
+      for (final entrant in cards[index].entrants) {
+        final previous = lastStartByHorse[entrant.id];
+        if (previous != null) {
+          expect(day - previous, greaterThanOrEqualTo(15));
+          returningHorseCount += 1;
+        }
+        lastStartByHorse[entrant.id] = day;
+      }
+    }
+    expect(lastStartByHorse.length, greaterThanOrEqualTo(160));
+    expect(returningHorseCount, greaterThan(0));
+  });
+
+  test('224 horses rotate through 24 distinct visual identities', () {
+    final horseIds = <String>{};
+    final visualAssets = <String>{};
+    final signatureSkills = <String>{};
+    for (var day = 1; day <= 28; day++) {
+      final race = buildAfternoonHorseRace(
+        simulationSeed: 'visual-roster-coverage',
+        day: day,
+      );
+      final familyIndexes = <int>{};
+      for (final entrant in race.entrants) {
+        horseIds.add(entrant.id);
+        visualAssets.add(entrant.spriteAsset);
+        signatureSkills.add(horseRaceSignatureSkill(entrant).name);
+        familyIndexes.add(
+          horseRaceGallopAssetFamilies.indexWhere(
+            (family) => family.contains(entrant.spriteAsset),
+          ),
+        );
+      }
+      expect(familyIndexes, hasLength(8));
+      expect(familyIndexes, isNot(contains(-1)));
+    }
+
+    expect(horseIds, hasLength(224));
+    expect(visualAssets, horseRaceAllGallopAssets.toSet());
+    expect(
+      signatureSkills,
+      hasLength(224),
+      reason: 'Every stable horse needs one roster-wide unique skill name.',
+    );
+  });
+
+  test('official results update recent form even when no wager was placed', () {
+    const seed = 'persistent-world-results';
+    final openingRace = buildAfternoonHorseRace(simulationSeed: seed, day: 1);
+    final trackedHorse = openingRace.entrants.first;
+    HorseRaceEntrant? returningHorse;
+
+    for (var day = 2; day <= 56; day++) {
+      final race = buildAfternoonHorseRace(simulationSeed: seed, day: day);
+      final matches = race.entrants.where(
+        (entrant) => entrant.id == trackedHorse.id,
+      );
+      if (matches.isNotEmpty) {
+        returningHorse = matches.single;
+        break;
+      }
+    }
+
+    expect(returningHorse, isNotNull);
+    expect(returningHorse!.recentPerformances.first.date, DateTime(2000, 1, 1));
+    expect(
+      returningHorse.recentPerformances.first.position,
+      openingRace.finishPosition(trackedHorse.id),
+    );
+
+    final restoredCard = buildAfternoonHorseRace(simulationSeed: seed, day: 1);
+    expect(restoredCard.finishOrder, openingRace.finishOrder);
+  });
+
   test('ability scores determine probability and all displayed odds', () {
     final race = buildAfternoonHorseRace(
       simulationSeed: 'ability-market',
@@ -309,10 +517,10 @@ void main() {
     }
   });
 
-  test('strong favorites win more often while upsets remain possible', () {
-    var favoriteWins = 0;
-    var outsiderWins = 0;
-    for (var day = 1; day <= 320; day++) {
+  test('favorite wins about one race in three while every rank can upset', () {
+    const raceCount = 1600;
+    final winsByMarketRank = List<int>.filled(8, 0);
+    for (var day = 1; day <= raceCount; day++) {
       final race = buildAfternoonHorseRace(
         simulationSeed: 'ability-frequency',
         day: day,
@@ -321,12 +529,17 @@ void main() {
         ..sort(
           (left, right) => right.winProbability.compareTo(left.winProbability),
         );
-      if (race.finishOrder.first == marketOrder.first.id) favoriteWins++;
-      if (race.finishOrder.first == marketOrder.last.id) outsiderWins++;
+      final winnerRank = marketOrder.indexWhere(
+        (entrant) => entrant.id == race.finishOrder.first,
+      );
+      winsByMarketRank[winnerRank]++;
     }
 
-    expect(favoriteWins, greaterThan(outsiderWins));
-    expect(outsiderWins, greaterThan(0));
+    final favoriteWinRate = winsByMarketRank.first / raceCount;
+    expect(favoriteWinRate, inInclusiveRange(0.33, 0.40));
+    expect(winsByMarketRank.first, greaterThan(winsByMarketRank[1]));
+    expect(winsByMarketRank[1], greaterThan(winsByMarketRank[2]));
+    expect(winsByMarketRank.last, greaterThan(0));
   });
 
   test('stake presets scale from 2 to 30 percent of available cash', () {
@@ -338,6 +551,21 @@ void main() {
     expect(isValidHorseRaceStake(15000, 50000), isTrue);
     expect(isValidHorseRaceStake(15500, 50000), isFalse);
     expect(isValidHorseRaceStake(1250, 50000), isFalse);
+  });
+
+  test('high-value accounts use a capped leisure stake basis', () {
+    const availableCash = 100000000000;
+    expect(
+      horseRaceStakeBasisForCash(availableCash),
+      horseRaceLeisureStakeBasisCap,
+    );
+    expect(horseRaceStakeForCashPercent(availableCash, 2), 1000000);
+    expect(horseRaceStakeForCashPercent(availableCash, 5), 2500000);
+    expect(horseRaceStakeForCashPercent(availableCash, 10), 5000000);
+    expect(horseRaceStakeForCashPercent(availableCash, 30), 15000000);
+    expect(horseRaceMaximumStakeForCash(availableCash), 15000000);
+    expect(isValidHorseRaceStake(15000000, availableCash), isTrue);
+    expect(isValidHorseRaceStake(15000500, availableCash), isFalse);
   });
 
   test('win, place, and quinella payouts follow the official finish', () {
@@ -539,5 +767,24 @@ void main() {
       ),
     );
     expect(blocked.success, isFalse);
+  });
+
+  test('winner gates rotate across the calendar', () {
+    final winnerCounts = <int, int>{
+      for (var gate = 1; gate <= 8; gate++) gate: 0,
+    };
+    for (var day = 1; day <= 240; day++) {
+      final race = buildAfternoonHorseRace(
+        simulationSeed: 'horse-race-preview-v1',
+        day: day,
+      );
+      final winnerGate = race.entrantById(race.finishOrder.first).gate;
+      winnerCounts[winnerGate] = winnerCounts[winnerGate]! + 1;
+    }
+
+    expect(winnerCounts.values.every((count) => count > 0), isTrue);
+    final mostWins = winnerCounts.values.reduce(math.max);
+    final fewestWins = winnerCounts.values.reduce(math.min);
+    expect(mostWins - fewestWins, lessThan(30));
   });
 }

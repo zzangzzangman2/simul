@@ -506,7 +506,7 @@ void main() {
       '15:10',
     );
     expect(find.textContaining('오늘 손익을 확인'), findsOneWidget);
-    expect(find.textContaining('장 마감 결과 보기'), findsOneWidget);
+    expect(find.textContaining('오후 일정 선택'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('apartment-day-guide')));
     await tester.pump();

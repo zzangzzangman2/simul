@@ -227,7 +227,7 @@ class _PhoneMessengerScreenState extends State<PhoneMessengerScreen> {
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 9),
               color: Colors.white,
               child: const Text(
-                '친구별 하루 3번 · 대화 1회 30분 · 22:00 취침',
+                '친구별 하루 3번 · 대화 1회 30분 · 마지막 시작 21:30 · 22:00 취침',
                 style: TextStyle(
                   color: Color(0xFF777777),
                   fontSize: 10,

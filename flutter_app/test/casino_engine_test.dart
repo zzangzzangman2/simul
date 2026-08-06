@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:millennium_capital/game/casino_state.dart';
 import 'package:millennium_capital/game/game_engine.dart';
@@ -13,7 +15,7 @@ GameState _nationalCasinoState(
   final state = engine
       .createNewGame('카지노 엔진 테스트', initialCash: 10000000, worldSeed: seed)
       .copyWith(day: day, marketMinute: krxCloseMinute, decisions: const []);
-  return engine.exchangeCasinoChips(state, 1000000).state;
+  return engine.exchangeCasinoChips(state, 500000).state;
 }
 
 void main() {
@@ -34,6 +36,72 @@ void main() {
     expect(isValidCasinoChipStake(30000, 100000), isTrue);
     expect(isValidCasinoChipStake(30500, 100000), isFalse);
     expect(isValidCasinoChipStake(1250, 100000), isFalse);
+    expect(isValidCasinoChipStake(10000, 1000000), isFalse);
+    expect(casinoStakePercentForAmount(10000, 100000), 10);
+    expect(casinoStakePercentForAmount(2000, 100000), 2);
+    expect(casinoStakePercentForAmount(1500, 99600), 2);
+    expect(casinoStakePercentForAmount(2000, 99600), isNull);
+  });
+
+  test('chip exchange keeps the smallest preset inside the monthly stop', () {
+    expect(casinoMaximumPlayableChipBalance(1000000), 50000000);
+    expect(
+      casinoMaximumSafeChipExchange(
+        availableCash: 100000000000,
+        chipBalance: 0,
+        remainingMonthlyLossAllowance: 1000000,
+      ),
+      50000000,
+    );
+
+    final day =
+        DateTime(2000, 1, 3).difference(DateTime(2000, 1, 1)).inDays + 1;
+    final state = engine
+        .createNewGame(
+          '고액 카지노 칩 테스트',
+          initialCash: 100000000000,
+          worldSeed: 'casino-high-value-chip-cap',
+        )
+        .copyWith(day: day, marketMinute: krxCloseMinute, decisions: const []);
+    final rejected = engine.exchangeCasinoChips(state, 50500000);
+    expect(rejected.success, isFalse);
+    expect(rejected.message, contains('최대 50000000원'));
+
+    final accepted = engine.exchangeCasinoChips(state, 50000000);
+    expect(accepted.success, isTrue);
+    expect(accepted.state.personalFinance.casino.chipBalance, 50000000);
+    expect(
+      casinoStakeForChipPercent(
+        accepted.state.personalFinance.casino.chipBalance,
+        2,
+      ),
+      1000000,
+    );
+
+    const payoutGrownChipBalance = 85000000;
+    expect(
+      casinoPlayableStakeBasis(
+        chipBalance: payoutGrownChipBalance,
+        remainingMonthlyLossAllowance: 1000000,
+      ),
+      50000000,
+    );
+    expect(
+      casinoPlayableStakeForPercent(
+        chipBalance: payoutGrownChipBalance,
+        remainingMonthlyLossAllowance: 1000000,
+        percent: 2,
+      ),
+      1000000,
+    );
+    expect(
+      isValidCasinoPlayableStake(
+        stake: 1000000,
+        chipBalance: payoutGrownChipBalance,
+        remainingMonthlyLossAllowance: 1000000,
+      ),
+      isTrue,
+    );
   });
 
   test('cash is exchanged into persistent casino chips and cashed out', () {
@@ -46,12 +114,17 @@ void main() {
           worldSeed: 'casino-chip-wallet',
         )
         .copyWith(day: day, marketMinute: krxCloseMinute, decisions: const []);
+    final grossAssetsBeforeExchange = state.balanceSheetGrossAssets();
 
     final exchanged = engine.exchangeCasinoChips(state, 100000);
     expect(exchanged.success, isTrue);
     expect(exchanged.state.availableBrokerageCash, 900000);
     expect(exchanged.state.bankCash, 0);
     expect(exchanged.state.personalFinance.casino.chipBalance, 100000);
+    expect(
+      exchanged.state.balanceSheetGrossAssets(),
+      grossAssetsBeforeExchange,
+    );
     expect(
       GameState.fromJson(
         exchanged.state.toJson(),
@@ -68,15 +141,24 @@ void main() {
     expect(cashedOut.state.availableBrokerageCash, 1000000);
     expect(cashedOut.state.bankCash, 0);
     expect(cashedOut.state.personalFinance.casino.chipBalance, 0);
+    expect(
+      cashedOut.state.balanceSheetGrossAssets(),
+      grossAssetsBeforeExchange,
+    );
     expect(cashedOut.state.ledger.last.counterAccount, 'casino_chips');
   });
 
   test('classic three-reel paytable has a 97.22 percent theoretical RTP', () {
     var payoutSum = 0;
+    var afterFeeReturnSum = 0.0;
     for (var first = 0; first < casinoSlotSymbols.length; first++) {
       for (var second = 0; second < casinoSlotSymbols.length; second++) {
         for (var third = 0; third < casinoSlotSymbols.length; third++) {
-          payoutSum += casinoSlotPayoutMultiplier([first, second, third]);
+          final multiplier = casinoSlotPayoutMultiplier([first, second, third]);
+          payoutSum += multiplier;
+          if (multiplier > 0) {
+            afterFeeReturnSum += 0.2 + multiplier * 0.8;
+          }
         }
       }
     }
@@ -86,6 +168,11 @@ void main() {
         casinoSlotSymbols.length;
     expect(payoutSum / combinations, casinoSlotsTheoreticalRtp);
     expect(casinoSlotsTheoreticalRtp * 100, closeTo(97.22, 0.01));
+    expect(
+      afterFeeReturnSum / combinations,
+      closeTo(casinoSlotsAfterFeeRtp, 0.0000001),
+    );
+    expect(casinoSlotsAfterFeeRtp * 100, closeTo(79.72, 0.01));
   });
 
   test('casino is online from 2000, afternoon-only, and deterministic', () {
@@ -209,7 +296,7 @@ void main() {
     );
 
     expect(result.success, isFalse);
-    expect(result.message, contains('보유 칩의 30%'));
+    expect(result.message, contains('2%·5%·10%·30%'));
     expect(
       result.state.personalFinance.casino.chipBalance,
       state.personalFinance.casino.chipBalance,
@@ -282,12 +369,16 @@ void main() {
   test('daily round limit and monthly loss stop are enforced', () {
     var state = _nationalCasinoState(engine, seed: 'casino-limits');
     for (var index = 0; index < casinoDailyRoundLimit; index++) {
+      final stake = casinoStakeForChipPercent(
+        state.personalFinance.casino.chipBalance,
+        2,
+      );
       final result = engine.playCasinoRound(
         state,
-        const CasinoBet(
+        CasinoBet(
           game: CasinoGameType.slots,
           type: CasinoBetType.slotsSpin,
-          stake: 10000,
+          stake: stake,
         ),
       );
       expect(result.success, isTrue, reason: 'round ${index + 1}');
@@ -516,5 +607,111 @@ void main() {
     expect(next.personalFinance.casino.activeCraps, isNull);
     expect(next.personalFinance.casino.history.last.game, CasinoGameType.craps);
     expect(next.personalFinance.casino.history.last.outcome, contains('몰수'));
+  });
+
+  test('craps one-roll proposition bets settle immediately', () {
+    for (final type in const <CasinoBetType>[
+      CasinoBetType.crapsField,
+      CasinoBetType.crapsAnySeven,
+      CasinoBetType.crapsAnyCraps,
+    ]) {
+      final state = _nationalCasinoState(
+        engine,
+        seed: 'craps-prop-${type.name}',
+      );
+      final result = engine.playCasinoRound(
+        state,
+        CasinoBet(game: CasinoGameType.craps, type: type, stake: 10000),
+      );
+
+      expect(result.success, isTrue, reason: result.message);
+      expect(result.minutesElapsed, casinoRoundMinutes);
+      expect(result.state.personalFinance.casino.activeCraps, isNull);
+      final record = result.state.personalFinance.casino.history.single;
+      expect(record.betLabel, casinoBetTitle(type));
+      expect(record.detail, contains('단판 프로포지션'));
+      expect(
+        record.nationalFee,
+        casinoNationalFee(grossPayout: record.grossPayout, stake: record.stake),
+      );
+    }
+  });
+
+  test('blackjack supports a persisted two-hand split', () {
+    CasinoActionResult? deal;
+    for (var index = 0; index < 1000; index++) {
+      final state = _nationalCasinoState(
+        engine,
+        seed: 'blackjack-split-$index',
+      );
+      final candidate = engine.startCasinoBlackjack(state, 10000);
+      final hand = candidate.state.personalFinance.casino.activeBlackjack!;
+      if (math.min(casinoCardRank(hand.playerCards[0]), 10) ==
+          math.min(casinoCardRank(hand.playerCards[1]), 10)) {
+        deal = candidate;
+        break;
+      }
+    }
+    expect(deal, isNotNull);
+
+    final split = engine.actCasinoBlackjack(deal!.state, BlackjackAction.split);
+    expect(split.success, isTrue, reason: split.message);
+    expect(split.state.personalFinance.casino.activeBlackjack!.isSplit, isTrue);
+    expect(
+      split.state.personalFinance.casino.activeBlackjack!.totalMainStake,
+      20000,
+    );
+
+    final firstStand = engine.actCasinoBlackjack(
+      split.state,
+      BlackjackAction.stand,
+    );
+    expect(firstStand.success, isTrue, reason: firstStand.message);
+    expect(
+      firstStand.state.personalFinance.casino.activeBlackjack!.activeSplitHand,
+      1,
+    );
+    final settled = engine.actCasinoBlackjack(
+      firstStand.state,
+      BlackjackAction.stand,
+    );
+    expect(settled.success, isTrue, reason: settled.message);
+    expect(settled.state.personalFinance.casino.activeBlackjack, isNull);
+    expect(settled.state.personalFinance.casino.history.single.stake, 20000);
+    expect(settled.state.personalFinance.casino.history.single.betLabel, '스플릿');
+  });
+
+  test('blackjack insurance is charged and included in settlement', () {
+    CasinoActionResult? deal;
+    for (var index = 0; index < 1000; index++) {
+      final state = _nationalCasinoState(
+        engine,
+        seed: 'blackjack-insurance-$index',
+      );
+      final candidate = engine.startCasinoBlackjack(state, 10000);
+      final hand = candidate.state.personalFinance.casino.activeBlackjack!;
+      if (blackjackHandValue(<int>[hand.dealerCards.first]).total == 11) {
+        deal = candidate;
+        break;
+      }
+    }
+    expect(deal, isNotNull);
+
+    final insured = engine.actCasinoBlackjack(
+      deal!.state,
+      BlackjackAction.insurance,
+    );
+    expect(insured.success, isTrue, reason: insured.message);
+    final settled = insured.state.personalFinance.casino.activeBlackjack == null
+        ? insured
+        : engine.actCasinoBlackjack(insured.state, BlackjackAction.stand);
+    expect(settled.success, isTrue, reason: settled.message);
+    final record = settled.state.personalFinance.casino.history.single;
+    expect(record.stake, 15000);
+    expect(record.betLabel, contains('보험'));
+    expect(
+      record.nationalFee,
+      casinoNationalFee(grossPayout: record.grossPayout, stake: record.stake),
+    );
   });
 }

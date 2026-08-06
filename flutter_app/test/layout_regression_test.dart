@@ -224,7 +224,7 @@ void main() {
     tester,
   ) async {
     await usePhoneSurface(tester);
-    final state = newState();
+    final state = engine.markNationalNetworkBriefingSeen(newState());
     await tester.pumpWidget(
       MaterialApp(
         home: OfficeScreen(

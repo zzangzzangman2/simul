@@ -244,6 +244,11 @@ List<double> generatedFullMarketDayPath({
       .toDouble();
   final randomGapRate =
       (_unit(seed, 880301) - 0.5) * 2 * math.min(0.012, dailyLimitRate * 0.08);
+  final overnightImbalanceDraw = _unit(seed, 880313);
+  final overnightImbalanceRate = overnightImbalanceDraw < 0.012
+      ? (_unit(seed, 880319) < 0.5 ? -1.0 : 1.0) *
+            (0.025 + _unit(seed, 880321) * 0.045)
+      : 0.0;
   final rawOpening = useIpoOpeningDiscovery
       ? previousClose *
             (1 +
@@ -251,7 +256,8 @@ List<double> generatedFullMarketDayPath({
                     0.82 +
                 (_unit(seed, 880307) - 0.5) * 0.08 +
                 preOpenImpact * 0.25)
-      : previousClose * (1 + randomGapRate + preOpenImpact * 0.60);
+      : previousClose *
+            (1 + randomGapRate + overnightImbalanceRate + preOpenImpact * 0.60);
   final openingCandidate = rawOpening.clamp(dailyLower, dailyUpper).toDouble();
   final openingTick = sharedMarketTickSize(openingCandidate, market: market);
   final openingPrice =

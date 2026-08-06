@@ -628,6 +628,20 @@ class CohortInvestmentActionResult {
   final CohortLoan? loan;
 }
 
+class CohortRollCallActionResult {
+  const CohortRollCallActionResult({
+    required this.state,
+    required this.success,
+    required this.message,
+    this.report,
+  });
+
+  final GameState state;
+  final bool success;
+  final String message;
+  final CohortDailyRollCallReport? report;
+}
+
 class PhoneMessengerActionResult {
   const PhoneMessengerActionResult({
     required this.state,
@@ -1502,6 +1516,391 @@ class GameEngine {
     );
   }
 
+  /// Finalizes the 20:00 whole-day roll call. Unlike the 15:00 investment
+  /// report this also runs on weekends and includes the one permitted leisure
+  /// market plus other realized funds.
+  CohortRollCallActionResult settleCohortDailyRollCall(GameState state) {
+    final existing = state.cohortInvestments.rollCallReportForDay(state.day);
+    if (existing != null) {
+      return CohortRollCallActionResult(
+        state: state,
+        success: true,
+        message: '오늘의 저녁 점호 결산은 이미 확정됐습니다.',
+        report: existing,
+      );
+    }
+
+    final stockReport = state.cohortInvestments.reportForDay(state.day);
+    final playerStock = stockReport?.resultFor('player')?.profitLoss ?? 0;
+    final casinoRecords = state.personalFinance.casino.history
+        .where((record) => record.day == state.day)
+        .toList(growable: false);
+    final playerCasinoStake = casinoRecords.fold<int>(
+      0,
+      (sum, record) => sum + record.stake,
+    );
+    final playerCasinoGrossPayout = casinoRecords.fold<int>(
+      0,
+      (sum, record) => sum + record.grossPayout,
+    );
+    final playerCasinoRecovery = casinoRecords.fold<int>(
+      0,
+      (sum, record) => sum + record.nationalFee,
+    );
+    final playerCasino = casinoRecords.fold<int>(
+      0,
+      (sum, record) => sum + record.payout - record.stake,
+    );
+    final horseEntries = state.ledger
+        .where(
+          (entry) =>
+              entry.day == state.day &&
+              (entry.counterAccount == 'horse_racing_wager_expense' ||
+                  entry.counterAccount == 'horse_racing_payout_income' ||
+                  entry.counterAccount == 'state_horse_racing_fee'),
+        )
+        .toList(growable: false);
+    final playerHorse = horseEntries.fold<int>(
+      0,
+      (sum, entry) => sum + entry.amount,
+    );
+    final playerHorseStake = horseEntries
+        .where((entry) => entry.counterAccount == 'horse_racing_wager_expense')
+        .fold<int>(0, (sum, entry) => sum - entry.amount);
+    final playerHorseGrossPayout = horseEntries
+        .where((entry) => entry.counterAccount == 'horse_racing_payout_income')
+        .fold<int>(0, (sum, entry) => sum + entry.amount);
+    final playerHorseRecovery = horseEntries
+        .where((entry) => entry.counterAccount == 'state_horse_racing_fee')
+        .fold<int>(0, (sum, entry) => sum - entry.amount);
+    final playerLeisure = playerCasino + playerHorse;
+    final playerAfternoonLogs = weekdayActivityLogsForDay(state, state.day);
+    final playerLoggedActivity = playerAfternoonLogs.isEmpty
+        ? null
+        : playerAfternoonLogs.first.activityId;
+    final playerLeisureActivity = casinoRecords.isNotEmpty
+        ? '카지노'
+        : horseRaceBetsForDay(state, state.day) > 0
+        ? '경마'
+        : switch (playerLoggedActivity) {
+            'bank' => '예금·은행',
+            'real_estate' => '부동산',
+            weekdayAfternoonSkipActivityId => '그냥 넘어감',
+            _ => '미참여',
+          };
+    final playerName = state.story.playerName.trim().isEmpty
+        ? '나'
+        : state.story.playerName.trim();
+
+    final rows = <CohortDailyRollCallRow>[
+      CohortDailyRollCallRow(
+        investorId: 'player',
+        name: playerName,
+        stockProfitLoss: playerStock,
+        leisureProfitLoss: playerLeisure,
+        otherProfitLoss: _playerOtherFundsProfitLoss(state),
+        leisureActivity: playerLeisureActivity,
+        isPlayer: true,
+        afternoonStake: playerCasinoStake + playerHorseStake,
+        afternoonGrossPayout: playerCasinoGrossPayout + playerHorseGrossPayout,
+        afternoonStateRecovery: playerCasinoRecovery + playerHorseRecovery,
+      ),
+    ];
+    final accounts = <String, CohortInvestorAccount>{
+      ...state.cohortInvestments.accounts,
+    };
+    for (final profile in cohortNpcInvestorProfiles) {
+      final stockProfitLoss =
+          stockReport?.resultFor(profile.id)?.profitLoss ?? 0;
+      final account = state.cohortInvestments.accountFor(profile.id);
+      final leisure = _npcLeisureRollCallResult(
+        state,
+        profile,
+        account.balance,
+      );
+      final balanceAfterLeisure = account.balance + leisure.profitLoss;
+      final otherProfitLoss =
+          _npcOtherFundsProfitLoss(
+                state,
+                profile,
+                balanceAfterLeisure,
+                leisure.activity,
+              )
+              .clamp(
+                -math.max(0, balanceAfterLeisure),
+                cohortInvestmentMaxMoney,
+              )
+              .toInt();
+      accounts[profile.id] = account.copyWith(
+        balance: account.balance + leisure.profitLoss + otherProfitLoss,
+      );
+      rows.add(
+        CohortDailyRollCallRow(
+          investorId: profile.id,
+          name: profile.name,
+          stockProfitLoss: stockProfitLoss,
+          leisureProfitLoss: leisure.profitLoss,
+          otherProfitLoss: otherProfitLoss,
+          leisureActivity: leisure.activity,
+          isPlayer: false,
+          afternoonStake: leisure.stake,
+          afternoonGrossPayout: leisure.grossPayout,
+          afternoonStateRecovery: leisure.stateRecovery,
+        ),
+      );
+    }
+
+    final report = CohortDailyRollCallReport(day: state.day, rows: rows);
+    final reports = <CohortDailyRollCallReport>[
+      ...state.cohortInvestments.rollCallReports.where(
+        (item) => item.day != state.day,
+      ),
+      report,
+    ];
+    final trimmedReports = reports.length <= cohortRollCallHistoryLimit
+        ? reports
+        : reports.sublist(reports.length - cohortRollCallHistoryLimit);
+    final next = state.copyWith(
+      cohortInvestments: state.cohortInvestments.copyWith(
+        accounts: accounts,
+        rollCallReports: List<CohortDailyRollCallReport>.unmodifiable(
+          trimmedReports,
+        ),
+      ),
+    );
+    return CohortRollCallActionResult(
+      state: next,
+      success: true,
+      message: '한서윤 운영관의 데시멀 10인 저녁 점호 결산이 확정됐습니다.',
+      report: report,
+    );
+  }
+
+  ({
+    String activity,
+    int profitLoss,
+    int stake,
+    int grossPayout,
+    int stateRecovery,
+  })
+  _npcLeisureRollCallResult(
+    GameState state,
+    CohortInvestorProfile profile,
+    int balance,
+  ) {
+    ({
+      String activity,
+      int profitLoss,
+      int stake,
+      int grossPayout,
+      int stateRecovery,
+    })
+    empty(String activity) => (
+      activity: activity,
+      profitLoss: 0,
+      stake: 0,
+      grossPayout: 0,
+      stateRecovery: 0,
+    );
+    if (state.currentDate.weekday >= DateTime.saturday) {
+      return empty('미참여');
+    }
+    final available = unlockedWeekdayActivities(state);
+    if (available.isEmpty) return empty('미참여');
+
+    // The nine classmates make the same one-slot decision as the player. More
+    // conservative profiles skip more often, so attendance is neither forced
+    // nor synchronized across the cohort.
+    final attendanceRoll =
+        _stableHash(
+          '${state.simulationSeed}:roll-call:${state.day}:${profile.id}:attendance',
+        ) %
+        100;
+    final skipThreshold =
+        18 + ((8500 - profile.investmentRatioBps).clamp(0, 4000) ~/ 500) * 2;
+    if (attendanceRoll < skipThreshold) return empty('그냥 넘어감');
+
+    final pick =
+        _stableHash(
+          '${state.simulationSeed}:roll-call:${state.day}:${profile.id}:activity',
+        ) %
+        available.length;
+    final activityId = available[pick].id;
+    if (activityId == 'bank') return empty('예금·은행');
+    if (activityId == 'real_estate') return empty('부동산');
+    final activity = activityId == 'casino' ? '카지노' : '경마';
+    final riskRoll =
+        _stableHash(
+          '${state.simulationSeed}:roll-call:${state.day}:${profile.id}:risk',
+        ) %
+        12;
+    final percent = riskRoll == 0
+        ? 30
+        : riskRoll < 4
+        ? 10
+        : riskRoll < 8
+        ? 5
+        : 2;
+    final stake = ((math.max(0, balance) * percent ~/ 100) ~/ 500) * 500;
+    if (stake < 500) return empty('자금 부족');
+
+    final outcome =
+        _stableHash(
+          '${state.simulationSeed}:roll-call:${state.day}:${profile.id}:$activity:outcome',
+        ) %
+        10000;
+    final grossMultiplier = activity == '카지노'
+        ? outcome < 4700
+              ? 0.0
+              : outcome < 7600
+              ? 1.0
+              : outcome < 9300
+              ? 2.0
+              : outcome < 9900
+              ? 4.0
+              : 12.0
+        : outcome < 6500
+        ? 0.0
+        : outcome < 8600
+        ? 1.5
+        : outcome < 9700
+        ? 3.0
+        : outcome < 9950
+        ? 7.0
+        : 20.0;
+    final grossPayout = (stake * grossMultiplier).round();
+    final confirmedProfit = math.max(0, grossPayout - stake);
+    final nationalFee =
+        (confirmedProfit *
+                state.story.stateRecoveryRateBps.clamp(0, 10000) /
+                10000)
+            .round();
+    return (
+      activity: activity,
+      profitLoss: grossPayout - stake - nationalFee,
+      stake: stake,
+      grossPayout: grossPayout,
+      stateRecovery: nationalFee,
+    );
+  }
+
+  int _npcOtherFundsProfitLoss(
+    GameState state,
+    CohortInvestorProfile profile,
+    int balance,
+    String afternoonActivity,
+  ) {
+    final annualRateBps =
+        300 +
+        _stableHash(
+              '${state.simulationSeed}:roll-call:${profile.id}:deposit-rate',
+            ) %
+            351;
+    final safeBalance = math.max(0, balance);
+    final interest = safeBalance * annualRateBps ~/ 10000 ~/ 365;
+    var activityCashflow = 0;
+    if (afternoonActivity == '예금·은행') {
+      final sweepBonusBps =
+          100 +
+          _stableHash(
+                '${state.simulationSeed}:roll-call:${state.day}:${profile.id}:bank',
+              ) %
+              151;
+      activityCashflow = safeBalance * sweepBonusBps ~/ 10000 ~/ 365;
+    } else if (afternoonActivity == '부동산') {
+      final allocationBps =
+          1500 +
+          _stableHash(
+                '${state.simulationSeed}:roll-call:${profile.id}:property-allocation',
+              ) %
+              2001;
+      final propertyCapital = safeBalance * allocationBps ~/ 10000;
+      final dailyCashflowBps =
+          _stableHash(
+                '${state.simulationSeed}:roll-call:${state.day}:${profile.id}:property-cashflow',
+              ) %
+              76 -
+          25;
+      activityCashflow = (propertyCapital * dailyCashflowBps / 10000).round();
+    }
+    if (state.currentDate.weekday < DateTime.saturday) {
+      return interest + activityCashflow;
+    }
+    final weekendRoll =
+        _stableHash(
+          '${state.simulationSeed}:roll-call:${state.day}:${profile.id}:weekend',
+        ) %
+        5;
+    if (weekendRoll != 0) return interest;
+    final workIncome =
+        900 +
+        _stableHash(
+              '${state.simulationSeed}:roll-call:${state.day}:${profile.id}:work',
+            ) %
+            1601;
+    return interest + workIncome;
+  }
+
+  int _playerOtherFundsProfitLoss(GameState state) {
+    final entries = state.ledger
+        .where((entry) => entry.day == state.day)
+        .toList(growable: false);
+    final bySource = <String, List<LedgerEntry>>{};
+    for (final entry in entries) {
+      bySource.putIfAbsent(entry.sourceId, () => <LedgerEntry>[]).add(entry);
+    }
+    const recognizedCashAccounts = <String>{
+      'work_income',
+      'research_income',
+      'management_fee',
+      'interest_income',
+      'company_income',
+      'property_rent_income',
+      'property_rental_income_tax',
+      'business_event_gain',
+      'business_event_loss',
+      'business_operating_profit',
+      'business_operating_loss',
+      'technology_partnership_income',
+      'tenant_default_loss',
+      'tenant_rent_arrears',
+      'rental_repair_event',
+      'rental_legal_event',
+      'property_maintenance',
+      'property_sale_cost',
+      'property_capital_gains_tax',
+    };
+    var total = 0;
+    for (final sourceEntries in bySource.values) {
+      final excluded = sourceEntries.any(
+        (entry) =>
+            entry.tradeSide.isNotEmpty ||
+            entry.counterAccount.startsWith('casino_') ||
+            entry.counterAccount == 'state_casino_fee' ||
+            entry.counterAccount.startsWith('horse_racing_') ||
+            entry.counterAccount == 'state_horse_racing_fee' ||
+            entry.counterAccount == 'market_security',
+      );
+      if (excluded) continue;
+      final realized = sourceEntries.fold<int>(
+        0,
+        (sum, entry) => sum + entry.realizedPnl,
+      );
+      if (realized != 0) {
+        total += realized;
+        continue;
+      }
+      for (final entry in sourceEntries) {
+        if (recognizedCashAccounts.contains(entry.counterAccount)) {
+          total += entry.amount;
+        } else if (entry.counterAccount == 'mortgage_payment') {
+          total -= entry.tradingFee;
+        }
+      }
+    }
+    return total.clamp(-cohortInvestmentMaxMoney, cohortInvestmentMaxMoney);
+  }
+
   CohortInvestmentActionResult lendToCohortInvestor(
     GameState state, {
     required String borrowerId,
@@ -1990,19 +2389,11 @@ class GameEngine {
         message: '오늘 저녁 업무는 이미 끝났습니다. 다음 날로 넘어가세요.',
       );
     }
-    if (activity.id == 'bank' && !bankAccessUnlocked(state)) {
+    if (!weekdayActivityUnlocked(state, activity.id)) {
       return WeekdayActivityResult(
         state: state,
         success: false,
-        message: '윤하린 은행원 소개 이야기를 먼저 확인해야 은행 업무가 열립니다.',
-        activity: activity,
-      );
-    }
-    if (activity.id == 'real_estate' && !realEstateAccessUnlocked(state)) {
-      return WeekdayActivityResult(
-        state: state,
-        success: false,
-        message: '서하늘 공인중개사 소개 이야기를 먼저 확인해야 부동산 업무가 열립니다.',
+        message: weekdayActivityLockReason(state, activity.id),
         activity: activity,
       );
     }
@@ -2095,7 +2486,9 @@ class GameEngine {
       return failure('오늘의 저녁 행동은 이미 사용했습니다.');
     }
     if (!isValidHorseRaceStake(session.stake, state.availableBrokerageCash)) {
-      return failure('전자 마권은 국가계좌 주문 가능금의 30% 이내에서 500원 단위로 선택할 수 있습니다.');
+      return failure(
+        '전자 마권은 주문 가능금 중 최대 5천만원을 레저 기준금으로 잡아, 그 30% 이내에서 500원 단위로 선택할 수 있습니다.',
+      );
     }
     if (state.availableBrokerageCash < session.stake) {
       return failure(
@@ -6500,6 +6893,24 @@ class GameEngine {
         message: '칩은 500원 단위로 국가계좌 주문 가능금 안에서 교환할 수 있습니다.',
       );
     }
+    final lossLimit = casinoMonthlyLossLimitForBasis(
+      profile.monthBankrollBasis,
+    );
+    final remainingLossAllowance = math.max(0, lossLimit - profile.monthlyLoss);
+    final maximumSafeExchange = casinoMaximumSafeChipExchange(
+      availableCash: state.availableBrokerageCash,
+      chipBalance: profile.chipBalance,
+      remainingMonthlyLossAllowance: remainingLossAllowance,
+    );
+    if (amount > maximumSafeExchange) {
+      return CasinoActionResult(
+        state: state,
+        success: false,
+        message: maximumSafeExchange >= casinoMinimumStake
+            ? '이번 달 손실 정지선 안에서 바로 플레이할 수 있도록 최대 $maximumSafeExchange원까지만 칩으로 바꿀 수 있습니다.'
+            : '이번 달 손실 정지선에 도달했거나 보유 칩이 충분합니다. 남은 칩은 환전할 수 있습니다.',
+      );
+    }
     final exchangeId =
         'casino-chip-exchange-${state.day}-${profile.roundSequence}-${state.ledger.length}';
     final nextProfile = profile.copyWith(
@@ -6586,7 +6997,9 @@ class GameEngine {
         message: '블랙잭은 카드를 받은 뒤 히트·스탠드·더블을 직접 선택합니다.',
       );
     }
-    if (bet.game == CasinoGameType.craps) {
+    if (bet.game == CasinoGameType.craps &&
+        (bet.type == CasinoBetType.crapsPassLine ||
+            bet.type == CasinoBetType.crapsDontPass)) {
       return startCasinoCraps(state, bet);
     }
     final profile = _casinoProfileForCurrentMonth(state);
@@ -6611,7 +7024,7 @@ class GameEngine {
       CasinoGameType.roulette => _resolveRouletteBet(bet, outcomeKey),
       CasinoGameType.sicBo => _resolveSicBoBet(bet, outcomeKey),
       CasinoGameType.slots => _resolveSlotsBet(bet, outcomeKey),
-      CasinoGameType.craps => throw StateError('handled above'),
+      CasinoGameType.craps => _resolveCrapsOneRollBet(bet, outcomeKey),
       CasinoGameType.blackjack => throw StateError('handled above'),
     };
     return _recordCasinoRound(
@@ -6706,12 +7119,166 @@ class GameEngine {
         message: '진행 중인 블랙잭 핸드가 없습니다.',
       );
     }
-    final playerValue = blackjackHandValue(hand.playerCards).total;
+    final activeCards = hand.activePlayerCards;
+    final playerValue = blackjackHandValue(activeCards).total;
     if (playerValue >= 21 && action == BlackjackAction.hit) {
       return CasinoActionResult(
         state: state,
         success: false,
         message: '21 이상에서는 카드를 더 받을 수 없습니다. 결과를 확인하세요.',
+      );
+    }
+
+    if (action == BlackjackAction.insurance) {
+      final dealerUp = blackjackHandValue(<int>[hand.dealerCards.first]).total;
+      final insuranceStake =
+          ((hand.stake ~/ 2) ~/ casinoMinimumStake) * casinoMinimumStake;
+      if (hand.isSplit ||
+          hand.playerCards.length != 2 ||
+          hand.insuranceStake > 0 ||
+          dealerUp != 11 ||
+          insuranceStake < casinoMinimumStake) {
+        return CasinoActionResult(
+          state: state,
+          success: false,
+          message: '보험은 딜러 오픈카드가 에이스인 첫 두 장에서만 선택할 수 있습니다.',
+        );
+      }
+      final profile = _casinoProfileForCurrentMonth(state);
+      if (insuranceStake > profile.chipBalance) {
+        return CasinoActionResult(
+          state: state,
+          success: false,
+          message: '보험에 필요한 추가 칩이 부족합니다.',
+        );
+      }
+      final lossLimit = casinoMonthlyLossLimitForBasis(
+        profile.monthBankrollBasis,
+      );
+      if (profile.monthlyLoss + insuranceStake > lossLimit) {
+        return CasinoActionResult(
+          state: state,
+          success: false,
+          message: '이번 달 손실 중단선 때문에 보험을 선택할 수 없습니다.',
+        );
+      }
+      final insured = hand.copyWith(insuranceStake: insuranceStake);
+      final chargedProfile = profile.copyWith(
+        chipBalance: profile.chipBalance - insuranceStake,
+        monthlyStake: profile.monthlyStake + insuranceStake,
+        totalStake: profile.totalStake + insuranceStake,
+        activeBlackjack: insured,
+      );
+      final charged = state.copyWith(
+        personalFinance: state.personalFinance.copyWith(
+          totalSpent: state.personalFinance.totalSpent + insuranceStake,
+          totalChanceStake:
+              state.personalFinance.totalChanceStake + insuranceStake,
+          casino: chargedProfile,
+        ),
+        ledger: <LedgerEntry>[
+          ...state.ledger,
+          LedgerEntry(
+            id: '${hand.id}-insurance',
+            day: state.day,
+            amount: -insuranceStake,
+            account: 'casino_chips',
+            counterAccount: 'casino_wager',
+            description: '카지노 · 블랙잭 보험 베팅',
+            sourceId: hand.id,
+          ),
+        ],
+      );
+      if (blackjackIsNatural(hand.dealerCards)) {
+        final settled = _settleCasinoBlackjack(charged, insured);
+        return CasinoActionResult(
+          state: settled.state,
+          success: settled.success,
+          message: settled.message,
+          cashDelta: settled.cashDelta - insuranceStake,
+          minutesElapsed: settled.minutesElapsed,
+        );
+      }
+      return CasinoActionResult(
+        state: charged,
+        success: true,
+        message: '딜러가 블랙잭이 아니어서 보험금은 잃었습니다. 메인 핸드를 계속하세요.',
+        cashDelta: -insuranceStake,
+      );
+    }
+
+    if (action == BlackjackAction.split) {
+      final sameValue =
+          hand.playerCards.length == 2 &&
+          math.min(casinoCardRank(hand.playerCards[0]), 10) ==
+              math.min(casinoCardRank(hand.playerCards[1]), 10);
+      if (hand.isSplit ||
+          !sameValue ||
+          hand.nextCardIndex + 1 >= hand.deck.length) {
+        return CasinoActionResult(
+          state: state,
+          success: false,
+          message: '스플릿은 같은 값의 첫 두 장에서 한 번만 선택할 수 있습니다.',
+        );
+      }
+      final profile = _casinoProfileForCurrentMonth(state);
+      if (hand.stake > profile.chipBalance) {
+        return CasinoActionResult(
+          state: state,
+          success: false,
+          message: '스플릿에 필요한 추가 칩이 부족합니다.',
+        );
+      }
+      final lossLimit = casinoMonthlyLossLimitForBasis(
+        profile.monthBankrollBasis,
+      );
+      if (profile.monthlyLoss + hand.stake > lossLimit) {
+        return CasinoActionResult(
+          state: state,
+          success: false,
+          message: '이번 달 손실 중단선 때문에 스플릿을 선택할 수 없습니다.',
+        );
+      }
+      final split = hand.copyWith(
+        splitHands: <List<int>>[
+          <int>[hand.playerCards[0], hand.deck[hand.nextCardIndex]],
+          <int>[hand.playerCards[1], hand.deck[hand.nextCardIndex + 1]],
+        ],
+        splitStakes: <int>[hand.stake, hand.stake],
+        splitDoubled: const <bool>[false, false],
+        activeSplitHand: 0,
+        nextCardIndex: hand.nextCardIndex + 2,
+      );
+      final nextProfile = profile.copyWith(
+        chipBalance: profile.chipBalance - hand.stake,
+        monthlyStake: profile.monthlyStake + hand.stake,
+        totalStake: profile.totalStake + hand.stake,
+        activeBlackjack: split,
+      );
+      final next = state.copyWith(
+        personalFinance: state.personalFinance.copyWith(
+          totalSpent: state.personalFinance.totalSpent + hand.stake,
+          totalChanceStake: state.personalFinance.totalChanceStake + hand.stake,
+          casino: nextProfile,
+        ),
+        ledger: <LedgerEntry>[
+          ...state.ledger,
+          LedgerEntry(
+            id: '${hand.id}-split',
+            day: state.day,
+            amount: -hand.stake,
+            account: 'casino_chips',
+            counterAccount: 'casino_wager',
+            description: '카지노 · 블랙잭 스플릿 추가 베팅',
+            sourceId: hand.id,
+          ),
+        ],
+      );
+      return CasinoActionResult(
+        state: next,
+        success: true,
+        message: '두 핸드로 나눴습니다. 1번 핸드부터 진행하세요.',
+        cashDelta: -hand.stake,
       );
     }
 
@@ -6723,15 +7290,36 @@ class GameEngine {
           message: '슈를 다시 준비해야 합니다. 스탠드로 정산해 주세요.',
         );
       }
-      final playerCards = <int>[
-        ...hand.playerCards,
-        hand.deck[hand.nextCardIndex],
-      ];
-      final updated = hand.copyWith(
-        playerCards: playerCards,
-        nextCardIndex: hand.nextCardIndex + 1,
-      );
+      final playerCards = <int>[...activeCards, hand.deck[hand.nextCardIndex]];
+      final updated = hand.isSplit
+          ? hand.copyWith(
+              splitHands: <List<int>>[
+                for (var index = 0; index < hand.splitHands.length; index++)
+                  index == hand.activeSplitHand
+                      ? playerCards
+                      : hand.splitHands[index],
+              ],
+              nextCardIndex: hand.nextCardIndex + 1,
+            )
+          : hand.copyWith(
+              playerCards: playerCards,
+              nextCardIndex: hand.nextCardIndex + 1,
+            );
       if (blackjackHandValue(playerCards).total >= 21) {
+        if (updated.isSplit && updated.activeSplitHand == 0) {
+          final continued = updated.copyWith(activeSplitHand: 1);
+          return CasinoActionResult(
+            state: state.copyWith(
+              personalFinance: state.personalFinance.copyWith(
+                casino: state.personalFinance.casino.copyWith(
+                  activeBlackjack: continued,
+                ),
+              ),
+            ),
+            success: true,
+            message: '1번 핸드를 마쳤습니다. 2번 핸드를 진행하세요.',
+          );
+        }
         return _settleCasinoBlackjack(state, updated);
       }
       final next = state.copyWith(
@@ -6749,7 +7337,7 @@ class GameEngine {
     }
 
     if (action == BlackjackAction.doubleDown) {
-      if (hand.playerCards.length != 2 || hand.doubled) {
+      if (activeCards.length != 2 || hand.activePlayerDoubled) {
         return CasinoActionResult(
           state: state,
           success: false,
@@ -6757,7 +7345,8 @@ class GameEngine {
         );
       }
       final profile = _casinoProfileForCurrentMonth(state);
-      if (hand.stake > profile.chipBalance) {
+      final additionalStake = hand.activePlayerStake;
+      if (additionalStake > profile.chipBalance) {
         return CasinoActionResult(
           state: state,
           success: false,
@@ -6767,33 +7356,53 @@ class GameEngine {
       final lossLimit = casinoMonthlyLossLimitForBasis(
         profile.monthBankrollBasis,
       );
-      if (profile.monthlyLoss + hand.stake > lossLimit) {
+      if (profile.monthlyLoss + additionalStake > lossLimit) {
         return CasinoActionResult(
           state: state,
           success: false,
           message: '이번 달 손실 중단선 때문에 더블을 선택할 수 없습니다.',
         );
       }
-      final playerCards = <int>[
-        ...hand.playerCards,
-        hand.deck[hand.nextCardIndex],
-      ];
-      final doubled = hand.copyWith(
-        stake: hand.stake * 2,
-        playerCards: playerCards,
-        nextCardIndex: hand.nextCardIndex + 1,
-        doubled: true,
-      );
+      final playerCards = <int>[...activeCards, hand.deck[hand.nextCardIndex]];
+      final doubled = hand.isSplit
+          ? hand.copyWith(
+              splitHands: <List<int>>[
+                for (var index = 0; index < hand.splitHands.length; index++)
+                  index == hand.activeSplitHand
+                      ? playerCards
+                      : hand.splitHands[index],
+              ],
+              splitStakes: <int>[
+                for (var index = 0; index < hand.splitStakes.length; index++)
+                  index == hand.activeSplitHand
+                      ? hand.splitStakes[index] * 2
+                      : hand.splitStakes[index],
+              ],
+              splitDoubled: <bool>[
+                for (var index = 0; index < hand.splitDoubled.length; index++)
+                  index == hand.activeSplitHand
+                      ? true
+                      : hand.splitDoubled[index],
+              ],
+              nextCardIndex: hand.nextCardIndex + 1,
+            )
+          : hand.copyWith(
+              stake: hand.stake * 2,
+              playerCards: playerCards,
+              nextCardIndex: hand.nextCardIndex + 1,
+              doubled: true,
+            );
       final profileWithDouble = profile.copyWith(
-        chipBalance: profile.chipBalance - hand.stake,
-        monthlyStake: profile.monthlyStake + hand.stake,
-        totalStake: profile.totalStake + hand.stake,
+        chipBalance: profile.chipBalance - additionalStake,
+        monthlyStake: profile.monthlyStake + additionalStake,
+        totalStake: profile.totalStake + additionalStake,
         activeBlackjack: doubled,
       );
       final charged = state.copyWith(
         personalFinance: state.personalFinance.copyWith(
-          totalSpent: state.personalFinance.totalSpent + hand.stake,
-          totalChanceStake: state.personalFinance.totalChanceStake + hand.stake,
+          totalSpent: state.personalFinance.totalSpent + additionalStake,
+          totalChanceStake:
+              state.personalFinance.totalChanceStake + additionalStake,
           casino: profileWithDouble,
         ),
         ledger: <LedgerEntry>[
@@ -6801,7 +7410,7 @@ class GameEngine {
           LedgerEntry(
             id: '${hand.id}-double',
             day: state.day,
-            amount: -hand.stake,
+            amount: -additionalStake,
             account: 'casino_chips',
             counterAccount: 'casino_wager',
             description: '카지노 · 블랙잭 더블다운 추가 베팅',
@@ -6809,16 +7418,45 @@ class GameEngine {
           ),
         ],
       );
+      if (doubled.isSplit && doubled.activeSplitHand == 0) {
+        final continued = doubled.copyWith(activeSplitHand: 1);
+        return CasinoActionResult(
+          state: charged.copyWith(
+            personalFinance: charged.personalFinance.copyWith(
+              casino: charged.personalFinance.casino.copyWith(
+                activeBlackjack: continued,
+              ),
+            ),
+          ),
+          success: true,
+          message: '1번 핸드 더블다운을 마쳤습니다. 2번 핸드를 진행하세요.',
+          cashDelta: -additionalStake,
+        );
+      }
       final settled = _settleCasinoBlackjack(charged, doubled);
       return CasinoActionResult(
         state: settled.state,
         success: settled.success,
         message: settled.message,
-        cashDelta: settled.cashDelta - hand.stake,
+        cashDelta: settled.cashDelta - additionalStake,
         minutesElapsed: settled.minutesElapsed,
       );
     }
 
+    if (hand.isSplit && hand.activeSplitHand == 0) {
+      final continued = hand.copyWith(activeSplitHand: 1);
+      return CasinoActionResult(
+        state: state.copyWith(
+          personalFinance: state.personalFinance.copyWith(
+            casino: state.personalFinance.casino.copyWith(
+              activeBlackjack: continued,
+            ),
+          ),
+        ),
+        success: true,
+        message: '1번 핸드에 스탠드했습니다. 2번 핸드를 진행하세요.',
+      );
+    }
     return _settleCasinoBlackjack(state, hand);
   }
 
@@ -6826,10 +7464,13 @@ class GameEngine {
     GameState state,
     BlackjackHandState hand,
   ) {
-    final player = blackjackHandValue(hand.playerCards);
+    final playerHands = hand.isSplit
+        ? hand.splitHands
+        : <List<int>>[hand.playerCards];
+    final playerStakes = hand.isSplit ? hand.splitStakes : <int>[hand.stake];
     var dealerCards = <int>[...hand.dealerCards];
     var nextIndex = hand.nextCardIndex;
-    if (player.total <= 21) {
+    if (playerHands.any((cards) => blackjackHandValue(cards).total <= 21)) {
       while (true) {
         final dealer = blackjackHandValue(dealerCards);
         // This table uses the common S17 rule: the dealer stands on every 17,
@@ -6841,35 +7482,59 @@ class GameEngine {
       }
     }
     final dealer = blackjackHandValue(dealerCards);
-    final playerNatural = blackjackIsNatural(hand.playerCards);
     final dealerNatural = blackjackIsNatural(dealerCards);
-    late final int grossPayout;
-    late final String outcome;
-    if (player.total > 21) {
-      grossPayout = 0;
-      outcome = '버스트';
-    } else if (playerNatural && !dealerNatural) {
-      grossPayout = hand.stake + (hand.stake * 3 ~/ 2);
-      outcome = '블랙잭 3:2';
-    } else if (dealerNatural && !playerNatural) {
-      grossPayout = 0;
-      outcome = '딜러 블랙잭';
-    } else if (player.total == dealer.total) {
-      grossPayout = hand.stake;
-      outcome = '푸시';
-    } else if (dealer.total > 21 || player.total > dealer.total) {
-      grossPayout = hand.stake * 2;
-      outcome = '승리';
-    } else {
-      grossPayout = 0;
-      outcome = '패배';
+    var mainGrossPayout = 0;
+    final handOutcomes = <String>[];
+    final handDetails = <String>[];
+    for (var index = 0; index < playerHands.length; index++) {
+      final cards = playerHands[index];
+      final player = blackjackHandValue(cards);
+      final stake = playerStakes[index];
+      final playerNatural = !hand.isSplit && blackjackIsNatural(cards);
+      late final int payout;
+      late final String result;
+      if (player.total > 21) {
+        payout = 0;
+        result = '버스트';
+      } else if (playerNatural && !dealerNatural) {
+        payout = stake + (stake * 3 ~/ 2);
+        result = '블랙잭 3:2';
+      } else if (dealerNatural && !playerNatural) {
+        payout = 0;
+        result = '딜러 블랙잭';
+      } else if (player.total == dealer.total) {
+        payout = stake;
+        result = '푸시';
+      } else if (dealer.total > 21 || player.total > dealer.total) {
+        payout = stake * 2;
+        result = '승리';
+      } else {
+        payout = 0;
+        result = '패배';
+      }
+      mainGrossPayout += payout;
+      handOutcomes.add(hand.isSplit ? '핸드 ${index + 1} $result' : result);
+      handDetails.add(
+        '${hand.isSplit ? '핸드 ${index + 1}' : '플레이어'} '
+        '${cards.map(casinoCardLabel).join(' ')} (${player.total})',
+      );
     }
+    final outcome = handOutcomes.join(' · ');
+    final insuranceGrossPayout = hand.insuranceStake > 0 && dealerNatural
+        ? hand.insuranceStake * 3
+        : 0;
+    final grossPayout = mainGrossPayout + insuranceGrossPayout;
+    final totalStake = hand.totalMainStake + hand.insuranceStake;
+    final insuranceOutcome = hand.insuranceStake <= 0
+        ? ''
+        : insuranceGrossPayout > 0
+        ? ' · 보험 적중'
+        : ' · 보험 손실';
     final detail =
-        '플레이어 ${hand.playerCards.map(casinoCardLabel).join(' ')} (${player.total}) · '
-        '딜러 ${dealerCards.map(casinoCardLabel).join(' ')} (${dealer.total})';
+        '${handDetails.join(' · ')} · 딜러 ${dealerCards.map(casinoCardLabel).join(' ')} (${dealer.total})';
     final nationalFee = casinoNationalFee(
       grossPayout: grossPayout,
-      stake: hand.stake,
+      stake: totalStake,
     );
     final netPayout = grossPayout - nationalFee;
     final record = CasinoRoundRecord(
@@ -6877,8 +7542,12 @@ class GameEngine {
       day: hand.day,
       minute: hand.minute,
       game: CasinoGameType.blackjack,
-      betLabel: hand.doubled ? '더블다운' : '기본 핸드',
-      stake: hand.stake,
+      betLabel: hand.isSplit
+          ? '스플릿$insuranceOutcome'
+          : hand.doubled
+          ? '더블다운$insuranceOutcome'
+          : '기본 핸드$insuranceOutcome',
+      stake: totalStake,
       payout: netPayout,
       grossPayout: grossPayout,
       nationalFee: nationalFee,
@@ -7233,12 +7902,20 @@ class GameEngine {
     if (profile.roundsForDay(state.day) >= casinoDailyRoundLimit) {
       return '오늘의 테이블 이용 한도 $casinoDailyRoundLimit판을 모두 사용했습니다.';
     }
-    if (!isValidCasinoChipStake(stake, profile.chipBalance)) {
-      return '베팅은 보유 칩의 30% 이내에서 500원 단위로 선택해야 합니다.';
-    }
     final lossLimit = casinoMonthlyLossLimitForBasis(
       profile.monthBankrollBasis,
     );
+    final remainingLossAllowance = math.max(0, lossLimit - profile.monthlyLoss);
+    if (remainingLossAllowance < casinoMinimumStake) {
+      return '이번 달 손실 중단선 $lossLimit원에 도달해 추가 베팅이 잠겼습니다.';
+    }
+    if (!isValidCasinoPlayableStake(
+      stake: stake,
+      chipBalance: profile.chipBalance,
+      remainingMonthlyLossAllowance: remainingLossAllowance,
+    )) {
+      return '베팅은 보유 칩과 이번 달 손실 정지선을 함께 반영한 플레이 기준 칩의 2%·5%·10%·30% 중 하나를 500칩 단위로 내려 선택해야 합니다.';
+    }
     if (profile.monthlyLoss + stake > lossLimit) {
       return '이번 달 손실 중단선 $lossLimit원에 도달해 추가 베팅이 잠겼습니다.';
     }
@@ -7257,7 +7934,10 @@ class GameEngine {
       CasinoGameType.roulette => bet.type.name.startsWith('roulette'),
       CasinoGameType.craps =>
         bet.type == CasinoBetType.crapsPassLine ||
-            bet.type == CasinoBetType.crapsDontPass,
+            bet.type == CasinoBetType.crapsDontPass ||
+            bet.type == CasinoBetType.crapsField ||
+            bet.type == CasinoBetType.crapsAnySeven ||
+            bet.type == CasinoBetType.crapsAnyCraps,
       CasinoGameType.sicBo => bet.type.name.startsWith('sicBo'),
       CasinoGameType.slots => bet.type == CasinoBetType.slotsSpin,
       CasinoGameType.blackjack => bet.type == CasinoBetType.blackjackHand,
@@ -7578,6 +8258,35 @@ class GameEngine {
     );
   }
 
+  ({int payout, String outcome, String detail}) _resolveCrapsOneRollBet(
+    CasinoBet bet,
+    String key,
+  ) {
+    final die1 = stableRandomInt('$key:craps-one-roll:0', 6) + 1;
+    final die2 = stableRandomInt('$key:craps-one-roll:1', 6) + 1;
+    final sum = die1 + die2;
+    var grossMultiplier = 0;
+    switch (bet.type) {
+      case CasinoBetType.crapsField:
+        if (sum == 2 || sum == 12) {
+          grossMultiplier = 3;
+        } else if (<int>{3, 4, 9, 10, 11}.contains(sum)) {
+          grossMultiplier = 2;
+        }
+      case CasinoBetType.crapsAnySeven:
+        if (sum == 7) grossMultiplier = 5;
+      case CasinoBetType.crapsAnyCraps:
+        if (<int>{2, 3, 12}.contains(sum)) grossMultiplier = 8;
+      default:
+        throw ArgumentError.value(bet.type, 'type', 'one-roll craps bet');
+    }
+    return (
+      payout: bet.stake * grossMultiplier,
+      outcome: grossMultiplier > 0 ? '$grossMultiplier배 적중' : '미적중',
+      detail: '주사위 $die1 + $die2 = $sum · 단판 프로포지션',
+    );
+  }
+
   ({int payout, String outcome, String detail}) _resolveSlotsBet(
     CasinoBet bet,
     String key,
@@ -7592,7 +8301,7 @@ class GameEngine {
     return (
       payout: bet.stake * multiplier,
       outcome: multiplier > 0 ? '$multiplier배 당첨' : '미당첨',
-      detail: '$detail · 공개 이론 지급률 97.2%',
+      detail: '$detail · 세전 RTP 97.2% · 국가 수수료 후 실수령 RTP 79.7%',
     );
   }
 
@@ -8543,7 +9252,11 @@ class GameEngine {
           )
         : state;
     final settled = replayed.copyWith(marketMinute: krxCloseMinute);
-    final accrued = const LocalBusinessEngine().accrueCurrentDay(settled).state;
+    var accrued = const LocalBusinessEngine().accrueCurrentDay(settled).state;
+    // Direct engine simulations do not pass through the narrated 20:00 screen,
+    // but they still need the same deterministic daily/monthly roll-call book.
+    final rollCall = settleCohortDailyRollCall(accrued);
+    if (rollCall.success) accrued = rollCall.state;
     var next = accrued.copyWith(
       day: state.day + 1,
       marketMinute: marketDayStartMinute,
@@ -8608,7 +9321,7 @@ class GameEngine {
       minute: hand.minute,
       game: CasinoGameType.blackjack,
       betLabel: hand.doubled ? '더블다운' : '기본 핸드',
-      stake: hand.stake,
+      stake: hand.totalMainStake + hand.insuranceStake,
       payout: 0,
       grossPayout: 0,
       nationalFee: 0,

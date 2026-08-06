@@ -13,7 +13,7 @@
   <meta name="twitter:title" content="10대부터 건물주 — 프로젝트 데시멀 투자 생활 게임">
   <meta name="twitter:description" content="2000년 서울, 프로젝트 데시멀의 열 명이 국가원금 5만원으로 생존과 투자를 배워 가는 모바일 세로형 생활·투자 시뮬레이션">
   <meta name="theme-color" content="#061F2A">
-  <meta name="decimal-build-id" content="9e17baa54158">
+  <meta name="decimal-build-id" content="c8ab7bacf438">
   <meta name="mobile-web-app-capable" content="yes">
   <!-- iOS는 아직 레거시 이름만 읽는다. 이 둘이 없으면 홈 화면에서 열어도 사파리 주소창이 남는다. -->
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -428,7 +428,7 @@
       const timeout = new Promise((resolve) => window.setTimeout(resolve, 4000));
 
       const activateCurrentWorker = window.navigator.serviceWorker
-        .register('pwa_service_worker.js?v=9e17baa54158', {
+        .register('pwa_service_worker.js?v=c8ab7bacf438', {
           scope: './',
           updateViaCache: 'none',
         })
@@ -497,7 +497,7 @@
     (() => {
       const loadFlutter = () => {
         const script = document.createElement('script');
-        script.src = 'flutter_bootstrap.js?v=9e17baa54158';
+        script.src = 'flutter_bootstrap.js?v=c8ab7bacf438';
         script.async = true;
         document.body.appendChild(script);
       };

@@ -1035,7 +1035,7 @@ class _HomeComputerScreenState extends State<HomeComputerScreen> {
     if (_state.marketMinute >= marketDayEndMinute) {
       return '오늘 접속 종료 · 다음 거래일 이용';
     }
-    return '장 마감 완료 · 경마 또는 카지노 중 하나 선택';
+    return '장 마감 완료 · 경마·카지노 선택 또는 그냥 넘어가기';
   }
 
   bool get _casinoSessionAvailable {
@@ -1174,7 +1174,7 @@ class _HomeComputerScreenState extends State<HomeComputerScreen> {
         key: const Key('after-market-horse-gateway'),
         title: const Text('국가망 경마 접속'),
         content: const Text(
-          '공용 PC의 국가망에서 원격 패독과 8두 출전표를 확인하고, 국가계좌 주문 가능금의 2%·5%·10%·30% 중 하나로 전자 마권을 전송합니다. 최소 500원이며 정산 즉시 20:00으로 이동합니다.\n\n'
+          '공용 PC의 국가망에서 원격 패독과 8두 출전표를 확인하고, 주문 가능금 중 최대 5천만원을 레저 기준금으로 잡아 2%·5%·10%·30% 중 하나로 전자 마권을 전송합니다. 최소 500원이며 정산 즉시 20:00으로 이동합니다.\n\n'
           '평일 장 마감 뒤 1일 1회 · 확정 이익 20% 국가 환수 · 카지노와 같은 날 중복 이용 불가',
         ),
         actions: [
@@ -1737,9 +1737,9 @@ const _nationalNetworkBriefingBeats = <_NationalNetworkBriefingBeat>[
         '한서윤 운영관: “주식 실습을 마친 후부터 PC에 국가망 경마와 데시멀 카지노가 열립니다. 둘 다 현장에 가는 서비스가 아니라, 프로젝트 내부 PC에서만 접속하는 확률시장입니다.”',
   ),
   _NationalNetworkBriefingBeat(
-    title: '국가망 경마 · 주문 가능금의 2~30%',
+    title: '국가망 경마 · 레저 기준금의 2~30%',
     body:
-        '한서윤 운영관: “단승·연승·복승 중 하나를 고르고 국가계좌 주문 가능금의 2%·5%·10%·30% 중 하나를 전자 마권으로 삽니다. 최소는 500원, 상한은 계좌의 30%이고 하루 한 번만 가능합니다.”',
+        '한서윤 운영관: “단승·연승·복승 중 하나를 고르고, 주문 가능금 중 최대 5천만원을 레저 기준금으로 잡아 2%·5%·10%·30% 중 하나를 전자 마권으로 삽니다. 최소는 500원이고 하루 한 번만 가능합니다.”',
   ),
   _NationalNetworkBriefingBeat(
     title: '데시멀 카지노 · 보유 칩의 2~30%',

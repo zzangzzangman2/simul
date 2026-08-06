@@ -3,6 +3,9 @@ class CohortCharacterProfile {
     required this.id,
     required this.name,
     required this.age,
+    required this.birthYear,
+    required this.birthMonth,
+    required this.birthDay,
     required this.group,
     required this.mbti,
     required this.role,
@@ -20,6 +23,9 @@ class CohortCharacterProfile {
   final String id;
   final String name;
   final int age;
+  final int birthYear;
+  final int birthMonth;
+  final int birthDay;
   final String group;
   final String mbti;
   final String role;
@@ -34,6 +40,16 @@ class CohortCharacterProfile {
   final String portraitAsset;
 
   String get ageLabel => age < 20 ? '$age살' : '$age세';
+
+  int ageAt(DateTime date) => date.year - birthYear + 1;
+
+  String ageLabelAt(DateTime date) {
+    final currentAge = ageAt(date);
+    return currentAge < 20 ? '$currentAge살' : '$currentAge세';
+  }
+
+  String get birthdayLabel =>
+      '$birthYear.${birthMonth.toString().padLeft(2, '0')}.${birthDay.toString().padLeft(2, '0')}';
 }
 
 const cohortCharacterProfiles = <CohortCharacterProfile>[
@@ -41,6 +57,9 @@ const cohortCharacterProfiles = <CohortCharacterProfile>[
     id: 'kim_seoa',
     name: '김서아',
     age: 14,
+    birthYear: 1987,
+    birthMonth: 2,
+    birthDay: 12,
     group: '프로젝트 데시멀 · 최종 10인',
     mbti: 'ISFJ',
     role: '신뢰 기록 · 역발상 가치 담당',
@@ -60,6 +79,9 @@ const cohortCharacterProfiles = <CohortCharacterProfile>[
     id: 'lee_jian',
     name: '이지안',
     age: 14,
+    birthYear: 1987,
+    birthMonth: 3,
+    birthDay: 28,
     group: '프로젝트 데시멀 · 최종 10인',
     mbti: 'ISTP',
     role: '체결 구조 · 초단기 대응 담당',
@@ -79,6 +101,9 @@ const cohortCharacterProfiles = <CohortCharacterProfile>[
     id: 'choi_iseo',
     name: '최이서',
     age: 14,
+    birthYear: 1987,
+    birthMonth: 5,
+    birthDay: 4,
     group: '프로젝트 데시멀 · 최종 10인',
     mbti: 'ISFP',
     role: '차트 리듬 · 이상 징후 담당',
@@ -98,6 +123,9 @@ const cohortCharacterProfiles = <CohortCharacterProfile>[
     id: 'jung_arin',
     name: '정아린',
     age: 14,
+    birthYear: 1987,
+    birthMonth: 6,
+    birthDay: 21,
     group: '프로젝트 데시멀 · 최종 10인',
     mbti: 'ESTJ',
     role: '인수 실행 · 운영 통합 담당',
@@ -117,6 +145,9 @@ const cohortCharacterProfiles = <CohortCharacterProfile>[
     id: 'park_haeun',
     name: '박하은',
     age: 14,
+    birthYear: 1987,
+    birthMonth: 8,
+    birthDay: 8,
     group: '프로젝트 데시멀 · 최종 10인',
     mbti: 'ENFJ',
     role: '정보망 · 협상 · 관계 위험 담당',
@@ -136,6 +167,9 @@ const cohortCharacterProfiles = <CohortCharacterProfile>[
     id: 'han_sua',
     name: '한수아',
     age: 14,
+    birthYear: 1987,
+    birthMonth: 9,
+    birthDay: 16,
     group: '프로젝트 데시멀 · 최종 10인',
     mbti: 'ENFP',
     role: '테마 · 유행 · 수요 전조 담당',
@@ -155,6 +189,9 @@ const cohortCharacterProfiles = <CohortCharacterProfile>[
     id: 'oh_jiwoo',
     name: '오지우',
     age: 14,
+    birthYear: 1987,
+    birthMonth: 11,
+    birthDay: 3,
     group: '프로젝트 데시멀 · 최종 10인',
     mbti: 'ENTP',
     role: '반대가설 · 공매도 논리 담당',
@@ -174,6 +211,9 @@ const cohortCharacterProfiles = <CohortCharacterProfile>[
     id: 'yoon_chaea',
     name: '윤채아',
     age: 14,
+    birthYear: 1987,
+    birthMonth: 12,
+    birthDay: 19,
     group: '프로젝트 데시멀 · 최종 10인',
     mbti: 'INTJ',
     role: '퀀트 · 장기 전략 담당',
@@ -193,6 +233,9 @@ const cohortCharacterProfiles = <CohortCharacterProfile>[
     id: 'kim_hakjun',
     name: '김학준',
     age: 14,
+    birthYear: 1987,
+    birthMonth: 1,
+    birthDay: 17,
     group: '프로젝트 데시멀 · 최종 10인',
     mbti: 'ISTJ',
     role: '규정 · 계산 · 교차검토 담당',
@@ -212,6 +255,9 @@ const cohortCharacterProfiles = <CohortCharacterProfile>[
     id: 'han_seoyoon',
     name: '한서윤',
     age: 23,
+    birthYear: 1978,
+    birthMonth: 4,
+    birthDay: 9,
     group: '프로젝트 데시멀 운영관',
     mbti: 'INFJ',
     role: '안전 공개 · 판단 기준 운영관',

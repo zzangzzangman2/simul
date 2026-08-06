@@ -7,6 +7,7 @@ const weekdayActivityHistoryLimit = 260;
 const facilityStoryGatesEnabledFlag = 'facilityStoryGatesEnabled';
 const bankAccessUnlockedFlag = 'bankAccessUnlocked';
 const realEstateAccessUnlockedFlag = 'realEstateAccessUnlocked';
+const weekdayAfternoonSkipActivityId = 'skip';
 
 bool facilityStoryGatesEnabled(GameState state) =>
     state.story.flagBool(facilityStoryGatesEnabledFlag);
@@ -58,32 +59,75 @@ class WeekdayActivityDefinition {
 const weekdayActivities = <WeekdayActivityDefinition>[
   WeekdayActivityDefinition(
     id: 'casino',
-    title: '카지노 LIVE 이용',
-    description: '요원 전용 중계에서 테이블을 고르고 저녁 시간을 사용합니다.',
+    title: '데시멀 카지노',
+    description: '국가망 테이블을 고르고 장 마감 뒤 오후 시간을 사용합니다.',
   ),
   WeekdayActivityDefinition(
     id: 'horse_racing',
-    title: '국가망 경마 중계',
-    description: '전자 마권 한 장을 정산하고 오늘의 저녁 시간을 사용합니다.',
+    title: '국가망 경마',
+    description: '전자 마권 한 장을 정산하고 장 마감 뒤 오후 시간을 사용합니다.',
   ),
   WeekdayActivityDefinition(
     id: 'real_estate',
-    title: '부동산 시장 확인',
+    title: '부동산 시장',
     description: '매물·시세·보유 부동산을 검토하고 필요한 거래를 처리합니다.',
   ),
   WeekdayActivityDefinition(
     id: 'bank',
-    title: '은행 업무 확인',
+    title: '예금·은행 업무',
     description: '예금·대출·상환 조건과 현재 현금 흐름을 확인합니다.',
   ),
 ];
 
+const weekdayAfternoonSkipActivity = WeekdayActivityDefinition(
+  id: weekdayAfternoonSkipActivityId,
+  title: '오늘은 그냥 넘어가기',
+  description: '오후 시설을 이용하지 않고 20:00 점호로 넘어갑니다.',
+);
+
 WeekdayActivityDefinition? weekdayActivityById(String id) {
+  if (id == weekdayAfternoonSkipActivityId) {
+    return weekdayAfternoonSkipActivity;
+  }
   for (final activity in weekdayActivities) {
     if (activity.id == id) return activity;
   }
   return null;
 }
+
+bool weekdayActivityUnlocked(GameState state, String activityId) =>
+    switch (activityId) {
+      weekdayAfternoonSkipActivityId => true,
+      'casino' || 'horse_racing' =>
+        !facilityStoryGatesEnabled(state) ||
+            state.story.nationalNetworkBriefingSeen,
+      'bank' => bankAccessUnlocked(state),
+      'real_estate' => realEstateAccessUnlocked(state),
+      _ => false,
+    };
+
+String weekdayActivityLockReason(GameState state, String activityId) =>
+    switch (activityId) {
+      weekdayAfternoonSkipActivityId => '',
+      'casino' || 'horse_racing' => '한서윤 운영관의 국가망 사전 설명 필요',
+      'bank' => '2월 예금·은행 이야기 이후 해금',
+      'real_estate' => '5월 부동산 이야기 이후 해금',
+      _ => '아직 선택할 수 없음',
+    };
+
+List<WeekdayActivityDefinition> unlockedWeekdayActivities(GameState state) =>
+    weekdayActivities
+        .where((activity) => weekdayActivityUnlocked(state, activity.id))
+        .toList(growable: false);
+
+/// Interactive `하루 보내기` stops at this decision gate whenever at least one
+/// afternoon destination is available. The player may use one destination or
+/// explicitly skip it; fast-forward simulations are not blocked by the UI.
+bool weekdayAfternoonScheduleRequired(GameState state) =>
+    state.currentDate.weekday < DateTime.saturday &&
+    state.marketMinute >= krxCloseMinute &&
+    !weekdayEveningUsed(state) &&
+    unlockedWeekdayActivities(state).isNotEmpty;
 
 class WeekdayActivityLog {
   const WeekdayActivityLog({
@@ -222,16 +266,14 @@ GameDayGuidance gameDayGuidanceForState(GameState state) {
     );
   }
   if (state.marketMinute < marketDayEndMinute) {
-    final adultEveningEntertainment =
-        !state.currentDate.isBefore(DateTime(2010, 1, 1)) &&
-        state.story.ageOn(state.currentDate) >= 20;
+    final available = unlockedWeekdayActivities(state);
     return GameDayGuidance(
       phaseLabel: '15:00 · 장 마감 후',
       title: '오늘 손익을 확인하고 오후 일정을 고르세요',
-      body: adultEveningEntertainment
-          ? '종가와 보유 현황을 확인한 뒤 컴퓨터실 PC의 카지노·경마 중 하나나 다른 저녁 일정을 선택합니다.'
-          : '종가와 보유 현황을 확인한 뒤 동기들과 보낼 시간을 선택합니다.',
-      actionLabel: '장 마감 결과 보기',
+      body: available.isEmpty
+          ? '아직 해금된 오후 일정이 없습니다. 국가망 사전 설명이나 시설 해금 이야기를 먼저 확인합니다.'
+          : '해금된 ${available.length}개 일정 중 하나를 이용하거나 오늘은 그냥 넘어갈 수 있습니다.',
+      actionLabel: '오후 일정 선택',
     );
   }
   return const GameDayGuidance(

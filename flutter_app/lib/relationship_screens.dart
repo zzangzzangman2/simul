@@ -10,6 +10,7 @@ class RelationshipStatusScreen extends StatelessWidget {
     Navigator.of(context).push(
       _gameSceneRoute<void>(
         _CharacterCardScreen(
+          state: state,
           profile: profile,
           progress: girlProfile == null
               ? null
@@ -45,6 +46,7 @@ class RelationshipStatusScreen extends StatelessWidget {
                 final profile = cohortCharacterProfiles[index];
                 final girlProfile = cohortGirlProfileById(profile.id);
                 return _CohortCharacterTile(
+                  currentDate: state.currentDate,
                   profile: profile,
                   progress: girlProfile == null
                       ? null
@@ -62,11 +64,13 @@ class RelationshipStatusScreen extends StatelessWidget {
 
 class _CohortCharacterTile extends StatelessWidget {
   const _CohortCharacterTile({
+    required this.currentDate,
     required this.profile,
     required this.progress,
     required this.onTap,
   });
 
+  final DateTime currentDate;
   final CohortCharacterProfile profile;
   final GirlRelationshipProgress? progress;
   final VoidCallback onTap;
@@ -170,7 +174,7 @@ class _CohortCharacterTile extends StatelessWidget {
                         right: 8,
                         top: 8,
                         child: _CharacterBadge(
-                          label: profile.ageLabel,
+                          label: profile.ageLabelAt(currentDate),
                           color: _ink,
                         ),
                       ),
@@ -257,15 +261,24 @@ class _CohortCharacterTile extends StatelessWidget {
 }
 
 class _CharacterCardScreen extends StatelessWidget {
-  const _CharacterCardScreen({required this.profile, required this.progress});
+  const _CharacterCardScreen({
+    required this.state,
+    required this.profile,
+    required this.progress,
+  });
 
+  final GameState state;
   final CohortCharacterProfile profile;
   final GirlRelationshipProgress? progress;
 
   void _openDetails(BuildContext context) {
     Navigator.of(context).push(
       _gameSceneRoute<void>(
-        _CharacterProfileDetailScreen(profile: profile, progress: progress),
+        _CharacterProfileDetailScreen(
+          state: state,
+          profile: profile,
+          progress: progress,
+        ),
       ),
     );
   }
@@ -282,7 +295,7 @@ class _CharacterCardScreen extends StatelessWidget {
             _RelationshipHeader(
               title: profile.name,
               subtitle:
-                  '${profile.ageLabel} · ${profile.mbti} · ${profile.group}',
+                  '${profile.ageLabelAt(state.currentDate)} · ${profile.mbti} · ${profile.group}',
               onBack: () => Navigator.pop(context),
             ),
             Expanded(
@@ -408,7 +421,9 @@ class _CharacterCardScreen extends StatelessWidget {
                                 runSpacing: 7,
                                 children: <Widget>[
                                   _CharacterBadge(
-                                    label: profile.ageLabel,
+                                    label: profile.ageLabelAt(
+                                      state.currentDate,
+                                    ),
                                     color: _ink,
                                   ),
                                   _CharacterBadge(
@@ -430,6 +445,16 @@ class _CharacterCardScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 15),
+                  _CohortInvestorIdentityPanel(
+                    age: profile.ageLabelAt(state.currentDate),
+                    birthday: profile.birthdayLabel,
+                    relationship: progress == null
+                        ? '호감도 수치 미적용'
+                        : '${progress!.affection} / $relationshipMaxAffection · ${progress!.stage.label}',
+                    ability: '${profile.role} · ${profile.strength}',
+                    accent: accent,
+                  ),
+                  const SizedBox(height: 11),
                   _CharacterSummaryPanel(
                     icon: Icons.auto_awesome_rounded,
                     title: '한 줄 소개',
@@ -443,6 +468,20 @@ class _CharacterCardScreen extends StatelessWidget {
                       progress: progress!,
                     ),
                   ],
+                  const SizedBox(height: 11),
+                  if (profile.id == 'han_seoyoon')
+                    _CharacterSummaryPanel(
+                      icon: Icons.lock_outline_rounded,
+                      title: '자산 장부',
+                      body: '운영관은 10인 투자 순위 참가자가 아니어서 개인 자산을 공개하지 않습니다.',
+                      accent: accent,
+                    )
+                  else
+                    _CohortInvestorAssetPanel(
+                      snapshot: _cohortAssetSnapshot(state, profile.id),
+                      accent: accent,
+                      investorId: profile.id,
+                    ),
                 ],
               ),
             ),
@@ -455,10 +494,12 @@ class _CharacterCardScreen extends StatelessWidget {
 
 class _CharacterProfileDetailScreen extends StatelessWidget {
   const _CharacterProfileDetailScreen({
+    required this.state,
     required this.profile,
     required this.progress,
   });
 
+  final GameState state;
   final CohortCharacterProfile profile;
   final GirlRelationshipProgress? progress;
 
@@ -503,7 +544,10 @@ class _CharacterProfileDetailScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 14),
-                  _CharacterFactPanel(profile: profile),
+                  _CharacterFactPanel(
+                    profile: profile,
+                    currentDate: state.currentDate,
+                  ),
                   const SizedBox(height: 11),
                   _CharacterSummaryPanel(
                     icon: Icons.psychology_alt_rounded,
@@ -546,6 +590,20 @@ class _CharacterProfileDetailScreen extends StatelessWidget {
                       progress: progress!,
                     ),
                   ],
+                  const SizedBox(height: 11),
+                  if (profile.id == 'han_seoyoon')
+                    _CharacterSummaryPanel(
+                      icon: Icons.lock_outline_rounded,
+                      title: '자산 장부',
+                      body: '운영관은 10인 투자 순위 참가자가 아니어서 개인 자산을 공개하지 않습니다.',
+                      accent: accent,
+                    )
+                  else
+                    _CohortInvestorAssetPanel(
+                      snapshot: _cohortAssetSnapshot(state, profile.id),
+                      accent: accent,
+                      investorId: profile.id,
+                    ),
                 ],
               ),
             ),
@@ -644,9 +702,10 @@ class _CharacterBadge extends StatelessWidget {
 }
 
 class _CharacterFactPanel extends StatelessWidget {
-  const _CharacterFactPanel({required this.profile});
+  const _CharacterFactPanel({required this.profile, required this.currentDate});
 
   final CohortCharacterProfile profile;
+  final DateTime currentDate;
 
   @override
   Widget build(BuildContext context) {
@@ -662,8 +721,13 @@ class _CharacterFactPanel extends StatelessWidget {
         children: <Widget>[
           _CharacterFactRow(label: '이름', value: profile.name, accent: accent),
           _CharacterFactRow(
-            label: '나이',
-            value: profile.ageLabel,
+            label: '현재 나이',
+            value: profile.ageLabelAt(currentDate),
+            accent: accent,
+          ),
+          _CharacterFactRow(
+            label: '생일',
+            value: profile.birthdayLabel,
             accent: accent,
           ),
           _CharacterFactRow(label: 'MBTI', value: profile.mbti, accent: accent),
