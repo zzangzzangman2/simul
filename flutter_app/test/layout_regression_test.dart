@@ -22,6 +22,25 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
   }
 
+  /// 이름 확정 뒤 열리는 4구간 시작 선택을 1부로 넘긴다. 선택 화면이 떠 있는
+  /// 동안에는 대사 진행·건너뛰기 버튼이 없다.
+  Future<void> chooseFirstPrologueEpisode(WidgetTester tester) async {
+    if (find.byKey(const Key('prologue-episode-picker')).evaluate().isEmpty) {
+      return;
+    }
+    await tester.tap(find.byKey(const Key('prologue-start-episode-1')));
+    await tester.pumpAndSettle();
+  }
+
+  /// 구간 경계에 도착하면 막간 카드가 대사창을 덮으므로 `바로 시작`으로 닫는다.
+  Future<void> dismissEpisodeIntermission(WidgetTester tester) async {
+    if (find.byKey(const Key('prologue-episode-continue')).evaluate().isEmpty) {
+      return;
+    }
+    await tester.tap(find.byKey(const Key('prologue-episode-continue')));
+    await tester.pumpAndSettle();
+  }
+
   Future<void> openMarketExplore(WidgetTester tester) async {
     for (var attempt = 0; attempt < 40; attempt++) {
       await tester.pump(const Duration(milliseconds: 100));
@@ -586,6 +605,8 @@ void main() {
       expect(tester.takeException(), isNull);
     }
 
+    await chooseFirstPrologueEpisode(tester);
+
     var sawRosterCard = false;
     // A typewriter beat can consume one tap to reveal the line and another to
     // advance, so leave enough taps to traverse the complete 302-beat script.
@@ -613,6 +634,7 @@ void main() {
         await tester.tap(find.byKey(const Key('story-continue')));
       }
       await tester.pumpAndSettle();
+      await dismissEpisodeIntermission(tester);
       expectPortraitInside();
     }
     expect(sawRosterCard, isTrue);
@@ -640,12 +662,16 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await chooseFirstPrologueEpisode(tester);
+
     for (var section = 0; section < 8; section++) {
+      await dismissEpisodeIntermission(tester);
       await tester.tap(find.byKey(const Key('story-skip-button')));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('story-skip-confirm')));
       await tester.pumpAndSettle();
     }
+    await dismissEpisodeIntermission(tester);
     expect(find.byKey(const Key('orientation-complete-card')), findsOneWidget);
     expect(find.byKey(const Key('academy-pc-powered-off')), findsOneWidget);
     expect(find.byKey(const Key('academy-pc-power-toggle')), findsOneWidget);

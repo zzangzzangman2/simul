@@ -301,6 +301,14 @@ Flutter는 analyze와 `flutter_app/test/*.dart` 파일별 테스트를 실행한
 `flutter_app/README.md`의 카지노 테스트 진입 날짜를 현재 코드에 맞췄고 `AGENTS.md`에
 4구간 분할 불변 조건을 추가했다.
 
+이어서 `test/*_test.dart` 96개 파일을 메모리 분리로 전수 실행해 남은 실패가
+`layout_regression_test.dart` 2건뿐임을 확인하고 같은 원인으로 고쳤다. 이 파일도
+구간 선택 화면과 막간 카드를 지나지 못해 `story-continue`·`story-skip-button`을 찾지
+못했으므로 `chooseFirstPrologueEpisode`·`dismissEpisodeIntermission` 헬퍼를 추가해
+10개 전체를 통과했다. 이로써 96개 파일 전부가 통과 상태이며 `flutter analyze`도
+문제 0건이다. 프롤로그를 처음부터 끝까지 걸어가는 테스트는 구간 선택을 먼저 넘기고
+막간 카드를 닫아야 하며, 막간 카드 자체를 검증하는 테스트는 헬퍼를 쓰지 않는다.
+
 ## 문서 진입점
 
 - 루트 `README.md`는 현재 데시멀 정사, 4부·8장 302장면, 구현 시스템, npm 실행법,
