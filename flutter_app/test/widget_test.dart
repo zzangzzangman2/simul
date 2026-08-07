@@ -399,6 +399,24 @@ void main() {
     }
   }
 
+  /// 구간 경계를 지나며 진행한다. 도착한 막간 카드는 대사창을 덮으므로 같은
+  /// 회차에서 `바로 시작`으로 닫아 진행한 장면이 화면에 남게 한다. 막간 자체는
+  /// 한 박자로 세지 않는다. 막간 카드 자체를 검증하는 테스트는
+  /// [advanceDialogue]를 그대로 쓴다.
+  Future<void> advanceDialogueAcrossEpisodes(
+    WidgetTester tester,
+    int count,
+  ) async {
+    for (var index = 0; index < count; index++) {
+      await advanceDialogue(tester, 1);
+      final arrived = find.byKey(const Key('prologue-episode-continue'));
+      if (arrived.evaluate().isNotEmpty) {
+        await tester.tap(arrived);
+        await tester.pumpAndSettle();
+      }
+    }
+  }
+
   Future<void> startNewGame(WidgetTester tester) async {
     if (find.byKey(const Key('game-title-screen')).evaluate().isEmpty) return;
     await tester.tap(find.byKey(const Key('new-game-button')));
@@ -918,6 +936,12 @@ void main() {
       '민수',
     );
     await tester.tap(find.byKey(const Key('prologue-player-name-confirm')));
+    await tester.pumpAndSettle();
+
+    // 이름 확정 뒤에는 4구간 시작 선택이 먼저 열린다. 1부를 골라야 첫 장면이 뜬다.
+    expect(find.byKey(const Key('prologue-episode-picker')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('prologue-start-episode-1')));
+    // 타이핑 연출이 진행 중인 상태를 유지해야 하므로 settle하지 않는다.
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
 
@@ -961,7 +985,7 @@ void main() {
       final operator = find.textContaining('감당하지 않아도 될 위험');
       var steps = 0;
       while (operator.evaluate().isEmpty && steps < 320) {
-        await advanceDialogue(tester, 1);
+        await advanceDialogueAcrossEpisodes(tester, 1);
         steps += 1;
       }
       expect(operator, findsOneWidget, reason: '$steps번 진행해도 한서윤 장면에 닿지 못했다');
@@ -1227,7 +1251,7 @@ void main() {
           .assetName,
       'assets/images/bg_bank_branch_2000_portrait_cartoon_v2.png',
     );
-    await advanceDialogue(tester, 54);
+    await advanceDialogueAcrossEpisodes(tester, 54);
 
     expect(find.text('수아'), findsOneWidget);
     expect(find.text('(수아가 새 장면의 문을 열었다.)'), findsNothing);
@@ -3073,7 +3097,8 @@ void main() {
     }
     final after = tester.widget<Text>(clock.first).data;
     expect(after, isNot(before));
-    expect(after, contains('09:05'));
+    // 기본 배속은 현실 1초당 게임 1분이므로 한 틱은 09:00 → 09:01이다.
+    expect(after, contains('09:01'));
 
     await tester.ensureVisible(find.byKey(const Key('stock-row-1001')));
     await tester.pump();
@@ -3443,7 +3468,7 @@ void main() {
               find.byKey(const Key('market-phone-status-time')).first,
             )
             .data,
-        contains(marketTimeLabel(transitionMinute + 5)),
+        contains(marketTimeLabel(transitionMinute + 1)),
       );
       expect(
         rowPrice(bestBidKey),
@@ -4423,7 +4448,7 @@ void main() {
               ? const Key('market-speed-10x')
               : remaining >= 15
               ? const Key('market-speed-3x')
-              : const Key('market-speed-normal');
+              : const Key('market-speed-1x');
           for (final confirmKey in const <Key>[
             Key('market-breaking-news-confirm'),
             Key('market-session-notice-confirm'),
@@ -4708,11 +4733,12 @@ void main() {
       synchronizedMinutes,
       orderedEquals(synchronizedMinutes.toList()..sort()),
     );
+    // 10x는 현실 1초당 게임 10분이므로 1초 동안 09:00 → 09:10까지만 진행한다.
     expect(
       synchronizedMinutes,
-      everyElement(inInclusiveRange(krxOpenMinute + 1, krxOpenMinute + 50)),
+      everyElement(inInclusiveRange(krxOpenMinute + 1, krxOpenMinute + 10)),
     );
-    expect(tester.widget<Text>(clock.first).data, contains('09:50'));
+    expect(tester.widget<Text>(clock.first).data, contains('09:10'));
     expect(tester.widget<Text>(clock.first).data, isNot(before));
     expect(find.text('내 지정가 주문이 체결되어 시장 시간을 일시정지했어요.'), findsNothing);
     expect(find.byKey(const Key('order-book-pending-count')), findsNothing);
@@ -4728,21 +4754,22 @@ void main() {
       );
     }
 
+    // 둘째 1초도 같은 10분/초로 이어져 09:10 → 09:20이 된다.
     await tester.pump(const Duration(seconds: 1));
     for (var attempt = 0; attempt < 20; attempt++) {
       await tester.pump();
-      if (tester.widget<Text>(clock.first).data?.contains('10:40') ?? false) {
+      if (tester.widget<Text>(clock.first).data?.contains('09:20') ?? false) {
         break;
       }
     }
-    expect(tester.widget<Text>(clock.first).data, contains('10:40'));
+    expect(tester.widget<Text>(clock.first).data, contains('09:20'));
     expect(
       synchronizedMinutes,
       orderedEquals(synchronizedMinutes.toList()..sort()),
     );
     expect(
       synchronizedMinutes,
-      everyElement(inInclusiveRange(krxOpenMinute + 1, krxOpenMinute + 100)),
+      everyElement(inInclusiveRange(krxOpenMinute + 1, krxOpenMinute + 20)),
     );
     expect(tester.takeException(), isNull);
   });

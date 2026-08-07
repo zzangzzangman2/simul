@@ -1,6 +1,6 @@
 # 문서 기준표
 
-최종 갱신: 2026-08-05
+최종 갱신: 2026-08-07
 
 이 저장소에는 현재 구현을 설명하는 문서만 둔다. 작업 일지, 후보 제작 보고서,
 폐기된 서사 원고는 정본과 함께 보관하지 않는다.
@@ -47,6 +47,7 @@
 | 부동산 | `REAL_ESTATE_SYSTEM.md` |
 | 가상기업·사건 문법 | `CONTENT_GUIDE.md` |
 | 데이터·라이선스 | `DATA_SOURCES.md` |
+| BGM·효과음 출처·라이선스 | `AUDIO_LICENSES.md` |
 | 제품 방향 | `PRODUCT_VISION.md` |
 | 이미지 제작·v3 전환 규칙 | `ART_STYLE_GUIDE.md`, `IMAGE_GENERATION_STYLE_PROMPT.md` |
 | 런타임 이미지 승인표 | `ART_STYLE_AUDIT.md` |

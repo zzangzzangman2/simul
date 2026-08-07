@@ -289,6 +289,18 @@ Flutter는 analyze와 `flutter_app/test/*.dart` 파일별 테스트를 실행한
 실행했고, 주문 거절 0건·미납 운영비 0원·최대 낙폭 15.31%를 확인했다. 100거래일 시장
 감사도 조용한 장·중간 변동·충격·상승·하락·추세·반전 조건을 모두 통과했다.
 
+2026-08-07 프롤로그 4구간 분할과 시장 배속 변경(현실 1초당 게임 5·15·50분 →
+1·3·10분) 뒤 남아 있던 `widget_test.dart` 실패 7건을 고쳐 88개 전체를 다시 통과했다.
+구간 선택 화면과 막간 카드를 지나지 못하던 프롤로그 테스트 3건은 시작 구간 선택과
+`advanceDialogueAcrossEpisodes` 헬퍼로 정리했고, 옛 5분/틱을 기대하던 시장 시계 검증
+3건과 삭제된 `market-speed-normal` 키 1건을 현재 계약으로 맞췄다. `flutter analyze`
+문제 0건, `market_data_test.dart` 23개·`game_engine_test.dart` 93개·데시멀톡·카지노·
+경마·호가 관련 파일도 함께 통과했다. `npm run lint`·`npm test` 통과와 루트 웹 테스트
+12/12, `npm run dialogue:sync`의 302장면 무변화도 확인했다. 같은 변경에서
+`PROJECT_GUIDE.md`의 기본 배속, `REAL_ESTATE_SYSTEM.md`의 저장 스키마,
+`flutter_app/README.md`의 카지노 테스트 진입 날짜를 현재 코드에 맞췄고 `AGENTS.md`에
+4구간 분할 불변 조건을 추가했다.
+
 ## 문서 진입점
 
 - 루트 `README.md`는 현재 데시멀 정사, 4부·8장 302장면, 구현 시스템, npm 실행법,
