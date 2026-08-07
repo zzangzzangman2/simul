@@ -283,6 +283,100 @@ void main() {
     }
   });
 
+  group('snapshot cache never changes what a caller receives', () {
+    const seed = 'cache-safety-world';
+    final date = DateTime(2008, 10, 27);
+    const regionKeys = <String>['seoul_gangnam_station', 'capital', 'office'];
+
+    setUp(resetWorldEconomySnapshotCache);
+
+    WorldEconomySnapshot take({
+      String worldSeed = seed,
+      DateTime? asOf,
+      Iterable<String> keys = regionKeys,
+      int projectionVersion = worldEconomyProjectionVersion,
+    }) => worldEconomySnapshot(
+      worldSeed: worldSeed,
+      asOf: asOf ?? date,
+      regionKeys: keys,
+      projectionVersion: projectionVersion,
+    );
+
+    void expectSameNumbers(
+      WorldEconomySnapshot left,
+      WorldEconomySnapshot right,
+    ) {
+      expect(left.businessImpact.demand, right.businessImpact.demand);
+      expect(left.businessImpact.rent, right.businessImpact.rent);
+      expect(left.businessImpact.risk, right.businessImpact.risk);
+      expect(left.realEstateImpact.price, right.realEstateImpact.price);
+      expect(left.realEstateImpact.rent, right.realEstateImpact.rent);
+      expect(left.realEstateImpact.liquidity, right.realEstateImpact.liquidity);
+      expect(
+        left.revealedEvents.map((event) => event.id).toList(),
+        right.revealedEvents.map((event) => event.id).toList(),
+      );
+    }
+
+    test('a warm read matches the cold computation', () {
+      final cold = take();
+      final warm = take();
+      expectSameNumbers(cold, warm);
+
+      resetWorldEconomySnapshotCache();
+      expectSameNumbers(cold, take());
+    });
+
+    test('region key order shares one entry without changing the result', () {
+      final sorted = take();
+      final shuffled = take(
+        keys: const ['office', 'capital', 'seoul_gangnam_station'],
+      );
+      expectSameNumbers(sorted, shuffled);
+      expect(shuffled.regionKeys, sorted.regionKeys);
+    });
+
+    test('a legacy caller never receives the projected entry', () {
+      // Order matters: the v1 entry is stored first, then v0 asks for the same
+      // seed, day, and regions. A key without the version would hand the
+      // legacy save a projected snapshot and silently rewrite its numbers.
+      final projected = take();
+      expect(projected.businessImpact.isNeutral, isFalse);
+
+      final legacy = take(projectionVersion: 0);
+      expect(legacy.businessImpact.isNeutral, isTrue);
+      expect(legacy.realEstateImpact.isNeutral, isTrue);
+      expect(legacy.revealedEvents, isEmpty);
+
+      // And the projected entry is still intact afterwards.
+      expectSameNumbers(projected, take());
+    });
+
+    test('seed, day, and region set stay separate', () {
+      final base = take();
+      expect(
+        take(worldSeed: 'other-world').businessImpact.demand,
+        isNot(base.businessImpact.demand),
+      );
+      expect(
+        take(asOf: DateTime(2020, 3, 19)).businessImpact.demand,
+        isNot(base.businessImpact.demand),
+      );
+
+      final narrower = take(keys: const ['capital']);
+      expect(narrower.regionKeys, isNot(base.regionKeys));
+    });
+
+    test('results stay correct after the bound evicts an entry', () {
+      final first = take();
+      // Push well past the cache bound with distinct days.
+      for (var offset = 1; offset <= 600; offset += 1) {
+        take(asOf: date.add(Duration(days: offset)));
+      }
+      expectSameNumbers(first, take());
+    });
+  });
+
   test('property liquidity is projected for v4 and neutral for v1-v3', () {
     final asset = realEstateMarketAssetById('uijeongbu_station_officetel_20')!;
     const seed = 'qa-world-alpha';

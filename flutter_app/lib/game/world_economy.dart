@@ -45,6 +45,44 @@ int worldEconomyProjectionVersionForBusinessGenerator(int generatorVersion) =>
 int worldEconomyProjectionVersionForRealEstateGenerator(int generatorVersion) =>
     generatorVersion >= 4 ? 1 : 0;
 
+/// Bound for the snapshot cache below.
+///
+/// One `상권판세` screen ranks 32 districts on a single day, and a 27-year
+/// monthly district history walks 324 days, so this holds a full screen plus
+/// recent history without growing without limit.
+const int _worldEconomySnapshotCacheLimit = 512;
+
+/// Least-recently-used cache of finished snapshots.
+///
+/// The snapshot is a pure function of world seed, calendar day, normalized
+/// region keys, and projection version, and every field it exposes is
+/// immutable, so a hit can hand back the same instance. The projection version
+/// is part of the key: a business v1 or property v3 caller must never receive
+/// the v1-projection entry that a v4 caller stored for the same day.
+final Map<String, WorldEconomySnapshot> _worldEconomySnapshotCache =
+    <String, WorldEconomySnapshot>{};
+
+WorldEconomySnapshot? _readWorldEconomySnapshotCache(String key) {
+  final value = _worldEconomySnapshotCache.remove(key);
+  if (value != null) _worldEconomySnapshotCache[key] = value;
+  return value;
+}
+
+void _writeWorldEconomySnapshotCache(String key, WorldEconomySnapshot value) {
+  _worldEconomySnapshotCache
+    ..remove(key)
+    ..[key] = value;
+  while (_worldEconomySnapshotCache.length > _worldEconomySnapshotCacheLimit) {
+    _worldEconomySnapshotCache.remove(_worldEconomySnapshotCache.keys.first);
+  }
+}
+
+/// Drops every cached snapshot.
+///
+/// Only long-running measurements need this; normal play and save restore rely
+/// on the key being complete.
+void resetWorldEconomySnapshotCache() => _worldEconomySnapshotCache.clear();
+
 enum WorldEconomyEventKind {
   creditShock,
   policySupport,
@@ -302,6 +340,15 @@ WorldEconomySnapshot worldEconomySnapshot({
           .toList()
         ..sort();
   final normalizedRegionKeys = List<String>.unmodifiable(sortedRegionKeys);
+
+  // Built after normalization so callers that pass the same keys in a
+  // different order share one entry.
+  final cacheKey =
+      '$worldSeed|${asOfDay.year}-${asOfDay.month}-${asOfDay.day}'
+      '|$projectionVersion|${sortedRegionKeys.join(",")}';
+  final cached = _readWorldEconomySnapshotCache(cacheKey);
+  if (cached != null) return cached;
+
   final sources = fictionalSharedEconomyEventsThrough(worldSeed, asOfDay);
 
   var demand = 0.0;
@@ -400,7 +447,7 @@ WorldEconomySnapshot worldEconomySnapshot({
         return byDate != 0 ? byDate : left.id.compareTo(right.id);
       });
 
-  return WorldEconomySnapshot(
+  final snapshot = WorldEconomySnapshot(
     asOf: asOfDay,
     regionKeys: normalizedRegionKeys,
     businessImpact: WorldEconomyBusinessImpact(
@@ -422,6 +469,8 @@ WorldEconomySnapshot worldEconomySnapshot({
     ),
     revealedEvents: List<WorldEconomyEvent>.unmodifiable(boundedEvents),
   );
+  _writeWorldEconomySnapshotCache(cacheKey, snapshot);
+  return snapshot;
 }
 
 DateTime? _eventDay(FictionalMarketEvent event) {
