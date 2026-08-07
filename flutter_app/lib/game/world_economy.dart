@@ -11,6 +11,40 @@ const int worldEconomyRecentEventLimit = 12;
 /// Public briefs are intentionally recent as well as bounded.
 const int worldEconomyRecentEventWindowDays = 730;
 
+/// Current version of the shared-economy projection layer.
+///
+/// The projection turns one canonical stock macro event into business and
+/// real-estate effects. Event identity — id, date, title, and the already
+/// seeded `impactPct` — comes from the stock exporter and is never rehashed
+/// here, so this version covers only the projection itself: event lifetimes,
+/// active decay, region sensitivity, per-kind coefficients, and the output
+/// clamp ranges.
+///
+/// Saves do not store this number. It is pinned by the generator version that
+/// each business or property asset already stores, through
+/// [worldEconomyProjectionVersionForBusinessGenerator] and
+/// [worldEconomyProjectionVersionForRealEstateGenerator]. Changing any
+/// coefficient therefore requires bumping this constant, mapping the existing
+/// generator versions to the old projection version, and giving the new
+/// projection to a new generator version only. Without that, a coefficient
+/// edit would silently recompute demand, rent, risk, and monthly profit for
+/// business v3 and property v4 saves that are already on disk.
+const int worldEconomyProjectionVersion = 1;
+
+/// Projection version pinned to a stored business generator version.
+///
+/// Returns 0 for business v1, which predates the shared economy and must stay
+/// numerically neutral.
+int worldEconomyProjectionVersionForBusinessGenerator(int generatorVersion) =>
+    generatorVersion >= 2 ? 1 : 0;
+
+/// Projection version pinned to a stored real-estate generator version.
+///
+/// Returns 0 for property v1-v3, whose stored price, rent, and risk
+/// fingerprints must not change.
+int worldEconomyProjectionVersionForRealEstateGenerator(int generatorVersion) =>
+    generatorVersion >= 4 ? 1 : 0;
+
 enum WorldEconomyEventKind {
   creditShock,
   policySupport,
@@ -239,12 +273,27 @@ String? worldEconomyBusinessDistrictIdForRealEstateRegion(
 /// This function never hashes [worldSeed]. The stock exporter has already
 /// applied the seed to each canonical event's impact; hashing again here would
 /// make the three systems disagree about the strength of one event.
+///
+/// [projectionVersion] selects the frozen coefficient set. Callers pass the
+/// version pinned to the asset's stored generator version so an update never
+/// recomputes an existing save. Version 0 means the caller predates the shared
+/// economy and receives a neutral snapshot that still lists no events.
 WorldEconomySnapshot worldEconomySnapshot({
   required String worldSeed,
   required DateTime asOf,
   Iterable<String> regionKeys = const <String>[],
+  int projectionVersion = worldEconomyProjectionVersion,
 }) {
   final asOfDay = DateTime(asOf.year, asOf.month, asOf.day);
+  if (projectionVersion <= 0) {
+    return WorldEconomySnapshot(
+      asOf: asOfDay,
+      regionKeys: const <String>[],
+      businessImpact: WorldEconomyBusinessImpact.zero,
+      realEstateImpact: WorldEconomyRealEstateImpact.zero,
+      revealedEvents: const <WorldEconomyEvent>[],
+    );
+  }
   final sortedRegionKeys =
       regionKeys
           .map(_normalizeSensitivityKey)

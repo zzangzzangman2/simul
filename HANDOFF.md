@@ -309,6 +309,19 @@ Flutter는 analyze와 `flutter_app/test/*.dart` 파일별 테스트를 실행한
 문제 0건이다. 프롤로그를 처음부터 끝까지 걸어가는 테스트는 구간 선택을 먼저 넘기고
 막간 카드를 닫아야 하며, 막간 카드 자체를 검증하는 테스트는 헬퍼를 쓰지 않는다.
 
+2026-08-07 공통경제 투영 계층을 `worldEconomyProjectionVersion`(현재 1)으로 동결했다.
+저장은 이 번호를 담지 않고, 각 자산이 이미 저장한 생성기 버전이
+`worldEconomyProjectionVersionForBusinessGenerator`·
+`worldEconomyProjectionVersionForRealEstateGenerator`로 쓸 투영 버전을 고정한다.
+사업 v1과 부동산 v1·v2·v3은 0을 받아 중립 스냅샷을 얻고 사업 v2 이상·부동산 v4는 1을
+받으므로, 계수를 바꿀 때 상수를 올리고 새 투영을 새 생성기 버전에만 주면 기존 저장의
+수요·임대료·위험·월 손익이 재계산되지 않는다. `world_economy_projection_freeze_test.dart`
+17개가 대표 시드 2개와 2001·2008·2020년 날짜의 투영값·상권 배율 골든, 버전 매핑,
+투영 0의 중립성을 고정한다. 감쇠 지수를 1.35에서 1.36으로 임시 변경해 골든 12건이
+실제로 실패하는지 확인한 뒤 되돌렸다. 계수는 바꾸지 않았으므로 기존 사업·부동산
+회귀 결과와 저장 지문은 그대로다. 남은 P2는 같은 키에 투영 버전을 포함한 스냅샷
+bounded cache와 성능 측정이다.
+
 ## 문서 진입점
 
 - 루트 `README.md`는 현재 데시멀 정사, 4부·8장 302장면, 구현 시스템, npm 실행법,

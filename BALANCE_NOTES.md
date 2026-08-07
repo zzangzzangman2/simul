@@ -126,6 +126,20 @@
   `commercialCycle`, `demographicShift`와 교통·재개발·건물 사건은 유지한다.
 - 공통 유동성은 NPC 매물 체류기간에는 `listedAt`, 보유자 매각 대기에는
   `saleListedDay` 시점에 각각 한 번 고정한다. 매일 다시 누적하지 않는다.
+- 투영 계층 자체는 `worldEconomyProjectionVersion`으로 동결한다. 현재 버전은 **1**이며
+  사건 지속일, 활성 감쇠, 권역 민감도, 종류별 계수, 출력 clamp 범위가 이 버전에 속한다.
+  사건 ID·발생일·제목·이미 시드화된 `impactPct`는 주식 원본 소유이므로 이 버전에
+  포함하지 않는다.
+- 저장은 이 번호를 따로 담지 않는다. 각 자산이 이미 저장한 생성기 버전이
+  `worldEconomyProjectionVersionForBusinessGenerator`와
+  `worldEconomyProjectionVersionForRealEstateGenerator`로 투영 버전을 고정한다.
+  사업 v1과 부동산 v1·v2·v3은 0을 받아 중립이고, 사업 v2 이상과 부동산 v4는 1을 받는다.
+- 계수를 바꿀 때는 이 상수를 올리고 기존 생성기 버전을 옛 투영 버전에 그대로 매핑한 뒤
+  새 투영을 새 생성기 버전에만 준다. 계수만 고치면 이미 저장된 사업 v3·부동산 v4의
+  수요·임대료·위험·월 손익이 조용히 재계산된다.
+- `world_economy_projection_freeze_test.dart`가 대표 시드 2개와 2001·2008·2020년
+  역사 날짜의 투영값·상권 배율 골든을 고정한다. 계수를 고치면 이 골든이 먼저 실패해야
+  하며, 골든 숫자를 그 자리에서 덮어쓰는 방식으로 통과시키지 않는다.
 
 ## 소비와 확률 오락
 

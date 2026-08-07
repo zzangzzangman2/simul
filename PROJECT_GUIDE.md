@@ -300,6 +300,9 @@ standing depth만 통과한다. 상승은 ask, 하락은 bid를 최우선부터 
 - 신규 사업 생성기 v3은 상권 생성기 v2를, 신규 부동산 생성기 v4는 공통 경제
   투영을 사용한다. 기존 사업 v1·v2와 부동산 v1·v2·v3은 저장된 공식을 유지한다.
   이 파생층 자체는 새 저장 필드를 요구하지 않으며 현재 `GameState` 스키마는 v27이다.
+- 투영 계층은 `worldEconomyProjectionVersion`으로 동결하며 저장된 생성기 버전이
+  쓸 투영 버전을 고정한다. 계수를 바꾸려면 상수를 올리고 새 투영을 새 생성기
+  버전에만 줘야 한다. 수치와 골든 규칙의 정본은 `BALANCE_NOTES.md`다.
 - 서울·경기 부동산 14개 권역은 중앙 매핑 하나를 통해 전국 32개 사업 상권 중
   대응 상권으로 연결한다. 지역 키는 강도 보정에만 쓰며 사건 정체성을 새로 만들지 않는다.
 - 월드시드 기반 결정론 계산의 FNV 계열 해시는 모두 `stable_hash.dart`의
@@ -520,6 +523,7 @@ standing depth만 통과한다. 상승은 ask, 하락은 bid를 최우선부터 
 | `flutter_app/test/business_ui_test.dart` | 390×844·360×800·텍스트 1.2에서 5탭·상권판세·공개 이력·인수·운영 UI 회귀 |
 | `flutter_app/test/shared_economy_stock_export_test.dart` | 주식 정규 사건 객체 재사용·정렬·순수 시장구조 제외 회귀 |
 | `flutter_app/test/world_economy_test.dart` | 결정론·다음날 전파·분류·상한·14권역 중앙 매핑 회귀 |
+| `flutter_app/test/world_economy_projection_freeze_test.dart` | 투영 버전 고정·구버전 중립·대표 시드/역사 날짜 투영값과 상권 배율 골든 |
 | `flutter_app/test/shared_economy_cross_asset_test.dart` | 한 사건 ID의 주식→상권 v2→부동산 v4 단회 전파와 레거시 격리 회귀 |
 | `flutter_app/test/real_estate_world_economy_bridge_test.dart` | 부동산 v3 지문 보존, v4 투영·지역 사건·유동성 기간 회귀 |
 | `flutter_app/assets/images/REAL_ESTATE_REALTOR_README.md` | 중개업자 정체성·의상 보존 v3 렌더링·6개 상태 매핑 규격 |

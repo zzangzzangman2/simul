@@ -741,6 +741,9 @@ _DistrictPoint _calculateDistrictPoint(
       worldSeed: worldSeed,
       asOf: asOf,
       regionKeys: _worldEconomyRegionKeys(profile),
+      projectionVersion: worldEconomyProjectionVersionForBusinessGenerator(
+        generatorVersion,
+      ),
     );
     final impact = economy.businessImpact;
     demand += impact.demand;
@@ -836,6 +839,9 @@ List<BusinessDistrictRevealedEvent> _revealedEventsFor(
       worldSeed: worldSeed,
       asOf: asOf,
       regionKeys: _worldEconomyRegionKeys(profile),
+      projectionVersion: worldEconomyProjectionVersionForBusinessGenerator(
+        generatorVersion,
+      ),
     );
     final existingIds = result.map((event) => event.id).toSet();
     for (final event in economy.revealedEvents) {

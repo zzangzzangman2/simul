@@ -116,6 +116,10 @@ flutter build web --release --base-href /play/
   적용한다.
 - 저장은 v27이다. 신규 사업 v3는 상권 생성기 v2, 신규 부동산은 v4를
   사용하며 사업 v1·v2와 부동산 v1·v2·v3 저장분의 수치 경로는 바꾸지 않는다.
+- 투영 계층은 `worldEconomyProjectionVersion`(현재 1)으로 동결한다. 저장은 이 번호를
+  담지 않고 각 자산의 저장된 생성기 버전이 쓸 투영 버전을 고정하므로, 계수를 바꿀 때는
+  상수를 올리고 새 투영을 새 생성기 버전에만 준다. 골든은
+  `test/world_economy_projection_freeze_test.dart`이며 정본 규칙은 `BALANCE_NOTES.md`다.
 
 ## 동네 사업 규칙
 

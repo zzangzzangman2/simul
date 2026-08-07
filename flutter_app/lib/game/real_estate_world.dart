@@ -621,11 +621,15 @@ List<String> _realEstateWorldEconomyRegionKeys(RealEstateMarketAsset asset) {
 WorldEconomySnapshot _realEstateWorldEconomySnapshotAt(
   RealEstateMarketAsset asset,
   String worldSeed,
-  DateTime date,
-) => worldEconomySnapshot(
+  DateTime date, {
+  int generatorVersion = realEstateWorldGeneratorVersion,
+}) => worldEconomySnapshot(
   worldSeed: worldSeed,
   asOf: date,
   regionKeys: _realEstateWorldEconomyRegionKeys(asset),
+  projectionVersion: worldEconomyProjectionVersionForRealEstateGenerator(
+    generatorVersion,
+  ),
 );
 
 /// Shared-economy liquidity for a property on [date].
@@ -644,6 +648,7 @@ double realEstateWorldLiquidityAt(
     asset,
     worldSeed,
     date,
+    generatorVersion: generatorVersion,
   ).realEstateImpact.liquidity;
 }
 
@@ -703,7 +708,12 @@ class GeneratedRealEstateListing {
   );
 
   WorldEconomySnapshot _worldEconomySnapshotAt(DateTime date) =>
-      _realEstateWorldEconomySnapshotAt(asset, worldSeed, date);
+      _realEstateWorldEconomySnapshotAt(
+        asset,
+        worldSeed,
+        date,
+        generatorVersion: generatorVersion,
+      );
 
   double _worldEconomyLiquidityAtListing(DateTime listedAt, int cycleNumber) {
     final cache = _realEstateWorldCacheFor(
