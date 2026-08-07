@@ -307,6 +307,28 @@ String orderBookQuantityDeltaLabel(int delta, {required bool isTrade}) {
   return '${delta > 0 ? '+' : ''}${_money(delta)}';
 }
 
+/// One compact line describing what is still moving through settlement.
+///
+/// The sell leg leads because it is the only one that holds cash back from
+/// withdrawal. A buy already took its cash out at fill time, so it rides along
+/// only when the settlement line is on screen anyway; promoting it on its own
+/// would hide the running cost line for two trading days after every purchase
+/// without telling the player anything they can act on.
+String marketAccountSettlementSummary(GameState state, int totalFees) {
+  final sellProceeds = state.unsettledBrokerageSellProceeds;
+  if (sellProceeds > 0) {
+    final buyPayments = state.unsettledBrokerageBuyPayments;
+    final buyClause = buyPayments > 0 ? ' · 매수 ${_money(buyPayments)}원' : '';
+    return 'T+2 결제예정 매도대금 ${_money(sellProceeds)}원$buyClause · '
+        '출금 가능 ${_money(state.withdrawableBrokerageCash)}원';
+  }
+  if (state.pendingBuyReservedCash > 0) {
+    return '미체결 매수 예약 ${_money(state.pendingBuyReservedCash)}원 · '
+        '출금 가능 ${_money(state.withdrawableBrokerageCash)}원';
+  }
+  return '누적 거래비용 ${_money(totalFees)}원 · 매도 시 시대별 거래세 포함';
+}
+
 typedef OrderBookCancellationNotice = ({
   GameOrderBookSide side,
   double price,
@@ -9504,14 +9526,7 @@ class _BrokerageAccountCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            state.unsettledBrokerageSellProceeds > 0
-                ? 'T+2 결제예정 매도대금 '
-                      '${_money(state.unsettledBrokerageSellProceeds)}원 · '
-                      '출금 가능 ${_money(state.withdrawableBrokerageCash)}원'
-                : state.pendingBuyReservedCash > 0
-                ? '미체결 매수 예약 ${_money(state.pendingBuyReservedCash)}원 · '
-                      '출금 가능 ${_money(state.withdrawableBrokerageCash)}원'
-                : '누적 거래비용 ${_money(totalFees)}원 · 매도 시 시대별 거래세 포함',
+            marketAccountSettlementSummary(state, totalFees),
             key: const Key('market-account-fees'),
             style: const TextStyle(
               color: Color(0xFF8B95A1),

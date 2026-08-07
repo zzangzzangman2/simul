@@ -330,6 +330,17 @@ Flutter는 analyze와 `flutter_app/test/*.dart` 파일별 테스트를 실행한
 `world_economy_projection_freeze_test.dart` 22개가 웜/콜드 동일성, 권역 키 순서 공유,
 구버전 호출자 격리, 시드·날짜·권역 분리, 상한 초과 축출 뒤 정확성을 함께 고정한다.
 
+2026-08-07 결제 원장을 매수 쪽까지 채웠다. 결제주기는 `marketSettlementTradingDays`가
+정하는 거래일 기준 D+2이며 주말·휴장일을 세지 않는다. 미결제 상태는 별도 저장 플래그
+없이 원장에서 파생하므로 저장 복원·부분체결·주문 취소에서 이중 결제가 구조적으로
+불가능하다. `unsettledBrokerageBuyPayments`, `unsettledBuyUnits`,
+`unsettledSellUnits`, `assetsAwaitingSettlement`를 추가했고 상장폐지 종목의 미결제
+구간도 날짜가 지나면 정상적으로 빠진다. 계좌 요약줄은 출금을 막는 매도대금을 우선
+표시하고 매수대금은 같은 줄에 덧붙인다. 매수만 있을 때는 이미 현금이 빠져 조치할 것이
+없으므로 누적 거래비용 줄을 유지한다. `settlement_ledger_test.dart` 17개와
+`widget_test.dart` 88개, 장기·기업행동 회귀를 함께 통과했다. 잔고 행의 종목별 미결제
+주식수 표시는 오버플로 회귀와 함께 다룰 후속 P2로 남겼다.
+
 ## 문서 진입점
 
 - 루트 `README.md`는 현재 데시멀 정사, 4부·8장 302장면, 구현 시스템, npm 실행법,

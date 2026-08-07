@@ -272,15 +272,19 @@ class GameState {
       positions.isEmpty &&
       availableBrokerageCash < cohortPlayerRecoveryCashThreshold;
 
-  DateTime _brokerageSettlementDateFor(LedgerEntry entry) {
-    var date = dateForDay(entry.day);
-    var remainingTradingDays = 2;
-    while (remainingTradingDays > 0) {
-      date = date.add(const Duration(days: 1));
-      if (isMarketTradingDay(date)) remainingTradingDays -= 1;
-    }
-    return date;
-  }
+  DateTime _brokerageSettlementDateFor(LedgerEntry entry) =>
+      marketSettlementDateFor(dateForDay(entry.day));
+
+  /// True while [entry] is filled but not yet settled.
+  ///
+  /// The ledger is the settlement record. Deriving the pending state from it
+  /// keeps one source of truth and makes a double settlement structurally
+  /// impossible: replaying a save, a partial fill, or a cancelled order can
+  /// only change the entries themselves, never a separate settled/unsettled
+  /// flag that could be applied twice.
+  bool _isAwaitingSettlement(LedgerEntry entry) =>
+      entry.day <= day &&
+      currentDate.isBefore(_brokerageSettlementDateFor(entry));
 
   /// Net sell proceeds that are usable for another order but not yet
   /// transferable to the company bank account under the market's T+2 rule.
@@ -289,13 +293,67 @@ class GameState {
         (entry) =>
             entry.tradeSide == 'sell' &&
             entry.amount > 0 &&
-            entry.day <= day &&
-            currentDate.isBefore(_brokerageSettlementDateFor(entry)),
+            _isAwaitingSettlement(entry),
       )
       .fold<int>(0, (sum, entry) {
         final remaining = 0x7fffffff - sum;
         return entry.amount >= remaining ? 0x7fffffff : sum + entry.amount;
       });
+
+  /// Buy consideration already charged to the brokerage account but still
+  /// inside the settlement cycle.
+  ///
+  /// The cash left the account at fill time, so this does not reduce buying
+  /// power again. It exists so the account screen can show what is still
+  /// moving through settlement instead of only the sell side.
+  int get unsettledBrokerageBuyPayments => ledger
+      .where(
+        (entry) =>
+            entry.tradeSide == 'buy' &&
+            entry.amount < 0 &&
+            _isAwaitingSettlement(entry),
+      )
+      .fold<int>(0, (sum, entry) {
+        final magnitude = -entry.amount;
+        final remaining = 0x7fffffff - sum;
+        return magnitude >= remaining ? 0x7fffffff : sum + magnitude;
+      });
+
+  /// Shares of [assetId] bought but not yet settled.
+  ///
+  /// KRX lets an investor sell an unsettled share, so this never reduces the
+  /// sellable quantity. It reports how much of a position is still in the
+  /// settlement cycle.
+  double unsettledBuyUnits(String assetId) => ledger
+      .where(
+        (entry) =>
+            entry.assetId == assetId &&
+            entry.tradeSide == 'buy' &&
+            _isAwaitingSettlement(entry),
+      )
+      .fold<double>(0, (sum, entry) => sum + entry.tradeQuantity);
+
+  /// Shares sold but not yet settled, by asset.
+  double unsettledSellUnits(String assetId) => ledger
+      .where(
+        (entry) =>
+            entry.assetId == assetId &&
+            entry.tradeSide == 'sell' &&
+            _isAwaitingSettlement(entry),
+      )
+      .fold<double>(0, (sum, entry) => sum + entry.tradeQuantity);
+
+  /// Every asset that still has a share leg inside the settlement cycle.
+  Set<String> get assetsAwaitingSettlement => ledger
+      .where(
+        (entry) =>
+            entry.assetId.isNotEmpty &&
+            (entry.tradeSide == 'buy' || entry.tradeSide == 'sell') &&
+            entry.tradeQuantity > 0 &&
+            _isAwaitingSettlement(entry),
+      )
+      .map((entry) => entry.assetId)
+      .toSet();
 
   /// Cash that may leave the brokerage account now.
   ///

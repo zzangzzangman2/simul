@@ -97,6 +97,29 @@ bool isMarketTradingDay(DateTime date) {
   return !fixedHoliday;
 }
 
+/// Trading days between a fill and its settlement on [tradeDate].
+///
+/// KRX equities settle on D+2 across the whole 2000-2026 campaign, so this
+/// returns one value today. It stays a function of the date so a future era
+/// with a different cycle can be added here instead of at each call site;
+/// changing it moves every settlement date, so treat it as a balance contract
+/// and update `BALANCE_NOTES.md` in the same change.
+int marketSettlementTradingDays(DateTime tradeDate) => 2;
+
+/// The date on which a fill made on [tradeDate] settles.
+///
+/// Only trading days count, so a Friday fill settles on Tuesday and a holiday
+/// in between pushes the date out by one more day.
+DateTime marketSettlementDateFor(DateTime tradeDate) {
+  var date = DateTime(tradeDate.year, tradeDate.month, tradeDate.day);
+  var remaining = marketSettlementTradingDays(date);
+  while (remaining > 0) {
+    date = date.add(const Duration(days: 1));
+    if (isMarketTradingDay(date)) remaining -= 1;
+  }
+  return date;
+}
+
 /// Official 2026 public holidays after the bundled KRX corpus ends.
 ///
 /// The campaign ends in 2026, so keeping this small explicit tail prevents
