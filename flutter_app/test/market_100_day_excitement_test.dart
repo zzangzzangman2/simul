@@ -9,7 +9,21 @@ void main() {
   test(
     '100 trading days contain calm sessions, shocks, trends, and reversals',
     () {
-      const seed = 'hundred-day-excitement-audit';
+      // 시드 하나만 보면 그 시드가 모집단을 대표하지 못할 때 실제 플레이어 시장이
+      // 계약을 벗어나도 초록불이 된다. 실제 새 게임은 매번 임의 시드를 받으므로
+      // (game_engine.dart의 createNewGame) 여러 시드를 합산해 검증한다.
+      // 실제로 'hundred-day-excitement-audit' 한 시드는 전형적인 시드보다
+      // 몇 배 변동이 커서, 이 시드만 보면 시장 전체가 밋밋해도 통과했다.
+      // 특정 시드를 골라 담지 않는다. 옛 'hundred-day-excitement-audit'는
+      // 전형적인 시드보다 변동이 몇 배 큰 이상치여서 모집단을 왜곡했다.
+      const seeds = <String>[
+        'excitement-audit-population-1',
+        'excitement-audit-population-2',
+        'excitement-audit-population-3',
+        'excitement-audit-population-4',
+        'excitement-audit-population-5',
+        'excitement-audit-population-6',
+      ];
       final tradingDates = <DateTime>[];
       for (
         var date = DateTime(2000, 1, 3);
@@ -19,13 +33,15 @@ void main() {
         if (isMarketTradingDay(date)) tradingDates.add(date);
       }
       final throughDate = tradingDates.last;
-      final universe = buildFictionalMarketUniverse(
-        seed,
-        throughDate: throughDate,
-      );
-      final assets = universe.assets
-          .where((asset) => asset.generation == 0)
-          .toList(growable: false);
+      final entries = [
+        for (final worldSeed in seeds)
+          for (final asset
+              in buildFictionalMarketUniverse(
+                worldSeed,
+                throughDate: throughDate,
+              ).assets.where((asset) => asset.generation == 0))
+            (seed: worldSeed, asset: asset),
+      ];
 
       var observations = 0;
       var quietCloses = 0;
@@ -57,7 +73,9 @@ void main() {
             })
           >[];
 
-      for (final asset in assets) {
+      for (final entry in entries) {
+        final seed = entry.seed;
+        final asset = entry.asset;
         final history = asset.historyThrough(throughDate, count: 100);
         final candles = recentMarketDailyCandles(
           asset: asset,
@@ -170,7 +188,7 @@ void main() {
       print('''
 === 주식시장 100거래일 재미 감사 ===
 기간: ${marketDateKey(tradingDates.first)} ~ ${marketDateKey(throughDate)}
-종목/관측: ${assets.length}개 / $observations건
+시드/종목/관측: ${seeds.length}개 / ${entries.length}개 / $observations건
 종가 |1% 미만|: $quietCloses (${pct(quietCloses)})
 종가 |1~5%|: $mediumCloses (${pct(mediumCloses)})
 종가 |5% 이상|: $largeCloses (${pct(largeCloses)})
@@ -195,7 +213,7 @@ ${strongestSelloffs.take(5).map((move) => '${move.date} ${move.asset}: ${(move.d
 ===================================
 ''');
 
-      expect(observations, assets.length * 100);
+      expect(observations, entries.length * 100);
       expect(quietCloses / observations, inInclusiveRange(0.20, 0.45));
       expect(mediumCloses / observations, inInclusiveRange(0.45, 0.75));
       expect(largeCloses / observations, inInclusiveRange(0.05, 0.18));

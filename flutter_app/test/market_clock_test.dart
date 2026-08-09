@@ -52,7 +52,9 @@ void main() {
     );
   });
 
-  test('market tick advances one game minute per real second', () {
+  // 내부 계약: 틱 하나는 언제나 게임 1분이고 타이머 주기는 현실 1초다.
+  // 화면 배속(5·15·50분/초)은 한 주기에 이 틱을 몇 번 돌릴지만 정한다.
+  test('one market tick is one game minute on a one-second timer', () {
     expect(marketTickMinutes, 1);
     expect(marketRealtimeTickDuration, const Duration(seconds: 1));
     expect(marketTickForMinute(8 * 60), 0);

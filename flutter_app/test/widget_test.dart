@@ -3097,8 +3097,8 @@ void main() {
     }
     final after = tester.widget<Text>(clock.first).data;
     expect(after, isNot(before));
-    // 기본 배속은 현실 1초당 게임 1분이므로 한 틱은 09:00 → 09:01이다.
-    expect(after, contains('09:01'));
+    // 기본 배속은 현실 1초당 게임 5분이므로 한 틱은 09:00 → 09:05이다.
+    expect(after, contains('09:05'));
 
     await tester.ensureVisible(find.byKey(const Key('stock-row-1001')));
     await tester.pump();
@@ -3108,7 +3108,7 @@ void main() {
     expect(find.text('한빛통신'), findsWidgets);
     expect(find.byKey(const Key('market-phone-status-bar')), findsWidgets);
     expect(find.byKey(const Key('stock-detail-price')), findsOneWidget);
-    expect(find.textContaining('현실 1초마다 게임 1분 진행'), findsNothing);
+    expect(find.textContaining('현실 1초마다 게임 5분 진행'), findsNothing);
     expect(find.byKey(const Key('stock-order-book')), findsOneWidget);
     expect(find.byKey(const Key('minute-interval-selector')), findsNothing);
     expect(find.byKey(const Key('company-overview-card')), findsNothing);
@@ -3117,6 +3117,16 @@ void main() {
     expect(find.byKey(const Key('minute-interval-selector')), findsOneWidget);
     expect(find.byKey(const Key('minute-candle-chart')), findsOneWidget);
     expect(find.byKey(const Key('chart-time-axis')), findsOneWidget);
+    // 기본 분봉은 배속(1초=5분)에 맞춘 5분봉이다.
+    expect(
+      tester.widget<Text>(find.byKey(const Key('chart-window-label'))).data,
+      startsWith('5분봉 · '),
+    );
+    // 아래 창 크기·캔들 수 검증은 1분봉 기준이므로 명시적으로 전환해서 확인한다.
+    await tester.tap(find.byKey(const Key('minute-interval-selector')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('1분').last);
+    await tester.pumpAndSettle();
     expect(
       tester.widget<Text>(find.byKey(const Key('chart-window-label'))).data,
       contains('최대 최근 90분'),
@@ -3468,7 +3478,8 @@ void main() {
               find.byKey(const Key('market-phone-status-time')).first,
             )
             .data,
-        contains(marketTimeLabel(transitionMinute + 1)),
+        // 한 타이머 틱(현실 1초)은 기본 배속에서 게임 5분이다.
+        contains(marketTimeLabel(transitionMinute + 5)),
       );
       expect(
         rowPrice(bestBidKey),
@@ -4219,7 +4230,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('open market advances one game minute after one real second', (
+  testWidgets('open market advances five game minutes after one real second', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
@@ -4246,12 +4257,13 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
     expect(tester.widget<Text>(clock.first).data, contains('09:00'));
     await tester.pump(const Duration(milliseconds: 500));
-    expect(tester.widget<Text>(clock.first).data, contains('09:01'));
+    // 기본 배속은 현실 1초당 게임 5분이다.
+    expect(tester.widget<Text>(clock.first).data, contains('09:05'));
 
     await openMarketExplore(tester);
     await tester.tap(find.byKey(const Key('stock-row-1001')));
     await tester.pumpAndSettle();
-    expect(find.textContaining('현실 1초마다 게임 1분 진행'), findsNothing);
+    expect(find.textContaining('현실 1초마다 게임 5분 진행'), findsNothing);
     final detailPrice = find.byKey(const Key('stock-detail-price'));
     expect(detailPrice, findsOneWidget);
     final clockBeforeTick = tester
@@ -4259,7 +4271,7 @@ void main() {
         .data;
     await tester.tap(find.byKey(const Key('stock-detail-tab-chart')));
     await tester.pump();
-    expect(find.textContaining('1분봉'), findsWidgets);
+    expect(find.textContaining('5분봉'), findsWidgets);
     await tester.pump(const Duration(seconds: 1));
     final clockAfterTick = tester
         .widget<Text>(find.byKey(const Key('market-phone-status-time')))
@@ -4302,7 +4314,7 @@ void main() {
     await tester.tap(find.byKey(const Key('market-speed-3x')));
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
-    expect(displayedMinute(), pausedAt + 3);
+    expect(displayedMinute(), pausedAt + 15);
 
     await tester.tap(find.byKey(const Key('market-speed-pause')));
     await tester.pump();
@@ -4313,7 +4325,7 @@ void main() {
     await tester.tap(find.byKey(const Key('market-speed-10x')));
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
-    expect(displayedMinute(), pausedAgainAt + 10);
+    expect(displayedMinute(), pausedAgainAt + 50);
 
     await openMarketExplore(tester);
     await tester.tap(find.byKey(const Key('stock-row-1001')));
@@ -4598,8 +4610,11 @@ void main() {
     ) {
       if (!isMarketTradingDay(date)) continue;
       for (final event in fictionalMarketEventsForDate(seed, date)) {
+        // 속보 모달은 breakingNewsModalMinImpact 이상인 사건만 띄운다.
+        // 그 미만은 티커로만 나가므로 이 테스트가 기다리는 모달이 열리지 않는다.
         if (event.companyId == fictionalWholeMarketCompanyId &&
-            event.revealMinute > marketDayStartMinute) {
+            event.revealMinute > marketDayStartMinute &&
+            event.impactPct.abs() >= breakingNewsModalMinImpact) {
           eventDate = date;
           watchedEvent = event;
           break;
@@ -4733,12 +4748,12 @@ void main() {
       synchronizedMinutes,
       orderedEquals(synchronizedMinutes.toList()..sort()),
     );
-    // 10x는 현실 1초당 게임 10분이므로 1초 동안 09:00 → 09:10까지만 진행한다.
+    // 10x는 현실 1초당 게임 50분이므로 1초 동안 09:00 → 09:50까지만 진행한다.
     expect(
       synchronizedMinutes,
-      everyElement(inInclusiveRange(krxOpenMinute + 1, krxOpenMinute + 10)),
+      everyElement(inInclusiveRange(krxOpenMinute + 1, krxOpenMinute + 50)),
     );
-    expect(tester.widget<Text>(clock.first).data, contains('09:10'));
+    expect(tester.widget<Text>(clock.first).data, contains('09:50'));
     expect(tester.widget<Text>(clock.first).data, isNot(before));
     expect(find.text('내 지정가 주문이 체결되어 시장 시간을 일시정지했어요.'), findsNothing);
     expect(find.byKey(const Key('order-book-pending-count')), findsNothing);
@@ -4754,22 +4769,23 @@ void main() {
       );
     }
 
-    // 둘째 1초도 같은 10분/초로 이어져 09:10 → 09:20이 된다.
+    // 둘째 1초도 같은 50분/초로 이어져 09:50 → 10:40이 된다.
     await tester.pump(const Duration(seconds: 1));
     for (var attempt = 0; attempt < 20; attempt++) {
       await tester.pump();
-      if (tester.widget<Text>(clock.first).data?.contains('09:20') ?? false) {
+      if (tester.widget<Text>(clock.first).data?.contains('10:40') ?? false) {
         break;
       }
     }
-    expect(tester.widget<Text>(clock.first).data, contains('09:20'));
+    expect(tester.widget<Text>(clock.first).data, contains('10:40'));
     expect(
       synchronizedMinutes,
       orderedEquals(synchronizedMinutes.toList()..sort()),
     );
+    // 50분/초로 두 번(현실 2초) 진행했으므로 09:00 → 10:40 = +100분 범위 안이다.
     expect(
       synchronizedMinutes,
-      everyElement(inInclusiveRange(krxOpenMinute + 1, krxOpenMinute + 20)),
+      everyElement(inInclusiveRange(krxOpenMinute + 1, krxOpenMinute + 100)),
     );
     expect(tester.takeException(), isNull);
   });
@@ -5007,9 +5023,10 @@ void main() {
     expect(find.text('개장전'), findsOneWidget);
     await tester.tap(find.byKey(const Key('stock-detail-tab-chart')));
     await tester.pump();
+    // 기본 5분봉 · 360분 창 → 70개 캔들.
     expect(
       tester.widget<Text>(find.byKey(const Key('chart-window-label'))).data,
-      allOf(contains('90개 캔들'), contains('전 거래일 포함')),
+      allOf(contains('5분봉'), contains('70개 캔들'), contains('전 거래일 포함')),
     );
     expect(find.textContaining('전일 '), findsWidgets);
     expect(find.text('개장 전 08:00'), findsOneWidget);
@@ -5055,9 +5072,10 @@ void main() {
     await tester.pump();
 
     expect(find.byKey(const Key('minute-candle-chart')), findsOneWidget);
+    // 기본 5분봉 · 360분 창 → 70개 캔들.
     expect(
       tester.widget<Text>(find.byKey(const Key('chart-window-label'))).data,
-      allOf(contains('90개 캔들'), contains('전 거래일 포함')),
+      allOf(contains('5분봉'), contains('70개 캔들'), contains('전 거래일 포함')),
     );
     expect(find.textContaining('전일 '), findsWidgets);
     expect(find.text('개장 전 08:00'), findsOneWidget);

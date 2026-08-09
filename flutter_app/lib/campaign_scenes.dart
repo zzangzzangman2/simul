@@ -3718,6 +3718,52 @@ class NewsBulletinSheet extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 14),
+            // 어느 종목 얘긴지 먼저 보여준다. companyName은 이벤트에 이미 있는데
+            // 제목 문장 안에만 묻혀 있어서 한눈에 안 들어왔다.
+            // 전체시장 사건은 종목이 없으므로 업종(=전체시장) 라벨만 쓴다.
+            Row(
+              children: [
+                Flexible(
+                  child: Text(
+                    event.companyId == fictionalWholeMarketCompanyId
+                        ? event.sector
+                        : event.companyName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: _ink,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -0.3,
+                    ),
+                  ),
+                ),
+                if (event.companyId != fictionalWholeMarketCompanyId) ...[
+                  const SizedBox(width: 6),
+                  Text(
+                    event.sector,
+                    style: const TextStyle(
+                      color: Color(0xFF7B849A),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+                const Spacer(),
+                Text(
+                  '${event.impactPct >= 0 ? '+' : ''}'
+                  '${(event.impactPct * 100).toStringAsFixed(2)}%',
+                  style: TextStyle(
+                    color: event.impactPct >= 0
+                        ? const Color(0xFFD03A3A)
+                        : const Color(0xFF1A62D6),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
             Text(
               event.title,
               style: const TextStyle(

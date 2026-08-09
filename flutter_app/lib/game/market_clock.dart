@@ -28,8 +28,13 @@ int marketLiquidityDayKey(DateTime date) =>
     ).difference(DateTime(2000, 1, 1)).inDays +
     1;
 
-/// 주식시장 화면의 기본 배속은 현실 1초마다 게임 시각 1분이다.
-/// 화면 배속은 이 주기를 유지한 채 한 번에 1·3·10분을 순차 처리한다.
+/// 주식시장 화면의 기본 배속은 현실 1초마다 게임 시각 5분이다.
+/// 화면 배속은 이 주기를 유지한 채 한 번에 5·15·50분을 순차 처리한다.
+///
+/// 내부 계산은 배속과 무관하게 항상 [marketTickMinutes](1분) 단위로 돈다.
+/// 분당 가격은 결정론적 `sessionPath[tick]`에서 읽고 루프는 [krxCloseTick]에서
+/// 멈추므로, 배속을 바꿔도 일봉 목표 종가와 분봉 값은 달라지지 않는다.
+/// 밸런스 계약이므로 바꿀 때 `BALANCE_NOTES.md`를 같은 변경에서 갱신한다.
 const marketRealtimeTickDuration = Duration(seconds: 1);
 
 const decisionActionMinutes = 30;

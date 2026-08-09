@@ -2408,6 +2408,77 @@ class _OrderSheetState extends State<_OrderSheet> {
     ),
   );
 
+  /// 주문 가능 수량의 몇 %로 수량을 채우는 단축 버튼.
+  ///
+  /// 기준은 [_maxQuantity]다. 매수면 예수금·일일 유동성 한도가, 매도면 보유
+  /// 수량에서 이미 예약된 몫을 뺀 값이 반영돼 있으므로 "가진 금액의 몇 %"가
+  /// 그대로 계산된다. 100%는 영웅문의 `가능` 버튼과 같다.
+  /// 신용·미수는 이 게임에 없으므로 현금 기준 하나만 둔다.
+  void _applyQuantityPercent(int percent) {
+    final maxQuantity = _maxQuantity;
+    if (maxQuantity < 1) return;
+    final target = percent >= 100
+        ? maxQuantity.floorToDouble()
+        : (maxQuantity * percent / 100).floorToDouble();
+    setState(() => _quantity = math.max(1, target));
+  }
+
+  Widget _quantityPercentRow() {
+    const percents = <int>[10, 20, 50, 100];
+    final maxQuantity = _maxQuantity;
+    return SizedBox(
+      height: 30,
+      child: Row(
+        children: [
+          for (var i = 0; i < percents.length; i += 1) ...[
+            if (i > 0) const SizedBox(width: 4),
+            Expanded(
+              child: Builder(
+                builder: (_) {
+                  final percent = percents[i];
+                  final target = percent >= 100
+                      ? maxQuantity.floorToDouble()
+                      : (maxQuantity * percent / 100).floorToDouble();
+                  final enabled = target >= 1;
+                  return Material(
+                    color: const Color(0xFFF4F6F8),
+                    borderRadius: BorderRadius.circular(8),
+                    child: InkWell(
+                      key: Key('order-quantity-percent-$percent'),
+                      borderRadius: BorderRadius.circular(8),
+                      onTap: enabled
+                          ? () => _applyQuantityPercent(percent)
+                          : null,
+                      child: Container(
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: const Color(0xFFE1E5EA),
+                          ),
+                        ),
+                        child: Text(
+                          percent >= 100 ? '가능' : '$percent%',
+                          maxLines: 1,
+                          style: TextStyle(
+                            color: enabled ? _marketInk : _marketMuted,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w900,
+                            fontFeatures: _marketNumberFeatures,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _compactSummaryRow(String label, int value, {bool strong = false}) =>
       Padding(
         padding: const EdgeInsets.symmetric(vertical: 2),
@@ -2632,6 +2703,8 @@ class _OrderSheetState extends State<_OrderSheet> {
               ],
             ),
           ),
+          const SizedBox(height: 5),
+          _quantityPercentRow(),
           SizedBox(
             height: 29,
             child: Row(
@@ -2979,6 +3052,8 @@ class _OrderSheetState extends State<_OrderSheet> {
                         ),
                       ],
                     ),
+                    const SizedBox(height: 8),
+                    _quantityPercentRow(),
                     const SizedBox(height: 8),
                     Row(
                       children: [

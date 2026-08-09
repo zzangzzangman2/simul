@@ -1180,11 +1180,21 @@ class _MarketPhoneStatusBar extends StatelessWidget {
   );
 }
 
+/// 속보 모달로 장을 끊는 최소 사건 강도.
+///
+/// 모달은 재생을 멈추고 화면을 덮으므로 실제로 값이 움직이는 사건에만 쓴다.
+/// 사건 강도는 단계별로 0.4% / 1.2% / 5.5% / 3.2%다(`fictional_market.dart`).
+/// 이 기준 미만은 상단 티커로 알리므로 놓치는 정보는 없다.
+const breakingNewsModalMinImpact = 0.015;
+
+/// 화면 배속. 실제 주기는 [marketRealtimeTickDuration](현실 1초)으로 고정이고,
+/// 이 값만큼의 게임 분을 한 번에 순차 처리한다. 내부 계산은 항상 1분 단위이며
+/// 가격은 결정론적 `sessionPath`에서 읽으므로, 배속을 바꿔도 분봉·종가는 같다.
 enum _MarketPlaybackSpeed {
   paused(minutesPerSecond: 0, orderBookAnimationRate: 0, label: '정지'),
-  normal(minutesPerSecond: 1, orderBookAnimationRate: 1, label: '1분'),
-  triple(minutesPerSecond: 3, orderBookAnimationRate: 3, label: '3분'),
-  tenfold(minutesPerSecond: 10, orderBookAnimationRate: 10, label: '10분');
+  normal(minutesPerSecond: 5, orderBookAnimationRate: 1, label: '5분'),
+  triple(minutesPerSecond: 15, orderBookAnimationRate: 3, label: '15분'),
+  tenfold(minutesPerSecond: 50, orderBookAnimationRate: 10, label: '50분');
 
   const _MarketPlaybackSpeed({
     required this.minutesPerSecond,
@@ -1193,6 +1203,11 @@ enum _MarketPlaybackSpeed {
   });
 
   final int minutesPerSecond;
+
+  /// 호가 재생 속도. 의도적으로 [minutesPerSecond]와 다르다(1·3·10).
+  /// `stock_market_order_workspace.dart`가 스윕 간격을 이 값으로 나누는데(36ms 하한),
+  /// 배속과 같이 올리면 하한에 걸려 체결 프레임이 뭉개진다. 시계는 5배로 가더라도
+  /// 호가 재생은 눈으로 따라갈 수 있는 속도를 유지한다.
   final int orderBookAnimationRate;
   final String label;
 }
@@ -1393,9 +1408,9 @@ class _MarketPlaybackBar extends StatelessWidget {
 
   String _tooltipFor(_MarketPlaybackSpeed value) => switch (value) {
     _MarketPlaybackSpeed.paused => '시장 시간 일시정지',
-    _MarketPlaybackSpeed.normal => '현실 1초에 게임 1분',
-    _MarketPlaybackSpeed.triple => '현실 1초에 게임 3분',
-    _MarketPlaybackSpeed.tenfold => '현실 1초에 게임 10분',
+    _MarketPlaybackSpeed.normal => '현실 1초에 게임 5분',
+    _MarketPlaybackSpeed.triple => '현실 1초에 게임 15분',
+    _MarketPlaybackSpeed.tenfold => '현실 1초에 게임 50분',
   };
 
   @override
@@ -2472,11 +2487,14 @@ class _StockMarketScreenState extends State<StockMarketScreen>
       ..._state.positions.map((position) => position.assetId),
       ?_openedAssetId,
     };
+    // 예전에는 전체시장 사건이면 크기와 무관하게 모달이라 0.4%짜리 예고 단계까지
+    // 장을 끊었다. "속보라며 멈췄는데 주가는 1%도 안 움직인다"가 여기서 나왔다.
     final modalEvents = events
         .where(
           (event) =>
-              event.companyId == fictionalWholeMarketCompanyId ||
-              watchedAssetIds.contains(event.companyId),
+              event.impactPct.abs() >= breakingNewsModalMinImpact &&
+              (event.companyId == fictionalWholeMarketCompanyId ||
+                  watchedAssetIds.contains(event.companyId)),
         )
         .toList(growable: false);
     final tickerEvents = events
@@ -10578,7 +10596,11 @@ class _MinuteChartPanel extends StatefulWidget {
 
 class _MinuteChartPanelState extends State<_MinuteChartPanel> {
   static const intervals = <int>[1, 3, 5, 10, 15, 30, 60, 120, 240];
-  int interval = 1;
+
+  // 기본 배속이 현실 1초당 게임 5분이므로 기본 분봉도 5분봉이다.
+  // 1분봉으로 두면 1초에 캔들 5개가 지나가 눈으로 따라갈 수 없다.
+  // (1분봉 선택지는 그대로 남겨 정지·수동 진행에서 쓸 수 있게 한다.)
+  int interval = 5;
 
   static const minuteWindows = <int, int>{
     1: 90,

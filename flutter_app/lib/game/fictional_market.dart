@@ -2768,9 +2768,13 @@ FictionalMarketUniverse buildFictionalMarketUniverse(
       final dayOrdinal = date.difference(DateTime(2000, 1, 1)).inDays;
       final events = fictionalMarketEventsForDate(seed, date);
       final corpusSample = _fictionalCorpusDailySampleForDate(seed, date);
-      final corpusLargeReturn = corpusSample.largeReturn * 0.34;
+      // 실제 시장 코퍼스(2000~2026 6,545거래일)의 지수 일간수익률을 그대로 쓴다.
+      // 이전에는 x0.34 + ±2.6% 클램프로 눌러, 실제로 |5%| 넘는 날이 1.4% 있는데도
+      // 게임 시장 전체는 단 하루도 3%를 못 넘었다(=큰 장이 구조적으로 불가능).
+      // 클램프는 극단 꼬리만 자르는 안전장치로 남긴다.
+      final corpusLargeReturn = corpusSample.largeReturn * 1.00;
       final macro =
-          corpusLargeReturn.clamp(-0.026, 0.026) +
+          corpusLargeReturn.clamp(-0.060, 0.060) +
           _fictionalFastSigned(macroNoiseSeed, dayOrdinal) * 0.0045 +
           _fictionalFastSigned(regimeNoiseSeed, dayOrdinal ~/ 90) * 0.0014;
       var wholeMarketEventImpact = 0.0;
@@ -2827,7 +2831,7 @@ FictionalMarketUniverse buildFictionalMarketUniverse(
             (company.market == fictionalGrowthMarket
                 ? corpusSample.growthReturn
                 : corpusSample.largeReturn) *
-            0.12;
+            0.70;
         final corpusRange = company.market == fictionalGrowthMarket
             ? corpusSample.growthRange
             : corpusSample.largeRange;
